@@ -12,48 +12,33 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ALL_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "collapse_shape.mlir",
+        "concat.mlir",
+        "expand_shape.mlir",
+        "extract_slice.mlir",
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "tensor_cast.mlir",
+        "tensor_insert_slice.mlir",
+        "unpack.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "collapse_shape.mlir",
-            "concat.mlir",
-            "expand_shape.mlir",
-            "extract_slice.mlir",
-            "pack.mlir",
-            "pack_dynamic_inner_tiles.mlir",
-            "pack_i8.mlir",
-            "tensor_cast.mlir",
-            "tensor_insert_slice.mlir",
-            "unpack.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [],
-    ),
+    srcs = ALL_SRCS,
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "collapse_shape.mlir",
-            "concat.mlir",
-            "expand_shape.mlir",
-            "extract_slice.mlir",
-            "pack.mlir",
-            "pack_dynamic_inner_tiles.mlir",
-            "pack_i8.mlir",
-            "tensor_cast.mlir",
-            "tensor_insert_slice.mlir",
-            "unpack.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [],
-    ),
+    srcs = ALL_SRCS,
     driver = "local-task",
     target_backend = "vmvx",
 )
@@ -79,26 +64,27 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
+LLVM_GPU_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "collapse_shape.mlir",
+        "concat.mlir",
+        "expand_shape.mlir",
+        "extract_slice.mlir",
+        "pack.mlir",
+        "tensor_cast.mlir",
+        "tensor_insert_slice.mlir",
+        "unpack.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "pack_dynamic_inner_tiles.mlir",
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "collapse_shape.mlir",
-            "concat.mlir",
-            "expand_shape.mlir",
-            "extract_slice.mlir",
-            "pack.mlir",
-            "tensor_insert_slice.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "pack_dynamic_inner_tiles.mlir",
-            "pack_i8.mlir",
-            "tensor_cast.mlir",
-            "unpack.mlir",
-        ],
-    ),
+    srcs = LLVM_GPU_SRCS,
     driver = "cuda",
     tags = [
         "noasan",
@@ -111,25 +97,40 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_rocm_hip",
+    srcs = LLVM_GPU_SRCS,
+    driver = "hip",
+    target_backend = "rocm",
+)
+
+SPIRV_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "collapse_shape.mlir",
+        "concat.mlir",
+        "expand_shape.mlir",
+        "extract_slice.mlir",
+        "tensor_cast.mlir",
+        "tensor_insert_slice.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "pack.mlir",
+        "pack_dynamic_inner_tiles.mlir",
+        "unpack.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_metal-spirv_metal",
+    srcs = SPIRV_SRCS,
+    driver = "metal",
+    target_backend = "metal-spirv",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "collapse_shape.mlir",
-            "concat.mlir",
-            "expand_shape.mlir",
-            "extract_slice.mlir",
-            "tensor_cast.mlir",
-            "tensor_insert_slice.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "pack.mlir",
-            "pack_dynamic_inner_tiles.mlir",
-            "pack_i8.mlir",
-            "unpack.mlir",
-        ],
-    ),
+    srcs = SPIRV_SRCS,
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

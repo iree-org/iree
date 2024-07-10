@@ -20,7 +20,6 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
-    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -40,7 +39,6 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
-    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -75,7 +73,9 @@ iree_check_single_backend_test_suite(
     "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
+    "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -86,6 +86,40 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip
+  SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
+    "extract_slice.mlir"
+    "pack.mlir"
+    "tensor_cast.mlir"
+    "tensor_insert_slice.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_metal
+  SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
+    "extract_slice.mlir"
+    "tensor_cast.mlir"
+    "tensor_insert_slice.mlir"
+  TARGET_BACKEND
+    "metal-spirv"
+  DRIVER
+    "metal"
 )
 
 iree_check_single_backend_test_suite(

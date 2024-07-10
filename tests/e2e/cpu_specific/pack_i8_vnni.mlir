@@ -1,3 +1,5 @@
+// These i8 pack ops are seen in CPU codegen with AVX-512 Vector Neural Network Instructions (VNNI).
+
 func.func private @generate_2D_source(%height : index, %width : index) -> tensor<?x?xi8> {
   %init_source = tensor.empty(%height, %width) : tensor<?x?xi8>
   %source = linalg.generic {
