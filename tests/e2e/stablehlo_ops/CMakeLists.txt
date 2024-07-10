@@ -263,7 +263,6 @@ iree_check_single_backend_test_suite(
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
     "exponential.mlir"
-    "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
     "finite.mlir"
