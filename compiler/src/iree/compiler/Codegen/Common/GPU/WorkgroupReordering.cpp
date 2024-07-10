@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -130,6 +131,7 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
 // chiplet groups (Function: chipletAwareWorkgroupReordering).
 // Step 2: Implement 'super-grouping' of workgroups before switching to the next
 // column.
+// Returns the permutated workgroup IDs (along X and Y dimension).
 static std::pair<Value, Value>
 makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
                       Value workgroupIdY, Value workgroupCountX,
@@ -360,17 +362,9 @@ struct ReorderWorkgroupsPass final
     });
 
     uint32_t numXCDs = 1;
-    if (IREE::HAL::ExecutableTargetAttr targetAttr =
-            IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
-      if (DictionaryAttr config = targetAttr.getConfiguration()) {
-        if (IREE::GPU::TargetAttr attr =
-                config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target")) {
-          IREE::GPU::TargetChipAttr chipAttr = attr.getChip();
-          if (chipAttr)
-            numXCDs = chipAttr.getChipletCount();
-        }
-      }
-    }
+    if (IREE::GPU::TargetAttr attr = getGPUTargetAttr(funcOp))
+      if (IREE::GPU::TargetChipAttr chipAttr = attr.getChip())
+        numXCDs = chipAttr.getChipletCount();
 
     LLVM_DEBUG(llvm::dbgs() << "Number of XCDs = " << numXCDs << "\n");
     if (numXCDs == 1 &&

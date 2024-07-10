@@ -282,7 +282,7 @@ def IREEGPU_WorkGroupReorderAttr: AttrDef<IREEGPU_Dialect, "WorkgroupReorderOpti
 
   let parameters = (ins
     OptionalParameter<"::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupEnum">:$reorder_option,
-    OptionalParameter<"std::optional<int64_t>", "the tile size to use">:$tileSize
+    OptionalParameter<"std::optional<int64_t>", "the tile size to use in log2">:$log_tile_size
   );
 
   let assemblyFormat = "`<` struct(params) `>`";

@@ -96,7 +96,7 @@ getPipelineOptions(FunctionOpInterface funcOp,
         IREE::GPU::WorkgroupReorderOptionsAttr ReorderOption =
             llvm::dyn_cast<IREE::GPU::WorkgroupReorderOptionsAttr>(
                 reorderWorkgroupOption);
-        pipelineOptions.reorderWgLogTileSize = ReorderOption.getTileSize();
+        pipelineOptions.reorderWgLogTileSize = ReorderOption.getLogTileSize();
         switch (ReorderOption.getReorderOption()) {
         case IREE::GPU::ReorderWorkgroupEnum::none:
           pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::None;
