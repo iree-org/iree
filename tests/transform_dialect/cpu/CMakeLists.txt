@@ -18,9 +18,7 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    iree-benchmark-module
     iree-compile
-    iree-opt
     iree-run-module
   DATA
     transform_library.mlir
