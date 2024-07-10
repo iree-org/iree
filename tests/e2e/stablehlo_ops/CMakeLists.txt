@@ -87,6 +87,85 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_llvm-cpu-host_local-task
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "householder.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
+    "--iree-llvmcpu-target-cpu-features=host"
+  INPUT_TYPE
+    "stablehlo"
+  LABELS
+    "hostonly"
+    "local"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vmvx_local-task
   SRCS
     "abs.mlir"
@@ -185,79 +264,6 @@ iree_check_single_backend_test_suite(
     "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
-    "finite.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "householder.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "philox.mlir"
-    "pow.mlir"
-    "reduce.mlir"
-    "reduce_window.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "rng_normal.mlir"
-    "rng_uniform.mlir"
-    "round.mlir"
-    "rsqrt.mlir"
-    "scatter.mlir"
-    "scatter_dynamic.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sort.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "three_fry.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-demote-f64-to-f32"
-  INPUT_TYPE
-    "stablehlo"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu-host_local-task
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "bitcast_convert.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "complex.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_bf16.mlir"
-    "dot_general.mlir"
-    "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
-    "exponential.mlir"
-    "exponential_fp16.mlir"
-    "exponential_minus_one.mlir"
     "fft.mlir"
     "finite.mlir"
     "floor.mlir"
@@ -296,17 +302,13 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "llvm-cpu"
+    "vulkan-spirv"
   DRIVER
-    "local-task"
+    "vulkan"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-    "--iree-llvmcpu-target-cpu-features=host"
   INPUT_TYPE
     "stablehlo"
-  LABELS
-    "hostonly"
-    "local"
 )
 
 iree_check_single_backend_test_suite(
@@ -476,6 +478,153 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip_stream
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "householder.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+  INPUT_TYPE
+    "stablehlo"
+  RUNNER_ARGS
+    "--hip_use_streams=true"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_meta-spirv_metal
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "householder.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "metal-spirv"
+  DRIVER
+    "metal"
+  INPUT_TYPE
+    "stablehlo"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 iree_check_single_backend_test_suite(
@@ -553,79 +702,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_metal-spirv_metal
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "bitcast_convert.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "complex.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_bf16.mlir"
-    "dot_general.mlir"
-    "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
-    "exponential.mlir"
-    "exponential_fp16.mlir"
-    "exponential_minus_one.mlir"
-    "fft.mlir"
-    "finite.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "philox.mlir"
-    "pow.mlir"
-    "reduce.mlir"
-    # "reduce_window.mlir"  # TODO(15012): fix test crash
-    "remainder.mlir"
-    "reshape.mlir"
-    "reverse.mlir"
-    "rng_normal.mlir"
-    "rng_uniform.mlir"
-    "round.mlir"
-    "rsqrt.mlir"
-    "scatter.mlir"
-    "scatter_dynamic.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sort.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "three_fry.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "metal-spirv"
-  DRIVER
-    "metal"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
-)
-
-
-iree_check_single_backend_test_suite(
-  NAME
     check_rocm-rocm
   SRCS
     "abs.mlir"
@@ -696,95 +772,3 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
 )
-
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
-
-unset(IREE_HIP_TEST_COMPILER_FLAGS)
-list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_hip_stream
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "bitcast_convert.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "complex.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_bf16.mlir"
-    "dot_general.mlir"
-    "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
-    "exponential.mlir"
-    "exponential_fp16.mlir"
-    "exponential_minus_one.mlir"
-    "fft.mlir"
-    "finite.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "householder.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "philox.mlir"
-    "pow.mlir"
-    "reduce.mlir"
-    "reduce_window.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "reverse.mlir"
-    "rng_normal.mlir"
-    "rng_uniform.mlir"
-    "round.mlir"
-    "rsqrt.mlir"
-    "scatter.mlir"
-    "scatter_dynamic.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sort.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "three_fry.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-    ${IREE_HIP_TEST_COMPILER_FLAGS}
-  INPUT_TYPE
-    "stablehlo"
-  RUNNER_ARGS
-    "--hip_use_streams=true"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-amd"
-)
-
-endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
