@@ -596,6 +596,11 @@ TEST_F(LoopTest, WaitOneBlocking) {
   // Spin up the thread to signal the event after a short delay.
   // We need to do this before we issue the wait so that loops which perform the
   // wait inline can still make forward progress even if they block.
+  //
+  // Note: there is a race here that can cause flakes. If this new thread
+  // starts running after the iree_loop_wait_* timeout below, the status check
+  // will fail. We make the timeout there sufficiently long to give the OS
+  // enough time to switch threads a few times.
   std::thread thread([&]() {
     IREE_TRACE_SCOPE();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -768,6 +773,11 @@ TEST_F(LoopTest, WaitAnyBlocking) {
   // Spin up the thread to signal the event after a short delay.
   // We need to do this before we issue the wait so that loops which perform the
   // wait inline can still make forward progress even if they block.
+  //
+  // Note: there is a race here that can cause flakes. If this new thread
+  // starts running after the iree_loop_wait_* timeout below, the status check
+  // will fail. We make the timeout there sufficiently long to give the OS
+  // enough time to switch threads a few times.
   std::thread thread([&]() {
     IREE_TRACE_SCOPE();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -783,7 +793,7 @@ TEST_F(LoopTest, WaitAnyBlocking) {
   } user_data;
   IREE_ASSERT_OK(iree_loop_wait_any(
       loop, IREE_ARRAYSIZE(wait_sources), wait_sources,
-      iree_make_timeout_ms(200),
+      iree_make_timeout_ms(2000),
       +[](void* user_data_ptr, iree_loop_t loop, iree_status_t status) {
         IREE_TRACE_SCOPE();
         IREE_EXPECT_OK(status);
@@ -941,6 +951,11 @@ TEST_F(LoopTest, WaitAllBlocking) {
   // Spin up the thread to signal the event after a short delay.
   // We need to do this before we issue the wait so that loops which perform the
   // wait inline can still make forward progress even if they block.
+  //
+  // Note: there is a race here that can cause flakes. If this new thread
+  // starts running after the iree_loop_wait_* timeout below, the status check
+  // will fail. We make the timeout there sufficiently long to give the OS
+  // enough time to switch threads a few times.
   std::thread thread([&]() {
     IREE_TRACE_SCOPE();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -956,7 +971,7 @@ TEST_F(LoopTest, WaitAllBlocking) {
   } user_data;
   IREE_ASSERT_OK(iree_loop_wait_all(
       loop, IREE_ARRAYSIZE(wait_sources), wait_sources,
-      iree_make_timeout_ms(200),
+      iree_make_timeout_ms(2000),
       +[](void* user_data_ptr, iree_loop_t loop, iree_status_t status) {
         IREE_TRACE_SCOPE();
         IREE_EXPECT_OK(status);
