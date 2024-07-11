@@ -45,8 +45,9 @@ struct CanonicalizerPass
   }
   void runOnOperation() override {
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
-    if (this->testConvergence && failed(applyPatternsAndFoldGreedily(
-                                     getOperation(), *patterns, config))) {
+    LogicalResult didConverge =
+        applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
+    if (this->testConvergence && failed(didConverge)) {
       getOperation()->emitError("Canonicalizer failed to converge");
       return signalPassFailure();
     }
