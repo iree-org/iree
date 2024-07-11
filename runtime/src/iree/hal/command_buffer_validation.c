@@ -123,15 +123,16 @@ static iree_status_t iree_hal_command_buffer_validate_binding_requirements(
   // it are in range.
   if (requirements.max_byte_offset > 0) {
     iree_device_size_t end = binding.offset + requirements.max_byte_offset;
-    if (IREE_UNLIKELY(end > binding.length)) {
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "at least one command attempted to access an "
-                              "address outside of the valid bound buffer "
-                              "range (length=%" PRIdsz ", end(inc)=%" PRIdsz
-                              ", binding offset=%" PRIdsz
-                              ", binding length=%" PRIdsz ")",
-                              requirements.max_byte_offset, end - 1,
-                              binding.offset, binding.length);
+    if (IREE_UNLIKELY(end > binding.offset + binding.length)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "at least one command attempted to access an "
+          "address outside of the valid bound buffer "
+          "range (length=%" PRIdsz ", end(inc)=%" PRIdsz
+          ", binding offset=%" PRIdsz ", binding length=%" PRIdsz
+          ", binding end(inc)=%" PRIdsz ")",
+          requirements.max_byte_offset, end - 1, binding.offset, binding.length,
+          binding.offset + binding.length - 1);
     }
   }
 
@@ -188,8 +189,11 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_requirements(
   table_requirements->type |= requirements.type;
   table_requirements->max_byte_offset = iree_max(
       table_requirements->max_byte_offset, requirements.max_byte_offset);
-  table_requirements->min_byte_alignment = iree_device_size_lcm(
-      table_requirements->min_byte_alignment, requirements.min_byte_alignment);
+  if (requirements.min_byte_alignment) {
+    table_requirements->min_byte_alignment =
+        iree_device_size_lcm(table_requirements->min_byte_alignment,
+                             requirements.min_byte_alignment);
+  }
 
   return iree_ok_status();
 }
@@ -430,14 +434,19 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
   // Check for overlap - just like memcpy we don't handle that.
   // Note that it's only undefined behavior if violated so we are ok if tricky
   // situations (subspans of subspans of binding table subranges etc) make it
-  // through.
-  if (iree_hal_buffer_test_overlap(source_ref.buffer, source_ref.offset,
-                                   source_ref.length, target_ref.buffer,
-                                   target_ref.offset, target_ref.length) !=
-      IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "source and target ranges overlap within the same buffer");
+  // through. This is only possible if both buffers are directly referenced -
+  // we _could_ try to catch this for indirect references by stashing the
+  // overlap check metadata for validation when the binding table is available
+  // but that's too costly to be worth it.
+  if (source_ref.buffer && target_ref.buffer) {
+    if (iree_hal_buffer_test_overlap(source_ref.buffer, source_ref.offset,
+                                     source_ref.length, target_ref.buffer,
+                                     target_ref.offset, target_ref.length) !=
+        IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "source and target ranges overlap within the same buffer");
+    }
   }
 
   return iree_ok_status();
@@ -571,10 +580,11 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
   // TODO(benvanik): validate set index.
 
   // TODO(benvanik): use pipeline layout to derive usage and access bits.
+  // For now we conservatively say _any_ access may be performed (read/write).
   iree_hal_buffer_binding_requirements_t requirements = {
       .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      // .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_...,
-      // .access = IREE_HAL_MEMORY_ACCESS_...,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
+      .access = IREE_HAL_MEMORY_ACCESS_ANY,
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
   };
   for (iree_host_size_t i = 0; i < binding_count; ++i) {

@@ -17,15 +17,14 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
+
 using namespace std::chrono_literals;
 
-class semaphore_test : public CTSTestBase<> {};
+class SemaphoreTest : public CTSTestBase<> {};
 
 // Tests that a semaphore that is unused properly cleans itself up.
-TEST_F(semaphore_test, NoOp) {
+TEST_F(SemaphoreTest, NoOp) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 123ull, &semaphore));
 
@@ -37,7 +36,7 @@ TEST_F(semaphore_test, NoOp) {
 }
 
 // Tests that a semaphore will accept new values as it is signaled.
-TEST_F(semaphore_test, NormalSignaling) {
+TEST_F(SemaphoreTest, NormalSignaling) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -59,7 +58,7 @@ TEST_F(semaphore_test, NormalSignaling) {
 // while others may accept the new, decreasing, values.
 
 // Tests semaphore failure handling.
-TEST_F(semaphore_test, Failure) {
+TEST_F(SemaphoreTest, Failure) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -80,7 +79,7 @@ TEST_F(semaphore_test, Failure) {
 }
 
 // Tests waiting on no semaphores.
-TEST_F(semaphore_test, EmptyWait) {
+TEST_F(SemaphoreTest, EmptyWait) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ANY, iree_hal_semaphore_list_empty(),
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
@@ -97,7 +96,7 @@ TEST_F(semaphore_test, EmptyWait) {
 }
 
 // Tests waiting on a semaphore that has already been signaled.
-TEST_F(semaphore_test, WaitAlreadySignaled) {
+TEST_F(SemaphoreTest, WaitAlreadySignaled) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -116,7 +115,7 @@ TEST_F(semaphore_test, WaitAlreadySignaled) {
 }
 
 // Tests waiting on a semaphore that has not been signaled.
-TEST_F(semaphore_test, WaitUnsignaled) {
+TEST_F(SemaphoreTest, WaitUnsignaled) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -130,7 +129,7 @@ TEST_F(semaphore_test, WaitUnsignaled) {
 }
 
 // Tests waiting on a semaphore that has signals past the desired value.
-TEST_F(semaphore_test, WaitLaterSignaledBeyond) {
+TEST_F(SemaphoreTest, WaitLaterSignaledBeyond) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -152,7 +151,7 @@ TEST_F(semaphore_test, WaitLaterSignaledBeyond) {
 // return UnknownError while others may succeed.
 
 // Tests IREE_HAL_WAIT_MODE_ALL when not all are signaled.
-TEST_F(semaphore_test, WaitAllButNotAllSignaled) {
+TEST_F(SemaphoreTest, WaitAllButNotAllSignaled) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -177,7 +176,7 @@ TEST_F(semaphore_test, WaitAllButNotAllSignaled) {
 }
 
 // Tests IREE_HAL_WAIT_MODE_ALL when all are signaled.
-TEST_F(semaphore_test, WaitAllAndAllSignaled) {
+TEST_F(SemaphoreTest, WaitAllAndAllSignaled) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_a));
@@ -202,7 +201,7 @@ TEST_F(semaphore_test, WaitAllAndAllSignaled) {
 }
 
 // Tests IREE_HAL_WAIT_MODE_ANY.
-TEST_F(semaphore_test, WaitAnyAlreadySignaled) {
+TEST_F(SemaphoreTest, WaitAnyAlreadySignaled) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -223,7 +222,7 @@ TEST_F(semaphore_test, WaitAnyAlreadySignaled) {
   iree_hal_semaphore_release(semaphore_b);
 }
 
-TEST_F(semaphore_test, WaitAnyLaterSignaled) {
+TEST_F(SemaphoreTest, WaitAnyLaterSignaled) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -253,7 +252,7 @@ TEST_F(semaphore_test, WaitAnyLaterSignaled) {
 
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
-TEST_F(semaphore_test, PingPong) {
+TEST_F(SemaphoreTest, PingPong) {
   iree_hal_semaphore_t* a2b = NULL;
   iree_hal_semaphore_t* b2a = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &a2b));
@@ -278,7 +277,7 @@ TEST_F(semaphore_test, PingPong) {
 }
 
 // Waiting the same value multiple times.
-TEST_F(semaphore_test, WaitOnTheSameValueMultipleTimes) {
+TEST_F(SemaphoreTest, WaitOnTheSameValueMultipleTimes) {
   iree_hal_semaphore_t* semaphore = CreateSemaphore();
   std::thread thread(
       [&]() { IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 1)); });
@@ -297,7 +296,7 @@ TEST_F(semaphore_test, WaitOnTheSameValueMultipleTimes) {
 }
 
 // Waiting for a finite amount of time.
-TEST_F(semaphore_test, WaitForFiniteTime) {
+TEST_F(SemaphoreTest, WaitForFiniteTime) {
   auto generic_test_fn = [this](auto wait_fn) {
     iree_hal_semaphore_t* semaphore = this->CreateSemaphore();
 
@@ -341,7 +340,7 @@ TEST_F(semaphore_test, WaitForFiniteTime) {
 }
 
 // Wait on all semaphores on multiple places simultaneously.
-TEST_F(semaphore_test, SimultaneousMultiWaitAll) {
+TEST_F(SemaphoreTest, SimultaneousMultiWaitAll) {
   iree_hal_semaphore_t* semaphore1 = this->CreateSemaphore();
   iree_hal_semaphore_t* semaphore2 = this->CreateSemaphore();
 
@@ -378,8 +377,6 @@ TEST_F(semaphore_test, SimultaneousMultiWaitAll) {
   iree_hal_semaphore_release(semaphore2);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_SEMAPHORE_TEST_H_
