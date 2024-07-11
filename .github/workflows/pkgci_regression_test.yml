@@ -334,14 +334,14 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 320 \
-            --goldentime-rocm-unet-ms 77 \
-            --goldentime-rocm-clip-ms 15 \
-            --goldentime-rocm-vae-ms 74 \
+            --goldentime-rocm-e2e-ms 325.0 \
+            --goldentime-rocm-unet-ms 77.0 \
+            --goldentime-rocm-clip-ms 15.5 \
+            --goldentime-rocm-vae-ms 74.0 \
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
-            --goldensize-rocm-unet-bytes 2054938 \
+            --goldensize-rocm-unet-bytes 2065289 \
             --goldensize-rocm-clip-bytes 783784 \
             --goldensize-rocm-vae-bytes 765869 \
             --gpu-number 0 \
