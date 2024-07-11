@@ -4286,7 +4286,7 @@ also supports permuting the tiled loops.</p>
 <p><em>Attention operator</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
-              `ins` `(` $inputs `:` type($inputs) `)`
+              `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
               `outs` `(` $outputs `:` type($outputs) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
@@ -4304,17 +4304,16 @@ where L != N).</p>
 <p>This operator after tiling results in a tiled result as per
 FlashAttention 2 and optionally results in the current <code>max</code> and <code>sum</code>
 statistics while processing the current tile.</p>
-<p>If transpose_v is speciifed, the V tensor passed as input is assumed to
-be transposed:</p>
+<p>With indexing_maps we can also infer when variables are transposed.
+for example, if V has indexing_map of (m, k1, k2, n) -&gt; (n, k2) instead
+of (m, k1, k2, n) -&gt; (k2, n), then we'd know that V is transposed (V.T),
+and we can expect computation to look like:</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T</p>
-<p>TODO: We should be moving to using a indexing map like approach so we
-can generalize which tensor is transposed and which is not.</p>
-<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>transpose_v</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
+<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>AffineMap array attribute</td></tr>
 </table>
 
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
@@ -4327,8 +4326,20 @@ can generalize which tensor is transposed and which is not.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of any type</td>
+<td style="text-align: center;"><code>query</code></td>
+<td>shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>key</code></td>
+<td>shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>scale</code></td>
+<td>floating-point</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
