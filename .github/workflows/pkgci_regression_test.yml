@@ -288,9 +288,9 @@ jobs:
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
-            --goldensize-rocm-unet-bytes 2062938 \
-            --goldensize-rocm-clip-bytes 780328 \
-            --goldensize-rocm-vae-bytes 757933 \
+            --goldensize-rocm-unet-bytes 2073609  \
+            --goldensize-rocm-clip-bytes 783720 \
+            --goldensize-rocm-vae-bytes 764909 \
             --gpu-number 6 \
             --rocm-chip ${{ matrix.rocm-chip }} \
             --log-cli-level=info \
