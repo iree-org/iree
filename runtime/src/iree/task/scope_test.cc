@@ -182,6 +182,8 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Spin up a thread to wait on the scope.
   std::thread wait_thread([&]() {
+    // Note: if the thread takes longer to start than the sleep below, this
+    // will fail with a flake :(
     EXPECT_FALSE(iree_task_scope_is_idle(&scope));
     EXPECT_TRUE(iree_status_is_ok(
         iree_task_scope_wait_idle(&scope, IREE_TIME_INFINITE_FUTURE)));
@@ -190,7 +192,7 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
   // Complete the task.
   iree_task_submission_t pending_submission;
@@ -222,6 +224,8 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Spin up a thread to wait on the scope.
   std::thread wait_thread([&]() {
+    // Note: if the thread takes longer to start than the sleep below, this
+    // will fail with a flake :(
     EXPECT_FALSE(iree_task_scope_is_idle(&scope));
     EXPECT_TRUE(iree_status_is_ok(
         iree_task_scope_wait_idle(&scope, IREE_TIME_INFINITE_FUTURE)));
@@ -230,7 +234,7 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
   // Set the failure state.
   iree_task_scope_fail(
