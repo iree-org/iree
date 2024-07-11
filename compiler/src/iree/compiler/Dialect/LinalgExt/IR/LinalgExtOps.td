@@ -554,6 +554,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
+  let hasFolder = 1;
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{

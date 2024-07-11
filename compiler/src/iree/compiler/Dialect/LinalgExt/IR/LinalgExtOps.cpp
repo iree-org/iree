@@ -1341,6 +1341,10 @@ LogicalResult AttentionOp::verify() {
   return success();
 }
 
+LogicalResult AttentionOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
 LogicalResult AttentionOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
