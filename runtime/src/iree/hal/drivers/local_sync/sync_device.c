@@ -398,11 +398,27 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
   // Stack allocate storage for an inline command buffer we'll use to replay
   // the deferred command buffers. We want to reset it between each apply so
   // that we don't get state carrying across.
-  iree_host_size_t storage_size = iree_hal_inline_command_buffer_size(
-      IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED,
-      /*binding_capacity=*/0);
+  iree_host_size_t max_storage_size = 0;
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    iree_hal_buffer_binding_table_t binding_table =
+        binding_tables ? binding_tables[i]
+                       : iree_hal_buffer_binding_table_empty();
+    max_storage_size = iree_max(
+        max_storage_size,
+        iree_hal_inline_command_buffer_size(
+            iree_hal_command_buffer_mode(command_buffer) |
+                IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
+                IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
+                // NOTE: we need to validate if a binding table is provided as
+                // the bindings were not known when it was originally recorded.
+                (iree_hal_buffer_binding_table_is_empty(binding_table)
+                     ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+                     : 0),
+            /*binding_capacity=*/0));
+  }
   iree_byte_span_t storage =
-      iree_make_byte_span(iree_alloca(storage_size), storage_size);
+      iree_make_byte_span(iree_alloca(max_storage_size), max_storage_size);
 
   // NOTE: we ignore any inline command buffers that may be passed in as they've
   // already executed during recording. The caller is probably in for a bad time
@@ -419,9 +435,15 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
       IREE_RETURN_IF_ERROR(iree_hal_inline_command_buffer_initialize(
           device->device_allocator,
           iree_hal_command_buffer_mode(command_buffer) |
+              IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
               IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
-              IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED,
-          IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+              // NOTE: we need to validate if a binding table is provided as the
+              // bindings were not known when it was originally recorded.
+              (iree_hal_buffer_binding_table_is_empty(binding_table)
+                   ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+                   : 0),
+          iree_hal_command_buffer_allowed_categories(command_buffer),
+          IREE_HAL_QUEUE_AFFINITY_ANY,
           /*binding_capacity=*/0, device->host_allocator, storage,
           &inline_command_buffer));
       iree_status_t status = iree_hal_deferred_command_buffer_apply(

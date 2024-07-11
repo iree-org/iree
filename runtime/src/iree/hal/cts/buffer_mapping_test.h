@@ -16,9 +16,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
 using ::testing::ContainerEq;
 
@@ -42,7 +40,7 @@ constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 //   * write with an offset and length
 //   * write into a subspan of a buffer
 
-class buffer_mapping_test : public CTSTestBase<> {
+class BufferMappingTest : public CTSTestBase<> {
  protected:
   void AllocateUninitializedBuffer(iree_device_size_t buffer_size,
                                    iree_hal_buffer_t** out_buffer) {
@@ -59,7 +57,7 @@ class buffer_mapping_test : public CTSTestBase<> {
   }
 };
 
-TEST_F(buffer_mapping_test, AllocatorSupportsBufferMapping) {
+TEST_F(BufferMappingTest, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
@@ -83,7 +81,7 @@ TEST_F(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, ZeroWholeBuffer) {
+TEST_F(BufferMappingTest, ZeroWholeBuffer) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -102,7 +100,7 @@ TEST_F(buffer_mapping_test, ZeroWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, ZeroWithOffset) {
+TEST_F(BufferMappingTest, ZeroWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -128,7 +126,7 @@ TEST_F(buffer_mapping_test, ZeroWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, ZeroSubspan) {
+TEST_F(BufferMappingTest, ZeroSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -171,7 +169,7 @@ TEST_F(buffer_mapping_test, ZeroSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, FillEmpty) {
+TEST_F(BufferMappingTest, FillEmpty) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -195,7 +193,7 @@ TEST_F(buffer_mapping_test, FillEmpty) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, FillWholeBuffer) {
+TEST_F(BufferMappingTest, FillWholeBuffer) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -217,7 +215,7 @@ TEST_F(buffer_mapping_test, FillWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, FillWithOffset) {
+TEST_F(BufferMappingTest, FillWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -244,7 +242,7 @@ TEST_F(buffer_mapping_test, FillWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, FillSubspan) {
+TEST_F(BufferMappingTest, FillSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -288,7 +286,7 @@ TEST_F(buffer_mapping_test, FillSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, ReadData) {
+TEST_F(BufferMappingTest, ReadData) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -325,7 +323,7 @@ TEST_F(buffer_mapping_test, ReadData) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, ReadDataSubspan) {
+TEST_F(BufferMappingTest, ReadDataSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -368,7 +366,7 @@ TEST_F(buffer_mapping_test, ReadDataSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, WriteDataWholeBuffer) {
+TEST_F(BufferMappingTest, WriteDataWholeBuffer) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -390,7 +388,7 @@ TEST_F(buffer_mapping_test, WriteDataWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, WriteDataWithOffset) {
+TEST_F(BufferMappingTest, WriteDataWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -417,7 +415,7 @@ TEST_F(buffer_mapping_test, WriteDataWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, WriteDataSubspan) {
+TEST_F(BufferMappingTest, WriteDataSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -459,7 +457,7 @@ TEST_F(buffer_mapping_test, WriteDataSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(buffer_mapping_test, CopyData) {
+TEST_F(BufferMappingTest, CopyData) {
   iree_hal_buffer_t* buffer_a = NULL;
   iree_hal_buffer_t* buffer_b = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_a);
@@ -490,7 +488,7 @@ TEST_F(buffer_mapping_test, CopyData) {
 
 // Maps a buffer range for reading from device -> host.
 // This is roughly what iree_hal_buffer_map_read does internally.
-TEST_F(buffer_mapping_test, MapRangeRead) {
+TEST_F(BufferMappingTest, MapRangeRead) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -520,7 +518,7 @@ TEST_F(buffer_mapping_test, MapRangeRead) {
 
 // Maps a buffer range for writing from host -> device.
 // This is roughly what iree_hal_buffer_map_write does internally.
-TEST_F(buffer_mapping_test, MapRangeWrite) {
+TEST_F(BufferMappingTest, MapRangeWrite) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -550,8 +548,6 @@ TEST_F(buffer_mapping_test, MapRangeWrite) {
   iree_hal_buffer_release(buffer);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_BUFFER_MAPPING_TEST_H_
