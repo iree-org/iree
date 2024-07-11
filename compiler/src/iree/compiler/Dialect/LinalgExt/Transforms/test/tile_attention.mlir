@@ -5,7 +5,11 @@
 func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>, %value: tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32> {
   %0 = tensor.empty() : tensor<1x1024x64xf32>
   %scale = arith.constant 0.05 : f32
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32>
   return %1 : tensor<1x1024x64xf32>
 }
 
@@ -54,7 +58,11 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value: tensor<?x?x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<?x?x?xf32> {
   %0 = tensor.empty(%dim0, %dim1, %dim2) : tensor<?x?x?xf32>
   %scale = arith.constant 0.05 : f32
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
 }
 
@@ -83,7 +91,8 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:          %[[K_S:.+]] = tensor.extract_slice %[[KEY]][0, %[[ARG6]], 0] [1, %[[DIM]], %[[DIM_0]]] [1, 1, 1]
 // CHECK:          %[[V_S:.+]] = tensor.extract_slice %[[VALUE]][0, %[[ARG6]], 0] [1, %[[DIM]], %[[DIM_0]]] [1, 1, 1]
 // CHECK:          %[[Q_S:.+]] = tensor.extract_slice %[[QUERY]][0, 0, 0] [1, %[[DIM]], %[[DIM_0]]] [1, 1, 1]
-// CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention ins(%[[Q_S]], %[[K_S]], %[[V_S]], %{{[a-z0-1]+}}
+// CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention
+// CHECK-SAME:                      ins(%[[Q_S]], %[[K_S]], %[[V_S]], %{{[a-z0-1]+}}
 // CHECK-SAME:                      outs(%[[ARG7]], %[[ARG8]], %[[ARG9]]
 // CHECK:          scf.yield %[[ATT]]#0, %[[ATT]]#1, %[[ATT]]#2
 // CHECK:        }
@@ -105,14 +114,19 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16> {
   %0 = tensor.empty() : tensor<1x1024x64xf16>
   %scale = arith.constant 0.05 : f16
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 
 // CHECK-LABEL:  @attention_f16
 
 // CHECK:        scf.for
-// CHECK:          iree_linalg_ext.attention ins(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}} : tensor<1024x64xf16>, tensor<1024x64xf16>, tensor<1024x64xf16>, f16
+// CHECK:          iree_linalg_ext.attention
+// CHECK-SAME:                                           ins(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}} : tensor<1024x64xf16>, tensor<1024x64xf16>, tensor<1024x64xf16>, f16
 // CHECK-SAME:                                           outs(%{{.*}}, %{{.*}}, %{{.*}} :
 // CHECK-SAME:                                           -> tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // CHECK:        scf.yield
@@ -129,13 +143,19 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
 
 // -----
 
+// transpose_V is detected through indexingMap.
+
 func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x64x1024xf16>) -> tensor<1x1024x64xf16> {
   %0 = tensor.empty() : tensor<1x1024x64xf16>
   %scale = arith.constant 0.05 : f16
-  %1 = iree_linalg_ext.attention {transpose_v = true} ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 // CHECK-LABEL:  func.func @attention_transpose_v
 // CHECK:          scf.for
-// CHECK:            iree_linalg_ext.attention {transpose_v = true}
+// CHECK:            iree_linalg_ext.attention
 // CHECK:          scf.yield
