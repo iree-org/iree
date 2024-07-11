@@ -100,7 +100,7 @@ void PackToIntrinsicsPass::runOnOperation() {
   linalg::ControlPropagationFn control = [](OpOperand *opOperand) -> bool {
     Operation *producer = opOperand->get().getDefiningOp();
     Operation *consumer = opOperand->getOwner();
-    return !getLoweringConfig(producer) || !getLoweringConfig(consumer);
+    return !getLoweringConfig(producer) && !getLoweringConfig(consumer);
   };
 
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
