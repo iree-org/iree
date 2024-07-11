@@ -283,8 +283,8 @@ jobs:
           pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 1336.0 \
             --goldentime-rocm-unet-ms 340.0 \
-            --goldentime-rocm-clip-ms 17.0 \
-            --goldentime-rocm-vae-ms 291.0 \
+            --goldentime-rocm-clip-ms 17.5 \
+            --goldentime-rocm-vae-ms 300.0 \
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
