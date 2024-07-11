@@ -1606,7 +1606,10 @@ module {
     %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
     %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
     %7 = tensor.empty() : tensor<20x4096x64xf16>
-    %8 = iree_linalg_ext.attention
+    %8 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
       ins(%4, %5, %6, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
       outs(%7 : tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>
     flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
@@ -1618,7 +1621,7 @@ module {
 //      CHECK: func.func @attention()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //     CHECK:   iree_linalg_ext.attention
-// CHECK-SAME:    {lowering_config = #[[CONFIG]]}
+// CHECK-SAME:    lowering_config = #[[CONFIG]]
 
 // -----
 

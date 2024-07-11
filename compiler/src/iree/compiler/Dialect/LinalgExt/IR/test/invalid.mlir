@@ -741,11 +741,15 @@ func.func @illegal_winograd_filter_kernel_dimensions(%arg0: tensor<3x3x64x128xf3
 
 // -----
 
-func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
+func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32> {
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 3 Got: 4}}
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                    ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
   return %1 : tensor<6x12x20x8xf32>
 }
 
@@ -757,7 +761,11 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
   %sum = tensor.empty() : tensor<8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 2 Got: 1}}
-  %1:3 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+  %1:3 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+                       affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0)>]}
+                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
   return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
 }
 
@@ -766,7 +774,11 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
 func.func @illegal_attention_inputs(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: f32) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
-  // expected-error @+1 {{expected Query, Key, Value inputs to be of shaped type}}
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+  // expected-error @+5 {{custom op 'iree_linalg_ext.attention' invalid kind of type specified}}
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                    ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
 }
