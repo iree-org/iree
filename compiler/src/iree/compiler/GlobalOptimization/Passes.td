@@ -105,10 +105,6 @@ def GeneralizeLinalgNamedOps :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics.";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createGeneralizeLinalgNamedOpsPass()";
-  let options = [
-    Option<"generalizeLinalgMatmulOps", "enable-generalize-linalg-matmul-ops", "bool",
-           /*default=*/"false", "Generalize linalg batch MatMul ops">,
-  ];
 }
 
 def InferNumericNarrowing :

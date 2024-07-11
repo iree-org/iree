@@ -86,7 +86,7 @@ createFuseSiluHorizontalMatmulPass();
 /// Generalizes some named Linalg ops into `linalg.generic` operations since the
 /// compiler can handle that better.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass(bool generalizeLinalgMatmulOps = false);
+createGeneralizeLinalgNamedOpsPass();
 
 /// Infers and inserts util.numeric.optional_narrow ops at points that may be
 /// beneficial.

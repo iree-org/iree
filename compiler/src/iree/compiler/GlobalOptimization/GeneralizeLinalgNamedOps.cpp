@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -24,10 +23,6 @@ namespace mlir::iree_compiler::GlobalOptimization {
 namespace {
 struct GeneralizeLinalgNamedOpsPass
     : public GeneralizeLinalgNamedOpsBase<GeneralizeLinalgNamedOpsPass> {
-
-  GeneralizeLinalgNamedOpsPass(bool generalizeLinalgMatmulOps) {
-    this->generalizeLinalgMatmulOps = generalizeLinalgMatmulOps;
-  }
 
   void runOnOperation() override;
 };
@@ -50,11 +45,6 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
             linalgOp.getOperation())) {
       namedOpCandidates.push_back(linalgOp);
     }
-    if (generalizeLinalgMatmulOps &&
-        isa_and_nonnull<linalg::BatchMatmulOp, linalg::BatchMatmulTransposeBOp>(
-            linalgOp)) {
-      namedOpCandidates.push_back(linalgOp);
-    }
   });
 
   IRRewriter rewriter(&getContext());
@@ -70,9 +60,8 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass(bool generalizeLinalgMatmulOps) {
-  return std::make_unique<GeneralizeLinalgNamedOpsPass>(
-      generalizeLinalgMatmulOps);
+createGeneralizeLinalgNamedOpsPass() {
+  return std::make_unique<GeneralizeLinalgNamedOpsPass>();
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization
