@@ -542,7 +542,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     statistics while processing the current tile.
 
     With indexing_maps we can also infer when variables are transposed.
-    for example, if V has indexing_map of (m, k1, k2, n) -> (n, k2) insted
+    for example, if V has indexing_map of (m, k1, k2, n) -> (n, k2) instead
     of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
     and we can expect computation to look like:
 
@@ -669,8 +669,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       return sumType->getRank();
     }
 
-    // Use indexing_map to infer if V is transposed.
-    bool getTransposeV() {
+    // Since we expect map_V to be (b, m, k1, k2, n) -> (b, k2, n), this function
+    // returns true if n is not the fastest dim.
+    bool isTransposeV() {
       AffineMap vMap = getValueMap();
       auto vFastDim = llvm::cast<AffineDimExpr>(vMap.getResults().back());
       int64_t nDim = vMap.getNumInputs() - 1;

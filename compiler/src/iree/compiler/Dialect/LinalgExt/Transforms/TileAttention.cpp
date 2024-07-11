@@ -297,7 +297,7 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
                                 headDimension, elementType, loc, rewriter);
   Value valueSlice =
       extractSlice(value, keyShape, ivs, keyValueTileLength, headDimension,
-                   elementType, loc, rewriter, attnOp.getTransposeV());
+                   elementType, loc, rewriter, attnOp.isTransposeV());
   Value querySlice = extractSlice(query, queryShape, {}, sequenceTileLength,
                                   headDimension, elementType, loc, rewriter);
 
@@ -305,7 +305,7 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   int64_t tiledInputRank = cast<ShapedType>(querySlice.getType()).getRank();
   SmallVector<AffineMap> tiledIndexingMaps = getTileAttentionIndexingMaps(
-      rewriter, tiledInputRank, attnOp.getTransposeV());
+      rewriter, tiledInputRank, attnOp.isTransposeV());
 
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
