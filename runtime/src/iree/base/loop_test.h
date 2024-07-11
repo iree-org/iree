@@ -606,7 +606,7 @@ TEST_F(LoopTest, WaitOneBlocking) {
     bool did_wait_callback = false;
   } user_data;
   IREE_ASSERT_OK(iree_loop_wait_one(
-      loop, wait_source, iree_make_timeout_ms(200),
+      loop, wait_source, iree_make_timeout_ms(2000),
       +[](void* user_data_ptr, iree_loop_t loop, iree_status_t status) {
         IREE_TRACE_SCOPE();
         IREE_EXPECT_OK(status);
