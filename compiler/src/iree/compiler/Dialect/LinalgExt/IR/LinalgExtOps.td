@@ -549,8 +549,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyShaped:$value,
                        AnyFloat:$scale,
                        Variadic<AnyShaped>:$outputs,
-                       AffineMapArrayAttr:$indexing_maps,
-                       DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
+                       AffineMapArrayAttr:$indexing_maps
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -662,6 +661,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       std::optional<ShapedType> sumType = getSumType();
       if (!sumType) return std::nullopt;
       return sumType->getRank();
+    }
+    bool getTransposeV() {
+      AffineMap vMap = getValueMap();
+      auto vFastDim = llvm::cast<AffineDimExpr>(vMap.getResults().back());
+      int64_t nDim = vMap.getNumInputs() - 1;
+      return nDim != vFastDim.getPosition();
     }
   }];
 }

@@ -143,19 +143,19 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
 
 // -----
 
+// transpose_V is detected through indexingMap.
+
 func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x64x1024xf16>) -> tensor<1x1024x64xf16> {
   %0 = tensor.empty() : tensor<1x1024x64xf16>
   %scale = arith.constant 0.05 : f16
   %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>], 
-                     transpose_v = true} 
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]} 
                      ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 // CHECK-LABEL:  func.func @attention_transpose_v
 // CHECK:          scf.for
 // CHECK:            iree_linalg_ext.attention
-// CHECK-SAME:        transpose_v = true
 // CHECK:          scf.yield

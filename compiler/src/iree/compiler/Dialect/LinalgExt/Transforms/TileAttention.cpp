@@ -313,9 +313,6 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
       SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum},
       rewriter.getAffineMapArrayAttr(tiledIndexingMaps));
 
-  if (attnOp.getTransposeV())
-    tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());
-
   Value tiledResult = tiledAttentionOp.getResult(0);
   Value newMax = tiledAttentionOp.getResult(1);
   Value newSum = tiledAttentionOp.getResult(2);
