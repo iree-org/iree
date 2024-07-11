@@ -98,14 +98,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  StringRef tilesizeStr = "<not set>";
-  if (options.reorderWgLogTileSize)
-    tilesizeStr = StringRef(
-        std::to_string((unsigned long)options.reorderWgLogTileSize.value()));
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", reorderWorkgroupsStrategy = " << reorderStr
-            << ", reorderWorkgroupsTileSize (log2) = " << tilesizeStr
+            << ", reorderWorkgroupsTileSize (log2) = "
+            << options.reorderWgLogTileSize
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
