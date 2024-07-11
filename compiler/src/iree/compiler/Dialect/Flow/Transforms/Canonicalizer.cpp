@@ -20,6 +20,8 @@ namespace {
 /// Canonicalize operations in nested regions.
 struct CanonicalizerPass
     : public impl::CanonicalizerPassBase<CanonicalizerPass> {
+  using IREE::Flow::impl::CanonicalizerPassBase<
+      CanonicalizerPass>::CanonicalizerPassBase;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {
@@ -43,7 +45,11 @@ struct CanonicalizerPass
   }
   void runOnOperation() override {
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
-    (void)applyPatternsAndFoldGreedily(getOperation(), *patterns, config);
+    if (this->testConvergence && failed(applyPatternsAndFoldGreedily(
+                                     getOperation(), *patterns, config))) {
+      getOperation()->emitError("Canonicalizer failed to converge");
+      return signalPassFailure();
+    }
   }
   GreedyRewriteConfig config;
   std::shared_ptr<const FrozenRewritePatternSet> patterns;

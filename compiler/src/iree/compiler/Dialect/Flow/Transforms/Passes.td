@@ -25,6 +25,10 @@ def BubbleUpExpandShapesPass :
 def CanonicalizerPass :
     Pass<"iree-flow-canonicalize", ""> {
   let summary = "Flow specific canonicalization pass";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
 }
 
 def CaptureDynamicDimsPass :
