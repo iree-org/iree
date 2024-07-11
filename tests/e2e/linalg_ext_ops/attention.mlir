@@ -11,7 +11,11 @@ func.func @attention1x3x4() {
                                             [0.5, 0.6, 0.7, 0.8],
                                             [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x3x4xf32>,
+  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<1x3x4xf32>,
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32) outs(%init : tensor<1x3x4xf32>) -> tensor<1x3x4xf32>
   check.expect_almost_eq_const(
       %1,
@@ -37,7 +41,11 @@ func.func @attention1x4x4() {
                                             [0.9, 1.0, 1.1, 1.2],
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x4x4xf32>,
+  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<1x4x4xf32>,
         tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32) outs(%init : tensor<1x4x4xf32>) -> tensor<1x4x4xf32>
   check.expect_almost_eq_const(
       %1,
@@ -79,7 +87,11 @@ func.func @attention3x3x4() {
                                             [-0.5962, -1.0055,  0.4285,  1.4761],
                                             [ 1.6103, -0.7040, -0.1853, -0.9962]]]> : tensor<3x3x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<3x3x4xf32>,
+  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<3x3x4xf32>,
         tensor<3x3x4xf32>, tensor<3x3x4xf32>, f32) outs(%init : tensor<3x3x4xf32>) -> tensor<3x3x4xf32>
   check.expect_almost_eq_const(
       %1,
