@@ -1311,11 +1311,9 @@ LogicalResult AttentionOp::verify() {
     return success();
   };
 
-  if (failed(checkShape("Query", getQuery().getType().getShape(),
-                        getQueryMap())) ||
-      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValue().getType().getShape(),
-                        getValueMap())) ||
+  if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
+      failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
       failed(
           checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
     return failure();

@@ -541,6 +541,11 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     FlashAttention 2 and optionally results in the current `max` and `sum`
     statistics while processing the current tile.
 
+    With indexing_maps we can also infer when variables are transposed.
+    for example, if V has indexing_map of (m, k1, k2, n) -> (n, k2) insted
+    of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
+    and we can expect computation to look like:
+
     attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
   }];
 
@@ -587,9 +592,26 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+    ShapedType getQueryType() {
+      return cast<ShapedType>(getQuery().getType());
+    }
+    ShapedType getKeyType() {
+      return cast<ShapedType>(getKey().getType());
+    }
+    ShapedType getValueType() {
+      return cast<ShapedType>(getValue().getType());
+    }
+    FloatType getScaleType() {
+      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
 
-    // TODO: Remove helper fns below once we move
-    //       to online_attn tile & decomp pipeline.
+    // Helper functions used for tile_and_decompose_attn.
+    // TODO: Remove once we completely move to
+    //       online_attn decompose pipeline.
+
     std::optional<AffineMap> getMaxMap() {
       if (getNumResults() < 2)
         return std::nullopt;
@@ -612,22 +634,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       if (getNumResults() < 3)
         return std::nullopt;
       return getDpsInitOperand(2)->get();
-    }
-
-    ShapedType getQueryType() {
-      return cast<ShapedType>(getQuery().getType());
-    }
-    ShapedType getKeyType() {
-      return cast<ShapedType>(getKey().getType());
-    }
-    ShapedType getValueType() {
-      return cast<ShapedType>(getValue().getType());
-    }
-    FloatType getScaleType() {
-      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
-    }
-    ShapedType getOutputType() {
-      return cast<ShapedType>(getOutput().getType());
     }
     std::optional<ShapedType> getMaxType() {
       std::optional<Value> maxVal = getMax();
@@ -662,6 +668,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       if (!sumType) return std::nullopt;
       return sumType->getRank();
     }
+
+    // Use indexing_map to infer if V is transposed.
     bool getTransposeV() {
       AffineMap vMap = getValueMap();
       auto vFastDim = llvm::cast<AffineDimExpr>(vMap.getResults().back());
