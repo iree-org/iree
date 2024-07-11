@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -39,6 +40,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/DialectResourceBlobManager.h"
@@ -118,6 +120,50 @@ private:
   }
 };
 
+// Set attributes on `funcOp` in order to use upstream's translation of
+// ROCDL dialect attributes to LLVM. Primarily this is `rocdl.kernel`
+// (sets the calling convention and workgroup size uniformity) but this will
+// also set both forms of workgroup size metadata from `exportOp` (if it is set)
+// and will set the waves_per_eq flag where relevant. Finally, it will mark
+// kernel arguments `inreg` to enable argument preloading on supported
+// architectures.
+static void annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
+                                         ExecutableExportOp exportOp,
+                                         ExecutableTargetAttr targetAttr,
+                                         OpBuilder &builder) {
+  auto *rocdlDialect =
+      funcOp.getContext()->getLoadedDialect<ROCDL::ROCDLDialect>();
+  UnitAttr unitAttr = builder.getUnitAttr();
+  rocdlDialect->getKernelAttrHelper().setAttr(funcOp, unitAttr);
+  std::optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
+  if (workgroupSizeAttr && workgroupSizeAttr->size() <= 3) {
+    std::array<int32_t, 3> wgSizes;
+    int32_t flatWgSize = 1;
+    for (auto [value, attr] : llvm::zip_equal(
+             wgSizes, workgroupSizeAttr->getAsRange<IntegerAttr>())) {
+      value = attr.getInt();
+      flatWgSize *= value;
+    }
+    rocdlDialect->getReqdWorkGroupSizeAttrHelper().setAttr(
+        funcOp, builder.getDenseI32ArrayAttr(wgSizes));
+    rocdlDialect->getFlatWorkGroupSizeAttrHelper().setAttr(
+        funcOp,
+        builder.getStringAttr(Twine(flatWgSize) + "," + Twine(flatWgSize)));
+  }
+
+  if (std::optional<IntegerAttr> attr =
+          getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
+    rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, *attr);
+  }
+
+  auto inRegAttrName =
+      builder.getStringAttr(LLVM::LLVMDialect::getInRegAttrName());
+  // Currently, `inreg` only enables argument preloading on gfx9,
+  // but it is harmless on other targets.
+  for (unsigned i = 0, e = funcOp.getNumArguments(); i < e; ++i)
+    funcOp.setArgAttr(i, inRegAttrName, unitAttr);
+}
+
 static void dumpModuleToPath(StringRef path, StringRef baseName,
                              StringRef suffix, StringRef extension,
                              llvm::Module &module) {
@@ -155,21 +201,6 @@ static std::string translateModuleToISA(llvm::Module &module,
   }
   return targetISA;
 }
-
-// Modified from lib/Target/AMDGPU/AMDGPUAttributor.cpp.
-// Adds argument hints to preload kernel arguments to SGPRs.
-// TODO: Query max number of user SGPRs from target machine.
-static void addPreloadKernArgHint(llvm::Function *F) {
-  static constexpr size_t maxSGPRs = 16;
-  for (size_t i = 0, e = std::min(F->arg_size(), maxSGPRs); i != e; ++i) {
-    llvm::Argument *Arg = F->getArg(i);
-    // Check for incompatible attributes.
-    if (Arg->hasByRefAttr() || Arg->hasNestAttr())
-      break;
-    Arg->addAttr(llvm::Attribute::InReg);
-  }
-}
-
 } // namespace
 
 class ROCMTargetDevice final : public TargetDevice {
@@ -249,6 +280,7 @@ public:
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
+    registry.insert<ROCDL::ROCDLDialect>();
   }
 
   void
@@ -380,7 +412,17 @@ public:
       // multi-threading issues.
       llvm::LLVMContext context;
 
-      auto llvmModule =
+      // Set up attributes so upstream's conversions work right.
+      for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
+        // Un-exported functions are library functions or otherwise
+        // not kernels, so don't need these annotations.
+        if (!exportOpMap.contains(func.getName()))
+          continue;
+        annotateKernelForTranslation(func, exportOpMap[func.getName()],
+                                     targetAttr, executableBuilder);
+      }
+
+      std::unique_ptr<llvm::Module> llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
       if (!llvmModule) {
         return variantOp.emitError() << "failed to translate the MLIR LLVM "
@@ -388,35 +430,9 @@ public:
       }
 
       for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-        int32_t flatWgSize = 1;
         llvm::Function *llvmFunc = llvmModule->getFunction(func.getName());
         if (llvmFunc->isDeclaration())
           continue;
-        auto exportOp = exportOpMap[func.getName()];
-        if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
-          for (Attribute attr : *workgroupSizeAttr) {
-            flatWgSize *= cast<IntegerAttr>(attr).getInt();
-          }
-        }
-
-        // For GPU kernels,
-        // 1. Insert AMDGPU_KERNEL calling convention.
-        // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
-        // 3. Insert amdgpu-implicitarg-num-bytes=56 (which must be set on
-        // OpenCL and HIP kernels per Clang).
-        llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
-        llvmFunc->addFnAttr(
-            "amdgpu-flat-work-group-size",
-            (llvm::Twine("1, ") + llvm::Twine(flatWgSize)).str());
-        if (targetArch.starts_with("gfx9"))
-          addPreloadKernArgHint(llvmFunc);
-
-        // Set the amdgpu-waves-per-eu flag from config if given.
-        if (std::optional<IntegerAttr> attr =
-                getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
-          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
-                              std::to_string(attr->getValue().getSExtValue()));
-        }
 
         // Override flags as given by target func attrs.
         if (auto funcAttrs =
