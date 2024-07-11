@@ -23,6 +23,10 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    clGeneralizeLinalgMatmulOps("enable-generalize-linalg-matmul-ops",
+                                llvm::cl::desc("Generalize linalg MatMul ops"),
+                                llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
     "iree-global-opt-enable-fuse-silu-horizontal-matmul",
     llvm::cl::desc(
@@ -122,7 +126,9 @@ void buildGlobalOptimizationPassPipeline(
       // dims as the unit dim folding pass updates indexing maps and is better
       // at working with generics. By this point we have already done any
       // specialized raising and the op names are no longer useful.
-      .addPass(createGeneralizeLinalgNamedOpsPass);
+      .addPass([&]() {
+        return createGeneralizeLinalgNamedOpsPass(clGeneralizeLinalgMatmulOps);
+      });
 
   mainPassManager.addPass(IREE::Flow::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
@@ -178,7 +184,9 @@ void buildGlobalOptimizationPassPipeline(
   }
   // Generalize transposes and any other remaining named linalg ops that can
   // now be represented as generics.
-  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
+  FunctionLikeNest(mainPassManager).addPass([&]() {
+    return createGeneralizeLinalgNamedOpsPass(clGeneralizeLinalgMatmulOps);
+  });
 
   // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
   FunctionLikeNest(mainPassManager)
