@@ -342,7 +342,7 @@ jobs:
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2065289 \
-            --goldensize-rocm-clip-bytes 783784 \
+            --goldensize-rocm-clip-bytes 783848 \
             --goldensize-rocm-vae-bytes 765869 \
             --gpu-number 0 \
             --rocm-chip gfx942 \
