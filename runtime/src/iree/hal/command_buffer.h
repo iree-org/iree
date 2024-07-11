@@ -451,6 +451,11 @@ iree_hal_buffer_binding_table_empty(void) {
   return table;
 }
 
+static inline bool iree_hal_buffer_binding_table_is_empty(
+    iree_hal_buffer_binding_table_t binding_table) {
+  return binding_table.count == 0;
+}
+
 // Returns an unretained buffer specified in |buffer_ref| or from
 // |binding_table| with the slot specified if indirect. If the caller needs to
 // preserve the buffer for longer than the (known) lifetime of the binding table

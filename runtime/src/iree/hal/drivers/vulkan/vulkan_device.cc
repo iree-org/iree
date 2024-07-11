@@ -1747,13 +1747,23 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
     iree_hal_command_buffer_t* command_buffer = command_buffers[i];
     if (iree_hal_deferred_command_buffer_isa(command_buffers[i])) {
       iree_hal_command_buffer_t* translated_command_buffer = NULL;
+      iree_hal_buffer_binding_table_t binding_table =
+          binding_tables ? binding_tables[i]
+                         : iree_hal_buffer_binding_table_empty();
       status = iree_hal_vulkan_device_create_command_buffer(
-          base_device, iree_hal_command_buffer_mode(command_buffer),
+          base_device,
+          iree_hal_command_buffer_mode(command_buffer) |
+              IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
+              // NOTE: we need to validate if a binding table is provided as the
+              // bindings were not known when it was originally recorded.
+              (iree_hal_buffer_binding_table_is_empty(binding_table)
+                   ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+                   : 0),
           iree_hal_command_buffer_allowed_categories(command_buffer),
           queue_affinity, /*binding_capacity=*/0, &translated_command_buffer);
       if (iree_status_is_ok(status)) {
         status = iree_hal_deferred_command_buffer_apply(
-            command_buffer, translated_command_buffer, binding_tables[i]);
+            command_buffer, translated_command_buffer, binding_table);
       }
       translated_command_buffers[i] = translated_command_buffer;
     } else {
@@ -1772,14 +1782,16 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
     status = queue->Submit(1, &batch);
   }
 
-  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-    iree_hal_command_buffer_release(translated_command_buffers[i]);
-  }
-
   // HACK: we don't track async resource lifetimes so we have to block.
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_wait(signal_semaphore_list,
                                           iree_infinite_timeout());
+  }
+
+  // TODO(indirect-cmd): when async these need to be retained until the
+  // submission completes.
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    iree_hal_command_buffer_release(translated_command_buffers[i]);
   }
 
   return status;

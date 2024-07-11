@@ -738,9 +738,14 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
+          iree_hal_command_buffer_mode(command_buffer) |
           IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
           IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
-          IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED;
+          // NOTE: we need to validate if a binding table is provided as the
+          // bindings were not known when it was originally recorded.
+          (iree_hal_buffer_binding_table_is_empty(binding_table)
+               ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+               : 0);
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_cuda_device_create_stream_command_buffer(
                   action->device, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
