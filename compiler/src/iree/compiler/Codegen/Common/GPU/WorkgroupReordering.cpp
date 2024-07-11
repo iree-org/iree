@@ -283,6 +283,8 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                         workgroupCntX, workgroupCntY, reorderWgTileSize);
   } else if (strategy == ReorderWorkgroupsStrategy::ChipletGroup) {
+    if (numXCDs <= 1)
+      return failure();
     std::tie(newWorkgroupIdX, newWorkgroupIdY) = makeChipletGroupedIds(
         funcOp.getLoc(), builder, workgroupIdX, workgroupIdY, workgroupCntX,
         workgroupCntY, reorderWgTileSize, numXCDs);
