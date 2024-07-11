@@ -40,6 +40,7 @@ struct iree_hal_hip_tracing_context_event_t {
   hipEvent_t event;
   iree_hal_hip_tracing_context_event_t* next_in_command_buffer;
   iree_hal_hip_tracing_context_event_t* next_submission;
+  bool was_submitted;
 };
 
 struct iree_hal_hip_tracing_context_t {
@@ -158,6 +159,7 @@ iree_status_t iree_hal_hip_tracing_context_allocate(
             &context->event_pool[i];
       }
       context->event_pool[i].next_submission = NULL;
+      context->event_pool[i].was_submitted = false;
       if (i + 1 == context->query_capacity) {
         context->event_pool[i].next_in_command_buffer = NULL;
       }
@@ -271,7 +273,7 @@ void iree_hal_hip_tracing_context_collect(
       event = event->next_in_command_buffer;
     }
     iree_hal_hip_tracing_context_event_t* next = events->next_submission;
-    events->next_submission = events;
+    events->was_submitted = true;
     events = next;
     context->submitted_event_list.head = events;
   }
@@ -321,7 +323,7 @@ void iree_hal_hip_tracing_free(
 
   // If this event list has never been submitted we still need to add values to
   // the timeline otherwise tracy will not behave correctly.
-  if (!event_list->head->next_submission) {
+  if (!event_list->head->was_submitted) {
     iree_hal_hip_tracing_context_event_t* event = event_list->head;
     while (event) {
       uint32_t query_id = (uint32_t)(event - &context->event_pool[0]);
@@ -336,12 +338,25 @@ void iree_hal_hip_tracing_free(
     return;
   }
   event_list->head->next_submission = NULL;
+  event_list->head->was_submitted = false;
   event_list->tail->next_in_command_buffer = context->event_freelist_head;
   context->event_freelist_head = event_list->head;
 
   event_list->head = NULL;
   event_list->tail = NULL;
   iree_slim_mutex_unlock(&context->event_mutex);
+}
+
+static uint16_t iree_hal_hip_tracing_context_event_list_append_event(
+  iree_hal_hip_tracing_context_event_list_t* event_list,
+  iree_hal_hip_tracing_context_event_t* event) {
+  if (!event_list->head) {
+    event_list->head = event;
+    event_list->tail = event;
+  } else {
+    event_list->tail->next_in_command_buffer = event;
+    event_list->tail = event;
+  }
 }
 
 // Grabs the next available query out of the freelist and adds it to
@@ -364,13 +379,7 @@ static uint16_t iree_hal_hip_stream_tracing_context_insert_query(
 
   IREE_HIP_IGNORE_ERROR(context->symbols, hipEventRecord(event->event, stream));
 
-  if (!event_list->head) {
-    event_list->head = event;
-    event_list->tail = event;
-  } else {
-    event_list->tail->next_in_command_buffer = event;
-    event_list->tail = event;
-  }
+  iree_hal_hip_tracing_context_event_list_append_event(event_list, event);
 
   iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
@@ -403,13 +412,8 @@ static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
                                  dependency_nodes_count, event->event));
   IREE_ASSERT(iree_status_is_ok(status));
 
-  if (!event_list->head) {
-    event_list->head = event;
-    event_list->tail = event;
-  } else {
-    event_list->tail->next_in_command_buffer = event;
-    event_list->tail = event;
-  }
+  iree_hal_hip_tracing_context_event_list_append_event(event_list, event);
+
   iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
 }
