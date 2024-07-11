@@ -272,8 +272,8 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 //===----------------------------------------------------------------------===//
 // Workgroup Reordering Attr
 
-def IREEGPU_WorkGroupReorderAttr: AttrDef<IREEGPU_Dialect, "WorkgroupReorderOptions">{
-  let mnemonic = "reorder_workgroups";
+def IREEGPU_WorkgroupReorderAttr: AttrDef<IREEGPU_Dialect, "WorkgroupReorderOptions">{
+  let mnemonic = "workgroup_reorder";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   string description = [{

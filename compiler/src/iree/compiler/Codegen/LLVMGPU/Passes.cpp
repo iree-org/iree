@@ -101,8 +101,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", reorderWorkgroupsStrategy = " << reorderStr
-            << ", reorderWorkgroupsTileSize (log2) = "
-            << options.reorderWgLogTileSize
+            << ", reorderWorkgroupsTileSize = " << options.reorderWgLogTileSize
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 

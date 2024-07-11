@@ -69,7 +69,7 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
   return {swizzledIdX, swizzledIdY};
 }
 
-// Reoredering to make workgroup ids move slowly between chiplet groups.
+// Reordering to make workgroup ids move slowly between chiplet groups.
 
 // Example:
 // Currently, the GPU launches workgroups in a round-robin fashion across
@@ -91,13 +91,25 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
 
 // Returns permuted workgroup id (linearized ID).
 // In the above example:
-// linearedId 0's permuted Id is still 0.
-// linearedId 1's permiuted Id is 4.
+// linearizedId 0's permuted Id is still 0.
+// linearizedId 1's permuted Id is 4.
 static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
                                              Value linearizedId,
                                              Value workgroupCountX,
                                              Value workgroupCountY,
                                              int64_t XCDParitionsOnGPU) {
+  // Given:
+  // Id = linearizedId
+  // x_dim = workgroupCountX
+  // y_dim = workgroupCountY
+  // xcd_count = XCDParitionsOnGPU
+
+  // The new workgroup ID is computed as follows:
+  // wgp_count = x_dim * y_dim
+  // reordered_id = (Id / xcd_count) + (Id % xcd_count) * (wgp_count /xcd_count)
+  // final_id = (Id >= (wgp_count - 1 - (wgp_count % xcd_count))) ? Id :
+  // reordered_id
+
   Value numChipletsVal =
       b.createOrFold<arith::ConstantIndexOp>(loc, XCDParitionsOnGPU);
   Value workgroupCount =
@@ -131,7 +143,7 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
 // chiplet groups (Function: chipletAwareWorkgroupReordering).
 // Step 2: Implement 'super-grouping' of workgroups before switching to the next
 // column.
-// Returns the permutated workgroup IDs (along X and Y dimension).
+// Returns the permuted workgroup IDs (along X and Y dimension).
 static std::pair<Value, Value>
 makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
                       Value workgroupIdY, Value workgroupCountX,
@@ -142,7 +154,7 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
       b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
   linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
 
-  assert(numXCDs > 1);
+  assert(numXCDs > 1 && "expected more than one XCD for chiplet reordering");
   // Map chiplets to perform a spatially local tile operation.
   // Reorder the linearized ID such that every consecutive group of chiplets
   // is the slowest-changing dimension in the grid.
@@ -362,9 +374,11 @@ struct ReorderWorkgroupsPass final
     });
 
     uint32_t numXCDs = 1;
-    if (IREE::GPU::TargetAttr attr = getGPUTargetAttr(funcOp))
-      if (IREE::GPU::TargetChipAttr chipAttr = attr.getChip())
+    if (IREE::GPU::TargetAttr attr = getGPUTargetAttr(funcOp)) {
+      if (IREE::GPU::TargetChipAttr chipAttr = attr.getChip()) {
         numXCDs = chipAttr.getChipletCount();
+      }
+    }
 
     LLVM_DEBUG(llvm::dbgs() << "Number of XCDs = " << numXCDs << "\n");
     if (numXCDs == 1 &&

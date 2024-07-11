@@ -26,7 +26,7 @@ namespace mlir::iree_compiler {
 /// attribute. These are used to override default pass heuristics at the
 /// function granularity.
 namespace LLVMGPUAttrNames {
-inline constexpr StringLiteral kReorderWorkgroups = "reorder_workgroups";
+inline constexpr StringLiteral kReorderWorkgroups = "workgroup_reorder";
 inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
     "no_reduce_shared_memory_bank_conflicts";
 } //  namespace LLVMGPUAttrNames
