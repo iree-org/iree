@@ -1,4 +1,4 @@
-# Copyright 2024 Advanced Micro Devices, Inc.
+# Copyright 2024 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -7,6 +7,7 @@
 import pytest
 from ireers_tools import *
 import os
+from conftest import VmfbManager
 
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
@@ -16,42 +17,42 @@ rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 sdxl_clip_inference_input_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
-    group="sdxl_clip_inference_input_0",
+    group="sdxl_clip",
 )
 
 sdxl_clip_inference_input_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
-    group="sdxl_clip_inference_input_1",
+    group="sdxl_clip",
 )
 
 sdxl_clip_inference_input_2 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
-    group="sdxl_clip_inference_input_2",
+    group="sdxl_clip",
 )
 
 sdxl_clip_inference_input_3 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
-    group="sdxl_clip_inference_input_3",
+    group="sdxl_clip",
 )
 
 sdxl_clip_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
-    group="sdxl_clip_inference_output_0",
+    group="sdxl_clip",
 )
 
 sdxl_clip_inference_output_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
-    group="sdxl_clip_inference_output_1",
+    group="sdxl_clip",
 )
 
 sdxl_clip_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
-    group="sdxl_clip_real_weights",
+    group="sdxl_clip",
 )
 
 sdxl_clip_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlirbc",
-    group="sdxl_clip_mlir",
+    group="sdxl_clip",
 )
 
 CPU_COMPILE_FLAGS = [
@@ -64,14 +65,23 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
-COMMON_RUN_FLAGS = [
-    f"--input=1x64xi64=@{sdxl_clip_inference_input_0.path}",
-    f"--input=1x64xi64=@{sdxl_clip_inference_input_1.path}",
-    f"--input=1x64xi64=@{sdxl_clip_inference_input_2.path}",
-    f"--input=1x64xi64=@{sdxl_clip_inference_input_3.path}",
-    f"--expected_output=2x64x2048xf16=@{sdxl_clip_inference_output_0.path}",
-    f"--expected_output=2x1280xf16=@{sdxl_clip_inference_output_1.path}",
-]
+@pytest.fixture
+def COMMON_RUN_FLAGS(
+    sdxl_clip_inference_input_0,
+    sdxl_clip_inference_input_1,
+    sdxl_clip_inference_input_2,
+    sdxl_clip_inference_input_3,
+    sdxl_clip_inference_output_0,
+    sdxl_clip_inference_output_1,
+):
+    return [
+        f"--input=1x64xi64=@{sdxl_clip_inference_input_0.path}",
+        f"--input=1x64xi64=@{sdxl_clip_inference_input_1.path}",
+        f"--input=1x64xi64=@{sdxl_clip_inference_input_2.path}",
+        f"--input=1x64xi64=@{sdxl_clip_inference_input_3.path}",
+        f"--expected_output=2x64x2048xf16=@{sdxl_clip_inference_output_0.path}",
+        f"--expected_output=2x1280xf16=@{sdxl_clip_inference_output_1.path}",
+    ]
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -96,17 +106,14 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
-cpu_vmfb = None
-
-
-def test_compile_clip_cpu():
-    cpu_vmfb = iree_compile(sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
+def test_compile_clip_cpu(sdxl_clip_mlir):
+    VmfbManager.cpu_vmfb = iree_compile(sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_cpu"])
-def test_run_clip_cpu():
+def test_run_clip_cpu(COMMON_RUN_FLAGS, sdxl_clip_real_weights):
     iree_run_module(
-        cpu_vmfb,
+        VmfbManager.cpu_vmfb,
         device="local-task",
         function="encode_prompts",
         args=[
@@ -121,17 +128,14 @@ def test_run_clip_cpu():
 # ROCM
 ###############################################################################
 
-rocm_vmfb = None
-
-
-def test_compile_clip_rocm():
-    rocm_vmfb = iree_compile(sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+def test_compile_clip_rocm(sdxl_clip_mlir):
+    VmfbManager.rocm_vmfb = iree_compile(sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_rocm"])
-def test_run_clip_rocm():
+def test_run_clip_rocm(COMMON_RUN_FLAGS, sdxl_clip_real_weights):
     return iree_run_module(
-        rocm_vmfb,
+        VmfbManager.rocm_vmfb,
         device="hip",
         function="encode_prompts",
         args=[

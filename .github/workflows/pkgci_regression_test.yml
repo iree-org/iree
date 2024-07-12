@@ -280,7 +280,7 @@ jobs:
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
+          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 1450.0 \
             --goldentime-rocm-unet-ms 370.0 \
             --goldentime-rocm-clip-ms 18.5 \
@@ -302,7 +302,7 @@ jobs:
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
+          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 325.0 \
             --goldentime-rocm-unet-ms 77.0 \
             --goldentime-rocm-clip-ms 15.5 \

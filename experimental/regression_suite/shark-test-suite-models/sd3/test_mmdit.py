@@ -1,4 +1,4 @@
-# Copyright 2024 Advanced Micro Devices, Inc.
+# Copyright 2024 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -8,6 +8,7 @@ import pytest
 from ireers_tools import *
 import os
 from pathlib import Path
+from conftest import VmfbManager
 
 iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
@@ -18,37 +19,37 @@ rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 sd3_mmdit_inference_input_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.0.bin",
-    group="sd3_clip_inference_input_0",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_inference_input_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.1.bin",
-    group="sd3_clip_inference_input_1",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_inference_input_2 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.2.bin",
-    group="sd3_mmdit_inference_input_2",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_inference_input_3 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.3.bin",
-    group="sd3_mmdit_inference_input_3",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_output.0.bin",
-    group="sd3_mmdit_inference_output_0",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/real_weights.irpa",
-    group="sd3_mmdit_real_weights",
+    group="sd3_mmdit",
 )
 
 sd3_mmdit_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/model.mlirbc",
-    group="sd3_mmdit_mlir",
+    group="sd3_mmdit",
 )
 
 CPU_COMPILE_FLAGS = [
@@ -61,13 +62,20 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
-COMMON_RUN_FLAGS = [
-    f"--input=2x16x128x128xf16=@{sd3_mmdit_inference_input_0.path}",
-    f"--input=2x154x4096xf16=@{sd3_mmdit_inference_input_1.path}",
-    f"--input=2x2048xf16=@{sd3_mmdit_inference_input_2.path}",
-    f"--input=2xf16=@{sd3_mmdit_inference_input_3.path}",
-    f"--expected_output=2x16x128x128xf32=@{sd3_mmdit_inference_output_0.path}",
-]
+def COMMON_RUN_FLAGS(
+    sd3_mmdit_inference_input_0,
+    sd3_mmdit_inference_input_1,
+    sd3_mmdit_inference_input_2,
+    sd3_mmdit_inference_input_3,
+    sd3_mmdit_inference_output_0,
+):
+    return [
+        f"--input=2x16x128x128xf16=@{sd3_mmdit_inference_input_0.path}",
+        f"--input=2x154x4096xf16=@{sd3_mmdit_inference_input_1.path}",
+        f"--input=2x2048xf16=@{sd3_mmdit_inference_input_2.path}",
+        f"--input=2xf16=@{sd3_mmdit_inference_input_3.path}",
+        f"--expected_output=2x16x128x128xf32=@{sd3_mmdit_inference_output_0.path}",
+    ]
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -93,22 +101,18 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
-cpu_vmfb = None
-
-
-def test_compile_mmdit_cpu():
-    cpu_vmfb = iree_compile(sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS)
+def test_compile_mmdit_cpu(sd3_mmdit_mlir):
+    VmfbManager.cpu_vmfb = iree_compile(sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.xfail(
-    raises=IreeRunException,
     strict=True,
     reason="Expected run to fail (remove xfail for test_run_mmdit_cpu)",
 )
 @pytest.mark.depends(on=["test_compile_mmdit_cpu"])
-def test_run_mmdit_cpu():
+def test_run_mmdit_cpu(COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
     return iree_run_module(
-        cpu_vmfb,
+        VmfbManager.cpu_vmfb,
         device="local-task",
         function="run_forward",
         args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
@@ -119,22 +123,18 @@ def test_run_mmdit_cpu():
 # ROCM
 ###############################################################################
 
-rocm_vmfb = None
-
-
 @pytest.mark.xfail(
-    raises=IreeCompileException,
     strict=True,
     reason="Expected compilation to fail (remove xfail for test_compile_mmdit_rocm)",
 )
-def test_compile_mmdit_rocm():
-    rocm_vmfb = iree_compile(sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+def test_compile_mmdit_rocm(sd3_mmdit_mlir):
+    VmfbManager.rocm_vmfb = iree_compile(sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_mmdit_rocm"])
-def test_run_mmdit_rocm():
+def test_run_mmdit_rocm(COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
     return iree_run_module(
-        rocm_vmfb,
+        VmfbManager.rocm_vmfb,
         device="hip",
         function="run_forward",
         args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,

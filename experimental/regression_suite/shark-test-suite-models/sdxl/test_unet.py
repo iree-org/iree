@@ -1,4 +1,4 @@
-# Copyright 2024 Advanced Micro Devices, Inc.
+# Copyright 2024 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -8,10 +8,10 @@ import pytest
 from ireers_tools import *
 import os
 import setuptools
+from conftest import VmfbManager
+from pathlib import Path
 
-repo_root = os.getenv("TEST_SUITE_REPO_ROOT")
-current_dir = repo_root + "/iree_special_models/sdxl/scheduled-unet"
-iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=current_dir)
+iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
@@ -20,42 +20,42 @@ rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 sdxl_unet_inference_input_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
-    group="sdxl_unet_inference_input_0",
+    group="sdxl_unet",
 )
 
 sdxl_unet_inference_input_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
-    group="sdxl_unet_inference_input_1",
+    group="sdxl_unet",
 )
 
 sdxl_unet_inference_input_2 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
-    group="sdxl_unet_inference_input_2",
+    group="sdxl_unet",
 )
 
 sdxl_unet_inference_input_3 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
-    group="sdxl_unet_inference_input_3",
+    group="sdxl_unet",
 )
 
 sdxl_unet_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
-    group="sdxl_unet_inference_output_0",
+    group="sdxl_unet",
 )
 
 sdxl_unet_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
-    group="sdxl_unet_real_weights",
+    group="sdxl_unet",
 )
 
 sdxl_unet_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlirbc",
-    group="sdxl_unet_mlir",
+    group="sdxl_unet",
 )
 
 sdxl_unet_pipeline_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
-    group="sdxl_unet_pipeline_mlir",
+    group="sdxl_unet",
 )
 
 CPU_COMPILE_FLAGS = [
@@ -68,13 +68,21 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
-COMMON_RUN_FLAGS = [
-    f"--input=1x4x128x128xf16=@{sdxl_unet_inference_input_0.path}",
-    f"--input=2x64x2048xf16=@{sdxl_unet_inference_input_1.path}",
-    f"--input=2x1280xf16=@{sdxl_unet_inference_input_2.path}",
-    f"--input=1xf16=@{sdxl_unet_inference_input_3.path}",
-    f"--expected_output=1x4x128x128xf16=@{sdxl_unet_inference_output_0.path}",
-]
+@pytest.fixture
+def COMMON_RUN_FLAGS(
+    sdxl_unet_inference_input_0,
+    sdxl_unet_inference_input_1,
+    sdxl_unet_inference_input_2,
+    sdxl_unet_inference_input_3,
+    sdxl_unet_inference_output_0
+):
+    return [
+        f"--input=1x4x128x128xf16=@{sdxl_unet_inference_input_0.path}",
+        f"--input=2x64x2048xf16=@{sdxl_unet_inference_input_1.path}",
+        f"--input=2x1280xf16=@{sdxl_unet_inference_input_2.path}",
+        f"--input=1xf16=@{sdxl_unet_inference_input_3.path}",
+        f"--expected_output=1x4x128x128xf16=@{sdxl_unet_inference_output_0.path}",
+    ]
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -109,31 +117,27 @@ ROCM_PIPELINE_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
-pipeline_cpu_vmfb = None
-cpu_vmfb = None
-
-
-def test_compile_unet_pipeline_cpu():
-    pipeline_cpu_vmfb = iree_compile(
+def test_compile_unet_pipeline_cpu(sdxl_unet_pipeline_mlir):
+    VmfbManager.cpu_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
         "cpu",
         CPU_COMPILE_FLAGS,
     )
 
 
-def test_compile_unet_cpu():
-    cpu_vmfb = iree_compile(sdxl_unet_mlir, "cpu", CPU_COMPILE_FLAGS)
+def test_compile_unet_cpu(sdxl_unet_mlir):
+    VmfbManager.cpu_vmfb = iree_compile(sdxl_unet_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_unet_pipeline_cpu", "test_compile_unet_cpu"])
-def test_run_unet_cpu():
+def test_run_unet_cpu(COMMON_RUN_FLAGS, sdxl_unet_real_weights):
     return iree_run_module(
-        cpu_vmfb,
+        VmfbManager.cpu_vmfb,
         device="local-task",
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={pipeline_cpu_vmfb.path}",
+            f"--module={VmfbManager.cpu_pipeline_vmfb.path}",
             "--expected_f16_threshold=0.8f",
         ]
         + COMMON_RUN_FLAGS,
@@ -144,31 +148,27 @@ def test_run_unet_cpu():
 # ROCM
 ###############################################################################
 
-pipeline_rocm_vmfb = None
-rocm_vmfb = None
-
-
-def test_compile_unet_pipeline_rocm():
-    pipeline_rocm_vmfb = iree_compile(
+def test_compile_unet_pipeline_rocm(sdxl_unet_pipeline_mlir):
+    VmfbManager.rocm_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
         f"rocm_{rocm_chip}",
         ROCM_PIPELINE_COMPILE_FLAGS,
     )
 
 
-def test_compile_unet_rocm():
-    rocm_vmfb = iree_compile(sdxl_unet_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+def test_compile_unet_rocm(sdxl_unet_mlir):
+    VmfbManager.rocm_vmfb = iree_compile(sdxl_unet_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_unet_pipeline_rocm", "test_compile_unet_rocm"])
-def test_run_unet_rocm():
+def test_run_unet_rocm(COMMON_RUN_FLAGS, sdxl_unet_real_weights):
     return iree_run_module(
-        rocm_vmfb,
+        VmfbManager.rocm_vmfb,
         device="hip",
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={pipeline_rocm_vmfb.path}",
+            f"--module={VmfbManager.rocm_pipeline_vmfb.path}",
             "--expected_f16_threshold=0.7f",
         ]
         + COMMON_RUN_FLAGS,
