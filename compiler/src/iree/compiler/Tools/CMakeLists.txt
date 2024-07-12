@@ -78,6 +78,8 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRArmNeonDialect
+    MLIRArmSVEDialect
+    MLIRArmSMEDialect
     MLIRArmNeon2dToIntr
     MLIRBufferizationDialect
     MLIRComplexDialect

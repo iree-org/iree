@@ -88,6 +88,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:ArmNeonDialect",
+        "@llvm-project//mlir:ArmSVEDialect",
+        "@llvm-project//mlir:ArmSMEDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:ControlFlowDialect",
