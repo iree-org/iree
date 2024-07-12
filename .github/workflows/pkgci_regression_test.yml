@@ -295,21 +295,6 @@ jobs:
       #       -rA -s -m "plat_host_cpu and presubmit" \
       #       experimental/regression_suite
 
-      # Out of tree tests
-      - name: Check out external TestSuite repository
-        uses: actions/checkout@v4.1.7
-        with:
-          repository: nod-ai/SHARK-TestSuite
-          ref: a06e730ce325c12db40bb89b43e8e6e897052e96
-          path: SHARK-TestSuite
-          submodules: false
-          lfs: true
-      - name: Install external TestSuite Python requirements
-        run: |
-          source ${VENV_DIR}/bin/activate
-          python3 -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
-          python3 -m pip install -r SHARK-TestSuite/iree_special_models/requirements.txt
-
       - name: "Running SDXL special model tests"
         if: "!cancelled()"
         run: |

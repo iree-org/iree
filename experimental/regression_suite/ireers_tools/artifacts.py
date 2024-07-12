@@ -215,6 +215,8 @@ class FetchedArtifact(ProducedArtifact):
     def _callback(self: "FetchedArtifact"):
         if "blob.core.windows.net" in self.url:
             self.download_azure_artifact()
+        else:
+            raise NotImplementedError(f"Unsupported fetched artifact URL schema for '{self.url}'")
 
 
 class StreamArtifact(Artifact):
