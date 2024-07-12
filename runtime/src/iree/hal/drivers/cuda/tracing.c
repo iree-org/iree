@@ -349,7 +349,7 @@ void iree_hal_cuda_tracing_free(
 }
 
 
-static uint16_t iree_hal_cuda_tracing_context_event_list_append_event(
+static void iree_hal_cuda_tracing_context_event_list_append_event(
   iree_hal_cuda_tracing_context_event_list_t* event_list,
   iree_hal_cuda_tracing_context_event_t* event) {
   if (!event_list->head) {
