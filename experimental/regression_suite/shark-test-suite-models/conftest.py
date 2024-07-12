@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+
 class VmfbManager:
     sdxl_clip_cpu_vmfb = None
     sdxl_vae_cpu_vmfb = None

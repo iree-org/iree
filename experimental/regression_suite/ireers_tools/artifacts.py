@@ -212,7 +212,8 @@ class FetchedArtifact(ProducedArtifact):
 
     @staticmethod
     def _callback(self: "FetchedArtifact"):
-        self.download_azure_artifact()
+        if "blob.core.windows.net" in self.url:
+            self.download_azure_artifact()
 
 
 class StreamArtifact(Artifact):
