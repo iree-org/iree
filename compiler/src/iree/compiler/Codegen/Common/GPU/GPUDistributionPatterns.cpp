@@ -163,32 +163,31 @@ struct DistributeElementwise final
 
 /// Given a projected permutation, get a reduced permutation, i.e. without
 /// the projected dimensions.
-static SmallVector<int64_t>
-getReducedPermutation(AffineMap permutationMap,
-                      llvm::SmallBitVector &unusedDims) {
+static SmallVector<int64_t> getReducedPermutation(AffineMap permutationMap) {
   assert(permutationMap.isProjectedPermutation() &&
          "permutation map should be a projected permutation.");
   // TODO: The permutation map may also have broadcasting. Currently, we do not
   // handle it. This can be fixed by adding a "BROADCAST" dimension in the
   // layout.
 
-  unusedDims.clear();
-  unusedDims.resize(permutationMap.getNumDims(), true);
-
-  for (AffineExpr dimExpr : permutationMap.getResults()) {
-    int64_t pos = cast<AffineDimExpr>(dimExpr).getPosition();
-    unusedDims[pos] = false;
-  }
-
   SmallVector<int64_t> permutation;
   permutation.reserve(permutationMap.getNumResults());
 
-  AffineMap reducedMap = compressUnusedDims(permutationMap);
-  for (AffineExpr dimExpr : reducedMap.getResults()) {
-    int64_t pos = cast<AffineDimExpr>(dimExpr).getPosition();
+  unsigned leadingUnitDims =
+      permutationMap.getNumDims() - permutationMap.getNumResults();
+  for (AffineExpr dim : permutationMap.getResults()) {
+    // Get this dim's position in the permutation map.
+    auto dimExpr = dyn_cast<AffineDimExpr>(dim);
+    if (!dimExpr) {
+      llvm::report_fatal_error("permutation map is not a projected "
+                               "permutation.");
+    }
+
+    unsigned pos = dimExpr.getPosition();
+    assert(pos >= leadingUnitDims && "invalid permutation map");
+    pos -= leadingUnitDims;
     permutation.push_back(pos);
   }
-
   return permutation;
 }
 
@@ -209,9 +208,8 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     // lowering. When accessing memory, we use the memoryLayout, because that
     // is how the data is accessed in memory. The data is stored in the vector
     // according to vectorLayout.
-    llvm::SmallBitVector unusedDims;
     SmallVector<int64_t> permutation =
-        getReducedPermutation(xferOp.getPermutationMap(), unusedDims);
+        getReducedPermutation(xferOp.getPermutationMap());
     LayoutAttr memoryLayout =
         cast<LayoutAttr>(vectorLayout.permute(permutation));
 
@@ -221,8 +219,8 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     LayoutIterator iterator(vectorLayout, steps);
 
     iterator.apply([&](const LayoutIterator::State &state) {
-      SmallVector<Value> memoryIndices = getMemoryIndices(
-          state, memoryLayout, xferOp.getIndices(), unusedDims, rewriter);
+      SmallVector<Value> memoryIndices =
+          getMemoryIndices(state, memoryLayout, xferOp.getIndices(), rewriter);
       SmallVector<int64_t> accIndices = state.computeSIMTIndex();
       accumulator = accessUnit(xferOp, memoryIndices, accIndices, accumulator,
                                vectorLayout, memoryLayout, rewriter);
@@ -234,22 +232,17 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
   SmallVector<Value> getMemoryIndices(const LayoutIterator::State &state,
                                       LayoutAttr memoryLayout,
                                       SmallVector<Value> indices,
-                                      llvm::SmallBitVector &projectedDims,
                                       RewriterBase &rewriter) const {
     SmallVector<Value> simdIndices =
         computeSIMDIndex(state, memoryLayout, laneId, rewriter);
     SmallVector<Value> memoryIndices(indices);
 
     // The memory layout has some projected leading dims that indices doesn't.
-    int currSimd = 0;
-    for (int i = 0, e = memoryIndices.size(); i < e; ++i) {
-      if (projectedDims[i]) {
-        continue;
-      }
-
+    int leadingProjectedDims = memoryIndices.size() - simdIndices.size();
+    for (int i = leadingProjectedDims, e = memoryIndices.size(); i < e; ++i) {
       memoryIndices[i] = rewriter.create<arith::AddIOp>(
-          rewriter.getUnknownLoc(), memoryIndices[i], simdIndices[currSimd]);
-      ++currSimd;
+          rewriter.getUnknownLoc(), memoryIndices[i],
+          simdIndices[i - leadingProjectedDims]);
     }
 
     return memoryIndices;
