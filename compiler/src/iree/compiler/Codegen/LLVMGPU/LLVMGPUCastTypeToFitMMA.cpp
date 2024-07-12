@@ -95,9 +95,12 @@ public:
       }
     }
 
+    // Import mma type from dispatch schedule attribute if present.
     if (scheduleAttr) {
       func.walk([&](vector::ContractionOp contract) {
-        contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+        if (!contract->hasAttr("iree.amdgpu.mma")) {
+          contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+        }
       });
     }
 
