@@ -541,7 +541,7 @@ module attributes { transform.with_named_sequence } {
         {mma_schedule = #iree_gpu.mma_schedule<
            intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
            subgroup_m_count = 2, subgroup_n_count = 1>
-         , workgroup_reorder = #iree_gpu.workgroup_reorder<reorder_option = "transpose", log_tile_size = 4>,
+         , workgroup_reorder = #iree_gpu.workgroup_reorder<reorder_option = "transpose">,
          llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -560,7 +560,7 @@ module attributes { transform.with_named_sequence } {
         {mma_schedule = #iree_gpu.mma_schedule<
            intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
            subgroup_m_count = 2, subgroup_n_count = 1>
-         , workgroup_reorder = #iree_gpu.workgroup_reorder<reorder_option = "transpose", log_tile_size = 4>,
+         , workgroup_reorder = #iree_gpu.workgroup_reorder<reorder_option = "transpose">,
          llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %matmul, %config : !transform.any_op, !transform.any_param
