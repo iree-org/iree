@@ -11,7 +11,7 @@ setup(
     version=f"0.1dev1",
     packages=find_namespace_packages(
         include=[
-            "ireers",
+            "ireers_tools",
         ],
     ),
     install_requires=[

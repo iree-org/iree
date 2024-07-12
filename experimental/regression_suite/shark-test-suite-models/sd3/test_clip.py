@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import pytest
-from ireers import *
+from ireers_tools import *
 import os
 
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")

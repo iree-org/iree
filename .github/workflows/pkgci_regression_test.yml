@@ -145,7 +145,7 @@ jobs:
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
-            rocm-chip: gfx942
+            rocm-chip: gfx90a
             backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
@@ -222,11 +222,12 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python3 -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
           python3 -m pip install -r SHARK-TestSuite/iree_special_models/requirements.txt
+          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
       - name: Download remote files for real weight model tests
         run: |
           source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir pytorch/models
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir sharktank
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/pytorch/models
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/sharktank
 
       - name: Run external tests - models with real weights
         if: "matrix.models-config-file != '' && !cancelled()"
@@ -256,7 +257,6 @@ jobs:
             --timeout=1200 \
             --durations=0
         env:
-          TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       - name: "Running SD3 special model tests"
@@ -271,7 +271,6 @@ jobs:
             --timeout=1200 \
             --durations=0
         env:
-          TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       # Note: mi250 benchmark times are more lenient than mi300 (allowing about
