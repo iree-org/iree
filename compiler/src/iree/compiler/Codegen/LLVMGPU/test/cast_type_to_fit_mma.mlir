@@ -86,3 +86,31 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]] : vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<48x32xf32> to vector<48x32xf16>
 //       CHECK:   return %[[TRUNC]] : vector<48x32xf16>
+
+// -----
+
+// This tests cast_type_to_fit_mma works on IR structure coming out of transform_dialect.
+
+// IR generated in transform_dialect is different from the one in C++ pipeline.
+// it will not have mma_schedule on function attributes, but instead it will have
+// "iree.amdgpu.mma" attribute directly on vector.contract.
+
+func.func @transform_dialect_mfma_matmul_96x64x16(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+    %0 = vector.contract {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+      %lhs, %rhs, %init
+      {iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}
+      : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf16>
+  return %0 : vector<96x64xf16>
+}
+
+// CHECK-LABEL: func.func @transform_dialect_mfma_matmul_96x64x16
+//  CHECK-SAME: (%[[A:.+]]: vector<96x16xf16>, %[[B:.+]]: vector<16x64xf16>, %[[INIT:.+]]: vector<96x64xf16>)
+//       CHECK:   %[[EXT:.+]] = arith.extf %[[INIT]] : vector<96x64xf16> to vector<96x64xf32>
+//       CHECK:   %[[MM:.+]] = vector.contract
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
+//  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]] : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
+//       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>
+//       CHECK:   return %[[TRUNC]] : vector<96x64xf16>
