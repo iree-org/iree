@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
+          ref: a06e730ce325c12db40bb89b43e8e6e897052e96
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -213,7 +213,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
+          ref: a06e730ce325c12db40bb89b43e8e6e897052e96
           path: SHARK-TestSuite
           submodules: false
           lfs: true
