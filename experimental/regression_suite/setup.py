@@ -20,6 +20,7 @@ setup(
         "pytest-xdist",
         "PyYAML",
         "tqdm",
+        "azure-storage-blob",
     ],
     extras_require={},
 )

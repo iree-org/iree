@@ -8,13 +8,61 @@ import pytest
 from ireers import *
 import os
 
-repo_root = os.getenv("TEST_SUITE_REPO_ROOT")
-current_dir = repo_root + "/iree_special_models/sd3/prompt-encoder"
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
 # Fixtures
 ###############################################################################
+
+sd3_clip_inference_input_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.0.bin",
+    group="sd3_clip_inference_input_0",
+)
+
+sd3_clip_inference_input_1 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.1.bin",
+    group="sd3_clip_inference_input_1",
+)
+
+sd3_clip_inference_input_2 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.2.bin",
+    group="sd3_clip_inference_input_2",
+)
+
+sd3_clip_inference_input_3 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.3.bin",
+    group="sd3_clip_inference_input_3",
+)
+
+sd3_clip_inference_input_4 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.4.bin",
+    group="sd3_clip_inference_input_4",
+)
+
+sd3_clip_inference_input_5 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.5.bin",
+    group="sd3_clip_inference_input_5",
+)
+
+sd3_clip_inference_output_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.0.bin",
+    group="sd3_clip_inference_output_0",
+)
+
+sd3_clip_inference_output_1 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.1.bin",
+    group="sd3_clip_inference_output_1",
+)
+
+sd3_clip_real_weights = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/real_weights.irpa",
+    group="sd3_clip_real_weights",
+)
+
+sd3_clip_mlir = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/model.mlirbc",
+    group="sd3_clip_mlir",
+)
 
 CPU_COMPILE_FLAGS = [
     "--iree-hal-target-backends=llvm-cpu",
@@ -27,14 +75,14 @@ CPU_COMPILE_FLAGS = [
 ]
 
 COMMON_RUN_FLAGS = [
-    "--input=1x77x2xi64=@inference_input.0.bin",
-    "--input=1x77x2xi64=@inference_input.1.bin",
-    "--input=1x77x2xi64=@inference_input.2.bin",
-    "--input=1x77x2xi64=@inference_input.3.bin",
-    "--input=1x77x2xi64=@inference_input.4.bin",
-    "--input=1x77x2xi64=@inference_input.5.bin",
-    "--expected_output=2x154x4096xf32=@inference_output.0.bin",
-    "--expected_output=2x2048xf32=@inference_output.1.bin",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_0.path}",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_1.path}",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_2.path}",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_3.path}",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_4.path}",
+    f"--input=1x77x2xi64=@{sd3_clip_inference_input_5.path}",
+    f"--expected_output=2x154x4096xf32=@{sd3_clip_inference_output_0.path}",
+    f"--expected_output=2x2048xf32=@{sd3_clip_inference_output_1.path}",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -54,32 +102,27 @@ ROCM_COMPILE_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv}))",
 ]
 
-mlir_path = current_dir + "/model.mlirbc"
-compile_cpu_cmd = get_compile_cmd(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS)
-compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS)
-
 ###############################################################################
 # CPU
 ###############################################################################
 
+cpu_vmfb = None
 
 def test_compile_clip_cpu():
-    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+    cpu_vmfb = iree_compile(sd3_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_cpu"])
 def test_run_clip_cpu():
-    vmfb_path = current_dir + "/model_cpu.vmfb"
     iree_run_module(
-        vmfb_path,
-        [
-            "--device=local-task",
-            "--parameters=model=real_weights.irpa",
+        cpu_vmfb,
+        device="local-task",
+        function="encode_tokens",
+        args = [
+            f"--parameters=model={sd3_clip_real_weights.path}",
             "--expected_f32_threshold=0.15f",
         ]
-        + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_cpu_cmd,
+        + COMMON_RUN_FLAGS
     )
 
 
@@ -87,6 +130,7 @@ def test_run_clip_cpu():
 # ROCM
 ###############################################################################
 
+rocm_vmfb = None
 
 @pytest.mark.xfail(
     raises=IreeCompileException,
@@ -94,15 +138,14 @@ def test_run_clip_cpu():
     reason="Expected compilation to fail (remove xfail for test_compile_clip_rocm)",
 )
 def test_compile_clip_rocm():
-    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
+    rocm_vmfb = iree_compile(sd3_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_rocm"])
 def test_run_clip_rocm():
-    vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
-        vmfb_path,
-        ["--device=hip", "--parameters=model=real_weights.irpa"] + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_rocm_cmd,
+        rocm_vmfb,
+        device="hip",
+        function="encode_tokens",
+        args=[f"--parameters=model={sd3_clip_real_weights.path}"] + COMMON_RUN_FLAGS,
     )

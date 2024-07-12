@@ -8,13 +8,31 @@ import pytest
 from ireers import *
 import os
 
-repo_root = os.getenv("TEST_SUITE_REPO_ROOT")
-current_dir = repo_root + "/iree_special_models/sd3/vae-decode"
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
 # Fixtures
 ###############################################################################
+
+sd3_vae_input_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/inference_input.0.bin",
+    group="sd3_vae_input_0",
+)
+
+sd3_vae_inference_output_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/inference_output.0.bin",
+    group="sd3_vae_output_0",
+)
+
+sd3_vae_real_weights = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/real_weights.irpa",
+    group="sd3_vae_real_weights",
+)
+
+sd3_vae_mlir = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/model.mlirbc",
+    group="sd3_vae_mlir",
+)
 
 CPU_COMPILE_FLAGS = [
     "--iree-hal-target-backends=llvm-cpu",
@@ -27,8 +45,8 @@ CPU_COMPILE_FLAGS = [
 ]
 
 COMMON_RUN_FLAGS = [
-    "--input=1x16x128x128xf16=@inference_input.0.bin",
-    "--expected_output=3x1024x1024xf32=@inference_output.0.bin",
+    f"--input=1x16x128x128xf16=@{sd3_vae_inference_input_0.path}",
+    f"--expected_output=3x1024x1024xf32=@{sd3_vae_inference_output_0.path}",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -45,32 +63,28 @@ ROCM_COMPILE_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
 ]
 
-mlir_path = current_dir + "/model.mlirbc"
-compile_cpu_cmd = get_compile_cmd(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS)
-compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS)
-
 ###############################################################################
 # CPU
 ###############################################################################
 
+cpu_vmfb = None
+
 
 def test_compile_vae_cpu():
-    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+    cpu_vmfb = iree_compile(sd3_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_vae_cpu"])
 def test_run_vae_cpu():
-    vmfb_path = current_dir + "/model_cpu.vmfb"
     return iree_run_module(
-        vmfb_path,
-        [
-            "--device=local-task",
-            "--parameters=model=real_weights.irpa",
+        cpu_vmfb,
+        device="local-task",
+        function="decode",
+        args = [
+            f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.01f",
         ]
         + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_cpu_cmd,
     )
 
 
@@ -78,22 +92,21 @@ def test_run_vae_cpu():
 # ROCM
 ###############################################################################
 
+rocm_vmfb = None
 
 def test_compile_vae_rocm():
-    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
+    rocm_vmfb = iree_compile(sd3_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_vae_rocm"])
 def test_run_vae_rocm():
-    vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
-        vmfb_path,
-        [
-            "--device=hip",
-            "--parameters=model=real_weights.irpa",
+        rocm_vmfb,
+        device="hip",
+        function="decode",
+        args = [
+            f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.7f",
         ]
         + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_rocm_cmd,
     )

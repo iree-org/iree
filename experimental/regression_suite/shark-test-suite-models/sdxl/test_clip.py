@@ -8,13 +8,51 @@ import pytest
 from ireers import *
 import os
 
-repo_root = os.getenv("TEST_SUITE_REPO_ROOT")
-current_dir = repo_root + "/iree_special_models/sdxl/prompt-encoder"
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
 # Fixtures
 ###############################################################################
+
+sdxl_clip_inference_input_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
+    group="sdxl_clip_inference_input_0",
+)
+
+sdxl_clip_inference_input_1 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
+    group="sdxl_clip_inference_input_1",
+)
+
+sdxl_clip_inference_input_2 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
+    group="sdxl_clip_inference_input_2",
+)
+
+sdxl_clip_inference_input_3 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
+    group="sdxl_clip_inference_input_3",
+)
+
+sdxl_clip_inference_output_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
+    group="sdxl_clip_inference_output_0",
+)
+
+sdxl_clip_inference_output_1 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
+    group="sdxl_clip_inference_output_1",
+)
+
+sdxl_clip_real_weights = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+    group="sdxl_clip_real_weights",
+)
+
+sdxl_clip_mlir = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlirbc",
+    group="sdxl_clip_mlir",
+)
 
 CPU_COMPILE_FLAGS = [
     "--iree-hal-target-backends=llvm-cpu",
@@ -27,12 +65,12 @@ CPU_COMPILE_FLAGS = [
 ]
 
 COMMON_RUN_FLAGS = [
-    "--input=1x64xi64=@inference_input.0.bin",
-    "--input=1x64xi64=@inference_input.1.bin",
-    "--input=1x64xi64=@inference_input.2.bin",
-    "--input=1x64xi64=@inference_input.3.bin",
-    "--expected_output=2x64x2048xf16=@inference_output.0.bin",
-    "--expected_output=2x1280xf16=@inference_output.1.bin",
+    f"--input=1x64xi64=@{sdxl_clip_inference_input_0.path}",
+    f"--input=1x64xi64=@{sdxl_clip_inference_input_1.path}",
+    f"--input=1x64xi64=@{sdxl_clip_inference_input_2.path}",
+    f"--input=1x64xi64=@{sdxl_clip_inference_input_3.path}",
+    f"--expected_output=2x64x2048xf16=@{sdxl_clip_inference_output_0.path}",
+    f"--expected_output=2x1280xf16=@{sdxl_clip_inference_output_1.path}",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -54,32 +92,27 @@ ROCM_COMPILE_FLAGS = [
     "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]
 
-mlir_path = current_dir + "/model.mlirbc"
-compile_cpu_cmd = get_compile_cmd(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS)
-compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS)
-
 ###############################################################################
 # CPU
 ###############################################################################
 
+cpu_vmfb = None
 
 def test_compile_clip_cpu():
-    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+    cpu_vmfb = iree_compile(sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_cpu"])
 def test_run_clip_cpu():
-    vmfb_path = current_dir + "/model_cpu.vmfb"
     iree_run_module(
-        vmfb_path,
-        [
-            "--device=local-task",
-            "--parameters=model=real_weights.irpa",
+        cpu_vmfb,
+        device="local-task",
+        function="encode_prompts",
+        args = [
+            f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]
         + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_cpu_cmd,
     )
 
 
@@ -87,22 +120,21 @@ def test_run_clip_cpu():
 # ROCM
 ###############################################################################
 
+rocm_vmfb = None
 
 def test_compile_clip_rocm():
-    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
+    rocm_vmfb = iree_compile(sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_clip_rocm"])
 def test_run_clip_rocm():
-    vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
-        vmfb_path,
-        [
-            "--device=hip",
-            "--parameters=model=real_weights.irpa",
+        rocm_vmfb,
+        device="hip",
+        function="encode_prompts",
+        args = [
+            f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]
         + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_rocm_cmd,
     )
