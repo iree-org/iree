@@ -99,16 +99,18 @@ class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> 
 }
 
 // Format: <kind>_<input-type>_<M>x<N>x<K>_<output-type>
-def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
-def MFMA_F16_32x32x8_F32  : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
-def MFMA_I8_16x16x32_I32  : I32EnumAttrCase<"MFMA_I8_16x16x32_I32", 2>;
-def MFMA_I8_32x32x16_I32  : I32EnumAttrCase<"MFMA_I8_32x32x16_I32", 3>;
+def MFMA_F32_16x16x4_F32 : I32EnumAttrCase<"MFMA_F32_16x16x4_F32", 0>;
+def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 1>;
+def MFMA_F16_32x32x8_F32  : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 2>;
+def MFMA_I8_16x16x32_I32  : I32EnumAttrCase<"MFMA_I8_16x16x32_I32", 3>;
+def MFMA_I8_32x32x16_I32  : I32EnumAttrCase<"MFMA_I8_32x32x16_I32", 4>;
 // TODO: Create separate WMMA ops for AMD and NVIDIA GPUs
-def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 4>;
-def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 5>;
+def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 5>;
+def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 6>;
 
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [
+      MFMA_F32_16x16x4_F32,
       MFMA_F16_16x16x16_F32,
       MFMA_F16_32x32x8_F32,
       MFMA_I8_16x16x32_I32,
