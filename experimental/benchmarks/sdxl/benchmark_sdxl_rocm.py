@@ -16,6 +16,7 @@ from pytest_check import check
 
 benchmark_dir = os.path.dirname(os.path.realpath(__file__))
 artifacts_dir = os.getenv("IREE_TEST_FILES", default=Path.cwd()) + "/artifacts"
+artifacts_dir = Path(os.path.expanduser(artifacts_dir)).resolve()
 prompt_encoder_dir = f"{artifacts_dir}/sdxl_clip"
 scheduled_unet_dir = f"{artifacts_dir}/sdxl_unet"
 vae_decode_dir = f"{artifacts_dir}/sdxl_vae"
