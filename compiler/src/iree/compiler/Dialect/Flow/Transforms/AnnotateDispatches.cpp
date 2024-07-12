@@ -227,13 +227,50 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   // Categorize linalg.generic ops better. The following checks more specific
   // cases before more general ones.
   if (prefix.empty() && isa<linalg::GenericOp>(op)) {
-    if (llvm::all_of(op.getIndexingMapsArray(),
-                     [](AffineMap m) { return m.isIdentity(); })) {
+    SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
+    ArrayRef<AffineMap> inputMaps(indexingMaps.begin(),
+                                  indexingMaps.begin() + op.getNumDpsInputs());
+    ArrayRef<AffineMap> outputMaps(indexingMaps.begin() + op.getNumDpsInputs(),
+                                   indexingMaps.end());
+    bool isIdentityOuts =
+        llvm::all_of(outputMaps, [](AffineMap m) { return m.isIdentity(); });
+    bool isPermutationOuts =
+        llvm::all_of(outputMaps, [](AffineMap m) { return m.isPermutation(); });
+    bool isProjectedPermIns = llvm::all_of(
+        inputMaps, [](AffineMap m) { return m.isProjectedPermutation(true); });
+    int64_t numIdentityIn =
+        llvm::count_if(inputMaps, [](AffineMap m) { return m.isIdentity(); });
+    int64_t numPermutationIn = llvm::count_if(
+        inputMaps, [](AffineMap m) { return m.isPermutation(); });
+    // We categorize elementwise operations as follows:
+    //   1. All output maps are identity with the iteration space.
+    //   2. There is at least one input with an identity indexing map.
+    //   3. There are no permuted inputs that are not also broadcast.
+    //
+    // This categorization tells us that the dispatch includes limited or no
+    // non-trivial data movement.
+    bool hasIdentityInputRoot =
+        numIdentityIn > 0 && numIdentityIn == numPermutationIn;
+    if (isIdentityOuts && isProjectedPermIns && hasIdentityInputRoot) {
       prefix = "elementwise";
-    } else if (llvm::all_of(op.getIndexingMapsArray(),
-                            [](AffineMap m) { return m.isMinorIdentity(); })) {
-      // We have checked that this is not pure elementwise in the above.
-      prefix = "broadcast";
+      // We draw a distinction between pure elementwise operations and
+      // elementwise operations that include a transpose. To separate
+      // transposes, there are two cases:
+      //   1. 2) and 3) hold for elementwise, but the output maps are instead
+      //      permutations.
+      //   2. The output maps are permutations or identity, and the most major
+      //      input indexing map is a permutation.
+    } else if (isPermutationOuts && isProjectedPermIns &&
+               ((hasIdentityInputRoot && !isIdentityOuts) ||
+                numPermutationIn > numIdentityIn)) {
+      prefix = "elementwise_transpose";
+      // Broadcasts are an indication that fusion went off the rails. We treat
+      // anything where all output maps are permutations, but the inputs are all
+      // projected permutations (without full rank) as a broadcast, which could
+      // potentially be fused with other elementwise operations/transposes.
+    } else if (isPermutationOuts && isProjectedPermIns &&
+               numPermutationIn == 0) {
+      prefix = "elementwise_broadcast";
     } else if (isMatvecLike(op)) {
       prefix = "matvec_like";
     } else if (isMatmulLike(op)) {
