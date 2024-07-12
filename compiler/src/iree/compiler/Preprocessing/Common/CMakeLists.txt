@@ -29,6 +29,7 @@ iree_cc_library(
     "ApplyPDLPatterns.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertConvToChannelsLast.cpp"
+    "GeneralizeLinalgMatMul.cpp"
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
     "PadLinalgOps.cpp"
