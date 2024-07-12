@@ -119,7 +119,6 @@ jobs:
         benchmark: ${{ fromJSON(needs.generate_matrix.outputs.benchmark-matrix) }}
     runs-on:
       - self-hosted # must come first
-      - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
       - machine-type=${{ matrix.benchmark.device_name }}
     env:
