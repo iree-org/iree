@@ -210,7 +210,7 @@ class FetchedArtifact(ProducedArtifact):
 
     @staticmethod
     def _callback(self: "FetchedArtifact"):
-        if self.check_azure_hashes():
+        if not self.check_azure_hashes():
             with tqdm(
                 unit="B",
                 unit_scale=True,
