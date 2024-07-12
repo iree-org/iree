@@ -302,9 +302,11 @@ primary CI is configured in the
 In addition to the default runners GitHub provides, IREE uses
 [self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)
 to run many of its workflow jobs. These enable access to additional compute and
-custom configurations such as accelerators. Configuration scripting is checked
-in to this repository (see the
-[README for that directory](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/README.md)).
+custom configurations such as accelerators.
+
+* Configuration for GCP runners is stored at
+[`build_tools/github_actions/runner/`](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/)
+* Configuration for other runners is done manually as needed
 
 #### CI behavior manipulation
 
