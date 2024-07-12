@@ -194,6 +194,8 @@ TEST(ScopeTest, WaitIdleSuccess) {
   // NOTE: this may flake. Need to see if there's a better way to do this.
   std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
+  // test CI
+
   // Complete the task.
   iree_task_submission_t pending_submission;
   iree_task_submission_initialize(&pending_submission);
