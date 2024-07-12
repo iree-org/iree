@@ -204,7 +204,6 @@ func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc:
                   : vector<16x16xf16>, memref<64x64xf16>
   func.return
 }
-
 // CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 mod 8)>
 // CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 8 + 8)>
 
