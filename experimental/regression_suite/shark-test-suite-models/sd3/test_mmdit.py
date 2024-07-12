@@ -7,15 +7,49 @@
 import pytest
 from ireers import *
 import os
+from pathlib import Path
 
-repo_root = os.getenv("TEST_SUITE_REPO_ROOT")
-current_dir = repo_root + "/iree_special_models/sd3/mmdit"
-iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=current_dir)
+iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
 # Fixtures
 ###############################################################################
+
+sd3_mmdit_inference_input_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.0.bin",
+    group="sd3_clip_inference_input_0",
+)
+
+sd3_mmdit_inference_input_1 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.1.bin",
+    group="sd3_clip_inference_input_1",
+)
+
+sd3_mmdit_inference_input_2 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.2.bin",
+    group="sd3_mmdit_inference_input_2",
+)
+
+sd3_mmdit_inference_input_3 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.3.bin",
+    group="sd3_mmdit_inference_input_3",
+)
+
+sd3_mmdit_inference_output_0 = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_output.0.bin",
+    group="sd3_mmdit_inference_output_0",
+)
+
+sd3_mmdit_real_weights = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/real_weights.irpa",
+    group="sd3_mmdit_real_weights",
+)
+
+sd3_mmdit_mlir = fetch_source_fixture(
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/model.mlirbc",
+    group="sd3_mmdit_mlir",
+)
 
 CPU_COMPILE_FLAGS = [
     "--iree-hal-target-backends=llvm-cpu",
@@ -28,11 +62,11 @@ CPU_COMPILE_FLAGS = [
 ]
 
 COMMON_RUN_FLAGS = [
-    "--input=2x16x128x128xf16=@inference_input.0.bin",
-    "--input=2x154x4096xf16=@inference_input.1.bin",
-    "--input=2x2048xf16=@inference_input.2.bin",
-    "--input=2xf16=@inference_input.3.bin",
-    "--expected_output=2x16x128x128xf32=@inference_output.0.bin",
+    f"--input=2x16x128x128xf16=@{sd3_mmdit_inference_input_0.path}",
+    f"--input=2x154x4096xf16=@{sd3_mmdit_inference_input_1.path}",
+    f"--input=2x2048xf16=@{sd3_mmdit_inference_input_2.path}",
+    f"--input=2xf16=@{sd3_mmdit_inference_input_3.path}",
+    f"--expected_output=2x16x128x128xf32=@{sd3_mmdit_inference_output_0.path}",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -55,17 +89,14 @@ ROCM_COMPILE_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
 ]
 
-mlir_path = current_dir + "/model.mlirbc"
-compile_cpu_cmd = get_compile_cmd(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS)
-compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS)
-
 ###############################################################################
 # CPU
 ###############################################################################
 
+cpu_vmfb = None
 
 def test_compile_mmdit_cpu():
-    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+    cpu_vmfb = iree_compile(sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.xfail(
@@ -75,13 +106,12 @@ def test_compile_mmdit_cpu():
 )
 @pytest.mark.depends(on=["test_compile_mmdit_cpu"])
 def test_run_mmdit_cpu():
-    vmfb_path = current_dir + "/model_cpu.vmfb"
     return iree_run_module(
-        vmfb_path,
-        ["--device=local-task", "--parameters=model=real_weights.irpa"]
+        cpu_vmfb,
+        device="local-task",
+        function="run_forward"
+        [f"--parameters=model={sd3_mmdit_real_weights.path}"]
         + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_cpu_cmd,
     )
 
 
@@ -89,6 +119,7 @@ def test_run_mmdit_cpu():
 # ROCM
 ###############################################################################
 
+rocm_vmfb = None
 
 @pytest.mark.xfail(
     raises=IreeCompileException,
@@ -96,15 +127,14 @@ def test_run_mmdit_cpu():
     reason="Expected compilation to fail (remove xfail for test_compile_mmdit_rocm)",
 )
 def test_compile_mmdit_rocm():
-    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
+    rocm_vmfb = iree_compile(sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_mmdit_rocm"])
 def test_run_mmdit_rocm():
-    vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
-        vmfb_path,
-        ["--device=hip", "--parameters=model=real_weights.irpa"] + COMMON_RUN_FLAGS,
-        current_dir,
-        compile_rocm_cmd,
+        rocm_vmfb,
+        device="hip",
+        function="run_forward",
+        [f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
     )

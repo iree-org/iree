@@ -10,6 +10,7 @@ from pathlib import Path
 from tqdm import tqdm
 import urllib.parse
 import urllib.request
+import os
 
 
 def show_progress(t):
@@ -26,8 +27,8 @@ def show_progress(t):
 
 @functools.cache
 def get_artifact_root_dir() -> Path:
-    # TODO: Make configurable.
-    return Path.cwd() / "artifacts"
+    root_path = os.getenv("IREE_TEST_FILES", default=str(Path.cwd()) + "/artifacts")
+    return Path(os.path.expanduser(root_path)).resolve()
 
 
 class ArtifactGroup:
@@ -126,19 +127,97 @@ class FetchedArtifact(ProducedArtifact):
         name = Path(urllib.parse.urlparse(url).path).name
         super().__init__(group, name, FetchedArtifact._callback)
         self.url = url
+    
+    def get_azure_md5(remote_file: str, azure_blob_properties: BlobProperties):
+        """Gets the content_md5 hash for a blob on Azure, if available."""
+        content_settings = azure_blob_properties.get("content_settings")
+        if not content_settings:
+            return None
+        azure_md5 = content_settings.get("content_md5")
+        if not azure_md5:
+            logger.warning(
+                f"  Remote file '{remote_file}' on Azure is missing the "
+                "'content_md5' property, can't check if local matches remote"
+            )
+        return azure_md5
+
+
+    def get_local_md5(local_file_path: Path):
+        """Gets the content_md5 hash for a lolca file, if it exists."""
+        if not local_file_path.exists() or local_file_path.stat().st_size == 0:
+            return None
+
+        with open(local_file_path) as file, mmap.mmap(
+            file.fileno(), 0, access=mmap.ACCESS_READ
+        ) as file:
+            return hashlib.md5(file).digest()
+
+    def check_azure_hashes(self: "FetchedArtifact"):
+        """
+        Checks the hashes between the local file and azure file.
+        """
+        remote_file_name = self.url.rsplit("/", 1)[-1]
+
+        # Extract path components from Azure URL to use with the Azure Storage Blobs
+        # client library for Python (https://pypi.org/project/azure-storage-blob/).
+        #
+        # For example:
+        #   https://sharkpublic.blob.core.windows.net/sharkpublic/path/to/blob.txt
+        #                                            ^           ^
+        #   account_url:    https://sharkpublic.blob.core.windows.net
+        #   container_name: sharkpublic
+        #   blob_name:      path/to/blob.txt
+        result = re.search(r"(https.+\.net)/([^/]+)/(.+)", remote_file)
+        account_url = result.groups()[0]
+        container_name = result.groups()[1]
+        blob_name = result.groups()[2]
+
+        with BlobClient(
+            account_url,
+            container_name,
+            blob_name,
+            max_chunk_get_size=1024 * 1024 * 32,  # 32 MiB
+            max_single_get_size=1024 * 1024 * 32,  # 32 MiB
+        ) as blob_client:
+            blob_properties = blob_client.get_blob_properties()
+            blob_size_str = human_readable_size(blob_properties.size)
+            azure_md5 = get_azure_md5(remote_file, blob_properties)
+
+            local_md5 = get_local_md5(self.path)
+
+            if azure_md5 and azure_md5 == local_md5:
+                print(
+                    f"  Skipping '{remote_file_name}' download ({blob_size_str}) "
+                    "- local MD5 hash matches"
+                )
+                return True
+
+            if not local_md5:
+                print(
+                    f"  Downloading '{remote_file_name}' ({blob_size_str}) "
+                    f"to '{relative_dir}'"
+                )
+                return False
+            else:
+                print(
+                    f"  Downloading '{remote_file_name}' ({blob_size_str}) "
+                    f"to '{relative_dir}' (local MD5 does not match)"
+                )
+                return False
+        
 
     @staticmethod
     def _callback(self: "FetchedArtifact"):
-        print(f"Downloading {self.url} -> {self.path}", flush=True, end="")
-        with tqdm(
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
-            miniters=1,
-            desc=str(self.path),
-        ) as t:
-            urllib.request.urlretrieve(self.url, self.path, reporthook=show_progress(t))
-        print(f": Retrieved {self.path.stat().st_size} bytes")
+        if self.check_azure_hashes():
+            with tqdm(
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+                miniters=1,
+                desc=str(self.path),
+            ) as t:
+                urllib.request.urlretrieve(self.url, self.path, reporthook=show_progress(t))
+            print(f": Retrieved {self.path.stat().st_size} bytes")
 
 
 class StreamArtifact(Artifact):
