@@ -63,6 +63,7 @@ CPU_COMPILE_FLAGS = [
 ]
 
 
+@pytest.fixture
 def SD3_MMDIT_COMMON_RUN_FLAGS(
     sd3_mmdit_inference_input_0,
     sd3_mmdit_inference_input_1,
