@@ -55,6 +55,11 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                    SmallVector<Operation *> ops);
 
+/// Returns the max padding factor value.
+int64_t getPaddingFactor(bool enableEarlyMaterialization = false);
+
+static int64_t getNarrowThreshhold() { return 16; }
+
 } // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

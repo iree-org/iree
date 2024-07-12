@@ -11,6 +11,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
@@ -67,8 +68,8 @@ Value calculateStorageElementCountInBytes(Location loc,
   SmallVector<int64_t> paddedShape(shapedType.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
   auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
-  if (encoding && !encoding.getRoundDimsToArray().empty()) {
-    auto roundDimsTo = encoding.getRoundDimsToArray();
+  if (encoding && !encoding.getMaxPaddingsArray().empty()) {
+    auto maxPaddings = encoding.getMaxPaddingsArray();
     FailureOr<linalg::ContractionDimensions> cDims =
         IREE::Encoding::getEncodingContractionDims(encoding);
     auto indexingMap = encoding.getMapForOperandIndex();
@@ -89,15 +90,13 @@ Value calculateStorageElementCountInBytes(Location loc,
         paddedShape[mappedDim] = llvm::alignTo(paddedShape[mappedDim], value);
       }
     };
-    for (auto m : cDims->m) {
-      pad(m, roundDimsTo[0]);
-    }
-    for (auto n : cDims->n) {
-      pad(n, roundDimsTo[1]);
-    }
-    for (auto k : cDims->k) {
-      pad(k, roundDimsTo[2]);
-    }
+
+    std::array<decltype(cDims->m) *, 3> dims = {&cDims->m, &cDims->n,
+                                                &cDims->k};
+    for (size_t i = 0; i < dims.size(); ++i)
+      for (auto &val : *dims[i]) {
+        pad(val, maxPaddings[i]);
+      }
   }
 
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {

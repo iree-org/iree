@@ -243,7 +243,7 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     return failure();
   }
   std::optional<Value> paddingValue;
-  if (encoding.getRoundDimsToArray().empty()) {
+  if (encoding.getMaxPaddingsArray().empty()) {
     paddingValue = getPaddingValue(source);
   } else {
     paddingValue = rewriter.create<arith::ConstantOp>(

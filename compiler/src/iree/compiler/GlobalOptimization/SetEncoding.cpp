@@ -9,6 +9,7 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
@@ -19,6 +20,8 @@
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -121,7 +124,8 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   // opportunities to select optimized narrow tiles for narrow matmuls.
   // If it is larger, everything will work fine, but the IR will be a bit more
   // verbose as more narrow_matmul_{M,N} optional parameters will be specified.
-  const int64_t kNarrowThreshold = 16;
+  const int64_t kNarrowThreshold =
+      mlir::iree_compiler::GlobalOptimization::getNarrowThreshhold();
   if (!ShapedType::isDynamic(M) && M < kNarrowThreshold) {
     narrow.M = M;
   }
@@ -151,9 +155,18 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
-  auto encodingForPad = EncodingAttr::get(
-      ctx, operandIndex, opType, operandElemTypes,
-      /*originalType=*/Type{}, narrow.M, narrow.N, indexingMaps);
+
+  // Override padding info with narrow dimensions
+  // TODO: plumb in the EnableEarlyMaterialization option when getting default
+  // Padding Factor.
+  int64_t defaultPaddingFactor =
+      mlir::iree_compiler::GlobalOptimization::getNarrowThreshhold();
+  llvm::ArrayRef<int64_t> rounding = {narrow.M.value_or(defaultPaddingFactor),
+                                      narrow.N.value_or(defaultPaddingFactor),
+                                      defaultPaddingFactor};
+  auto encodingForPad =
+      EncodingAttr::get(ctx, operandIndex, opType, operandElemTypes,
+                        /*originalType=*/Type{}, indexingMaps, rounding);
   Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
@@ -165,7 +178,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   if (padded.getType() != source.getType()) {
     encodingForSetEncoding = EncodingAttr::get(
         ctx, operandIndex, opType, operandElemTypes,
-        /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
+        /*originalType=*/source.getType(), indexingMaps, rounding);
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
@@ -351,10 +364,12 @@ public:
                             elemTypes, narrowSizes, maps, opType);
     } else {
       auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-        SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
+        SmallVector<int64_t> maxPaddings(linalgOp.getNumLoops(), padFactor);
+        maxPaddings[0] = narrowSizes.M.value_or(maxPaddings[0]);
+        maxPaddings[1] = narrowSizes.N.value_or(maxPaddings[1]);
         auto encoding = EncodingAttr::get(
             linalgOp.getContext(), operandIndex, opType, elemTypes,
-            src.getType(), narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+            src.getType(), maps, maxPaddings);
         return setEncoding(rewriter, loc, src, encoding);
       };
       encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);

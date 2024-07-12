@@ -80,21 +80,16 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
-    OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
-    OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
-    // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to
+    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$max_paddings
   );
 
   let builders = [
     AttrBuilder<(ins "int64_t":$operandIndex,
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes, "Type":$origType,
-        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
-        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
+        CArg<"ArrayRef<int64_t>", "{}">:$maxPaddings)>
   ];
 
   let extraClassDeclaration = [{
@@ -105,8 +100,14 @@ def EncodingAttr :
     /// matching index of the given encoding's tensor.
     unsigned mapDimToOperandIndex(int64_t dimPos);
 
-    /// Returns an integer array with values in `round_dims_to`.
-    ArrayRef<int64_t> getRoundDimsToArray();
+    /// Returns an integer array with values in `max_paddings`.
+    ArrayRef<int64_t> getMaxPaddingsArray();
+  
+    /// optionally return narrow M if possible
+    std::optional<int64_t> getNarrowM();
+
+    // optionally return narrow N if possible
+    std::optional<int64_t> getNarrowN();
   }];
 
   let genVerifyDecl = 0;

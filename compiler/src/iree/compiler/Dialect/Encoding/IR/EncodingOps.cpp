@@ -99,14 +99,9 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
                                Type origType,
-                               std::optional<int64_t> matmulNarrowM,
-                               std::optional<int64_t> matmulNarrowN,
                                ArrayRef<AffineMap> maps,
                                ArrayRef<int64_t> roundDimsTo) {
   Builder b(ctx);
-  auto optionalToAttr = [&](std::optional<int64_t> x) {
-    return x ? b.getIndexAttr(*x) : IntegerAttr();
-  };
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
   auto roundDimsToAttr = roundDimsTo.empty()
@@ -114,7 +109,6 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                              : b.getDenseI64ArrayAttr(roundDimsTo);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
              b.getTypeArrayAttr(elemTypes), origTypeAttr,
-             optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
              b.getAffineMapArrayAttr(maps), roundDimsToAttr);
 }
 
@@ -138,13 +132,17 @@ unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
   return idx.value();
 }
 
-ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
-  auto roundDimsTo = getRoundDimsTo();
-  if (!roundDimsTo) {
+ArrayRef<int64_t> EncodingAttr::getMaxPaddingsArray() {
+  auto maxPaddings = getMaxPaddings();
+  if (!maxPaddings) {
     return {};
   }
-  return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
+  return llvm::cast<DenseI64ArrayAttr>(maxPaddings).asArrayRef();
 }
+
+std::optional<int64_t> EncodingAttr::getNarrowM() { return std::nullopt; }
+
+std::optional<int64_t> EncodingAttr::getNarrowN() { return std::nullopt; }
 
 //===---------------------------------------------------------------------===//
 // Encoding Dialect Helpers

@@ -55,11 +55,11 @@ util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<2
 // PAD-WITHIN-ENCODING-SAME:   %[[ARG1:[a-zA-Z0-9]+]]
 // PAD-WITHIN-ENCODING-SAME:   %[[ARG2:[a-zA-Z0-9]+]]
 // PAD-WITHIN-ENCODING:        %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// PAD-WITHIN-ENCODING-SAME:     tensor<100x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<100x250xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
+// PAD-WITHIN-ENCODING-SAME:     tensor<100x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<100x250xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], max_paddings = array<i64: 16, 16, 16>>>
 // PAD-WITHIN-ENCODING:        %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// PAD-WITHIN-ENCODING-SAME:     tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<250x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
+// PAD-WITHIN-ENCODING-SAME:     tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<250x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], max_paddings = array<i64: 16, 16, 16>>>
 // PAD-WITHIN-ENCODING:        %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// PAD-WITHIN-ENCODING-SAME:     tensor<100x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<100x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
+// PAD-WITHIN-ENCODING-SAME:     tensor<100x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<100x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], max_paddings = array<i64: 16, 16, 16>>>
 
 // -----
 

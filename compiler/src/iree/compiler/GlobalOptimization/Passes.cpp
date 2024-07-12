@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -166,7 +167,7 @@ void buildGlobalOptimizationPassPipeline(
     // we can use `FunctionLikNest` here.
     // TODO(hanchung): Make it controlable through flags. It is fine for now
     // because it is an experimental path.
-    const int64_t kPadFactor = clEnableEarlyMaterialization ? 0 : 16;
+    const int64_t kPadFactor = clEnableEarlyMaterialization ? 0 : getNarrowThreshhold();
     mainPassManager.addPass(createSetEncodingPass(kPadFactor));
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());

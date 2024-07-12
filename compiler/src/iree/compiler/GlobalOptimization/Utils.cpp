@@ -122,4 +122,8 @@ wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                                         regionOp);
 }
 
+int64_t getPaddingFactor(bool enableEarlyMaterialization) {
+  return enableEarlyMaterialization ? 0 : 16;
+}
+
 } // namespace mlir::iree_compiler::GlobalOptimization

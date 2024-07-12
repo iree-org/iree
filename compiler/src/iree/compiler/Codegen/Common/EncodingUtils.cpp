@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -63,13 +64,13 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     std::swap(maps[0], maps[1]);
   }
 
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
-  SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
-  assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() >= 3);
-  if (newRoundDimsTo.size() != 0) {
-    std::swap(newRoundDimsTo[newRoundDimsTo.size() - 3],
-              newRoundDimsTo[newRoundDimsTo.size() - 2]);
+  SmallVector<int64_t> maxPaddings(encoding.getMaxPaddingsArray());
+  assert(maxPaddings.size() == 0 || maxPaddings.size() >= 3);
+  if (maxPaddings.size() != 0) {
+    std::swap(maxPaddings[maxPaddings.size() - 3],
+              maxPaddings[maxPaddings.size() - 2]);
   }
+
   auto context = tensorType.getContext();
   AffineMap permutation = AffineMap::getPermutationMap(permIndices, context);
   for (auto &map : maps) {
@@ -88,8 +89,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
-      encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
-      newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
+      newIndexingMaps, DenseI64ArrayAttr::get(context, maxPaddings));
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
@@ -209,9 +209,17 @@ bool isNarrowNResult(EncodingAttr encoding) {
   if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
     return false;
   }
-  IntegerAttr narrowM = encoding.getMatmulNarrow_M();
-  IntegerAttr narrowN = encoding.getMatmulNarrow_N();
-  return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
+
+  // compare value with max padding factors.
+  auto defaultMaxPaddingFactor =
+      mlir::iree_compiler::GlobalOptimization::getNarrowThreshhold();
+  auto maxPaddings = encoding.getMaxPaddingsArray();
+
+  bool isNarrowM = defaultMaxPaddingFactor > maxPaddings[0];
+  bool isNarrowN = defaultMaxPaddingFactor > maxPaddings[1];
+
+  return isNarrowN &&
+         (!isNarrowM || /*M*/ maxPaddings[0] > /*N*/ maxPaddings[1]);
 }
 
 } // namespace mlir::iree_compiler
