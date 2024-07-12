@@ -127,21 +127,6 @@ Signed-off-by: Random J Developer <random@developer.example.org>
 * See `.git/hooks/prepare-commit-msg.sample` for how to automatically
   add this using a [git hook](https://git-scm.com/docs/githooks)
 
-### :octicons-law-16: Contributor License Agreement
-
-!!! info - "CLA is being replaced with DCO. Both are enabled while we migrate."
-
-Contributions to this project must be accompanied by a Contributor License
-Agreement (CLA). Head over to <https://cla.developers.google.com/> to see
-your current agreements on file or to sign a new one.
-
-* You (or your employer) retain the copyright to your contribution; this simply
-  gives us permission to use and redistribute your contributions as part of the
-  project.
-* You generally only need to submit a CLA once, so if you've already submitted
-  one (even if it was for a different project), you probably don't need to do it
-  again.
-
 ### :octicons-people-16: AUTHORS, CODEOWNERS, and MAINTAINERS
 
 The [`AUTHORS` file](https://github.com/iree-org/iree/blob/main/AUTHORS) keeps
