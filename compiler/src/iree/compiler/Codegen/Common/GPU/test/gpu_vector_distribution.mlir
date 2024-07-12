@@ -287,6 +287,21 @@ func.func @distribute_transfer_write_col_major_transpose(%root: vector<16x16xf16
   func.return
 }
 
+func.func @distribute_transfer_write_with_non_contiguous_broadcast(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
+  %c0 = arith.constant 0 : index
+  vector.transfer_write %root, %alloc[%c0, %a, %c0, %b]
+          {in_bounds = [true, true],
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
+           "__vector_layout_test_anchor_operand_0" = #layout_row_major}
+                  : vector<16x16xf16>, memref<32x32x32x32xf16>
+  func.return
+}
+
+// CHECK-LABEL: func.func @distribute_transfer_write_with_non_contiguous_broadcast
+// CHECK-SAME: %[[ROOT:.+]]: vector<16x16xf16>, %[[A:.+]]: index, %[[B:.+]]: index, %[[ALLOC:.+]]: memref<32x32x32x32xf16>)
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-COUNT-4: vector.store %{{.+}}, %[[ALLOC]][%[[C0]], {{.+}}, %[[C0]], %{{.+}}] : memref<32x32x32x32xf16>, vector<8xf16>
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
