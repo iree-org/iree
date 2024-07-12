@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true})))))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-SCALABLE-MASK
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
   %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
@@ -366,3 +367,48 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK:           %[[GENERIC_SRC:.+]] = vector.transfer_read %[[UNPACK_WRITE]]{{.+}}, %[[GENERIC_MASK]]
 // CHECK-MASK:           %[[EXP:.+]] = math.exp %[[GENERIC_SRC]]
 // CHECK-MASK:           vector.transfer_write %[[EXP]]{{.+}}, %[[GENERIC_MASK]]
+
+// -----
+
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
+
+hal.executable private @test {
+  hal.executable.variant public @test target(#aarch64_sve) {
+    builtin.module {
+      func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x67x120x176xf32>) -> tensor<1x67x120x176xf32> {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
+        %c3 = arith.constant 3 : index
+        %c4 = arith.constant 4 : index
+        %c67 = arith.constant 67 : index
+        %c120 = arith.constant 120 : index
+        %c176 = arith.constant 176 : index
+        %c0_f32 = arith.constant 0.0 : f32
+        %vscale = vector.vscale
+        %c4_vscale = arith.muli %vscale, %c4 : index
+        %0 = scf.for %arg1 = %c0 to %c67 step %c1 iter_args(%arg2 = %arg0) -> (tensor<1x67x120x176xf32>) {
+          %1 = scf.for %arg3 = %c0 to %c120 step %c4 iter_args(%arg4 = %arg2) -> (tensor<1x67x120x176xf32>) {
+            %2 = affine.apply #map()[%c4_vscale]
+            %3 = scf.for %arg5 = %c0 to %2 step %c4_vscale iter_args(%arg6 = %arg4) -> (tensor<1x67x120x176xf32>) {
+              %extracted_slice = tensor.extract_slice %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x67x120x176xf32> to tensor<1x1x4x?xf32>
+              %4 = linalg.fill ins(%c0_f32 : f32) outs(%extracted_slice : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
+              %inserted_slice = tensor.insert_slice %4 into %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x67x120x176xf32>
+              scf.yield %inserted_slice : tensor<1x67x120x176xf32>
+            }
+            scf.yield %3 : tensor<1x67x120x176xf32>
+          }
+          scf.yield %1 : tensor<1x67x120x176xf32>
+        }
+        return %0 : tensor<1x67x120x176xf32>
+      }
+    }
+  }
+}
+
+// CHECK-SCALABLE-MASK-LABEL: func.func @dynamic_fill_with_scalable_tiling_infer_vector_size
+// CHECK-SCALABLE-MASK: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1x1x4x[4]xf32>
+// CHECK-SCALABLE-MASK: scf.for
+// CHECK-SCALABLE-MASK:   scf.for
+// CHECK-SCALABLE-MASK:     scf.for
+// CHECK-SCALABLE-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x1x4x?xf32>
