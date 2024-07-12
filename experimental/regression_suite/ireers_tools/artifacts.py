@@ -100,36 +100,20 @@ class ProducedArtifact(Artifact):
         name: str,
         callback: Callable[["ProducedArtifact"], Any],
         *,
-        always_produce: bool = False,
         depends: Collection["Artifact"] = (),
     ):
         self.group = ArtifactGroup.get(group)
         super().__init__(group, name, depends)
         self.name = name
         self.callback = callback
-        self.always_produce = always_produce
-
-    @property
-    def stamp_path(self) -> Path:
-        """Path of a stamp file which indicates successful transfer."""
-        return self.path.with_suffix(self.path.suffix + ".stamp")
 
     def start(self) -> "ProducedArtifact":
-        if not self.always_produce and self.stamp_path.exists():
-            if self.path.exists():
-                print(f"Not producing {self} because it has already been produced")
-                return self
-            self.stamp_path.unlink()
         self.callback(self)
         if not self.path.exists():
             raise RuntimeError(
                 f"Artifact {self} succeeded generation but was not produced"
             )
-        self.stamp()
         return self
-
-    def stamp(self):
-        self.stamp_path.touch()
 
 
 class FetchedArtifact(ProducedArtifact):
