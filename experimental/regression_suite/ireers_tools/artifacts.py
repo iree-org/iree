@@ -192,6 +192,7 @@ class FetchedArtifact(ProducedArtifact):
                     f"  Skipping '{remote_file_name}' download ({blob_size_str}) "
                     "- local MD5 hash matches"
                 )
+                return
 
             if not local_md5:
                 logger.info(
