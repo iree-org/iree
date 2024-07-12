@@ -300,8 +300,4 @@ iree_cc_library(
     iree::base::core_headers
     iree::schemas::cpu_data
     iree::builtins::ukernel::internal_headers
-    ${IREE_UK_ARM_64_DEPS}
-  PUBLIC
-)
-
-set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::arm_64" PARENT_SCOPE)
+    ${IREE_U

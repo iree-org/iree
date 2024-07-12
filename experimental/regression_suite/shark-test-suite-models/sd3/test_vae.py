@@ -80,7 +80,7 @@ def test_run_vae_cpu():
         cpu_vmfb,
         device="local-task",
         function="decode",
-        args = [
+        args=[
             f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.01f",
         ]
@@ -94,6 +94,7 @@ def test_run_vae_cpu():
 
 rocm_vmfb = None
 
+
 def test_compile_vae_rocm():
     rocm_vmfb = iree_compile(sd3_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
@@ -104,7 +105,7 @@ def test_run_vae_rocm():
         rocm_vmfb,
         device="hip",
         function="decode",
-        args = [
+        args=[
             f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.7f",
         ]

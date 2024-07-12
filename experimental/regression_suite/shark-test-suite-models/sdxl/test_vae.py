@@ -71,6 +71,7 @@ ROCM_COMPILE_FLAGS = [
 
 cpu_vmfb = None
 
+
 def test_compile_vae_cpu():
     iree_compile(sdxl_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
 
@@ -80,8 +81,8 @@ def test_run_vae_cpu():
     return iree_run_module(
         cpu_vmfb,
         device="local-task",
-        function="main"
-        args = [
+        function="main",
+        args=[
             f"--parameters=model={sdxl_vae_real_weights.path}",
             "--expected_f16_threshold=0.02f",
         ]
@@ -106,7 +107,7 @@ def test_run_vae_rocm():
         rocm_vmfb,
         device="hip",
         function="main",
-        args = [
+        args=[
             f"--parameters=model={sdxl_vae_real_weights.path}",
             "--expected_f16_threshold=0.4f",
         ]

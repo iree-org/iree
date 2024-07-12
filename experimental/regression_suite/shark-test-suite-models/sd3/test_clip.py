@@ -108,6 +108,7 @@ ROCM_COMPILE_FLAGS = [
 
 cpu_vmfb = None
 
+
 def test_compile_clip_cpu():
     cpu_vmfb = iree_compile(sd3_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
 
@@ -118,11 +119,11 @@ def test_run_clip_cpu():
         cpu_vmfb,
         device="local-task",
         function="encode_tokens",
-        args = [
+        args=[
             f"--parameters=model={sd3_clip_real_weights.path}",
             "--expected_f32_threshold=0.15f",
         ]
-        + COMMON_RUN_FLAGS
+        + COMMON_RUN_FLAGS,
     )
 
 
@@ -131,6 +132,7 @@ def test_run_clip_cpu():
 ###############################################################################
 
 rocm_vmfb = None
+
 
 @pytest.mark.xfail(
     raises=IreeCompileException,
