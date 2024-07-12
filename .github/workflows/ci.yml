@@ -429,7 +429,7 @@ jobs:
           IREE_HIP_DISABLE: 0
         run: |
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
-  
+
    test_amd_mi300:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi300')

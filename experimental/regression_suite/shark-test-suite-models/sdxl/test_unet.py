@@ -112,6 +112,7 @@ ROCM_PIPELINE_COMPILE_FLAGS = [
 pipeline_cpu_vmfb = None
 cpu_vmfb = None
 
+
 def test_compile_unet_pipeline_cpu():
     pipeline_cpu_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
@@ -130,7 +131,7 @@ def test_run_unet_cpu():
         cpu_vmfb,
         device="local-task",
         function="produce_image_latents",
-        args = [
+        args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
             f"--module={pipeline_cpu_vmfb.path}",
             "--expected_f16_threshold=0.8f",
@@ -145,6 +146,7 @@ def test_run_unet_cpu():
 
 pipeline_rocm_vmfb = None
 rocm_vmfb = None
+
 
 def test_compile_unet_pipeline_rocm():
     pipeline_rocm_vmfb = iree_compile(
@@ -164,7 +166,7 @@ def test_run_unet_rocm():
         rocm_vmfb,
         device="hip",
         function="produce_image_latents",
-        args = [
+        args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
             f"--module={pipeline_rocm_vmfb.path}",
             "--expected_f16_threshold=0.7f",

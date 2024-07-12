@@ -11,6 +11,10 @@ from tqdm import tqdm
 import urllib.parse
 import urllib.request
 import os
+from azure.storage.blob import BlobClient, BlobProperties
+import hashlib
+import mmap
+import re
 
 
 def show_progress(t):
@@ -127,7 +131,7 @@ class FetchedArtifact(ProducedArtifact):
         name = Path(urllib.parse.urlparse(url).path).name
         super().__init__(group, name, FetchedArtifact._callback)
         self.url = url
-    
+
     def get_azure_md5(remote_file: str, azure_blob_properties: BlobProperties):
         """Gets the content_md5 hash for a blob on Azure, if available."""
         content_settings = azure_blob_properties.get("content_settings")
@@ -140,7 +144,6 @@ class FetchedArtifact(ProducedArtifact):
                 "'content_md5' property, can't check if local matches remote"
             )
         return azure_md5
-
 
     def get_local_md5(local_file_path: Path):
         """Gets the content_md5 hash for a lolca file, if it exists."""
@@ -204,7 +207,6 @@ class FetchedArtifact(ProducedArtifact):
                     f"to '{relative_dir}' (local MD5 does not match)"
                 )
                 return False
-        
 
     @staticmethod
     def _callback(self: "FetchedArtifact"):
@@ -216,7 +218,9 @@ class FetchedArtifact(ProducedArtifact):
                 miniters=1,
                 desc=str(self.path),
             ) as t:
-                urllib.request.urlretrieve(self.url, self.path, reporthook=show_progress(t))
+                urllib.request.urlretrieve(
+                    self.url, self.path, reporthook=show_progress(t)
+                )
             print(f": Retrieved {self.path.stat().st_size} bytes")
 
 

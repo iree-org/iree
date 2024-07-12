@@ -98,6 +98,7 @@ ROCM_COMPILE_FLAGS = [
 
 cpu_vmfb = None
 
+
 def test_compile_clip_cpu():
     cpu_vmfb = iree_compile(sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
 
@@ -108,7 +109,7 @@ def test_run_clip_cpu():
         cpu_vmfb,
         device="local-task",
         function="encode_prompts",
-        args = [
+        args=[
             f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]
@@ -122,6 +123,7 @@ def test_run_clip_cpu():
 
 rocm_vmfb = None
 
+
 def test_compile_clip_rocm():
     rocm_vmfb = iree_compile(sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
 
@@ -132,7 +134,7 @@ def test_run_clip_rocm():
         rocm_vmfb,
         device="hip",
         function="encode_prompts",
-        args = [
+        args=[
             f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]

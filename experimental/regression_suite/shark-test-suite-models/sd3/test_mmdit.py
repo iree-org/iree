@@ -95,6 +95,7 @@ ROCM_COMPILE_FLAGS = [
 
 cpu_vmfb = None
 
+
 def test_compile_mmdit_cpu():
     cpu_vmfb = iree_compile(sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS)
 
@@ -109,9 +110,8 @@ def test_run_mmdit_cpu():
     return iree_run_module(
         cpu_vmfb,
         device="local-task",
-        function="run_forward"
-        [f"--parameters=model={sd3_mmdit_real_weights.path}"]
-        + COMMON_RUN_FLAGS,
+        function="run_forward",
+        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
     )
 
 
@@ -120,6 +120,7 @@ def test_run_mmdit_cpu():
 ###############################################################################
 
 rocm_vmfb = None
+
 
 @pytest.mark.xfail(
     raises=IreeCompileException,
@@ -136,5 +137,5 @@ def test_run_mmdit_rocm():
         rocm_vmfb,
         device="hip",
         function="run_forward",
-        [f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
+        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
     )
