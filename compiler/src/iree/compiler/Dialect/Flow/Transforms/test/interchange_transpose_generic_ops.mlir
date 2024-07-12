@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-interchange-transpose-generic-ops --canonicalize -cse --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-interchange-transpose-generic-ops --iree-flow-canonicalize -cse --mlir-print-local-scope %s | FileCheck %s
 
 util.func @supported_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x320xf16>) -> tensor<2x320x128x128xf16> {
   %empty = tensor.empty() : tensor<2x128x128x320xf32>

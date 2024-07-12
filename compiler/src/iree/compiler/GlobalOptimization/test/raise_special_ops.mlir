@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-global-opt-raise-special-ops -canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-raise-special-ops --iree-flow-canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
