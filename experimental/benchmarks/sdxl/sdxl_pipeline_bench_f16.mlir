@@ -19,5 +19,5 @@ module @sdxl_compiled_pipeline {
     }
     %image = func.call @compiled_vae.main(%res): (tensor<1x4x128x128xf16>) -> tensor<1x3x1024x1024xf16>
     return %image : tensor<1x3x1024x1024xf16>
-  } 
+  }
 }

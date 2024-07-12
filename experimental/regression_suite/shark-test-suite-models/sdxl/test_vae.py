@@ -45,8 +45,9 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
+
 @pytest.fixture
-def COMMON_RUN_FLAGS(
+def SDXL_VAE_COMMON_RUN_FLAGS(
     sdxl_vae_inference_input_0,
     sdxl_vae_inference_output_0,
 ):
@@ -54,6 +55,7 @@ def COMMON_RUN_FLAGS(
         f"--input=1x4x128x128xf16=@{sdxl_vae_inference_input_0.path}",
         f"--expected_output=1x3x1024x1024xf16=@{sdxl_vae_inference_output_0.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -75,21 +77,24 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_vae_cpu(sdxl_vae_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sdxl_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sdxl_vae_cpu_vmfb = iree_compile(
+        sdxl_vae_mlir, "cpu", CPU_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_vae_cpu"])
-def test_run_vae_cpu(COMMON_RUN_FLAGS, sdxl_vae_real_weights):
+def test_run_vae_cpu(SDXL_VAE_COMMON_RUN_FLAGS, sdxl_vae_real_weights):
     return iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sdxl_vae_cpu_vmfb,
         device="local-task",
         function="main",
         args=[
             f"--parameters=model={sdxl_vae_real_weights.path}",
             "--expected_f16_threshold=0.02f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_VAE_COMMON_RUN_FLAGS,
     )
 
 
@@ -97,19 +102,22 @@ def test_run_vae_cpu(COMMON_RUN_FLAGS, sdxl_vae_real_weights):
 # ROCM
 ###############################################################################
 
+
 def test_compile_vae_rocm(sdxl_vae_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sdxl_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sdxl_vae_rocm_vmfb = iree_compile(
+        sdxl_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_vae_rocm"])
-def test_run_vae_rocm(COMMON_RUN_FLAGS, sdxl_vae_real_weights):
+def test_run_vae_rocm(SDXL_VAE_COMMON_RUN_FLAGS, sdxl_vae_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sdxl_vae_rocm_vmfb,
         device="hip",
         function="main",
         args=[
             f"--parameters=model={sdxl_vae_real_weights.path}",
             "--expected_f16_threshold=0.4f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_VAE_COMMON_RUN_FLAGS,
     )

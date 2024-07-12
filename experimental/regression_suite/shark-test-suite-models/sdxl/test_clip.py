@@ -65,8 +65,9 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
+
 @pytest.fixture
-def COMMON_RUN_FLAGS(
+def SDXL_CLIP_COMMON_RUN_FLAGS(
     sdxl_clip_inference_input_0,
     sdxl_clip_inference_input_1,
     sdxl_clip_inference_input_2,
@@ -82,6 +83,7 @@ def COMMON_RUN_FLAGS(
         f"--expected_output=2x64x2048xf16=@{sdxl_clip_inference_output_0.path}",
         f"--expected_output=2x1280xf16=@{sdxl_clip_inference_output_1.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -106,21 +108,24 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_clip_cpu(sdxl_clip_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sdxl_clip_cpu_vmfb = iree_compile(
+        sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_clip_cpu"])
-def test_run_clip_cpu(COMMON_RUN_FLAGS, sdxl_clip_real_weights):
+def test_run_clip_cpu(SDXL_CLIP_COMMON_RUN_FLAGS, sdxl_clip_real_weights):
     iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sdxl_clip_cpu_vmfb,
         device="local-task",
         function="encode_prompts",
         args=[
             f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_CLIP_COMMON_RUN_FLAGS,
     )
 
 
@@ -128,19 +133,22 @@ def test_run_clip_cpu(COMMON_RUN_FLAGS, sdxl_clip_real_weights):
 # ROCM
 ###############################################################################
 
+
 def test_compile_clip_rocm(sdxl_clip_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sdxl_clip_rocm_vmfb = iree_compile(
+        sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_clip_rocm"])
-def test_run_clip_rocm(COMMON_RUN_FLAGS, sdxl_clip_real_weights):
+def test_run_clip_rocm(SDXL_CLIP_COMMON_RUN_FLAGS, sdxl_clip_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sdxl_clip_rocm_vmfb,
         device="hip",
         function="encode_prompts",
         args=[
             f"--parameters=model={sdxl_clip_real_weights.path}",
             "--expected_f16_threshold=1.0f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_CLIP_COMMON_RUN_FLAGS,
     )

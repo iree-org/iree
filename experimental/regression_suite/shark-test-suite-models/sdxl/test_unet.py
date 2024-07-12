@@ -68,13 +68,14 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
+
 @pytest.fixture
-def COMMON_RUN_FLAGS(
+def SDXL_UNET_COMMON_RUN_FLAGS(
     sdxl_unet_inference_input_0,
     sdxl_unet_inference_input_1,
     sdxl_unet_inference_input_2,
     sdxl_unet_inference_input_3,
-    sdxl_unet_inference_output_0
+    sdxl_unet_inference_output_0,
 ):
     return [
         f"--input=1x4x128x128xf16=@{sdxl_unet_inference_input_0.path}",
@@ -83,6 +84,7 @@ def COMMON_RUN_FLAGS(
         f"--input=1xf16=@{sdxl_unet_inference_input_3.path}",
         f"--expected_output=1x4x128x128xf16=@{sdxl_unet_inference_output_0.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -117,8 +119,9 @@ ROCM_PIPELINE_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_unet_pipeline_cpu(sdxl_unet_pipeline_mlir):
-    VmfbManager.cpu_pipeline_vmfb = iree_compile(
+    VmfbManager.sdxl_unet_cpu_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
         "cpu",
         CPU_COMPILE_FLAGS,
@@ -126,21 +129,23 @@ def test_compile_unet_pipeline_cpu(sdxl_unet_pipeline_mlir):
 
 
 def test_compile_unet_cpu(sdxl_unet_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sdxl_unet_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sdxl_unet_cpu_vmfb = iree_compile(
+        sdxl_unet_mlir, "cpu", CPU_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_unet_pipeline_cpu", "test_compile_unet_cpu"])
-def test_run_unet_cpu(COMMON_RUN_FLAGS, sdxl_unet_real_weights):
+def test_run_unet_cpu(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
     return iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sdxl_unet_cpu_vmfb,
         device="local-task",
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.cpu_pipeline_vmfb.path}",
+            f"--module={VmfbManager.sdxl_unet_cpu_pipeline_vmfb.path}",
             "--expected_f16_threshold=0.8f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_UNET_COMMON_RUN_FLAGS,
     )
 
 
@@ -148,8 +153,9 @@ def test_run_unet_cpu(COMMON_RUN_FLAGS, sdxl_unet_real_weights):
 # ROCM
 ###############################################################################
 
+
 def test_compile_unet_pipeline_rocm(sdxl_unet_pipeline_mlir):
-    VmfbManager.rocm_pipeline_vmfb = iree_compile(
+    VmfbManager.sdxl_unet_rocm_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
         f"rocm_{rocm_chip}",
         ROCM_PIPELINE_COMPILE_FLAGS,
@@ -157,19 +163,21 @@ def test_compile_unet_pipeline_rocm(sdxl_unet_pipeline_mlir):
 
 
 def test_compile_unet_rocm(sdxl_unet_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sdxl_unet_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sdxl_unet_rocm_vmfb = iree_compile(
+        sdxl_unet_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_unet_pipeline_rocm", "test_compile_unet_rocm"])
-def test_run_unet_rocm(COMMON_RUN_FLAGS, sdxl_unet_real_weights):
+def test_run_unet_rocm(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sdxl_unet_rocm_vmfb,
         device="hip",
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.rocm_pipeline_vmfb.path}",
+            f"--module={VmfbManager.sdxl_unet_rocm_pipeline_vmfb.path}",
             "--expected_f16_threshold=0.7f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SDXL_UNET_COMMON_RUN_FLAGS,
     )

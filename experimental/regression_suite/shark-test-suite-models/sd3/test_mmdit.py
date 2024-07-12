@@ -62,7 +62,8 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
-def COMMON_RUN_FLAGS(
+
+def SD3_MMDIT_COMMON_RUN_FLAGS(
     sd3_mmdit_inference_input_0,
     sd3_mmdit_inference_input_1,
     sd3_mmdit_inference_input_2,
@@ -76,6 +77,7 @@ def COMMON_RUN_FLAGS(
         f"--input=2xf16=@{sd3_mmdit_inference_input_3.path}",
         f"--expected_output=2x16x128x128xf32=@{sd3_mmdit_inference_output_0.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -101,8 +103,11 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_mmdit_cpu(sd3_mmdit_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sd3_mmdit_cpu_vmfb = iree_compile(
+        sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.xfail(
@@ -110,12 +115,13 @@ def test_compile_mmdit_cpu(sd3_mmdit_mlir):
     reason="Expected run to fail (remove xfail for test_run_mmdit_cpu)",
 )
 @pytest.mark.depends(on=["test_compile_mmdit_cpu"])
-def test_run_mmdit_cpu(COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
+def test_run_mmdit_cpu(SD3_MMDIT_COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
     return iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sd3_mmdit_cpu_vmfb,
         device="local-task",
         function="run_forward",
-        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
+        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"]
+        + SD3_MMDIT_COMMON_RUN_FLAGS,
     )
 
 
@@ -123,19 +129,23 @@ def test_run_mmdit_cpu(COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
 # ROCM
 ###############################################################################
 
+
 @pytest.mark.xfail(
     strict=True,
     reason="Expected compilation to fail (remove xfail for test_compile_mmdit_rocm)",
 )
 def test_compile_mmdit_rocm(sd3_mmdit_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sd3_mmdit_rocm_vmfb = iree_compile(
+        sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_mmdit_rocm"])
-def test_run_mmdit_rocm(COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
+def test_run_mmdit_rocm(SD3_MMDIT_COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sd3_mmdit_rocm_vmfb,
         device="hip",
         function="run_forward",
-        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"] + COMMON_RUN_FLAGS,
+        args=[f"--parameters=model={sd3_mmdit_real_weights.path}"]
+        + SD3_MMDIT_COMMON_RUN_FLAGS,
     )

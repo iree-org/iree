@@ -45,8 +45,9 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
+
 @pytest.fixture
-def COMMON_RUN_FLAGS(
+def SD3_VAE_COMMON_RUN_FLAGS(
     sd3_vae_inference_input_0,
     sd3_vae_inference_output_0,
 ):
@@ -54,6 +55,7 @@ def COMMON_RUN_FLAGS(
         f"--input=1x16x128x128xf16=@{sd3_vae_inference_input_0.path}",
         f"--expected_output=3x1024x1024xf32=@{sd3_vae_inference_output_0.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -73,21 +75,22 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_vae_cpu(sd3_vae_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sd3_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sd3_vae_cpu_vmfb = iree_compile(sd3_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
 
 
 @pytest.mark.depends(on=["test_compile_vae_cpu"])
-def test_run_vae_cpu(COMMON_RUN_FLAGS, sd3_vae_real_weights):
+def test_run_vae_cpu(SD3_VAE_COMMON_RUN_FLAGS, sd3_vae_real_weights):
     return iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sd3_vae_cpu_vmfb,
         device="local-task",
         function="decode",
         args=[
             f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.01f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SD3_VAE_COMMON_RUN_FLAGS,
     )
 
 
@@ -95,19 +98,22 @@ def test_run_vae_cpu(COMMON_RUN_FLAGS, sd3_vae_real_weights):
 # ROCM
 ###############################################################################
 
+
 def test_compile_vae_rocm(sd3_vae_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sd3_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sd3_vae_rocm_vmfb = iree_compile(
+        sd3_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_vae_rocm"])
-def test_run_vae_rocm(COMMON_RUN_FLAGS, sd3_vae_real_weights):
+def test_run_vae_rocm(SD3_VAE_COMMON_RUN_FLAGS, sd3_vae_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sd3_vae_rocm_vmfb,
         device="hip",
         function="decode",
         args=[
             f"--parameters=model={sd3_vae_real_weights.path}",
             "--expected_f32_threshold=0.7f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SD3_VAE_COMMON_RUN_FLAGS,
     )

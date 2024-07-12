@@ -24,6 +24,7 @@ for log_name, log_obj in logging.Logger.manager.loggerDict.items():
     if log_name.startswith("azure"):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
+
 def show_progress(t):
     last_b = [0]
 
@@ -138,7 +139,7 @@ class FetchedArtifact(ProducedArtifact):
         name = Path(urllib.parse.urlparse(url).path).name
         super().__init__(group, name, FetchedArtifact._callback)
         self.url = url
-    
+
     def human_readable_size(self, size, decimal_places=2):
         for unit in ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]:
             if size < 1024.0 or unit == "PiB":

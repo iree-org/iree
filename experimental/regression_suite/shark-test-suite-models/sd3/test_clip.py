@@ -75,8 +75,9 @@ CPU_COMPILE_FLAGS = [
     "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
+
 @pytest.fixture
-def COMMON_RUN_FLAGS(
+def SD3_CLIP_COMMON_RUN_FLAGS(
     sd3_clip_inference_input_0,
     sd3_clip_inference_input_1,
     sd3_clip_inference_input_2,
@@ -96,6 +97,7 @@ def COMMON_RUN_FLAGS(
         f"--expected_output=2x154x4096xf32=@{sd3_clip_inference_output_0.path}",
         f"--expected_output=2x2048xf32=@{sd3_clip_inference_output_1.path}",
     ]
+
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
@@ -118,21 +120,24 @@ ROCM_COMPILE_FLAGS = [
 # CPU
 ###############################################################################
 
+
 def test_compile_clip_cpu(sd3_clip_mlir):
-    VmfbManager.cpu_vmfb = iree_compile(sd3_clip_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sd3_clip_cpu_vmfb = iree_compile(
+        sd3_clip_mlir, "cpu", CPU_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_clip_cpu"])
-def test_run_clip_cpu(COMMON_RUN_FLAGS, sd3_clip_real_weights):
+def test_run_clip_cpu(SD3_CLIP_COMMON_RUN_FLAGS, sd3_clip_real_weights):
     iree_run_module(
-        VmfbManager.cpu_vmfb,
+        VmfbManager.sd3_clip_cpu_vmfb,
         device="local-task",
         function="encode_tokens",
         args=[
             f"--parameters=model={sd3_clip_real_weights.path}",
             "--expected_f32_threshold=0.15f",
         ]
-        + COMMON_RUN_FLAGS,
+        + SD3_CLIP_COMMON_RUN_FLAGS,
     )
 
 
@@ -140,19 +145,23 @@ def test_run_clip_cpu(COMMON_RUN_FLAGS, sd3_clip_real_weights):
 # ROCM
 ###############################################################################
 
+
 @pytest.mark.xfail(
     strict=True,
     reason="Expected compilation to fail (remove xfail for test_compile_clip_rocm)",
 )
 def test_compile_clip_rocm(sd3_clip_mlir):
-    VmfbManager.rocm_vmfb = iree_compile(sd3_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS)
+    VmfbManager.sd3_clip_rocm_vmfb = iree_compile(
+        sd3_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+    )
 
 
 @pytest.mark.depends(on=["test_compile_clip_rocm"])
-def test_run_clip_rocm(COMMON_RUN_FLAGS, sd3_clip_real_weights):
+def test_run_clip_rocm(SD3_CLIP_COMMON_RUN_FLAGS, sd3_clip_real_weights):
     return iree_run_module(
-        VmfbManager.rocm_vmfb,
+        VmfbManager.sd3_clip_rocm_vmfb,
         device="hip",
         function="encode_tokens",
-        args=[f"--parameters=model={sd3_clip_real_weights.path}"] + COMMON_RUN_FLAGS,
+        args=[f"--parameters=model={sd3_clip_real_weights.path}"]
+        + SD3_CLIP_COMMON_RUN_FLAGS,
     )
