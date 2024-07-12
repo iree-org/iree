@@ -241,8 +241,6 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
     IREE::LinalgExt::SortOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::ReverseOp::attachInterface<
-        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
     IREE::LinalgExt::TopkOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
     IREE::LinalgExt::WinogradInputTransformOp::attachInterface<

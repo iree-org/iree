@@ -369,67 +369,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
   }];
 }
 
-def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-  DeclareOpInterfaceMethods<LinalgFusionInterface>,
-  DeclareOpInterfaceMethods<
-      TilingInterface,
-      ["generateScalarImplementation",
-       "getIterationDomain",
-       "getLoopIteratorTypes",
-       "getResultTilePosition",
-       "getTiledImplementation"]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface>]> {
-  let summary = "Reverse operator";
-  let description = [{
-    A temporary solution for lowering reverse ops into IREE, allowing IREE to
-    tile and distribute them.
-    }
-  }];
-
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       I64ElementsAttr:$dimensions
-  );
-  let results = (outs Variadic<AnyRankedTensor>:$results);
-  let assemblyFormat = [{
-    attr-dict `dimensions` `(` $dimensions `)`
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-    (`:` type($results)^)?
-  }];
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-    ShapedType getOperandType() {
-      return cast<ShapedType>(getInput().getType());
-    }
-    int64_t getOperandRank() {
-      return getOperandType().getRank();
-    }
-    ArrayRef<int64_t> getOprerandShape() {
-      return getOperandType().getShape();
-    }
-    SmallVector<int64_t> getDimensionsArray() {
-      SmallVector<int64_t> ret;
-      for (const APInt& elem : getDimensions()) {
-        ret.push_back(elem.getLimitedValue());
-      }
-      return ret;
-    }
-
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
-  }];
-}
-
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
