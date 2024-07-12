@@ -512,6 +512,8 @@ flow.executable private @ex {
 
 // -----
 
+// Test transposing elementwise operation.
+
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
@@ -540,6 +542,8 @@ flow.executable private @ex {
 }
 
 // -----
+
+// Same as the above, but with the transpose map represented on the output.
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -570,6 +574,8 @@ flow.executable private @ex {
 
 // -----
 
+// Test marking a strictly broadcasting elementwise operation as a broadcast.
+
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 flow.executable private @ex {
@@ -597,6 +603,8 @@ flow.executable private @ex {
 }
 
 // -----
+
+// Test a pure elementwise operation with a broadcasted operand.
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -628,6 +636,8 @@ flow.executable private @ex {
 }
 
 // -----
+
+// Test a multi-result elementwise operation where one result is transposed.
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
