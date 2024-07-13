@@ -65,7 +65,8 @@ iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers);
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables);
 
 // Tries to scan the pending actions and release ready ones to the GPU.
 iree_status_t iree_hal_cuda_pending_queue_actions_issue(

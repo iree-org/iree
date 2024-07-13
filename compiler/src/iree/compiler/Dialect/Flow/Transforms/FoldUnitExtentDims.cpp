@@ -13,7 +13,10 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,6 +24,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-flow-fold-unit-extent-dims"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -46,15 +51,24 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   auto newGlobalType = globalType.clone(newShape);
   auto initialValue = global.getGlobalInitialValue();
-  // TODO: Handle non-uninitialized cases.
-  auto uninitializedAttr =
-      llvm::dyn_cast_if_present<IREE::Util::UninitializedAttr>(initialValue);
-  if (initialValue && !uninitializedAttr)
+  if (!initialValue)
     return success();
-  TypedAttr newInitialValue;
-  if (initialValue) {
-    newInitialValue = IREE::Util::UninitializedAttr::get(rewriter.getContext(),
-                                                         newGlobalType);
+  // TODO: Handle other cases
+  auto newInitialValue =
+      llvm::TypeSwitch<Attribute, Attribute>(initialValue)
+          .Case<IREE::Util::UninitializedAttr>([&](Attribute) {
+            return IREE::Util::UninitializedAttr::get(rewriter.getContext(),
+                                                      newGlobalType);
+          })
+          .Case<IREE::Stream::NamedParameterAttr>(
+              [&](IREE::Stream::NamedParameterAttr attr) {
+                return IREE::Stream::NamedParameterAttr::get(
+                    rewriter.getContext(), newGlobalType, attr.getScope(),
+                    attr.getKey(), attr.getConfig());
+              })
+          .Default([&](Attribute) { return nullptr; });
+  if (!newInitialValue) {
+    return success();
   }
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(global);
@@ -101,19 +115,19 @@ struct FoldUnitExtentDimsPass
 } // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  auto moduleOp = getOperation();
   MLIRContext *context = &getContext();
 
-  Explorer explorer(funcOp, TraversalAction::RECURSE);
+  SymbolTable moduleSymbols(moduleOp);
+  Explorer explorer(moduleOp, TraversalAction::RECURSE);
   explorer.initialize();
   IRRewriter rewriter(context);
-  SymbolTable moduleSymbols(funcOp);
 
   // Fold unit dims of GlobalOpInterface ops.
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
     IREE::Util::GlobalOpInterface global = globalInfo->op;
     auto tensorType = dyn_cast<RankedTensorType>(global.getGlobalType());
-    if (!tensorType || !global.isGlobalPrivate() || !global.isGlobalMutable()) {
+    if (!tensorType || !global.isGlobalPrivate()) {
       return;
     }
     if (llvm::none_of(tensorType.getShape(),
@@ -142,7 +156,7 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   };
   linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp,
+  if (failed(applyPatternsAndFoldGreedily(moduleOp,
                                           std::move(foldUnitDimsPatterns)))) {
     return signalPassFailure();
   }

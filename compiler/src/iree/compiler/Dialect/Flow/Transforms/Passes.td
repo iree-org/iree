@@ -22,6 +22,15 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def CanonicalizerPass :
+    Pass<"iree-flow-canonicalize", ""> {
+  let summary = "Flow specific canonicalization pass";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
+}
+
 def CaptureDynamicDimsPass :
     Pass<"iree-flow-capture-dynamic-dims", ""> {
   let summary = "Captures dynamic shape dimensions required by dispatch operands/results and control flow operations.";
@@ -318,15 +327,11 @@ def ExportBenchmarkFuncsPass :
   ];
 }
 
-def FusionOfTensorOpsPass :
-    InterfacePass<"iree-flow-fusion-of-tensor-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Fuse Linalg operations on tensors.";
+def FuseMultiUseElementwiseProducerPass :
+    InterfacePass<"iree-flow-fuse-multi-use-elementwise-producer", "mlir::FunctionOpInterface"> {
+  let summary = "Fuse elementwise linalg operations on tensors when producers have multiple uses.";
   let options = [
-    Option<"fuseMultiUse", "fuse-multi-use", "bool",
-           /*default=*/"false", "Fuse ops with multiuse">,
-    Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
-           /*default=*/"true", "Fuse ops that have multiple reduction iterators">,
-    Option<"multiUseFusionIteration", "multi-use-fusion-iteration", "unsigned",
+    Option<"numIterations", "num-iterations", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
   let dependentDialects = [

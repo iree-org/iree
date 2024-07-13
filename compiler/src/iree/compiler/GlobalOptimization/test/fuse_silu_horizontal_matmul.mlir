@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-global-opt-fuse-silu-horizontal-matmul,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-global-opt-fuse-silu-horizontal-matmul,iree-flow-canonicalize))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 util.func public @silu_horizontal_matmul_fusion(%arg0: index, %arg1: tensor<?x5120xf16>, %arg2: tensor<13824x5120xf16>, %arg3: tensor<13824x5120xf16>) -> tensor<?x13824xf16> {

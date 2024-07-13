@@ -205,8 +205,9 @@ TransferBuffersToHost(
         iree_hal_device_allocator(device), target_params, buffer_length,
         &target_buffer));
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_copy_buffer(
-        command_buffer.get(), source_buffer, 0, target_buffer.get(), 0,
-        buffer_length));
+        command_buffer.get(),
+        iree_hal_make_buffer_ref(source_buffer, 0, buffer_length),
+        iree_hal_make_buffer_ref(target_buffer.get(), 0, buffer_length)));
     vm::ref<iree_hal_buffer_view_t> target_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create_like(
         target_buffer.get(), source_views[i].get(),
@@ -222,7 +223,8 @@ TransferBuffersToHost(
       semaphore.get(), 1ull, iree_hal_device_host_allocator(device), &fence));
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
       device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-      iree_hal_fence_semaphore_list(fence.get()), 1, &command_buffer));
+      iree_hal_fence_semaphore_list(fence.get()), 1, &command_buffer,
+      /*binding_tables=*/NULL));
   IREE_RETURN_IF_ERROR(
       iree_hal_fence_wait(fence.get(), iree_infinite_timeout()));
   return std::move(target_views);

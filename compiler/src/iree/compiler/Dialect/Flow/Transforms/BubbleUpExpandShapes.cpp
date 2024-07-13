@@ -53,7 +53,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         }
 
         // Do not fuse by expand if consumer is dequant.
-        if (isDequantizationLikeOp(consumer)) {
+        if (isBitExtendOp(consumer)) {
           return false;
         }
 

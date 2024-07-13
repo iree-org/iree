@@ -288,6 +288,91 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     "large",
 ]]
 
+[iree_generated_e2e_runner_test(
+    name = "e2e_matmul_vmvx_experimental_dt%s_%s_%s" % (
+        ("_uk" if use_uk else ""),
+        lhs_rhs_type,
+        acc_type,
+    ),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-global-opt-enable-early-materialization=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=small",
+    ],
+    tags = [],
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+) for use_uk in [
+    False,
+    True,
+] for (lhs_rhs_type, acc_type) in (
+    [
+        ("f32", "f32"),
+    ]
+)]
+
+[iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cuda_experimental_dt_%s_%s" % (
+        lhs_rhs_type,
+        acc_type,
+    ),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-global-opt-enable-early-materialization=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=small",
+    ],
+    tags = [],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+) for (lhs_rhs_type, acc_type) in (
+    [
+        ("f32", "f32"),
+    ]
+)]
+
+[iree_generated_e2e_runner_test(
+    name = "e2e_matmul_spirv_experimental_dt_%s_%s" % (
+        lhs_rhs_type,
+        acc_type,
+    ),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-global-opt-enable-early-materialization=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=small",
+    ],
+    tags = [],
+    target_backends_and_drivers = [
+        ("vulkan-spirv", "vulkan"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+) for (lhs_rhs_type, acc_type) in (
+    [
+        ("f32", "f32"),
+    ]
+)]
+
 ###########################################################################
 ##
 ## VMVX backend

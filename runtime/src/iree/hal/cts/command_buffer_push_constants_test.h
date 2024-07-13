@@ -14,13 +14,11 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
 using ::testing::ContainerEq;
 
-class command_buffer_push_constants_test : public CtsTestBase {
+class CommandBufferPushConstantsTest : public CTSTestBase<> {
  protected:
   void PrepareExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -77,7 +75,7 @@ class command_buffer_push_constants_test : public CtsTestBase {
   iree_hal_executable_t* executable_ = NULL;
 };
 
-TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
+TEST_F(CommandBufferPushConstantsTest, DispatchWithPushConstants) {
   ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
 
   iree_hal_command_buffer_t* command_buffer = NULL;
@@ -101,7 +99,7 @@ TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, output_params, 4 * sizeof(uint32_t), &output_buffer));
 
-  iree_hal_descriptor_set_binding_t descriptor_set_bindings[] = {
+  iree_hal_buffer_ref_t descriptor_set_bindings[] = {
       {
           /*binding=*/0,
           /*buffer_slot=*/0,
@@ -152,8 +150,6 @@ TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
   CleanupExecutable();
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_COMMAND_BUFFER_PUSH_CONSTANTS_TEST_H_

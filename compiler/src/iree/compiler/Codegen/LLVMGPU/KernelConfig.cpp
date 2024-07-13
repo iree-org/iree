@@ -380,9 +380,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 }
 
 [[maybe_unused]] static void
-debugPrintContractionInfo(unsigned numLoops,
+debugPrintContractionInfo(StringRef label, unsigned numLoops,
                           linalg::ContractionDimensions contractionDims,
-                          ArrayRef<int64_t> workgroupTileSizes) {
+                          ArrayRef<int64_t> sizes) {
   ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
                                   contractionDims.n, contractionDims.k};
   std::string dimSymbols(numLoops, '*');
@@ -395,8 +395,8 @@ debugPrintContractionInfo(unsigned numLoops,
   llvm::interleaveComma(dimSymbols, llvm::dbgs());
   llvm::dbgs() << "]\n";
 
-  DBGS() << "Workgroup tile sizes: [";
-  llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+  DBGS() << label << ": [";
+  llvm::interleaveComma(sizes, llvm::dbgs());
   llvm::dbgs() << "]\n";
 }
 
@@ -418,6 +418,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       contractionDims->n.size() < 1) {
     return failure();
   }
+
+  LLVM_DEBUG(debugPrintContractionInfo("Problem size", op.getNumLoops(),
+                                       *contractionDims, bounds));
 
   // For now we are not being smart and trying to reshape dimensions to allow
   // for better usage of intrinsics, and instead are tiling all dimensions
@@ -447,11 +450,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type initElemType = getElementTypeOrSelf(init);
 
   if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isDequantizationLikeOp(lhsOp))
+    if (IREE::Flow::isBitExtendOp(lhsOp))
       lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
   }
   if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isDequantizationLikeOp(rhsOp))
+    if (IREE::Flow::isBitExtendOp(rhsOp))
       rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
   }
 
@@ -577,8 +580,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
-  LLVM_DEBUG(debugPrintContractionInfo(op.getNumLoops(), *contractionDims,
-                                       workgroupTileSizes));
+  LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
+                                       *contractionDims, workgroupTileSizes));
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);

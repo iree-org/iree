@@ -20,13 +20,13 @@
 // in the future but right now guards the stack from blowing up during calls.
 #define IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT ((iree_host_size_t)32)
 
-// Limit the number of execution bindings in a binding table. This today limits
-// our number of unique indirect buffers used within a command buffer but the
-// compiler is very good at coalescing those and we often end up with 1-3. If in
-// the future we want to use more from compiled programs we could change from
-// using a stack allocation to a heap allocation when many bindings are
-// provided.
-#define IREE_HAL_MODULE_MAX_COMMAND_BUFFER_BINDING_COUNT ((iree_host_size_t)256)
+// Limit the number of bindings in a binding table that we allocate on the stack
+// while marshaling from the VM. Counts over this amount will result in heap
+// allocations to avoid blowing the native stack. In most programs we expect
+// at most a dozen buffers but programs with individually stored parameters may
+// need hundreds or even thousands. Yuck.
+#define IREE_HAL_MODULE_MAX_STACK_COMMAND_BUFFER_BINDING_COUNT \
+  ((iree_host_size_t)64)
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -679,14 +679,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
       (iree_hal_command_category_t)args->i2;
   iree_host_size_t binding_capacity = (iree_host_size_t)args->i3;
 
-  if (IREE_UNLIKELY(binding_capacity >
-                    IREE_HAL_MODULE_MAX_COMMAND_BUFFER_BINDING_COUNT)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "binding table capacity %" PRIhsz " > %" PRIhsz,
-                            binding_capacity,
-                            IREE_HAL_MODULE_MAX_COMMAND_BUFFER_BINDING_COUNT);
-  }
-
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
       device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -776,9 +768,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
   uint32_t pattern = (uint32_t)args->i4;
   uint32_t pattern_length = (uint32_t)args->i5;
 
-  return iree_hal_command_buffer_fill_buffer(command_buffer, target_buffer,
-                                             target_offset, length, &pattern,
-                                             pattern_length);
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target_buffer, target_offset, length);
+  return iree_hal_command_buffer_fill_buffer(command_buffer, target_ref,
+                                             &pattern, pattern_length);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
@@ -795,9 +788,12 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
   iree_device_size_t target_offset = iree_hal_cast_device_size(args->i4);
   iree_device_size_t length = iree_hal_cast_device_size(args->i5);
 
-  return iree_hal_command_buffer_copy_buffer(command_buffer, source_buffer,
-                                             source_offset, target_buffer,
-                                             target_offset, length);
+  iree_hal_buffer_ref_t source_ref =
+      iree_hal_make_buffer_ref(source_buffer, source_offset, length);
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target_buffer, target_offset, length);
+  return iree_hal_command_buffer_copy_buffer(command_buffer, source_ref,
+                                             target_ref);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
@@ -810,25 +806,20 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
   IREE_RETURN_IF_ERROR(iree_hal_channel_check_deref(args->r1, &channel));
   iree_hal_collective_op_t op = {.packed = args->i2};
   uint32_t param = args->i3;
-  iree_hal_buffer_binding_t send_binding = {
-      .buffer = NULL,
-      .offset = iree_hal_cast_device_size(args->i5),
-      .length = iree_hal_cast_device_size(args->i6),
-  };
+  iree_hal_buffer_ref_t send_ref =
+      iree_hal_make_buffer_ref(NULL, iree_hal_cast_device_size(args->i5),
+                               iree_hal_cast_device_size(args->i6));
   IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_check_deref_or_null(args->r4, &send_binding.buffer));
-  iree_hal_buffer_binding_t recv_binding = {
-      .buffer = NULL,
-      .offset = iree_hal_cast_device_size(args->i8),
-      .length = iree_hal_cast_device_size(args->i9),
-  };
+      iree_hal_buffer_check_deref_or_null(args->r4, &send_ref.buffer));
+  iree_hal_buffer_ref_t recv_ref =
+      iree_hal_make_buffer_ref(NULL, iree_hal_cast_device_size(args->i8),
+                               iree_hal_cast_device_size(args->i9));
   IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_check_deref_or_null(args->r7, &recv_binding.buffer));
+      iree_hal_buffer_check_deref_or_null(args->r7, &recv_ref.buffer));
   iree_device_size_t element_count = iree_hal_cast_device_size(args->i10);
 
   return iree_hal_command_buffer_collective(command_buffer, channel, op, param,
-                                            send_binding, recv_binding,
-                                            element_count);
+                                            send_ref, recv_ref, element_count);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants,  //
@@ -867,11 +858,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
         IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
         binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
   }
-  iree_hal_descriptor_set_binding_t* bindings =
-      (iree_hal_descriptor_set_binding_t*)iree_alloca(
-          binding_count * sizeof(iree_hal_descriptor_set_binding_t));
+  iree_hal_buffer_ref_t* bindings = (iree_hal_buffer_ref_t*)iree_alloca(
+      binding_count * sizeof(iree_hal_buffer_ref_t));
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    bindings[i].binding = (uint32_t)args->a3[i].i0;
+    bindings[i].ordinal = (uint32_t)args->a3[i].i0;
     bindings[i].buffer_slot = (uint32_t)args->a3[i].i1;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref_or_null(
         args->a3[i].r2, &bindings[i].buffer));
@@ -915,43 +905,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
       iree_hal_buffer_check_deref(args->r3, &workgroups_buffer));
   iree_device_size_t workgroups_offset = iree_hal_cast_device_size(args->i4);
 
-  return iree_hal_command_buffer_dispatch_indirect(
-      command_buffer, executable, entry_point, workgroups_buffer,
-      workgroups_offset);
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execute_commands,  //
-                   iree_hal_module_state_t,                          //
-                   rrCrIID, v) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_command_buffer_t* commands = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r1, &commands));
-
-  iree_host_size_t binding_count = args->a2_count;
-  if (IREE_UNLIKELY(binding_count >
-                    IREE_HAL_MODULE_MAX_COMMAND_BUFFER_BINDING_COUNT)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE, "binding table count %" PRIhsz " > %" PRIhsz,
-        binding_count, IREE_HAL_MODULE_MAX_COMMAND_BUFFER_BINDING_COUNT);
-  }
-  iree_hal_buffer_binding_t* bindings = (iree_hal_buffer_binding_t*)iree_alloca(
-      binding_count * sizeof(iree_hal_buffer_binding_t));
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref_or_null(
-        args->a2[i].r0, &bindings[i].buffer));
-    bindings[i].offset = iree_hal_cast_device_size(args->a2[i].i1);
-    bindings[i].length = iree_hal_cast_device_size(args->a2[i].i2);
-  }
-
-  const iree_hal_buffer_binding_table_t binding_table = {
-      .count = binding_count,
-      .bindings = bindings,
-  };
-  return iree_hal_command_buffer_execute_commands(command_buffer, commands,
-                                                  binding_table);
+  iree_hal_buffer_ref_t workgroups_ref = iree_hal_make_buffer_ref(
+      workgroups_buffer, workgroups_offset, 3 * sizeof(uint32_t));
+  return iree_hal_command_buffer_dispatch_indirect(command_buffer, executable,
+                                                   entry_point, workgroups_ref);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1128,7 +1085,69 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
   return iree_hal_device_queue_execute(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
       iree_hal_fence_semaphore_list(signal_fence), command_buffer_count,
-      command_buffers);
+      command_buffers, /*binding_tables=*/NULL);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute_indirect,  //
+                   iree_hal_module_state_t,                        //
+                   rIrrrCrIID, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r4, &command_buffer));
+
+  // Allocate temporary storage for the binding table in order to marshal VM
+  // refs and 64-bit offsets/lengths into the types required by the HAL C API.
+  iree_host_size_t binding_count = args->a5_count;
+  iree_hal_buffer_binding_t* bindings = NULL;
+  if (binding_count > IREE_HAL_MODULE_MAX_STACK_COMMAND_BUFFER_BINDING_COUNT) {
+    // Heap allocate when using a large number of bindings to avoid blowing the
+    // native stack. Note that we have to free it before returning from the
+    // function.
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc_uninitialized(
+        state->host_allocator, binding_count * sizeof(*bindings),
+        (void**)&bindings));
+  } else {
+    // Stack allocate when using a small number of bindings (common).
+    bindings = (iree_hal_buffer_binding_t*)iree_alloca(binding_count *
+                                                       sizeof(*bindings));
+  }
+
+  // Ensure all buffers are valid (may be NULL) and build the binding table.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < binding_count; ++i) {
+    status = iree_hal_buffer_check_deref_or_null(args->a5[i].r0,
+                                                 &bindings[i].buffer);
+    if (!iree_status_is_ok(status)) break;
+    bindings[i].offset = iree_hal_cast_device_size(args->a5[i].i1);
+    bindings[i].length = iree_hal_cast_device_size(args->a5[i].i2);
+  }
+
+  // Schedule execution with the binding table - it will be copied by the device
+  // and need not live longer than the call.
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_binding_table_t binding_table = {
+        .count = binding_count,
+        .bindings = bindings,
+    };
+    status = iree_hal_device_queue_execute(
+        device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+        iree_hal_fence_semaphore_list(signal_fence), 1, &command_buffer,
+        &binding_table);
+  }
+
+  // If we had to heap-allocate the binding table storage it must be freed
+  // before returning to the VM.
+  if (binding_count > IREE_HAL_MODULE_MAX_STACK_COMMAND_BUFFER_BINDING_COUNT) {
+    iree_allocator_free(state->host_allocator, bindings);
+  }
+
+  return status;
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //

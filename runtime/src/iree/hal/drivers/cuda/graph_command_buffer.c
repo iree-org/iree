@@ -155,7 +155,7 @@ static void iree_cuda_graph_command_buffer_trace_zone_end(
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     iree_hal_cuda_tracing_context_t* tracing_context, CUcontext context,
     iree_hal_command_buffer_mode_t mode,
@@ -177,11 +177,16 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
 
   iree_hal_cuda_graph_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*command_buffer),
-                                (void**)&command_buffer));
+      z0,
+      iree_allocator_malloc(host_allocator,
+                            sizeof(*command_buffer) +
+                                iree_hal_command_buffer_validation_state_size(
+                                    mode, binding_capacity),
+                            (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device, mode, command_categories, queue_affinity, binding_capacity,
+      device_allocator, mode, command_categories, queue_affinity,
+      binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
       &iree_hal_cuda_graph_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->symbols = cuda_symbols;
@@ -448,7 +453,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_wait_events(
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t buffer_ref) {
   // We could mark the memory as invalidated so that if this is a managed buffer
   // CUDA does not try to copy it back to the host.
   return iree_ok_status();
@@ -478,8 +484,7 @@ static uint32_t iree_hal_cuda_splat_pattern(const void* pattern,
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
+    iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
@@ -491,17 +496,19 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                       &target_buffer));
+                                       &target_ref.buffer));
 
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_buffer));
-  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+  iree_device_size_t target_offset =
+      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
   uint32_t pattern_4byte = iree_hal_cuda_splat_pattern(pattern, pattern_length);
+
   CUDA_MEMSET_NODE_PARAMS params = {
       .dst = target_device_buffer + target_offset,
       .elementSize = pattern_length,
-      .pitch = 0,                        // unused if height == 1
-      .width = length / pattern_length,  // element count
+      .pitch = 0,                                   // unused if height == 1
+      .width = target_ref.length / pattern_length,  // element count
       .height = 1,
       .value = pattern_4byte,
   };
@@ -528,8 +535,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -546,23 +552,25 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
   // operation and get the wrong data.
   uint8_t* storage = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_arena_allocate(&command_buffer->arena, length, (void**)&storage));
-  memcpy(storage, (const uint8_t*)source_buffer + source_offset, length);
+      z0, iree_arena_allocate(&command_buffer->arena, target_ref.length,
+                              (void**)&storage));
+  memcpy(storage, (const uint8_t*)source_buffer + source_offset,
+         target_ref.length);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                       &target_buffer));
+                                       &target_ref.buffer));
 
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+      iree_hal_buffer_allocated_buffer(target_ref.buffer));
   CUDA_MEMCPY3D params = {
       .srcMemoryType = CU_MEMORYTYPE_HOST,
       .srcHost = storage,
       .dstMemoryType = CU_MEMORYTYPE_DEVICE,
       .dstDevice = target_device_buffer,
-      .dstXInBytes = iree_hal_buffer_byte_offset(target_buffer) + target_offset,
-      .WidthInBytes = length,
+      .dstXInBytes =
+          iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset,
+      .WidthInBytes = target_ref.length,
       .Height = 1,
       .Depth = 1,
   };
@@ -589,9 +597,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -600,17 +606,20 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
-  const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
+  const iree_hal_buffer_t* resources[2] = {source_ref.buffer,
+                                           target_ref.buffer};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set,
+                                       IREE_ARRAYSIZE(resources), resources));
 
-  CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_buffer));
-  target_offset += iree_hal_buffer_byte_offset(target_buffer);
   CUdeviceptr source_device_buffer = iree_hal_cuda_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(source_buffer));
-  source_offset += iree_hal_buffer_byte_offset(source_buffer);
+      iree_hal_buffer_allocated_buffer(source_ref.buffer));
+  iree_device_size_t source_offset =
+      iree_hal_buffer_byte_offset(source_ref.buffer) + source_ref.offset;
+  CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
+      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+  iree_device_size_t target_offset =
+      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
 
   CUDA_MEMCPY3D params = {
       .srcMemoryType = CU_MEMORYTYPE_DEVICE,
@@ -619,7 +628,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       .dstMemoryType = CU_MEMORYTYPE_DEVICE,
       .dstDevice = target_device_buffer,
       .dstXInBytes = target_offset,
-      .WidthInBytes = length,
+      .WidthInBytes = target_ref.length,
       .Height = 1,
       .Depth = 1,
   };
@@ -646,11 +655,20 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+    iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
+    iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_hal_buffer_binding_t send_binding = {
+      .buffer = send_ref.buffer,
+      .offset = send_ref.offset,
+      .length = send_ref.length,
+  };
+  iree_hal_buffer_binding_t recv_binding = {
+      .buffer = recv_ref.buffer,
+      .offset = recv_ref.offset,
+      .length = recv_ref.length,
+  };
   return iree_hal_collective_batch_append(&command_buffer->collective_batch,
                                           channel, op, param, send_binding,
                                           recv_binding, element_count);
@@ -673,8 +691,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
   if (binding_count > IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -689,7 +706,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
 
   CUdeviceptr* current_bindings = command_buffer->descriptor_sets[set].bindings;
   for (iree_host_size_t i = 0; i < binding_count; i++) {
-    const iree_hal_descriptor_set_binding_t* binding = &bindings[i];
+    const iree_hal_buffer_ref_t* binding = &bindings[i];
     CUdeviceptr device_ptr = 0;
     if (binding->buffer) {
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -701,7 +718,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
       device_ptr = device_buffer + offset + binding->offset;
     }
-    current_bindings[binding->binding] = device_ptr;
+    current_bindings[binding->ordinal] = device_ptr;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -837,23 +854,9 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
 static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer,
-    iree_device_size_t workgroups_offset) {
+    iree_hal_buffer_ref_t workgroups_ref) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "indirect dispatch not yet implemented");
-}
-
-static iree_status_t iree_hal_cuda_graph_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): support indirect command buffers by adding subgraph nodes and
-  // tracking the binding table for future cuGraphExecKernelNodeSetParams usage.
-  // Need to look into how to update the params of the subgraph nodes - is the
-  // graph exec the outer one and if so will it allow node handles from the
-  // subgraphs?
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
 }
 
 static const iree_hal_command_buffer_vtable_t
@@ -880,5 +883,4 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_cuda_graph_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_cuda_graph_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_cuda_graph_command_buffer_execute_commands,
 };

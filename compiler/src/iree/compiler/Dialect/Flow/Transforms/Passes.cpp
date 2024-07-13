@@ -129,7 +129,7 @@ using FunctionLikeNest =
 static void addCleanupPatterns(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // Standard MLIR cleanup.
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
       // Simplify util.global accesses; this can help with data flow tracking as
@@ -161,14 +161,14 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 clEnableElementWiseFuseMultiReduction});
       })
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
       .addPass(IREE::Flow::createBubbleUpExpandShapesPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
       // 3. Perform elementwise operation fusion again (now with higher
@@ -178,13 +178,13 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             ElementwiseOpFusionPassOptions{
                 clEnableElementWiseFuseMultiReduction});
       })
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
       // 4. After elementwise operation fusion sink reshapes that block
       //    producer-consumer fusion.
       .addPass(IREE::Flow::createSinkReshapesPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 }
 
@@ -231,7 +231,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // acts as a contiguous view of the tensor
       // - Apply tensor -> flow patterns
       .addPass(IREE::Flow::createConvertTensorToFlowPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       /// Creates the workgroup count region where the materialized computation
       /// is derived as a program slice of the body of the dispatch. This method
       /// - Computes the `workload` to use for the `workgroupsOp`, which are
@@ -252,20 +252,16 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion.
       .addPass(IREE::Flow::createFusionPreprocessingPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
 
   FunctionLikeNest(passManager)
-      .addPass([]() {
-        return IREE::Flow::createFusionOfTensorOpsPass(
-            FusionOfTensorOpsPassOptions{
-                clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction});
-      })
+      .addPass(IREE::Flow::createFuseMultiUseElementwiseProducerPass)
       .addPredicatedPass(clDetensoring,
                          [&]() { return mlir::createLinalgDetensorizePass(); })
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clCollapseReductionDims,
                          IREE::Flow::createCollapseReductionDimensionsPass)
@@ -321,7 +317,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createCaptureDynamicDimsPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPass([&]() {
         return IREE::Flow::createInitializeEmptyTensorsPass(
@@ -361,7 +357,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       IREE::Util::createStripDebugOpsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
+  FunctionLikeNest(passManager).addPass(IREE::Flow::createCanonicalizerPass);
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
@@ -428,7 +424,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Cleanup executable contents.
   {
     auto executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
-    executablePassManager.addPass(mlir::createCanonicalizerPass());
+    executablePassManager.addPass(IREE::Flow::createCanonicalizerPass());
     executablePassManager.addPass(mlir::createCSEPass());
   }
 

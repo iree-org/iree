@@ -793,7 +793,8 @@ static iree_status_t process_call_outputs(
     };
     status = iree_hal_device_queue_execute(
         device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-        signal_semaphores, 1, &transfer_command_buffer);
+        signal_semaphores, 1, &transfer_command_buffer,
+        /*binding_tables=*/NULL);
   }
   // TODO(scotttodd): Make this async - pass a wait source to iree_loop_wait_one
   //     1. create iree_hal_fence_t, iree_hal_fence_insert(fance, semaphore)

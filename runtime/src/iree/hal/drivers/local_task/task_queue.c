@@ -11,6 +11,8 @@
 
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
+#include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/resource_set.h"
 #include "iree/task/submission.h"
 
 // Each submission is turned into a DAG for execution:
@@ -75,8 +77,9 @@ static iree_status_t iree_hal_semaphore_list_clone(
   out_target_list->payload_values = (uint64_t*)(buffer + semaphores_size);
 
   for (iree_host_size_t i = 0; i < source_list->count; ++i) {
-    out_target_list->semaphores[i] = source_list->semaphores[i];
-    iree_hal_semaphore_retain(out_target_list->semaphores[i]);
+    iree_hal_semaphore_t* semaphore = source_list->semaphores[i];
+    iree_hal_semaphore_retain(semaphore);
+    out_target_list->semaphores[i] = semaphore;
     out_target_list->payload_values[i] = source_list->payload_values[i];
   }
 
@@ -147,7 +150,7 @@ static void iree_hal_task_queue_wait_cmd_cleanup(
 // Allocates and initializes a iree_hal_task_queue_wait_cmd_t task.
 static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
     iree_task_scope_t* scope, const iree_hal_semaphore_list_t* wait_semaphores,
-    iree_arena_allocator_t* arena, iree_hal_task_queue_wait_cmd_t** out_cmd) {
+    iree_arena_allocator_t* arena, iree_task_t** out_issue_task) {
   iree_hal_task_queue_wait_cmd_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd));
   iree_task_call_initialize(
@@ -162,7 +165,7 @@ static iree_status_t iree_hal_task_queue_wait_cmd_allocate(
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_clone(wait_semaphores, arena,
                                                      &cmd->wait_semaphores));
 
-  *out_cmd = cmd;
+  *out_issue_task = &cmd->task.header;
   return iree_ok_status();
 }
 
@@ -185,10 +188,75 @@ typedef struct iree_hal_task_queue_issue_cmd_t {
   // if we are the last issue pending.
   iree_hal_task_queue_t* queue;
 
-  // Command buffers to be issued in the order the appeared in the submission.
+  // A resource set containing all binding table buffers.
+  // Owned by the retire command and any resources added will be retained until
+  // the submission has completed (or failed).
+  iree_hal_resource_set_t* resource_set;
+
+  // Command buffers to be issued in the order they appeared in the submission.
   iree_host_size_t command_buffer_count;
-  iree_hal_command_buffer_t* command_buffers[];
+  iree_hal_command_buffer_t** command_buffers;
+  iree_hal_buffer_binding_table_t* binding_tables;
 } iree_hal_task_queue_issue_cmd_t;
+
+static iree_status_t iree_hal_task_queue_issue_cmd_deferred(
+    iree_hal_task_queue_issue_cmd_t* cmd,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_task_submission_t* pending_submission) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Create a transient command buffer that we'll apply the deferred commands
+  // into. It will live beyond this function as we'll issue the commands but
+  // they may not run immediately.
+  iree_hal_command_buffer_t* task_command_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_task_command_buffer_create(
+          cmd->queue->device_allocator, &cmd->queue->scope,
+          iree_hal_command_buffer_mode(command_buffer) |
+              IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
+              // NOTE: we need to validate if a binding table is provided as the
+              // bindings were not known when it was originally recorded.
+              (iree_hal_buffer_binding_table_is_empty(binding_table)
+                   ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+                   : 0),
+          iree_hal_command_buffer_allowed_categories(command_buffer),
+          cmd->queue->affinity, /*binding_capacity=*/0,
+          cmd->queue->large_block_pool,
+          iree_hal_allocator_host_allocator(cmd->queue->device_allocator),
+          &task_command_buffer));
+
+  // Keep the command buffer live until the queue operation completes.
+  iree_status_t status =
+      iree_hal_resource_set_insert(cmd->resource_set, 1, &task_command_buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_command_buffer_release(task_command_buffer);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  // Replay the commands from the deferred command buffer into the new task one.
+  // This creates the task graph and captures the binding references but does
+  // not yet issue the commands.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_deferred_command_buffer_apply(
+              command_buffer, task_command_buffer, binding_table));
+
+  // Issue the task command buffer as if it had been recorded directly to begin
+  // with.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_task_command_buffer_issue(task_command_buffer,
+                                             &cmd->queue->state,
+                                             cmd->task.header.completion_task,
+                                             cmd->arena, pending_submission));
+
+  // Still retained in the resource set until retirement.
+  iree_hal_command_buffer_release(task_command_buffer);
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
 
 // Issues a set of command buffers without waiting for them to complete.
 static iree_status_t iree_hal_task_queue_issue_cmd(
@@ -202,12 +270,23 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
   // NOTE: it's ok for there to be no command buffers - in that case the
   // submission was purely for synchronization.
   for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-    if (iree_hal_task_command_buffer_isa(cmd->command_buffers[i])) {
-      status = iree_hal_task_command_buffer_issue(
-          cmd->command_buffers[i], &cmd->queue->state,
-          cmd->task.header.completion_task, cmd->arena, pending_submission);
-      iree_hal_command_buffer_release(cmd->command_buffers[i]);
-      cmd->command_buffers[i] = NULL;
+    iree_hal_command_buffer_t* command_buffer = cmd->command_buffers[i];
+    if (iree_hal_task_command_buffer_isa(command_buffer)) {
+      if (cmd->binding_tables && cmd->binding_tables[i].count > 0) {
+        status = iree_make_status(
+            IREE_STATUS_UNIMPLEMENTED,
+            "task command buffers do not support binding tables yet");
+      } else {
+        status = iree_hal_task_command_buffer_issue(
+            command_buffer, &cmd->queue->state,
+            cmd->task.header.completion_task, cmd->arena, pending_submission);
+      }
+    } else if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
+      iree_hal_buffer_binding_table_t binding_table =
+          cmd->binding_tables ? cmd->binding_tables[i]
+                              : iree_hal_buffer_binding_table_empty();
+      status = iree_hal_task_queue_issue_cmd_deferred(
+          cmd, command_buffer, binding_table, pending_submission);
     } else {
       status = iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
@@ -220,52 +299,82 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
   return status;
 }
 
-// Cleanup for iree_hal_task_queue_issue_cmd_t to drop all resources.
-// Any that need to remain live during execution are retained by the tasks
-// performing that execution.
-static void iree_hal_task_queue_issue_cmd_cleanup(
-    iree_task_t* task, iree_status_code_t status_code) {
-  iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Release command buffers; some may have been released after issuing but this
-  // handles leftovers that may appear due to failures.
-  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-    iree_hal_command_buffer_release(cmd->command_buffers[i]);
-    cmd->command_buffers[i] = NULL;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
 // Allocates and initializes a iree_hal_task_queue_issue_cmd_t task.
 static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
-    iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
-    iree_task_t* retire_task, iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_arena_allocator_t* arena, iree_hal_task_queue_issue_cmd_t** out_cmd) {
+    void* user_data, iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
+    iree_task_t* retire_task, iree_arena_allocator_t* arena,
+    iree_hal_resource_set_t* resource_set, iree_task_t** out_issue_task) {
+  iree_hal_task_submission_batch_t* batch =
+      (iree_hal_task_submission_batch_t*)user_data;
+
   iree_hal_task_queue_issue_cmd_t* cmd = NULL;
-  iree_host_size_t total_cmd_size =
-      sizeof(*cmd) + command_buffer_count * sizeof(*cmd->command_buffers);
+  iree_host_size_t command_buffers_size =
+      batch->command_buffer_count * sizeof(*cmd->command_buffers);
+  iree_host_size_t binding_tables_size = 0;
+  iree_host_size_t binding_table_elements_size = 0;
+  if (batch->binding_tables) {
+    binding_tables_size =
+        batch->command_buffer_count * sizeof(*cmd->binding_tables);
+    for (iree_host_size_t i = 0; i < batch->command_buffer_count; ++i) {
+      binding_table_elements_size += batch->binding_tables[i].count *
+                                     sizeof(*batch->binding_tables[i].bindings);
+    }
+  }
+  iree_host_size_t total_cmd_size = sizeof(*cmd) + command_buffers_size +
+                                    binding_tables_size +
+                                    binding_table_elements_size;
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(arena, total_cmd_size, (void**)&cmd));
   iree_task_call_initialize(
       scope, iree_task_make_call_closure(iree_hal_task_queue_issue_cmd, 0),
       &cmd->task);
   iree_task_set_completion_task(&cmd->task.header, retire_task);
-  iree_task_set_cleanup_fn(&cmd->task.header,
-                           iree_hal_task_queue_issue_cmd_cleanup);
   cmd->arena = arena;
   cmd->queue = queue;
+  cmd->resource_set = resource_set;
 
-  cmd->command_buffer_count = command_buffer_count;
-  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-    cmd->command_buffers[i] = command_buffers[i];
-    iree_hal_command_buffer_retain(cmd->command_buffers[i]);
+  cmd->command_buffer_count = batch->command_buffer_count;
+  cmd->command_buffers =
+      (iree_hal_command_buffer_t**)((uint8_t*)cmd + sizeof(*cmd));
+  memcpy(cmd->command_buffers, batch->command_buffers, command_buffers_size);
+
+  // Binding tables are optional and we only need this extra work if there were
+  // any non-empty binding tables provided during submission.
+  iree_status_t status = iree_ok_status();
+  if (binding_table_elements_size > 0) {
+    // Copy over binding tables and all of their contents.
+    cmd->binding_tables =
+        (iree_hal_buffer_binding_table_t*)((uint8_t*)cmd->command_buffers +
+                                           command_buffers_size);
+    iree_hal_buffer_binding_t* binding_element_ptr =
+        (iree_hal_buffer_binding_t*)((uint8_t*)cmd->binding_tables +
+                                     binding_tables_size);
+    for (iree_host_size_t i = 0; i < batch->command_buffer_count; ++i) {
+      iree_host_size_t element_count = batch->binding_tables[i].count;
+      cmd->binding_tables[i].count = element_count;
+      cmd->binding_tables[i].bindings = binding_element_ptr;
+      memcpy((void*)cmd->binding_tables[i].bindings,
+             batch->binding_tables[i].bindings,
+             element_count * sizeof(*binding_element_ptr));
+      binding_element_ptr += element_count;
+
+      // Bulk insert all bindings into the resource set. This will keep the
+      // referenced buffers live until the issue has completed. Note that if we
+      // fail here we need to clean up the resource set below before returning.
+      status = iree_hal_resource_set_insert_strided(
+          cmd->resource_set, element_count, cmd->binding_tables[i].bindings,
+          offsetof(iree_hal_buffer_binding_t, buffer),
+          sizeof(iree_hal_buffer_binding_t));
+      if (!iree_status_is_ok(status)) break;
+    }
+  } else {
+    cmd->binding_tables = NULL;
   }
 
-  *out_cmd = cmd;
-  return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    *out_issue_task = &cmd->task.header;
+  }
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -291,8 +400,10 @@ typedef struct iree_hal_task_queue_retire_cmd_t {
   // Resources retained until all have retired.
   // We could release them earlier but that would require tracking individual
   // resource-level completion.
-  iree_host_size_t resource_count;
-  iree_hal_resource_t* resources[];
+  //
+  // This resource set is allocated from the small block pool and is expected to
+  // only have a small number of resources (command buffers, etc).
+  iree_hal_resource_set_t* resource_set;
 } iree_hal_task_queue_retire_cmd_t;
 
 // Retires a submission by signaling semaphores to their desired value and
@@ -304,13 +415,11 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
       (iree_hal_task_queue_retire_cmd_t*)task;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Release command buffers now that all are known to have retired.
+  // Release retained resources (command buffers, etc).
   // We do this before signaling so that waiting threads can immediately reuse
   // resources that are released.
-  for (iree_host_size_t i = 0; i < cmd->resource_count; ++i) {
-    iree_hal_resource_release(cmd->resources[i]);
-    cmd->resources[i] = NULL;
-  }
+  iree_hal_resource_set_free(cmd->resource_set);
+  cmd->resource_set = NULL;
 
   // Signal all semaphores to their new values.
   // Note that if any signal fails then the whole command will fail and all
@@ -339,9 +448,9 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
   // Release resources now that all are known to have retired.
   // In success cases we try to do this eagerly to allow for more potential
   // reuse but during full/partial failures they may still be live here.
-  for (iree_host_size_t i = 0; i < cmd->resource_count; ++i) {
-    iree_hal_resource_release(cmd->resources[i]);
-    cmd->resources[i] = NULL;
+  if (!cmd->resource_set) {
+    iree_hal_resource_set_free(cmd->resource_set);
+    cmd->resource_set = NULL;
   }
 
   // If the command failed then fail all semaphores to ensure future
@@ -368,8 +477,7 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
 // The command will own an arena that can be used for other submission-related
 // allocations.
 static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
-    iree_task_scope_t* scope, iree_host_size_t resource_count,
-    iree_hal_resource_t* const* resources,
+    iree_task_scope_t* scope,
     const iree_hal_semaphore_list_t* signal_semaphores,
     iree_arena_block_pool_t* block_pool,
     iree_hal_task_queue_retire_cmd_t** out_cmd) {
@@ -379,17 +487,20 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
 
   // Allocate the command from the arena.
   iree_hal_task_queue_retire_cmd_t* cmd = NULL;
-  iree_host_size_t total_cmd_size =
-      sizeof(*cmd) + resource_count * sizeof(*cmd->resources);
   iree_status_t status =
-      iree_arena_allocate(&arena, total_cmd_size, (void**)&cmd);
-  if (iree_status_is_ok(status)) {
-    iree_task_call_initialize(
-        scope, iree_task_make_call_closure(iree_hal_task_queue_retire_cmd, 0),
-        &cmd->task);
-    iree_task_set_cleanup_fn(&cmd->task.header,
-                             iree_hal_task_queue_retire_cmd_cleanup);
+      iree_arena_allocate(&arena, sizeof(*cmd), (void**)&cmd);
+  if (!iree_status_is_ok(status)) {
+    iree_arena_deinitialize(&arena);
+    return status;
   }
+
+  iree_task_call_initialize(
+      scope, iree_task_make_call_closure(iree_hal_task_queue_retire_cmd, 0),
+      &cmd->task);
+  iree_task_set_cleanup_fn(&cmd->task.header,
+                           iree_hal_task_queue_retire_cmd_cleanup);
+  cmd->signal_semaphores = iree_hal_semaphore_list_empty();
+  cmd->resource_set = NULL;
 
   // Clone the signal semaphores from the batch - we retain them and their
   // payloads.
@@ -398,19 +509,22 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
                                            &cmd->signal_semaphores);
   }
 
+  // Create a lightweight resource set to retain any resources used by the
+  // command. Note that this is coming from the small block pool and is intended
+  // only for a small number of resources.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_allocate(block_pool, &cmd->resource_set);
+  }
+
   if (iree_status_is_ok(status)) {
     // Transfer ownership of the arena to command.
     memcpy(&cmd->arena, &arena, sizeof(cmd->arena));
-
-    // Retain command buffers.
-    cmd->resource_count = resource_count;
-    for (iree_host_size_t i = 0; i < resource_count; ++i) {
-      cmd->resources[i] = resources[i];
-      iree_hal_resource_retain(cmd->resources[i]);
-    }
-
     *out_cmd = cmd;
   } else {
+    if (cmd) {
+      iree_hal_resource_set_free(cmd->resource_set);
+      iree_hal_semaphore_list_release(&cmd->signal_semaphores);
+    }
     iree_arena_deinitialize(&arena);
   }
   return status;
@@ -421,18 +535,25 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
 //===----------------------------------------------------------------------===//
 
 void iree_hal_task_queue_initialize(iree_string_view_t identifier,
+                                    iree_hal_queue_affinity_t affinity,
                                     iree_task_scope_flags_t scope_flags,
                                     iree_task_executor_t* executor,
-                                    iree_arena_block_pool_t* block_pool,
+                                    iree_arena_block_pool_t* small_block_pool,
+                                    iree_arena_block_pool_t* large_block_pool,
+                                    iree_hal_allocator_t* device_allocator,
                                     iree_hal_task_queue_t* out_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, identifier.data, identifier.size);
 
   memset(out_queue, 0, sizeof(*out_queue));
 
+  out_queue->affinity = affinity;
   out_queue->executor = executor;
   iree_task_executor_retain(out_queue->executor);
-  out_queue->block_pool = block_pool;
+  out_queue->small_block_pool = small_block_pool;
+  out_queue->large_block_pool = large_block_pool;
+  out_queue->device_allocator = device_allocator;
+  iree_hal_allocator_retain(out_queue->device_allocator);
 
   iree_task_scope_initialize(identifier, scope_flags, &out_queue->scope);
 
@@ -449,6 +570,7 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
 
   iree_hal_task_queue_state_deinitialize(&queue->state);
   iree_task_scope_deinitialize(&queue->scope);
+  iree_hal_allocator_release(queue->device_allocator);
   iree_task_executor_release(queue->executor);
 
   IREE_TRACE_ZONE_END(z0);
@@ -459,45 +581,59 @@ void iree_hal_task_queue_trim(iree_hal_task_queue_t* queue) {
   iree_task_executor_trim(queue->executor);
 }
 
-static iree_status_t iree_hal_task_queue_submit_batch(
-    iree_hal_task_queue_t* queue, const iree_hal_submission_batch_t* batch) {
+typedef iree_status_t(IREE_API_PTR* iree_hal_task_queue_issue_t)(
+    void* user_data, iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
+    iree_task_t* retire_task, iree_arena_allocator_t* arena,
+    iree_hal_resource_set_t* resource_set, iree_task_t** out_issue_task);
+
+static iree_status_t iree_hal_task_queue_submit(
+    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores,
+    iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
+    iree_hal_task_queue_issue_t issue, void* user_data) {
   // Task to retire the submission and free the transient memory allocated for
   // it (including the command itself). We allocate this first so it can get an
   // arena which we will use to allocate all other commands.
   iree_hal_task_queue_retire_cmd_t* retire_cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_retire_cmd_allocate(
-      &queue->scope, batch->command_buffer_count,
-      (iree_hal_resource_t* const*)batch->command_buffers,
-      &batch->signal_semaphores, queue->block_pool, &retire_cmd));
+      &queue->scope, &signal_semaphores, queue->small_block_pool, &retire_cmd));
 
+  // If the caller provided any resources they wanted to retain we add them to
+  // the resource set for them. This is just a helper to avoid needing to pass
+  // too much state back to issue callbacks.
+  //
   // NOTE: if we fail from here on we must drop the retire_cmd arena.
   iree_status_t status = iree_ok_status();
+  if (resource_count > 0) {
+    status = iree_hal_resource_set_insert(retire_cmd->resource_set,
+                                          resource_count, resources);
+  }
 
   // A fence we'll use to detect when the entire submission has completed.
   // TODO(benvanik): fold into the retire command.
   iree_task_fence_t* fence = NULL;
-  status =
-      iree_task_executor_acquire_fence(queue->executor, &queue->scope, &fence);
-  iree_task_set_completion_task(&retire_cmd->task.header, &fence->header);
+  if (iree_status_is_ok(status)) {
+    status = iree_task_executor_acquire_fence(queue->executor, &queue->scope,
+                                              &fence);
+    iree_task_set_completion_task(&retire_cmd->task.header, &fence->header);
+  }
 
   // Task to fork and wait for unsatisfied semaphore dependencies.
   // This is optional and only required if we have previous submissions still
   // in-flight - if the queue is empty then we can directly schedule the waits.
-  iree_hal_task_queue_wait_cmd_t* wait_cmd = NULL;
-  if (iree_status_is_ok(status) && batch->wait_semaphores.count > 0) {
+  iree_task_t* wait_task = NULL;
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
     status = iree_hal_task_queue_wait_cmd_allocate(
-        &queue->scope, &batch->wait_semaphores, &retire_cmd->arena, &wait_cmd);
+        &queue->scope, &wait_semaphores, &retire_cmd->arena, &wait_task);
   }
 
   // Task to issue all the command buffers in the batch.
   // After this task completes the commands have been issued but have not yet
   // completed and the issued commands may complete in any order.
-  iree_hal_task_queue_issue_cmd_t* issue_cmd = NULL;
-  if (iree_status_is_ok(status) && batch->command_buffer_count > 0) {
-    status = iree_hal_task_queue_issue_cmd_allocate(
-        &queue->scope, queue, &retire_cmd->task.header,
-        batch->command_buffer_count, batch->command_buffers, &retire_cmd->arena,
-        &issue_cmd);
+  iree_task_t* issue_cmd = NULL;
+  if (iree_status_is_ok(status) && issue != NULL) {
+    status = issue(user_data, &queue->scope, queue, &retire_cmd->task.header,
+                   &retire_cmd->arena, retire_cmd->resource_set, &issue_cmd);
   }
 
   // Last chance for failure - from here on we are submitting.
@@ -510,12 +646,11 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   iree_task_submission_initialize(&submission);
 
   // Sequencing: wait on semaphores or go directly into the executor queue.
-  iree_task_t* head_task =
-      issue_cmd ? &issue_cmd->task.header : &retire_cmd->task.header;
-  if (wait_cmd != NULL) {
+  iree_task_t* head_task = issue_cmd ? issue_cmd : &retire_cmd->task.header;
+  if (wait_task != NULL) {
     // Ensure that we only issue command buffers after all waits have completed.
-    iree_task_set_completion_task(&wait_cmd->task.header, head_task);
-    iree_task_submission_enqueue(&submission, &wait_cmd->task.header);
+    iree_task_set_completion_task(wait_task, head_task);
+    iree_task_submission_enqueue(&submission, wait_task);
   } else {
     // No waits needed; directly enqueue.
     iree_task_submission_enqueue(&submission, head_task);
@@ -527,30 +662,73 @@ static iree_status_t iree_hal_task_queue_submit_batch(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_task_queue_submit_barrier(
+    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_task_queue_submit(
+      queue, wait_semaphores, signal_semaphores, 0, NULL, NULL, NULL);
+  if (iree_status_is_ok(status)) {
+    iree_task_executor_flush(queue->executor);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t iree_hal_task_queue_submit_batches(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+    const iree_hal_task_submission_batch_t* batches) {
   // For now we process each batch independently. To elide additional semaphore
   // work and prevent unneeded coordinator scheduling logic we could instead
   // build the whole DAG prior to submitting.
   for (iree_host_size_t i = 0; i < batch_count; ++i) {
-    const iree_hal_submission_batch_t* batch = &batches[i];
-    IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_batch(queue, batch));
+    const iree_hal_task_submission_batch_t* batch = &batches[i];
+    IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit(
+        queue, batch->wait_semaphores, batch->signal_semaphores,
+        batch->command_buffer_count,
+        (iree_hal_resource_t* const*)batch->command_buffers,
+        iree_hal_task_queue_issue_cmd_allocate, (void*)batch));
   }
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_task_queue_submit(
+iree_status_t iree_hal_task_queue_submit_commands(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+    const iree_hal_task_submission_batch_t* batches) {
   IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_status_t status =
       iree_hal_task_queue_submit_batches(queue, batch_count, batches);
   if (iree_status_is_ok(status)) {
     iree_task_executor_flush(queue->executor);
   }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
 
+static iree_status_t iree_hal_task_queue_callback_cmd_allocate(
+    void* user_data, iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
+    iree_task_t* retire_task, iree_arena_allocator_t* arena,
+    iree_hal_resource_set_t* resource_set, iree_task_t** out_issue_task) {
+  iree_task_call_closure_t callback = *(iree_task_call_closure_t*)user_data;
+
+  iree_task_call_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd));
+  iree_task_call_initialize(scope, callback, cmd);
+  iree_task_set_completion_task(&cmd->header, retire_task);
+
+  *out_issue_task = &cmd->header;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_task_queue_submit_callback(
+    iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores,
+    iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
+    iree_task_call_closure_t callback) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_task_queue_submit(
+      queue, wait_semaphores, signal_semaphores, resource_count, resources,
+      iree_hal_task_queue_callback_cmd_allocate, &callback);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

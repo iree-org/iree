@@ -74,8 +74,9 @@ typedef struct iree_hal_cuda_queue_action_t {
   union {
     struct {
       iree_host_size_t count;
-      iree_hal_command_buffer_t** ptr;
-    } command_buffers;
+      iree_hal_command_buffer_t** command_buffers;
+      iree_hal_buffer_binding_table_t* binding_tables;
+    } execution;
   } payload;
 
   // The device from which to allocate CUDA stream-based command buffers for
@@ -431,58 +432,6 @@ static const iree_hal_resource_vtable_t
         .destroy = iree_hal_cuda_pending_queue_actions_destroy,
 };
 
-// Copies of the given |in_list| to |out_list| to retain the command buffer
-// list.
-static iree_status_t iree_hal_cuda_copy_command_buffer_list(
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* in_list, iree_allocator_t host_allocator,
-    iree_hal_command_buffer_t*** out_list) {
-  *out_list = NULL;
-  if (!command_buffer_count) return iree_ok_status();
-
-  iree_host_size_t total_size = command_buffer_count * sizeof(*in_list);
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(host_allocator, total_size, (void**)out_list));
-  memcpy((void*)*out_list, in_list, total_size);
-  return iree_ok_status();
-}
-
-// Frees the semaphore and value list inside |semaphore_list|.
-static void iree_hal_cuda_free_command_buffer_list(
-    iree_allocator_t host_allocator,
-    iree_hal_command_buffer_t* const* command_buffer_list) {
-  iree_allocator_free(host_allocator, (void*)command_buffer_list);
-}
-
-// Copies of the given |in_list| to |out_list| to retain the semaphore and value
-// list.
-static iree_status_t iree_hal_cuda_copy_semaphore_list(
-    iree_hal_semaphore_list_t in_list, iree_allocator_t host_allocator,
-    iree_hal_semaphore_list_t* out_list) {
-  memset(out_list, 0, sizeof(*out_list));
-  if (!in_list.count) return iree_ok_status();
-
-  out_list->count = in_list.count;
-  iree_host_size_t semaphore_size = in_list.count * sizeof(*in_list.semaphores);
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, semaphore_size,
-                                             (void**)&out_list->semaphores));
-  memcpy(out_list->semaphores, in_list.semaphores, semaphore_size);
-
-  iree_host_size_t value_size = in_list.count * sizeof(*in_list.payload_values);
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      host_allocator, value_size, (void**)&out_list->payload_values));
-  memcpy(out_list->payload_values, in_list.payload_values, value_size);
-  return iree_ok_status();
-}
-
-// Frees the semaphore and value list inside |semaphore_list|.
-static void iree_hal_cuda_free_semaphore_list(
-    iree_allocator_t host_allocator,
-    iree_hal_semaphore_list_t* semaphore_list) {
-  iree_allocator_free(host_allocator, semaphore_list->semaphores);
-  iree_allocator_free(host_allocator, semaphore_list->payload_values);
-}
-
 static void iree_hal_cuda_queue_action_destroy(
     iree_hal_cuda_queue_action_t* action) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -496,10 +445,6 @@ static void iree_hal_cuda_queue_action_destroy(
 
   // Only release resources after callbacks have been issued.
   iree_hal_resource_set_free(action->resource_set);
-  iree_hal_cuda_free_semaphore_list(host_allocator,
-                                    &action->wait_semaphore_list);
-  iree_hal_cuda_free_semaphore_list(host_allocator,
-                                    &action->signal_semaphore_list);
 
   iree_hal_cuda_queue_action_clear_events(action);
 
@@ -510,7 +455,7 @@ static void iree_hal_cuda_queue_action_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static void decrement_work_items_count(
+static void iree_hal_cuda_queue_decrement_work_items_count(
     iree_hal_cuda_working_area_t* working_area) {
   iree_slim_mutex_lock(&working_area->pending_work_items_count_mutex);
   --working_area->pending_work_items_count;
@@ -531,15 +476,41 @@ iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   IREE_ASSERT_ARGUMENT(actions);
   IREE_ASSERT_ARGUMENT(command_buffer_count == 0 || command_buffers);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Embed captured tables in the action allocation.
   iree_hal_cuda_queue_action_t* action = NULL;
+  const iree_host_size_t wait_semaphore_list_size =
+      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
+      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
+  const iree_host_size_t signal_semaphore_list_size =
+      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
+      signal_semaphore_list.count *
+          sizeof(*signal_semaphore_list.payload_values);
+  const iree_host_size_t command_buffers_size =
+      command_buffer_count * sizeof(*action->payload.execution.command_buffers);
+  iree_host_size_t binding_tables_size = 0;
+  iree_host_size_t binding_table_elements_size = 0;
+  if (binding_tables) {
+    binding_tables_size = command_buffer_count * sizeof(*binding_tables);
+    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+      binding_table_elements_size +=
+          binding_tables[i].count * sizeof(*binding_tables[i].bindings);
+    }
+  }
+  const iree_host_size_t payload_size =
+      command_buffers_size + binding_tables_size + binding_table_elements_size;
+  const iree_host_size_t total_action_size =
+      sizeof(*action) + wait_semaphore_list_size + signal_semaphore_list_size +
+      payload_size;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(actions->host_allocator, sizeof(*action),
+      z0, iree_allocator_malloc(actions->host_allocator, total_action_size,
                                 (void**)&action));
+  uint8_t* action_ptr = (uint8_t*)action + sizeof(*action);
 
   action->owning_actions = actions;
   action->state = IREE_HAL_CUDA_QUEUE_ACTION_STATE_ALIVE;
@@ -554,51 +525,93 @@ iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
   action->event_count = 0;
   action->is_pending = true;
 
+  // Copy wait list for later access.
+  action->wait_semaphore_list.count = wait_semaphore_list.count;
+  action->wait_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  memcpy(action->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
+         wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
+  action->wait_semaphore_list.payload_values =
+      (uint64_t*)(action_ptr + wait_semaphore_list.count *
+                                   sizeof(*wait_semaphore_list.semaphores));
+  memcpy(
+      action->wait_semaphore_list.payload_values,
+      wait_semaphore_list.payload_values,
+      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
+  action_ptr += wait_semaphore_list_size;
+
+  // Copy signal list for later access.
+  action->signal_semaphore_list.count = signal_semaphore_list.count;
+  action->signal_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  memcpy(
+      action->signal_semaphore_list.semaphores,
+      signal_semaphore_list.semaphores,
+      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
+  action->signal_semaphore_list.payload_values =
+      (uint64_t*)(action_ptr + signal_semaphore_list.count *
+                                   sizeof(*signal_semaphore_list.semaphores));
+  memcpy(action->signal_semaphore_list.payload_values,
+         signal_semaphore_list.payload_values,
+         signal_semaphore_list.count *
+             sizeof(*signal_semaphore_list.payload_values));
+  action_ptr += signal_semaphore_list_size;
+
+  // Copy the execution resources for later access.
+  action->payload.execution.count = command_buffer_count;
+  action->payload.execution.command_buffers =
+      (iree_hal_command_buffer_t**)action_ptr;
+  memcpy(action->payload.execution.command_buffers, command_buffers,
+         command_buffers_size);
+  action_ptr += command_buffers_size;
+
   // Retain all command buffers and semaphores.
-  iree_hal_resource_set_t* resource_set = NULL;
-  iree_status_t status =
-      iree_hal_resource_set_allocate(actions->block_pool, &resource_set);
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    status = iree_hal_resource_set_insert(resource_set, command_buffer_count,
-                                          command_buffers);
+  iree_status_t status = iree_hal_resource_set_allocate(actions->block_pool,
+                                                        &action->resource_set);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(action->resource_set,
+                                          wait_semaphore_list.count,
+                                          wait_semaphore_list.semaphores);
   }
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    status =
-        iree_hal_resource_set_insert(resource_set, wait_semaphore_list.count,
-                                     wait_semaphore_list.semaphores);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(action->resource_set,
+                                          signal_semaphore_list.count,
+                                          signal_semaphore_list.semaphores);
   }
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    status =
-        iree_hal_resource_set_insert(resource_set, signal_semaphore_list.count,
-                                     signal_semaphore_list.semaphores);
-  }
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    action->resource_set = resource_set;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(
+        action->resource_set, command_buffer_count, command_buffers);
   }
 
-  // Copy the command buffer list for later access.
-  // TODO: avoid host allocator malloc; use some pool for the allocation.
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    action->payload.command_buffers.count = command_buffer_count;
-    status = iree_hal_cuda_copy_command_buffer_list(
-        command_buffer_count, command_buffers, actions->host_allocator,
-        &action->payload.command_buffers.ptr);
+  // Copy binding tables and retain all bindings.
+  if (iree_status_is_ok(status) && binding_table_elements_size > 0) {
+    action->payload.execution.binding_tables =
+        (iree_hal_buffer_binding_table_t*)action_ptr;
+    action_ptr += binding_tables_size;
+    iree_hal_buffer_binding_t* binding_element_ptr =
+        (iree_hal_buffer_binding_t*)action_ptr;
+    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+      iree_host_size_t element_count = binding_tables[i].count;
+      iree_hal_buffer_binding_table_t* target_table =
+          &action->payload.execution.binding_tables[i];
+      target_table->count = element_count;
+      target_table->bindings = binding_element_ptr;
+      memcpy((void*)target_table->bindings, binding_tables[i].bindings,
+             element_count * sizeof(*binding_element_ptr));
+      binding_element_ptr += element_count;
+
+      // Bulk insert all bindings into the resource set. This will keep the
+      // referenced buffers live until the action has completed. Note that if we
+      // fail here we need to clean up the resource set below before returning.
+      status = iree_hal_resource_set_insert_strided(
+          action->resource_set, element_count, target_table->bindings,
+          offsetof(iree_hal_buffer_binding_t, buffer),
+          sizeof(iree_hal_buffer_binding_t));
+      if (!iree_status_is_ok(status)) break;
+    }
+  } else {
+    action->payload.execution.binding_tables = NULL;
   }
 
-  // Copy the semaphore and value list for later access.
-  // TODO: avoid host allocator malloc; use some pool for the allocation.
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    status = iree_hal_cuda_copy_semaphore_list(wait_semaphore_list,
-                                               actions->host_allocator,
-                                               &action->wait_semaphore_list);
-  }
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    status = iree_hal_cuda_copy_semaphore_list(signal_semaphore_list,
-                                               actions->host_allocator,
-                                               &action->signal_semaphore_list);
-  }
-
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
+  if (iree_status_is_ok(status)) {
     // Retain the owning queue to make sure the action outlives it.
     iree_hal_resource_retain(actions);
 
@@ -607,13 +620,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
     iree_hal_cuda_queue_action_list_push_back(&actions->action_list, action);
     iree_slim_mutex_unlock(&actions->action_mutex);
   } else {
-    iree_hal_cuda_free_semaphore_list(actions->host_allocator,
-                                      &action->wait_semaphore_list);
-    iree_hal_cuda_free_semaphore_list(actions->host_allocator,
-                                      &action->signal_semaphore_list);
-    iree_hal_cuda_free_command_buffer_list(actions->host_allocator,
-                                           action->payload.command_buffers.ptr);
-    iree_hal_resource_set_free(resource_set);
+    iree_hal_resource_set_free(action->resource_set);
     iree_allocator_free(actions->host_allocator, action);
   }
 
@@ -684,7 +691,7 @@ static void iree_hal_cuda_execution_device_signal_host_callback(
   }
 
   // The callback (work item) is complete.
-  decrement_work_items_count(&actions->working_area);
+  iree_hal_cuda_queue_decrement_work_items_count(&actions->working_area);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -712,43 +719,44 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
   }
 
   // Then launch all command buffers to the dispatch stream.
-  IREE_TRACE_ZONE_BEGIN(dispatch_command_buffers);
-  IREE_TRACE_ZONE_APPEND_TEXT(dispatch_command_buffers,
-                              " dispatch_command_buffers",
-                              strlen(" dispatch_command_buffers"));
-  for (iree_host_size_t i = 0; i < action->payload.command_buffers.count; ++i) {
+  IREE_TRACE_ZONE_BEGIN(z_dispatch_command_buffers);
+  IREE_TRACE_ZONE_APPEND_TEXT(z_dispatch_command_buffers,
+                              "dispatch_command_buffers");
+  for (iree_host_size_t i = 0; i < action->payload.execution.count; ++i) {
     iree_hal_command_buffer_t* command_buffer =
-        action->payload.command_buffers.ptr[i];
+        action->payload.execution.command_buffers[i];
+    iree_hal_buffer_binding_table_t binding_table =
+        action->payload.execution.binding_tables
+            ? action->payload.execution.binding_tables[i]
+            : iree_hal_buffer_binding_table_empty();
     if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
-      CUgraphExec exec = iree_hal_cuda_graph_command_buffer_handle(
-          action->payload.command_buffers.ptr[i]);
+      CUgraphExec exec =
+          iree_hal_cuda_graph_command_buffer_handle(command_buffer);
       IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
           z0, symbols, cuGraphLaunch(exec, action->dispatch_cu_stream),
           "cuGraphLaunch");
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
+          iree_hal_command_buffer_mode(command_buffer) |
           IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
           IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
-          IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED;
+          // NOTE: we need to validate if a binding table is provided as the
+          // bindings were not known when it was originally recorded.
+          (iree_hal_buffer_binding_table_is_empty(binding_table)
+               ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
+               : 0);
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_cuda_device_create_stream_command_buffer(
                   action->device, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
                   /*binding_capacity=*/0, &stream_command_buffer));
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(action->resource_set, 1,
-                                           &stream_command_buffer));
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_deferred_command_buffer_apply(
-                  command_buffer, stream_command_buffer,
-                  iree_hal_buffer_binding_table_empty()));
-      // The stream_command_buffer is going to be retained by
-      // the action->resource_set and deleted after the action
-      // completes.
+                  command_buffer, stream_command_buffer, binding_table));
       iree_hal_resource_release(stream_command_buffer);
     }
   }
-  IREE_TRACE_ZONE_END(dispatch_command_buffers);
+  IREE_TRACE_ZONE_END(z_dispatch_command_buffers);
 
   // Last record CUevent signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
@@ -802,7 +810,7 @@ static void iree_hal_cuda_pending_queue_actions_issue_cleanup(
 
   // Now we fully executed and cleaned up this action. Decrease the work items
   // counter.
-  decrement_work_items_count(&actions->working_area);
+  iree_hal_cuda_queue_decrement_work_items_count(&actions->working_area);
 
   IREE_TRACE_ZONE_END(z0);
 }

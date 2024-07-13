@@ -132,4 +132,12 @@ def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   ];
 }
 
+def GeneralizeLinalgMatMulPass :
+    InterfacePass<"iree-preprocessing-generalize-linalg-matmul-experimental", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg matmul ops to linalg.generics.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
 #endif  // IREE_PREPROCESSING_COMMON_PASSES

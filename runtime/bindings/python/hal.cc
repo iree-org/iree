@@ -549,10 +549,10 @@ void HalDevice::QueueExecute(py::handle command_buffers,
     cb_list[i] = py::cast<HalCommandBuffer*>(command_buffers[i])->raw_ptr();
   }
 
-  CheckApiStatus(
-      iree_hal_device_queue_execute(raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY,
-                                    wait_list, signal_list, cb_count, cb_list),
-      "executing command buffers");
+  CheckApiStatus(iree_hal_device_queue_execute(
+                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
+                     signal_list, cb_count, cb_list, /*binding_tables=*/NULL),
+                 "executing command buffers");
 }
 
 void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
@@ -1693,8 +1693,11 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_copy_buffer(
-                    self.raw_ptr(), source_buffer.raw_ptr(), source_offset,
-                    target_buffer.raw_ptr(), target_offset, resolved_length),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(source_buffer.raw_ptr(),
+                                             source_offset, resolved_length),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length)),
                 "copy command");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
@@ -1729,8 +1732,10 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_fill_buffer(
-                    self.raw_ptr(), target_buffer.raw_ptr(), target_offset,
-                    resolved_length, pattern_view.buf, pattern_view.len),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length),
+                    pattern_view.buf, pattern_view.len),
                 "command buffer fill");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),

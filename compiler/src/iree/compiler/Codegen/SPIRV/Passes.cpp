@@ -623,9 +623,9 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+    addEncodingToNopPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-
   modulePassManager.addPass(createSPIRVSelectLoweringStrategyPass());
 }
 

@@ -109,7 +109,8 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
 
   uint16_t ordinal = function.ordinal;
   iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
-  if (function.linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+  if (function.linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT ||
+      function.linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
     // Look up the internal ordinal index of this export in the function table.
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
@@ -287,7 +288,8 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
         return iree_ok_status();
       }
     }
-  } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+  } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT ||
+             linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
     for (iree_host_size_t ordinal = 0;
@@ -303,8 +305,12 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
     }
   }
 
+  if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
+    return iree_status_from_code(IREE_STATUS_NOT_FOUND);  // lightweight fail
+  }
   return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "function with the given name not found");
+                          "no function `%.*s` exported by module",
+                          (int)name.size, name.data);
 }
 
 static iree_status_t iree_vm_bytecode_module_get_function(
@@ -342,7 +348,8 @@ static iree_status_t iree_vm_bytecode_module_get_function(
                           iree_vm_ImportFlagBits_OPTIONAL)) {
       linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL;
     }
-  } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+  } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT ||
+             linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
     if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
@@ -389,7 +396,8 @@ static iree_status_t iree_vm_bytecode_module_get_function(
 static iree_status_t iree_vm_bytecode_module_get_function_attr(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
     iree_host_size_t index, iree_string_pair_t* out_attr) {
-  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT &&
+      linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "only exported functions can be queried");
   }

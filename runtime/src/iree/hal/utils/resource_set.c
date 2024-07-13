@@ -93,6 +93,7 @@ static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set) {
 }
 
 IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
+  if (!set) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
 #if defined(IREE_SANITIZER_ADDRESS)
@@ -121,6 +122,7 @@ IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
 
 IREE_API_EXPORT void iree_hal_resource_set_freeze(
     iree_hal_resource_set_t* set) {
+  if (!set) return;
 #if defined(IREE_SANITIZER_ADDRESS)
   // Poison all chunks until the resource set is freed.
   iree_hal_resource_set_chunk_t* chunk = set->chunk_head;
@@ -275,16 +277,27 @@ static iree_status_t iree_hal_resource_set_insert_1(
 IREE_API_EXPORT iree_status_t
 iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
                              iree_host_size_t count, const void* resources) {
+  IREE_ASSERT_ARGUMENT(set);
+  return iree_hal_resource_set_insert_strided(set, count, resources, 0,
+                                              sizeof(iree_hal_resource_t*));
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert_strided(
+    iree_hal_resource_set_t* set, iree_host_size_t count, const void* elements,
+    iree_host_size_t offset, iree_host_size_t stride) {
+  IREE_ASSERT_ARGUMENT(set);
   // For now we process one at a time. We should have a stride that lets us
   // amortize the cost of doing the MRU update and insertion allocation by
   // say slicing off 4/8/16/32 resources at a time etc. Today each miss that
   // requires a full insertion goes down the whole path of checking chunk
   // capacity and such.
-  iree_hal_resource_t* const* typed_resources =
-      (iree_hal_resource_t* const*)resources;
+  const uint8_t* elements_ptr = (const uint8_t*)elements;
   for (iree_host_size_t i = 0; i < count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_resource_set_insert_1(set, typed_resources[i]));
+    iree_hal_resource_t* resource =
+        *(iree_hal_resource_t**)(elements_ptr + i * stride + offset);
+    if (resource) {
+      IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_1(set, resource));
+    }
   }
   return iree_ok_status();
 }

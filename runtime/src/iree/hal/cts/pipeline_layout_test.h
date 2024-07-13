@@ -13,13 +13,11 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
-class pipeline_layout_test : public CtsTestBase {};
+class PipelineLayoutTest : public CTSTestBase<> {};
 
-TEST_P(pipeline_layout_test, CreateWithNoLayouts) {
+TEST_F(PipelineLayoutTest, CreateWithNoLayouts) {
   iree_hal_pipeline_layout_t* pipeline_layout = NULL;
   IREE_ASSERT_OK(iree_hal_pipeline_layout_create(device_, /*push_constants=*/0,
                                                  /*set_layout_count=*/0, NULL,
@@ -28,7 +26,7 @@ TEST_P(pipeline_layout_test, CreateWithNoLayouts) {
   iree_hal_pipeline_layout_release(pipeline_layout);
 }
 
-TEST_P(pipeline_layout_test, CreateWithPushConstants) {
+TEST_F(PipelineLayoutTest, CreateWithPushConstants) {
   iree_hal_pipeline_layout_t* pipeline_layout = NULL;
   // Note: The Vulkan maxPushConstantsSize limit must be at least 128 bytes:
   // https://www.khronos.org/registry/vulkan/specs/1.2/html/vkspec.html#limits-minmax
@@ -39,7 +37,7 @@ TEST_P(pipeline_layout_test, CreateWithPushConstants) {
   iree_hal_pipeline_layout_release(pipeline_layout);
 }
 
-TEST_P(pipeline_layout_test, CreateWithOneLayout) {
+TEST_F(PipelineLayoutTest, CreateWithOneLayout) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {
@@ -67,7 +65,7 @@ TEST_P(pipeline_layout_test, CreateWithOneLayout) {
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
 }
 
-TEST_P(pipeline_layout_test, CreateWithTwoLayouts) {
+TEST_F(PipelineLayoutTest, CreateWithTwoLayouts) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layouts[2] = {NULL};
   iree_hal_descriptor_set_layout_binding_t layout_bindings_0[] = {
       {
@@ -118,8 +116,6 @@ TEST_P(pipeline_layout_test, CreateWithTwoLayouts) {
   iree_hal_descriptor_set_layout_release(descriptor_set_layouts[1]);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_PIPELINE_LAYOUT_TEST_H_
