@@ -6,6 +6,12 @@
 
 #include "./hal.h"
 
+#include <nanobind/stl/vector.h>
+
+#include <algorithm>
+#include <iterator>
+#include <optional>
+
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
@@ -14,6 +20,7 @@
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
+#include "nanobind/nanobind.h"
 
 namespace iree {
 namespace python {
@@ -1066,12 +1073,35 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 // HAL module
 //------------------------------------------------------------------------------
 
-// TODO(multi-device): allow for multiple devices to be passed in.
-VmModule CreateHalModule(VmInstance* instance, HalDevice* device) {
-  iree_hal_device_t* device_ptr = device->raw_ptr();
+VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
+                         std::optional<py::list> devices) {
+  if (device && devices) {
+    PyErr_SetString(
+        PyExc_ValueError,
+        "\"device\" and \"devices\" are mutually exclusive arguments.");
+  }
+  std::vector<iree_hal_device_t*> devices_vector;
+  iree_hal_device_t* device_ptr;
+  iree_hal_device_t** devices_ptr;
+  iree_host_size_t device_count;
   iree_vm_module_t* module = NULL;
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), /*device_count=*/1,
-                                        &device_ptr, IREE_HAL_MODULE_FLAG_NONE,
+  if (device) {
+    device_ptr = device.value()->raw_ptr();
+    devices_ptr = &device_ptr;
+    device_count = 1;
+  } else {
+    // Set device related arguments in the case of multiple devices.
+    devices_vector.reserve(devices->size());
+    std::transform(devices->begin(), devices->end(),
+                   std::back_inserter(devices_vector), [](nanobind::handle h) {
+                     HalDevice* d = py::cast<HalDevice*>(h);
+                     return d->raw_ptr();
+                   });
+    devices_ptr = devices_vector.data();
+    device_count = devices_vector.size();
+  }
+  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
+                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
                                         iree_allocator_system(), &module),
                  "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
@@ -1085,7 +1115,8 @@ void SetupHalBindings(nanobind::module_ m) {
   py::dict driver_cache;
 
   // Built-in module creation.
-  m.def("create_hal_module", &CreateHalModule);
+  m.def("create_hal_module", &CreateHalModule, py::arg("instance"),
+        py::arg("device") = py::none(), py::arg("devices") = py::none());
 
   // Enums.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
