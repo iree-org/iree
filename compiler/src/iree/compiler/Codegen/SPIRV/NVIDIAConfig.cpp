@@ -10,16 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
 
 #define DEBUG_TYPE "iree-spirv-nvidia-config"
 
@@ -32,15 +26,14 @@ constexpr unsigned NVIDIANumMNTilesPerSubgroup = 4;
 namespace mlir::iree_compiler::detail {
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
-                                           const spirv::TargetEnv &targetEnv) {
+                                           IREE::GPU::TargetAttr target) {
   // First try to see if we can use tensor cores.
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  if (succeeded(setCooperativeMatrixConfig(targetEnv, op,
+  if (succeeded(setCooperativeMatrixConfig(target, op,
                                            NVIDIANumSubgroupsPerWorkgroup,
                                            NVIDIANumMNTilesPerSubgroup)))
     return success();
 
-  const int subgroupSize = limits.getSubgroupSize();
+  const int subgroupSize = target.getPreferredSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
   auto inputType =
@@ -50,7 +43,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
   } else {
     threadMNK = {4, 4, 32};
   }
-  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
+  return setMatmulOpConfig(target, op, workgroupXY, threadMNK,
                            /*enablePromotion=*/true);
 }
 
@@ -84,11 +77,11 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
 // Note that the above numbers are from CUDA docs; for Vulkan the drivder can
 // expose slightly different numbers, e.g., max shared memory size is smaller.
 
-LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setNVIDIACodeGenConfig(IREE::GPU::TargetAttr target,
                                      Operation *rootOp) {
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setNVIDIAMatmulConfig(linalgOp, targetEnv);
+      return setNVIDIAMatmulConfig(linalgOp, target);
   }
 
   return failure();

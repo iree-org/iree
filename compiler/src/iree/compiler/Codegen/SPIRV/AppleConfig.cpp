@@ -14,15 +14,12 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir::iree_compiler::detail {
 
 static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
-                                          spirv::ResourceLimitsAttr limits) {
+                                          IREE::GPU::TargetAttr target) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
   auto inputType =
@@ -32,21 +29,20 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
   } else {
     threadMNK = {4, 4, 4};
   }
-  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
+  return setMatmulOpConfig(target, op, workgroupXY, threadMNK);
 }
 
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setAppleCodeGenConfig(IREE::GPU::TargetAttr target,
                                     Operation *rootOp) {
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  int subgroupSize = limits.getSubgroupSize();
+  int subgroupSize = target.getPreferredSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setAppleMatmulConfig(linalgOp, limits);
+      return setAppleMatmulConfig(linalgOp, target);
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {

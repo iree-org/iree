@@ -1,14 +1,13 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='builtin.module(func.func(iree-spirv-tile-and-promote, cse))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(func.func(iree-spirv-tile-and-promote, cse))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 128], [16, 4], [0, 0, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [65535, 65535, 65535]>>}>
 #map = affine_map<()[s0] -> (s0 * 128)>
 #map1 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
 module {
-  func.func @matmul_f32_256x1024x128() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation} {
     %c1024 = arith.constant 1024 : index
     %c256 = arith.constant 256 : index
     %c0 = arith.constant 0 : index
@@ -107,13 +106,12 @@ module {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 256], [1, 8, 8], [0, 0, 0, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16], []>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1]>
 module {
-  func.func @batch_matmul_16x1024x1024x80() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %c16 = arith.constant 16 : index
     %c1024 = arith.constant 1024 : index
@@ -169,12 +167,11 @@ module {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<()[s0] -> (s0 * 512)>
 #map1 = affine_map<()[s0] -> (s0 * 8)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [2, 64, 1]>
 module {
-  func.func @batch_matmul_f32_16x4096x40x4096() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @batch_matmul_f32_16x4096x40x4096() attributes {translation_info = #translation} {
     %c16 = arith.constant 16 : index
     %c4096 = arith.constant 4096 : index
     %c40 = arith.constant 40 : index

@@ -1,35 +1,27 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-map-memref-storage-class)))))' --allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-spirv-map-memref-storage-class))' --allow-unregistered-dialect %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-hal.executable private @vulkan_client_api {
-  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}>) {
-    hal.executable.export @vulkan_client_api layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    builtin.module {
-      func.func @vulkan_client_api() {
-        %0 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
-        "dialect.memref_consumer"(%0) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
+#target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
+      compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
+      dot = none, mma = [], subgroup_size_choices = [64],
+      max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
+      max_workgroup_memory_bytes = 16384>>}>
 
-        %1 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>)
-        "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>) -> ()
+func.func @vulkan_client_api() attributes {hal.executable.target = #target} {
+  %0 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
+  "dialect.memref_consumer"(%0) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
 
-        %2 = "dialect.memref_producer"() : () -> (memref<?x8xf32>)
-        "dialect.memref_consumer"(%2) : (memref<?x8xf32>) -> ()
+  %1 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>)
+  "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>) -> ()
 
-        %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
-        "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
+  %2 = "dialect.memref_producer"() : () -> (memref<?x8xf32>)
+  "dialect.memref_consumer"(%2) : (memref<?x8xf32>) -> ()
 
-        return
-      }
-    }
-  }
+  %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
+  "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
+
+  return
 }
 
 // CHECK-LABEL: func.func @vulkan_client_api()
@@ -47,36 +39,28 @@ hal.executable private @vulkan_client_api {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-hal.executable private @opencl_client_api {
-  hal.executable.variant @opencl target(<"opencl-spirv", "opencl-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Kernel], []>, #spirv.resource_limits<>>}>) {
-    hal.executable.export @opencl_client_api layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    builtin.module {
-      func.func @opencl_client_api() {
-        %0 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
-        "dialect.memref_consumer"(%0) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
+#target = #hal.executable.target<"opencl-spirv", "opencl-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "", features = "spirv:v1.3,cap:Kernel", wgp = <
+      compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
+      dot = none, mma = [], subgroup_size_choices = [64],
+      max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
+      max_workgroup_memory_bytes = 16384>>}>
 
-        %1 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>)
-        "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>) -> ()
+func.func @opencl_client_api() attributes {hal.executable.target = #target} {
+  %0 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
+  "dialect.memref_consumer"(%0) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
 
-        %2 = "dialect.memref_producer"() : () -> (memref<?x8xf32>)
-        "dialect.memref_consumer"(%2) : (memref<?x8xf32>) -> ()
+  %1 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>)
+  "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<storage_buffer>>) -> ()
 
-        %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
-        "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
+  %2 = "dialect.memref_producer"() : () -> (memref<?x8xf32>)
+  "dialect.memref_consumer"(%2) : (memref<?x8xf32>) -> ()
 
-        return
-      }
-    }
-  }
+  %3 = "dialect.memref_producer"() : () -> (memref<?x8xf32, 3>)
+  "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
+
+  return
 }
 
 // CHECK-LABEL: func.func @opencl_client_api()
