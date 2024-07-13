@@ -378,7 +378,9 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     // TODO: We should be able to force Vulkan side to use 32 consistently
     // too with subgroup size control; it might have perf implications though.
     int getPreferredSubgroupSize(bool pickLargest=false) const {
-      if (pickLargest) return getMaxSubgroupSize();
+      if (pickLargest) {
+        return getMaxSubgroupSize();
+      }
       return getMinSubgroupSize();
     }
 
