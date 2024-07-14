@@ -55,3 +55,27 @@ util.func @generalize_to_any_linalg_op(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tenso
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3) -> (d3, d0, d1, d2)>]
 //       CHECK:   return %[[RESULT]]
+
+//  -----
+
+//      CHECK: util.func public @interchange
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d3, d0, d1)>
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d2, d0, d1)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+util.func public @interchange(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>, %arg2: tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+    affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>],
+    iterator_types = ["reduction", "parallel", "parallel", "parallel"]}
+  ins(%arg0, %arg1 : tensor<?x?x?xf32>, tensor<?x?x?xf32>)
+  outs(%arg2 : tensor<?x?x?xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+    %m = arith.mulf %arg3, %arg4 : f32
+    %a = arith.addf %arg5, %m : f32
+    linalg.yield %a : f32
+  } -> tensor<?x?x?xf32>
+  util.return %0 : tensor<?x?x?xf32>
+}
