@@ -65,7 +65,7 @@
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar @kuhar
 /compiler/src/iree/compiler/Codegen/TransformStrategies/ @qedawkins @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @stellaraccident
-/compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar
+/compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst @kuhar
 /compiler/src/iree/compiler/GlobalOptimization/ @hanhanW
