@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -14,6 +15,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-scalar-dispatches"
 
@@ -150,6 +152,24 @@ formDispatchRegionFromSlice(RewriterBase &rewriter, Operation *rootOp,
   return newDispatchOp.value();
 }
 
+// Insert all operations into the set that define op's operands or define values
+// used inside of op's regions
+static void
+insertAllOperationsUsedAbove(Operation *op,
+                             llvm::SetVector<Operation *> &operations) {
+  mlir::visitUsedValuesDefinedAbove(op->getRegions(), [&](OpOperand *operand) {
+    if (auto definingOp = operand->get().getDefiningOp()) {
+      operations.insert(definingOp);
+    }
+  });
+
+  for (Value val : op->getOperands()) {
+    if (auto definingOp = val.getDefiningOp()) {
+      operations.insert(definingOp);
+    }
+  }
+}
+
 void FormScalarDispatchesPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
@@ -189,29 +209,27 @@ void FormScalarDispatchesPass::runOnOperation() {
     Block *currBlock = op->getBlock();
     Operation *prevOp = op;
     bool didHorizontalFusion = false;
+    llvm::SetVector<Operation *> ineligibleRoots;
     while (prevOp != &currBlock->front()) {
       prevOp = prevOp->getPrevNode();
+
+      // If this operation is used by a operation we previously visited, but we
+      // couldn't fuse it, stop.
+      if (ineligibleRoots.contains(prevOp)) {
+        break;
+      }
 
       if (opToRootMap.count(prevOp)) {
         continue;
       }
 
       if (!isSliceRoot(scalarWorkloadLimit, prevOp)) {
-        // Keep looking for more roots to horizontally fuse if the `prevOp` has
-        // no dependencies. e.g. `tensor.empty()`
-        if (prevOp->getNumOperands() == 0 && prevOp->getNumRegions() == 0)
-          continue;
-
-        // If `prevOp` is clonable AND only used by the fused/cloned then it
-        // will get cloned before any possible roots that may define its
-        // operands. (if it is not used by the region it may not be cloned)
-        if (isClonableIntoDispatchOp(prevOp) &&
-            llvm::any_of(prevOp->getUsers(), [&](Operation *user) {
-              return user == op || opToRootMap.count(user);
-            })) {
-          continue;
+        // If this op is not being fused, any operations that defines values
+        // used by this op cannot be horizontally fused
+        if (!fusedOpsSet.contains(prevOp)) {
+          insertAllOperationsUsedAbove(prevOp, ineligibleRoots);
         }
-        break;
+        continue;
       }
 
       didHorizontalFusion = true;
