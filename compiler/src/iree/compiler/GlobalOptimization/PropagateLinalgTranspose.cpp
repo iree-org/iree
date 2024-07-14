@@ -633,23 +633,58 @@ private:
   bool allowGeneralizing = false;
 };
 
-bool isUnaryElementwiseGeneric(linalg::GenericOp genericOp) {
-  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInputs() != 1 ||
-      !linalg::isElementwise(genericOp)) {
-    return false;
+static bool isOperandMapAffectedByTransposeMap(
+    AffineMap indexingMap, ArrayRef<int64_t> iterationSpacePermutation) {
+  int64_t prevIdx = -1;
+  for (auto result : indexingMap.getResults()) {
+    assert(isa<AffineDimExpr>(result) &&
+           "expected projected permutation indexing map");
+    int64_t idx =
+        iterationSpacePermutation[cast<AffineDimExpr>(result).getPosition()];
+    // Verify that the relative ordering of indices in the map remain the same.
+    // If not, then the transposition affects the access order for the given
+    // map (and associated operand).
+    if (idx <= prevIdx) {
+      return true;
+    }
+    prevIdx = idx;
   }
-
-  // Skip transposes and broadcasts. Transposes make more sense to fuse
-  // rather than propagate through, and broadcasts are cheaper to transpose
-  // before broadcasting.
-  if (genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0)) !=
-      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0))) {
-    return false;
-  }
-  return true;
+  return false;
 }
 
-// Sinks a transpose through the input of a unary elementwise operation.
+static OpOperand *
+getSingleTransposedInputOperand(linalg::GenericOp genericOp,
+                                ArrayRef<int64_t> iterationSpacePermutation) {
+  OpOperand *operand = nullptr;
+  for (auto input : genericOp.getDpsInputOperands()) {
+    if (!isOperandMapAffectedByTransposeMap(
+            genericOp.getMatchingIndexingMap(input),
+            iterationSpacePermutation)) {
+      continue;
+    }
+    if (operand) {
+      return nullptr;
+    }
+    operand = input;
+  }
+  return operand;
+}
+
+static SmallVector<AffineMap>
+getTransposedIndexingMaps(linalg::GenericOp genericOp,
+                          int64_t transposedInputIdx, AffineMap transposeMap) {
+  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+  for (unsigned i = 0, e = genericOp.getNumDpsInputs(); i < e; ++i) {
+    if (i == transposedInputIdx) {
+      continue;
+    }
+    indexingMaps[i] = indexingMaps[i].compose(transposeMap);
+  }
+  return indexingMaps;
+}
+
+// Sinks a transpose through the input of a elementwise operation where the
+// transposition of the iteration space only affects a single input operand.
 class SinkTransposeThroughUnaryElementwiseInput
     : public OpRewritePattern<linalg::GenericOp> {
 public:
@@ -658,22 +693,57 @@ public:
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
-      return failure();
+      return rewriter.notifyMatchFailure(genericOp, "pre-formed dispatch");
     }
 
-    if (!isUnaryElementwiseGeneric(genericOp)) {
-      return rewriter.notifyMatchFailure(genericOp, "not unary elementwise");
+    if (!linalg::isElementwise(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp, "non-elementwise generic");
     }
 
-    auto transposeOp =
-        genericOp.getDpsInputs()[0].getDefiningOp<linalg::TransposeOp>();
-    if (!transposeOp) {
-      return rewriter.notifyMatchFailure(genericOp, "no transpose operand");
+    if (genericOp.getNumDpsInits() != 1) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "unimplemented: multiple results");
     }
 
-    if (!transposeOp->hasOneUse()) {
+    AffineMap resultMap =
+        genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+    if (!resultMap.isIdentity()) {
       return rewriter.notifyMatchFailure(
-          genericOp, "do not propagate multi-use transpose");
+          genericOp, "unimplemented: non-identity result map");
+    }
+
+    linalg::TransposeOp transposeOp;
+    OpOperand *inputOperand;
+    for (auto input : genericOp.getDpsInputOperands()) {
+      // Skip broadcasted operands and transposed operands. If the input is
+      // broadcasted then we would not want to propagate because that would
+      // do the transpose on larger data, and if transposed we would rather
+      // simply compose the transposes (handled in a separate pattern).
+      if (genericOp.getMatchingIndexingMap(input) != resultMap) {
+        continue;
+      }
+
+      auto maybeTransposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
+      // Skip multi-use transposes.
+      if (!maybeTransposeOp || !maybeTransposeOp->hasOneUse()) {
+        continue;
+      }
+
+      auto transposableInputOperand = getSingleTransposedInputOperand(
+          genericOp, maybeTransposeOp.getPermutation());
+      // Skip if more than one operand is affected by the transpose.
+      if (transposableInputOperand != input) {
+        continue;
+      }
+
+      transposeOp = maybeTransposeOp;
+      inputOperand = transposableInputOperand;
+      break;
+    }
+
+    if (!transposeOp) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "no single use transpose operand");
     }
 
     ArrayRef<int64_t> perm = transposeOp.getPermutation();
@@ -683,18 +753,30 @@ public:
     Value newInit =
         createTransposeInit(rewriter, genericOp.getDpsInits()[0], invPerm);
 
-    // We do not need to update indexing maps because this is a unary
-    // elementwise op where the input and output maps are the same. Just
-    // replace the operands with transposed variants.
-    auto newGenericOp = mlir::clone(rewriter, genericOp, newInit.getType(),
-                                    {transposeOp.getInput(), newInit});
+    // We do not need to update iterator types because this is an elementwise
+    // op. We just need to update the indexing maps of all other input operands
+    // by composing the transpose map.
+    AffineMap transposeMap =
+        AffineMap::getPermutationMap(perm, rewriter.getContext());
+    SmallVector<AffineMap> indexingMaps = getTransposedIndexingMaps(
+        genericOp, inputOperand->getOperandNumber(), transposeMap);
+
+    SmallVector<Value> newOperands = genericOp->getOperands();
+    newOperands[inputOperand->getOperandNumber()] = transposeOp.getInput();
+    newOperands[genericOp.getDpsInitOperand(0)->getOperandNumber()] = newInit;
+
+    auto newGenericOp =
+        mlir::clone(rewriter, genericOp, newInit.getType(), newOperands);
+    newGenericOp.setIndexingMapsAttr(
+        rewriter.getAffineMapArrayAttr(indexingMaps));
     rewriter.replaceOp(
         genericOp, createTranspose(rewriter, newGenericOp->getResult(0), perm));
     return success();
   }
 };
 
-// Bubbles a transpose through the init of a unary elementwise operation.
+// Bubbles a transpose through the init of a elementwise operation where the
+// transposition of the iteration space only affects a single input operand.
 class BubbleTransposeThroughUnaryElementwiseDpsInit
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
@@ -704,33 +786,64 @@ public:
                                 PatternRewriter &rewriter) const override {
     auto genericOp = transposeOp.getInput().getDefiningOp<linalg::GenericOp>();
     if (!genericOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(transposeOp, "non-generic producer");
     }
+
+    if (genericOp.getNumDpsInits() != 1) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "unimplemented: multiple results");
+    }
+
     if (!IREE::Flow::isNonNullAndOutsideDispatch({genericOp, transposeOp})) {
       return failure();
     }
 
-    if (!isUnaryElementwiseGeneric(genericOp)) {
-      return rewriter.notifyMatchFailure(genericOp, "not unary elementwise");
+    if (!linalg::isElementwise(genericOp) ||
+        !genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0))
+             .isIdentity()) {
+      return rewriter.notifyMatchFailure(transposeOp, "not elementwise");
     }
 
     if (!genericOp->hasOneUse()) {
-      return rewriter.notifyMatchFailure(genericOp, "not single user");
+      return rewriter.notifyMatchFailure(transposeOp, "not single user");
     }
 
     ArrayRef<int64_t> perm = transposeOp.getPermutation();
-    Value newTranspose =
-        createTranspose(rewriter, genericOp.getOperand(0), perm);
+    auto invPerm = invertPermutationVector(perm);
+
+    auto inputOperand = getSingleTransposedInputOperand(genericOp, invPerm);
+    if (!inputOperand ||
+        !genericOp.getMatchingIndexingMap(inputOperand).isIdentity()) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "no single transposable input operand");
+    }
+
+    Value newTranspose = createTranspose(rewriter, inputOperand->get(), perm);
 
     // Create a new empty init for the transposed generic.
     Value newInit =
         createTransposeInit(rewriter, genericOp.getDpsInits()[0], perm);
 
+    SmallVector<Value> newOperands = genericOp->getOperands();
+    newOperands[inputOperand->getOperandNumber()] = newTranspose;
+    newOperands[genericOp.getDpsInitOperand(0)->getOperandNumber()] = newInit;
+
+    AffineMap transposeMap =
+        AffineMap::getPermutationMap(invPerm, rewriter.getContext());
+
+    // We do not need to update iterator types because this is an elementwise
+    // op. We just need to update the indexing maps of all other input operands
+    // by composing the transpose map.
+    SmallVector<AffineMap> indexingMaps = getTransposedIndexingMaps(
+        genericOp, inputOperand->getOperandNumber(), transposeMap);
+
     // We do not need to update indexing maps because this is a unary
     // elementwise op where the input and output maps are the same. Just
     // replace the operands with transposed variants.
-    auto newGenericOp = mlir::clone(rewriter, genericOp, newInit.getType(),
-                                    {newTranspose, newInit});
+    auto newGenericOp =
+        mlir::clone(rewriter, genericOp, newInit.getType(), newOperands);
+    newGenericOp.setIndexingMapsAttr(
+        rewriter.getAffineMapArrayAttr(indexingMaps));
     rewriter.replaceOp(transposeOp, newGenericOp);
     return success();
   }
@@ -929,6 +1042,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
         context, /*benefit=*/2);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
+      funcOp.emitError("Transpose initial sinking patterns failed");
       return signalPassFailure();
     }
   }
@@ -985,6 +1099,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(bubblingPatterns)))) {
+      funcOp.emitError("Transpose bubbling patterns failed");
       return signalPassFailure();
     }
   }
@@ -1037,8 +1152,13 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
+    GreedyRewriteConfig config;
+    // TODO: This is inefficient. Consider rewriting this pass to use a
+    // worklist of just the transpose operations.
+    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns),
+                                            config))) {
+      funcOp.emitError("Transpose sinking patterns failed");
       return signalPassFailure();
     }
   }
