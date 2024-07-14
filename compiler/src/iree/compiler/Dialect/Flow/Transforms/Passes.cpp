@@ -188,7 +188,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(mlir::createCSEPass)
 
       // 5. After all the reshape propagations, fuse elementwise operations
-      //    even if the producer has multipe uses.
+      //    even if the producer has multiple uses.
       .addPass(IREE::Flow::createFuseMultiUseElementwiseProducerPass)
 
       // 6. Some more "post elementwise fusion passes".
@@ -207,13 +207,13 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
                          IREE::Flow::createCollapseReductionDimensionsPass)
 
       //     c. Split reduction operations into parallel and reduction, i.e
-      //        split-k
+      //        .
       .addPass(IREE::Flow::createSplitReductionPass)
 
       //     d. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
-      .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass);
+      .addPass(IREE::Flow::createTransposeGenericOpsPass);
 }
 
 // Pipeline to first create `flow.dispatch.region` ops and then lower to

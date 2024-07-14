@@ -18,7 +18,7 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_INTERCHANGETRANSPOSEGENERICOPSPASS
+#define GEN_PASS_DEF_TRANSPOSEGENERICOPSPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
@@ -112,9 +112,9 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct InterchangeTransposeGenericOpsPass
-    : public IREE::Flow::impl::InterchangeTransposeGenericOpsPassBase<
-          InterchangeTransposeGenericOpsPass> {
+struct TransposeGenericOpsPass
+    : public IREE::Flow::impl::TransposeGenericOpsPassBase<
+          TransposeGenericOpsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<MakeReductionInnermostPattern, TransposeGenericOpPattern>(
