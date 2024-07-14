@@ -76,8 +76,9 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter,
 }
 
 /// Rewrite top-level InsertSliceOps to FlowUpdateOps or wrap them in a
-/// dispatch region.
-static LogicalResult convertInsertSliceOps(
+/// dispatch region. Returns the number of dispatches for non-contiguous insert
+/// slices created.
+static FailureOr<int> convertInsertSliceOps(
     mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
     SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible InsertSliceOps.
@@ -94,6 +95,8 @@ static LogicalResult convertInsertSliceOps(
       remainingInsertSliceOps.push_back(insertSliceOp);
     }
   }
+  int64_t numRemainingInsertSliceOps =
+      static_cast<int64_t>(remainingInsertSliceOps.size());
 
   // Create a DispatchWorkgroupsOp for every remaining InsertSliceOp.
   FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
@@ -102,12 +105,13 @@ static LogicalResult convertInsertSliceOps(
     return failure();
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
-  return success();
+  return numRemainingInsertSliceOps;
 }
 
 /// Rewrite top-level ExtractSliceOps to FlowSliceOps or wrap them in a
-/// dispatch region.
-static LogicalResult convertExtractSliceOps(
+/// dispatch region. Returns the number of dispatches for non-contiguous extract
+/// slices created.
+static FailureOr<size_t> convertExtractSliceOps(
     mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
     SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible ExtractSliceOps.
@@ -125,6 +129,9 @@ static LogicalResult convertExtractSliceOps(
     }
   }
 
+  int64_t numRemainingExtractSliceOps =
+      static_cast<int64_t>(remainingExtractSliceOps.size());
+
   // Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
   FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
       wrapInWorkgroupsOp(rewriter, remainingExtractSliceOps);
@@ -132,7 +139,7 @@ static LogicalResult convertExtractSliceOps(
     return failure();
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
-  return success();
+  return numRemainingExtractSliceOps;
 }
 
 namespace {
@@ -156,18 +163,24 @@ void ConvertTensorToFlowPass::runOnOperation() {
   });
 
   // Rewrite InsertSliceOps to FlowUpdateOps.
-  if (failed(convertInsertSliceOps(rewriter, funcOp, workgroupsOps))) {
+  FailureOr<size_t> numSlowInsertSliceDispatches =
+      convertInsertSliceOps(rewriter, funcOp, workgroupsOps);
+  if (failed(numSlowInsertSliceDispatches)) {
     funcOp->emitOpError(
         "failed to create dispatch region for `tensor.insert_slice`");
     return signalPassFailure();
   }
+  numSlowCopyDispatches += numSlowInsertSliceDispatches.value();
 
   // Rewrite ExtractSliceOps to FlowUpdateOps.
-  if (failed(convertExtractSliceOps(rewriter, funcOp, workgroupsOps))) {
+  FailureOr<size_t> numSlowExtractSliceDispatches =
+      convertExtractSliceOps(rewriter, funcOp, workgroupsOps);
+  if (failed(numSlowExtractSliceDispatches)) {
     funcOp->emitOpError(
         "failed to create dispatch region for `tensor.extract_slice`");
     return signalPassFailure();
   }
+  numSlowCopyDispatches += numSlowExtractSliceDispatches.value();
 
   // Canonicalize to flow.tensor ops.
   RewritePatternSet convertToFlowPatterns(context);
