@@ -18,11 +18,50 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_INTERCHANGETRANSPOSEGENERICOPSPASS
+#define GEN_PASS_DEF_TRANSPOSEGENERICOPSPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
+//===----------------------------------------------------------------------===//
+// MakeReductionInnermostPattern
+//===----------------------------------------------------------------------===//
+
+/// For generic ops that are reduction, make the reduction the innermost
+/// dimension.
+struct MakeReductionInnermostPattern
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<unsigned> interchange;
+    bool needInterchange = false;
+    unsigned numParallelLoop = genericOp.getNumParallelLoops();
+    if (numParallelLoop == 0)
+      return failure();
+    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
+      if (linalg::isParallelIterator(iter.value())) {
+        interchange.push_back(iter.index());
+        if (iter.index() >= numParallelLoop)
+          needInterchange = true;
+      }
+    }
+    // If all the parallel loops are outter loops skip the pattern.
+    if (!needInterchange)
+      return failure();
+    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
+      if (linalg::isReductionIterator(iter.value())) {
+        interchange.push_back(iter.index());
+      }
+    }
+    return interchangeGenericOp(rewriter, genericOp, interchange);
+  }
+};
+
+/// For elementwise ops that consumer values produced by named ops (or reduction
+/// ops), the dispatch region fusion logic requires the indexing maps to be
+/// identity (or projections that are not transposing as well). This pattern
+/// fixes up elementwise operations for which that is not the case.
 struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
@@ -73,12 +112,13 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-struct InterchangeTransposeGenericOpsPass
-    : public IREE::Flow::impl::InterchangeTransposeGenericOpsPassBase<
-          InterchangeTransposeGenericOpsPass> {
+struct TransposeGenericOpsPass
+    : public IREE::Flow::impl::TransposeGenericOpsPassBase<
+          TransposeGenericOpsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<TransposeGenericOpPattern>(&getContext());
+    patterns.add<MakeReductionInnermostPattern, TransposeGenericOpPattern>(
+        &getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
