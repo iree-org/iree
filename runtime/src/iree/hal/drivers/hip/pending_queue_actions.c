@@ -760,6 +760,9 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
                   action->device, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
                   /*binding_capacity=*/0, &stream_command_buffer));
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_resource_set_insert(action->resource_set, 1,
+                                           &stream_command_buffer));
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_deferred_command_buffer_apply(
                   command_buffer, stream_command_buffer, binding_table));
       iree_hal_hip_stream_notify_submitted_commands(stream_command_buffer);
