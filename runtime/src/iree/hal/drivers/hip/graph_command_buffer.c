@@ -34,6 +34,7 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
 
   // Per-stream HIP tracing context.
   iree_hal_hip_tracing_context_t* tracing_context;
+  iree_hal_hip_tracing_context_event_list_t tracing_event_list;
 
   // A resource set to maintain references to all resources used within the
   // command buffer.
@@ -97,10 +98,11 @@ static void iree_hip_graph_command_buffer_trace_zone_begin_external(
       &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++];
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context, tracing_event_node,
-      command_buffer->hip_graph, &command_buffer->hip_barrier_node,
-      dependency_count, file_name, file_name_length, line, function_name,
-      function_name_length, name, name_length);
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      tracing_event_node, command_buffer->hip_graph,
+      &command_buffer->hip_barrier_node, dependency_count, file_name,
+      file_name_length, line, function_name, function_name_length, name,
+      name_length);
 
   // Move the barrier forward to make sure that the tracing event is recorded
   // before work starts.
@@ -122,10 +124,10 @@ static void iree_hip_graph_command_buffer_trace_zone_end(
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_ASSERT_GT(dependency_count, 0,
                  "ending a zone should at least depend on the beginning");
-  IREE_HIP_GRAPH_TRACE_ZONE_END(command_buffer->tracing_context,
-                                tracing_event_node, command_buffer->hip_graph,
-                                &command_buffer->hip_barrier_node,
-                                dependency_count);
+  IREE_HIP_GRAPH_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      tracing_event_node, command_buffer->hip_graph,
+      &command_buffer->hip_barrier_node, dependency_count);
 
   // We need to wait on the tracing end before other work starts.
   // GPU tracing zones are first-in, last-out.
@@ -194,6 +196,8 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
   command_buffer->host_allocator = host_allocator;
   command_buffer->symbols = hip_symbols;
   command_buffer->tracing_context = tracing_context;
+  command_buffer->tracing_event_list.head = NULL;
+  command_buffer->tracing_event_list.tail = NULL;
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->hip_context = context;
   command_buffer->hip_graph = NULL;
@@ -226,6 +230,9 @@ static void iree_hal_hip_graph_command_buffer_destroy(
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_hip_tracing_free(command_buffer->tracing_context,
+                            &command_buffer->tracing_event_list);
 
   // Drop any pending collective batches before we tear things down.
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
@@ -262,6 +269,18 @@ hipGraphExec_t iree_hal_hip_graph_command_buffer_handle(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   return command_buffer->hip_exec;
+}
+
+void iree_hal_hip_graph_tracing_notify_submitted_commands(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_hip_graph_command_buffer_t* command_buffer =
+      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+  if (!command_buffer->tracing_context) {
+    return;
+  }
+
+  iree_hal_hip_tracing_notify_submitted(command_buffer->tracing_context,
+                                        &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
@@ -321,7 +340,11 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin(
       hipGraphCreate(&command_buffer->hip_graph, /*flags=*/0),
       "hipGraphCreate");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer,
+      /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_graph_command_buffer",
+      strlen("iree_hal_hip_graph_command_buffer"),
+      /*name=*/NULL, 0);
 
   return iree_ok_status();
 }

@@ -44,6 +44,12 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
 bool iree_hal_cuda_stream_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer);
 
+// This is to be called after a command buffer has been submitted
+// in order to notify the tracing system that there are events
+// to collect.
+void iree_hal_cuda_stream_notify_submitted_commands(
+    iree_hal_command_buffer_t* base_command_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

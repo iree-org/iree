@@ -730,16 +730,20 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
             ? action->payload.execution.binding_tables[i]
             : iree_hal_buffer_binding_table_empty();
     if (iree_hal_hip_stream_command_buffer_isa(command_buffer)) {
-      // Nothing to do for an inline command buffer; all the work has already
-      // been submitted. When we support semaphores we'll still need to signal
-      // their completion but do not have to worry about any waits: if there
-      // were waits we wouldn't have been able to execute inline!
+      // Nothing much to do for an inline command buffer; all the work has
+      // already been submitted. When we support semaphores we'll still need to
+      // signal their completion but do not have to worry about any waits: if
+      // there were waits we wouldn't have been able to execute inline! We do
+      // notify that the commands were "submitted" so we can make sure to clean
+      // up our trace events.
+      iree_hal_hip_stream_notify_submitted_commands(command_buffer);
     } else if (iree_hal_hip_graph_command_buffer_isa(command_buffer)) {
       hipGraphExec_t exec =
           iree_hal_hip_graph_command_buffer_handle(command_buffer);
       IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
           z0, symbols, hipGraphLaunch(exec, action->dispatch_hip_stream),
           "hipGraphLaunch");
+      iree_hal_hip_graph_tracing_notify_submitted_commands(command_buffer);
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
@@ -758,6 +762,10 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_deferred_command_buffer_apply(
                   command_buffer, stream_command_buffer, binding_table));
+      iree_hal_hip_stream_notify_submitted_commands(stream_command_buffer);
+      // The stream_command_buffer is going to be retained by
+      // the action->resource_set and deleted after the action
+      // completes.
       iree_hal_resource_release(stream_command_buffer);
     }
   }
