@@ -113,6 +113,7 @@ iree_cc_library(
     MLIRFuncTransforms
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRIndexToLLVM
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
