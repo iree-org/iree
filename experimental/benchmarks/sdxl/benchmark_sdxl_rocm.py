@@ -38,7 +38,11 @@ def run_iree_command(args: Sequence[str] = ()):
     return_code = proc.returncode
     if return_code == 0:
         return 0, proc.stdout
-    logging.getLogger().info(f"Command failed with error: {proc.stderr}")
+    logging.getLogger().error(
+        f"Command failed!\n"
+        f"Stderr diagnostics:\n{proc.stderr}\n"
+        f"Stdout diagnostics:\n{proc.stdout}\n"
+    )
     return 1, proc.stdout
 
 
@@ -174,8 +178,10 @@ def decode_output(bench_lines):
 
 def job_summary_process(ret_value, output):
     if ret_value == 1:
-        logging.getLogger().info("Running SDXL ROCm benchmark failed. Exiting")
+        # Output should have already been logged earlier.
+        logging.getLogger().error("Running SDXL ROCm benchmark failed. Exiting.")
         return
+
     bench_lines = output.decode().split("\n")[3:]
     benchmark_results = decode_output(bench_lines)
     logging.getLogger().info(benchmark_results)
