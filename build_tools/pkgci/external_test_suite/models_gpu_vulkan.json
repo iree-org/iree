@@ -12,13 +12,16 @@
     // TODO(#17344): need to regenerate .mlirbc
     "pytorch/models/opt-125M",
     "pytorch/models/resnet50",
+
     "pytorch/models/sdxl-prompt-encoder-tank",
     "pytorch/models/sdxl-scheduled-unet-3-tank",
     "pytorch/models/sdxl-vae-decode-tank",
 
-    // error: 'builtin.module' op failed to run transform dialect passes
-    // (transform spec file is specific to SDXL?)
-    "sharktank/llama/open-llama-3b-v2-f16"
+    // TODO(#17874): error: a handle passed as operand #0 and consumed by this operation points to a payload entity more than once
+    "sharktank/llama/open-llama-3b-v2-f16",
+
+    "sharktank/punet/fp16",
+    "sharktank/punet/int8"
   ],
   "expected_run_failures": []
 }
