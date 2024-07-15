@@ -9,6 +9,7 @@
 
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
@@ -57,8 +58,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
-  std::optional<BitWidthChangeInfo> consumerBitwidthChangeInfo =
-      isBitExtendOrTruncateOp(consumerOp);
   // Do no fuse bitextend-like operations with producers. Such ops are cloned
   // into all their use dispatches. So fusing producer with consumer here would
   // then result in producer also getting cloned into many dispatches which is
@@ -66,8 +65,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // (except for bit-extend ops). If the consumer has only one use, then this
   // fusion is fine since cloning wont result in redundant computation of the
   // producer. (Also note that the producer is always an elementwise operation).
-  if (consumerBitwidthChangeInfo &&
-      consumerBitwidthChangeInfo->isExtensionOp() && !consumerOp->hasOneUse()) {
+  if (LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
     return false;
   }
 

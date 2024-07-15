@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -156,7 +158,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
         // Dequantization-like operations should be fused with consumers to keep
         // the smaller bit width on the dispatch boundary.
-        if (isBitExtendOp(genericOp)) {
+        if (LinalgExt::isBitExtendOp(genericOp)) {
           return;
         }
 
@@ -196,7 +198,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
           // 7. Skip dequantization-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
-          if (isBitExtendOp(producer)) {
+          if (LinalgExt::isBitExtendOp(producer)) {
             return;
           }
 
