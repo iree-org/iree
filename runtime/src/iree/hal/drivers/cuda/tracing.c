@@ -288,7 +288,6 @@ void iree_hal_cuda_tracing_notify_submitted(
   IREE_ASSERT_ARGUMENT(event_list);
   iree_slim_mutex_lock(&context->event_mutex);
 
-
   if (!event_list->head) {
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
@@ -348,10 +347,9 @@ void iree_hal_cuda_tracing_free(
   iree_slim_mutex_unlock(&context->event_mutex);
 }
 
-
 static void iree_hal_cuda_tracing_context_event_list_append_event(
-  iree_hal_cuda_tracing_context_event_list_t* event_list,
-  iree_hal_cuda_tracing_context_event_t* event) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list,
+    iree_hal_cuda_tracing_context_event_t* event) {
   if (!event_list->head) {
     event_list->head = event;
     event_list->tail = event;
@@ -360,7 +358,6 @@ static void iree_hal_cuda_tracing_context_event_list_append_event(
     event_list->tail = event;
   }
 }
-
 
 // Grabs the next available query out of the freelist and adds it to
 // the event_list that was passed in. Also starts the recording of the
@@ -381,7 +378,7 @@ static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
   event->next_in_command_buffer = NULL;
 
   IREE_CUDA_IGNORE_ERROR(context->symbols, cuEventRecord(event->event, stream));
-  
+
   iree_hal_cuda_tracing_context_event_list_append_event(event_list, event);
 
   iree_slim_mutex_unlock(&context->event_mutex);

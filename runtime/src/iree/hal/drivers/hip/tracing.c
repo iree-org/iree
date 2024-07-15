@@ -348,8 +348,8 @@ void iree_hal_hip_tracing_free(
 }
 
 static void iree_hal_hip_tracing_context_event_list_append_event(
-  iree_hal_hip_tracing_context_event_list_t* event_list,
-  iree_hal_hip_tracing_context_event_t* event) {
+    iree_hal_hip_tracing_context_event_list_t* event_list,
+    iree_hal_hip_tracing_context_event_t* event) {
   if (!event_list->head) {
     event_list->head = event;
     event_list->tail = event;
