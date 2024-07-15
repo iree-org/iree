@@ -134,6 +134,24 @@ util.initializer {
 
 // -----
 
+builtin.module attributes {
+  some.attr = @only_ref_on_module
+} {
+  // CHECK: @only_ref_on_module
+  util.global private @only_ref_on_module : index
+}
+
+// -----
+
+builtin.module @named_module attributes {
+  some.attr = @named_module::@only_ref_on_module
+} {
+  // CHECK: @only_ref_on_module
+  util.global private @only_ref_on_module : index
+}
+
+// -----
+
 // CHECK: util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1

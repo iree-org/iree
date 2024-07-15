@@ -56,7 +56,7 @@ struct Global {
   // aliased or have side effects on creation.
   bool canDCE() {
     return isCandidate() &&
-           !isa<IREE::Util::ReferenceTypeInterface>(op.getGlobalType());
+           cast<SymbolOpInterface>(op.getOperation()).canDiscardOnUseEmpty();
   }
 
   // Erases all stores to the global.

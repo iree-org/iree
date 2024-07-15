@@ -332,8 +332,6 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
     baseGlobalOp->setLoc(fusedLoc);
 
     // Replace all other globals to point at the new one.
-    auto baseGlobalNameAttr =
-        FlatSymbolRefAttr::get(context, baseGlobalOp.getGlobalName());
     for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
       Global &global = globalTable.lookup(*mi);
       if (global.op == baseGlobalOp) {

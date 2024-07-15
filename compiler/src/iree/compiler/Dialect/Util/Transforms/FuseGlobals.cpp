@@ -133,7 +133,7 @@ public:
       auto &global = globalTable.lookup(globalName);
       llvm::BitVector tempBits = correlationBits;
       for (auto ordinal : correlationBits.set_bits()) {
-        auto &otherGlobalName = globalTable.lookupByOrdinal(ordinal);
+        auto otherGlobalName = globalTable.lookupByOrdinal(ordinal);
         if (otherGlobalName == globalName) {
           continue;
         }
@@ -201,6 +201,7 @@ public:
 
     // For each foldable set combine into a single global and update all uses.
     SymbolTable symbolTable(moduleOp);
+    SmallVector<StringRef> deadGlobalNames;
     for (auto &fusableSet : fusableSets) {
       auto *baseGlobal = fusableSet.front();
       LLVM_DEBUG(llvm::dbgs()
@@ -222,19 +223,16 @@ public:
       baseGlobalOp->setLoc(fusedLoc);
 
       // Replace all globals to point at the new one.
-      auto baseGlobalNameAttr = FlatSymbolRefAttr::get(
-          baseGlobalOp.getContext(), baseGlobalOp.getGlobalName());
       for (auto *global : fusableSet) {
         if (global->op == baseGlobalOp) {
           continue;
         }
-
-        // Redirect all loads to the new fused global.
         globalTable.renameGlobalUses(*global, *baseGlobal);
-
-        // Remove all stores to and the definition of the dead global op.
-        globalTable.eraseGlobal(global->getName());
+        deadGlobalNames.push_back(global->getName());
       }
+    }
+    for (auto globalName : deadGlobalNames) {
+      globalTable.eraseGlobal(globalName);
     }
   }
 };
