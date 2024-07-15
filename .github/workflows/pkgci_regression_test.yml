@@ -114,7 +114,7 @@ jobs:
         if: failure()
         run: |
           source ${VENV_DIR}/bin/activate
-          python ./build_tools/pkgci/external_test_suite/update_config_files.py \
+          python SHARK-TestSuite/iree_tests/update_config_xfails.py \
             --log-file=${LOG_FILE_PATH} \
             --config-file=${CONFIG_FILE_PATH}
           cat ${CONFIG_FILE_PATH}
