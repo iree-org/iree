@@ -16,10 +16,12 @@ iree_compiler_cc_library(
     name = "Analysis",
     srcs = [
         "Explorer.cpp",
+        "GlobalTable.cpp",
         "Position.cpp",
     ],
     hdrs = [
         "Explorer.h",
+        "GlobalTable.h",
         "Position.h",
     ],
     deps = [
