@@ -260,6 +260,11 @@ def get_rocm_test_compilation_infos(
     schedules = []
     if intrinsic == "MFMA":
         schedules = [
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 2),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 2, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 2, 1, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 2, 2, 1, 1, 2),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
@@ -299,10 +304,16 @@ def get_rocm_test_compilation_infos(
     for schedule in schedules:
         # Skip schedules with an intrinsic which element type does not
         # match the requested one.
-        if lhs_rhs_type.value.upper() not in schedule.intrinsic:
+        # Search for the lhs_rhs type in the first part of intrinsic
+        # e.g., MFMA_F32_16x16x4_F32 -> MFMA_F32
+        if lhs_rhs_type.value.upper() not in schedule.intrinsic[:8]:
             continue
 
-        if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
+        if schedule.intrinsic == "MFMA_F32_16x16x4_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 4
+        elif schedule.intrinsic == "MFMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
