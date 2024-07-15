@@ -16,8 +16,36 @@
 // To prevent spilling pages we leave some room for the context structure.
 #define IREE_HAL_HIP_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
+// iree_hal_hip_tracing_context_event_t contains a hipEvent that is used to
+// record timestamps for tracing GPU execution. In this struct, there are also
+// two linked lists that the current event may be added to during its lifetime.
+//
+// --------------------->---Submissions--->----------
+// \                     \                    \
+//  \                     \                    \
+// command_buffer        command_buffer          command_buffer
+//
+// The submission list is owned by the tracing context and elements are
+// inserted and removed as commmand_buffers are submitted and when they
+// complete. This is a list of the head elements for each command buffer.
+// The commnad buffer list is owned by the command buffer. It is the list of
+// events used to trace command buffer dispatches.
+//
+// When the event is in the freelist, next_submission should be null, and
+// we reuse next_in_command_buffer to track the next free event.
+//
+// When the even is grabbed from the freelist to track GPU executions,
+// it is added to the list in recording command_buffer.
+struct iree_hal_hip_tracing_context_event_t {
+  hipEvent_t event;
+  iree_hal_hip_tracing_context_event_t* next_in_command_buffer;
+  iree_hal_hip_tracing_context_event_t* next_submission;
+  bool was_submitted;
+};
+
 struct iree_hal_hip_tracing_context_t {
   const iree_hal_hip_dynamic_symbols_t* symbols;
+  iree_slim_mutex_t event_mutex;
 
   hipStream_t stream;
   iree_arena_block_pool_t* block_pool;
@@ -32,13 +60,32 @@ struct iree_hal_hip_tracing_context_t {
   // we need a stable base event.
   hipEvent_t base_event;
 
-  // Indices into |event_pool| defining a ringbuffer.
-  uint32_t query_head;
-  uint32_t query_tail;
+  // Unallocated event list head. next_in_command_buffer points to the next
+  // available event.
+  iree_hal_hip_tracing_context_event_t* event_freelist_head;
+
+  // Submitted events
+  iree_hal_hip_tracing_context_event_list_t submitted_event_list;
+
   uint32_t query_capacity;
 
   // Event pool reused to capture tracing timestamps.
-  hipEvent_t event_pool[IREE_HAL_HIP_TRACING_DEFAULT_QUERY_CAPACITY];
+  // The lifetime of the events are as follows.
+  // 1) All events are allocated when the tracing context is created.
+  // 2) When a command_buffer inserts a query via:
+  //    iree_hal_cuda_**_tracing_context_insert_query
+  //    an event is pulled from the event freelist and added to the
+  //    command buffer.
+  // 3) When a command buffer is dispatched and
+  //    iree_hal_hip_tracing_notify_submitted is called, the events
+  //    for that command buffer are added to the submitted_event_list.
+  // 4) When the command buffer completes iree_hal_cuda_tracing_context_collect
+  //    is called, and the events are removed from submitted_event_list as
+  //    we collect their values.
+  // 5) When the command buffer is destroyed, all events are put at the front
+  //    of event_freelist.
+  iree_hal_hip_tracing_context_event_t
+      event_pool[IREE_HAL_HIP_TRACING_DEFAULT_QUERY_CAPACITY];
 };
 
 static iree_status_t iree_hal_hip_tracing_context_initial_calibration(
@@ -90,6 +137,9 @@ iree_status_t iree_hal_hip_tracing_context_allocate(
     context->block_pool = block_pool;
     context->host_allocator = host_allocator;
     context->query_capacity = IREE_ARRAYSIZE(context->event_pool);
+    context->submitted_event_list.head = NULL;
+    context->submitted_event_list.tail = NULL;
+    iree_slim_mutex_initialize(&context->event_mutex);
   }
 
   // Pre-allocate all events in the event pool.
@@ -98,11 +148,21 @@ iree_status_t iree_hal_hip_tracing_context_allocate(
         z_event_pool, "iree_hal_hip_tracing_context_allocate_event_pool");
     IREE_TRACE_ZONE_APPEND_VALUE_I64(z_event_pool,
                                      (int64_t)context->query_capacity);
+    context->event_freelist_head = &context->event_pool[0];
     for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
       status = IREE_HIP_RESULT_TO_STATUS(
-          symbols,
-          hipEventCreateWithFlags(&context->event_pool[i], hipEventDefault));
+          symbols, hipEventCreateWithFlags(&context->event_pool[i].event,
+                                           hipEventDefault));
       if (!iree_status_is_ok(status)) break;
+      if (i > 0) {
+        context->event_pool[i - 1].next_in_command_buffer =
+            &context->event_pool[i];
+      }
+      context->event_pool[i].next_submission = NULL;
+      context->event_pool[i].was_submitted = false;
+      if (i + 1 == context->query_capacity) {
+        context->event_pool[i].next_in_command_buffer = NULL;
+      }
     }
     IREE_TRACE_ZONE_END(z_event_pool);
   }
@@ -152,9 +212,9 @@ void iree_hal_hip_tracing_context_free(
   IREE_TRACE_ZONE_BEGIN_NAMED(z_event_pool,
                               "iree_hal_hip_tracing_context_free_event_pool");
   for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
-    if (context->event_pool[i]) {
+    if (context->event_pool[i].event) {
       IREE_HIP_IGNORE_ERROR(context->symbols,
-                            hipEventDestroy(context->event_pool[i]));
+                            hipEventDestroy(context->event_pool[i].event));
     }
   }
   IREE_TRACE_ZONE_END(z_event_pool);
@@ -162,6 +222,8 @@ void iree_hal_hip_tracing_context_free(
     IREE_HIP_IGNORE_ERROR(context->symbols,
                           hipEventDestroy(context->base_event));
   }
+
+  iree_slim_mutex_deinitialize(&context->event_mutex);
 
   iree_allocator_t host_allocator = context->host_allocator;
   iree_allocator_free(host_allocator, context);
@@ -172,31 +234,30 @@ void iree_hal_hip_tracing_context_free(
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context) {
   if (!context) return;
-  if (context->query_tail == context->query_head) {
-    // No outstanding queries.
+  iree_slim_mutex_lock(&context->event_mutex);
+  // No outstanding queries
+  if (!context->submitted_event_list.head) {
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  while (context->query_tail != context->query_head) {
-    // Compute the contiguous range of queries ready to be read.
-    // If the ringbuffer wraps around we'll handle that in the next loop.
-    uint32_t try_query_count =
-        context->query_head < context->query_tail
-            ? context->query_capacity - context->query_tail
-            : context->query_head - context->query_tail;
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)try_query_count);
+  // submitted_event_list is a list of the head elements for each command
+  // buffer that has been submitted. Here we loop over all of the events,
+  // wait for them to complete and gather the results with hipEventQuery.
+  iree_hal_hip_tracing_context_event_t* events =
+      context->submitted_event_list.head;
+  uint32_t read_query_count = 0;
+  // Outer per-command_buffer loop.
+  while (events) {
+    iree_hal_hip_tracing_context_event_t* event = events;
+    // Inner per-event loop.
+    while (event) {
+      uint32_t query_id = (uint32_t)(event - &context->event_pool[0]);
 
-    // Scan and feed the times to tracy, stopping when we hit the first
-    // unavailable query.
-    uint32_t query_base = context->query_tail;
-    uint32_t read_query_count = 0;
-    for (uint32_t i = 0; i < try_query_count; ++i) {
-      // Ensure the event has completed; will return HIP_ERROR_NOT_READY if
-      // recorded but not retired or any other deferred error.
-      uint16_t query_id = (uint16_t)(query_base + i);
-      hipEvent_t query_event = context->event_pool[query_id];
-      hipError_t result = context->symbols->hipEventQuery(query_event);
+      hipError_t result = context->symbols->hipEventSynchronize(event->event);
+      if (result != hipSuccess) break;
+      result = context->symbols->hipEventQuery(event->event);
       if (result != hipSuccess) break;
 
       // Calculate context-relative time and notify tracy.
@@ -204,66 +265,156 @@ void iree_hal_hip_tracing_context_collect(
       IREE_HIP_IGNORE_ERROR(
           context->symbols,
           hipEventElapsedTime(&relative_millis, context->base_event,
-                              query_event));
+                              event->event));
       int64_t gpu_timestamp = (int64_t)((double)relative_millis * 1000000.0);
+
       iree_tracing_gpu_zone_notify(context->id, query_id, gpu_timestamp);
-
-      read_query_count = i + 1;
+      read_query_count += 1;
+      event = event->next_in_command_buffer;
     }
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)read_query_count);
+    iree_hal_hip_tracing_context_event_t* next = events->next_submission;
+    events->was_submitted = true;
+    events = next;
+    context->submitted_event_list.head = events;
+  }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)read_query_count);
 
-    context->query_tail += read_query_count;
-    if (context->query_tail >= context->query_capacity) {
-      context->query_tail = 0;
+  IREE_TRACE_ZONE_END(z0);
+  iree_slim_mutex_unlock(&context->event_mutex);
+}
+
+void iree_hal_hip_tracing_notify_submitted(
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list) {
+  if (!context) return;
+  IREE_ASSERT_ARGUMENT(event_list);
+  iree_slim_mutex_lock(&context->event_mutex);
+
+  if (!event_list->head) {
+    iree_slim_mutex_unlock(&context->event_mutex);
+    return;
+  }
+
+  if (!context->submitted_event_list.head) {
+    context->submitted_event_list.head = event_list->head;
+    context->submitted_event_list.tail = event_list->head;
+  } else {
+    context->submitted_event_list.tail->next_submission = event_list->head;
+    context->submitted_event_list.tail = event_list->head;
+  }
+
+  iree_slim_mutex_unlock(&context->event_mutex);
+}
+
+void iree_hal_hip_tracing_free(
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list) {
+  if (!context) return;
+  iree_slim_mutex_lock(&context->event_mutex);
+  IREE_ASSERT_ARGUMENT(event_list);
+
+  if (!event_list->head) {
+    iree_slim_mutex_unlock(&context->event_mutex);
+    return;
+  }
+  // Free an event list that was previously created. There is some book-keeping
+  // to keep tracy happy, and then we remove the elements from the
+  // passed in event_list and add them to the front of the free-list.
+
+  // If this event list has never been submitted we still need to add values to
+  // the timeline otherwise tracy will not behave correctly.
+  if (!event_list->head->was_submitted) {
+    iree_hal_hip_tracing_context_event_t* event = event_list->head;
+    while (event) {
+      uint32_t query_id = (uint32_t)(event - &context->event_pool[0]);
+      iree_tracing_gpu_zone_notify(context->id, query_id, 0);
+      event = event->next_in_command_buffer;
     }
   }
 
-  IREE_TRACE_ZONE_END(z0);
+  if (!context->event_freelist_head) {
+    context->event_freelist_head = event_list->head;
+    iree_slim_mutex_unlock(&context->event_mutex);
+    return;
+  }
+  event_list->head->next_submission = NULL;
+  event_list->head->was_submitted = false;
+  event_list->tail->next_in_command_buffer = context->event_freelist_head;
+  context->event_freelist_head = event_list->head;
+
+  event_list->head = NULL;
+  event_list->tail = NULL;
+  iree_slim_mutex_unlock(&context->event_mutex);
 }
 
+static void iree_hal_hip_tracing_context_event_list_append_event(
+    iree_hal_hip_tracing_context_event_list_t* event_list,
+    iree_hal_hip_tracing_context_event_t* event) {
+  if (!event_list->head) {
+    event_list->head = event;
+    event_list->tail = event;
+  } else {
+    event_list->tail->next_in_command_buffer = event;
+    event_list->tail = event;
+  }
+}
+
+// Grabs the next available query out of the freelist and adds it to
+// the event_list that was passed in. Also starts the recording of the
+// event.
 static uint16_t iree_hal_hip_stream_tracing_context_insert_query(
-    iree_hal_hip_tracing_context_t* context, hipStream_t stream) {
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream) {
+  iree_slim_mutex_lock(&context->event_mutex);
+  IREE_ASSERT_ARGUMENT(event_list);
+
   // Allocate an event from the pool for use by the query.
-  uint32_t query_id = context->query_head;
-  context->query_head = (context->query_head + 1) % context->query_capacity;
+  // TODO: If we have run out of our freelist, then we need to try and recover
+  // or allocate more events.
+  iree_hal_hip_tracing_context_event_t* event = context->event_freelist_head;
+  context->event_freelist_head = event->next_in_command_buffer;
+  uint32_t query_id = event - &context->event_pool[0];
+  IREE_ASSERT(event->next_in_command_buffer != NULL);
+  event->next_in_command_buffer = NULL;
 
-  // TODO: check to see if the read and write heads of the ringbuffer have
-  // overlapped. If they have we could try to collect but it's not guaranteed
-  // that collection will complete (e.g. we may be reserving events for use in
-  // graphs that haven't yet been launched).
-  //
-  // For now we just allow the overlap and tracing results will be inconsistent.
-  IREE_ASSERT_NE(context->query_head, context->query_tail);
+  IREE_HIP_IGNORE_ERROR(context->symbols, hipEventRecord(event->event, stream));
 
-  hipEvent_t event = context->event_pool[query_id];
-  IREE_HIP_IGNORE_ERROR(context->symbols, hipEventRecord(event, stream));
+  iree_hal_hip_tracing_context_event_list_append_event(event_list, event);
 
+  iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
 }
 
+// Grabs the next available query out of the freelist and adds it to
+// the event_list that was passed in. Also inserts the event record
+// node into the passed in graph. It returns the index of the
+// event.
 static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
-    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
-    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
-    size_t dependency_nodes_count) {
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list,
+    hipGraphNode_t* out_node, hipGraph_t graph,
+    hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count) {
+  IREE_ASSERT_ARGUMENT(event_list);
+  iree_slim_mutex_lock(&context->event_mutex);
   // Allocate an event from the pool for use by the query.
-  uint32_t query_id = context->query_head;
-  context->query_head = (context->query_head + 1) % context->query_capacity;
+  // TODO: If we have run out of our freelist, then we need to try and recover
+  // or
+  //  allocate more events.
+  iree_hal_hip_tracing_context_event_t* event = context->event_freelist_head;
+  context->event_freelist_head = event->next_in_command_buffer;
+  uint32_t query_id = event - &context->event_pool[0];
+  IREE_ASSERT(event->next_in_command_buffer != NULL);
+  event->next_in_command_buffer = NULL;
 
-  // TODO: check to see if the read and write heads of the ringbuffer have
-  // overlapped. If they have we could try to collect but it's not guaranteed
-  // that collection will complete (e.g. we may be reserving events for use in
-  // graphs that haven't yet been launched).
-  //
-  // For now we just allow the overlap and tracing results will be inconsistent.
-  IREE_ASSERT_NE(context->query_head, context->query_tail);
-
-  hipEvent_t event = context->event_pool[query_id];
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       context->symbols,
       hipGraphAddEventRecordNode(out_node, graph, dependency_nodes,
-                                 dependency_nodes_count, event));
+                                 dependency_nodes_count, event->event));
   IREE_ASSERT(iree_status_is_ok(status));
 
+  iree_hal_hip_tracing_context_event_list_append_event(event_list, event);
+
+  iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
 }
 
@@ -271,58 +422,65 @@ static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
 // today we insert 2 events per zone (one for begin and one for end) but in
 // many cases we could reduce this by inserting events only between zones and
 // using the differences between them.
-
 void iree_hal_hip_stream_tracing_zone_begin_impl(
-    iree_hal_hip_tracing_context_t* context, hipStream_t stream,
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
     const iree_tracing_location_t* src_loc) {
   IREE_ASSERT_ARGUMENT(context);
-  uint16_t query_id =
-      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
+  uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
+      context, event_list, stream);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
 }
 
 void iree_hal_hip_stream_tracing_zone_begin_external_impl(
-    iree_hal_hip_tracing_context_t* context, hipStream_t stream,
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
   IREE_ASSERT_ARGUMENT(context);
-  uint16_t query_id =
-      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
+  uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
+      context, event_list, stream);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
 }
 
 void iree_hal_hip_graph_tracing_zone_begin_external_impl(
-    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
-    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
-    size_t dependency_nodes_count, const char* file_name,
-    size_t file_name_length, uint32_t line, const char* function_name,
-    size_t function_name_length, const char* name, size_t name_length) {
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list,
+    hipGraphNode_t* out_node, hipGraph_t graph,
+    hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count,
+    const char* file_name, size_t file_name_length, uint32_t line,
+    const char* function_name, size_t function_name_length, const char* name,
+    size_t name_length) {
   if (!context) return;
   uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
-      context, out_node, graph, dependency_nodes, dependency_nodes_count);
+      context, event_list, out_node, graph, dependency_nodes,
+      dependency_nodes_count);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
 }
 
 void iree_hal_hip_stream_tracing_zone_end_impl(
-    iree_hal_hip_tracing_context_t* context, hipStream_t stream) {
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream) {
   if (!context) return;
-  uint16_t query_id =
-      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
+  uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
+      context, event_list, stream);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
 void iree_hal_hip_graph_tracing_zone_end_impl(
-    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
-    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
-    size_t dependency_nodes_count) {
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list,
+    hipGraphNode_t* out_node, hipGraph_t graph,
+    hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count) {
   if (!context) return;
   uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
-      context, out_node, graph, dependency_nodes, dependency_nodes_count);
+      context, event_list, out_node, graph, dependency_nodes,
+      dependency_nodes_count);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
@@ -342,5 +500,13 @@ void iree_hal_hip_tracing_context_free(
 
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context) {}
+
+void iree_hal_hip_tracing_notify_submitted(
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list) {}
+
+void iree_hal_hip_tracing_free(
+    iree_hal_hip_tracing_context_t* context,
+    iree_hal_hip_tracing_context_event_list_t* event_list) {}
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
