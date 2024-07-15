@@ -7,9 +7,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -31,7 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-global-opt-fuse-horizontal-contraction"
+#define DEBUG_TYPE "iree-flow-fuse-horizontal-contraction"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
