@@ -13,12 +13,12 @@ util.func public @no_fold_constant() -> (i32) {
 
 // CHECK-LABEL: @no_fold_add
 util.func public @no_fold_add() -> (i32) {
-  // CHECK-NEXT: %[[C1:.+]] = vm.const.i32 1
-  %c1 = vm.const.i32 1
+  // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
   // CHECK-NEXT: %[[R1:.+]] = util.optimization_barrier %[[C1]]
   %0 = util.optimization_barrier %c1 : i32
-  // CHECK-NEXT: %[[R2:.+]] = vm.add.i32 %[[R1]], %[[R1]]
-  %1 = vm.add.i32 %0, %0 : i32
+  // CHECK-NEXT: %[[R2:.+]] = arith.addi %[[R1]], %[[R1]]
+  %1 = arith.addi %0, %0 : i32
   // CHECK-NEXT: util.return %[[R2]]
   util.return %1 : i32
 }
@@ -28,10 +28,10 @@ util.func public @no_fold_add() -> (i32) {
 // Exists to check that the above succeeds when there's no barrier.
 // CHECK-LABEL: @fold_add
 util.func public @fold_add() -> (i32) {
-  // CHECK-NEXT: %[[C2:.+]] = vm.const.i32 2
+  // CHECK-NEXT: %[[C2:.+]] = arith.constant 2
   // CHECK-NEXT: util.return %[[C2]]
-  %c1 = vm.const.i32 1
-  %0 = vm.add.i32 %c1, %c1 : i32
+  %c1 = arith.constant 1 : i32
+  %0 = arith.addi %c1, %c1 : i32
   util.return %0 : i32
 }
 

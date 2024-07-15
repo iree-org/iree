@@ -84,6 +84,25 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// util.cmp.ne
+//===----------------------------------------------------------------------===//
+
+struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto operandType = adaptor.getLhs().getType();
+    if (llvm::isa<IREE::VM::RefType>(operandType)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNERefOp>(
+          op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
+      return success();
+    }
+    return failure(); // not used for non-ref types currently
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
@@ -111,6 +130,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
+  patterns.insert<CmpNEOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,

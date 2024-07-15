@@ -23,6 +23,8 @@ iree_lit_test_suite(
             "attributes.mlir",
             "buffer_folding.mlir",
             "buffer_ops.mlir",
+            "comparison_folding.mlir",
+            "comparison_ops.mlir",
             "global_folding.mlir",
             "global_ops.mlir",
             "hint_folding.mlir",
