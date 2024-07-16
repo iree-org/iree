@@ -29,7 +29,6 @@ iree_lit_test_suite(
             "global_loop_invariant_code_motion.mlir",
             "hoist_into_globals.mlir",
             "infer_numeric_narrowing.mlir",
-            "materialize_homogeneous_encodings.mlir",
             "optimize_numerics.mlir",
             "propagate_linalg_transpose.mlir",
             "raise_special_ops.mlir",
