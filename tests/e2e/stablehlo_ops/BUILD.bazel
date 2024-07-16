@@ -88,6 +88,11 @@ iree_check_single_backend_test_suite(
     ],
     driver = "local-task",
     input_type = "stablehlo",
+    tags = [
+        # round_nearest_afz/fmodf fail with a wasm target, just disable all tests there for now
+        #   undefined symbol: round_nearest_afz/fmodf
+        "nowasm",
+    ],
     target_backend = "llvm-cpu",
 )
 
