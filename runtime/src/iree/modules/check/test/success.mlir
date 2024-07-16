@@ -73,7 +73,6 @@ func.func @floats() {
   %p8 = arith.addf %p7, %cp1 : tensor<f32>
   %p9 = arith.addf %p8, %cp1 : tensor<f32>
   %approximately_1 = arith.addf %p9, %cp1 : tensor<f32>
-
   check.expect_almost_eq(%approximately_1, %c1) : tensor<f32>
   return
 }

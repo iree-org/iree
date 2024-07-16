@@ -99,7 +99,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv}))",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})",
     "--iree-scheduling-dump-statistics-format=json",
     "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]

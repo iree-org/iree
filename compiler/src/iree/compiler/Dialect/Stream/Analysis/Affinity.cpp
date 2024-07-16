@@ -565,9 +565,10 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
         if (auto affinityOp =
                 dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
                     result.getDefiningOp())) {
-          auto &opPVS = solver.getElementFor<OpAffinityPVS>(
-              *this, Position::forOperation(result.getOwner()),
-              DFX::Resolution::OPTIONAL);
+          auto &opPVS = solver.getOrCreateElementFor<OpAffinityPVS>(
+              Position::forOperation(result.getOwner()), *this,
+              DFX::Resolution::OPTIONAL, /*forceUpdate=*/false,
+              /*updateAfterInit=*/false);
           LLVM_DEBUG({
             llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
             value.printAsOperand(llvm::dbgs(), solver.getAsmState());
