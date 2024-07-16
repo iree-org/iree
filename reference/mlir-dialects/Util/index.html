@@ -2266,6 +2266,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilcmpne-utilcmpneop" class="md-nav__link">
+    <span class="md-ellipsis">
+      util.cmp.ne (Util::CmpNEOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utilnull-utilnullop" class="md-nav__link">
     <span class="md-ellipsis">
       util.null (Util::NullOp)
@@ -2358,6 +2367,15 @@
   <a href="#inlineneverattr" class="md-nav__link">
     <span class="md-ellipsis">
       InlineNeverAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nullattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullAttr
     </span>
   </a>
   
@@ -4824,6 +4842,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilcmpne-utilcmpneop" class="md-nav__link">
+    <span class="md-ellipsis">
+      util.cmp.ne (Util::CmpNEOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utilnull-utilnullop" class="md-nav__link">
     <span class="md-ellipsis">
       util.null (Util::NullOp)
@@ -4916,6 +4943,15 @@
   <a href="#inlineneverattr" class="md-nav__link">
     <span class="md-ellipsis">
       InlineNeverAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nullattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullAttr
     </span>
   </a>
   
@@ -5093,6 +5129,7 @@
 <li><a href="#type-manipulation-ops">Type manipulation ops</a><ul>
 <li><a href="#utilcast-utilcastop">util.cast (Util::CastOp)</a></li>
 <li><a href="#utilcmpeq-utilcmpeqop">util.cmp.eq (Util::CmpEQOp)</a></li>
+<li><a href="#utilcmpne-utilcmpneop">util.cmp.ne (Util::CmpNEOp)</a></li>
 <li><a href="#utilnull-utilnullop">util.null (Util::NullOp)</a></li>
 </ul>
 </li>
@@ -5108,6 +5145,7 @@
 <li><a href="#compositeattr">CompositeAttr</a></li>
 <li><a href="#inlinealwaysattr">InlineAlwaysAttr</a></li>
 <li><a href="#inlineneverattr">InlineNeverAttr</a></li>
+<li><a href="#nullattr">NullAttr</a></li>
 <li><a href="#uninitializedattr">UninitializedAttr</a></li>
 </ul>
 </li>
@@ -6741,6 +6779,50 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilcmpne-utilcmpneop"><code>util.cmp.ne</code> (Util::CmpNEOp)<a class="headerlink" href="#utilcmpne-utilcmpneop" title="Permanent link">link</a></h4>
+<p><em>Compares two values for inequality</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.cmp.ne` operands attr-dict `:` type($lhs)
+</code></pre></div>
+<p>Compares two operands for inequality. This is intended for comparing IREE
+reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>lhs</code></td>
+<td>any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs</code></td>
+<td>any type</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>1-bit signless integer</td>
+</tr>
+</tbody>
+</table>
 <h4 id="utilnull-utilnullop"><code>util.null</code> (Util::NullOp)<a class="headerlink" href="#utilnull-utilnullop" title="Permanent link">link</a></h4>
 <p><em>Returns a null type value</em></p>
 <p>Syntax:</p>
@@ -6748,10 +6830,10 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </code></pre></div>
 <p>Defines an SSA value that is lowered into dialects supporting
 null/undefined/optional/etc values.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ConstantLike</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6786,7 +6868,7 @@ the index is out of bounds.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
+<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6809,7 +6891,7 @@ the index is out of bounds.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
+<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6926,6 +7008,31 @@ satisfied.</p>
 <p>Syntax: <code>#util.inline.never</code></p>
 <p>Disables inlining of the function the attribute is associated with into
 any call-site.</p>
+<h3 id="nullattr">NullAttr<a class="headerlink" href="#nullattr" title="Permanent link">link</a></h3>
+<p>an attribute specifying a null reference</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#util.null&lt;
+  ::mlir::Type   # type
+&gt;
+</code></pre></div>
+<p>A null reference value.</p>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">type</td>
+<td style="text-align: center;"><code>::mlir::Type</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="uninitializedattr">UninitializedAttr<a class="headerlink" href="#uninitializedattr" title="Permanent link">link</a></h3>
 <p>an attribute specifying uninitialized storage</p>
 <p>Syntax:</p>
@@ -6937,7 +7044,7 @@ any call-site.</p>
 runtime. This is a hint to implementations that if policy allows memory
 allocated for the storage of this attribute type is allowed to have
 undefined contents upon return.</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6967,7 +7074,7 @@ undefined contents upon return.</p>
 &gt;
 </code></pre></div>
 <p>Typed container supporting variant storage.</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6998,7 +7105,7 @@ collected at runtime.</p>
 </code></pre></div>
 <p>A typed indirect reference to a value. These define a runtime addressable
 value that is strongly referenced.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
