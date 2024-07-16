@@ -539,14 +539,15 @@ jobs:
           - name: macos-14
             runs-on: macos-14
             # No container, just install what we need directly.
-          - name: arm64
-            runs-on:
-              - self-hosted # must come first
-              - runner-group=${{ needs.setup.outputs.runner-group }}
-              - environment=${{ needs.setup.outputs.runner-env }}
-              - arm64
-              - os-family=Linux
-            container: gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59
+          # Disabled while we are short on arm64 runners. Could also make this opt-in, but the matrix complicates that.
+          # - name: arm64
+          #   runs-on:
+          #     - self-hosted # must come first
+          #     - runner-group=${{ needs.setup.outputs.runner-group }}
+          #     - environment=${{ needs.setup.outputs.runner-env }}
+          #     - arm64
+          #     - os-family=Linux
+          #   container: gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59
     env:
       BUILD_DIR: build-runtime
       BUILD_PRESET: test
