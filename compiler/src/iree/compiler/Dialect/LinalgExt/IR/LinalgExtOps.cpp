@@ -1282,7 +1282,7 @@ LogicalResult AttentionOp::verify() {
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
-    return op->emitOpError("expected scale to be of floating point type");
+    return attnOp->emitOpError("expected scale to be of floating point type");
   }
 
   // Check shape compatibility based on indexing maps.
@@ -1323,12 +1323,6 @@ LogicalResult AttentionOp::verify() {
     return failure();
   }
 
-<<<<<<< HEAD
-=======
-  if (queryElementType != keyElementType) {
-    return op->emitOpError("element types of (Q)uery and (K)ey should be same");
-  }
->>>>>>> 3f0179b1bf (git-clang-format)
   if (isTiled) {
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
