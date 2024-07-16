@@ -549,14 +549,17 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  // Run the tests. Note that some modules may be compiled for other platforms
+  // and not have the required architectures for execution within them - to keep
+  // the test runner dumber we gracefully fail those cases by returning success.
   iree_status_t status = iree_test_utils_load_and_run_e2e_tests(
       iree_allocator_system(), conv2d_test_module_create);
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
-    bool is_unavailable = iree_status_is_unavailable(status);
+    bool is_device_unavailable = iree_status_is_not_found(status);
     iree_status_free(status);
-    exit_code = is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit_code = is_device_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
   IREE_TRACE_APP_EXIT(exit_code);
