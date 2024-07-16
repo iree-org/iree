@@ -2020,14 +2020,57 @@ LogicalResult AsyncTransferOp::verify() {
 }
 
 IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
-  return getResultAffinityAttr();
+  auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
+  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
+      resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // TODO(multi-device): figure out how to model staging->staging transfers.
+    return getSourceAffinityAttr();
+  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If source is staging then the op should execute on the consumer.
+    return getResultAffinityAttr();
+  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If result is staging then the op should execute on the producer.
+    return getSourceAffinityAttr();
+  } else {
+    // Default to result affinity.
+    return getResultAffinityAttr();
+  }
 }
 
 void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
-  if (value)
-    setResultAffinityAttr(value);
-  else
-    removeResultAffinityAttr();
+  auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
+  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
+      resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // TODO(multi-device): figure out how to model staging->staging transfers.
+    if (value) {
+      setSourceAffinityAttr(value);
+    } else {
+      removeSourceAffinityAttr();
+    }
+  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If source is staging then the op should execute on the consumer.
+    if (value) {
+      setResultAffinityAttr(value);
+    } else {
+      removeResultAffinityAttr();
+    }
+  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+    // If result is staging then the op should execute on the producer.
+    if (value) {
+      setSourceAffinityAttr(value);
+    } else {
+      removeSourceAffinityAttr();
+    }
+  } else {
+    // Default to result affinity.
+    if (value) {
+      setResultAffinityAttr(value);
+    } else {
+      removeResultAffinityAttr();
+    }
+  }
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(

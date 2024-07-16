@@ -84,8 +84,8 @@ def MakeSingleDispatchForFunctionPass :
   ];
 }
 
-def PadToIntrinsics :
-    InterfacePass<"iree-preprocessing-pad-to-intrinsics", "mlir::FunctionOpInterface"> {
+def PadToIntrinsicsPass :
+    Pass<"iree-preprocessing-pad-to-intrinsics", "ModuleOp"> {
   let summary = "Pad linalg ops such that we can use target's intrinsics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",

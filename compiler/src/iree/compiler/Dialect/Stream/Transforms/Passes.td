@@ -457,6 +457,11 @@ def PackDispatchOperandsPass :
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
+def AnnotateAffinitiesPass :
+    Pass<"iree-stream-annotate-affinities", "mlir::ModuleOp"> {
+  let summary = "Annotates affinities on all ops for debugging.";
+}
+
 def DumpStatisticsPass :
     Pass<"iree-stream-dump-statistics", "mlir::ModuleOp"> {
   let summary = "Dumps stream dialect usage information to a file.";

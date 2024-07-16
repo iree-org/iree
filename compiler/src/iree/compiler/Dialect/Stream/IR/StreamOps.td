@@ -1520,7 +1520,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $value `,` $target `[` $start_indices `for` $lengths `]` `:`
+    $value `,` $target (`[` $start_indices `for` $lengths^ `]`)? `:`
     type($value)
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
