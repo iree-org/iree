@@ -167,6 +167,9 @@ def ConvertDispatchRegionsToWorkgroupsPass :
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
   ];
+  let statistics = [
+    Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
+  ];
 }
 
 def ConvertTensorToFlowPass :
@@ -181,6 +184,10 @@ def ConvertTensorToFlowPass :
       "mlir::linalg::LinalgDialect",
       "mlir::tensor::TensorDialect",
       "IREE::Flow::FlowDialect",
+    ];
+    let statistics = [
+      Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",
+                "Number of slow copy dispatches (for handling slices) created">
     ];
 }
 
