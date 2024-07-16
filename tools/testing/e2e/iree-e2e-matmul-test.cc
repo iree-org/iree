@@ -93,23 +93,6 @@ static void reference_matmul_f16_f16_f32_f32(
   result_data[n + m * n_size] = acc;
 }
 
-// Reference mamtul for the f8 input, f32 accumlation, and f32 result.
-// [f32 <= f8 * f8 + f32]
-static void reference_matmul_f8_f8_f32_f32(
-    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
-    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, bool transpose_rhs,
-    const uint8_t* lhs_data, const uint8_t* rhs_data, const float* acc_data,
-    float* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {
-  float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
-  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
-    int64_t rhs_index = transpose_rhs ? k + n * k_size : n + k * n_size;
-    acc += iree_math_f8e4m3_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_f8e4m3_to_f32(rhs_data[rhs_index]);
-  }
-  result_data[n + m * n_size] = acc;
-}
-
 // Reference mamtul for the bf16 input, bf16 accumlation, and bf16 result.
 // [bf16 <= bf16 * bf16 + bf16]
 static void reference_matmul_bf16_bf16_bf16_bf16(
@@ -201,13 +184,6 @@ static iree_status_t reference_matmul_element(
     reference_matmul_bf16_bf16_f32_f32(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
-        (const float*)acc_data, (float*)result_data, m, n);
-  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8 &&
-             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8 &&
-             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    reference_matmul_f8_f8_f32_f32(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
-        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

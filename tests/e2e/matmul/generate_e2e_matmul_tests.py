@@ -462,6 +462,20 @@ def int_or_DYN(s: DimSize):
     return s.value or "DYN"
 
 
+# Gets friendlier form/type that we can use as arg types which we can cast into the target_type.
+def cast_argtype_if_required(target_type: MatrixElemTypeId):
+    if target_type == MatrixElemTypeId.F8E4M3FNUZ:
+        return MatrixElemTypeId.F32
+    return target_type
+
+
+# Gets the op needed to cast/convert from the friendly form/type into the target_type.
+def get_castback_from_arg_op(target_type: MatrixElemTypeId):
+    if target_type == MatrixElemTypeId.F8E4M3FNUZ:
+        return "arith.truncf"
+    return ValueError(f"Unhandled castback type of {t}")
+
+
 # Describes the fully resolved shape dimensions of all 3 input matrices,
 # LHS, RHS, and Accumulator, in a testcase.
 # Each value is a string, which may either represent a positive integer such as "123",
@@ -567,8 +581,10 @@ def generate_function(
     rhs_c = int_or_question_mark(shapes.rhs_cols)
     acc_r = int_or_question_mark(shapes.acc_rows)
     acc_c = int_or_question_mark(shapes.acc_cols)
-    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
-    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
+
+    casted_lhs_rhs_type = cast_argtype_if_required(lhs_rhs_type)
+    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{casted_lhs_rhs_type.value}>"
+    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{casted_lhs_rhs_type.value}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
     if transpose_rhs:
@@ -611,13 +627,22 @@ def generate_function(
         )
         func_definition = func_definition + compilation_info_string
         generate_function.compilation_index += 1
-
+    compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+    if casted_lhs_rhs_type != lhs_rhs_type:
+        castback_op = get_castback_from_arg_op(lhs_rhs_type)
+        compute_lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
+        compute_rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
+        compute = (
+            f"  %lhs_casted = {castback_op} %lhs: {lhs_tensor_type} to {compute_lhs_tensor_type}\n"
+            f"  %rhs_casted = {castback_op} %rhs: {rhs_tensor_type} to {compute_rhs_tensor_type}\n"
+            f"  %result = {op_name} {compilation_info_attr}ins(%lhs_casted, %rhs_casted: {compute_lhs_tensor_type}, {compute_rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}"
+        )
     if shape.accumulate:
         signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
         import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
         func_definition = func_definition + (
             f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-            f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+            f"{compute}\n"
             f"  return %result: {acc_tensor_type}\n"
             f"}}\n"
         )
@@ -635,7 +660,7 @@ def generate_function(
                 f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+                f"{compute}"
                 f"  return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
@@ -647,7 +672,7 @@ def generate_function(
                 f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+                f"{compute}"
                 f"  return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
@@ -741,8 +766,9 @@ def generate_call(
         rhs_shape = [shape.k, shape.n]
         transpose_rhs = 0
 
-    op = op + generate_random_matrix("lhs", lhs_shape, lhs_rhs_type)
-    op = op + generate_random_matrix("rhs", rhs_shape, lhs_rhs_type)
+    casted_lhs_rhs_type = cast_argtype_if_required(lhs_rhs_type)
+    op = op + generate_random_matrix("lhs", lhs_shape, casted_lhs_rhs_type)
+    op = op + generate_random_matrix("rhs", rhs_shape, casted_lhs_rhs_type)
     if shape.accumulate:
         op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
         # TODO(#16168): there's a bug with in-place input->output aliasing and

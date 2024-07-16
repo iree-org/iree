@@ -93,13 +93,6 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_i32(int32_t value) {
   return result;
 }
 
-iree_test_utils_e2e_value_t iree_test_utils_value_make_f8(uint8_t value) {
-  iree_test_utils_e2e_value_t result;
-  result.type = IREE_TEST_UTILS_VALUE_TYPE_F8;
-  result.f8_u8 = value;
-  return result;
-}
-
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f16(uint16_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F16;
@@ -130,8 +123,6 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_i16(((int16_t*)data)[index]);
   } else if (iree_hal_element_type_is_integer(result_type, 32)) {
     return iree_test_utils_value_make_i32(((int32_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8) {
-    return iree_test_utils_value_make_f8(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     return iree_test_utils_value_make_f16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
@@ -156,10 +147,6 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
       return snprintf(buf, bufsize, "%" PRIi32, value.i32);
     case IREE_TEST_UTILS_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
-    case IREE_TEST_UTILS_VALUE_TYPE_F8:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
-                      iree_math_f8e4m3_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
@@ -205,12 +192,6 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
     // functional testing, we can test for bit-exactness on the actual and
     // expected values. Inexact results are only permitted when the
     // `require_exact_results` flag is set to `false`.
-    case IREE_TEST_UTILS_VALUE_TYPE_F8:
-      if (actual.f8_u8 == expected.f8_u8) return true;
-      if (iree_test_utils_max_elements_to_check()) return false;
-      return fabsf(iree_math_f8e4m3_to_f32(actual.f8_u8) -
-                   iree_math_f8e4m3_to_f32(expected.f8_u8)) <
-             acceptable_fp_delta;
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       if (actual.f16_u16 == expected.f16_u16) return true;
       if (iree_test_utils_max_elements_to_check()) return false;
@@ -259,9 +240,6 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     WRITE_ELEMENT_CASE(UINT_32, uint32_t)
     WRITE_ELEMENT_CASE(UINT_64, uint64_t)
       // clang-format off
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_8:
-      *(uint8_t*)dst = iree_math_f32_to_f8e4m3((float)value);
-      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
       break;
@@ -293,7 +271,6 @@ void iree_test_utils_get_min_max_for_element_type(
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_8:
       *min = -2;
       *max = +2;
       break;
