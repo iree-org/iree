@@ -335,20 +335,40 @@ void TimepointAttr::print(AsmPrinter &p) const {
 // #stream.affinity
 //===----------------------------------------------------------------------===//
 
-AffinityAttr AffinityAttr::lookup(Operation *op) {
-  auto attrId = StringAttr::get(op->getContext(), "stream.affinity");
-  while (op) {
-    if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
-      auto affinity = affinityOp.getAffinityAttr();
-      if (affinity)
+// static
+AffinityAttr AffinityAttr::lookup(Operation *fromOp) {
+  auto attrId = StringAttr::get(fromOp->getContext(), "stream.affinity");
+  while (fromOp) {
+    if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(fromOp)) {
+      if (auto affinity = affinityOp.getAffinityAttr()) {
         return affinity;
+      }
     }
-    auto attr = op->getAttrOfType<AffinityAttr>(attrId);
-    if (attr)
+    if (auto attr = fromOp->getAttrOfType<AffinityAttr>(attrId)) {
       return attr;
-    op = op->getParentOp();
+    }
+    fromOp = fromOp->getParentOp();
   }
-  return {}; // No affinity found; let caller decide what to do.
+  // No affinity found; let caller decide what to do.
+  return {};
+}
+
+// static
+AffinityAttr AffinityAttr::lookupOrDefault(Operation *fromOp) {
+  if (auto affinityAttr = AffinityAttr::lookup(fromOp)) {
+    return affinityAttr; // found a specified affinity
+  }
+  auto attrId =
+      StringAttr::get(fromOp->getContext(), "stream.affinity.default");
+  while (fromOp) {
+    if (auto affinityAttr =
+            fromOp->getAttrOfType<IREE::Stream::AffinityAttr>(attrId)) {
+      return affinityAttr;
+    }
+    fromOp = fromOp->getParentOp();
+  }
+  // No affinity or default found; let caller decide what to do.
+  return {};
 }
 
 // static

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_affinities.mlir"
     "annotate_dispatch_arguments.mlir"
     "convert_to_stream.mlir"
     "dump_statistics.mlir"

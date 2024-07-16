@@ -27,7 +27,7 @@ static LogicalResult
 verifyAffinityAssigned(IREE::Stream::AffinityOpInterface op) {
   if (!op.requiresAffinity()) {
     return success(); // does not require an affinity
-  } else if (IREE::Stream::AffinityAttr::lookup(op)) {
+  } else if (IREE::Stream::AffinityAttr::lookupOrDefault(op)) {
     return success(); // has an affinity
   }
   return op->emitOpError()
@@ -55,7 +55,10 @@ struct VerifyAffinitiesPass
                   return WalkResult::interrupt();
                 }
               }
-              return WalkResult::advance();
+              return (op->hasTrait<OpTrait::IREE::Util::ObjectLike>() ||
+                      op->hasTrait<OpTrait::SymbolTable>())
+                         ? WalkResult::skip()
+                         : WalkResult::advance();
             })
             .wasInterrupted())
       return signalPassFailure();
