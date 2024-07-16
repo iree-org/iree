@@ -302,6 +302,9 @@ typedef struct iree_hal_hip_working_area_t {
       IREE_GUARDED_BY(pending_work_items_count_mutex);
 
   iree_allocator_t host_allocator;  // const
+
+  const iree_hal_hip_dynamic_symbols_t* symbols;
+  hipDevice_t device;
 } iree_hal_hip_working_area_t;
 
 // This data structure is shared by the parent thread. It is responsible
@@ -330,10 +333,13 @@ typedef struct iree_hal_hip_completion_area_t {
       IREE_GUARDED_BY(pending_completion_count_mutex);
 
   iree_allocator_t host_allocator;
+
+  hipDevice_t device;
 } iree_hal_hip_completion_area_t;
 
 static void iree_hal_hip_working_area_initialize(
-    iree_allocator_t host_allocator,
+    iree_allocator_t host_allocator, hipDevice_t device,
+    const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_working_area_t* working_area) {
   iree_notification_initialize(&working_area->state_notification);
   iree_notification_initialize(&working_area->exit_notification);
@@ -348,6 +354,8 @@ static void iree_hal_hip_working_area_initialize(
       &working_area->pending_work_items_count_notification);
   working_area->pending_work_items_count = 0;
   working_area->host_allocator = host_allocator;
+  working_area->symbols = symbols;
+  working_area->device = device;
 }
 
 static void iree_hal_hip_working_area_deinitialize(
@@ -362,7 +370,7 @@ static void iree_hal_hip_working_area_deinitialize(
 }
 
 static void iree_hal_hip_completion_area_initialize(
-    iree_allocator_t host_allocator,
+    iree_allocator_t host_allocator, hipDevice_t device,
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_completion_area_t* completion_area) {
   iree_notification_initialize(&completion_area->state_notification);
@@ -379,6 +387,7 @@ static void iree_hal_hip_completion_area_initialize(
   completion_area->pending_completion_count = 0;
   completion_area->host_allocator = host_allocator;
   completion_area->symbols = symbols;
+  completion_area->device = device;
 }
 
 static void iree_hal_hip_completion_area_deinitialize(
@@ -437,13 +446,16 @@ struct iree_hal_hip_pending_queue_actions_t {
 
   // Completion thread's working area.
   iree_hal_hip_completion_area_t completion_area;
+
+  // The associated hip device.
+  hipDevice_t device;
 };
 
 static const iree_hal_resource_vtable_t
     iree_hal_hip_pending_queue_actions_vtable;
 
 iree_status_t iree_hal_hip_pending_queue_actions_create(
-    const iree_hal_hip_dynamic_symbols_t* symbols,
+    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_hip_pending_queue_actions_t** out_actions) {
   IREE_ASSERT_ARGUMENT(symbols);
@@ -460,15 +472,18 @@ iree_status_t iree_hal_hip_pending_queue_actions_create(
   actions->host_allocator = host_allocator;
   actions->block_pool = block_pool;
   actions->symbols = symbols;
+  actions->device = device;
+
   iree_slim_mutex_initialize(&actions->action_mutex);
   memset(&actions->action_list, 0, sizeof(actions->action_list));
 
   // Initialize the working area for the ready-list processing worker.
   iree_hal_hip_working_area_t* working_area = &actions->working_area;
-  iree_hal_hip_working_area_initialize(host_allocator, working_area);
+  iree_hal_hip_working_area_initialize(host_allocator, device, symbols,
+                                       working_area);
 
   iree_hal_hip_completion_area_t* completion_area = &actions->completion_area;
-  iree_hal_hip_completion_area_initialize(host_allocator, symbols,
+  iree_hal_hip_completion_area_initialize(host_allocator, device, symbols,
                                           completion_area);
 
   // Create the ready-list processing worker itself.
@@ -868,9 +883,6 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   const iree_hal_hip_dynamic_symbols_t* symbols =
       action->owning_actions->symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, symbols, hipSetDevice(iree_hal_hip_device_get_device(action->device)),
-      "hipSetDevice");
 
   // No need to lock given that this action is already detched from the pending
   // actions list; so only this thread is seeing it now.
@@ -1319,6 +1331,16 @@ static int iree_hal_hip_completion_execute(
     iree_hal_hip_completion_area_t* completion_area) {
   iree_hal_hip_completion_slist_t* worklist = &completion_area->completion_list;
 
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      completion_area->symbols, hipSetDevice(completion_area->device),
+      "hipSetDevice");
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_hal_hip_completion_wait_pending_completion_items(completion_area);
+    iree_hal_hip_post_error_to_completion_state(completion_area,
+                                                iree_status_code(status));
+    return -1;
+  }
+
   while (true) {
     iree_notification_await(
         &completion_area->state_notification,
@@ -1383,7 +1405,7 @@ static int iree_hal_hip_completion_execute(
     }
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-      iree_hal_hip_completion_has_no_pending_completion_items(completion_area);
+      iree_hal_hip_completion_wait_pending_completion_items(completion_area);
       iree_hal_hip_post_error_to_completion_state(completion_area,
                                                   iree_status_code(status));
       IREE_TRACE_ZONE_END(z0);
@@ -1420,6 +1442,16 @@ static int iree_hal_hip_completion_execute(
 static int iree_hal_hip_worker_execute(
     iree_hal_hip_working_area_t* working_area) {
   iree_hal_hip_ready_action_slist_t* worklist = &working_area->ready_worklist;
+
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      working_area->symbols, hipSetDevice(working_area->device),
+      "hipSetDevice");
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_hal_hip_worker_wait_pending_work_items(working_area);
+    iree_hal_hip_post_error_to_worker_state(working_area,
+                                            iree_status_code(status));
+    return -1;
+  }
 
   while (true) {
     // Block waiting for incoming requests.

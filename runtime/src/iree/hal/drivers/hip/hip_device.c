@@ -156,7 +156,7 @@ static iree_status_t iree_hal_hip_device_create_internal(
   device->host_allocator = host_allocator;
 
   iree_status_t status = iree_hal_hip_pending_queue_actions_create(
-      symbols, &device->block_pool, host_allocator,
+      symbols, hip_device, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
@@ -284,11 +284,6 @@ iree_status_t iree_hal_hip_device_create(
 hipCtx_t iree_hal_hip_device_context(iree_hal_device_t* base_device) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast_unsafe(base_device);
   return device->hip_context;
-}
-
-hipDevice_t iree_hal_hip_device_get_device(iree_hal_device_t* base_device) {
-  iree_hal_hip_device_t* device = iree_hal_hip_device_cast_unsafe(base_device);
-  return device->hip_device;
 }
 
 const iree_hal_hip_dynamic_symbols_t* iree_hal_hip_device_dynamic_symbols(
