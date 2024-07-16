@@ -540,12 +540,12 @@ func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   } : (tensor<?x?xi32>) -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %[[C0]]
-// CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[IN]], %[[C1]]
-// CHECK:        %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
-// CHECK:        %[[GEN:.+]] = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%[[INIT]] : tensor<?x?xi32>) {
+// CHECK:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK:    %[[D:.+]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xi32>
+// CHECK:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK:    %[[D0:.+]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xi32>
+// CHECK:    %[[INIT:.+]] = tensor.empty(%[[D]], %[[D0]]) : tensor<?x?xi32>
+// CHECK:    %[[GEN:.+]] = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%[[INIT]] : tensor<?x?xi32>) {
 
 // First reverse dimension
 // CHECK:       %[[IDX0:.+]] = linalg.index 0 : index

@@ -438,23 +438,16 @@ struct ReverseOpConversion final
     Value input = op.getOperand();
     auto inputTy = cast<ShapedType>(input.getType());
     auto resultTy = cast<ShapedType>(op.getType());
-    auto dims = op.getDimensions();
+    ArrayRef<int64_t> dims = op.getDimensions();
     Location loc = op.getLoc();
-
-    SmallVector<Value> dynDims;
-    for (int i = 0; i < inputTy.getRank(); i++) {
-      if (inputTy.isDynamicDim(i)) {
-        dynDims.push_back(rewriter.create<tensor::DimOp>(loc, input, i));
-      }
-    }
+    int64_t inputTyRank = inputTy.getRank();
 
     // First fill the output buffer with the init value.
-    auto emptyTensor = rewriter
-                           .create<tensor::EmptyOp>(loc, inputTy.getShape(),
-                                                    inputTy.getElementType(),
-                                                    ArrayRef<Value>({dynDims}))
-                           .getResult();
-    SmallVector<AffineMap, 2> affineMaps = {
+    SmallVector<OpFoldResult> inputMixedSizes =
+        tensor::getMixedSizes(rewriter, loc, input);
+    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, inputMixedSizes, inputTy.getElementType());
+    SmallVector<AffineMap> affineMaps = {
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
     rewriter.replaceOpWithNewOp<linalg::GenericOp>(
@@ -462,7 +455,7 @@ struct ReverseOpConversion final
         getNParallelLoopsAttrs(resultTy.getRank()),
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           llvm::SmallVector<Value> indices;
-          for (unsigned int i = 0; i < inputTy.getRank(); i++) {
+          for (unsigned int i = 0; i < inputTyRank; i++) {
             Value index =
                 rewriter.create<linalg::IndexOp>(nestedLoc, i).getResult();
             if (std::find(dims.begin(), dims.end(), i) != dims.end()) {
