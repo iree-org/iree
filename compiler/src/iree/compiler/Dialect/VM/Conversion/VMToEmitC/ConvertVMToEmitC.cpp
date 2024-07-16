@@ -1063,7 +1063,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         if (typeName[0] == '!') {
           typeName = typeName.substr(1);
         }
-        typeName = std::string("\"") + typeName + std::string("\"");
 
         Value stringView =
             emitc_builders::ireeMakeCstringView(builder, loc, typeName);
@@ -2947,6 +2946,107 @@ class CompareRefNotZeroOpConversion
   }
 };
 
+class SelectRefOpConversion
+    : public EmitCConversionPattern<IREE::VM::SelectRefOp> {
+  using Adaptor = typename IREE::VM::SelectRefOp::Adaptor;
+  using EmitCConversionPattern<IREE::VM::SelectRefOp>::EmitCConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VM::SelectRefOp selectOp, Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto ctx = selectOp.getContext();
+    auto loc = selectOp.getLoc();
+
+    auto moduleOp =
+        selectOp.getOperation()->template getParentOfType<IREE::VM::ModuleOp>();
+    auto funcOp = selectOp.getOperation()
+                      ->template getParentOfType<mlir::emitc::FuncOp>();
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
+
+    const BlockArgument moduleArg = funcOp.getArgument(CCONV_ARGUMENT_MODULE);
+    auto resultTypePtr =
+        createVmTypeDefPtr(rewriter, loc, this->getModuleAnalysis(), moduleOp,
+                           moduleArg, selectOp.getType());
+    if (!resultTypePtr.has_value()) {
+      return selectOp->emitError() << "generating iree_vm_type_def_t* failed";
+    }
+    auto resultTypeAsRef =
+        rewriter
+            .create<emitc::CallOpaqueOp>(
+                /*location=*/loc,
+                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+                /*callee=*/StringAttr::get(ctx, "iree_vm_type_def_as_ref"),
+                /*args=*/ArrayAttr{}, /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{resultTypePtr.value()})
+            .getResult(0);
+
+    bool moveTrue =
+        funcAnalysis.isMove(selectOp.getTrueValue(), selectOp.getOperation());
+    bool moveFalse =
+        funcAnalysis.isMove(selectOp.getFalseValue(), selectOp.getOperation());
+
+    Value refTrue =
+        this->getModuleAnalysis().lookupRef(selectOp.getTrueValue());
+    Value refFalse =
+        this->getModuleAnalysis().lookupRef(selectOp.getFalseValue());
+    Value refResult = this->getModuleAnalysis().lookupRef(selectOp.getResult());
+
+    Type boolType = rewriter.getI1Type();
+    auto condition = rewriter.create<IREE::VM::CmpNZI32Op>(
+        loc, rewriter.getI32Type(), selectOp.getCondition());
+    auto conditionI1 = rewriter.create<emitc::CastOp>(
+        /*location=*/loc,
+        /*type=*/boolType,
+        /*operand=*/condition.getResult());
+
+    auto *continueBlock =
+        rewriter.splitBlock(selectOp->getBlock(), Block::iterator(selectOp));
+
+    Block *trueBlock = nullptr;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      trueBlock = rewriter.createBlock(continueBlock);
+      returnIfError(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move_checked"),
+          /*args=*/
+          ArrayAttr::get(
+              ctx, {rewriter.getBoolAttr(moveTrue), rewriter.getIndexAttr(0),
+                    rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
+          /*operands=*/
+          ArrayRef<Value>{refTrue, resultTypeAsRef, refResult},
+          this->getModuleAnalysis());
+      rewriter.create<IREE::VM::BranchOp>(loc, continueBlock);
+    }
+
+    Block *falseBlock = nullptr;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      falseBlock = rewriter.createBlock(continueBlock);
+      returnIfError(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move_checked"),
+          /*args=*/
+          ArrayAttr::get(
+              ctx, {rewriter.getBoolAttr(moveFalse), rewriter.getIndexAttr(0),
+                    rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
+          /*operands=*/
+          ArrayRef<Value>{refFalse, resultTypeAsRef, refResult},
+          this->getModuleAnalysis());
+      rewriter.create<IREE::VM::BranchOp>(loc, continueBlock);
+    }
+
+    rewriter.setInsertionPointAfterValue(conditionI1);
+    rewriter.create<mlir::cf::CondBranchOp>(loc, conditionI1.getResult(),
+                                            trueBlock, falseBlock);
+    rewriter.replaceOp(selectOp, refResult);
+
+    return success();
+  }
+};
+
 template <typename OpTy>
 class ConstOpConversion : public EmitCConversionPattern<OpTy> {
   using Adaptor = typename OpTy::Adaptor;
@@ -3429,12 +3529,8 @@ class FailOpConversion : public EmitCConversionPattern<IREE::VM::FailOp> {
 
       releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
-      std::string messageStr = std::string("\"") +
-                               op.getMessage().value_or("").str() +
-                               std::string("\"");
-
-      Value message =
-          emitc_builders::ireeMakeCstringView(rewriter, loc, messageStr);
+      Value message = emitc_builders::ireeMakeCstringView(
+          rewriter, loc, op.getMessage().value_or("").str());
 
       auto messageSizeOp = emitc_builders::structMember(
           rewriter, loc,
@@ -4430,6 +4526,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
     CallOpConversion<IREE::VM::CallOp>,
     CallOpConversion<IREE::VM::CallVariadicOp>,
     CompareRefNotZeroOpConversion,
+    SelectRefOpConversion,
     CondBranchOpConversion,
     BranchTableOpConversion,
     ConstOpConversion<IREE::VM::ConstF32Op>,
