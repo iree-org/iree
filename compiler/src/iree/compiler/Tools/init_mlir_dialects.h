@@ -16,6 +16,8 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmSME/IR/ArmSME.h"
+#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -50,6 +52,7 @@
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
+
 #include "mlir/IR/Dialect.h"
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
@@ -80,6 +83,8 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
                   arm_neon::ArmNeonDialect,
+                  arm_sve::ArmSVEDialect,
+                  arm_sme::ArmSMEDialect,
                   func::FuncDialect,
                   mlir::arith::ArithDialect,
                   vector::VectorDialect,
