@@ -205,6 +205,36 @@ def FixupLegacySyncPass :
   ];
 }
 
+def InlineMemoizeRegionsPass :
+    Pass<"iree-hal-inline-memoize-regions", ""> {
+  let summary = "Inlines `hal.device.memoize` regions into their parent region.";
+  let description = [{
+    Inlines any `hal.device.memoize` ops into their parent region and removes
+    the op. This prevents memoization and has the same behavior as having never
+    formed the memoization regions.
+  }];
+  let dependentDialects = [
+    "mlir::cf::ControlFlowDialect",
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def OutlineMemoizeRegionsPass :
+    Pass<"iree-hal-outline-memoize-regions", "mlir::ModuleOp"> {
+  let summary = "Outlines `hal.device.memoize` regions and creates global resources.";
+  let description = [{
+    Outlines any `hal.device.memoize` ops in the module by creating functions
+    and per-device globals with initializers.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::cf::ControlFlowDialect",
+    "mlir::scf::SCFDialect",
+    "IREE::HAL::HALDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def MemoizeDeviceQueriesPass :
     Pass<"iree-hal-memoize-device-queries", "mlir::ModuleOp"> {
   let summary = "Finds hal.device.query ops and creates variables initialized on startup.";

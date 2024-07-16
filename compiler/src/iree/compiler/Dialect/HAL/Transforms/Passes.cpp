@@ -42,6 +42,13 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   };
 };
 
+static llvm::cl::opt<bool> clMemoization{
+    "iree-hal-memoization",
+    llvm::cl::desc(
+        "Whether to memoize device resources such as command buffers."),
+    llvm::cl::init(false),
+};
+
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
@@ -435,6 +442,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
   passManager.addPass(IREE::HAL::createConvertToHALPass());
+
+  // If memoization is disabled then inline any regions that were created during
+  // conversion.
+  if (!clMemoization) {
+    FunctionLikeNest(passManager)
+        .addPass(IREE::HAL::createInlineMemoizeRegionsPass);
+  } else {
+    passManager.addPass(IREE::HAL::createOutlineMemoizeRegionsPass());
+  }
 
   // If any devices require the legacy synchronous execution behavior then
   // make all async operations blocking.
