@@ -86,13 +86,13 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
     ],
+    driver = "local-task",
+    input_type = "stablehlo",
     tags = [
         # round_nearest_afz/fmodf fail with a wasm target, just disable all tests there for now
         #   undefined symbol: round_nearest_afz/fmodf
         "nowasm",
     ],
-    driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
