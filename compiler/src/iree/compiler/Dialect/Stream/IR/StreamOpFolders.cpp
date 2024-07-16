@@ -1231,7 +1231,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
         constantOp, constantOp.getResult().getType(), splatOp.getResult(),
         resultSize, resultSize,
         /*source_affinity=*/constantOp.getAffinityAttr(),
-        /*result_affinity=*/nullptr);
+        /*result_affinity=*/constantOp.getAffinityAttr());
     return success();
   }
 };
@@ -1452,9 +1452,9 @@ struct ConvertSplatConstantsIntoSplats
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
     auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
-    if (!value || !value.isSplat())
+    if (!value || !value.isSplat()) {
       return failure();
-
+    }
     auto splatElementAttr =
         llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(

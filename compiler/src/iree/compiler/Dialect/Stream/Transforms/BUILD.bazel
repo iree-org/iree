@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateAffinities.cpp",
         "AnnotateDispatchArguments.cpp",
         "ConvertToStream.cpp",
         "DumpStatistics.cpp",

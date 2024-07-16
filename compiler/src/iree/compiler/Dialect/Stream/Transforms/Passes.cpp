@@ -16,6 +16,12 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> clAnnotateInputAffinities(
+    "iree-stream-annotate-input-affinities",
+    llvm::cl::desc("Annotates all tensor/resource affinities on the input to "
+                   "the pipeline for debugging."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -68,6 +74,13 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Conversion
   //----------------------------------------------------------------------------
 
+  // Annotate all ops/resources with the analyzed affinities.
+  // This should have no behavioral changes during conversion but allows for
+  // debugging of analysis errors in end-user tooling.
+  if (clAnnotateInputAffinities) {
+    passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
+  }
+
   // Converts from all input dialects into various levels of the stream dialect.
   // Tensor-like things go to stream.tensor.* ops while lower level buffer-like
   // things will go to stream.async.* ops.
@@ -80,6 +93,9 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
   // Constant/variable optimization
   //----------------------------------------------------------------------------
+
+  // Run inlining after having baked out affinities.
+  passManager.addPass(mlir::createInlinerPass());
 
   // Cleanup globals that were created during conversion.
   addCleanupPatterns(passManager);
@@ -96,10 +112,15 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): annotate all dispatches with preferred executable affinity.
   // TODO(benvanik): DFA to specify all value affinities and pin dispatches.
 
+  // TODO(multi-device): it's really nice to be able to verify here but it
+  // prevents compiling to stream without devices specified or continuation at
+  // various phases. It'd be nice to find a way to enable this when the user
+  // expects it to work and otherwise not.
+  //
   // Verify that all ops that may require affinities have them assigned or
   // available (on a parent scope, etc). This allows subsequent passes to trust
   // that an affinity lookup will always return a valid affinity.
-  passManager.addPass(IREE::Stream::createVerifyAffinitiesPass());
+  // passManager.addPass(IREE::Stream::createVerifyAffinitiesPass());
 }
 
 //===----------------------------------------------------------------------===//

@@ -17,7 +17,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -416,10 +415,14 @@ private:
           // TODO(benvanik): remove kFavorTransients.
           bool isSourceExternal = !sourceUsage.isAssumed(NOT_EXTERNAL);
           bool isTargetInternal = isAssumed(NOT_EXTERNAL);
-          if (kFavorTransients && isSourceExternal && isTargetInternal) {
+          bool deviceChange =
+              op.getSourceAffinityAttr() != op.getResultAffinityAttr();
+          if ((kFavorTransients || deviceChange) && isSourceExternal &&
+              isTargetInternal) {
             LLVM_DEBUG({
-              llvm::dbgs() << "[ValueResourceUsage] skipping forward prop of "
-                              "external into internal: ";
+              llvm::dbgs()
+                  << "[ValueResourceUsage] skipping forward prop of external "
+                     "into internal due to kFavorTransients/device-change: ";
               op.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
@@ -529,7 +532,6 @@ private:
               *this,
               Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
               DFX::Resolution::REQUIRED);
-
           getState() ^= beforeUsage.getState();
         })
         .Case([&](mlir::scf::ConditionOp op) {
@@ -562,29 +564,30 @@ private:
                 Position::forValue(op->getParentOp()->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
-          } else if (auto whileOp =
-                         dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+          } else if (auto whileOp = dyn_cast<scf::WhileOp>(op->getParentOp())) {
             auto value =
                 Position::forValue(whileOp.getBefore().getArgument(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
-          } else if (auto forOp =
-                         dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(whileOp->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
+          } else if (auto forOp = dyn_cast<scf::ForOp>(op->getParentOp())) {
             auto value = Position::forValue(forOp.getRegionIterArg(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
-
             auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(forOp->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
           } else {
-            assert(false && "Unsupported test case");
+            assert(false && "unhandled scf yield parent");
           }
         })
-        .Case([&](mlir::func::ReturnOp op) {
+        .Case([&](IREE::Util::ReturnOp op) {
           auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
@@ -734,11 +737,14 @@ private:
           // TODO(benvanik): remove kFavorTransients.
           bool isSourceInternal = isAssumed(NOT_EXTERNAL);
           bool isTargetExternal = !resultUsage.isAssumed(NOT_EXTERNAL);
-          if (kFavorTransients && isSourceInternal && isTargetExternal) {
+          bool deviceChange =
+              op.getSourceAffinityAttr() != op.getResultAffinityAttr();
+          if ((kFavorTransients || deviceChange) && isSourceInternal &&
+              isTargetExternal) {
             LLVM_DEBUG({
               llvm::dbgs()
                   << "[ValueResourceUsage] skipping back prop of external into "
-                     "internal due to kFavorTransients: ";
+                     "internal due to kFavorTransients/device-change: ";
               op.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });

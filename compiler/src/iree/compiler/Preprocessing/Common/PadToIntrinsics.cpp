@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -25,7 +26,7 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_PADTOINTRINSICS
+#define GEN_PASS_DEF_PADTOINTRINSICSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 namespace {
@@ -533,7 +534,7 @@ static void padContractionLikeOp(
 }
 
 struct PadToIntrinsicsPass
-    : public impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
+    : public impl::PadToIntrinsicsPassBase<PadToIntrinsicsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
@@ -544,10 +545,15 @@ void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
 
-  auto funcOp = getOperation();
-  IREE::HAL::DeviceAnalysis deviceAnalysis(funcOp->getParentOp());
-  if (failed(deviceAnalysis.run()))
+  auto moduleOp = getOperation();
+  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+  if (failed(affinityAnalysis.run())) {
     return signalPassFailure();
+  }
+  IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+  if (failed(deviceAnalysis.run())) {
+    return signalPassFailure();
+  }
 
   bool padConvOps = padTargetType == PadTargetType::ConvOp ||
                     padTargetType == PadTargetType::All;
@@ -555,37 +561,46 @@ void PadToIntrinsicsPass::runOnOperation() {
                            padTargetType == PadTargetType::All;
   SmallVector<linalg::LinalgOp> targetConvOps;
   SmallVector<linalg::LinalgOp> targetContractOps;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) && padConvOps) {
-      // Add convOps into worklist.
-      targetConvOps.push_back(linalgOp);
-    } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
-                   linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
-               padContractionOps) {
-      // Add named contractionOps into worklist.
-      targetContractOps.push_back(linalgOp);
-    } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
-               linalg::isaContractionOpInterface(linalgOp) &&
-               padContractionOps) {
-      // Add named generic contractionOps into worklist.
-      targetContractOps.push_back(linalgOp);
-    }
-  });
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) &&
+          padConvOps) {
+        targetConvOps.push_back(linalgOp);
+      } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
+                     linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
+                 padContractionOps) {
+        targetContractOps.push_back(linalgOp);
+      } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+                 linalg::isaContractionOpInterface(linalgOp) &&
+                 padContractionOps) {
+        targetContractOps.push_back(linalgOp);
+      }
+    });
+  }
 
   // Iterate through and pad ops in the worklists.
+  auto getRequiredExecutableTargetAttrs = [&](Operation *op) {
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
+    if (affinityAnalysis.tryInferExecutionAffinity(op, affinityAttrs)) {
+      for (auto affinityAttr : affinityAttrs) {
+        deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
+                                                       executableTargetAttrs);
+      }
+    }
+    return executableTargetAttrs;
+  };
   IRRewriter rewriter(context);
   for (auto convOp : targetConvOps) {
     rewriter.setInsertionPoint(convOp);
-    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
-    deviceAnalysis.gatherRequiredExecutableTargets(convOp, executableTargets);
-    padConvOp(rewriter, convOp, executableTargets.getArrayRef());
+    auto executableTargetAttrs = getRequiredExecutableTargetAttrs(convOp);
+    padConvOp(rewriter, convOp, executableTargetAttrs.getArrayRef());
   }
   for (auto contractOp : targetContractOps) {
     rewriter.setInsertionPoint(contractOp);
-    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
-    deviceAnalysis.gatherRequiredExecutableTargets(contractOp,
-                                                   executableTargets);
-    padContractionLikeOp(rewriter, contractOp, executableTargets.getArrayRef());
+    auto executableTargetAttrs = getRequiredExecutableTargetAttrs(contractOp);
+    padContractionLikeOp(rewriter, contractOp,
+                         executableTargetAttrs.getArrayRef());
   }
 }
 
