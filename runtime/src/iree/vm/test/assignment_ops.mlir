@@ -17,7 +17,7 @@ vm.module @assignment_ops {
     vm.return
   }
 
-  vm.export @test_select_ref attributes {emitc.exclude}
+  vm.export @test_select_ref
   vm.func private @test_select_ref() {
     %c0 = vm.const.i32 0
     %list0 = vm.list.alloc %c0 : (i32) -> !vm.list<i8>
