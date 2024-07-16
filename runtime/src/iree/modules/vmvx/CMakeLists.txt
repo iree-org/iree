@@ -17,8 +17,8 @@ iree_cc_library(
   TEXTUAL_HDRS
     "exports.inl"
   SRCS
-  "elementwise.c"
-  "module.c"
+    "elementwise.c"
+    "module.c"
   DEFINES
     "IREE_HAVE_VMVX_MODULE"
   DEPS
