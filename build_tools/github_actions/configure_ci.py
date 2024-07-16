@@ -128,17 +128,34 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         # "build_test_all_windows",  # Currently disabled
         # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",
-        # Due to the outstock of A100, only run this test in postsubmit.
+        "test_nvidia_gpu",
         "test_nvidia_a100",
-        # Due to the instability issues at the current runner,
-        # only run this test in postsubmit.
+        "test_amd_mi250",
+        "test_amd_mi300",
         "test_amd_w7900",
     ]
 )
 
+NVGPU_PATHS = [
+    # Directly related to NVIDIA GPU code generation and execution:
+    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "runtime/src/iree/hal/drivers/cuda/*",
+    # Common code likely enough to affect code paths unique to NVIDIA GPUs:
+    "compiler/src/iree/compiler/GlobalOptimization/*",
+]
+
+AMDGPU_PATHS = [
+    # Directly related to AMDGPU code generation and execution:
+    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "runtime/src/iree/hal/drivers/hip/*",
+    # Common code likely enough to affect code paths unique to AMDGPU:
+    "compiler/src/iree/compiler/GlobalOptimization/*",
+]
+
 # Jobs to run in presumbit if files under the corresponding path see changes.
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards.
+# Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     # Currently disabled
     # ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
@@ -147,6 +164,17 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     #     "build_test_all_windows",
     #     ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
     # ),
+    #
+    # The runners with GPUs for these jobs can be unstable or in short supply,
+    # so limit jobs to only code paths most likely to affect the tests.
+    ("test_nvidia_gpu", NVGPU_PATHS),
+    # Due to the outstock of A100, only run this test in postsubmit.
+    # ("test_nvidia_a100", NVGPU_PATHS),
+    ("test_amd_mi250", AMDGPU_PATHS),
+    ("test_amd_mi300", AMDGPU_PATHS),
+    # Due to the instability issues at the current runner,
+    # only run this test in postsubmit.
+    # ("test_amd_w7900", AMDGPU_PATHS),
 ]
 
 # Default presets enabled in CI.
@@ -490,23 +518,26 @@ def get_enabled_jobs(
             f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
         )
 
-    default_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
+    enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
 
     if not modifies_non_skip_paths(modified_paths):
         print(
             "Not including any jobs by default because all modified files"
             " are marked as excluded."
         )
-        default_jobs = frozenset()
+        enabled_jobs = frozenset()
     else:
         # Add jobs if the monitored files are changed.
         for modified_path in modified_paths:
             for job, match_paths in PRESUBMIT_TOUCH_ONLY_JOBS:
                 for match_path in match_paths:
                     if fnmatch.fnmatch(modified_path, match_path):
-                        default_jobs |= {job}
+                        print(
+                            f"Enabling '{job}' since '{modified_path}' matches pattern '{match_path}'"
+                        )
+                        enabled_jobs |= {job}
 
-    return (default_jobs | extra_jobs) - skip_jobs
+    return (enabled_jobs | extra_jobs) - skip_jobs
 
 
 def get_benchmark_presets(
