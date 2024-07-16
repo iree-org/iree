@@ -136,6 +136,22 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     ]
 )
 
+NVGPU_PATHS = [
+    # Directly related to NVIDIA GPU code generation and execution:
+    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "runtime/src/iree/hal/drivers/cuda/*",
+    # Common code likely enough to affect code paths unique to NVIDIA GPUs:
+    "compiler/src/iree/compiler/GlobalOptimization/*",
+]
+
+AMDGPU_PATHS = [
+    # Directly related to AMDGPU code generation and execution:
+    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "runtime/src/iree/hal/drivers/hip/*",
+    # Common code likely enough to affect code paths unique to AMDGPU:
+    "compiler/src/iree/compiler/GlobalOptimization/*",
+]
+
 # Jobs to run in presumbit if files under the corresponding path see changes.
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards.
@@ -147,6 +163,14 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     #     "build_test_all_windows",
     #     ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
     # ),
+    #
+    # The runners with GPUs for these jobs can be unstable or in short supply,
+    # so limit jobs to only code paths most likely to affect the tests.
+    ("test_nvidia_gpu", NVGPU_PATHS),
+    # ("test_nvidia_a100", NVGPU_PATHS),
+    ("test_amd_mi250", AMDGPU_PATHS),
+    ("test_amd_mi300", AMDGPU_PATHS),
+    # ("test_amd_w7900", AMDGPU_PATHS),
 ]
 
 # Default presets enabled in CI.
