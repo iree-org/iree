@@ -316,7 +316,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
       .Default([&](Operation *) {});
 
   if (vectorSizes) {
-    scalableFlags.resize(vectorSizes->size());
+    scalableFlags.resize(vectorSizes->size(), false);
     return std::make_pair(vectorSizes.value(), scalableFlags);
   }
   return std::nullopt;
