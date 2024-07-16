@@ -42,6 +42,9 @@ iree_status_t iree_hal_hip_device_create_stream_command_buffer(
 // contexts and the context may be in use on other threads.
 hipCtx_t iree_hal_hip_device_context(iree_hal_device_t* device);
 
+// Returns the hip device for the given iree_hal_device.
+hipDevice_t iree_hal_hip_device_get_device(iree_hal_device_t* device);
+
 // Returns the dynamic symbol table from the |device| if it is a HIP device
 // and otherwise returns NULL.
 //
