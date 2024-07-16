@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -39,46 +38,6 @@ public:
 };
 
 } // namespace
-
-// Indicates whether the given linalg op represents a transpose. In particular,
-// it requires a single input where the indexing maps are full permutations and
-// non-equal.
-static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
-    return false;
-
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
-    return false;
-  auto mapRange = linalgOp.getIndexingMapsArray();
-  if (!mapRange.front().isPermutation() || !mapRange.back().isPermutation() ||
-      mapRange.front() == mapRange.back()) {
-    return false;
-  }
-  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
-}
-
-// Check if the `op` is the start of a
-// `linalg.transpose -> (tensor.collapse_shape ->)? -> linalg_ext.attention`
-// chain.
-static bool isTransposeOfAttentionOperands(Operation *op) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp && !isaTransposeOpInterface(linalgOp)) {
-    return false;
-  }
-  for (Operation *user : op->getUsers()) {
-    Operation *checkOp = user;
-    if (isa<tensor::CollapseShapeOp>(checkOp)) {
-      if (!checkOp->hasOneUse()) {
-        return false;
-      }
-      checkOp = *checkOp->user_begin();
-    }
-    if (!isa<IREE::LinalgExt::AttentionOp>(checkOp)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 void ElementwiseOpFusionPass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -111,17 +70,8 @@ void ElementwiseOpFusionPass::runOnOperation() {
         if (operands.size() >= kIreeMaxOperandCount)
           return false;
 
-        if (!areFusableAsElementwiseOps(context, fusedOperand,
-                                        fuseMultiReduction)) {
-          return false;
-        }
-
-        // TODO(MaheshRavishankar): Transpose before attention
-        // seems to throw fusion into a bad state. Avoid this for now
-        if (isTransposeOfAttentionOperands(consumer)) {
-          return false;
-        }
-        return true;
+        return areFusableAsElementwiseOps(context, fusedOperand,
+                                          fuseMultiReduction);
       };
   linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                fuseElementwiseOpsControlFn);
