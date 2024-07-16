@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"

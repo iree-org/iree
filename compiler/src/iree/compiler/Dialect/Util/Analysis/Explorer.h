@@ -37,6 +37,31 @@ enum class TraversalAction {
   IGNORE,
 };
 
+enum class TraversalBehavior : uint32_t {
+  // When traversing defining ops any tied result will move through its tied
+  // operand. When traversing uses any tied operand will move through its tied
+  // results (as many as are tied to the operand).
+  DEFAULT = 0u,
+  // Don't traverse through tied operands or results.
+  DONT_WALK_TIED_VALUES = 1 << 0u,
+};
+inline TraversalBehavior operator~(TraversalBehavior value) {
+  return static_cast<TraversalBehavior>(~static_cast<uint32_t>(value));
+}
+inline TraversalBehavior operator|(TraversalBehavior lhs,
+                                   TraversalBehavior rhs) {
+  return static_cast<TraversalBehavior>(static_cast<uint32_t>(lhs) |
+                                        static_cast<uint32_t>(rhs));
+}
+inline TraversalBehavior operator&(TraversalBehavior lhs,
+                                   TraversalBehavior rhs) {
+  return static_cast<TraversalBehavior>(static_cast<uint32_t>(lhs) &
+                                        static_cast<uint32_t>(rhs));
+}
+inline bool bitEnumContains(TraversalBehavior bits, TraversalBehavior bit) {
+  return (static_cast<uint32_t>(bits) & static_cast<uint32_t>(bit)) != 0;
+}
+
 // Boolean operations on TraversalResult behave as though `INCOMPLETE` is
 // truthy to allow for |='ing results.
 enum class TraversalResult {
@@ -313,7 +338,9 @@ public:
   //  Walk %2: [%2 of producer.b]
   //  Walk @some_user::%arg0: [%0 of producer.a]
   //  Walk @some_user::ret0: [%2 of producer.b]
-  TraversalResult walkDefiningOps(Value value, ResultWalkFn fn);
+  TraversalResult
+  walkDefiningOps(Value value, ResultWalkFn fn,
+                  TraversalBehavior options = TraversalBehavior::DEFAULT);
 
   // Randomly walks uses of |value| and any transitive alias of |value|.
   // The uses may come from any part of the program.
@@ -334,13 +361,17 @@ public:
   //  Walk %arg0: [%arg0 of producer.a]
   //  Walk %0: [%0 of call @some_user, %arg0 of producer.b]
   //  Walk %2: [%2 of return, %1 of return]
-  TraversalResult walkTransitiveUses(Value value, UseWalkFn fn);
+  TraversalResult
+  walkTransitiveUses(Value value, UseWalkFn fn,
+                     TraversalBehavior options = TraversalBehavior::DEFAULT);
 
   // Randomly walks uses of |value| and any transitive alias of |value| and
   // returns each owner operation once. As a value may be used multiple times
   // by a single operation this is equivalent to a walkTransitiveUses with
   // deduplication on the owner of the use.
-  TraversalResult walkTransitiveUsers(Value value, OperationWalkFn fn);
+  TraversalResult
+  walkTransitiveUsers(Value value, OperationWalkFn fn,
+                      TraversalBehavior options = TraversalBehavior::DEFAULT);
 
 private:
   // Maps callee callable region -> call sites.

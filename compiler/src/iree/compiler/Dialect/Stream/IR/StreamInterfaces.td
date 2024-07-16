@@ -97,7 +97,13 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     // Returns an affinity active for the given operation.
     // This will recursively walk parent operations until one with the
     // `stream.affinity` attribute is found.
-    static AffinityAttr lookup(Operation *op);
+    static AffinityAttr lookup(Operation *fromOp);
+
+    // Returns an affinity active for the given operation or the fallback
+    // default if none is specified.
+    // This will recursively walk parent operations until one with the
+    // `stream.affinity` attribute is found.
+    static AffinityAttr lookupOrDefault(Operation *fromOp);
 
     // TODO(benvanik): replace with more fine-grained compatibility checks.
     // "Compatible" can mean a lot of things: are they cache-coherent, are they
@@ -116,10 +122,24 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AffinityTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AffinityType : TypeInterface<"AffinityTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
+  let description = [{
+    Indicates a type represents a resource that has its affinity tracked.
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::AffinityOpInterface
 //===----------------------------------------------------------------------===//
 
 def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     TBD. Used to denote a stream affinity for ops and specify the kind of
     environment the ops are expected run in.
@@ -142,6 +162,19 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the operands and results should be pinned to the
+        affinity of the op. This overrides all automatic placement logic.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"pinsValueAffinity",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the stream affinity for the op, indicating where it should run.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
@@ -149,7 +182,7 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_self->getAttr("affinity"));
+        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_op->getAttr("affinity"));
       }]
     >,
     InterfaceMethod<
@@ -161,8 +194,8 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*args=*/(ins "IREE::Stream::AffinityAttr":$value),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        if (value) $_self->setAttr("affinity", value);
-        else $_self->removeAttr("affinity");
+        if (value) $_op->setAttr("affinity", value);
+        else $_op->removeAttr("affinity");
       }]
     >,
   ];
@@ -173,6 +206,8 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def Stream_StreamableOp : OpInterface<"StreamableOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that can be asynchronous executed in a streaming context.
   }];
@@ -212,6 +247,8 @@ def Stream_StreamableOp : OpInterface<"StreamableOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def Stream_AsyncAccessOp : OpInterface<"AsyncAccessOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for stream.async.* ops that access subviews of resources.
     This allows for some basic analysis and is only valid prior to allocation.
@@ -240,6 +277,8 @@ def Stream_AsyncAccessOp : OpInterface<"AsyncAccessOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that operate on subviews of resources used to query the
     memory effects for subviews on operands.
@@ -258,6 +297,8 @@ def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that operate in an ordered sequence defined by timepoints.
   }];
