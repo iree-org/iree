@@ -242,7 +242,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldAcc = getOutput();
   Value oldMax = getMax();
   Value oldSum = getSum();
-  Type elementType = getElementTypeOrSelf(getResult(0).getType());
+  Type elementType = getElementTypeOrSelf(getOutput().getType());
   Type reduceType = getElementTypeOrSelf(oldMax.getType());
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
@@ -270,7 +270,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   //
   // But, it is mathematically equivalent to do it on Q first and then multiply
   // it by K.T. This just allows us to do the scaling once, instead of each
-  // iteration of the loop. This is only valid for f16 or f32 types.
+  // iteration of the loop. This is only valid for f16 or f32 types as f8
+  // is extremely limited on its dynamic range therefore this would
+  // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
     AffineMap qMap = getQueryMap();
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
@@ -295,8 +297,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
 
-  // Scaling is performed after the softmax as smaller bit depths are more
-  // sensitive to total range.
+  // For low bit-depth types we perform post Q @ K scaling. This is to avoid
+  // losing numerical precision due to the low dynamic range of fp8 types when
+  // pre applying the sclaing.
   if (qETy.getIntOrFloatBitWidth() <= 8) {
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
@@ -337,11 +340,10 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   auto pETy = getElementTypeOrSelf(p.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
     if (vETy.getIntOrFloatBitWidth() <= 8) {
-      SmallVector<OpFoldResult> mSizes;
-      for (AffineExpr dimExpr : maxMap.getResults()) {
-        int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-        mSizes.push_back(sizes[dim]);
-      }
+      SmallVector<OpFoldResult> mSizes(
+          llvm::map_range(maxMap.getResults(), [&](AffineExpr dimExpr) {
+            return sizes[cast<AffineDimExpr>(dimExpr).getPosition()];
+          }));
 
       // We rescale `p` to use the full range and pass back the `pScale`.
       Value maxEmpty = b.create<tensor::EmptyOp>(loc, mSizes, reduceType);
@@ -356,16 +358,18 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
       AffineMap scaleMap = AffineMap::get(/*dimCount=*/maxMap.getNumInputs(),
                                           /*symbolCount=*/0, getContext());
 
-      // Compute the post matmul scale required:
+      // We normalize p from [0, max] to [0, fp8.max] to guarantee we
+      // use the full `fp8` range, then renormlize post Softmax@V matmul
+      // to correct.
       Value largestInv = b.create<arith::ConstantOp>(
           loc, b.getFloatAttr(elementType, 1.0 / largestDbl));
       pScale = scaleValueInPlace(b, loc, maxMap, scaleMap, absMax, largestInv);
 
       // Compute the pre matmul scale to handle fp8 quantization:
-      Value pScaleInv = b.create<tensor::EmptyOp>(loc, mSizes, elementType);
+      Value recInit = b.create<tensor::EmptyOp>(loc, mSizes, elementType);
       Value largest = b.create<arith::ConstantOp>(
           loc, b.getFloatAttr(elementType, largestDbl));
-      pScaleInv = reciprocalValue(b, loc, absMax, pScaleInv);
+      Value pScaleInv = reciprocalValue(b, loc, absMax, recInit);
       pScaleInv =
           scaleValueInPlace(b, loc, maxMap, scaleMap, pScaleInv, largest);
 
