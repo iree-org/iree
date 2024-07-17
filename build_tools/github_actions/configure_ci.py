@@ -125,7 +125,7 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_arm64",
-        # "build_test_all_windows",  # Currently disabled
+        "build_test_all_windows",
         # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",
         "test_nvidia_gpu",
@@ -159,11 +159,6 @@ AMDGPU_PATHS = [
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     # Currently disabled
     # ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
-    # Currently disabled
-    # (
-    #     "build_test_all_windows",
-    #     ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
-    # ),
     #
     # The runners with GPUs for these jobs can be unstable or in short supply,
     # so limit jobs to only code paths most likely to affect the tests.
