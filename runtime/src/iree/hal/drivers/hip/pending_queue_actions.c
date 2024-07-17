@@ -198,9 +198,14 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_hip_ready_action,
 
 // Ready action atomic slist entry struct.
 typedef struct iree_hal_hip_atomic_slist_completion_t {
-  void (*callback)(void* user_data);
+  // The callback and user data for that callback. To be called
+  // when the associated event has completed.
+  iree_status_t (*callback)(void* user_data);
   void* user_data;
+  // The event to wait for on the completion thread.
   hipEvent_t event;
+  // If this event was created just for the completion thread, and therefore
+  // needs to be cleaned up.
   bool created_event;
   iree_atomic_slist_intrusive_ptr_t slist_next;
 } iree_hal_hip_atomic_slist_completion_t;
@@ -323,7 +328,7 @@ typedef struct iree_hal_hip_completion_area_t {
   iree_atomic_int32_t worker_state;                 // atomic
 
   iree_atomic_intptr_t error_code;  // atomic
-  const iree_hal_hip_dynamic_symbols_t* symbols;
+
   // The number of asynchronous completions items that are scheduled and not
   // yet waited on.
   // We need to wait for them to finish before destroying the context.
@@ -334,6 +339,7 @@ typedef struct iree_hal_hip_completion_area_t {
 
   iree_allocator_t host_allocator;
 
+  const iree_hal_hip_dynamic_symbols_t* symbols;
   hipDevice_t device;
 } iree_hal_hip_completion_area_t;
 
@@ -495,7 +501,7 @@ iree_status_t iree_hal_hip_pending_queue_actions_create(
       (iree_thread_entry_t)iree_hal_hip_worker_execute, working_area, params,
       actions->host_allocator, &actions->worker_thread);
 
-  params.name = IREE_SV("completion_worker");
+  params.name = IREE_SV("done_worker");
   params.create_suspended = false;
   if (iree_status_is_ok(status)) {
     status = iree_thread_create(
@@ -827,11 +833,7 @@ static void iree_hal_hip_post_error_to_completion_state(
 
 // Releases resources after action completion on the GPU and advances timeline
 // and pending actions queue.
-//
-// This is the HIP host function callback to hipLaunchHostFunc(), invoked by a
-// HIP driver thread. Note that code in this function MUST NOT invoke any GPU
-// API under the hood to avoid potential deadlock.
-static void iree_hal_hip_execution_device_signal_host_callback(
+static iree_status_t iree_hal_hip_execution_device_signal_host_callback(
     void* user_data) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_hip_queue_action_t* action = (iree_hal_hip_queue_action_t*)user_data;
@@ -873,6 +875,7 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   iree_hal_hip_queue_decrement_work_items_count(&actions->working_area);
 
   IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 // Issues the given kernel dispatch |action| to the GPU.
@@ -971,6 +974,9 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   }
 
   bool created_event = false;
+  // In the case where a we issue an execution and there are signal semaphores
+  // we can re-use those as a wait event. However if there are no signals
+  // then we create one. In my testing this not a common case.
   if (IREE_UNLIKELY(!completion_event)) {
     IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
         z0, symbols,
@@ -985,7 +991,8 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
       "hipEventRecord");
   iree_slim_mutex_lock(
       &action->owning_actions->working_area.pending_work_items_count_mutex);
-  // One work item is the host stream callback.
+  // One work item is the callback that makes it across from the
+  // completion thread.
   // The other is the cleanup of the action.
   action->owning_actions->working_area.pending_work_items_count += 2;
   iree_slim_mutex_unlock(
@@ -997,7 +1004,6 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
       action->owning_actions->host_allocator, sizeof(*entry), (void**)&entry);
 
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    // Release all actions in the ready list to avoid leaking.
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -1326,7 +1332,47 @@ static void iree_hal_hip_completion_wait_pending_completion_items(
   iree_slim_mutex_unlock(&completion_area->pending_completion_count_mutex);
 }
 
-// The main function for the ready-list processing worker thread.
+static iree_status_t iree_hal_hip_process_completion(
+    iree_hal_hip_completion_slist_t* worklist,
+    iree_hal_hip_completion_area_t* completion_area) {
+  iree_status_t status = iree_ok_status();
+  while (true) {
+    iree_hal_hip_atomic_slist_completion_t* entry =
+        iree_hal_hip_completion_slist_pop(worklist);
+    if (!entry) break;
+
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "hipEventSynchronize");
+    hipError_t result =
+        completion_area->symbols->hipEventSynchronize(entry->event);
+    IREE_TRACE_ZONE_END(z1);
+    if (IREE_UNLIKELY(result != hipSuccess)) {
+      // Let common destruction path take care of destroying the worklist.
+      // When we know all host stream callbacks are done and not touching
+      // anything.
+      iree_hal_hip_completion_slist_push(worklist, entry);
+      status =
+          iree_make_status(IREE_STATUS_ABORTED, "Could not wait on hip event.");
+      break;
+    }
+    status = entry->callback(entry->user_data);
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      break;
+    }
+
+    if (IREE_UNLIKELY(entry->created_event)) {
+      IREE_HIP_IGNORE_ERROR(completion_area->symbols,
+                            hipEventDestroy(entry->event));
+    }
+    iree_allocator_free(completion_area->host_allocator, entry);
+
+    // Now we fully executed and cleaned up this entry. Decrease the work
+    // items counter.
+    iree_hal_hip_queue_decrement_completion_count(completion_area);
+  }
+  return status;
+}
+
+// The main function for the completion worker thread.
 static int iree_hal_hip_completion_execute(
     iree_hal_hip_completion_area_t* completion_area) {
   iree_hal_hip_completion_slist_t* worklist = &completion_area->completion_list;
@@ -1375,34 +1421,8 @@ static int iree_hal_hip_completion_execute(
     bool should_exit =
         (worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED);
 
-    iree_status_t status = iree_ok_status();
-    while (true) {
-      iree_hal_hip_atomic_slist_completion_t* entry =
-          iree_hal_hip_completion_slist_pop(worklist);
-      if (!entry) break;
-
-      const iree_hal_hip_dynamic_symbols_t* symbols = completion_area->symbols;
-      IREE_TRACE_ZONE_BEGIN_NAMED(z1, "hipEventSynchronize");
-      hipError_t result = symbols->hipEventSynchronize(entry->event);
-      IREE_TRACE_ZONE_END(z1);
-      if (IREE_UNLIKELY(result != hipSuccess)) {
-        // Let common destruction path take care of destroying the worklist.
-        // When we know all host stream callbacks are done and not touching
-        // anything.
-        iree_hal_hip_completion_slist_push(worklist, entry);
-        break;
-      }
-      entry->callback(entry->user_data);
-
-      if (IREE_UNLIKELY(entry->created_event)) {
-        IREE_HIP_IGNORE_ERROR(symbols, hipEventDestroy(entry->event));
-      }
-      iree_allocator_free(completion_area->host_allocator, entry);
-
-      // Now we fully executed and cleaned up this entry. Decrease the work
-      // items counter.
-      iree_hal_hip_queue_decrement_completion_count(completion_area);
-    }
+    iree_status_t status =
+        iree_hal_hip_process_completion(worklist, completion_area);
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       iree_hal_hip_completion_wait_pending_completion_items(completion_area);
@@ -1415,7 +1435,7 @@ static int iree_hal_hip_completion_execute(
     if (IREE_UNLIKELY(should_exit &&
                       iree_hal_hip_completion_has_no_pending_completion_items(
                           completion_area))) {
-      iree_hal_hip_completion_has_no_pending_completion_items(completion_area);
+      iree_hal_hip_completion_wait_pending_completion_items(completion_area);
       // Signal that this thread is committed to exit.
       // This state has a priority that is only lower than error exit.
       // A HIP callback may have posted an error, make sure we don't
@@ -1443,6 +1463,10 @@ static int iree_hal_hip_worker_execute(
     iree_hal_hip_working_area_t* working_area) {
   iree_hal_hip_ready_action_slist_t* worklist = &working_area->ready_worklist;
 
+  // Hip stores thread-local data based on the device. Some hip commands pull
+  // the device from there, and it defaults to device 0 (e.g. hipEventCreate),
+  // this will cause failures when using it with other devices (or streams from
+  // other devices). Force the correct device onto this thread.
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       working_area->symbols, hipSetDevice(working_area->device),
       "hipSetDevice");

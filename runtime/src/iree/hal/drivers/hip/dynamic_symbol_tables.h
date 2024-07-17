@@ -107,10 +107,10 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadData, hipModule_t *, const void *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *,
                                unsigned int, hipJitOption *, void **)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleUnload, hipModule_t)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipSetDevice, unsigned int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamCreateWithFlags, hipStream_t *,
                                unsigned int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamDestroy, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamSynchronize, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamWaitEvent, hipStream_t, hipEvent_t,
                                unsigned int)
-IREE_HAL_HIP_REQUIRED_PFN_DECL(hipSetDevice, unsigned int)
