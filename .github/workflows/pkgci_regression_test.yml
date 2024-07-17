@@ -323,31 +323,6 @@ jobs:
         env:
           ROCM_CHIP: ${{ matrix.rocm-chip }}
 
-      # Note: mi250 benchmark times are more lenient than mi300 (allowing about
-      # 10% deviation from observed averages), since the mi250 runners we use
-      # are more unstable and we care most about peak performance on mi300.
-      - name: "Running SDXL rocm pipeline benchmark (mi250)"
-        if: contains(matrix.name, 'rocm_mi250_gfx90a')
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1450.0 \
-            --goldentime-rocm-unet-ms 370.0 \
-            --goldentime-rocm-clip-ms 18.5 \
-            --goldentime-rocm-vae-ms 315.0 \
-            --goldendispatch-rocm-unet 1714 \
-            --goldendispatch-rocm-clip 1569 \
-            --goldendispatch-rocm-vae 248 \
-            --goldensize-rocm-unet-bytes 2280000  \
-            --goldensize-rocm-clip-bytes 860000 \
-            --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 6 \
-            --rocm-chip gfx90a \
-            --log-cli-level=info \
-            --retries 7
-          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
-          rm job_summary.md
-
       - name: "Running SDXL rocm pipeline benchmark (mi300)"
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
