@@ -90,6 +90,7 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
             APFloat::getLargest(dstTy.getFloatSemantics(), /*Negative=*/false)
                 .convertToDouble();
 
+        // Truncate to the `fp8` range so avoid nan values.
         Value mn = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mnDbl));
         Value mx = builder.create<arith::ConstantOp>(
