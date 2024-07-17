@@ -19,6 +19,11 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineValueBarriersPass :
+    Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
+  let summary = "Combines `iree_gpu.value_barrier` ops";
+}
+
 def GPUCreateFastSlowPathPass :
     InterfacePass<"iree-codegen-gpu-create-fast-slow-path", "mlir::FunctionOpInterface"> {
   let summary = "Create separate fast and slow paths to handle padding";
