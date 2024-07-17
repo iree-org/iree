@@ -13,7 +13,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -27,39 +26,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-using DimBound = vector::ConstantOrScalableBound;
-using DimBoundSize = DimBound::BoundSize;
-
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
   SmallVector<bool> vectorScalableFlags;
 };
-
-/// Computes the upper bound of `operandDim` for the ShapedType `operand`. If
-/// the optional `vscaleRange` is provided then the computed bound can be a
-/// scalable quantity.
-static FailureOr<DimBoundSize>
-computeDimUpperBound(Value operand, unsigned operandDim,
-                     std::optional<VscaleRange> vscaleRange) {
-  if (!vscaleRange.has_value()) {
-    FailureOr<int64_t> maybeDimBoundSize =
-        ValueBoundsConstraintSet::computeConstantBound(
-            presburger::BoundType::UB, {operand, operandDim},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
-    if (succeeded(maybeDimBoundSize))
-      return DimBoundSize{.baseSize = *maybeDimBoundSize, .scalable = false};
-    return failure();
-  }
-  FailureOr<DimBound> maybeDimBound =
-      vector::ScalableValueBoundsConstraintSet::computeScalableBound(
-          operand, operandDim,
-          /*vscaleMin=*/vscaleRange->min,
-          /*vscaleMax=*/vscaleRange->max, presburger::BoundType::UB);
-  if (succeeded(maybeDimBound))
-    return maybeDimBound->getSize();
-  return failure();
-}
 
 /// Returns a VectorizationTileSizes which contains the inferred bounded result
 /// shape and vector input sizes. This is useful to infer the sizes from a
