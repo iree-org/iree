@@ -129,7 +129,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",
         "test_nvidia_gpu",
-        "test_nvidia_a100",
+        # "test_nvidia_a100",  # Currently disabled
         "test_amd_mi250",
         "test_amd_mi300",
         "test_amd_w7900",
@@ -192,6 +192,8 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
         benchmark_presets.ANDROID_CPU_DT_ONLY,
         benchmark_presets.ANDROID_GPU,
     ]
+    # CUDA benchmarks on CI depend on low availability a100 runners.
+    and preset not in [benchmark_presets.CUDA]
 ] + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
 LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS
