@@ -222,6 +222,7 @@ tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
+  funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createConvertToDestinationPassingStylePass(
       useWARForCooperativeMatrixCodegen));
