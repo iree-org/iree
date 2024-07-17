@@ -181,6 +181,31 @@ struct GenericResourcePattern : public ConversionPattern {
   }
 };
 
+namespace {
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpConversionPattern<
+      IREE::Util::OptimizationBarrierOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> newOperands;
+    for (Value v : adaptor.getOperands()) {
+      if (isa<TensorType>(v.getType())) {
+        newOperands.push_back(
+            consumeTensorOperand(op.getLoc(), v, rewriter).resource);
+      } else {
+        newOperands.push_back(v);
+      }
+    }
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(op,
+                                                                   newOperands);
+    return success();
+  }
+};
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // --iree-stream-conversion
 //===----------------------------------------------------------------------===//
@@ -228,13 +253,16 @@ struct ConvertToStreamPass final
           auto resourceSize = inputs[1];
           assert(inputs.size() == 2 &&
                  "expecting 2 operands (resource + size)");
+          Value cast = builder
+                           .create<IREE::Stream::AsyncTransferOp>(
+                               loc, resourceValue.getType(), resourceValue,
+                               resourceSize, resourceSize,
+                               /*source_affinity=*/nullptr,
+                               /*result_affinity=*/nullptr)
+                           .getResult();
           return builder
-              .create<IREE::Stream::AsyncTransferOp>(
-                  loc, resourceValue.getType(), resourceValue, resourceSize,
-                  resourceSize,
-                  /*source_affinity=*/nullptr,
-                  /*result_affinity=*/nullptr)
-              .getResult();
+              .create<UnrealizedConversionCastOp>(loc, resultType, cast)
+              .getResult(0);
         });
 
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
@@ -252,6 +280,8 @@ struct ConvertToStreamPass final
     conversionTarget.markUnknownOpDynamicallyLegal(
         [&](Operation *op) -> bool { return !doesOperationNeedWrapping(op); });
     patterns.insert<GenericResourcePattern>(context, typeConverter);
+    patterns.insert<OptimizationBarrierOpConversion>(typeConverter, context,
+                                                     /*benefit=*/2);
 
     // NOTE: we allow ops that we don't know about to allow custom dialects
     // that don't need anything Stream-specific to pass through.

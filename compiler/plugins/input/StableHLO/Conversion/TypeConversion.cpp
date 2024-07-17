@@ -56,17 +56,20 @@ std::optional<Value> materializeCastToIllegal(OpBuilder &builder, Type type,
       ->getResult(0);
 }
 
-std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type type,
                                     ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
-  return builder
-      .create<tensor::FromElementsOp>(
-          loc, RankedTensorType::get({}, inputs.front().getType()),
-          inputs.front())
-      .getResult();
+  auto tensor =
+      builder
+          .create<tensor::FromElementsOp>(
+              loc, RankedTensorType::get({}, inputs.front().getType()),
+              inputs.front())
+          .getResult();
+  return builder.create<UnrealizedConversionCastOp>(loc, type, tensor)
+      .getResult(0);
 }
 
 } // namespace
@@ -77,7 +80,7 @@ RemoveSignTypeConverter::RemoveSignTypeConverter() {
   addConversion(convertInteger);
   addConversion(convertShapedType);
 
-  addArgumentMaterialization(materializeCastFromIllegal);
+  addArgumentMaterialization(materializeCastToIllegal);
   addSourceMaterialization(materializeCastToIllegal);
   addTargetMaterialization(materializeCastFromIllegal);
 }
