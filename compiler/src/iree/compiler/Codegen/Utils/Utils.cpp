@@ -152,10 +152,12 @@ getDefaultEnabledUkernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName) {
   auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
-  if (!enabledUkernels) {
-    return false;
+  StringRef enabledUkernelsStr;
+  if (enabledUkernels) {
+    enabledUkernelsStr = enabledUkernels->getValue();
+  } else {
+    enabledUkernelsStr = "default";
   }
-  StringRef enabledUkernelsStr = enabledUkernels->getValue();
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
     enabledUkernelsStr = getDefaultEnabledUkernels(targetAttr);
