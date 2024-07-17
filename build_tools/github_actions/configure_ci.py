@@ -131,8 +131,8 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         "test_nvidia_gpu",
         "test_nvidia_a100",
         "test_amd_mi250",
-        "test_amd_mi300",
-        "test_amd_w7900",
+        # "test_amd_mi300",  # Currenly disabled
+        # "test_amd_w7900",  # Currenly disabled
     ]
 )
 
@@ -168,12 +168,16 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     # The runners with GPUs for these jobs can be unstable or in short supply,
     # so limit jobs to only code paths most likely to affect the tests.
     ("test_nvidia_gpu", NVGPU_PATHS),
+    #
     # Due to the outstock of A100, only run this test in postsubmit.
     # ("test_nvidia_a100", NVGPU_PATHS),
+    #
     ("test_amd_mi250", AMDGPU_PATHS),
-    ("test_amd_mi300", AMDGPU_PATHS),
-    # Due to the instability issues at the current runner,
-    # only run this test in postsubmit.
+    #
+    # Disabled while runner is unstable.
+    # ("test_amd_mi300", AMDGPU_PATHS),
+    #
+    # Disabled while runner is unstable.
     # ("test_amd_w7900", AMDGPU_PATHS),
 ]
 

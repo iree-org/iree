@@ -31,15 +31,16 @@ jobs:
             numprocesses: auto
             runs-on: ubuntu-20.04
 
-          # AMD GPU
-          - name: amdgpu_rocm_rdna3
-            numprocesses: 1
-            config-file: onnx_gpu_rocm_rdna3.json
-            runs-on: nodai-amdgpu-w7900-x86-64
-          - name: amdgpu_vulkan
-            numprocesses: 4
-            config-file: onnx_gpu_vulkan.json
-            runs-on: nodai-amdgpu-w7900-x86-64
+          # Disabled while runner is unstable.
+          # # AMD GPU
+          # - name: amdgpu_rocm_rdna3
+          #   numprocesses: 1
+          #   config-file: onnx_gpu_rocm_rdna3.json
+          #   runs-on: nodai-amdgpu-w7900-x86-64
+          # - name: amdgpu_vulkan
+          #   numprocesses: 4
+          #   config-file: onnx_gpu_vulkan.json
+          #   runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           - name: nvidiagpu_cuda
@@ -126,6 +127,7 @@ jobs:
           name: ${{ matrix.config-file }}
           path: ${{ env.CONFIG_FILE_PATH }}
 
+  # Disabled while runners are unstable.
   test_models:
     name: "test_models :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
@@ -137,20 +139,23 @@ jobs:
       matrix:
         include:
           # CPU
-          - name: cpu_llvm_task
-            models-config-file: models_cpu_llvm_task.json
-            runs-on: nodai-amdgpu-w7900-x86-64
+          # Disabled while runner is unstable.
+          # - name: cpu_llvm_task
+          #   models-config-file: models_cpu_llvm_task.json
+          #   runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
-            models-config-file: models_gpu_rocm_gfx942.json
-            runs-on: nodai-amdgpu-mi300-x86-64
-          - name: amdgpu_vulkan
-            models-config-file: models_gpu_vulkan.json
-            runs-on: nodai-amdgpu-w7900-x86-64
+          # Disabled while runner is unstable.
+          # - name: amdgpu_rocm_mi300_gfx942
+          #   models-config-file: models_gpu_rocm_gfx942.json
+          #   runs-on: nodai-amdgpu-mi300-x86-64
+          # Disabled while runner is unstable.
+          # - name: amdgpu_vulkan
+          #   models-config-file: models_gpu_vulkan.json
+          #   runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           # None at the moment. Could maybe use the persistent a100 runners:
@@ -240,20 +245,22 @@ jobs:
       matrix:
         include:
           # CPU
-          - name: cpu_llvm_task
-            models-config-file: models_cpu_llvm_task.json
-            backend: cpu
-            runs-on: nodai-amdgpu-w7900-x86-64
+          # Disabled while runner is unstable.
+          # - name: cpu_llvm_task
+          #   models-config-file: models_cpu_llvm_task.json
+          #   backend: cpu
+          #   runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
-            rocm-chip: gfx942
-            backend: rocm
-            runs-on: nodai-amdgpu-mi300-x86-64
+          # Disabled while runner is unstable.
+          # - name: amdgpu_rocm_mi300_gfx942
+          #   rocm-chip: gfx942
+          #   backend: rocm
+          #   runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
