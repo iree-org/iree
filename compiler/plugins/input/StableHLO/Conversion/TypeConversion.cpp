@@ -62,12 +62,14 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type type,
   if (llvm::isa<ShapedType>(inputs.front().getType())) {
     return std::nullopt;
   }
-  auto x = builder
-               .create<tensor::FromElementsOp>(
-                   loc, RankedTensorType::get({}, inputs.front().getType()),
-                   inputs.front())
-               .getResult();
-  return builder.create<UnrealizedConversionCastOp>(loc, type, x).getResult(0);
+  auto tensor =
+      builder
+          .create<tensor::FromElementsOp>(
+              loc, RankedTensorType::get({}, inputs.front().getType()),
+              inputs.front())
+          .getResult();
+  return builder.create<UnrealizedConversionCastOp>(loc, type, tensor)
+      .getResult(0);
 }
 
 } // namespace
