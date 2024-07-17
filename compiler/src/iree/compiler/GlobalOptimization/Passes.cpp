@@ -63,6 +63,12 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
         clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
     llvm::cl::init(DemotionOption::None));
 
+static llvm::cl::opt<int> clPadFactor(
+    "iree-global-opt-pad-factor",
+    llvm::cl::desc("provides padding size hints that will be attached to "
+                   "encodings."),
+    llvm::cl::init(32));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -166,8 +172,7 @@ void buildGlobalOptimizationPassPipeline(
     // we can use `FunctionLikNest` here.
     // TODO(hanchung): Make it controlable through flags. It is fine for now
     // because it is an experimental path.
-    const int64_t kPadFactor = clEnableEarlyMaterialization ? 0 : 16;
-    mainPassManager.addPass(createSetEncodingPass(kPadFactor));
+    mainPassManager.addPass(createSetEncodingPass(clPadFactor));
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }

@@ -14,6 +14,7 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -33,7 +34,7 @@ public:
   MaterializeHomogeneousEncodingsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect>();
   }
 
   void runNopPipeline(ModuleOp &moduleOp) {

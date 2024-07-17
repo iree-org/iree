@@ -113,10 +113,10 @@ std::unique_ptr<Pass> createRaiseSpecialOps();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
-/// Sets encoding for tensors to allow tiled execution of operations. If
-/// `padFactor` is set to non-zero, the padding sizes hint will be attached to
-/// encodings. It makes the host and device agree with the same padding sizes.
-std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor = 0);
+/// Sets encoding for tensors to allow tiled execution of operations. The
+/// `padFactor` provides padding size hints that will be attached to encodings.
+/// It makes the host and device agree with the same padding sizes.
+std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor = 32);
 
 /// Simplifies tensor pack/unpack ops to reshape ops.
 std::unique_ptr<Pass> createSimplifyPackUnpackPass();
