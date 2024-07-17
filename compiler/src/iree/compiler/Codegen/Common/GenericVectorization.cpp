@@ -27,7 +27,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-using DimBoundSize = vector::ConstantOrScalableBound::BoundSize;
+using DimBound = vector::ConstantOrScalableBound;
+using DimBoundSize = DimBound::BoundSize;
 
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
@@ -42,14 +43,15 @@ static FailureOr<DimBoundSize>
 computeDimUpperBound(Value operand, unsigned operandDim,
                      std::optional<VscaleRange> vscaleRange) {
   if (!vscaleRange.has_value()) {
-    auto maybeDimBoundSize = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, {operand, operandDim},
-        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    FailureOr<int64_t> maybeDimBoundSize =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {operand, operandDim},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (succeeded(maybeDimBoundSize))
       return DimBoundSize{.baseSize = *maybeDimBoundSize, .scalable = false};
     return failure();
   }
-  auto maybeDimBound =
+  FailureOr<DimBound> maybeDimBound =
       vector::ScalableValueBoundsConstraintSet::computeScalableBound(
           operand, operandDim,
           /*vscaleMin=*/vscaleRange->min,

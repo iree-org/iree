@@ -373,16 +373,14 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 #map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
 
 func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x67x120x176xf32>) -> tensor<1x67x120x176xf32>
-  attributes { hal.executable.target = #aarch64_sve }
+  attributes {hal.executable.target = #aarch64_sve}
 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
   %c4 = arith.constant 4 : index
   %c67 = arith.constant 67 : index
   %c120 = arith.constant 120 : index
-  %c176 = arith.constant 176 : index
-  %c0_f32 = arith.constant 0.0 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %vscale = vector.vscale
   %c4_vscale = arith.muli %vscale, %c4 : index
   %0 = scf.for %arg1 = %c0 to %c67 step %c1 iter_args(%arg2 = %arg0) -> (tensor<1x67x120x176xf32>) {
@@ -390,7 +388,7 @@ func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x6
       %2 = affine.apply #map()[%c4_vscale]
       %3 = scf.for %arg5 = %c0 to %2 step %c4_vscale iter_args(%arg6 = %arg4) -> (tensor<1x67x120x176xf32>) {
         %extracted_slice = tensor.extract_slice %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x67x120x176xf32> to tensor<1x1x4x?xf32>
-        %4 = linalg.fill ins(%c0_f32 : f32) outs(%extracted_slice : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
+        %4 = linalg.fill ins(%cst : f32) outs(%extracted_slice : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
         %inserted_slice = tensor.insert_slice %4 into %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x67x120x176xf32>
         scf.yield %inserted_slice : tensor<1x67x120x176xf32>
       }
