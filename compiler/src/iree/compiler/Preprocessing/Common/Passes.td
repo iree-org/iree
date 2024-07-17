@@ -51,6 +51,11 @@ def ConvertConvToChannelsLastPass :
   ];
 }
 
+def FoldAttentionWithTransposePass :
+    Pass<"iree-preprocessing-fold-attention-with-transpose", ""> {
+  let summary = "Fold attention operation with transpose";
+}
+
 def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
   let summary = "transform dialect interpreter";
   let description = [{

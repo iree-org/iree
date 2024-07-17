@@ -413,11 +413,11 @@ struct ConvertAllGatherOp
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
-        op, collectiveAttr, adaptor.getTarget(),
+        op, collectiveAttr, newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
         /*target_end=*/newTargetCast.resourceSize,
-        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*target_length=*/newTargetCast.resourceSize, newSourceCast.resource,
         /*source_size=*/newSourceCast.resourceSize,
         /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
         /*source_length=*/newSourceCast.resourceSize, elementCount,
@@ -448,11 +448,11 @@ struct ConvertAllReduceOp
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
-        op, collectiveAttr, adaptor.getTarget(),
+        op, collectiveAttr, newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
         /*target_end=*/newTargetCast.resourceSize,
-        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*target_length=*/newTargetCast.resourceSize, newSourceCast.resource,
         /*source_size=*/newSourceCast.resourceSize,
         /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
         /*source_length=*/newSourceCast.resourceSize, elementCount,
@@ -483,11 +483,11 @@ struct ConvertAllToAllOp
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
-        op, collectiveAttr, adaptor.getTarget(),
+        op, collectiveAttr, newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
         /*target_end=*/newTargetCast.resourceSize,
-        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*target_length=*/newTargetCast.resourceSize, newSourceCast.resource,
         /*source_size=*/newSourceCast.resourceSize,
         /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
         /*source_length=*/newSourceCast.resourceSize, elementCount,
@@ -518,11 +518,11 @@ struct ConvertReduceScatterOp
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
-        op, collectiveAttr, adaptor.getTarget(),
+        op, collectiveAttr, newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
         /*target_end=*/newTargetCast.resourceSize,
-        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*target_length=*/newTargetCast.resourceSize, newSourceCast.resource,
         /*source_size=*/newSourceCast.resourceSize,
         /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
         /*source_length=*/newSourceCast.resourceSize, elementCount,
@@ -567,11 +567,11 @@ struct ConvertCollectiveSendRecvOp
     auto param = rewriter.create<arith::OrIOp>(op.getLoc(), hi, lo);
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCollectiveOp>(
-        op, collectiveAttr, adaptor.getTarget(),
+        op, collectiveAttr, newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
         /*target_end=*/newTargetCast.resourceSize,
-        /*target_length=*/newTargetCast.resourceSize, adaptor.getSource(),
+        /*target_length=*/newTargetCast.resourceSize, newSourceCast.resource,
         /*source_size=*/newSourceCast.resourceSize,
         /*source_offset=*/zeroOffset, /*source_end=*/newSourceCast.resourceSize,
         /*source_length=*/newSourceCast.resourceSize, elementCount,
