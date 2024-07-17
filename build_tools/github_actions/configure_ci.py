@@ -130,9 +130,9 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         "build_test_all_macos_x86_64",
         "test_nvidia_gpu",
         "test_nvidia_a100",
-        "test_amd_mi250",
-        # "test_amd_mi300",  # Currenly disabled
-        # "test_amd_w7900",  # Currenly disabled
+        # "test_amd_mi250",  # Currently disabled
+        # "test_amd_mi300",  # Currently disabled
+        # "test_amd_w7900",  # Currently disabled
     ]
 )
 
@@ -172,7 +172,8 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     # Due to the outstock of A100, only run this test in postsubmit.
     # ("test_nvidia_a100", NVGPU_PATHS),
     #
-    ("test_amd_mi250", AMDGPU_PATHS),
+    # Disabled while runner is unstable.
+    # ("test_amd_mi250", AMDGPU_PATHS),
     #
     # Disabled while runner is unstable.
     # ("test_amd_mi300", AMDGPU_PATHS),
