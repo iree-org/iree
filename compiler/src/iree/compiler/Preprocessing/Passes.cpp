@@ -22,6 +22,12 @@ namespace mlir::iree_compiler::Preprocessing {
 using FunctionLikeNest =
     MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
+static llvm::cl::opt<bool> clEnableConvert1X1Conv2D(
+    "iree-preprocessing-convert-1x1-conv2d",
+    llvm::cl::desc(
+        "Enables conversion of 1x1 filter conv2d ops to matmul ops."),
+    llvm::cl::init(true));
+
 namespace {
 
 void extendWithTextPipeline(OpPassManager &passManager,
@@ -100,9 +106,12 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
                                       const TransformOptions &options) {
   FunctionLikeNest(passManager)
       .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
-      .addPass(createConvertConvToChannelsLastPass);
+      .addPass(mlir::createLinalgNamedOpConversionPass);
+  if (clEnableConvert1X1Conv2D) {
+    passManager.addPass(
+        GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass());
+  }
+  passManager.addPass(createConvertConvToChannelsLastPass());
   passManager.addPass(IREE::Flow::createFoldUnitExtentDimsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());

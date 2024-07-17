@@ -35,6 +35,12 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
         "Enables propagation of transpose ops to improve fusion chances."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableConvert1X1Conv2D(
+    "iree-global-opt-convert-1x1-conv2d",
+    llvm::cl::desc(
+        "Enables conversion of 1x1 filter conv2d ops to matmul ops."),
+    llvm::cl::init(true));
+
 // TODO(hanchung): Remove the flag. We don't want to do early materialization by
 // default. Because it won't work for heterogeneous computing. This is not the
 // right layer for handling such information.
@@ -93,8 +99,10 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(createConvert1X1FilterConv2DToMatmulPass);
+      .addPass(mlir::createLinalgNamedOpConversionPass);
+  if (clEnableConvert1X1Conv2D) {
+    mainPassManager.addPass(createConvert1X1FilterConv2DToMatmulPass());
+  }
   mainPassManager.addPass(createEraseUnusedLinalgOperands());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
