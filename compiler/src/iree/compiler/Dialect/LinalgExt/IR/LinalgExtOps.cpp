@@ -1275,11 +1275,15 @@ LogicalResult AttentionOp::verify() {
   }
   bool isTiled = numOutputs == 3;
 
-  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
-
   // Check if indexing maps can represent attention.
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+
+  FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
+  if (!scaleElementType) {
+    return attnOp->emitOpError("expected scale to be of floating point type");
+  }
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());
