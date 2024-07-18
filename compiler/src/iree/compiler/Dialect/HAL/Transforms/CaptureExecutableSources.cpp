@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/LocationSnapshot.h"
+#include "mlir/IR/AsmState.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
