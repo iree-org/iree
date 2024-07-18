@@ -974,9 +974,9 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   }
 
   bool created_event = false;
-  // In the case where a we issue an execution and there are signal semaphores
+  // In the case where we issue an execution and there are signal semaphores
   // we can re-use those as a wait event. However if there are no signals
-  // then we create one. In my testing this not a common case.
+  // then we create one. In my testing this is not a common case.
   if (IREE_UNLIKELY(!completion_event)) {
     IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
         z0, symbols,
@@ -1332,7 +1332,7 @@ static void iree_hal_hip_completion_wait_pending_completion_items(
   iree_slim_mutex_unlock(&completion_area->pending_completion_count_mutex);
 }
 
-static iree_status_t iree_hal_hip_process_completion(
+static iree_status_t iree_hal_hip_worker_process_completion(
     iree_hal_hip_completion_slist_t* worklist,
     iree_hal_hip_completion_area_t* completion_area) {
   iree_status_t status = iree_ok_status();
@@ -1351,7 +1351,7 @@ static iree_status_t iree_hal_hip_process_completion(
       // anything.
       iree_hal_hip_completion_slist_push(worklist, entry);
       status =
-          iree_make_status(IREE_STATUS_ABORTED, "Could not wait on hip event.");
+          iree_make_status(IREE_STATUS_ABORTED, "could not wait on hip event");
       break;
     }
     status = entry->callback(entry->user_data);
@@ -1422,7 +1422,7 @@ static int iree_hal_hip_completion_execute(
         (worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED);
 
     iree_status_t status =
-        iree_hal_hip_process_completion(worklist, completion_area);
+        iree_hal_hip_worker_process_completion(worklist, completion_area);
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       iree_hal_hip_completion_wait_pending_completion_items(completion_area);
