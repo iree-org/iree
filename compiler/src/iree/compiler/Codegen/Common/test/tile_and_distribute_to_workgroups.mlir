@@ -2663,3 +2663,68 @@ hal.executable private @set_size_to_tilesize_when_divisible {
 //      NO-LOOP:   %[[RESULT:.+]] = linalg.generic
 //      NO-LOOP:   -> tensor<1x16x128xf16>
 //      NO-LOOP:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[IDX_Y]], 0, %[[OFFX]]]
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 16, 0], [16, 8, 0], [0, 0, 2]]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @reshape_matmul_tensors {
+  hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
+    hal.executable.export public @reshape_matmul layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @reshape_matmul() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<64x2x256xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<256x512xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 2, 256], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<64x2x256xf32>> -> tensor<64x2x256xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 512], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<256x512xf32>> -> tensor<256x512xf32>
+        %collapsed = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<64x2x256xf32> into tensor<128x256xf32>
+        %5 = tensor.empty() : tensor<128x512xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x512xf32>) -> tensor<128x512xf32>
+        %7 = linalg.matmul {lowering_config = #config}
+            ins(%collapsed, %4 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%6 : tensor<128x512xf32>) -> tensor<128x512xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
+            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 16)>
+//      CHECK: hal.executable.export public @reshape_matmul
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device)
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//      CHECK:   hal.return %[[C32]], %[[C4]], %[[C1]]
+//      CHECK: func.func @reshape_matmul()
+//      CHECK:   scf.for %[[IV0:.+]] =
+//      CHECK:     scf.for %[[IV1:.+]] =
+//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [%[[IV0]], 0], sizes = [32, 256]
+//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV1]]], sizes = [256, 16]
+//  CHECK-DAG:       %[[INIT:.+]] = tensor.empty
+//  CHECK-DAG:       %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:           outs(%[[INIT]] :
+//  CHECK-DAG:       %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:           outs(%[[FILL]] :
+//      CHECK:       flow.dispatch.tensor.store %[[GEMM]]
+// CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]]], sizes = [32, 16]
