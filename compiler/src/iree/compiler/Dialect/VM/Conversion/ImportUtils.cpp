@@ -58,8 +58,7 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
   return success();
 }
 
-Value castToImportType(Value value, Type targetType,
-                       ConversionPatternRewriter &rewriter) {
+Value castToImportType(Value value, Type targetType, OpBuilder &builder) {
   auto sourceType = value.getType();
   if (sourceType == targetType)
     return value;
@@ -70,36 +69,35 @@ Value castToImportType(Value value, Type targetType,
   if (llvm::isa<FloatType>(sourceType) && llvm::isa<IntegerType>(targetType) &&
       sourceType.getIntOrFloatBitWidth() ==
           targetType.getIntOrFloatBitWidth()) {
-    return rewriter.create<mlir::arith::BitcastOp>(value.getLoc(), targetType,
-                                                   value);
+    return builder.create<mlir::arith::BitcastOp>(value.getLoc(), targetType,
+                                                  value);
   } else if (sourceIsInteger &&
              (targetType.isSignedInteger() || targetType.isSignlessInteger())) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
-      return rewriter.create<mlir::arith::ExtSIOp>(value.getLoc(), targetType,
-                                                   value);
+      return builder.create<mlir::arith::ExtSIOp>(value.getLoc(), targetType,
+                                                  value);
     } else {
-      return rewriter.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
-                                                    value);
+      return builder.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
+                                                   value);
     }
   } else if (sourceIsInteger && targetType.isUnsignedInteger()) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
-      return rewriter.create<mlir::arith::ExtUIOp>(value.getLoc(), targetType,
-                                                   value);
+      return builder.create<mlir::arith::ExtUIOp>(value.getLoc(), targetType,
+                                                  value);
     } else {
-      return rewriter.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
-                                                    value);
+      return builder.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
+                                                   value);
     }
   } else {
     return value;
   }
 }
 
-Value castFromImportType(Value value, Type targetType,
-                         ConversionPatternRewriter &rewriter) {
+Value castFromImportType(Value value, Type targetType, OpBuilder &builder) {
   // Right now the to-import and from-import types are the same.
-  return castToImportType(value, targetType, rewriter);
+  return castToImportType(value, targetType, builder);
 }
 
 void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
@@ -118,15 +116,16 @@ size_t getSegmentSpanSize(Type spanType) {
   }
 }
 
-std::optional<SmallVector<Value>>
-rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
-                      ConversionPatternRewriter &rewriter) {
+std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
+                                                        Attribute attrValue,
+                                                        Type inputType,
+                                                        OpBuilder &builder) {
   if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attrValue)) {
     // NOTE: we intentionally go to std.constant ops so that the standard
     // conversions can do their job. If we want to remove the dependency
     // from standard ops in the future we could instead go directly to
     // one of the vm constant ops.
-    auto constValue = rewriter.createOrFold<mlir::arith::ConstantOp>(
+    auto constValue = builder.create<mlir::arith::ConstantOp>(
         loc, inputType,
         IntegerAttr::get(inputType,
                          APInt(32, static_cast<int32_t>(intAttr.getInt()))));
@@ -136,7 +135,7 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
     SmallVector<Value> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
-      elementValues.push_back(rewriter.createOrFold<mlir::arith::ConstantOp>(
+      elementValues.push_back(builder.create<mlir::arith::ConstantOp>(
           loc, elementsAttr.getType().getElementType(),
           cast<TypedAttr>(intAttr)));
     }
@@ -146,7 +145,7 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
     SmallVector<Value> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
-          rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
+          rewriteAttrToOperands(loc, elementAttr, inputType, builder);
       if (!flattenedValues)
         return std::nullopt;
       allValues.append(flattenedValues->begin(), flattenedValues->end());
@@ -154,7 +153,7 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
     return allValues;
   }
   if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
-    return {{rewriter.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
+    return {{builder.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
   }
 
   // This may be a custom dialect type. As we can't trivially access the storage
@@ -176,7 +175,7 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
               return;
             auto elementType = tupleTypes[ordinal++];
             auto flattenedValues =
-                rewriteAttrToOperands(loc, elementAttr, elementType, rewriter);
+                rewriteAttrToOperands(loc, elementAttr, elementType, builder);
             if (!flattenedValues) {
               anyFailed = true;
               return;
@@ -192,7 +191,7 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
             if (anyFailed)
               return;
             auto flattenedValues =
-                rewriteAttrToOperands(loc, elementAttr, inputType, rewriter);
+                rewriteAttrToOperands(loc, elementAttr, inputType, builder);
             if (!flattenedValues) {
               anyFailed = true;
               return;

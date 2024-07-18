@@ -52,9 +52,10 @@ util.func public @command_buffer_fill_buffer_i8(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i8.i32.u %arg2 : i32 -> i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[UNUSED_SLOT]], %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i8)
@@ -71,9 +72,10 @@ util.func public @command_buffer_fill_buffer_i16(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 2
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i16.i32.u %arg2 : i32 -> i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[UNUSED_SLOT]], %[[EXTEND]], %[[PATTERN_LENGTH]])
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i16)
@@ -90,10 +92,30 @@ util.func public @command_buffer_fill_buffer_i32(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %arg2, %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[UNUSED_SLOT]], %arg2, %[[PATTERN_LENGTH]])
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
+      pattern(%arg2 : i32)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_fill_buffer_i32_indirect
+util.func public @command_buffer_fill_buffer_i32_indirect(
+  %arg0: !hal.command_buffer,
+  %arg1: index,
+  %arg2: i32
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %[[NULL_BUFFER]], %c100, %c200, %arg1, %arg2, %[[PATTERN_LENGTH]])
+  hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : index)[%c100, %c200]
       pattern(%arg2 : i32)
   util.return
 }
@@ -111,6 +133,7 @@ util.func public @command_buffer_update_buffer(
     %device_buffer: !hal.buffer, %dst_offset: index,
     %length: index
   ) {
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
   //  CHECK-DAG: %[[SRC_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[SRC_OFFSET]]
   //  CHECK-DAG: %[[DST_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[DST_OFFSET]]
   //  CHECK-DAG: %[[LENGTH_I64:.+]] = vm.ext.i32.i64.s %[[LENGTH]]
@@ -118,7 +141,7 @@ util.func public @command_buffer_update_buffer(
   // CHECK-SAME: (%[[CMD]],
   // CHECK-SAME:  %[[HOST_BUFFER]], %[[SRC_OFFSET_I64]],
   // CHECK-SAME:  %[[DEVICE_BUFFER]], %[[DST_OFFSET_I64]],
-  // CHECK-SAME:  %[[LENGTH_I64]])
+  // CHECK-SAME:  %[[LENGTH_I64]], %[[UNUSED_SLOT]])
   hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
       source(%host_buffer : !util.buffer{%host_buffer_size})[%src_offset]
       target(%device_buffer : !hal.buffer)[%dst_offset]
@@ -128,18 +151,69 @@ util.func public @command_buffer_update_buffer(
 
 // -----
 
+// CHECK-LABEL: @command_buffer_update_buffer_indirect
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[HOST_BUFFER:[a-z0-9]+]]: !vm.buffer, %[[HOST_BUFFER_SIZE:[a-z0-9]+]]: i32, %[[SRC_OFFSET:[a-z0-9]+]]: i32,
+//  CHECK-SAME:  %[[DEVICE_BUFFER_SLOT:[a-z0-9]+]]: i32, %[[DST_OFFSET:[a-z0-9]+]]: i32,
+//  CHECK-SAME:  %[[LENGTH:[a-z0-9]+]]: i32)
+util.func public @command_buffer_update_buffer_indirect(
+    %cmd: !hal.command_buffer,
+    %host_buffer: !util.buffer, %host_buffer_size: index, %src_offset: index,
+    %device_buffer: index, %dst_offset: index,
+    %length: index
+  ) {
+  //  CHECK-DAG: %[[SRC_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[SRC_OFFSET]]
+  //  CHECK-DAG: %[[DST_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[DST_OFFSET]]
+  //  CHECK-DAG: %[[LENGTH_I64:.+]] = vm.ext.i32.i64.s %[[LENGTH]]
+  //  CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  //      CHECK: vm.call @hal.command_buffer.update_buffer
+  // CHECK-SAME: (%[[CMD]],
+  // CHECK-SAME:  %[[HOST_BUFFER]], %[[SRC_OFFSET_I64]],
+  // CHECK-SAME:  %[[NULL_BUFFER]], %[[DST_OFFSET_I64]],
+  // CHECK-SAME:  %[[LENGTH_I64]], %[[DEVICE_BUFFER_SLOT]])
+  hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
+      source(%host_buffer : !util.buffer{%host_buffer_size})[%src_offset]
+      target(%device_buffer : index)[%dst_offset]
+      length(%length)
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_copy_buffer
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
 util.func public @command_buffer_copy_buffer(
-  %arg0: !hal.command_buffer,
-  %arg1: !hal.buffer
+  %cmd: !hal.command_buffer,
+  %buffer: !hal.buffer
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.copy_buffer(%arg0, %arg1, %c100, %arg1, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, !vm.ref<!hal.buffer>, i64, i64) -> ()
-  hal.command_buffer.copy_buffer<%arg0 : !hal.command_buffer>
-      source(%arg1 : !hal.buffer)[%c100]
-      target(%arg1 : !hal.buffer)[%c200]
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.command_buffer.copy_buffer(%[[CMD]], %[[UNUSED_SLOT]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100, %[[BUFFER]], %c200, %c300)
+  hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer>
+      source(%buffer : !hal.buffer)[%c100]
+      target(%buffer : !hal.buffer)[%c200]
+      length(%c300)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_copy_buffer_indirect
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER_SLOT:.+]]: i32)
+util.func public @command_buffer_copy_buffer_indirect(
+  %cmd: !hal.command_buffer,
+  %buffer_slot: index
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.copy_buffer(%[[CMD]], %[[BUFFER_SLOT]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100, %[[NULL_BUFFER]], %c200, %c300)
+  hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer>
+      source(%buffer_slot : index)[%c100]
+      target(%buffer_slot : index)[%c200]
       length(%c300)
   util.return
 }
@@ -159,16 +233,17 @@ util.func public @command_buffer_collective_all_reduce_sum(
     %send_buffer: !hal.buffer, %recv_buffer: !hal.buffer,
     %count: index) {
   // CHECK-DAG: %[[OP_BITS:.+]] = vm.const.i32 590081
-  // CHECK-DAG: %[[PARAM:.+]] = vm.const.i32.zero
+  // CHECK-DAG: %[[ZERO_I32:.+]] = vm.const.i32.zero
   %c10 = arith.constant 10 : index
   %c20 = arith.constant 20 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   // CHECK-DAG: %[[COUNT_I64:.+]] = vm.ext.i32.i64.s %[[COUNT]]
   // CHECK: vm.call @hal.command_buffer.collective
-  // CHECK-SAME: (%[[CMD]], %[[CHANNEL]], %[[OP_BITS]], %[[PARAM]]
-  // CHECK-SAME:  %[[SEND_BUFFER]], %c10, %c128,
-  // CHECK-SAME:  %[[RECV_BUFFER]], %c20, %c256,
+  // CHECK-SAME: (%[[CMD]], %[[CHANNEL]], %[[OP_BITS]], %[[ZERO_I32]]
+  // CHECK-SAME:  %[[ZERO_I32]], %[[ZERO_I32]],
+  // CHECK-SAME:  %[[SEND_BUFFER]], %[[RECV_BUFFER]],
+  // CHECK-SAME:  %c10, %c128, %c20, %c256,
   // CHECK-SAME:  %[[COUNT_I64]])
   hal.command_buffer.collective<%cmd : !hal.command_buffer>
       channel(%channel : !hal.channel)
@@ -193,15 +268,18 @@ util.func public @command_buffer_collective_send(
     %param: i32,
     %send_buffer: !hal.buffer,
     %count: index) {
-  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
   // CHECK-DAG: %[[OP_BITS:.+]] = vm.const.i32 262150
   %c10 = arith.constant 10 : index
   %c128 = arith.constant 128 : index
   // CHECK-DAG: %[[COUNT_I64:.+]] = vm.ext.i32.i64.s %[[COUNT]]
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK-DAG: %[[ZERO_I64:.+]] = vm.const.i64.zero
   // CHECK: vm.call @hal.command_buffer.collective
   // CHECK-SAME: (%[[CMD]], %[[CHANNEL]], %[[OP_BITS]], %[[PARAM]],
-  // CHECK-SAME:  %[[SEND_BUFFER]], %c10, %c128,
-  // CHECK-SAME:  %[[NULL_BUFFER]], %zero, %zero,
+  // CHECK-SAME:  %[[UNUSED_SLOT]], %[[UNUSED_SLOT]],
+  // CHECK-SAME:  %[[SEND_BUFFER]], %[[NULL_BUFFER]],
+  // CHECK-SAME:  %c10, %c128, %[[ZERO_I64]], %[[ZERO_I64]],
   // CHECK-SAME:  %[[COUNT_I64]])
   hal.command_buffer.collective<%cmd : !hal.command_buffer>
       channel(%channel : !hal.channel)
@@ -215,10 +293,10 @@ util.func public @command_buffer_collective_send(
 // -----
 
 // CHECK-LABEL: @command_buffer_push_descriptor_set
-//  CHECK-SAME: %[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
-//  CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.pipeline_layout>,
-//  CHECK-SAME: %[[BUFFER:.+]]: !vm.ref<!hal.buffer>,
-//  CHECK-SAME: %[[SLOT:.+]]: i32
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[LAYOUT:.+]]: !vm.ref<!hal.pipeline_layout>,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !vm.ref<!hal.buffer>,
+//  CHECK-SAME:  %[[SLOT:.+]]: i32)
 util.func public @command_buffer_push_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.pipeline_layout,
@@ -250,18 +328,20 @@ util.func public @command_buffer_push_descriptor_set(
 // -----
 
 // CHECK-LABEL: @command_buffer_dispatch
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>)
 util.func public @command_buffer_dispatch(
-  %arg0: !hal.command_buffer,
-  %arg1: !hal.executable
+  %cmd: !hal.command_buffer,
+  %executable: !hal.executable
 ) {
   // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
   %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %[[ORDINAL]], %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-  hal.command_buffer.dispatch<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[%ordinal]
+  // CHECK: vm.call @hal.command_buffer.dispatch(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %c100, %c200, %c300)
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
+      target(%executable : !hal.executable)[%ordinal]
       workgroups([%c100, %c200, %c300])
   util.return
 }
@@ -269,17 +349,43 @@ util.func public @command_buffer_dispatch(
 // -----
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
 util.func public @command_buffer_dispatch_indirect(
-  %arg0: !hal.command_buffer,
-  %arg1: !hal.executable,
-  %arg2: !hal.buffer
+  %cmd: !hal.command_buffer,
+  %executable: !hal.executable,
+  %buffer: !hal.buffer
 ) {
-  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
   %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %[[ORDINAL]], %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
-  hal.command_buffer.dispatch.indirect<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[%ordinal]
-      workgroups(%arg2 : !hal.buffer)[%c100]
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100)
+  hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
+      target(%executable : !hal.executable)[%ordinal]
+      workgroups(%buffer : !hal.buffer)[%c100]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_dispatch_indirect_indirect
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>,
+//  CHECK-SAME:  %[[BUFFER_SLOT:.+]]: i32)
+util.func public @command_buffer_dispatch_indirect_indirect(
+  %cmd: !hal.command_buffer,
+  %executable: !hal.executable,
+  %buffer_slot: index
+) {
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  %ordinal = arith.constant 123 : index
+  %c100 = arith.constant 100 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100)
+  hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
+      target(%executable : !hal.executable)[%ordinal]
+      workgroups(%buffer_slot : index)[%c100]
   util.return
 }

@@ -1291,7 +1291,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_BufferType:$target_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
     HAL_FillPatternType:$pattern
@@ -1360,9 +1360,9 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_BufferType:$source_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    HAL_BufferType:$target_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -1396,10 +1396,10 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
     Optional<I32>:$param,
     // TODO(benvanik): change this to take descriptor set + binding instead.
     // This would let us use indirect bindings.
-    Optional<HAL_BufferType>:$send_buffer,
+    Optional<AnyTypeOf<[Index, HAL_BufferType]>>:$send_buffer,
     Optional<HAL_DeviceSize>:$send_offset,
     Optional<HAL_DeviceSize>:$send_length,
-    Optional<HAL_BufferType>:$recv_buffer,
+    Optional<AnyTypeOf<[Index, HAL_BufferType]>>:$recv_buffer,
     Optional<HAL_DeviceSize>:$recv_offset,
     Optional<HAL_DeviceSize>:$recv_length
   );
@@ -1529,7 +1529,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
     HAL_Ordinal:$entry_point,
-    HAL_BufferType:$workgroups_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );
 

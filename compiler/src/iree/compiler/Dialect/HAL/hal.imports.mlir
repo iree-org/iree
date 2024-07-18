@@ -231,28 +231,35 @@ vm.import private @command_buffer.execution_barrier(
 )
 
 // Fills the target buffer with the given repeating value.
+// NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.fill_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i64,
   %length : i64,
+  %target_buffer_slot : i32,
   %pattern : i32,
   %pattern_length: i32
 )
 
 // Updates a device buffer with the captured contents of a host buffer.
+// NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.update_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_buffer : !vm.buffer,
   %source_offset : i64,
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i64,
-  %length : i64
+  %length : i64,
+  %target_buffer_slot : i32
 )
 
 // Copies a range of one buffer to another.
+// NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.copy_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,
+  %source_buffer_slot : i32,
+  %target_buffer_slot : i32,
   %source_buffer : !vm.ref<!hal.buffer>,
   %source_offset : i64,
   %target_buffer : !vm.ref<!hal.buffer>,
@@ -267,10 +274,12 @@ vm.import private @command_buffer.collective(
   %channel : !vm.ref<!hal.channel>,
   %op : i32,
   %param : i32,
+  %send_buffer_slot : i32,
+  %recv_buffer_slot : i32,
   %send_buffer : !vm.ref<!hal.buffer>,
+  %recv_buffer : !vm.ref<!hal.buffer>,
   %send_offset : i64,
   %send_length : i64,
-  %recv_buffer : !vm.ref<!hal.buffer>,
   %recv_offset : i64,
   %recv_length : i64,
   %element_count : i64
@@ -309,6 +318,7 @@ vm.import private @command_buffer.dispatch.indirect(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable : !vm.ref<!hal.executable>,
   %entry_point : i32,
+  %workgroups_buffer_slot : i32,
   %workgroups_buffer : !vm.ref<!hal.buffer>,
   %workgroups_offset : i64
 )
