@@ -22,6 +22,7 @@
 static const char kConfigAttrName[] = "lowering_config";
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
+static const char kRootOpInfoAttrName[] = "root_op_info";
 
 namespace mlir::iree_compiler {
 
@@ -471,15 +472,15 @@ void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
 }
 
-} // namespace mlir::iree_compiler
-
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting `iree_codegen.root_op_info` attribute on root
+// Helpers for setting `root_op_info` attribute on root
 // operations.
 // ===----------------------------------------------------------------------===//
 
-void setRootOpInfo(Operation *op, Attribute config) {
-  op->setAttr("root_op_info", config);
+void setRootOpInfo(Operation *op, StringAttr config) {
+  op->setAttr(kRootOpInfoAttrName, config);
 }
 
-void eraseRootOpInfo(Operation *op) { op->removeAttr("root_op_info"); }
+void eraseRootOpInfo(Operation *op) { op->removeAttr(kRootOpInfoAttrName); }
+
+} // namespace mlir::iree_compiler
