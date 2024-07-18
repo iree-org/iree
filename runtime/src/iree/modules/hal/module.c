@@ -32,8 +32,8 @@
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
-#define IREE_HAL_MODULE_VERSION_0_2 0x00000002u
-#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_2
+#define IREE_HAL_MODULE_VERSION_0_3 0x00000003u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_3
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;

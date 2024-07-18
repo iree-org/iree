@@ -33,7 +33,6 @@ vm.import private @allocator.allocate(
   %buffer_usage : i32,
   %allocation_size : i64
 ) -> !vm.ref<!hal.buffer>
-attributes {minimum_version = 1 : i32}
 
 // Imports a host byte buffer into a device visible buffer.
 // If try!=0 then returns null if the given memory type cannot be mapped.
@@ -48,7 +47,6 @@ vm.import private @allocator.import(
   %offset : i64,
   %length : i64
 ) -> !vm.ref<!hal.buffer>
-attributes {minimum_version = 1 : i32}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t
@@ -202,6 +200,9 @@ vm.import private @command_buffer.create(
   %queue_affinity : i64,
   %binding_capacity : i32
 ) -> !vm.ref<!hal.command_buffer>
+attributes {
+  minimum_version = 3 : i32  // command buffer API version
+}
 
 // Finalizes recording into the command buffer and prepares it for submission.
 // No more commands can be recorded afterward.
@@ -448,16 +449,10 @@ vm.import private @device.queue.flush(
 //===----------------------------------------------------------------------===//
 
 vm.import private @devices.count() -> i32
-attributes {
-  minimum_version = 2 : i32,
-  nosideeffects
-}
+attributes {nosideeffects}
 
 vm.import private @devices.get(%index : i32) -> !vm.ref<!hal.device>
-attributes {
-  minimum_version = 2 : i32,
-  nosideeffects
-}
+attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t
