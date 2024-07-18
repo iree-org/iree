@@ -122,11 +122,17 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+    DictionaryAttr pipelineConfig = DictionaryAttr()
+    std::optional<StringAttr> rootOpInfo = std::nullopt) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
   setLoweringConfig(op, config);
+  rootOpInfo = mlir::StringAttr::get(context, "this-is-root-op"); //TODO: add more info for tuner
+  if (rootOpInfo.has_value()) {
+    setRootOpInfo(op, rootOpInfo)
+  }
+
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn.getContext(), passPipeline, SymbolRefAttr(), workgroupSize,
       subgroupSize, pipelineConfig);

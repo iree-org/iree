@@ -472,3 +472,14 @@ void eraseCompilationInfo(Operation *op) {
 }
 
 } // namespace mlir::iree_compiler
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting `iree_codegen.root_op_info` attribute on root
+// operations.
+// ===----------------------------------------------------------------------===//
+
+void setRootOpInfo(Operation *op, Attribute config) {
+  op->setAttr("root_op_info", config);
+}
+
+void eraseRootOpInfo(Operation *op) { op->removeAttr("root_op_info"); }
