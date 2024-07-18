@@ -9,12 +9,14 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Utils/TilingUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
@@ -99,10 +101,12 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       tileSizes.push_back(zero);
     }
 
+    bool isParallelTiling = tilingLevel == IREE::GPU::TilingLevel::Thread ||
+                            tilingLevel == IREE::GPU::TilingLevel::Subgroup;
+
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tileSizes);
-    if (tilingLevel == IREE::GPU::TilingLevel::Thread ||
-        tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
+    if (isParallelTiling) {
       tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
 
       // TODO: Add some helpers to construct this based on the enum type rather
@@ -133,6 +137,14 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
         [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
             bool isDestinationOperand) {
           Operation *owner = originalProducer.getOwner();
+
+          // Only fuse reshapes for serial tiling. Reshapes should end up
+          // at the boundary of allocations to works around limitations in
+          // vectorization and loop fusion.
+          if (isa<tensor::ExpandShapeOp>(owner)) {
+            return std::make_tuple(!isParallelTiling, false);
+          }
+
           bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
           bool shouldFuse = false;
           if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
@@ -145,8 +157,8 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
     tileAndFuseOptions.setFusionControlFn(controlFn);
 
     FailureOr<scf::SCFTileAndFuseResult> tiledResults =
-        scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
-                                                  tileAndFuseOptions);
+        tileConsumerAndFuseProducersWithReshapeFusion(
+            rewriter, tilingInterfaceOp, tileAndFuseOptions);
     if (failed(tiledResults)) {
       return failure();
     }

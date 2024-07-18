@@ -19,6 +19,7 @@ iree_cc_library(
     "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
+    "TilingUtils.h"
     "Utils.h"
   SRCS
     "CPUUtils.cpp"
@@ -26,6 +27,7 @@ iree_cc_library(
     "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
+    "TilingUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport

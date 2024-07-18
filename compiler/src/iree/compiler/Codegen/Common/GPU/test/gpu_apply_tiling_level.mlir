@@ -271,3 +271,75 @@ module {
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 8]}>
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+module {
+  func.func @reduction_reshape() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<256x384xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x64xf32>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x384xf32>> -> tensor<256x384xf32>
+    %expand = tensor.expand_shape %3 [[0, 1], [2]] output_shape [4, 64, 384] : tensor<256x384xf32> into tensor<4x64x384xf32>
+    %empty = tensor.empty() : tensor<4x64xf32>
+    %4 = linalg.fill ins(%cst : f32) outs(%empty : tensor<4x64xf32>) -> tensor<4x64xf32>
+    %5 = linalg.generic {
+      indexing_maps = [#map, #map1],
+      iterator_types = ["parallel", "parallel", "reduction"]
+      } ins(%expand : tensor<4x64x384xf32>) outs(%4 : tensor<4x64xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %7 = arith.addf %in, %out : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x64xf32>
+    flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [4, 64], strides = [1, 1] : tensor<4x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x64xf32>>
+    return
+  }
+}
+
+// CHECK-LABEL: func.func @reduction_reshape
+//       CHECK:   %[[IN:.+]] = flow.dispatch.tensor.load %{{.*}} tensor<256x384xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill {{.*}} tensor<4x64xf32>
+//       CHECK:   scf.for %[[ARG0:.+]] = %c0 to %c384 step %c8 iter_args(%{{.*}} = %[[FILL]])
+//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[IN]][0, %[[ARG0]]] [256, 8] [1, 1] : tensor<256x384xf32> to tensor<256x8xf32>
+//       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{.*}} : tensor<256x8xf32> into tensor<4x64x8xf32>
+//       CHECK:     linalg.generic {{.*}} ins(%[[EXPAND]] : tensor<4x64x8xf32>)
+//       CHECK:     scf.yield
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [0, 0, 8]}>
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+module {
+  func.func @parallel_reshape() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<256x384xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x64x384xf32>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x384xf32>> -> tensor<256x384xf32>
+    %expand = tensor.expand_shape %3 [[0, 1], [2]] output_shape [4, 64, 384] : tensor<256x384xf32> into tensor<4x64x384xf32>
+    %empty = tensor.empty() : tensor<4x64x384xf32>
+    %5 = linalg.generic {
+      indexing_maps = [#map, #map1],
+      iterator_types = ["parallel", "parallel", "parallel"]
+      } ins(%expand : tensor<4x64x384xf32>) outs(%empty : tensor<4x64x384xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %7 = math.rsqrt %in : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x64x384xf32>
+    flow.dispatch.tensor.store %5, %1, offsets = [0, 0, 0], sizes = [4, 64, 384], strides = [1, 1, 1] : tensor<4x64x384xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x64x384xf32>>
+    return
+  }
+}
+
+// THREAD-LABEL: func.func @parallel_reshape
+//       THREAD:   %[[IN:.+]] = flow.dispatch.tensor.load %{{.*}} tensor<256x384xf32>
+//       THREAD:   %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{.*}} : tensor<256x384xf32> into tensor<4x64x384xf32>
+//       THREAD:   scf.forall
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %[[EXPAND]][0, 0, %{{.*}}] [4, 64, 8] [1, 1, 1] : tensor<4x64x384xf32> to tensor<4x64x8xf32>
+//       THREAD:     linalg.generic {{.*}} ins(%[[SLICE]] : tensor<4x64x8xf32>)
+//       THREAD:     scf.forall.in_parallel
