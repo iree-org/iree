@@ -131,10 +131,10 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
   setLoweringConfig(op, config);
-  rootOpInfo = mlir::StringAttr::get(context, "this-is-root-op"); //TODO: add more info for tuner
+  rootOpInfo = mlir::StringAttr::get(
+      context, "this-is-root-op"); // TODO: add more info for tuner
   if (rootOpInfo.has_value()) {
     setRootOpInfo(op, rootOpInfo.value());
-    
   }
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn.getContext(), passPipeline, SymbolRefAttr(), workgroupSize,
