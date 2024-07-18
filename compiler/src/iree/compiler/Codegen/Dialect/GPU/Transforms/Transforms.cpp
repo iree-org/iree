@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -108,14 +109,19 @@ static LogicalResult compareWorkerCounts(scf::ForallOp producer,
   return success();
 }
 
-static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
-                                 Value source,
-                                 tensor::ParallelInsertSliceOp parallelInsert,
-                                 SmallVector<Operation *> consumerChain) {
+static LogicalResult
+replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
+                     tensor::ParallelInsertSliceOp parallelInsert,
+                     SmallVector<Operation *> consumerChain) {
   auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
   OpBuilder::InsertionGuard g(rewriter);
   Value shuffleDest = parallelInsert.getDest();
-  if (auto empty = shuffleDest.getDefiningOp<tensor::EmptyOp>()) {
+  auto empty = shuffleDest.getDefiningOp<tensor::EmptyOp>();
+  if (!empty) {
+    return failure();
+  }
+
+  {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(empty);
     Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
@@ -139,6 +145,7 @@ static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
       ->replaceUsesOfWith(source, shuffleOp.getBody()->getArgument(0));
   rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
                                 terminator);
+  return success();
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
@@ -225,8 +232,10 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  replaceConsumerChain(rewriter, loc, producer.getResult(0), parallelInsert,
-                       consumerChain);
+  if (failed(replaceConsumerChain(rewriter, loc, producer.getResult(0),
+                                  parallelInsert, consumerChain))) {
+    return failure();
+  }
 
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
