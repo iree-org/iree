@@ -991,6 +991,32 @@ void CommandBufferCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.command_buffer.update_buffer
+//===----------------------------------------------------------------------===//
+
+IREE::Util::SubrangeOperand
+CommandBufferUpdateBufferOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 1) {
+    return IREE::Util::SubrangeOperand{getSourceBuffer(), getSourceSize(),
+                                       getSourceOffset(), getLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void CommandBufferUpdateBufferOp::setSubrangeOperand(
+    unsigned operandIndex, IREE::Util::SubrangeOperand operand) {
+  if (operandIndex == 1) {
+    getSourceBufferMutable().assign(operand.resource);
+    getSourceSizeMutable().assign(operand.resourceSize);
+    getSourceOffsetMutable().assign(operand.offset);
+  } else {
+    assert(false && "only source is a subrange");
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // hal.command_buffer.push_descriptor_set
 //===----------------------------------------------------------------------===//
 

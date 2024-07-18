@@ -58,6 +58,7 @@ EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buff
 EXPORT_FN("command_buffer.finalize", iree_hal_module_command_buffer_finalize, r, v)
 EXPORT_FN("command_buffer.push_constants", iree_hal_module_command_buffer_push_constants, rriCiD, v)
 EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_push_descriptor_set, rriCiirIID, v)
+EXPORT_FN("command_buffer.update_buffer", iree_hal_module_command_buffer_update_buffer, rrIrII, v)
 
 EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiiD, r)
 

@@ -98,6 +98,34 @@ util.func public @command_buffer_fill_buffer_i32(
 
 // -----
 
+// CHECK-LABEL: @command_buffer_update_buffer
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[HOST_BUFFER:[a-z0-9]+]]: !vm.buffer, %[[HOST_BUFFER_SIZE:[a-z0-9]+]]: i32, %[[SRC_OFFSET:[a-z0-9]+]]: i32,
+//  CHECK-SAME:  %[[DEVICE_BUFFER:[a-z0-9]+]]: !vm.ref<!hal.buffer>, %[[DST_OFFSET:[a-z0-9]+]]: i32,
+//  CHECK-SAME:  %[[LENGTH:[a-z0-9]+]]: i32)
+util.func public @command_buffer_update_buffer(
+    %cmd: !hal.command_buffer,
+    %host_buffer: !util.buffer, %host_buffer_size: index, %src_offset: index,
+    %device_buffer: !hal.buffer, %dst_offset: index,
+    %length: index
+  ) {
+  //  CHECK-DAG: %[[SRC_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[SRC_OFFSET]]
+  //  CHECK-DAG: %[[DST_OFFSET_I64:.+]] = vm.ext.i32.i64.s %[[DST_OFFSET]]
+  //  CHECK-DAG: %[[LENGTH_I64:.+]] = vm.ext.i32.i64.s %[[LENGTH]]
+  //      CHECK: vm.call @hal.command_buffer.update_buffer
+  // CHECK-SAME: (%[[CMD]],
+  // CHECK-SAME:  %[[HOST_BUFFER]], %[[SRC_OFFSET_I64]],
+  // CHECK-SAME:  %[[DEVICE_BUFFER]], %[[DST_OFFSET_I64]],
+  // CHECK-SAME:  %[[LENGTH_I64]])
+  hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
+      source(%host_buffer : !util.buffer{%host_buffer_size})[%src_offset]
+      target(%device_buffer : !hal.buffer)[%dst_offset]
+      length(%length)
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_copy_buffer
 util.func public @command_buffer_copy_buffer(
   %arg0: !hal.command_buffer,

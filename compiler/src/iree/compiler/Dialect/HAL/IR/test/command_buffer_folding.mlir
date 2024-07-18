@@ -42,6 +42,35 @@ util.func public @fold_buffer_subspan_into_fill_buffer(
 
 // -----
 
+// CHECK-LABEL: @fold_buffer_subspans_into_update_buffer
+//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[SOURCE_BUFFER:.+]]: !util.buffer, %[[SOURCE_BUFFER_SIZE:.+]]: index,
+//  CHECK-SAME: %[[TARGET_BUFFER:.+]]: !hal.buffer
+util.func public @fold_buffer_subspans_into_update_buffer(
+    %cmd: !hal.command_buffer,
+    %source_buffer: !util.buffer, %source_buffer_size: index,
+    %target_buffer: !hal.buffer
+  ) {
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %c8192 = arith.constant 8192 : index
+  %c100000 = arith.constant 100000 : index
+  %c262144 = arith.constant 262144 : index
+  %source_subspan = util.buffer.subspan %source_buffer[%c4096] : !util.buffer{%source_buffer_size} -> !util.buffer{%c262144}
+  %target_subspan = hal.buffer.subspan<%target_buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
+  // CHECK: hal.command_buffer.update_buffer
+  hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
+      // CHECK-SAME: source(%[[SOURCE_BUFFER]] : !util.buffer{%[[SOURCE_BUFFER_SIZE]]})[%c4096]
+      source(%source_subspan : !util.buffer{%c262144})[%c0]
+      // CHECK-SAME: target(%[[TARGET_BUFFER]] : !hal.buffer)[%c108192]
+      target(%target_subspan : !hal.buffer)[%c100000]
+      // CHECK-SAME: length(%c8192)
+      length(%c8192)
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @fold_buffer_subspan_into_copy_buffer
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer

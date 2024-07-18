@@ -1306,7 +1306,49 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
   let hasCanonicalizer = 1;
 }
 
-// TODO(benvanik): update buffer op.
+def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
+  // TODO(benvanik): figure out the right way to model host effects - this is
+  // a host read but a device write; if we make it just MemRead then it gets
+  // DCEd because it has no result. For now we report both to keep analysis
+  // appeased even if incorrect.
+  MemoryEffects<[MemRead, MemWrite]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
+]> {
+  let summary = [{command buffer buffer update recording operation}];
+  let description = [{
+    Copies a range of a host buffer into a device buffer. The host buffer
+    contents will be captured at the time of the call and embedded in the
+    command buffer.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    Util_BufferType:$source_buffer,
+    Util_Size:$source_size,
+    Util_Size:$source_offset,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `source` `(` $source_buffer `:` type($source_buffer) `{` $source_size `}` `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return idx == 1 ? getSourceSize() : Value{}; }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
 
 def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let summary = [{command buffer buffer copy recording operation}];

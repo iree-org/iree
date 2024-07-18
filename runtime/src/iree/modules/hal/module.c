@@ -774,6 +774,30 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
                                              &pattern, pattern_length);
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_update_buffer,  //
+                   iree_hal_module_state_t,                       //
+                   rrIrII, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  iree_vm_buffer_t* source_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &source_buffer));
+  iree_host_size_t source_offset = iree_hal_cast_host_size(args->i2);
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r3, &target_buffer));
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i4);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
+
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(
+      source_buffer, source_offset, (iree_host_size_t)length, 1, &source_span));
+
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target_buffer, target_offset, length);
+  return iree_hal_command_buffer_update_buffer(command_buffer, source_span.data,
+                                               /*source_offset=*/0, target_ref);
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
                    iree_hal_module_state_t,                     //
                    rrIrII, v) {

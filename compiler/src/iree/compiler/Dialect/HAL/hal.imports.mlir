@@ -239,6 +239,16 @@ vm.import private @command_buffer.fill_buffer(
   %pattern_length: i32
 )
 
+// Updates a device buffer with the captured contents of a host buffer.
+vm.import private @command_buffer.update_buffer(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %source_buffer : !vm.buffer,
+  %source_offset : i64,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64
+)
+
 // Copies a range of one buffer to another.
 vm.import private @command_buffer.copy_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,

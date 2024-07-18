@@ -127,6 +127,43 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+class CommandBufferUpdateBufferOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferUpdateBufferOp> {
+public:
+  CommandBufferUpdateBufferOpConversion(MLIRContext *context,
+                                        SymbolTable &importSymbols,
+                                        TypeConverter &typeConverter,
+                                        StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferUpdateBufferOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+    SmallVector<Value, 8> callOperands = {
+        adaptor.getCommandBuffer(),
+        adaptor.getSourceBuffer(),
+        castToImportType(adaptor.getSourceOffset(), rewriter.getI64Type(),
+                         rewriter),
+        adaptor.getTargetBuffer(),
+        castToImportType(adaptor.getTargetOffset(), rewriter.getI64Type(),
+                         rewriter),
+        castToImportType(adaptor.getLength(), rewriter.getI64Type(), rewriter),
+    };
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 class CommandBufferCollectiveOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferCollectiveOp> {
 public:
@@ -329,6 +366,9 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
           "hal.command_buffer.execution_barrier");
   patterns.insert<CommandBufferFillBufferOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
+  patterns.insert<CommandBufferUpdateBufferOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal.command_buffer.update_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
   patterns.insert<CommandBufferCollectiveOpConversion>(

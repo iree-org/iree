@@ -73,6 +73,30 @@ util.func public @command_buffer_fill_buffer(
 
 // -----
 
+// CHECK-LABEL: @command_buffer_update_buffer
+//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME:  %[[HOST_BUFFER:[a-z0-9]+]]: !util.buffer, %[[HOST_BUFFER_SIZE:[a-z0-9]+]]: index, %[[SRC_OFFSET:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[DEVICE_BUFFER:[a-z0-9]+]]: !hal.buffer, %[[DST_OFFSET:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[LENGTH:[a-z0-9]+]]: index)
+util.func public @command_buffer_update_buffer(
+    %cmd: !hal.command_buffer,
+    %host_buffer: !util.buffer, %host_buffer_size: index, %src_offset: index,
+    %device_buffer: !hal.buffer, %dst_offset: index,
+    %length: index
+  ) {
+  //      CHECK: hal.command_buffer.update_buffer<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   source(%[[HOST_BUFFER]] : !util.buffer{%[[HOST_BUFFER_SIZE]]})[%[[SRC_OFFSET]]]
+  // CHECK-SAME:   target(%[[DEVICE_BUFFER]] : !hal.buffer)[%[[DST_OFFSET]]]
+  // CHECK-SAME:   length(%[[LENGTH]])
+  hal.command_buffer.update_buffer<%cmd : !hal.command_buffer>
+      source(%host_buffer : !util.buffer{%host_buffer_size})[%src_offset]
+      target(%device_buffer : !hal.buffer)[%dst_offset]
+      length(%length)
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_copy_buffer
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
