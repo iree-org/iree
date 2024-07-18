@@ -1163,6 +1163,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     HAL_Device:$device,
     HAL_CommandBufferModeBitfieldAttr:$modes,
     HAL_CommandCategoryBitfieldAttr:$command_categories,
+    HAL_DeviceQueueAffinity:$queue_affinity,
     Optional<Index>:$binding_capacity
   );
   let results = (outs
@@ -1173,6 +1174,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     `device` `(` $device `:` type($device) `)`
     `mode` `(` $modes `)`
     `categories` `(` $command_categories `)`
+    `affinity` `(` $queue_affinity `)`
     (`bindings` `(` $binding_capacity^ `)`)?
     `:` type($result)
     attr-dict-with-keyword

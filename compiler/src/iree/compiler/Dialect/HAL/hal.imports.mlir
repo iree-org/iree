@@ -199,6 +199,7 @@ vm.import private @command_buffer.create(
   %device : !vm.ref<!hal.device>,
   %modes : i32,
   %command_categories : i32,
+  %queue_affinity : i64,
   %binding_capacity : i32
 ) -> !vm.ref<!hal.command_buffer>
 

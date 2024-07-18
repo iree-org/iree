@@ -670,19 +670,21 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_rank_and_count,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
                    iree_hal_module_state_t,                //
-                   riii, r) {
+                   riiIi, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_command_buffer_mode_t modes =
       (iree_hal_command_buffer_mode_t)args->i1;
   iree_hal_command_category_t command_categories =
       (iree_hal_command_category_t)args->i2;
-  iree_host_size_t binding_capacity = (iree_host_size_t)args->i3;
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i3;
+  iree_host_size_t binding_capacity = (iree_host_size_t)args->i4;
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-      device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
-      binding_capacity, &command_buffer));
+      device, modes, command_categories, queue_affinity, binding_capacity,
+      &command_buffer));
 
   iree_status_t status = iree_hal_command_buffer_begin(command_buffer);
   if (iree_status_is_ok(status)) {

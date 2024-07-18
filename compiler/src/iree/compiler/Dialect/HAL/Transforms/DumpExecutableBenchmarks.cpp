@@ -256,6 +256,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   // TODO(multi-device): support multiple devices in benchmark generation.
   // For now we should just use the affinityAttr to resolve the device.
   Value device = IREE::HAL::DeviceType::resolveAny(loc, funcBuilder);
+  Value queueAffinity = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
 
   // Create and begin command buffer.
   // TODO(benvanik): reuse the command buffer (initialize once and store).
@@ -267,6 +268,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
           .create<IREE::HAL::CommandBufferCreateOp>(
               loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
               commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch,
+              queueAffinity,
               /*binding_capacity=*/Value{})
           .getResult();
 
@@ -379,7 +381,6 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       IREE::HAL::FenceFlagBitfield::None);
 
   // Queue execution.
-  auto queueAffinity = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
   funcBuilder.create<IREE::HAL::DeviceQueueExecuteOp>(
       loc, device, queueAffinity, waitFence, signalFence,
       ValueRange{commandBuffer});

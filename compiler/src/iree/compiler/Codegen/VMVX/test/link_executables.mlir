@@ -74,7 +74,8 @@ func.func @basic_linking() -> () attributes {
 } {
   %c0 = arith.constant 0 : index
   %device = hal.devices.get %c0 : !hal.device
-  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer attributes {
+  %affinity = arith.constant -1 : i64
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer attributes {
     testing.op.a = @dispatch_0,
     testing.op.b = @dispatch_0::@vmvx,
     testing.op.c = @dispatch_0::@vmvx::@dispatch_0
@@ -94,7 +95,8 @@ func.func @basic_linking() -> () attributes {
 util.initializer {
   %c0 = arith.constant 0 : index
   %device = hal.devices.get %c0 : !hal.device
-  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
+  %affinity = arith.constant -1 : i64
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
   %c1 = arith.constant 1 : index
   %dispatch_0_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_0) : !hal.executable
   %dispatch_1_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_1) : !hal.executable

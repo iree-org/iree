@@ -1,18 +1,20 @@
 // RUN: iree-opt --split-input-file --iree-vm-conversion --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
-util.func public @command_buffer_create(%arg0: !hal.device) {
-  // CHECK: %ref = vm.call @hal.command_buffer.create(%arg0, %c1, %c3, %zero) : (!vm.ref<!hal.device>, i32, i32, i32) -> !vm.ref<!hal.command_buffer>
-  %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
+// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)
+util.func public @command_buffer_create(%device: !hal.device, %affinity: i64) {
+  // CHECK: = vm.call @hal.command_buffer.create(%[[DEVICE]], %c1, %c3, %[[AFFINITY]], %zero) : (!vm.ref<!hal.device>, i32, i32, i64, i32) -> !vm.ref<!hal.command_buffer>
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
   util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_create_bindings
-util.func public @command_buffer_create_bindings(%arg0: !hal.device, %arg1: index) {
-  // CHECK: %ref = vm.call @hal.command_buffer.create(%arg0, %c1, %c3, %arg1) : (!vm.ref<!hal.device>, i32, i32, i32) -> !vm.ref<!hal.command_buffer>
-  %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode("OneShot") categories("Transfer|Dispatch") bindings(%arg1) : !hal.command_buffer
+// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[CAPACITY:.+]]: i32)
+util.func public @command_buffer_create_bindings(%device: !hal.device, %affinity: i64, %capacity: index) {
+  // CHECK: = vm.call @hal.command_buffer.create(%[[DEVICE]], %c1, %c3, %[[AFFINITY]], %[[CAPACITY]]) : (!vm.ref<!hal.device>, i32, i32, i64, i32) -> !vm.ref<!hal.command_buffer>
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") affinity(%affinity) bindings(%capacity) : !hal.command_buffer
   util.return
 }
 

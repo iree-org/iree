@@ -51,6 +51,7 @@ public:
     if (!categoriesValue.has_value())
       return failure();
     callOperands.append(categoriesValue.value());
+    callOperands.push_back(adaptor.getQueueAffinity());
     if (adaptor.getBindingCapacity()) {
       callOperands.push_back(castToImportType(adaptor.getBindingCapacity(),
                                               rewriter.getI32Type(), rewriter));

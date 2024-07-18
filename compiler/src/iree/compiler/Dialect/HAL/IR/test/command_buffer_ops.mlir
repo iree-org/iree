@@ -1,15 +1,17 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
-//  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-util.func public @command_buffer_create(%device: !hal.device) {
+//  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
+util.func public @command_buffer_create(%device: !hal.device, %affinity: i64) {
   //      CHECK: %cmd = hal.command_buffer.create
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   mode(OneShot)
-  // CHECK-SAME:   categories("Transfer|Dispatch") : !hal.command_buffer
+  // CHECK-SAME:   categories("Transfer|Dispatch")
+  // CHECK-SAME:   affinity(%[[AFFINITY]]) : !hal.command_buffer
   %cmd = hal.command_buffer.create device(%device : !hal.device)
                                      mode(OneShot)
-                               categories("Transfer|Dispatch") : !hal.command_buffer
+                               categories("Transfer|Dispatch")
+                                 affinity(%affinity) : !hal.command_buffer
   util.return
 }
 

@@ -1,11 +1,12 @@
 // RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @skip_command_buffer_device
-// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-util.func public @skip_command_buffer_device(%device: !hal.device) -> !hal.executable {
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
+util.func public @skip_command_buffer_device(%device: !hal.device, %affinity: i64) -> !hal.executable {
   %cmd = hal.command_buffer.create device(%device : !hal.device)
                                      mode(OneShot)
-                               categories("Transfer|Dispatch") : !hal.command_buffer
+                               categories("Transfer|Dispatch")
+                                 affinity(%affinity) : !hal.command_buffer
 
   // CHECK-NOT: hal.command_buffer.device
   //      CHECK: = hal.executable.lookup device(%[[DEVICE]] : !hal.device)

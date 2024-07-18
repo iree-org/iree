@@ -939,7 +939,8 @@ struct CmdExecuteOpPattern
         rewriter
             .create<IREE::HAL::CommandBufferCreateOp>(
                 loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device,
-                modes, commandCategories, /*binding_capacity=*/Value{})
+                modes, commandCategories, queueAffinity,
+                /*binding_capacity=*/Value{})
             .getResult();
     mapping->mapCommandBuffer(executeOp, commandBuffer);
 
