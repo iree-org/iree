@@ -13,6 +13,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -113,10 +114,21 @@ static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
                                  SmallVector<Operation *> consumerChain) {
   auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
   OpBuilder::InsertionGuard g(rewriter);
+  Value shuffleDest = parallelInsert.getDest();
+  if (auto empty = shuffleDest.getDefiningOp<tensor::EmptyOp>()) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(empty);
+    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
+        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+    auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
+        empty->getLoc(), empty->getResultTypes()[0], empty.getDynamicSizes());
+    allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+    shuffleDest = allocTensor.getResult();
+  }
   auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
-      loc, extractSlice.getType(), parallelInsert.getSource(),
-      parallelInsert.getDest(), parallelInsert.getMixedOffsets(),
-      parallelInsert.getMixedSizes(), parallelInsert.getMixedStrides());
+      loc, extractSlice.getType(), parallelInsert.getSource(), shuffleDest,
+      parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
+      parallelInsert.getMixedStrides());
   rewriter.setInsertionPointToStart(shuffleOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
