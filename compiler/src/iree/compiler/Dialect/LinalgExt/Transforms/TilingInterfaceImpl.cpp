@@ -1847,6 +1847,29 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
+FailureOr<TilingResult>
+AttentionOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
+  // Input offsets and sizes here are from the POV of the outputMap. We need to
+  // normalize these offsets and size for it to be useful.
+
+  // Initialize normalized offsets with 0s and normalized sizes with original
+  // size.
+  SmallVector<Range> iterationDomain(getIterationDomain(builder));
+  SmallVector<OpFoldResult> normalizedSizes =
+      llvm::map_to_vector(iterationDomain, [](Range x) { return x.size; });
+  SmallVector<OpFoldResult> normalizedOffsets(getIterationDomainRank(),
+                                              builder.getIndexAttr(0));
+  ArrayRef<AffineExpr> outputDims = getOutputMap().getResults();
+  for (int i = 0; i < outputDims.size(); i++) {
+    int dim = cast<AffineDimExpr>(outputDims[i]).getPosition();
+    normalizedOffsets[dim] = offsets[i];
+    normalizedSizes[dim] = sizes[i];
+  }
+  return getTiledImplementation(builder, normalizedOffsets, normalizedSizes);
+}
+
 LogicalResult AttentionOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,

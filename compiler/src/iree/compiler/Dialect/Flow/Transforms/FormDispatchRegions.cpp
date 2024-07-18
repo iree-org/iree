@@ -616,6 +616,19 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // TODO: Hardcoding the logic for attention fusion for now. The indexing maps
+  // dont work out-of-the-box with the analysis here. So punt on it and just do
+  // basic check
+  if (isa<IREE::LinalgExt::AttentionOp>(producer)) {
+    auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer);
+    if (!consumerGenericOp || !linalg::isElementwise(cast<linalg::LinalgOp>(
+                                  consumerGenericOp.getOperation()))) {
+      return false;
+    }
+
+    return consumerGenericOp.getMatchingIndexingMap(&fusedOperand).isIdentity();
+  }
+
   auto producerFusionOp =
       dyn_cast<LinalgExt::LinalgFusionOpInterface>(producer);
   auto consumerFusionOp =

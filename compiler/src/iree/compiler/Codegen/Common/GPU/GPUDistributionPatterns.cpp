@@ -670,22 +670,9 @@ struct DistributeBroadcastLayoutAttr final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
 
-    VectorValue source = dyn_cast<VectorValue>(broadcastOp.getSource());
-    if (!source) {
-      // TODO: Add support for scalar broadcasting.
-      return failure();
-    }
-
     VectorValue vector = broadcastOp.getVector();
     LayoutAttr layout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!layout) {
-      return failure();
-    }
-
-    VectorLayoutInterface sourceLayout = signature[source];
-
-    // We currently only support 1-D to 2-D broadcasting.
-    if (source.getType().getRank() != 1 || vector.getType().getRank() != 2) {
       return failure();
     }
 
@@ -700,13 +687,30 @@ struct DistributeBroadcastLayoutAttr final
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
+    VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
+    if (!srcVector) {
+      // Scalar broadcasting, broadcasts same scalar across threads.
+      Value source = broadcastOp.getSource();
+      VectorValue distBroadcast =
+          rewriter.create<vector::BroadcastOp>(loc, vectorType, source);
+      replaceOpWithDistributedValues(rewriter, broadcastOp, distBroadcast);
+      return success();
+    }
+    VectorLayoutInterface sourceLayout = signature[srcVector];
+
+    // We currently only support 1-D to 2-D broadcasting.
+    if (srcVector.getType().getRank() != 1 || vector.getType().getRank() != 2) {
+      return failure();
+    }
+
     // Iterate over the parallel dimension.;
     LayoutIterator parallelIterator(layout, parallelDim);
     parallelIterator.apply([&](const LayoutIterator::State &parallelState) {
       // Extract the value from source.
       SmallVector<int64_t> sourceIndices = parallelState.computeSIMTIndex();
       Value value = rewriter.create<vector::ExtractOp>(
-          loc, getDistributed(rewriter, source, sourceLayout), sourceIndices);
+          loc, getDistributed(rewriter, srcVector, sourceLayout),
+          sourceIndices);
 
       // Broadcast value over the broadcasted dimension.
       LayoutIterator broadcastIterator(layout, broadcastedDim);
