@@ -111,8 +111,8 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, Attribute config);
 
-/// Sets the root operation mark in attributes.
-void setRootOpInfo(Operation *op, StringAttr config);
+/// Adds an attribute (`root_op_info`) to `op` to mark it as the root op.
+void setRootOpInfo(Operation *op, Attribute info);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info on the entry point op for the common case of specifying
