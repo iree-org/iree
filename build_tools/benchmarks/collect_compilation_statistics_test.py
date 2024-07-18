@@ -60,8 +60,7 @@ class CollectCompilationStatistics(unittest.TestCase):
             zip.writestr(CONST_COMPONENT_NAME, b"123")
             zip.writestr("main_dispatch_0_vulkan_spirv_fb.fb", b"bindata0")
             zip.writestr("main_dispatch_1_vulkan_spirv_fb.fb", b"bindata1")
-            zip.writestr("predict_dispatch_2_cuda_nvptx_fb.fb", b"bindata2")
-            zip.writestr("dispatch_3_embedded_elf_x86_64.so", b"bindata3")
+            zip.writestr("dispatch_3_embedded_elf_x86_64.so", b"bindata2")
         module_file_data = module_file.getvalue()
 
         component_sizes = get_module_component_info(
@@ -74,7 +73,7 @@ class CollectCompilationStatistics(unittest.TestCase):
                 file_bytes=len(module_file_data),
                 vm_component_bytes=4,
                 const_component_bytes=3,
-                total_dispatch_component_bytes=32,
+                total_dispatch_component_bytes=24,
             ),
         )
 

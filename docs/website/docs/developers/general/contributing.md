@@ -422,12 +422,6 @@ runs.
     ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
     ```
 
-* Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
-
-    ``` text
-    ci-extra: test_nvidia_a100
-    ```
-
 * Skip all CI builds and tests, e.g. for comment-only changes:
 
     ``` text

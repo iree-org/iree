@@ -228,8 +228,6 @@ class BenchmarkDriver(object):
             name, value = line.strip().split("=")
             if value != "ON":
                 continue
-            if name == "IREE_HAL_DRIVER_CUDA":
-                available_drivers.append("cuda")
             elif name == "IREE_HAL_DRIVER_LOCAL_SYNC":
                 available_drivers.append("local-sync")
             elif name == "IREE_HAL_DRIVER_LOCAL_TASK":

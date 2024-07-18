@@ -17,7 +17,6 @@ from benchmark_suites.iree import (
     x86_64_benchmarks,
     adreno_benchmarks,
     armv8_a_benchmarks,
-    cuda_benchmarks,
     mali_benchmarks,
     vulkan_nvidia_benchmarks,
     vmvx_benchmarks,
@@ -99,7 +98,6 @@ def generate_benchmarks() -> (
 
     benchmarks = [
         x86_64_benchmarks.Linux_x86_64_Benchmarks(),
-        cuda_benchmarks.Linux_CUDA_Benchmarks(),
         riscv_benchmarks.Linux_RV64_Benchmarks(),
         riscv_benchmarks.Linux_RV32_Benchmarks(),
         armv8_a_benchmarks.Android_ARMv8_A_Benchmarks(),

@@ -129,7 +129,6 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",
         "test_nvidia_gpu",
-        # "test_nvidia_a100",  # Currently disabled
         "test_amd_mi250",
         "test_amd_mi300",
         "test_amd_w7900",
@@ -168,8 +167,6 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     # The runners with GPUs for these jobs can be unstable or in short supply,
     # so limit jobs to only code paths most likely to affect the tests.
     ("test_nvidia_gpu", NVGPU_PATHS),
-    # Due to the outstock of A100, only run this test in postsubmit.
-    # ("test_nvidia_a100", NVGPU_PATHS),
     ("test_amd_mi250", AMDGPU_PATHS),
     ("test_amd_mi300", AMDGPU_PATHS),
     # Due to the instability issues at the current runner,
@@ -192,8 +189,6 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
         benchmark_presets.ANDROID_CPU_DT_ONLY,
         benchmark_presets.ANDROID_GPU,
     ]
-    # CUDA benchmarks on CI depend on low availability a100 runners.
-    and preset not in [benchmark_presets.CUDA]
 ] + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
 LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS

@@ -108,7 +108,6 @@ IREE_DRIVERS_INFOS = {
     "iree-vmvx": DriverInfo("IREE-VMVX", "CPU", "local-task", "vmvx-module"),
     "iree-vmvx-sync": DriverInfo("IREE-VMVX-Sync", "CPU", "local-sync", "vmvx-module"),
     "iree-vulkan": DriverInfo("IREE-Vulkan", "GPU", "vulkan", ""),
-    "iree-cuda": DriverInfo("IREE-CUDA", "GPU", "cuda", ""),
 }
 
 IREE_PRETTY_NAME_TO_DRIVER_NAME = {

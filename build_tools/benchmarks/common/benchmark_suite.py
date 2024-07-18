@@ -76,10 +76,6 @@ EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[
         iree_definitions.RuntimeDriver.VULKAN,
         iree_definitions.RuntimeLoader.NONE,
     ): "iree-vulkan",
-    (
-        iree_definitions.RuntimeDriver.CUDA,
-        iree_definitions.RuntimeLoader.NONE,
-    ): "iree-cuda",
 }
 
 

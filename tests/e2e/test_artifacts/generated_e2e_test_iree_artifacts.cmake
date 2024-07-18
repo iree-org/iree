@@ -1180,188 +1180,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "EfficientNetV2STF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "MiniLML12H384Uncased(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BertForMaskedLMTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BertLargeTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_3456x1024x2048_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_3456x1024x2048_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_3456x1024x2048_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2560x2560x2560_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_2560x2560x2560_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2560x2560x2560_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_2560x2560x2560_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-  FRIENDLY_NAME "matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-flow-split-matmul-reduction=4"
-    "--iree-codegen-llvmgpu-use-wmma"
-  FRIENDLY_NAME "matmul_128x256x8192_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-flow-split-matmul-reduction=4"
-    "--iree-codegen-llvmgpu-use-wmma"
-  FRIENDLY_NAME "matmul_128x256x8192_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
@@ -3570,244 +3388,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNetV2STF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MiniLML12H384Uncased(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BertForMaskedLMTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BertLargeTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_3456x1024x2048_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_3456x1024x2048_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_3456x1024x2048_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2560x2560x2560_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_2560x2560x2560_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2560x2560x2560_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_2560x2560x2560_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-flow-split-matmul-reduction=4"
-    "--iree-codegen-llvmgpu-use-wmma"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_128x256x8192_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-hal-benchmark-dispatch-repeat-count=100"
-    "--iree-flow-split-matmul-reduction=4"
-    "--iree-codegen-llvmgpu-use-wmma"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_128x256x8192_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
@@ -4852,20 +4432,10 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X1XI32
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X4XI32
   ${PACKAGE_NAME}_model-MiniLML12H384Uncased
-  ${PACKAGE_NAME}_model-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_128x256x8192_f16t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_128x256x8192_f32t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_1x256x2048_i8_i4_i32_tile_config_default
   ${PACKAGE_NAME}_model-matmul_1x256x2048_i8_i8_i32_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_2560x2560x2560_f16t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_2560x2560x2560_f32t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_256x256x2048_i8_i4_i32_tile_config_default
   ${PACKAGE_NAME}_model-matmul_256x256x2048_i8_i8_i32_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_3456x1024x2048_f16t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_3456x1024x2048_f32t_tile_config_default
 )
 
 add_dependencies(iree-benchmark-import-models-large
@@ -4931,11 +4501,9 @@ add_dependencies(iree-benchmark-suites-android-gpu
 )
 
 add_dependencies(iree-benchmark-suites-comp-stats
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -4946,7 +4514,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -4967,7 +4534,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
@@ -5032,9 +4598,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -5047,11 +4610,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -5064,8 +4622,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
 )
 
 add_dependencies(iree-benchmark-suites-comp-stats-large
@@ -5080,29 +4636,10 @@ add_dependencies(iree-benchmark-suites-comp-stats-large
   ${PACKAGE_NAME}_iree-module-T5_LARGE_FP32_JAX_512XI32_BATCH32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
 )
 
-add_dependencies(iree-benchmark-suites-cuda
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-)
-
 add_dependencies(iree-benchmark-suites-default
-  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
@@ -5113,7 +4650,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
@@ -5134,7 +4670,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
@@ -5199,9 +4734,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
-  ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
@@ -5214,11 +4746,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2562x2564x2562_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_2564x2564x2564_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
@@ -5231,8 +4758,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i8_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
-  ${PACKAGE_NAME}_iree-module-matmul_3456x1024x2048_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
 )
 
 add_dependencies(iree-benchmark-suites-large

@@ -21,7 +21,7 @@ on:
           The reserved keyword `default` assigns a shard count to all target devices
           that are not explicitly listed.
         # Please keep this default value in sync with the jobs.build_e2e_test_artifacts.with.shard-count field below
-        default: a2-highgpu-1g=1,c2-standard-60=2,default=1
+        default: c2-standard-60=2,default=1
         type: string
 
 concurrency:
@@ -74,10 +74,10 @@ jobs:
       install-dir: ${{ needs.build_all.outputs.install-dir }}
       install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
       install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
-      benchmark-presets: cuda-large,comp-stats-large,x86_64-large
+      benchmark-presets: comp-stats-large,x86_64-large
       build-default-benchmark-suites: 0
       # Please keep the shard count default value in sync with on.workflow_dispatch.shard-count.default
-      shard-count: ${{ inputs && inputs.shard_count || 'a2-highgpu-1g=1,c2-standard-60=2,default=1' }}
+      shard-count: ${{ inputs && inputs.shard_count || 'c2-standard-60=2,default=1' }}
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
