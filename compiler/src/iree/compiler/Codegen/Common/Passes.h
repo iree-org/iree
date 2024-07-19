@@ -174,6 +174,8 @@ struct GenericVectorizationPassOptions {
   bool foldCastIntoContract = false;
   // Max vector size allowed to avoid creating large vectors.
   int64_t maxVectorSize = std::numeric_limits<int64_t>::max();
+  // Enable early folding of tensor subset ops into vector transfer ops.
+  bool earlySubsetTransferFolding = true;
 };
 /// Creates a pass to perform vectorization on LinAlg and tensor ops.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>

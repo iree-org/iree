@@ -322,6 +322,8 @@ public:
     this->generateContract.setValue(options.generateContract);
     this->foldCastIntoContract.setValue(options.foldCastIntoContract);
     this->maxVectorSize.setValue(options.maxVectorSize);
+    this->earlySubsetTransferFolding.setValue(
+        options.earlySubsetTransferFolding);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -384,8 +386,17 @@ void GenericVectorizationPass::runOnOperation() {
   };
 
   {
-    // Canonicalize mask related ops before we lower them.
+    // Canonicalize mask related ops before we lower them. Also run patterns
+    // for vector transfers on tensor subset ops, since they can be folded if
+    // not handled here.
     RewritePatternSet maskCanonPatterns(funcOp.getContext());
+    if (earlySubsetTransferFolding) {
+      // It is important to add these vector transfer on tensor subset patterns
+      // in the first greedy pattern rewrite, since transfer foldings can remove
+      // vectorized reads and writes by folding them into tensor ops.
+      tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(
+          maskCanonPatterns);
+    }
     vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                       funcOp.getContext());
     vector::ConstantMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
