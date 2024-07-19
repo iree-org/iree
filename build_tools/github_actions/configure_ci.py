@@ -124,7 +124,7 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
-        "build_test_all_arm64",
+        # "build_test_all_arm64",  # Currently disabled
         # "build_test_all_windows",  # Currently disabled
         # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",

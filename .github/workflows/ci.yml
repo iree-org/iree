@@ -65,41 +65,45 @@ jobs:
       write-caches: ${{ needs.setup.outputs.write-caches }}
       run-tests: true
 
-  build_test_all_arm64:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_arm64')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - arm64
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-arm64
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building IREE"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
-      - name: "Testing IREE"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+  # Disabled since we don't have any runners for arm64.
+  # As of July 2024, GitHub has "large" arm64 runners available in beta at cost.
+  # If these get included in the free/standard tier or if a project member
+  # sponsors their use then we could re-enable this job.
+  # build_test_all_arm64:
+  #   needs: setup
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_arm64')
+  #   runs-on:
+  #     - self-hosted # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - arm64
+  #     - os-family=Linux
+  #   env:
+  #     BUILD_DIR: build-arm64
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@v4.1.7
+  #       with:
+  #         submodules: true
+  #     - name: "Building IREE"
+  #       env:
+  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh \
+  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59" \
+  #           --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
+  #           gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+  #           ./build_tools/cmake/build_all.sh \
+  #           "${BUILD_DIR}"
+  #     - name: "Testing IREE"
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh \
+  #           --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
+  #           gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+  #           ./build_tools/cmake/ctest_all.sh \
+  #           "${BUILD_DIR}"
 
   # Disabled since
   #   * windows-2022 is too slow
@@ -977,7 +981,7 @@ jobs:
       - build_test_all_bazel
 
       # Platforms
-      - build_test_all_arm64
+      # - build_test_all_arm64
       # - build_test_all_windows
       # - build_test_all_macos_arm64
       - build_test_all_macos_x86_64
