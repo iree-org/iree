@@ -44,6 +44,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Validate runtime wheel
         run: |
+          source ${VENV_DIR}/bin/activate
           echo "Testing default runtime package:"
           python -m iree.runtime._package_test
           echo "Testing tracy runtime package:"
@@ -54,5 +55,6 @@ jobs:
             python -m iree.runtime._package_test
       - name: Validate compiler wheel
         run: |
+          source ${VENV_DIR}/bin/activate
           echo "Testing compiler package:"
           python -m iree.compiler._package_test
