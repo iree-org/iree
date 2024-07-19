@@ -1166,7 +1166,8 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
             presburger::BoundType::UB, {shapedValue, dimNum},
             /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (succeeded(maybeDimBoundSize))
-      return DimBoundSize{.baseSize = *maybeDimBoundSize, .scalable = false};
+      return DimBoundSize{/*baseSize=*/*maybeDimBoundSize,
+                          /*scalable=*/false};
     return failure();
   }
   FailureOr<DimBound> maybeDimBound =
