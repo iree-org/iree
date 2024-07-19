@@ -151,6 +151,7 @@ static iree_status_t iree_hal_hip_device_create_internal(
   device->params = *params;
   device->params.command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
   device->params.allow_inline_execution = true;
+  printf("[hip] creating device with inline execution hack..\n");
   device->hip_context = context;
   device->hip_device = hip_device;
   device->hip_dispatch_stream = dispatch_stream;
@@ -526,6 +527,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
   if (device->params.allow_inline_execution &&
       iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    printf("[hip] creating stream command buffer with inline execution hack..\n");
     // The caller has indicated the command buffer can be executed as it is
     // recorded, implying that the command buffer cannot be reused and doesn't
     // need to be persisted. This lets us lower the execution delay as we can
