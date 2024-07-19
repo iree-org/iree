@@ -149,6 +149,8 @@ static iree_status_t iree_hal_hip_device_create_internal(
   device->hip_symbols = symbols;
   device->nccl_symbols = nccl_symbols;
   device->params = *params;
+  device->params.command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
+  device->params.allow_inline_execution = true;
   device->hip_context = context;
   device->hip_device = hip_device;
   device->hip_dispatch_stream = dispatch_stream;
