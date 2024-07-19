@@ -134,7 +134,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
     ```
 
-    ## Motivation, Design Choices, and Pitfalls
+    #### Motivation, Design Choices, and Pitfalls
 
     The idea behind this operation is to decouple the layout setting/tiling
     required to target certain intrinsics from the lowering to them. Because

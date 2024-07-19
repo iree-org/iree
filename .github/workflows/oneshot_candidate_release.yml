@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
@@ -26,7 +26,7 @@ jobs:
           git tag "${tag_name}"
 
       - name: Pushing changes
-        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
+        uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: ${{ github.ref_name }}

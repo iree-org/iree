@@ -17,16 +17,12 @@
 #include <cstdint>
 #include <tuple>
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -41,15 +37,11 @@
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
@@ -596,17 +588,21 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
-  spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
-  moduleOp->setAttr(spirv::getTargetEnvAttrName(), targetAttr);
-
   if (indexBits != 32 && indexBits != 64) {
     moduleOp.emitOpError(
-        "Only 32-bit or 64-bit indices are supported for SPIR-V");
+        "only 32-bit or 64-bit indices are supported for SPIR-V");
     return signalPassFailure();
   }
-
   bool use64bitIndex = indexBits == 64;
+
+  auto targetAttr = moduleOp->getAttrOfType<spirv::TargetEnvAttr>(
+      spirv::getTargetEnvAttrName());
+  if (!targetAttr) {
+    moduleOp.emitOpError("should contain a spirv.target_env attribute");
+    return signalPassFailure();
+  }
   spirv::TargetEnv targetEnv(targetAttr);
+
   if (use64bitIndex && !targetEnv.allows(spirv::Capability::Int64)) {
     moduleOp.emitOpError(
         "64-bit indices are not supported for the specified target "

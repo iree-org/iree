@@ -19,7 +19,7 @@ We'd love to accept your patches and contributions to this project.
 ### :octicons-code-of-conduct-16: Code of conduct
 
 This project follows the
-[OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
+[LF Projects code of conduct](https://lfprojects.org/policies/code-of-conduct/).
 
 ### :octicons-law-16: Developer Certificate of Origin
 
@@ -169,25 +169,26 @@ documents official maintainers for project components.
 
 Most of the code style is derived from the
 [Google Style Guides](http://google.github.io/styleguide/) for the appropriate
-language and is generally not something we accept changes on (as clang-format
-and other linters set that for us). The C++ compiler portion of the project
-follows the
+language. The C++ compiler portion of the project follows the
 [MLIR/LLVM style guide](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide).
 
-Improvements to code structure and clarity are welcome but please file issues
-to track such work first. Pure style changes are unlikely to be accepted unless
-they are applied consistently across the project.
+We use [pre-commit](https://pre-commit.com/) to run assorted formatters and lint
+checks. The configuration file at
+[`.pre-commit-config.yaml`](https://github.com/iree-org/iree/blob/main/.pre-commit-config.yaml)
+defines which "hooks" run.
 
-??? tip - "Tip - code formatters and lint scripts"
+* To run these hooks on your local commits, follow the
+  [pre-commit installation instructions](https://pre-commit.com/#installation).
+* Individual formatters like
+  [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) (C/C++) and
+  [_Black_](https://black.readthedocs.io/en/stable/) (Python) can also be set to
+  run automatically in your editor of choice.
 
-    Formatters like
-    [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) (C/C++) and
-    [_Black_](https://black.readthedocs.io/en/stable/) (Python) can be set to
-    run automatically in your editor of choice.
+!!! note
 
-    The script at
-    [`build_tools/scripts/lint.sh`](https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh)
-    can also be used to run the full suite of lint checks.
+    Improvements to code structure and clarity are welcome but please file
+    issues to track such work first. Pure style changes are unlikely to be
+    accepted unless they are applied consistently across the project.
 
 ### :material-test-tube: Testing policy
 
@@ -264,12 +265,6 @@ All access tiers first require joining the
 
 Once you are a member of the iree-org GitHub organization, you can request to
 join any of the teams on <https://github.com/orgs/iree-org/teams>.
-
-!!! note - "Note: other GitHub organizations"
-
-    Work on IREE sometimes spans other GitHub organizations like
-    [shark-infra](https://github.com/shark-infra/). Reach out to a project
-    member if you would also like access to repositories in those organizations.
 
 ### :octicons-git-branch-16: Branch naming
 

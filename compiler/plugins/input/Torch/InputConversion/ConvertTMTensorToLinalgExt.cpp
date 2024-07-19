@@ -71,80 +71,37 @@ struct ScatterOpConversion
 };
 } // namespace
 
-static Value collapseBatches(PatternRewriter &rewriter, Location loc,
-                             Value val) {
-  auto valSizes = cast<RankedTensorType>(val.getType()).getShape();
-  int64_t newBatch =
-      std::accumulate(valSizes.begin(), valSizes.end() - 2, 1,
-                      [](int64_t x, int64_t y) { return x * y; });
-  Type elementType = cast<RankedTensorType>(val.getType()).getElementType();
-  SmallVector<int64_t> newSizes{newBatch};
-  newSizes.append(valSizes.end() - 2, valSizes.end());
-  Type newType = RankedTensorType::get(newSizes, elementType);
+static SmallVector<AffineMap>
+getStandardAttentionIndexingMaps(MLIRContext *ctx) {
+  AffineExpr m, k1, k2, n;
+  bindDims(ctx, m, k1, k2, n);
 
-  auto rank = valSizes.size();
-  SmallVector<int64_t> collapsed;
-  for (auto i = 0; i < rank - 2; i++)
-    collapsed.push_back(i);
+  AffineMap qMap =
+      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
+  AffineMap kMap =
+      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
+  AffineMap vMap =
+      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
+  AffineMap rMap =
+      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
 
-  SmallVector<ReassociationIndices> reassociation(3);
-  reassociation[0].append(collapsed);
-  reassociation[1].push_back(rank - 2);
-  reassociation[2].push_back(rank - 1);
-
-  return rewriter
-      .create<tensor::CollapseShapeOp>(loc, newType, val, reassociation)
-      .getResult();
+  return {qMap, kMap, vMap, rMap};
 }
-static Value expandBatches(PatternRewriter &rewriter, Location loc,
-                           SmallVector<int64_t> batchSizes, Value val) {
-  auto valSizes = cast<RankedTensorType>(val.getType()).getShape();
-  Type elementType = cast<RankedTensorType>(val.getType()).getElementType();
-  SmallVector<int64_t> newSizes(batchSizes);
-  newSizes.append(valSizes.end() - 2, valSizes.end());
-  auto rank = newSizes.size();
-  Type newType = RankedTensorType::get(newSizes, elementType);
 
-  SmallVector<ReassociationIndices> reassociation(3);
-  for (auto i = 0; i < batchSizes.size(); i++)
-    reassociation[0].push_back(i);
-  reassociation[1].push_back(rank - 2);
-  reassociation[2].push_back(rank - 1);
-
-  return rewriter
-      .create<tensor::ExpandShapeOp>(loc, newType, val, reassociation)
-      .getResult();
-}
 struct AttentionOpConversion
     : public OpRewritePattern<mlir::torch::TMTensor::AttentionOp> {
   using OpRewritePattern<mlir::torch::TMTensor::AttentionOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::AttentionOp op,
                                 PatternRewriter &rewriter) const override {
+    MLIRContext *ctx = getContext();
     Location loc = op->getLoc();
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
-    auto sizes = cast<RankedTensorType>(query.getType()).getShape();
-    SmallVector<int64_t> batchSizes(sizes.begin(), sizes.end() - 2);
 
-    if (sizes.size() > 3) {
-      query = collapseBatches(rewriter, loc, query);
-      key = collapseBatches(rewriter, loc, key);
-      value = collapseBatches(rewriter, loc, value);
-    }
-
-    SmallVector<int64_t> resultShape(
-        cast<RankedTensorType>(op->getResultTypes()[0]).getShape());
-    SmallVector<int64_t> collapsedResultShape;
-    collapsedResultShape.push_back(
-        std::accumulate(resultShape.begin(), resultShape.end() - 2, 1,
-                        [](int64_t x, int64_t y) { return x * y; }));
-    collapsedResultShape.append(resultShape.end() - 2, resultShape.end());
-    Type elementType = cast<RankedTensorType>(query.getType()).getElementType();
-    auto collapsedResultType =
-        RankedTensorType::get(collapsedResultShape, elementType);
-    Value collapsedResult = rewriter.create<tensor::EmptyOp>(
-        loc, collapsedResultShape, elementType);
+    ShapedType outputType = op.getOutputType();
+    Value result = rewriter.create<tensor::EmptyOp>(
+        loc, outputType.getShape(), outputType.getElementType());
 
     // TODO: This is a hack. This should be replaced with a simple getScale()
     // when support for scaling is plumbed to TMTensor on the torch-mlir side.
@@ -174,15 +131,21 @@ struct AttentionOpConversion
     Value scale = rewriter.create<arith::ConstantOp>(
         loc, targetType, rewriter.getFloatAttr(targetType, dk));
 
-    auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value, scale},
-        collapsedResult);
+    // Add batches to standard attention indexing maps.
+    SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(ctx);
+    int64_t numBatches = op.getQueryType().getRank() - 2;
+    for (AffineMap &map : indexingMaps) {
+      map = map.shiftDims(numBatches);
+      for (int batch : llvm::seq<int>(numBatches)) {
+        map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
+      }
+    }
 
-    if (sizes.size() > 3)
-      rewriter.replaceOp(
-          op, expandBatches(rewriter, loc, batchSizes, attention.getResult(0)));
-    else
-      rewriter.replaceOp(op, attention.getResult(0));
+    auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
+        loc, result.getType(), query, key, value, scale, result,
+        rewriter.getAffineMapArrayAttr(indexingMaps));
+
+    rewriter.replaceOp(op, attention.getResult(0));
     return success();
   }
 };

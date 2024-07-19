@@ -1,10 +1,9 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=valhall1 --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 // Large matmul that can match the best tiling scheme.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_1024x2048x512() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_1024x2048x512() {
     %c0 = arith.constant 0 : index
     %c2048 = arith.constant 2048 : index
     %c1024 = arith.constant 1024 : index
@@ -33,9 +32,8 @@ module {
 
 // Small matmul N that can still tile to all threads in a workgroup.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_3136x24x96() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_3136x24x96() {
     %c0 = arith.constant 0 : index
     %c24 = arith.constant 24 : index
     %c3136 = arith.constant 3136 : index
@@ -64,9 +62,8 @@ module {
 
 // Small matmul M that can still tile to all threads in a workgroup.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_196x64x192() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_196x64x192() {
     %c0 = arith.constant 0 : index
     %c64 = arith.constant 64 : index
     %c196 = arith.constant 196 : index
@@ -95,9 +92,8 @@ module {
 
 // Small matmul K that can still tile to all threads in a workgroup.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_12544x96x16() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_12544x96x16() {
     %c0 = arith.constant 0 : index
     %c96 = arith.constant 96 : index
     %c12544 = arith.constant 12544 : index
@@ -122,9 +118,8 @@ module {
 
 // Odd matmul M and small N that cannot utilize all threads in a workgroup.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_49x160x576() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_49x160x576() {
     %c0 = arith.constant 0 : index
     %c160 = arith.constant 160 : index
     %c49 = arith.constant 49 : index
@@ -153,9 +148,8 @@ module {
 
 // Small matmul M to "shift" parallelism to N.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_2x1024x576() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_2x1024x576() {
     %cst = arith.constant 0.000000e+00 : f32
     %cst_0 = arith.constant 3.000000e+00 : f32
     %cst_1 = arith.constant 6.000000e+00 : f32
@@ -190,9 +184,8 @@ module {
 
 // Large matmul with i8 inputs.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @matmul_1024x2048x512xi8() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_1024x2048x512xi8() {
     %c0 = arith.constant 0 : index
     %c2048 = arith.constant 2048 : index
     %c1024 = arith.constant 1024 : index
@@ -211,9 +204,8 @@ module {
 }
 
 // -----
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @batch_matmul_4x384x384() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @batch_matmul_4x384x384() {
     %c0 = arith.constant 0 : index
     %c384 = arith.constant 384 : index
     %c4 = arith.constant 4 : index
@@ -242,9 +234,8 @@ module {
 
 // Small batch matmul.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @batch_matmul_4x2x8() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @batch_matmul_4x2x8() {
     %c0 = arith.constant 0 : index
     %c8 = arith.constant 8 : index
     %c2 = arith.constant 2 : index
@@ -274,7 +265,6 @@ module {
 
 // Linalg.generic that is a batch matmul.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -282,7 +272,7 @@ module {
 #map4 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @generic_batch_matmul_32x2x512() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @generic_batch_matmul_32x2x512() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<8x32x64xf32>>
@@ -314,13 +304,12 @@ module {
 
 // Linalg.generic that is a batch matmul.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 module {
-  func.func @generic_batch_matmul_8x2500x512x4608() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @generic_batch_matmul_8x2500x512x4608() {
     %c168607744 = arith.constant 168607744 : index
     %c537247744 = arith.constant 537247744 : index
     %c0 = arith.constant 0 : index

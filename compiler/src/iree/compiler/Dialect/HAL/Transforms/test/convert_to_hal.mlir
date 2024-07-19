@@ -75,6 +75,8 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
 
+  // CHECK: %[[NULL_FENCE:.+]] = util.null : !hal.fence
+
   // CHECK: %[[ARG0_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG0]] : !hal.buffer_view> : !hal.buffer
 
   // (annoyingly out of order)
@@ -172,10 +174,9 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
   } => !stream.timepoint
 
-  // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: hal.device.queue.execute<%[[DEVICE]]
-  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: wait(%[[NULL_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: commands([%[[CMD]]])
 

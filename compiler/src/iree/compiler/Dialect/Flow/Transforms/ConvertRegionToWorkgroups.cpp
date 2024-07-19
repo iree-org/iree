@@ -18,9 +18,6 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_CONVERTREGIONTOWORKGROUPSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
-
 namespace {
 
 /// Compute the dynamic dims of the given value and add them to the vector.
@@ -255,27 +252,5 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.replaceOp(regionOp, workgroupsOp.getResults());
   return workgroupsOp;
 }
-
-namespace {
-struct ConvertRegionToWorkgroupsPass
-    : public IREE::Flow::impl::ConvertRegionToWorkgroupsPassBase<
-          ConvertRegionToWorkgroupsPass> {
-  void runOnOperation() override {
-    SmallVector<IREE::Flow::DispatchRegionOp> ops;
-    getOperation()->walk(
-        [&](IREE::Flow::DispatchRegionOp op) { ops.push_back(op); });
-
-    IRRewriter rewriter(getOperation()->getContext());
-    for (IREE::Flow::DispatchRegionOp regionOp : ops) {
-      if (failed(rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp,
-                                                                   rewriter))) {
-        signalPassFailure();
-        return;
-      }
-    }
-  }
-};
-
-} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Flow

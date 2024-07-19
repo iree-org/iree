@@ -20,7 +20,7 @@ def IREEGPU_Dialect : Dialect {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let summary = [{
-    A dialect representing attributes used by GPU focused IREE code generation.
+    A dialect for common functionality used by GPU focused IREE code generation.
   }];
   let description = [{
     This dialect provides operations and attributes to aid in code generation

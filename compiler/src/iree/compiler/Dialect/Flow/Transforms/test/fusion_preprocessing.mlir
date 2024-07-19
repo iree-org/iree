@@ -1,29 +1,5 @@
 // RUN: iree-opt --iree-flow-fusion-preprocessing --split-input-file %s | FileCheck %s
 
-// CHECK: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
-// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d0, d1)>
-// CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d0, d1)>
-//      CHECK: util.func public @interchange
-//      CHECK:   linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
-util.func public @interchange(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>, %arg2: tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
-  %0 = linalg.generic {indexing_maps = [
-    affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,
-    affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
-    affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>],
-    iterator_types = ["reduction", "parallel", "parallel", "parallel"]}
-  ins(%arg0, %arg1 : tensor<?x?x?xf32>, tensor<?x?x?xf32>)
-  outs(%arg2 : tensor<?x?x?xf32>) {
-  ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-    %m = arith.mulf %arg3, %arg4 : f32
-    %a = arith.addf %arg5, %m : f32
-    linalg.yield %a : f32
-  } -> tensor<?x?x?xf32>
-  util.return %0 : tensor<?x?x?xf32>
-}
-
-// -----
-
 util.func public @fold_insert_slices(%source : tensor<?x?xf32>,
     %dest0 : tensor<?x?xf32>, %dest1 : tensor<?x?xf32>, %val: f32,
     %o1 : index, %o2 : index, %o3 : index, %o4 : index,
@@ -138,3 +114,23 @@ util.func public @fuse_generic_gather2(
 // CHECK-NEXT:    %[[RES3:[a-zA-Z0-9]+]] = arith.mulf %[[RES]], %[[RES]] : f32
 // CHECK-NEXT:    %[[RES4:[a-zA-Z0-9]+]] = arith.addf %[[RES2]], %[[RES3]] : f32
 // CHECK-NEXT:    linalg.yield %[[RES4]] : f32
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
+util.func @output_transpose_map(%arg0: tensor<2x128x128x320xf32>) -> tensor<2x320x128x128xf16> {
+  %0 = tensor.empty() : tensor<2x320x128x128xf16>
+  %1 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<2x128x128x320xf32>) outs(%0 : tensor<2x320x128x128xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %2 = arith.truncf %in : f32 to f16
+    linalg.yield %2 : f16
+  } -> tensor<2x320x128x128xf16>
+  util.return %1 : tensor<2x320x128x128xf16>
+}
+
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-LABEL: util.func public @output_transpose_map
+// CHECK:         linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$MAP0]], #[[$MAP1]]]

@@ -51,6 +51,7 @@ iree_lit_test_suite(
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
+    "propagate_reshapes_by_expansion.mlir"
     "reconcile_translation_info.mlir"
     "reductions.mlir"
     "rematerialize_parallel_ops.mlir"
@@ -62,7 +63,6 @@ iree_lit_test_suite(
     "tile_and_distribute_to_workgroups.mlir"
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
-    "transform_distribute_lane_forall.mlir"
     "transform_flatten_forall.mlir"
     "transform_hoist_forall.mlir"
     "transform_match_partial_reduction.mlir"
@@ -71,6 +71,7 @@ iree_lit_test_suite(
     "type_propagation.mlir"
     "type_propagation_packing.mlir"
     "vector_layout_analysis.mlir"
+    "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
     "workgroup_specialization.mlir"
   TOOLS

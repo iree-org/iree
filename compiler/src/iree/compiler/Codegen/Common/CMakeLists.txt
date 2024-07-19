@@ -120,6 +120,7 @@ iree_cc_library(
     "PassUtils.cpp"
     "Passes.cpp"
     "PolynomialApproximationPass.cpp"
+    "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
@@ -132,6 +133,7 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
+    "VectorizeMemrefCopy.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
@@ -171,6 +173,7 @@ iree_cc_library(
     MLIRSCFTransforms
     MLIRSCFUtils
     MLIRSideEffectInterfaces
+    MLIRSubsetOpInterface
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms

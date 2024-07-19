@@ -103,7 +103,7 @@ jobs:
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading install dir archive"
@@ -169,7 +169,7 @@ jobs:
       EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           # We need the full history (and main branch) to generate the report.
           fetch-depth: 0
@@ -262,7 +262,7 @@ jobs:
       - process_benchmark_results
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: Getting failed jobs
         id: failed_jobs
         run: |
@@ -288,7 +288,7 @@ jobs:
         run: |
           envsubst < ./.github/workflows/ARTIFACT_SUMMARY_TEMPLATE.md >> "${GITHUB_STEP_SUMMARY}"
       - name: Posting to Discord
-        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
+        uses: sarisia/actions-status-discord@v1.14.3
         if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

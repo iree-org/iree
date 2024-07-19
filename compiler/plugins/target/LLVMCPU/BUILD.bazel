@@ -64,6 +64,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArmNeonDialect",
         "@llvm-project//mlir:ArmSMEDialect",
         "@llvm-project//mlir:ArmSMEToLLVMIRTranslation",
+        "@llvm-project//mlir:ArmSVEDialect",
+        "@llvm-project//mlir:ArmSVEToLLVMIRTranslation",
         "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
@@ -109,6 +111,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Analysis",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",

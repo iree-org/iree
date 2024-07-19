@@ -2,7 +2,12 @@
 
 // Odd K that forbids vectorization.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 module {
   func.func @batch_matmul_1x3x32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index
@@ -34,7 +39,12 @@ module {
 
 // 8-bit integers can be vectorized.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 module {
   func.func @matmul_64x16xi8() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index
@@ -65,7 +75,12 @@ module {
 
 // Vectorize non-32 bit types.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, Int64], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int64|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 module {
   func.func @matmul_64x16xi64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index
@@ -96,7 +111,12 @@ module {
 
 // Odd N that forbids vectorization.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module {
@@ -138,7 +158,12 @@ module {
 
 // Odd M and non-4-multiplier N
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module {
@@ -180,7 +205,12 @@ module {
 
 // Matmul with consumer pointwise ops
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @matmul_pointwise_256x1024() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {

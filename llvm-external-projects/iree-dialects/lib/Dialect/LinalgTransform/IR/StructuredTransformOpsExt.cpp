@@ -427,7 +427,7 @@ DiagnosedSilenceableFailure transform_ext::MatchCallbackOp::apply(
 
 void transform_ext::MatchCallbackOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  mlir::transform::onlyReadsHandle(getInputs(), effects);
+  mlir::transform::onlyReadsHandle(getInputsMutable(), effects);
   mlir::transform::producesHandle(getOutputs(), effects);
   // TODO: it doesn't really modify the payload, we need a separate resource for
   // this mapping.
@@ -919,9 +919,8 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
 
 void transform_ext::TakeFirstOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  mlir::transform::onlyReadsHandle(getInputs(), effects);
-  mlir::transform::producesHandle(getFirst(), effects);
-  mlir::transform::producesHandle(getRest(), effects);
+  mlir::transform::onlyReadsHandle(getInputsMutable(), effects);
+  mlir::transform::producesHandle(getOperation()->getOpResults(), effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -940,6 +939,6 @@ DiagnosedSilenceableFailure transform_ext::EmitRemarkOp::applyToOne(
 
 void transform_ext::EmitRemarkOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  mlir::transform::onlyReadsHandle(getHandle(), effects);
+  mlir::transform::onlyReadsHandle(getHandleMutable(), effects);
   mlir::transform::onlyReadsPayload(effects);
 }

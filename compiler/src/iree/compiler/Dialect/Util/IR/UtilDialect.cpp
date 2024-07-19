@@ -127,7 +127,9 @@ UtilDialect::UtilDialect(MLIRContext *context)
 
 Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
-  if (arith::ConstantOp::isBuildableWith(value, type)) {
+  if (isa<IREE::Util::NullAttr>(value)) {
+    return builder.create<IREE::Util::NullOp>(loc, type);
+  } else if (arith::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
   }
   return nullptr;

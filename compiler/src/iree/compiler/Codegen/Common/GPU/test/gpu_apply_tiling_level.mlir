@@ -1,7 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 
-#config = #iree_gpu.lowering_config<{thread = [2, 16]}>
+#config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @add_tensor() {
@@ -34,6 +35,48 @@ module {
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+
+// SUBGROUP-LABEL: func.func @add_tensor
+//       SUBGROUP:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (2, 16)
+//       SUBGROUP:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
+//       SUBGROUP:     scf.forall.in_parallel
+//       SUBGROUP:   mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @sequential_forall_mappings() {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x256xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x256xf32>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x256xf32>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0], sizes = [4, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x256xf32>> -> tensor<4x256xf32>
+    %4 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0], sizes = [4, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x256xf32>> -> tensor<4x256xf32>
+    %5 = flow.dispatch.tensor.load %2, offsets = [%c0, %c0], sizes = [4, 256], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<4x256xf32>> -> tensor<4x256xf32>
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    flow.dispatch.tensor.store %6, %2, offsets = [%c0, %c0], sizes = [4, 256], strides = [1, 1] : tensor<4x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x256xf32>>
+    return
+  }
+}
+
+// Verify that no loops are generated without a reduction configuration.
+// CHECK-LABEL: func.func @sequential_forall_mappings
+//   CHECK-NOT:   scf.for
+
+// THREAD-LABEL: func.func @sequential_forall_mappings
+//       THREAD:   scf.forall ({{.*}}) = (0) to (256) step (16)
+//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<4x16xf32>, tensor<4x16xf32>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
 
 // -----
 
@@ -191,3 +234,40 @@ module {
 //   THREAD-DAG:       %[[LHS:.+]] = tensor.extract_slice %[[A]]
 //   THREAD-DAG:       %[[RHS:.+]] = tensor.extract_slice %[[B]]
 //       THREAD:       %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_add_tensor()
+      attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [16, 32, 1] subgroup_size = 64, {}>} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x256xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x256xf32>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0], sizes = [64, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x256xf32>> -> tensor<64x256xf32>
+    %4 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0], sizes = [64, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x256xf32>> -> tensor<64x256xf32>
+    %5 = flow.dispatch.tensor.load %2, offsets = [%c0, %c0], sizes = [64, 256], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<64x256xf32>> -> tensor<64x256xf32>
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<64x256xf32>, tensor<64x256xf32>) outs(%5 : tensor<64x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<64x256xf32>
+    flow.dispatch.tensor.store %6, %2, offsets = [%c0, %c0], sizes = [64, 256], strides = [1, 1] : tensor<64x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x256xf32>>
+    return
+  }
+}
+
+// Verify that no loops are generated without a reduction configuration.
+// CHECK-LABEL: func.func @inferred_add_tensor
+//   CHECK-NOT:   scf.for
+
+// THREAD-LABEL: func.func @inferred_add_tensor
+//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (8, 4)
+//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]

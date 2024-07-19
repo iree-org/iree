@@ -31,12 +31,12 @@ iree_lit_test_suite(
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
     "peel.mlir"
+    "pipeline_arm_sme_streaming_mode_tests.mlir"
     "pipeline_pack_unpack_tests.mlir"
     "pipeline_pad_conv_tests.mlir"
     "pipeline_pad_tests.mlir"
     "pipeline_peel_and_vectorize_tests.mlir"
     "pipeline_split_reduction_tests.mlir"
-    "pipeline_ssve_tests.mlir"
     "pipeline_tests.mlir"
     "pipeline_transpose_avx2_tests.mlir"
     "pipeline_vector_masking_tests.mlir"
@@ -61,6 +61,7 @@ iree_lit_test_suite(
     "vector_transpose_lowering.mlir"
     "vectorize_with_masking_and_hoist.mlir"
     "verify_linalg_transform_legality.mlir"
+    "verify_vector_size_legality.mlir"
   TOOLS
     FileCheck
     iree-compile

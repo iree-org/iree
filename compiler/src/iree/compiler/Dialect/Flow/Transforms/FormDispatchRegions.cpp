@@ -226,7 +226,7 @@ static bool isRootOp(Operation *op) {
     return false;
   }
   // Dequantization-like ops get cloned into dispatches later.
-  if (isDequantizationLikeOp(op)) {
+  if (isBitExtendOp(op)) {
     return false;
   }
   // Any Linalg named op or generic op with reduction iterator types is a root
@@ -539,7 +539,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  if (isDequantizationLikeOp(consumer)) {
+  if (isBitExtendOp(consumer)) {
     return false;
   }
 
@@ -636,10 +636,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
-  auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
-  auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
-  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
-    return false;
+  if (!options.aggressiveFusion) {
+    auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
+    auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+      return false;
+    }
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
@@ -872,7 +874,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
+          isa<linalg::FillOp>(op) || isBitExtendOp(&op)) {
         continue;
       }
 

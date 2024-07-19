@@ -147,7 +147,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
       TypeConverter::SignatureConversion result(newRegion->getNumArguments());
       (void)getTypeConverter()->convertSignatureArgs(
           newRegion->getArgumentTypes(), result);
-      rewriter.applySignatureConversion(newRegion, result);
+      rewriter.applySignatureConversion(&newRegion->front(), result);
     }
 
     Operation *newOp = rewriter.create(state);

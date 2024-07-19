@@ -11,17 +11,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/IRMapping.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchTypes.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionDialect.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
-#include "torch-mlir/Dialect/TorchConversion/Transforms/BackendTypeConversion.h"
 
 namespace Torch = mlir::torch::Torch;
 namespace TorchConversion = mlir::torch::TorchConversion;
@@ -103,8 +100,18 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
   if (isa<TensorType>(ty))
     return possibleTorchTensor;
 
+  if (auto defining = dyn_cast_or_null<TorchConversion::FromBuiltinTensorOp>(
+          possibleTorchTensor.getDefiningOp())) {
+    return defining.getOperand();
+  }
+
   Torch::ValueTensorType vtensorType = cast<Torch::ValueTensorType>(ty);
   TensorType builtinTy = vtensorType.toBuiltinTensor();
+  if (auto intTy = dyn_cast<IntegerType>(builtinTy.getElementType())) {
+    builtinTy =
+        builtinTy.clone(builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+  }
+
   return builder.create<TorchConversion::ToBuiltinTensorOp>(
       possibleTorchTensor.getLoc(), builtinTy, possibleTorchTensor);
 }
@@ -357,6 +364,11 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
     builtinTensorType = tType;
   } else if (auto vtType = dyn_cast<Torch::ValueTensorType>(torchType)) {
     builtinTensorType = vtType.toBuiltinTensor();
+    if (auto intTy =
+            dyn_cast<IntegerType>(builtinTensorType.getElementType())) {
+      builtinTensorType = builtinTensorType.clone(
+          builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+    }
   } else {
     return emitError(loc) << "unsupported immutable tensor argument: "
                           << torchType;

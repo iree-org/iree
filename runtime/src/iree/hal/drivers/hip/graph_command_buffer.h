@@ -28,7 +28,7 @@ typedef struct iree_hal_hip_tracing_context_t iree_hal_hip_tracing_context_t;
 // NOTE: the |block_pool| must remain live for the lifetime of the command
 // buffers that use it.
 iree_status_t iree_hal_hip_graph_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     iree_hal_hip_tracing_context_t* tracing_context, hipCtx_t context,
     iree_hal_command_buffer_mode_t mode,
@@ -43,6 +43,11 @@ bool iree_hal_hip_graph_command_buffer_isa(
 
 // Returns the native HIP graph associated to the command buffer.
 hipGraphExec_t iree_hal_hip_graph_command_buffer_handle(
+    iree_hal_command_buffer_t* command_buffer);
+
+// This is to be called after the given |command_buffer| has been submitted
+// in order to notify the tracing system that there are events to collect.
+void iree_hal_hip_graph_tracing_notify_submitted_commands(
     iree_hal_command_buffer_t* command_buffer);
 
 #ifdef __cplusplus

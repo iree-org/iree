@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "amdgpu_chained_matmul.mlir",
             "amdgpu_contraction_distribution.mlir",
+            "amdgpu_set_anchor_layouts.mlir",
             "attention.mlir",
             "attention_mfma.mlir",
             "conv_pipeline_test_cuda.mlir",

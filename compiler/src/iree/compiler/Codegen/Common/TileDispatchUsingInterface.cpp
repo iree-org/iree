@@ -65,6 +65,19 @@ getDistributeLBAndStep(OpBuilder &b, Location loc, OpFoldResult lb,
   return {distributeLB, distributeStep};
 }
 
+// Helper function to change arith.constant to i64 attribute.
+static void changeArithCstToI64Attr(OpBuilder &b,
+                                    MutableArrayRef<OpFoldResult> constants) {
+  for (OpFoldResult &val : constants) {
+    if (auto dyn_cast = llvm::dyn_cast_if_present<Value>(val)) {
+      APInt intVal;
+      if (matchPattern(dyn_cast, m_ConstantInt(&intVal))) {
+        val = b.getI64IntegerAttr(intVal.getSExtValue());
+      }
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // TileDispatchUsingSCFForOp implementation.
 //===----------------------------------------------------------------------===//
@@ -166,6 +179,13 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     loops.push_back(loop);
     builder.setInsertionPoint(loop.getBody()->getTerminator());
   }
+
+  // Update the sizes if it contains arith.index with i64 attrs.
+  // TODO: tensor.extract_slice is unable to determine the
+  // result type if arith.constant is present. This is a workaround
+  // to ensure that the result type is determined.
+  changeArithCstToI64Attr(builder, sizes);
+
   return loops;
 }
 

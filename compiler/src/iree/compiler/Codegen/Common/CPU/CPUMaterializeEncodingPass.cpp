@@ -114,8 +114,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
-      rhs.isSignlessInteger(8) && out.isSignlessInteger(32)) {
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
           TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
@@ -134,8 +134,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
-      rhs.isSignlessInteger(4) && out.isSignlessInteger(32)) {
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
           TileMxNxK{4, 8, 16},
@@ -156,45 +156,6 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
         TileMxNxK{2, 16, 2},
         TileMxNxK{1, 16, 2},
     };
-  }
-
-  if (!hasUkernel(target)) {
-    if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
-      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
-        return {
-            TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
-            TileMxNxK{4, 8, 8}, // Truncation of the above.
-            TileMxNxK{2, 8, 8}, // Truncation of the above.
-            TileMxNxK{1, 8, 8}, // Truncation of the above.
-        };
-      }
-
-      // Default.
-      return {
-          TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
-          TileMxNxK{4, 8, 1}, // Truncation of the above.
-          TileMxNxK{2, 8, 1}, // Truncation of the above.
-          TileMxNxK{1, 8, 1}, // Truncation of the above.
-      };
-    }
-    if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
-      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
-        return {
-            TileMxNxK{4, 8, 32},
-            TileMxNxK{2, 8, 32},
-            TileMxNxK{1, 8, 32},
-        };
-      }
-
-      // Default.
-      return {
-          TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
-          TileMxNxK{2, 32, 1}, // Truncation of the above.
-          TileMxNxK{1, 64, 1}, // Truncation of the above.
-      };
-    }
   }
 
   // Fallback - no architecture-optimized tile size for this case.
@@ -230,23 +191,13 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
       // reconsider when taking advantage of native f16/bf16 arithmetic when the
       // accumulator itself is f16/bf16.
       if (hasFeature(target, "+avx512f")) {
-        if (hasUkernel(target)) {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 16, 1},  // Truncation of the above.
-              TileMxNxK{4, 16, 1},  // Truncation of the above.
-              TileMxNxK{2, 16, 1},  // Truncation of the above.
-              TileMxNxK{1, 16, 1},  // Truncation of the above.
-          };
-        } else {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 32, 1},  // Use same number of accumulators.
-              TileMxNxK{4, 64, 1},  // Use same number of accumulators.
-              TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
-              TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
-          };
-        }
+        return {
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 16, 1},  // Truncation of the above.
+            TileMxNxK{4, 16, 1},  // Truncation of the above.
+            TileMxNxK{2, 16, 1},  // Truncation of the above.
+            TileMxNxK{1, 16, 1},  // Truncation of the above.
+        };
       }
       if (hasFeature(target, "+avx")) {
         // Note: for good performance, most +avx users will also want to add
@@ -334,7 +285,7 @@ static TileMxNxK
 chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
                  int64_t matmulNarrowN,
                  ArrayRef<int64_t> hostDefinedUpperBound = {}) {
-  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() == 3) &&
+  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
          "expected hostDefinedUpperBound is empty or has upper bound for {M, "
          "N, K}");
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
@@ -498,20 +449,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  // Check if the encoding specifies static narrow sizes for the M/N dimensions.
-  // This can be used to choose a correspondingly narrow tile shape.
-  // With microkernels, we keep this logic in sync with the set of actual
-  // optimized microkernel tile functions to avoid a tile shape specialization
-  // causing a fallback to a slow generic tile function. At the moment,
-  // microkernel tile functions are only specialize for narrow M, not for narrow
-  // N. Accordingly, we leave matmulNarrowN as 0 (default) when microkernels are
-  // used. Generally it would be best to deal with narrow-N cases by transposing
-  // the whole matmul and swapping LHS<->RHS, reducing the narrow-N case to
-  // narrow-M.
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
-                              ? 0
-                              : getIntOrZero(encoding.getMatmulNarrow_N());
+  int64_t matmulNarrowN = getIntOrZero(encoding.getMatmulNarrow_N());
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
@@ -519,7 +458,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
                        encoding.getRoundDimsToArray());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
-  // based on its role in the matmul.
+  // based on its operand index in the matmul.
   auto rank = tensorType.getRank();
   return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }

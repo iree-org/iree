@@ -36,7 +36,11 @@ typedef enum iree_vm_function_linkage_e {
   // Function is an export from the module.
   IREE_VM_FUNCTION_LINKAGE_EXPORT = 2,
   // Function is an import from another module that may be unavailable.
+  // This is a hint that failures should be lightweight/not reported.
   IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL = 3,
+  // Function is an export from the module that may be unavailable.
+  // This is a hint that failures should be lightweight/not reported.
+  IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL = 4,
 } iree_vm_function_linkage_t;
 
 // A function reference that can be used with the iree_vm_function_* methods.

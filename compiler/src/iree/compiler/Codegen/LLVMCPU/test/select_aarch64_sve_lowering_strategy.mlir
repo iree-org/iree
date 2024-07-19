@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' \
 // RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefixes=CHECK,WITH-SME
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' \
-// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file  --iree-experimental-llvmcpu-arm-force-ssve=true %s | FileCheck %s --check-prefixes=CHECK,SSVE-WITHOUT-SME
+// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file --iree-llvmcpu-disable-arm-sme-tiling %s | FileCheck %s --check-prefixes=CHECK,DISABLE-ARM-SME
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 module {
@@ -101,12 +101,12 @@ module {
   }
 }
 
-//  SSVE-WITHOUT-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
-//  SSVE-WITHOUT-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      SSVE-WITHOUT-SME: func.func @matmul_tensors()
-//  SSVE-WITHOUT-SME-SAME:     translation_info = #[[TRANSLATION]]
-//       SSVE-WITHOUT-SME: linalg.matmul
-//  SSVE-WITHOUT-SME-SAME:     lowering_config = #[[CONFIG]]
+//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//  DISABLE-ARM-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      DISABLE-ARM-SME: func.func @matmul_tensors()
+//  DISABLE-ARM-SME-SAME:     translation_info = #[[TRANSLATION]]
+//       DISABLE-ARM-SME: linalg.matmul
+//  DISABLE-ARM-SME-SAME:     lowering_config = #[[CONFIG]]
 
 //   WITH-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], {{\[}}[8], [8], 0], [0, 0, 1], [0, 0, 0]]>
 //   WITH-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>

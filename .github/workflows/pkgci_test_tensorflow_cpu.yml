@@ -28,14 +28,14 @@ jobs:
       IREE_VMVX_DISABLE: 0
     steps:
       - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: false
-      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
+      - uses: actions/setup-python@v5.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
-          python-version: '3.11'
-      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}

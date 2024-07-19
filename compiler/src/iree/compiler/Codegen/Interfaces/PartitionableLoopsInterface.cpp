@@ -254,8 +254,13 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         AllParallelAsPartitionableLoops<
             IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    IREE::LinalgExt::Im2colOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::Im2colOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::AttentionOp>>(*ctx);
+    IREE::LinalgExt::OnlineAttentionOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::OnlineAttentionOp>>(
+        *ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PackOp::attachInterface<

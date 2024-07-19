@@ -3,7 +3,12 @@
 // RUN:   --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -21,7 +26,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -39,7 +49,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 128], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -57,7 +72,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -75,7 +95,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [8, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -93,7 +118,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [15, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -111,7 +141,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -129,7 +164,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -147,7 +187,13 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+    mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -170,7 +216,13 @@ module {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+    mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -194,7 +246,13 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+    mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [256, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -218,7 +276,13 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+    mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -242,7 +306,13 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+    mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -266,7 +336,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
@@ -315,7 +390,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
@@ -364,7 +444,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0) -> (d0 * 2)>
@@ -413,7 +498,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -431,7 +521,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+}>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {

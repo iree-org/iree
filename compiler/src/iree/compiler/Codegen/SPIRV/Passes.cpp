@@ -18,7 +18,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -29,12 +28,13 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -183,10 +183,9 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createPadDynamicAlloc);
 
   // Check to make sure we are not exceeding shared memory usage limit.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface func) {
-    auto moduleOp = func->getParentOfType<ModuleOp>();
-    spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
-    return target.getResourceLimits().getMaxComputeSharedMemorySize();
+  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface fn) {
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(fn);
+    return target.getWgp().getMaxWorkgroupMemoryBytes();
   };
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
@@ -252,10 +251,12 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
+  modulePassManager.addPass(createSPIRVConvertGPUTargetPass());
   modulePassManager.addPass(createConvertToSPIRVPass(clSPIRVIndexingBits));
 
   auto getTargetEnv = [](spirv::ModuleOp moduleOp) {
-    return getSPIRVTargetEnvAttr(moduleOp);
+    return moduleOp->getParentOfType<mlir::ModuleOp>()
+        ->getAttrOfType<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
   };
 
   OpPassManager &spirvModulePassManager =
@@ -599,8 +600,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   auto getWarpSize = [](mlir::FunctionOpInterface func) -> int {
     // TODO: This kind of call back function is a really really bad idea
     // This should be easier to resolve than doing this.
-    std::optional<int64_t> subgroupSize = getSPIRVSubgroupSize(func);
-    return subgroupSize.value_or(32);
+    return *getGPUSubgroupSize(func, /*pickLargest=*/true);
   };
 
   // Handle vector reduction operations specifically.
@@ -623,9 +623,9 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+    addEncodingToNopPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-
   modulePassManager.addPass(createSPIRVSelectLoweringStrategyPass());
 }
 

@@ -124,7 +124,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -348,7 +348,7 @@ void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
 
 void transform_dialect::VectorWarpDistributionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -638,7 +638,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
 
 void transform_dialect::VectorToMMAConversionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -782,7 +782,7 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
 
 void transform_dialect::SynchronizeLoopOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getForOp(), effects);
+  transform::onlyReadsHandle(getForOpMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -801,7 +801,7 @@ DiagnosedSilenceableFailure transform_dialect::SynchronizeLoopOp::applyToOne(
 
 void transform_dialect::CreateAsyncGroupsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1445,7 +1445,7 @@ transform_dialect::PackSharedMemoryAllocOp::applyToOne(
 
 void transform_dialect::PackSharedMemoryAllocOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1512,8 +1512,8 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1647,6 +1647,7 @@ transform_dialect::SetContractionLayoutAttributes::apply(
              << "invalid opaque mma layout for annotation " << mmaType;
     }
 
+    contract->setAttr("iree.amdgpu.mma", mmaType);
     auto [aLayout, bLayout, cLayout] = *maybeLayouts;
     contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
     contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);
@@ -1689,8 +1690,8 @@ transform_dialect::SetContractionLayoutAttributes::apply(
 
 void transform_dialect::SetContractionLayoutAttributes::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::onlyReadsHandle(getMmaType(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::onlyReadsHandle(getMmaTypeMutable(), effects);
   transform::modifiesPayload(effects);
 }
 

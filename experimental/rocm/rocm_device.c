@@ -238,9 +238,9 @@ static iree_status_t iree_hal_rocm_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_direct_command_buffer_create(
-      base_device, &device->context_wrapper, device->tracing_context, mode,
-      command_categories, queue_affinity, binding_capacity, &device->block_pool,
-      out_command_buffer);
+      iree_hal_device_allocator(base_device), &device->context_wrapper,
+      device->tracing_context, mode, command_categories, queue_affinity,
+      binding_capacity, &device->block_pool, out_command_buffer);
 }
 
 static iree_status_t iree_hal_rocm_device_create_descriptor_set_layout(
@@ -385,7 +385,8 @@ static iree_status_t iree_hal_rocm_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   // TODO(raikonenfnu): Once semaphore is implemented wait for semaphores
   // TODO(thomasraoux): implement semaphores - for now this conservatively

@@ -549,10 +549,10 @@ void HalDevice::QueueExecute(py::handle command_buffers,
     cb_list[i] = py::cast<HalCommandBuffer*>(command_buffers[i])->raw_ptr();
   }
 
-  CheckApiStatus(
-      iree_hal_device_queue_execute(raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY,
-                                    wait_list, signal_list, cb_count, cb_list),
-      "executing command buffers");
+  CheckApiStatus(iree_hal_device_queue_execute(
+                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
+                     signal_list, cb_count, cb_list, /*binding_tables=*/NULL),
+                 "executing command buffers");
 }
 
 void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
@@ -905,29 +905,40 @@ std::vector<std::string> HalDriver::Query() {
   return driver_names;
 }
 
-py::object HalDriver::Create(const std::string& device_uri,
-                             py::dict& driver_cache) {
-  iree_string_view_t driver_name, device_path, params_str;
+HalDriver::DeviceUri::DeviceUri(const std::string& device_uri) {
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
+}
 
-  // Check cache.
-  py::str cache_key(driver_name.data, driver_name.size);
+py::object HalDriver::Create(const DeviceUri& device_uri) {
+  iree_hal_driver_t* driver;
+  CheckApiStatus(iree_hal_driver_registry_try_create(
+                     iree_hal_driver_registry_default(), device_uri.driver_name,
+                     iree_allocator_system(), &driver),
+                 "Error creating driver");
+
+  py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
+  return driver_obj;
+}
+
+py::object HalDriver::Create(const std::string& device_uri) {
+  DeviceUri parsed_uri(device_uri);
+  return HalDriver::Create(parsed_uri);
+}
+
+py::object HalDriver::Create(const std::string& device_uri,
+                             py::dict& driver_cache) {
+  // Look up the driver by driver name in the cache, and return it if found.
+  DeviceUri parsed_uri(device_uri);
+  py::str cache_key(parsed_uri.driver_name.data, parsed_uri.driver_name.size);
   py::object cached = driver_cache.attr("get")(cache_key);
   if (!cached.is_none()) {
     return cached;
   }
 
-  // Create.
-  iree_hal_driver_t* driver;
-  CheckApiStatus(iree_hal_driver_registry_try_create(
-                     iree_hal_driver_registry_default(), driver_name,
-                     iree_allocator_system(), &driver),
-                 "Error creating driver");
-
-  // Cache.
-  py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
+  // Create a new driver and put it in the cache.
+  py::object driver_obj = HalDriver::Create(parsed_uri);
   driver_cache[cache_key] = driver_obj;
   return driver_obj;
 }
@@ -1026,7 +1037,8 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   std::vector<iree_string_pair_t> params;
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_device_by_id(
-                     raw_ptr(), device_id, params.size(), &params.front(),
+                     raw_ptr(), device_id, params.size(),
+                     (params.empty() ? nullptr : &params.front()),
                      iree_allocator_system(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
@@ -1288,6 +1300,14 @@ void SetupHalBindings(nanobind::module_ m) {
                                  const_cast<py::dict&>(driver_cache));
       },
       py::arg("device_uri"));
+
+  m.def(
+      "create_hal_driver",
+      [](std::string device_uri) { return HalDriver::Create(device_uri); },
+      py::arg("device_uri"));
+
+  m.def("clear_hal_driver_cache",
+        [driver_cache]() { const_cast<py::dict&>(driver_cache).clear(); });
 
   py::class_<HalAllocator>(m, "HalAllocator")
       .def("trim",
@@ -1673,8 +1693,11 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_copy_buffer(
-                    self.raw_ptr(), source_buffer.raw_ptr(), source_offset,
-                    target_buffer.raw_ptr(), target_offset, resolved_length),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(source_buffer.raw_ptr(),
+                                             source_offset, resolved_length),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length)),
                 "copy command");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
@@ -1709,8 +1732,10 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_fill_buffer(
-                    self.raw_ptr(), target_buffer.raw_ptr(), target_offset,
-                    resolved_length, pattern_view.buf, pattern_view.len),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length),
+                    pattern_view.buf, pattern_view.len),
                 "command buffer fill");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),

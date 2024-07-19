@@ -14,10 +14,8 @@
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 32]
 >
 
 // B: shape = 8x32, layout = layoutB
@@ -28,8 +26,8 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 // C: shape = 32x32, layout = layoutC
@@ -40,8 +38,8 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
@@ -101,10 +99,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [16, 4],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [16, 4]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 16]
 >
 
 // B: shape = 16x16, layout = layoutB
@@ -115,8 +111,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 16],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [4, 16]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
 >
 
 // C: shape = 16x16, layout = layoutB
@@ -179,10 +175,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 32]
 >
 
 // B: shape = 8x32, layout = layoutB
@@ -193,8 +187,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 // C: shape = 64x32, layout = layoutC
@@ -205,8 +199,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vector<8x32xf16>, %c : vector<64x32xf32>) -> vector<64x32xf32> {
@@ -268,10 +262,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 32]
 >
 
 // B: shape = 16x32, layout = layoutB
@@ -282,8 +274,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides         = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 // C: shape = 32x32, layout = layoutC
@@ -294,8 +286,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides         = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vector<16x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
@@ -351,10 +343,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 32]
 >
 
 // B: shape = 8x96, layout = layoutB
@@ -365,8 +355,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 // C: shape = 64x96, layout = layoutC
@@ -377,8 +367,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b : vector<8x96xf16>, %c : vector<64x96xf32>) -> vector<64x96xf32> {
@@ -442,10 +432,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 32]
 >
 
 // B: shape = 64x8, layout = layoutB
@@ -456,10 +444,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [32, 2]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 // C: shape = 32x64, layout = layoutC
@@ -470,8 +456,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [32, 1]
 >
 
 func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8xf16>, %c : vector<32x64xf32>) -> vector<32x64xf32> {
@@ -523,10 +509,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [16, 1],
   elements_per_thread     = [1, 16],
 
-  thread_order            = [1, 0],
-
-  subgroup_basis          = [1, 1],
-  thread_basis            = [1, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 16]
 >
 
 // B: shape = 16x16, layout = layoutB
@@ -537,8 +521,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [1, 16],
   elements_per_thread     = [16, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [1, 32]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
 >
 
 // C: shape = 16x16, layout = layoutC
@@ -549,8 +533,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 16],
   elements_per_thread     = [1, 1],
 
-  subgroup_basis          = [1, 1],
-  thread_basis            = [2, 16]
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
 >
 
 func.func @contract_to_wmma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {

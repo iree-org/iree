@@ -28,7 +28,11 @@ def GPUCreateFastSlowPathPass :
 def GPUDistributePass :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";
-  let dependentDialects = ["::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect"];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
 }
 
 def GPUDistributeSharedMemoryCopyPass :
@@ -96,6 +100,17 @@ def GPUPipeliningPass :
   ];
 }
 
+def GPUPromoteMatmulOperandsPass :
+    InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to insert copies with a different thread configuration "
+                "on matmul operands";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
@@ -141,6 +156,8 @@ def GPUApplyTilingLevelPass :
               clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
                          "Tile and fuse all annotated ops to serial loops"),
               clEnumValN(IREE::GPU::TilingLevel::Thread, "thread",
+                         "Tile and fuse all annotated ops to threads"),
+              clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
                          "Tile and fuse all annotated ops to threads")
            )}]>,
   ];

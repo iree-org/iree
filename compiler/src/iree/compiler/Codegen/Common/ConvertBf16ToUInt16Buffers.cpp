@@ -164,18 +164,22 @@ struct GenericTypeConversionPattern : public ConversionPattern {
     for (Region &r : op->getRegions()) {
       Region *newRegion = state.addRegion();
       rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
-      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+    }
+    Operation *newOp = rewriter.create(state);
+
+    for (Region &newRegion : newOp->getRegions()) {
+      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
 
       if (failed(getTypeConverter()->convertSignatureArgs(
-              newRegion->getArgumentTypes(), result))) {
+              newRegion.getArgumentTypes(), result))) {
         return rewriter.notifyMatchFailure(op,
                                            "argument type conversion failed");
       }
 
-      rewriter.applySignatureConversion(newRegion, result, typeConverter);
+      rewriter.applySignatureConversion(&newRegion.front(), result,
+                                        typeConverter);
     }
 
-    Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

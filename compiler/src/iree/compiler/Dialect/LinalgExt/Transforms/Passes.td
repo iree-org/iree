@@ -53,6 +53,14 @@ def TopkSplitReduction:
   ];
 }
 
+def DecomposeIm2col :
+    InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes im2col ops into insert and extract slice ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createDecomposeIm2colPass()";
+}
+
 def DecomposeWinogradTransform :
     InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
@@ -96,6 +104,14 @@ def DecomposeAttention :
     Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
            "Tile size for sequential for loop in attention">,
   ];
+}
+
+def ConvertAttentionToOnlineAttention :
+    InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
+    "mlir::FunctionOpInterface"> {
+  let summary = "";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createConvertAttentionToOnlineAttentionPass()";
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions, iree-flow-clone-producers-into-dispatch-regions, iree-flow-form-dispatch-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions, iree-flow-clone-producers-into-dispatch-regions,iree-flow-convert-dispatch-regions-to-workgroups), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
 
 util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi8>,
     %arg2 : i32, %arg3 : i32) -> tensor<?x56x56x64xi8> {
@@ -33,7 +33,7 @@ util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : ten
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
-    %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>> {
+    %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
   %0 = tensor.empty() : tensor<384x512xf32>
   %1 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map1],
                        iterator_types = ["parallel", "parallel"]}
@@ -44,8 +44,8 @@ util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x51
     %4 = arith.addf %3, %in_1 : f32
     linalg.yield %4 : f32
   } -> tensor<384x512xf32>
-  %2 = iree_encoding.set_encoding %1 : tensor<384x512xf32> -> tensor<384x512xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>
-  util.return %2 : tensor<384x512xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>
+  %2 = iree_encoding.set_encoding %1 : tensor<384x512xf32> -> tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  util.return %2 : tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: util.func public @elem_set_encoding
 // CHECK:         flow.dispatch.workgroups

@@ -10,15 +10,15 @@ func.func @mmt4d_i8() attributes {hal.executable.target = #executable_target_vmv
   %c256 = arith.constant 256 : index
   %c512 = arith.constant 512 : index
   %c16 = arith.constant 16 : index
-  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_encoding.encoding<role =  LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %1 = affine.apply #map3()[%0#0]
   %2 = affine.apply #map3()[%0#1]
   %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi8>>{%1, %2, %0#0, %0#1}
-  %4:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_encoding.encoding<role =  RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %4:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %5 = affine.apply #map3()[%4#0]
   %6 = affine.apply #map3()[%4#1]
   %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c256) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi8>>{%5, %6, %4#0, %4#1}
-  %8:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_encoding.encoding<role =  RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %8:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %9 = affine.apply #map3()[%8#0]
   %10 = affine.apply #map3()[%8#1]
   %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c512) : !flow.dispatch.tensor<readwrite:tensor<?x?x?x?xi32>>{%9, %10, %8#0, %8#1}

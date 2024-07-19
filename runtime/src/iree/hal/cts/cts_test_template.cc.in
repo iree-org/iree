@@ -8,7 +8,6 @@
 #cmakedefine IREE_CTS_TEST_FILE_PATH "@IREE_CTS_TEST_FILE_PATH@"
 #cmakedefine IREE_CTS_DRIVER_REGISTRATION_HDR "@IREE_CTS_DRIVER_REGISTRATION_HDR@"
 #cmakedefine IREE_CTS_DRIVER_REGISTRATION_FN @IREE_CTS_DRIVER_REGISTRATION_FN@
-#cmakedefine IREE_CTS_TEST_CLASS_NAME @IREE_CTS_TEST_CLASS_NAME@
 #cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
 #cmakedefine IREE_CTS_EXECUTABLE_FORMAT @IREE_CTS_EXECUTABLE_FORMAT@
 #cmakedefine IREE_CTS_EXECUTABLES_TESTDATA_HDR "@IREE_CTS_EXECUTABLES_TESTDATA_HDR@"
@@ -29,6 +28,10 @@
 namespace iree {
 namespace hal {
 namespace cts {
+
+const char* get_test_driver_name() {
+  return IREE_CTS_DRIVER_NAME;
+}
 
 iree_status_t register_test_driver(iree_hal_driver_registry_t* registry) {
   return IREE_CTS_DRIVER_REGISTRATION_FN(registry);
@@ -61,10 +64,6 @@ iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name) {
 #endif
   return iree_const_byte_span_empty();
 }
-
-INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,
-                         ::testing::Values(IREE_CTS_DRIVER_NAME),
-                         GenerateTestName());
 
 }  // namespace cts
 }  // namespace hal

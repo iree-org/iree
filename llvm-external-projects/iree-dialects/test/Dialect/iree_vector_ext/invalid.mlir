@@ -46,7 +46,7 @@ func.func @invalid_to_simt_vector_element_type(%simt : vector<64xf32>) -> vector
 
 // -----
 
-// expected-error @+1 {{number of active basis ids must be equal to the layout rank}}
+// expected-error @+1 {{all fields must have the same rank as the layout}}
 #layout = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1],
   batches_per_subgroup = [1],
@@ -54,7 +54,6 @@ func.func @invalid_to_simt_vector_element_type(%simt : vector<64xf32>) -> vector
   threads_per_outer = [1],
   elements_per_thread = [1],
 
-  subgroup_basis = [2],
-  subgroup_active_ids = [false],
-  thread_basis   = [2]
+  subgroup_strides = [0, 0],
+  thread_strides = [0]
 >

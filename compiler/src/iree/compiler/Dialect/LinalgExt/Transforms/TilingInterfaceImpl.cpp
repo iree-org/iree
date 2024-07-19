@@ -4,11 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,7 +14,8 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1237,6 +1236,99 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 }
 
 //===----------------------------------------------------------------------===//
+// Im2colOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> Im2colOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  Value dest = getOutput();
+  SmallVector<Range> loopBounds(getOutputRank());
+  for (int dim = 0; dim < getOutputRank(); ++dim) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, dest, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType> Im2colOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult>
+Im2colOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  OpFoldResult one = builder.getIndexAttr(1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+
+  ReifiedRankedShapedTypeDims reifiedInputShapes;
+  SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
+  SmallVector<OpFoldResult> inputSizes = getDims(builder, loc, getInput());
+
+  // Set batch offsets and sizes for input
+  for (auto [idx, dim] : llvm::enumerate(getBatchPos())) {
+    inputOffsets[dim] = offsets[idx];
+    inputSizes[dim] = sizes[idx];
+  }
+
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
+  Value inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
+                              inputSizes, inputStrides);
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
+  Value outputSlice =
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputSlice.getType());
+  }
+
+  AffineExpr d0, d1;
+  bindDims(getContext(), d0, d1);
+  auto map = AffineMap::get(2, 0, {d0 + d1}, getContext());
+  OpFoldResult kTileOffset = offsets.back();
+  OpFoldResult kOpOffset = getMixedKOffset()[0];
+  OpFoldResult kOffset = affine::makeComposedFoldedAffineApply(
+      builder, loc, map, {kTileOffset, kOpOffset});
+  OpFoldResult mTileOffset = offsets[offsets.size() - 2];
+  OpFoldResult mOpOffset = getMixedMOffset()[0];
+  OpFoldResult mOffset = affine::makeComposedFoldedAffineApply(
+      builder, loc, map, {mTileOffset, mOpOffset});
+
+  SmallVector<Value> operands = {inputSlice, outputSlice};
+  operands.append(getOperation()->getOperands().begin() + 2,
+                  getOperation()->getOperands().end());
+  Im2colOp tiledOp =
+      mlir::clone(builder, *this, TypeRange{outputSlice.getType()}, operands);
+  tiledOp.setMixedKOffset({kOffset});
+  tiledOp.setMixedMOffset({mOffset});
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+FailureOr<TilingResult>
+Im2colOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+LogicalResult Im2colOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets = SmallVector<OpFoldResult>(offsets);
+  resultSizes = SmallVector<OpFoldResult>(sizes);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // WinogradInputTransformOp
 //===----------------------------------------------------------------------===//
 
@@ -1605,16 +1697,16 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
-// AttentionOp
+// Attention Helpers
 //===----------------------------------------------------------------------===//
 
-SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
-  int64_t domainRank = getIterationDomainRank();
-
+static SmallVector<Range>
+getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
+                            ArrayRef<Value> values,
+                            ArrayRef<AffineMap> indexingMaps) {
   SmallVector<Range> loopBounds(domainRank);
-  Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
 
   for (auto dim : llvm::seq<int64_t>(0, domainRank)) {
     loopBounds[dim].offset = zero;
@@ -1631,26 +1723,27 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
         continue;
       }
       dimsFound[pos] = true;
-      loopBounds[pos].size = getDimValue(builder, loc, val, idx);
+      loopBounds[pos].size = getDimValue(b, loc, val, idx);
     }
   };
 
-  // Sizes can be found from Q, K, V alone.
-  fillSizes(getQuery(), getQueryMap());
-  fillSizes(getKey(), getKeyMap());
-  fillSizes(getValue(), getValueMap());
+  for (auto [val, indexingMap] : llvm::zip_equal(values, indexingMaps)) {
+    fillSizes(val, indexingMap);
+  }
 
   return loopBounds;
 }
 
-SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
+static SmallVector<utils::IteratorType>
+getAttentionIteratorTypes(int64_t domainRank,
+                          ArrayRef<AffineMap> indexingMaps) {
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(getIndexingMapsArray());
+      AttentionOpDetail::get(indexingMaps);
   assert(succeeded(maybeOpInfo) && "Failed to infer attention op details");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 
   // All dimensions other than k1 and k2 are parallel.
-  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+  SmallVector<utils::IteratorType> iteratorTypes(domainRank,
                                                  utils::IteratorType::parallel);
 
   for (auto dim :
@@ -1661,6 +1754,42 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
+static SmallVector<Range> getPermutedSlice(AffineMap permutation,
+                                           ArrayRef<OpFoldResult> offsets,
+                                           ArrayRef<OpFoldResult> sizes) {
+  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
+  assert(permutation.isProjectedPermutation() &&
+         "Indexing map should be a projected permutation");
+  SmallVector<Range> output;
+  for (AffineExpr dimExpr : permutation.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    Range dimRange;
+    dimRange.offset = offsets[dim];
+    dimRange.size = sizes[dim];
+    dimRange.stride = one;
+    output.push_back(dimRange);
+  }
+  return output;
+}
+
+//===----------------------------------------------------------------------===//
+// AttentionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &b) {
+  // Attention shape can be determined from Q, K, V alone.
+  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
+  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
+                                         getValueMap()};
+  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
+                                     shapedValues, indexingMaps);
+}
+
+SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
+  return getAttentionIteratorTypes(getIterationDomainRank(),
+                                   getIndexingMapsArray());
+}
+
 FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
@@ -1669,59 +1798,36 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   assert(sizes.size() == getIterationDomainRank());
 
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
 
-  auto tileValue = [&](Value val, AffineMap indexingMap)
-      -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                    SmallVector<OpFoldResult>> {
-    assert(indexingMap.isProjectedPermutation() &&
-           "Indexing map should be a projected permutation");
-    SmallVector<OpFoldResult> outputOffsets;
-    SmallVector<OpFoldResult> outputSizes;
-    SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
-    for (AffineExpr dimExpr : indexingMap.getResults()) {
-      int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-      outputOffsets.push_back(offsets[dim]);
-      outputSizes.push_back(sizes[dim]);
-    }
-    return {outputOffsets, outputSizes, outputStrides};
-  };
-
-  auto [queryOffsets, querySizes, queryStrides] =
-      tileValue(getQuery(), getQueryMap());
-  auto [keyOffsets, keySizes, keyStrides] = tileValue(getKey(), getKeyMap());
-  auto [valueOffsets, valueSizes, valueStrides] =
-      tileValue(getValue(), getValueMap());
-  auto [outputOffsets, outputSizes, outputStrides] =
-      tileValue(getOutput(), getOutputMap());
+  SmallVector<Range> querySlice =
+      getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+  SmallVector<Range> valueSlice =
+      getPermutedSlice(getValueMap(), offsets, sizes);
+  SmallVector<Range> outputSlice =
+      getPermutedSlice(getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), queryOffsets,
-                                      querySizes, queryStrides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getKey(), keyOffsets, keySizes, keyStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueOffsets,
-                                      valueSizes, valueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
   tiledOperands.emplace_back(scale);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
 
   std::optional<Value> max = getMax();
   if (max) {
-    auto [maxOffsets, maxSizes, maxStrides] =
-        tileValue(max.value(), *getMaxMap());
-    tiledOperands.emplace_back(
-        getSlice(builder, loc, max.value(), maxOffsets, maxSizes, maxStrides));
+    SmallVector<Range> maxSlice =
+        getPermutedSlice(*getMaxMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, max.value(), maxSlice));
   }
 
   std::optional<Value> sum = getMax();
   if (sum) {
-    auto [sumOffsets, sumSizes, sumStrides] =
-        tileValue(sum.value(), *getSumMap());
-    tiledOperands.emplace_back(
-        getSlice(builder, loc, sum.value(), sumOffsets, sumSizes, sumStrides));
+    SmallVector<Range> sumSlice =
+        getPermutedSlice(*getSumMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, sum.value(), sumSlice));
   }
 
   SmallVector<Type> resultTypes;
@@ -1758,6 +1864,95 @@ LogicalResult AttentionOp::getResultTilePosition(
     break;
   case 2:
     resultIndexingMap = *getSumMap();
+    break;
+  default:
+    return failure();
+  }
+
+  for (AffineExpr dimExpr : resultIndexingMap.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    resultOffsets.push_back(offsets[dim]);
+    resultSizes.push_back(sizes[dim]);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// OnlineAttentionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> OnlineAttentionOp::getIterationDomain(OpBuilder &b) {
+  // Attention shape can be determined from Q, K, V alone.
+  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
+  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
+                                         getValueMap()};
+  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
+                                     shapedValues, indexingMaps);
+}
+
+SmallVector<utils::IteratorType> OnlineAttentionOp::getLoopIteratorTypes() {
+  return getAttentionIteratorTypes(getIterationDomainRank(),
+                                   getIndexingMapsArray());
+}
+
+FailureOr<TilingResult>
+OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
+                                          ArrayRef<OpFoldResult> offsets,
+                                          ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() == getIterationDomainRank());
+  assert(sizes.size() == getIterationDomainRank());
+
+  Location loc = getLoc();
+
+  SmallVector<Range> querySlice =
+      getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+  SmallVector<Range> valueSlice =
+      getPermutedSlice(getValueMap(), offsets, sizes);
+  SmallVector<Range> outputSlice =
+      getPermutedSlice(getOutputMap(), offsets, sizes);
+  SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
+  SmallVector<Range> sumSlice = getPermutedSlice(getSumMap(), offsets, sizes);
+
+  Value scale = getScale();
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
+  tiledOperands.emplace_back(scale);
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getMax(), maxSlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getSum(), sumSlice));
+
+  SmallVector<Type> resultTypes;
+  resultTypes.push_back(tiledOperands[4].getType());
+  resultTypes.push_back(tiledOperands[5].getType());
+  resultTypes.push_back(tiledOperands[6].getType());
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+LogicalResult OnlineAttentionOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  AffineMap resultIndexingMap;
+  switch (resultNumber) {
+  case 0:
+    resultIndexingMap = getOutputMap();
+    break;
+  case 1:
+    resultIndexingMap = getMaxMap();
+    break;
+  case 2:
+    resultIndexingMap = getSumMap();
     break;
   default:
     return failure();

@@ -25,7 +25,7 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 // NOTE: the |block_pool| must remain live for the lifetime of the command
 // buffers that use it.
 iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,

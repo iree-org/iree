@@ -1,0 +1,26 @@
+{
+  "config_name": "cpu_llvm_task",
+  "iree_compile_flags": [
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-llvmcpu-target-cpu-features=host"
+  ],
+  "iree_run_module_flags": [
+    "--device=local-task"
+  ],
+  "skip_compile_tests": [
+    // TODO(scotttodd): Don't skip these?
+    //     At least shouldn't have something here _and_ expected_run_failures
+    "pytorch/models/sdxl-scheduled-unet-3-tank",
+    "pytorch/models/sdxl-prompt-encoder-tank",
+    "pytorch/models/sdxl-vae-decode-tank"
+  ],
+  "skip_run_tests": [],
+  "expected_compile_failures": [
+    // TODO(#17344): need to regenerate .mlirbc
+    "pytorch/models/opt-125M",
+    "pytorch/models/resnet50"
+  ],
+  "expected_run_failures": [
+    "pytorch/models/sdxl-vae-decode-tank"
+  ]
+}

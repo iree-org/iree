@@ -53,6 +53,8 @@ def LLVMGPU_PadAndVectorDistribute
     : I32EnumAttrCase<"LLVMGPUPadAndVectorDistribute", 111>;
 def LLVMGPU_WinogradVectorize
     : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 112>;
+def LLVMGPU_TileAndFuse
+    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 113>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -95,6 +97,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
     LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
     LLVMGPU_PadAndVectorDistribute, LLVMGPU_WinogradVectorize,
+    LLVMGPU_TileAndFuse,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
@@ -208,6 +211,7 @@ def IREECodegen_LoweringConfigAttr :
         "getWorkgroupInterchange",
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -282,21 +286,19 @@ def IREECodegen_CompilationInfoAttr :
     Specifies the information that allows controlling the compilation
     of operations like `linalg.matmul`/`linalg.*conv` within
     IREE. This information is used to override the defaults used by
-    the IREE compiler. Currently it is only valid to set this on
-    `linalg.matmul`/`linalg.*conv*` operations.
+    the IREE compiler. If set on the input to the compiler, there is no
+    guarantee that the config survives until codegen. Named operations like
+    `linalg.matmul`/`linalg.*conv*` are more likely to retain their lowering
+    configurations.
 
     TODO: It is expected that the `TranslationInfoAttr` and the
     `LoweringConfigAttr` are specified. Currently there is no
     verification that the values of the `LoweringConfigAttr` fully
     specifies the behaviour of the compilation path chosen with
-    `TranslationInfoAttr`. This could be added in the future.  Note:
-    Typically the values used for the first-level tiling in
-    `LoweringConfigAttr` value in the `TranslationInfoAttr` are the
-    same since the first-level of tile + distribute is already done
-    at the `Flow` level. This verification is also a TODO.
+    `TranslationInfoAttr`. This could be added in the future.
   }];
   let parameters = (ins
-    AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
+    AttrParameter<"LoweringConfigAttrInterface", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo
   );
 

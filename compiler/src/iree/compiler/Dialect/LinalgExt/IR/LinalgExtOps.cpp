@@ -6,22 +6,21 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -32,14 +31,12 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/MathExtras.h"
 
 #include <cstdint>
 #include <optional>
@@ -60,21 +57,21 @@ static Type getComplexElementTypeOrSelf(Type ty) {
 static void getEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
-    ValueRange inputOperands, ValueRange outputOperands) {
-  for (Value value : inputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+    ArrayRef<OpOperand *> inputOperands, MutableOperandRange outputOperands) {
+  for (OpOperand *operand : inputOperands) {
+    if (!llvm::isa<MemRefType>(operand->get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), operand,
                          SideEffects::DefaultResource::get());
   }
-  for (Value value : outputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+  for (OpOperand &operand : outputOperands) {
+    if (!llvm::isa<MemRefType>(operand.get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), &operand,
                          SideEffects::DefaultResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), value,
+    effects.emplace_back(MemoryEffects::Write::get(), &operand,
                          SideEffects::DefaultResource::get());
   }
 }
@@ -256,7 +253,8 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
-          builder.getMultiDimIdentityMap(getIndicesType().getRank())};
+          builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
@@ -498,7 +496,8 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
 
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getOperandRank())};
+  return {builder.getMultiDimIdentityMap(getOperandRank()),
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
@@ -626,6 +625,21 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
   return false;
 }
 
+static SmallVector<OpFoldResult> getMixedValues(MLIRContext *context,
+                                                ArrayRef<int64_t> staticValues,
+                                                OperandRange dynamicValues) {
+  OpBuilder b(context);
+  return mlir::getMixedValues(staticValues, dynamicValues, b);
+}
+
+static SmallVector<int64_t>
+getStaticValues(SmallVector<OpFoldResult> mixedValues) {
+  SmallVector<Value> dynamicTiles;
+  SmallVector<int64_t> staticTiles;
+  dispatchIndexOpFoldResults(mixedValues, dynamicTiles, staticTiles);
+  return staticTiles;
+}
+
 /// Utility function shared between Pack and UnPack to get the tile sizes as
 /// OpFoldResults.
 // TODO: interface or base class in .td
@@ -633,17 +647,8 @@ template <typename OpTy>
 static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
-  SmallVector<OpFoldResult> mixedInnerTiles;
-  unsigned dynamicValIndex = 0;
-  OpBuilder b(op.getContext());
-  for (int64_t tileSize : op.getStaticInnerTiles()) {
-    if (!ShapedType::isDynamic(tileSize)) {
-      mixedInnerTiles.push_back(b.getIndexAttr(tileSize));
-    } else {
-      mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
-    }
-  }
-  return mixedInnerTiles;
+  return LinalgExt::getMixedValues(op.getContext(), op.getStaticInnerTiles(),
+                                   op.getInnerTiles());
 }
 
 /// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
@@ -652,10 +657,7 @@ template <typename OpTy>
 static SmallVector<int64_t> getStaticTiles(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
-  SmallVector<Value> dynamicTiles;
-  SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(op.getMixedTiles(), dynamicTiles, staticTiles);
-  return staticTiles;
+  return getStaticValues(op.getMixedTiles());
 }
 
 /// Utility function shared between Pack and UnPack to get a map between
@@ -837,7 +839,8 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
       resultShape[tiledDim] = ShapedType::kDynamic;
       continue;
     }
-    resultShape[tiledDim] = ceilDiv(resultShape[tiledDim], innerTileSizes[idx]);
+    resultShape[tiledDim] =
+        llvm::divideCeil(resultShape[tiledDim], innerTileSizes[idx]);
   }
 
   // Swap tile loops if outer_dims_perm is available.
@@ -1263,64 +1266,48 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 
 LogicalResult AttentionOp::verify() {
-  Operation *op = getOperation();
+  AttentionOp attnOp = *this;
 
-  int numInputs = getNumDpsInputs();
   int numOutputs = getNumDpsInits();
-
-  if (numInputs != 4) {
-    return op->emitOpError(
-        "expected 4 input operands: Query, Key, Value and Scale");
-  }
-
   if (numOutputs != 1 && numOutputs != 3) {
-    return op->emitOpError(
+    return attnOp->emitOpError(
         "expected 1 or 3 output operands: Output, [Max and Sum]");
   }
-
   bool isTiled = numOutputs == 3;
 
-  if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
-        return isa<ShapedType>(input.getType());
-      })) {
-    return op->emitOpError(
-        "expected Query, Key, Value inputs to be of shaped type");
-  }
-
-  ShapedType queryType = getQueryType();
-  ShapedType keyType = getKeyType();
-  ShapedType valueType = getValueType();
-  ShapedType outputType = getOutputType();
-  Type queryElementType = queryType.getElementType();
-  Type keyElementType = keyType.getElementType();
-  Type valueElementType = valueType.getElementType();
-  Type outputElementType = outputType.getElementType();
+  // Check if indexing maps can represent attention.
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+  FailureOr<AttentionOpDetail> maybeOpInfo =
+      AttentionOpDetail::get(indexingMaps);
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
-    return op->emitOpError("expected scale to be of floating point type");
+    return attnOp->emitOpError("expected scale to be of floating point type");
   }
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());
   SmallVector<bool> foundDims(getIterationDomainRank(), false);
   auto checkShape = [&shape, &foundDims,
-                     &op](StringRef operandName, ArrayRef<int64_t> valShape,
-                          AffineMap indexingMap) -> LogicalResult {
+                     &attnOp](StringRef operandName, ArrayRef<int64_t> valShape,
+                              AffineMap indexingMap) -> LogicalResult {
     if (indexingMap.getNumResults() != valShape.size()) {
-      return op->emitError("Rank Mismatch for ")
+      return attnOp->emitError("Rank Mismatch for ")
              << operandName << ". Expected: " << indexingMap.getNumResults()
              << " Got: " << valShape.size();
     }
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
+      if (ShapedType::isDynamic(valShape[i])) {
+        continue;
+      }
       if (!foundDims[pos]) {
         foundDims[pos] = true;
         shape[pos] = valShape[i];
       }
       if (shape[pos] != valShape[i]) {
-        return op->emitError("Shape Mismatch for ")
+        return attnOp->emitError("Shape Mismatch for ")
                << operandName << ". Expected: " << shape[pos]
                << " Got: " << valShape[i];
       }
@@ -1330,32 +1317,20 @@ LogicalResult AttentionOp::verify() {
 
   if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
       failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValueType().getShape(), getValueMap()))) {
+      failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
+      failed(
+          checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
     return failure();
   }
 
-  if (queryElementType != keyElementType ||
-      queryElementType != valueElementType ||
-      queryElementType != scaleElementType) {
-    return op->emitOpError(
-        "element types of (Q)uery, (K)ey and (V)alue and scale should be "
-        "same");
-  }
-  if (!isTiled) {
-    // Vanilla attention.
-    if (queryElementType != outputElementType) {
-      return op->emitOpError("expected element type for Output ")
-             << queryElementType << "but found " << outputElementType
-             << " instead";
-    }
-  }
   if (isTiled) {
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
     Type sumElementType = getSumType()->getElementType();
+    Type outputElementType = getOutputType().getElementType();
     if (outputElementType != maxElementType ||
         maxElementType != sumElementType) {
-      return op->emitOpError(
+      return attnOp->emitOpError(
           "element types of tiled output, max and sum should be same");
     }
 
@@ -1379,59 +1354,230 @@ LogicalResult AttentionOp::reifyResultShapes(
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
-  MLIRContext *ctx = getContext();
+  return SmallVector<AffineMap>(
+      getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
 
-  AffineExpr batch, m, k1, k2, n;
-  bindDims(ctx, batch, m, k1, k2, n);
+//===----------------------------------------------------------------------===//
+// OnlineAttentionOp
+//===----------------------------------------------------------------------===//
 
-  AffineMap qMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, k1}, ctx);
-  AffineMap kMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, k1}, ctx);
+LogicalResult OnlineAttentionOp::verify() {
+  OnlineAttentionOp attnOp = *this;
 
-  AffineMap vMap;
-  if (getTransposeV()) {
-    vMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, n, k2}, ctx);
-  } else {
-    vMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, n}, ctx);
-  }
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
 
-  AffineMap resMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, n}, ctx);
+  // Check if indexing maps can represent attention.
+  FailureOr<AttentionOpDetail> maybeOpInfo =
+      AttentionOpDetail::get(indexingMaps);
 
-  SmallVector<AffineMap> results = {qMap, kMap, vMap, resMap};
-
-  if (getMax()) {
-    AffineMap maxMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
-    results.push_back(maxMap);
-  }
-
-  if (getSum()) {
-    AffineMap sumMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
-    results.push_back(sumMap);
-  }
-
-  // Remove batch dim for tiled operands.
-  // TODO: This is a weird expectation from TileAndDecomposeAttention.
-  bool isTiled = getNumResults() == 3;
-  if (isTiled) {
-    for (AffineMap &map : results) {
-      map = map.dropResult(0);
+  // Check shape compatibility based on indexing maps.
+  SmallVector<int64_t> shape(getIterationDomainRank());
+  SmallVector<bool> foundDims(getIterationDomainRank(), false);
+  auto checkShape = [&shape, &foundDims,
+                     &attnOp](StringRef operandName, ArrayRef<int64_t> valShape,
+                              AffineMap indexingMap) -> LogicalResult {
+    if (indexingMap.getNumResults() != valShape.size()) {
+      return attnOp->emitError("Rank Mismatch for ")
+             << operandName << ". Expected: " << indexingMap.getNumResults()
+             << " Got: " << valShape.size();
     }
+    for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
+      AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
+      int64_t pos = dim.getPosition();
+      if (ShapedType::isDynamic(valShape[i])) {
+        continue;
+      }
+      if (!foundDims[pos]) {
+        foundDims[pos] = true;
+        shape[pos] = valShape[i];
+      }
+      if (shape[pos] != valShape[i]) {
+        return attnOp->emitError("Shape Mismatch for ")
+               << operandName << ". Expected: " << shape[pos]
+               << " Got: " << valShape[i];
+      }
+    }
+    return success();
+  };
+
+  if (failed(checkShape("Query", getQuery().getType().getShape(),
+                        getQueryMap())) ||
+      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValue().getType().getShape(),
+                        getValueMap())) ||
+      failed(checkShape("Output", getOutput().getType().getShape(),
+                        getOutputMap())) ||
+      failed(checkShape("Max", getMax().getType().getShape(), getMaxMap())) ||
+      failed(checkShape("Sum", getSum().getType().getShape(), getSumMap()))) {
+    return failure();
   }
 
-  return results;
+  return success();
+}
+
+MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/4, /*numInits=*/3);
+}
+
+LogicalResult OnlineAttentionOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
+  return SmallVector<AffineMap>(
+      getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+//===----------------------------------------------------------------------===//
+// Im2colOp
+//===----------------------------------------------------------------------===//
+
+/// Return all static and dynamic kernel_size as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedKernelSize() {
+  return LinalgExt::getMixedValues(getContext(), getStaticKernelSize(),
+                                   getKernelSize());
+}
+
+/// Return all static and dynamic k_offset as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedKOffset() {
+  return LinalgExt::getMixedValues(getContext(), getStaticKOffset(),
+                                   getKOffset());
+}
+
+/// Return all static and dynamic k_offset as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedMOffset() {
+  return LinalgExt::getMixedValues(getContext(), getStaticMOffset(),
+                                   getMOffset());
+}
+
+void Im2colOp::setMixedKOffset(SmallVector<OpFoldResult> kOffset) {
+  SmallVector<int64_t> staticKOffset;
+  SmallVector<Value> dynamicKOffset;
+  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
+  setStaticKOffset(staticKOffset);
+  getKOffsetMutable().assign(dynamicKOffset);
+}
+
+void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
+  SmallVector<int64_t> staticMOffset;
+  SmallVector<Value> dynamicMOffset;
+  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
+  setStaticMOffset(staticMOffset);
+  getMOffsetMutable().assign(dynamicMOffset);
+}
+
+/// Custom builder methods for im2col op.
+void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
+                     Value output, ArrayRef<int64_t> strides,
+                     ArrayRef<int64_t> dilations,
+                     ArrayRef<OpFoldResult> kernelSize,
+                     ArrayRef<OpFoldResult> kOffset,
+                     ArrayRef<OpFoldResult> mOffset, ArrayRef<int64_t> batchPos,
+                     ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
+  assert(strides.size() == kernelSize.size() &&
+         dilations.size() == kernelSize.size() &&
+         mPos.size() == kernelSize.size() &&
+         "strides, dilations, m_pos, and kernel expected to be the same rank");
+  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset;
+  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset;
+  dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
+  dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
+  dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
+  SmallVector<Type> resultType;
+  auto outputType = output.getType();
+  if (isa<RankedTensorType>(outputType)) {
+    resultType.push_back(outputType);
+  }
+  build(builder, state, resultType, input, output,
+        builder.getDenseI64ArrayAttr(strides),
+        builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
+        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicKOffset,
+        builder.getDenseI64ArrayAttr(staticKOffset), dynamicMOffset,
+        builder.getDenseI64ArrayAttr(staticMOffset),
+        builder.getDenseI64ArrayAttr(batchPos),
+        builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos));
+}
+
+LogicalResult Im2colOp::verify() {
+  Operation *op = getOperation();
+  if (llvm::count_if(getDpsInputs(), [](Value v) {
+        return isa<ShapedType>(v.getType());
+      }) != 1) {
+    return op->emitOpError("expected only one ShapedType operand");
+  }
+  if (getNumDpsInits() != 1) {
+    return op->emitOpError("expected one output operand");
+  }
+
+  // TODO(Max191): Support cases with more than 1 m or k dimension, and remove
+  // the check for a single m_offset and k_offset.
+  if (getMixedMOffset().size() != 1) {
+    return op->emitOpError("expected one m_offset");
+  }
+  if (getMixedKOffset().size() != 1) {
+    return op->emitOpError("expected one k_offset");
+  }
+  auto inputType = getInputType();
+  unsigned inputRank = inputType.getRank();
+  ArrayRef<int64_t> batchPos = getBatchPos();
+  ArrayRef<int64_t> mPos = getMPos();
+  ArrayRef<int64_t> kPos = getKPos();
+  if (inputRank != batchPos.size() + mPos.size() + kPos.size()) {
+    return op->emitOpError(
+        "expected input rank to be the sum of batch, m, and k ranks");
+  }
+  ArrayRef<int64_t> strides = getStrides();
+  ArrayRef<int64_t> dilations = getDilations();
+  SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
+  if (kernelSize.size() != mPos.size()) {
+    return op->emitOpError(
+        "expected kernel rank to be equal to the m_pos rank");
+  }
+  if (strides.size() != kernelSize.size()) {
+    return op->emitOpError(
+        "expected strides rank to be equal to the kernel rank");
+  }
+  if (dilations.size() != kernelSize.size()) {
+    return op->emitOpError(
+        "expected dilations rank to be equal to the kernel rank");
+  }
+
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  SmallVector<int64_t> expectedOutputShape;
+  for (auto pos : batchPos) {
+    expectedOutputShape.push_back(inputShape[pos]);
+  }
+  ArrayRef<int64_t> outputShape = getOutputType().getShape();
+  // When the op is tiled, the m and k dimensions of the output are tiled, but
+  // they are not tiled in the input, so we cannot verify the output size of
+  // these dimensions.
+  expectedOutputShape.push_back(outputShape[outputShape.size() - 2]);
+  expectedOutputShape.push_back(outputShape.back());
+  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
+    return op->emitOpError("incompatible output shape");
+  }
+  return success();
+}
+
+LogicalResult Im2colOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
+LogicalResult
+Im2colOp::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
           &effects) {                                                          \
-    getEffectsImpl(effects, getDpsInputs(), getDpsInits());                    \
+    getEffectsImpl(effects, getDpsInputOperands(), getDpsInitsMutable());      \
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
@@ -1446,6 +1592,8 @@ DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
+DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
+DEFINE_OP_GET_EFFECTS(Im2colOp)
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 

@@ -67,6 +67,14 @@ static iree_status_t iree_io_stream_validate_mode(
 // iree_io_stream_t
 //===----------------------------------------------------------------------===//
 
+IREE_API_EXPORT void iree_io_stream_destroy(iree_io_stream_t* stream) {
+  if (IREE_LIKELY(stream)) {
+    IREE_TRACE_ZONE_BEGIN(z0);
+    stream->vtable->destroy(stream);
+    IREE_TRACE_ZONE_END(z0);
+  }
+}
+
 IREE_API_EXPORT void iree_io_stream_retain(iree_io_stream_t* stream) {
   if (IREE_LIKELY(stream)) {
     iree_atomic_ref_count_inc(&stream->ref_count);
@@ -76,9 +84,7 @@ IREE_API_EXPORT void iree_io_stream_retain(iree_io_stream_t* stream) {
 IREE_API_EXPORT void iree_io_stream_release(iree_io_stream_t* stream) {
   if (IREE_LIKELY(stream) &&
       iree_atomic_ref_count_dec(&stream->ref_count) == 1) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_io_stream_destroy");
-    stream->vtable->destroy(stream);
-    IREE_TRACE_ZONE_END(z0);
+    iree_io_stream_destroy(stream);
   }
 }
 

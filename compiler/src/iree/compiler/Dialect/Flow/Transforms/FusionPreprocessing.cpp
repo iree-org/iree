@@ -37,35 +37,27 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// GenericOpInterchangePattern
+// ElementwiseOpInterchangePattern
 //===----------------------------------------------------------------------===//
 
-struct GenericOpInterchangePattern
+struct ElementwiseOpInterchangePattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    SmallVector<unsigned> interchange;
-    bool needInterchange = false;
-    unsigned numParallelLoop = genericOp.getNumParallelLoops();
-    if (numParallelLoop == 0)
+    if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1)
       return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isParallelIterator(iter.value())) {
-        interchange.push_back(iter.index());
-        if (iter.index() >= numParallelLoop)
-          needInterchange = true;
-      }
-    }
-    // If all the parallel loops are outter loops skip the pattern.
-    if (!needInterchange)
+
+    AffineMap indexingMap = genericOp.getIndexingMapsArray().back();
+    if (indexingMap.isIdentity())
       return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isReductionIterator(iter.value())) {
-        interchange.push_back(iter.index());
-      }
-    }
-    return interchangeGenericOp(rewriter, genericOp, interchange);
+
+    ArrayRef<AffineExpr> exprs = indexingMap.getResults();
+    auto perm = llvm::map_to_vector(exprs, [](AffineExpr e) -> unsigned {
+      return cast<AffineDimExpr>(e).getPosition();
+    });
+
+    return linalg::interchangeGenericOp(rewriter, genericOp, perm);
   }
 };
 
@@ -170,7 +162,7 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
 
     // Check if the producerOp is fusible
     if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) || !isDequantizationLikeOp(producerOp)) {
+        !isElementwise(producerOp) || !isBitExtendOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
@@ -209,8 +201,8 @@ struct FusionPreprocessingPass
           FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<FoldSuccessiveTensorInsertSliceOps,
-                 GenericOpInterchangePattern, GatherFusionPattern>(
+    patterns.add<ElementwiseOpInterchangePattern,
+                 FoldSuccessiveTensorInsertSliceOps, GatherFusionPattern>(
         &getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its

@@ -72,6 +72,7 @@ iree_cc_library(
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransferLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
+    "LLVMCPUVerifyVectorSizeLegality.cpp"
     "LLVMCPUVirtualVectorLowering.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
@@ -101,6 +102,8 @@ iree_cc_library(
     MLIRArmSMEToLLVMIRTranslation
     MLIRArmSMEToSCF
     MLIRArmSMETransforms
+    MLIRArmSVEDialect
+    MLIRArmSVETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
     MLIRComplexToStandard
@@ -110,6 +113,7 @@ iree_cc_library(
     MLIRFuncTransforms
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRIndexToLLVM
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect

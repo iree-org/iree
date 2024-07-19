@@ -122,9 +122,32 @@ IREE_API_EXPORT void iree_hal_resource_set_freeze(iree_hal_resource_set_t* set);
 
 // Inserts zero or more resources into the set.
 // Each resource will be retained for at least the lifetime of the set.
+// Entries will be ignored if NULL.
 IREE_API_EXPORT iree_status_t
 iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
                              iree_host_size_t count, const void* resources);
+
+// Inserts zero or more resources into the set from a user-defined data
+// structure. Each resource will be retained for at least the lifetime of the
+// set. Entries will be ignored if NULL.
+//
+// |elements| should point to the first element of the data structure array,
+// |offset| to the iree_hal_resource_t* pointer within it, and |stride| should
+// be the bytes between that and the subsequent data structure entry. For
+// example, a dense list of resource pointers would have an offset of 0 and a
+// stride of sizeof(iree_hal_resource_t*).
+//
+// Example:
+//   struct my_struct_t {
+//     int something;
+//     iree_hal_resource_t* resource;
+//   } structs[5];
+//   iree_hal_resource_set_insert_strided(set, 5, structs,
+//                                        offsetof(my_struct_t, resource),
+//                                        sizeof(my_struct_t));
+IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert_strided(
+    iree_hal_resource_set_t* set, iree_host_size_t count, const void* data,
+    iree_host_size_t offset, iree_host_size_t stride);
 
 #ifdef __cplusplus
 }  // extern "C"

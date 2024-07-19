@@ -8,8 +8,8 @@ func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8]
   %zps = torch.vtensor.literal(dense<0.0> : tensor<8x4x1xf16>) : !torch.vtensor<[8,4,1],f16>
   %bit_width = torch.constant.int 4
   %group_size = torch.constant.int 2
-  // CHECK: %[[TOBUILTIN:.*]] = torch_c.to_builtin_tensor %[[C0]] : !torch.vtensor<[8,4],ui8> -> tensor<8x4xi8>
-  // CHECK: %[[BITCAST:.*]] = flow.tensor.bitcast %[[TOBUILTIN]] : tensor<8x4xi8> -> tensor<8x8xi4>
+  // CHECK: %[[TOBUILTIN:.*]] = torch_c.to_builtin_tensor %[[C0]] : !torch.vtensor<[8,4],ui8> -> tensor<8x4xui8>
+  // CHECK: %[[BITCAST:.*]] = flow.tensor.bitcast %[[TOBUILTIN]] : tensor<8x4xui8> -> tensor<8x8xi4>
   // CHECK: %[[TOTORCH:.*]] = torch_c.from_builtin_tensor %[[BITCAST]] : tensor<8x8xi4> -> !torch.vtensor<[8,8],ui4>
   %output = torch.operator "quant.matmul_rhs_group_quant"(%arg0, %q_rhs, %scales, %zps, %bit_width, %group_size) : (!torch.vtensor<[1,1,8],f16>, !torch.vtensor<[8,4],ui8>, !torch.vtensor<[8,4,1],f16>, !torch.vtensor<[8,4,1],f16>, !torch.int, !torch.int) -> !torch.vtensor<[1,1,8],f16>
   return %output : !torch.vtensor<[1,1,8],f16>

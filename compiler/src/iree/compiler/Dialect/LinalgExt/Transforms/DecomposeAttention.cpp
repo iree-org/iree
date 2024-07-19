@@ -331,7 +331,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   auto [result, newMax, newSum] = createAttentionBody(
       keySlice, valueSlice, querySlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
-      tiledAttnOp.getTransposeV(), loc, rewriter);
+      tiledAttnOp.isTransposeV(), loc, rewriter);
 
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
@@ -365,6 +365,16 @@ void DecomposeAttentionPass::runOnOperation() {
   getOperation().walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
     decomposeTiledAttention(attnOp, ops, rewriter, optionalTileSize);
+  });
+  getOperation().walk([&](OnlineAttentionOp onlineAtt) {
+    rewriter.setInsertionPoint(onlineAtt);
+    FailureOr<SmallVector<Value>> results =
+        onlineAtt.decomposeOperation(rewriter);
+    if (failed(results)) {
+      onlineAtt->emitOpError("Could not decompose online attention");
+      return signalPassFailure();
+    }
+    rewriter.replaceOp(onlineAtt, results.value());
   });
 }
 

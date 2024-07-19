@@ -86,6 +86,9 @@ createSPIRVAnnotateWinogradLoopsPass();
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVBreakDownLargeVectorPass();
 
+// Converts #iree_gpu.target into #spirv.target_env.
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVConvertGPUTargetPass();
+
 /// Emulates bfloat 16 ops with 32-bit float ops.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVEmulateBf16Pass();

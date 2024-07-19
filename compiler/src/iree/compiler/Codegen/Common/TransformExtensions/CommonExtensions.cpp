@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -252,7 +253,7 @@ void transform_dialect::ApplyBubbleExpandPatternsOp::populatePatterns(
 void transform_dialect::ApplyBubblePackUnpackPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
-      patterns, [](Operation *op) { return true; });
+      patterns, [](OpOperand *opOperand) { return true; });
 }
 
 void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
@@ -303,8 +304,8 @@ DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
 
 void transform_dialect::CopyTensorOperandOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -435,78 +436,8 @@ transform_dialect::FlattenForallMappingOp::applyToOne(
 
 void transform_dialect::FlattenForallMappingOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===---------------------------------------------------------------------===//
-// ForallToLanesOp
-//===---------------------------------------------------------------------===//
-
-static bool isLaneMappableForall(scf::ForallOp forallOp) {
-  if (forallOp.getNumResults() > 0)
-    return false;
-  if (forallOp.getRank() != 1)
-    return false;
-  if (!forallOp.getMapping().has_value())
-    return false;
-  Attribute mapping = *forallOp.getMapping()->getValue().begin();
-  if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
-    return false;
-  }
-  return true;
-}
-
-static void rewriteForallToLanes(RewriterBase &rewriter,
-                                 scf::ForallOp forallOp) {
-  Location loc = forallOp->getLoc();
-  assert(isLaneMappableForall(forallOp) &&
-         "mapping non-lane mappable forall op");
-
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc);
-
-  // Step 4. Predicate omitted given unique topLevel scf::ForallOp.
-
-  // Step 5. Move the body of forallOp.
-  // Erase the terminator first, it will not be used since we are on buffers.
-  rewriter.eraseOp(forallOp.getTerminator());
-  rewriter.setInsertionPoint(forallOp);
-  rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
-  rewriter.create<gpu::BarrierOp>(loc);
-
-  // Step 7. Erase old op.
-  rewriter.eraseOp(forallOp);
-}
-
-DiagnosedSilenceableFailure transform_dialect::ForallToLanesOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-
-  SmallVector<scf::ForallOp> foralls;
-  target->walk([&](scf::ForallOp forallOp) {
-    if (isLaneMappableForall(forallOp)) {
-      foralls.push_back(forallOp);
-    }
-  });
-
-  if (foralls.empty()) {
-    return mlir::emitSilenceableFailure(
-        target, "could not find a lane mappable scf.forall");
-  }
-
-  for (auto forall : foralls) {
-    rewriter.setInsertionPoint(forall);
-    rewriteForallToLanes(rewriter, forall);
-  }
-
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ForallToLanesOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -638,7 +569,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -692,7 +623,7 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
 
 void transform_dialect::GpuDistributeSharedMemoryCopyOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -711,7 +642,7 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -721,7 +652,7 @@ void transform_dialect::HoistStaticAllocOp::getEffects(
 
 void transform_dialect::PopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
     getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getForAllOp(), effects);
+  transform::onlyReadsHandle(getForAllOpMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -814,7 +745,7 @@ transform_dialect::IREEApplyLoopIndependentCodeMotionOp::applyToOne(
 
 void transform_dialect::IREEApplyLoopIndependentCodeMotionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1063,7 +994,7 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1085,7 +1016,7 @@ transform_dialect::ReduceSharedMemoryBankConflictsOp::applyToOne(
 
 void transform_dialect::ReduceSharedMemoryBankConflictsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1209,7 +1140,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
 
 void transform_dialect::TestGpuVectorDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1258,7 +1189,7 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
 
 void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1276,7 +1207,60 @@ DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
 
 void transform_dialect::WorkgroupSwizzleOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// FuseConsumerOp
+//===----------------------------------------------------------------------===//
+
+/// Apply fusing of consumer transformation to all payload ops and store both
+/// the original consumer operation as well as the fused consumer operation.
+template <typename Range>
+static LogicalResult
+applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
+                  Range &&payloadOps,
+                  transform::TransformResults &transformResults) {
+  SmallVector<Operation *> originalConsumerOps;
+  SmallVector<Operation *> fusedConsumerOps;
+
+  for (Operation *target : payloadOps) {
+    rewriter.setInsertionPoint(target);
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
+        scf::tileAndFuseConsumerOfSlice(rewriter, target);
+
+    if (failed(fuseConsumerResults))
+      return failure();
+
+    // Report back the relevant handles to the transform op.
+    originalConsumerOps.push_back(
+        fuseConsumerResults->origConsumerOperand->getOwner());
+    fusedConsumerOps.push_back(
+        fuseConsumerResults->tiledAndFusedConsumerOperand->getOwner());
+  }
+
+  transformResults.set(transformOp->getOpResult(0), originalConsumerOps);
+  transformResults.set(transformOp->getOpResult(1), fusedConsumerOps);
+  return success();
+}
+
+DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  LogicalResult result =
+      applyFuseConsumer(rewriter, getOperation(),
+                        state.getPayloadOps(getTarget()), transformResults);
+  return failed(result) ? DiagnosedSilenceableFailure::definiteFailure()
+                        : DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseConsumerOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 

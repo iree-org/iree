@@ -115,19 +115,19 @@ flow.executable private @ex0 {
   // CHECK: flow.executable.export public @dispatch0_map_DxD_f32
   flow.executable.export public @dispatch0
   builtin.module {
-    func.func @dispatch0(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>) {
+    func.func @dispatch0(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>) {
       %0 = flow.dispatch.workload.ordinal %arg2, 0 : index
       %1 = flow.dispatch.workload.ordinal %arg3, 1 : index
       %2 = flow.dispatch.workload.ordinal %arg4, 2 : index
       %3 = flow.dispatch.workload.ordinal %arg5, 3 : index
       %4 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
       %5 = flow.dispatch.tie_shape %arg1 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %3}
-      %6 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%2, %3}
+      %6 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>{%2, %3}
       %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
       %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %3} -> tensor<?x?xf32>
       %mapped = linalg.map { math.absf } ins(%7 : tensor<?x?xf32>) outs(%8 : tensor<?x?xf32>)
-      %9 = iree_encoding.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>
-      flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg4, %arg5}
+      %9 = iree_encoding.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+      flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>{%arg4, %arg5}
       return
     }
   }
@@ -136,11 +136,11 @@ flow.executable private @ex1 {
   // CHECK: flow.executable.export public @dispatch1_unset_encoding_LHS_DxD
   flow.executable.export public @dispatch1
   builtin.module {
-    func.func @dispatch1(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>, %arg1: index, %arg2: index, %arg3: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
-      %0 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2}
+    func.func @dispatch1(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>, %arg1: index, %arg2: index, %arg3: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>{%arg1, %arg2}
       %1 = flow.dispatch.tie_shape %arg3 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2} -> tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>>
-      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>>{%arg1, %arg2} -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
       flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
       return
     }
@@ -211,7 +211,7 @@ flow.executable private @ex {
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 flow.executable private @ex {
-  // CHECK: flow.executable.export public @ex_unpack_broadcast_384x512_f32_pack
+  // CHECK: flow.executable.export public @ex_unpack_elementwise_384x512_f32_pack
   flow.executable.export public @ex
   builtin.module {
     func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<512xf32>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>) {
@@ -479,6 +479,191 @@ flow.executable private @ex {
         linalg.yield %3 : f32
       } -> tensor<8x16x32xf32>
       flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0, 0], sizes = [8, 16, 32], strides = [1, 1, 1] : tensor<8x16x32xf32> -> !flow.dispatch.tensor<readwrite:tensor<8x16x32xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4, d3, d5)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export private @dispatch_winograd_input_transform_1xDxDx1xf16_generic
+  flow.executable.export private @dispatch
+    builtin.module {
+      func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>, %arg1: !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>>, %arg2: index, %arg3: index) {
+        %0 = flow.dispatch.workload.ordinal %arg2, 0 : index
+        %1 = flow.dispatch.workload.ordinal %arg3, 1 : index
+        %2 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>{%0, %1}
+        %3 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [1, %0, %1, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>{%0, %1} -> tensor<1x?x?x1xf16>
+        %4 = flow.dispatch.tensor.load %arg1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 8, 1, 1, 1, 1], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>> -> tensor<8x8x1x1x1x1xf16>
+        %5 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) ins(%3 : tensor<1x?x?x1xf16>) outs(%4 : tensor<8x8x1x1x1x1xf16>) -> tensor<8x8x1x1x1x1xf16>
+        %6 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+          ins(%5 : tensor<8x8x1x1x1x1xf16>) outs(%4 : tensor<8x8x1x1x1x1xf16>) {
+            ^bb0(%in: f16, %out: f16):
+              %7 = arith.negf %in : f16
+              linalg.yield %7 : f16
+          } -> tensor<8x8x1x1x1x1xf16>
+        flow.dispatch.tensor.store %6, %arg1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 8, 1, 1, 1, 1], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x1x1x1xf16> -> !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>>
+        return
+      }
+    }
+}
+
+// -----
+
+// Test transposing elementwise operation.
+
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+#map2 = affine_map<(d0, d1) -> (d0, d1)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_elementwise_transpose_7x5_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<5x7xf32>>,
+                  %arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>,
+                  %arg2: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [5, 7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5x7xf32>> -> tensor<5x7xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
+      %2 = tensor.empty() : tensor<7x5xf32>
+      %3 = linalg.generic {
+        indexing_maps = [#map, #map1, #map2],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%1, %0 : tensor<7xf32>, tensor<5x7xf32>) outs(%2 : tensor<7x5xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %5 : f32
+      } -> tensor<7x5xf32>
+      flow.dispatch.tensor.store %3, %arg2, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+// Same as the above, but with the transpose map represented on the output.
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> (d1, d0)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_elementwise_transpose_5x7_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<5x7xf32>>,
+                  %arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>,
+                  %arg2: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [5, 7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5x7xf32>> -> tensor<5x7xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
+      %2 = tensor.empty() : tensor<7x5xf32>
+      %3 = linalg.generic {
+        indexing_maps = [#map, #map1, #map2],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%1, %0 : tensor<7xf32>, tensor<5x7xf32>) outs(%2 : tensor<7x5xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %5 : f32
+      } -> tensor<7x5xf32>
+      flow.dispatch.tensor.store %3, %arg2, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+// Test marking a strictly broadcasting elementwise operation as a broadcast.
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_elementwise_broadcast_7x5_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
+                  %arg1: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
+                  %arg2: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<5xf32>> -> tensor<5xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<5xf32>> -> tensor<5xf32>
+      %2 = tensor.empty() : tensor<7x5xf32>
+      %3 = linalg.generic {
+        indexing_maps = [#map, #map, #map1],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%1, %0 : tensor<5xf32>, tensor<5xf32>) outs(%2 : tensor<7x5xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %5 : f32
+      } -> tensor<7x5xf32>
+      flow.dispatch.tensor.store %3, %arg2, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+// Test a pure elementwise operation with a broadcasted operand.
+
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_elementwise_7x5_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<7x5xf32>>,
+                  %arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>,
+                  %arg2: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>,
+                  %arg3: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<7x5xf32>> -> tensor<7x5xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
+      %2 = tensor.empty() : tensor<7x5xf32>
+      %3:2 = linalg.generic {
+        indexing_maps = [#map, #map1, #map1, #map1],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%1, %0 : tensor<7xf32>, tensor<7x5xf32>) outs(%2, %2 : tensor<7x5xf32>, tensor<7x5xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32, %out_0: f32):
+        %4 = arith.mulf %in, %in_0 : f32
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %4, %5 : f32, f32
+      } -> (tensor<7x5xf32>, tensor<7x5xf32>)
+      flow.dispatch.tensor.store %3#0, %arg2, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      flow.dispatch.tensor.store %3#1, %arg3, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+// Test a multi-result elementwise operation where one result is transposed.
+
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> (d1, d0)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_elementwise_transpose_7x5_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<7x5xf32>>,
+                  %arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>,
+                  %arg2: !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>,
+                  %arg3: !flow.dispatch.tensor<writeonly:tensor<5x7xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<7x5xf32>> -> tensor<7x5xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
+      %2 = tensor.empty() : tensor<7x5xf32>
+      %3 = tensor.empty() : tensor<5x7xf32>
+      %4:2 = linalg.generic {
+        indexing_maps = [#map, #map1, #map1, #map2],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%1, %0 : tensor<7xf32>, tensor<7x5xf32>) outs(%2, %3 : tensor<7x5xf32>, tensor<5x7xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32, %out_0: f32):
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %5, %5 : f32, f32
+      } -> (tensor<7x5xf32>, tensor<5x7xf32>)
+      flow.dispatch.tensor.store %4#0, %arg2, offsets = [0, 0], sizes = [7, 5], strides = [1, 1] : tensor<7x5xf32> -> !flow.dispatch.tensor<writeonly:tensor<7x5xf32>>
+      flow.dispatch.tensor.store %4#1, %arg3, offsets = [0, 0], sizes = [5, 7], strides = [1, 1] : tensor<5x7xf32> -> !flow.dispatch.tensor<writeonly:tensor<5x7xf32>>
       return
     }
   }

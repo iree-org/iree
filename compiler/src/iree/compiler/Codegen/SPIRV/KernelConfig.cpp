@@ -8,8 +8,8 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -26,8 +26,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -605,7 +603,7 @@ static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
 
 namespace detail {
 
-LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
+LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
                                 linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
@@ -704,8 +702,8 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     llvm::dbgs() << ")\n";
   });
 
-  const int subgroupSize = limits.getSubgroupSize();
-  const int maxBytes = limits.getMaxComputeSharedMemorySize();
+  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  const int maxBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // We want a 2-stage pipeline without multi-buffering if the depth is 0 to
   // keep the default for compilation configs that don't specify a pipeline
@@ -844,17 +842,16 @@ bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp) {
 
 namespace detail {
 
-LogicalResult setCooperativeMatrixConfig(
-    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
-    const unsigned numSubgroupsPerWorkgroup,
-    const unsigned numMNTilesPerSubgroup, unsigned softwarePipelineDepth,
-    unsigned softwarePipelineStoreStage) {
-  LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
+LogicalResult
+setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
+                           const unsigned numSubgroupsPerWorkgroup,
+                           const unsigned numMNTilesPerSubgroup,
+                           unsigned softwarePipelineDepth,
+                           unsigned softwarePipelineStoreStage) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to matmul cooperative matrix config...\n");
   // This configuration is only for cooperative matrix.
-  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixKHR) ||
-      !targetEnv.allows(spirv::Extension::SPV_KHR_cooperative_matrix)) {
+  if (target.getWgp().getMma().empty())
     return failure();
-  }
 
   if (op.hasDynamicShape())
     return failure();
@@ -895,40 +892,42 @@ LogicalResult setCooperativeMatrixConfig(
   Type initElem = getElementType(init);
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  auto properties =
-      limits.getCooperativeMatrixPropertiesKhr()
-          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
-
   SmallVector<GPUMatmulShapeType> intrinsics;
-  intrinsics.reserve(limits.getCooperativeMatrixPropertiesKhr().size());
-  for (auto p : properties) {
-    intrinsics.emplace_back(p.getMSize(), p.getNSize(), p.getKSize(),
-                            p.getAType(), p.getBType(), p.getCType());
+  intrinsics.reserve(target.getWgp().getMma().size());
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
   int64_t sharedMemoryLimitInBytes =
-      targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
+      target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
+  // wave32 mode for better performance.
+  int64_t subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/false);
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  bool transposedLhs =
+      kIndex !=
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nIndex !=
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                        subgroupSize, transposedLhs, transposedRhs);
   if (failed(schedule))
     return failure();
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
-  std::optional<int64_t> subgroupSize = limits.getSubgroupSize();
-  // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
-  // wave32 mode for better performance.
-  if (targetEnv.getVendorID() == spirv::Vendor::AMD) {
-    if (std::optional<int> minSize = limits.getMinSubgroupSize())
-      subgroupSize = *minSize;
-  }
-
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * *subgroupSize,
+  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
                                        schedule->mWarpCount, 1};
 
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
@@ -972,7 +971,7 @@ LogicalResult setCooperativeMatrixConfig(
   bool promoteC = needToPrmoteCForCooperativeMatrix(op);
 
   // Decrease pipeline depth until it fits in shared memory.
-  const int maxBytes = limits.getMaxComputeSharedMemorySize();
+  const int maxBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
   auto usedBytes =
       getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],
                    reductionTileSizes[kIndex],
@@ -997,10 +996,10 @@ LogicalResult setCooperativeMatrixConfig(
 // FFT Default Configuration
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
+static LogicalResult setFftOpConfig(IREE::GPU::TargetAttr target,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
-  const int subgroupSize = limits.getSubgroupSize();
+  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
   auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
@@ -1036,7 +1035,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Winograd Default Configuration
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
+static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
                                          IREE::LinalgExt::LinalgExtOp op) {
   // Tiling is already done by tile and decompose, so we only set pipeline and
   // workgroup size. The tile sizes below are placeholders and were obtained
@@ -1055,13 +1054,13 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 //===----------------------------------------------------------------------===//
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
-static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
+static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                         linalg::LinalgOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
 
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
-  if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
+  if (!target.supportsSubgroupShuffle())
     return failure();
 
   SmallVector<unsigned> parallelDims;
@@ -1122,7 +1121,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   if (!foundSingleReductionOutput)
     return failure();
 
-  const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
 
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1182,7 +1181,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // the workgroup size we use can divide the total reduction size, and it's
   // also within hardware limitations.
   const int64_t maxWorkgroupSize =
-      targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
+      target.getWgp().getMaxThreadCountPerWorkgroup();
   int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = GreatestCommonDivisor(APInt(64, uint64_t(groupSize)),
@@ -1298,7 +1297,7 @@ static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
   return bitwidth;
 };
 
-static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
+static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
                                         Operation *op,
                                         bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce as default op...\n");
@@ -1317,7 +1316,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                                  workgroupSize);
   }
 
-  const int subgroupSize = limits.getSubgroupSize();
+  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
   const unsigned loopDepth = partitionedLoops.back() + 1;
 
   // Configurations we need to decide.
@@ -1532,7 +1531,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
 static LogicalResult
 setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
-                          const spirv::TargetEnv &targetEnv) {
+                          IREE::GPU::TargetAttr target) {
   if (!clSPIRVEnableTransformDialectJit) {
     return failure();
   }
@@ -1541,30 +1540,24 @@ setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, CodeGenPipeline::TransformDialectCodegen);
 
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-
   // TODO: unify the target information into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
-  gpuModel.hasWarpShuffle =
-      targetEnv.allows(spirv::Capability::GroupNonUniformShuffle);
+  gpuModel.hasWarpShuffle = target.supportsSubgroupShuffle();
   gpuModel.hasTF32TensorCore = false;
   gpuModel.hasMmaSync = false;
   gpuModel.hasTF32TensorCore = false;
-  gpuModel.minSubgroupSize = limits.getMinSubgroupSize();
-  gpuModel.maxSubgroupSize = limits.getMaxSubgroupSize();
-  gpuModel.maxWorkGroupInvocations = limits.getMaxComputeWorkgroupInvocations();
+  gpuModel.minSubgroupSize = target.getMinSubgroupSize();
+  gpuModel.maxSubgroupSize = target.getMaxSubgroupSize();
+  gpuModel.maxWorkGroupInvocations =
+      target.getWgp().getMaxThreadCountPerWorkgroup();
 
   // Populates the supported WMMA fragment combinations from the target
   // environment. Infer tf32 support from the list of supported fragment types.
-  auto properties =
-      limits.getCooperativeMatrixPropertiesKhr()
-          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
-  for (auto property : properties) {
-    if (property.getScope().getValue() != spirv::Scope::Subgroup)
-      continue;
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
     gpuModel.supportedWMMAConfigs.emplace_back(iree_compiler::gpu::MMAConfig{
-        property.getMSize(), property.getNSize(), property.getKSize(),
-        property.getAType(), property.getBType(), property.getCType()});
+        mSize, nSize, kSize, aType, bType, cType});
   }
 
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
@@ -1579,44 +1572,32 @@ setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
 
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
-static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
+static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPointFn,
                                       Operation *rootOp) {
   // First try to see if there is a matching transform dialect configuration.
-  if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, targetEnv))) {
+  if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, target))) {
     return success();
   }
 
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
-  switch (targetEnv.getVendorID()) {
-  case spirv::Vendor::AMD:
-    if (succeeded(detail::setAMDCodeGenConfig(targetEnv, rootOp)))
-      return success();
-    break;
-  case spirv::Vendor::Apple:
-    if (succeeded(detail::setAppleCodeGenConfig(targetEnv, rootOp)))
-      return success();
-    break;
-  case spirv::Vendor::ARM:
-    if (succeeded(detail::setMaliCodeGenConfig(targetEnv, rootOp)))
-      return success();
-    break;
-  case spirv::Vendor::NVIDIA:
-    if (succeeded(detail::setNVIDIACodeGenConfig(targetEnv, rootOp)))
-      return success();
-    break;
-  case spirv::Vendor::Qualcomm:
-    if (succeeded(detail::setAdrenoCodeGenConfig(targetEnv, rootOp)))
-      return success();
-    break;
-  default:
-    break;
-  }
+  if (target.isAMD() && succeeded(detail::setAMDCodeGenConfig(target, rootOp)))
+    return success();
+  if (target.isApple() &&
+      succeeded(detail::setAppleCodeGenConfig(target, rootOp)))
+    return success();
+  if (target.isARM() && succeeded(detail::setMaliCodeGenConfig(target, rootOp)))
+    return success();
+  if (target.isNVIDIA() &&
+      succeeded(detail::setNVIDIACodeGenConfig(target, rootOp)))
+    return success();
+  if (target.isQualcomm() &&
+      succeeded(detail::setAdrenoCodeGenConfig(target, rootOp)))
+    return success();
 
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([&](auto op) {
         // Try to tile and vectorize first. It's common to see 32 threads
@@ -1630,19 +1611,19 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
           threadMNK = {8, 8, 4};
         }
         auto result =
-            detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
+            detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
         if (succeeded(result))
           return success();
 
         LLVM_DEBUG(llvm::dbgs()
                    << "failed to set matmul op config, trying reduction\n");
-        if (succeeded(setReductionConfig(targetEnv, op)))
+        if (succeeded(setReductionConfig(target, op)))
           return success();
 
         // If unsuccessful, try to tile and distribute.
-        return setDefaultOpConfig(limits, op);
+        return setDefaultOpConfig(target, op);
       })
-      .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
+      .Case<linalg::ConvolutionOpInterface>([target](auto op) {
         // Use the result type in case of larger bitwidth for accumulators.
         auto type = cast<ShapedType>(op->getResult(0).getType());
         const int bitwidth = type.getElementTypeBitWidth();
@@ -1657,27 +1638,27 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         }
 
         // If unsuccessful, try to tile and distribute/vectorize.
-        return setDefaultOpConfig(limits, op);
+        return setDefaultOpConfig(target, op);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
         LLVM_DEBUG(llvm::dbgs() << "figuring configuration for generic op\n");
-        if (succeeded(setReductionConfig(targetEnv, op)))
+        if (succeeded(setReductionConfig(target, op)))
           return success();
 
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,
         // which will mark it as a root.
         if (op.getNumLoops() != op.getNumParallelLoops()) {
-          return setDefaultOpConfig(limits, op);
+          return setDefaultOpConfig(target, op);
         }
         return failure();
       })
-      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
-        return setFftOpConfig(limits, op);
+      .Case<IREE::LinalgExt::FftOp>([target](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(target, op);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp>(
-          [&](auto op) { return setWinogradOpConfig(limits, op); })
+          [&](auto op) { return setWinogradOpConfig(target, op); })
       .Default([](Operation *) { return failure(); });
 };
 
@@ -1685,7 +1666,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
+static LogicalResult setConfigForKernel(IREE::GPU::TargetAttr target,
                                         mlir::FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   if (computeOps.empty()) {
@@ -1707,14 +1688,13 @@ static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
   }
 
   for (Operation *computeOp : roots) {
-    if (succeeded(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
+    if (succeeded(setSPIRVOpConfig(target, funcOp, computeOp)))
       return success();
   }
 
   Operation *computeOp = roots.back();
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   // If there are still no root op, check for any linalg.generic op.
-  if (succeeded(setDefaultOpConfig(limits, computeOp)))
+  if (succeeded(setDefaultOpConfig(target, computeOp)))
     return success();
 
   // Check if the op configuration was set.
@@ -1724,15 +1704,12 @@ static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
 }
 
 LogicalResult initSPIRVLaunchConfig(FunctionOpInterface funcOp) {
-  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(funcOp);
-  if (!targetEnvAttr) {
-    return funcOp.emitOpError(
-        "expected parent hal.executable.variant to have spirv.target_env "
-        "attribute");
-  }
-  if (getTranslationInfo(funcOp)) {
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target)
+    return funcOp.emitError("missing GPU target in #hal.executable.target");
+
+  if (getTranslationInfo(funcOp))
     return success();
-  }
 
   if (auto exportOp = getEntryPoint(funcOp)) {
     // If no translation info set, first check whether we already have workgroup
@@ -1752,8 +1729,7 @@ LogicalResult initSPIRVLaunchConfig(FunctionOpInterface funcOp) {
     }
   }
 
-  spirv::TargetEnv targetEnv(targetEnvAttr);
-  if (failed(setConfigForKernel(targetEnv, funcOp))) {
+  if (failed(setConfigForKernel(target, funcOp))) {
     return failure();
   }
 

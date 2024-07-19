@@ -179,6 +179,16 @@ def _initializeGlobalCL(*cl_args: str):
     _dylib.ireeCompilerSetupGlobalCL(len(cl_args), arg_pointers, b"ctypes", False)
 
 
+def _is_null_terminated(view: memoryview):
+    return view.nbytes > 0 and view[-1] == 0
+
+
+def _is_mlir_bytecode(view: memoryview):
+    """Compares the first 4 bytes of the view against the magic number 4d4cef52.
+    See https://mlir.llvm.org/docs/BytecodeFormat/#magic-number for more info."""
+    return len(view) >= 4 and view[:4].hex() == "4d4cef52"
+
+
 class Session:
     def __init__(self):
         self._global_init = _global_init
@@ -339,7 +349,7 @@ class Source:
                 buffer,
                 buffer_len,
                 # Detect if nul terminated.
-                True if buffer_len > 0 and view[-1] == 0 else False,
+                _is_null_terminated(view) and not _is_mlir_bytecode(view),
                 byref(source_p),
             )
         )

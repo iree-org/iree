@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )
@@ -109,6 +110,15 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls IREEGPUOps.h.inc
     --gen-op-defs IREEGPUOps.cpp.inc
+)
+
+iree_tablegen_doc(
+  NAME
+    IREEGPUDialectDocGen
+  TD_FILE
+    "IREEGPUOps.td"
+  OUTS
+    --gen-dialect-doc --dialect=iree_gpu IREEGPUDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

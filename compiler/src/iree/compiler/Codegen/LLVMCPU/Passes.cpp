@@ -42,6 +42,11 @@ static llvm::cl::opt<bool> clFailOnOutOfBoundsStackAllocation(
                    "be solved"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clFailOnLargeVector(
+    "iree-llvmcpu-fail-on-large-vector",
+    llvm::cl::desc("fail if there are operations with large vectors"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clCheckLinalgVectorization(
     "iree-llvmcpu-check-linalg-vectorization",
     llvm::cl::desc(
@@ -84,6 +89,19 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
     "iree-llvmcpu-enable-vector-contract-custom-kernels",
     llvm::cl::desc("Enables vector contract custom kernels for "
                    "LLVMCPUMmt4dVectorLowering pass."),
+    llvm::cl::init(false));
+
+// By default, IREE does not enable the Armv9-A streaming SVE mode in the
+// presence of scalable vectors (even when using `+sme`), as currently there's
+// no cost model of when it could be beneficial. This flag will effectively make
+// IREE/LLVM switch from SVE to SSVE in dispatch regions with supported
+// scalable vector operations.
+static llvm::cl::opt<bool> clForceArmStreaming(
+    "iree-llvmcpu-force-arm-streaming",
+    llvm::cl::desc(
+        "Enables Armv9-A streaming SVE mode for any dispatch region that "
+        "contains supported scalable vector operations (i.e., use SSVE rather "
+        "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
@@ -320,6 +338,9 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   // Run IREE specific passes before vector lowering expert.
@@ -332,10 +353,6 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
@@ -397,6 +414,9 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);
@@ -411,10 +431,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(
@@ -456,6 +472,9 @@ void addConvTileAndDecomposeExpertPassPipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   // Eliminate redundant transfer_read/write to avoid stack allocations.
@@ -473,10 +492,6 @@ void addConvTileAndDecomposeExpertPassPipeline(
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
@@ -484,43 +499,15 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  }
-
-  // We still run codegen pipeline because we want a better fallback when
-  // ukernels are not available. They are nop if the mmt4d op is convereted to
-  // ukernels. If ukernels are not implemented, the lowering config is still
-  // carried by compute ops, so we can use it as a fallback solution.
-
-  // Apply tile and fuse to all the non-distribution fusable levels. Skip
-  // distribution level as such a level has been fused already.
-  SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
-  if (allFusableLevels.size() > 1) {
-    llvm::SmallSetVector<int64_t, 4> fusableLevels(allFusableLevels.begin(),
-                                                   allFusableLevels.end());
-    for (int i = 0, end = tilingConfig.getNumTilingLevels(); i < end; ++i) {
-      if (i == tilingConfig.getDistributionLevel())
-        continue;
-      if (fusableLevels.contains(i)) {
-        funcPassManager.addPass(createLLVMCPUTileAndFusePass(i));
-        continue;
-      }
-
-      if (i == tilingConfig.getVectorReductionLevel()) {
-        // Run SplitReductionPass before the final reduction Fuse pass, because
-        // SplitReductionPass takes care of banked-tiling.
-        funcPassManager.addPass(
-            createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
-        funcPassManager.addPass(createLLVMCPUTilePass(i));
-        continue;
-      }
-
-      funcPassManager.addPass(createLLVMCPUTilePass(i));
-    }
-  }
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
+  // The below two passes are nop if the "mmt4d" is explicitly excluded in the
+  // ukernels attribute.
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  funcPassManager.addPass(createLLVMCPUTilePass(
+      static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
 
   {
     GenericVectorizationPassOptions options;
@@ -531,6 +518,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -555,11 +545,11 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  }
+  // The below two passes are nop if pack/unpack is not specified in ukernels
+  // attribute. By default, they are disabled.
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
 
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
@@ -576,6 +566,9 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);
@@ -597,10 +590,13 @@ void addCPULinalgExtTileAndVectorizePipeline(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   // TODO: Remove the pass once we have PartialReductionOpInterface implemented
   // for AttentionOp.
-  funcPassManager.addPass(IREE::LinalgExt::createTileAttentionPass());
-  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(
+      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
+  funcPassManager.addPass(
+      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
 
   {
     GenericVectorizationPassOptions options;
@@ -610,6 +606,9 @@ void addCPULinalgExtTileAndVectorizePipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);
@@ -667,15 +666,29 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   if (enableAArch64SME) {
     modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
     FunctionLikeNest(modulePassManager)
+        .addPredicatedPass(
+            clForceArmStreaming,
+            [] {
+              // 1. Enable Armv9-A streaming mode without ZA (i.e., SSVE) for
+              // dispatch regions that contain scalable vectors when forced via
+              // the --iree-llvmcpu-force-arm-streaming flag.
+              return mlir::arm_sme::createEnableArmStreamingPass(
+                  mlir::arm_sme::ArmStreamingMode::StreamingLocally,
+                  mlir::arm_sme::ArmZaMode::Disabled,
+                  /*ifRequiredByOps=*/false,
+                  /*ifContainsScalableVectors=*/true);
+            })
         .addPass(createCanonicalizerPass)
         .addPass(createCSEPass)
         .addPass(mlir::createArithToArmSMEConversionPass)
         .addPass(mlir::createConvertVectorToArmSMEPass)
-        .addPass([]() {
+        .addPass([] {
+          // 2. Enable ZA for dispatch regions that contain ArmSME ops (which
+          // all make use of the ZA state).
           return mlir::arm_sme::createEnableArmStreamingPass(
               mlir::arm_sme::ArmStreamingMode::StreamingLocally,
               mlir::arm_sme::ArmZaMode::NewZA,
-              /*onlyIfRequiredByOps=*/true);
+              /*ifRequiredByOps=*/true);
         })
         .addPass(mlir::createConvertArmSMEToSCFPass);
   }
@@ -824,12 +837,22 @@ void registerCodegenLLVMCPUPasses() {
         buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
       });
 
-  static PassPipelineRegistration<> LinalgLLVMPipeline(
-      "iree-codegen-linalg-to-llvm-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to LLVM",
-      [](OpPassManager &variantPassManager) {
-        buildLLVMCPUCodegenPassPipeline(variantPassManager);
-      });
+  struct LinalgToLLVMPipelineOptions
+      : public PassPipelineOptions<LinalgToLLVMPipelineOptions> {
+    Option<bool> enableArmSME{
+        *this, "enable-arm-sme",
+        llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+  };
+
+  static PassPipelineRegistration<LinalgToLLVMPipelineOptions>
+      LinalgLLVMPipeline(
+          "iree-codegen-linalg-to-llvm-pipeline",
+          "Runs the progressive lowering pipeline from Linalg to LLVM",
+          [](OpPassManager &variantPassManager,
+             LinalgToLLVMPipelineOptions const &options) {
+            buildLLVMCPUCodegenPassPipeline(variantPassManager,
+                                            options.enableArmSME);
+          });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
       "iree-codegen-llvmcpu-linking-pipeline",

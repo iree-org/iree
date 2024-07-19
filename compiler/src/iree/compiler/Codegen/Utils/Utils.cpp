@@ -134,17 +134,33 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
 }
 
+static const char *
+getDefaultEnabledUkernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isX86_64(targetAttr)) {
+    return "mmt4d";
+  }
+  if (isAArch64(targetAttr)) {
+    if (hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
+        hasFeature(targetAttr, "+sme")) {
+      return "none";
+    }
+    return "mmt4d";
+  }
+  return "none";
+}
+
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName) {
   auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
-  if (!enabledUkernels) {
-    return false;
+  StringRef enabledUkernelsStr;
+  if (enabledUkernels) {
+    enabledUkernelsStr = enabledUkernels->getValue();
+  } else {
+    enabledUkernelsStr = "default";
   }
-  StringRef enabledUkernelsStr = enabledUkernels->getValue();
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
-    // Current defaults implemented here. Could depend on targetAttr.
-    enabledUkernelsStr = "none";
+    enabledUkernelsStr = getDefaultEnabledUkernels(targetAttr);
   }
   // Resolve `none`.
   if (enabledUkernelsStr == "none") {

@@ -12,6 +12,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -24,7 +25,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Support/MathExtras.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -279,7 +279,7 @@ private:
     ub = *ubCst;
     step = *stepCst;
 
-    int64_t numIters = mlir::ceilDiv(ub - lb, step);
+    int64_t numIters = llvm::divideCeil(ub - lb, step);
     if (numIters <= 2)
       return failure();
 

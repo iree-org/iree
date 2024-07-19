@@ -57,6 +57,10 @@ function(iree_check_test)
     ${ARGN}
   )
 
+  # Normalize some variables before using them.
+  string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
+  string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
+
   # ---------------------------------------------------------------------------
   # Bytecode module builds require
   #   1. the compiler, either in the same build or provided in IREE_HOST_BIN_DIR
@@ -92,13 +96,15 @@ function(iree_check_test)
   # backends are enabled. We could query the tools in the binary directory for
   # support dynamically if optionality would be useful.
   if(NOT IREE_HOST_BIN_DIR)
-    string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
-    string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
     # TODO(scotttodd): allow plugins to provide external backends here
     if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
       message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
     endif()
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+    endif()
+    # rocm/hip require a target chip to be specified at compile time that matches the runtime device
+    if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM" AND NOT IREE_HIP_TEST_TARGET_CHIP)
       set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
@@ -158,6 +164,9 @@ function(iree_check_test)
   endif()
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
+  if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}")
   endif()
 
   if(_BYTECODE_MODULE_BUILD_ENABLED)
@@ -437,6 +446,7 @@ function(iree_check_test_suite)
   endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
+    # Default backends/drivers.
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
     set(_RULE_DRIVERS "local-task" "vulkan" "local-task")
   endif()

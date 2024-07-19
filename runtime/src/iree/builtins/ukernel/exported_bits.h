@@ -86,7 +86,7 @@
 // query_tile_sizes
 //===----------------------------------------------------------------------===//
 
-// OPERAND_ROLE describes the role that a tensor plays in an
+// OPERAND_INDEX describes the index that a tensor plays in an
 // operation, e.g. "left-hand-size operand" (e.g. in a matmul).
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK 0xFF
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE 0x00

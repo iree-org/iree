@@ -18,13 +18,11 @@ repos:
         #   resulting in errors like `expected a single document in the stream`
         exclude: "mkdocs.yml|.clang-format"
 
-    # TODO(scotttodd): enable once enough contributors are familiar with pre-commit
-    # -   id: end-of-file-fixer
-    #     exclude_types: ["image", "jupyter"]
+    -   id: end-of-file-fixer
+        exclude_types: ["image", "jupyter"]
 
-    # TODO(scotttodd): enable once enough contributors are familiar with pre-commit
-    # -   id: trailing-whitespace
-    #     exclude_types: ["image", "jupyter"]
+    -   id: trailing-whitespace
+        exclude_types: ["image", "jupyter"]
 
 -   repo: https://github.com/psf/black
     rev: 23.3.0
@@ -60,33 +58,46 @@ repos:
 -   repo: https://github.com/jlebar/pre-commit-hooks.git
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
     hooks:
-      # TODO(scotttodd): Download as needed
-      #   https://github.com/jlebar/pre-commit-hooks/issues/3
-      # TODO(scotttodd): enable when this works on Windows
-      #   https://github.com/bazelbuild/buildtools/issues/914
-      #   could try `git add . --renormalize`
-      # -   id: bazel-buildifier
-
       -   id: do-not-submit
 
 -   repo: local
     hooks:
+    -   id: buildifier
+        name: Run buildifier
+        entry: buildifier
+        language: golang
+        # Pinned to v7.1.2, but of course we can't use a tag because semver
+        # and "go install" just don't work together???
+        # This makes absolutely no sense and the maintainers have no intention
+        # of improving it or at least explaining it as hundreds of developers
+        # search for basic support: https://github.com/golang/go/issues/35732.
+        # Docs are technically at https://go.dev/ref/mod#go-install ¯\_(ツ)_/¯
+        additional_dependencies: ["github.com/bazelbuild/buildtools/buildifier@1429e15ae755a6762d0edf9198062dc6ed04408d"]
+        files: '^(.*/)?(BUILD\.bazel|BUILD|WORKSPACE|WORKSPACE\.bazel|WORKSPACE\.bzlmod|MODULE\.bazel)$|\.BUILD$|\.bzl$'
+        # Pin the language version so other system version are _not_ used.
+        # Older go versions used different syntax for "go install" (which is
+        # apparently different from "go get" and "go build"), so for this to
+        # work reliably at all we need to ensure at least some minimum. Syntax
+        # probably changed again in a future version, whatever.
+        language_version: "1.16"
+
     -   id: bazel_to_cmake
         name: Run bazel_to_cmake.py
         language: python
+        # Note: this passes file names to the tool. The tool can also be run
+        # manually with no arguments specified to walk directories on its own.
         entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-        # TODO(scotttodd): run on BUILD.bazel/CMakeLists.txt files individually
-        always_run: true
-        pass_filenames: false
+        # Keep the top level directories here in sync with .bazel_to_cmake.cfg.py.
+        files: '^(compiler|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel|CMakeLists.txt)$'
 
-    # TODO(scotttodd): replace with an official pre-commit hook?
-    #   See https://github.com/pre-commit/pre-commit-hooks/issues/760
     -   id: check_path_lengths
-        name: Run check_path_lengths.py
-        language: python
-        entry: ./build_tools/scripts/check_path_lengths.py
-        always_run: true
-        pass_filenames: false
+        name: Check for excessively long path lengths
+        language: fail
+        entry: Path lengths relative to the root should be < 75 characters (run ./build_tools/scripts/check_path_lengths.py for detailed output)
+        # The regex includes/excludes here should roughly match the behavior of
+        # the check_path_lengths.py script.
+        files: '^compiler/.{66,}/\w+\.'
+        exclude: 'test/'
 
     -   id: build_file_names
         name: Check Bazel file names
@@ -94,23 +105,20 @@ repos:
         language: fail
         files: "BUILD$"
 
-    # TODO(scotttodd): enable these checks when they work on Windows
-    #   the generator scripts use \ on Windows instead of /
+    # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)
 
-    # -   id: generate_cmake_e2e_test_artifacts_suite
-    #     name: Run generate_cmake_e2e_test_artifacts_suite.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
-    #     args: ["--output_dir", "./tests/e2e/test_artifacts"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
+    -   id: generate_cmake_e2e_test_artifacts_suite
+        name: Run generate_cmake_e2e_test_artifacts_suite.py
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
+        args: ["--output_dir", "./tests/e2e/test_artifacts"]
+        files: '^(build_tools/python|build_tools/testing|tests/e2e/test_artifacts)/.*'
+        pass_filenames: false
 
-    # -   id: generate_cmake_e2e_model_tests
-    #     name: Run generate_cmake_e2e_model_tests.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
-    #     args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
+    -   id: generate_cmake_e2e_model_tests
+        name: Run generate_cmake_e2e_model_tests.py
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
+        args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
+        files: '^(build_tools/python|build_tools/testing|tests/e2e/stablehlo_models)/.*'
+        pass_filenames: false

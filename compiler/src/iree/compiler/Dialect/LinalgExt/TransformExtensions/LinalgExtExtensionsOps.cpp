@@ -51,5 +51,17 @@ DiagnosedSilenceableFailure LinalgExt::DecomposeTiledAttentionOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+DiagnosedSilenceableFailure LinalgExt::ConvertToOnlineAttention::applyToOne(
+    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  SmallVector<Operation *> ops;
+  LinalgExt::convertToOnlineAttention(attentionOp, ops, rewriter);
+  for (Operation *op : ops) {
+    results.push_back(op);
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.cpp.inc"

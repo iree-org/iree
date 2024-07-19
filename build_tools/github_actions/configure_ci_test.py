@@ -292,6 +292,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {postsubmit_job})
 
+    @unittest.skip("skip while `build_test_all_macos_arm64` job is disabled")
     def test_get_enabled_jobs_metal(self):
         trailers = {}
         all_jobs = {"job1"}

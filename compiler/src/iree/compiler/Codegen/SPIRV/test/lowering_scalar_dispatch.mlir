@@ -1,13 +1,9 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-spirv-select-lowering-strategy-pass, func.func(iree-spirv-lower-executable-target-pass)))))' -mlir-print-local-scope %s | FileCheck %s
-
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32>>}>
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-spirv-select-lowering-strategy-pass, func.func(iree-spirv-lower-executable-target-pass)))))' -mlir-print-local-scope %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @scalar_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @scalar_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %c1 = arith.constant 1 : index

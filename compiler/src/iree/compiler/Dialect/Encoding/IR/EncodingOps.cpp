@@ -6,34 +6,22 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/MathExtras.h"
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -108,8 +96,9 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
 // encoding.encoding
 //===----------------------------------------------------------------------===//
 
-EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
-                               ArrayRef<Type> elemTypes, Type origType,
+EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
+                               EncodingOpType opType, ArrayRef<Type> elemTypes,
+                               Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
                                ArrayRef<AffineMap> maps,
@@ -118,32 +107,32 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
   auto optionalToAttr = [&](std::optional<int64_t> x) {
     return x ? b.getIndexAttr(*x) : IntegerAttr();
   };
-  auto roleAttr = EncodingRoleAttr::get(ctx, role);
+  auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
-  return get(ctx, roleAttr, b.getTypeArrayAttr(elemTypes), origTypeAttr,
+  return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
+             b.getTypeArrayAttr(elemTypes), origTypeAttr,
              optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
              b.getAffineMapArrayAttr(maps), roundDimsToAttr);
 }
 
-AffineMap EncodingAttr::getMapForRole() {
-  EncodingRole role = getRole().getValue();
-  switch (role) {
-  case EncodingRole::LHS:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[0]).getAffineMap();
-  case EncodingRole::RHS:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[1]).getAffineMap();
-  case EncodingRole::RESULT:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[2]).getAffineMap();
+AffineMap EncodingAttr::getMapForOperandIndex() {
+  auto index = getOperandIndex().getValue().getZExtValue();
+  switch (index) {
+  case MATMUL_LHS:
+  case MATMUL_RHS:
+  case MATMUL_RESULT:
+    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index])
+        .getAffineMap();
   default:
     return AffineMap();
   }
 }
 
-unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
-  AffineMap map = getMapForRole();
+unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+  AffineMap map = getMapForOperandIndex();
   auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
   assert(idx.has_value());
   return idx.value();
@@ -173,6 +162,21 @@ getEncodingContractionDims(EncodingAttr encoding) {
         return cast<AffineMapAttr>(m).getAffineMap();
       });
   return linalg::inferContractionDims(indexingMaps);
+}
+
+std::string stringifyOperandIndex(IntegerAttr valueAttr) {
+  auto value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case MATMUL_LHS:
+    return "LHS";
+  case MATMUL_RHS:
+    return "RHS";
+  case MATMUL_RESULT:
+    return "RESULT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

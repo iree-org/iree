@@ -153,6 +153,8 @@ enum iree_hal_memory_access_bits_t {
 };
 typedef uint16_t iree_hal_memory_access_t;
 
+typedef uint32_t iree_hal_buffer_compatibility_t;
+
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
 // efficient operations of the specified types. Validation will fail if a buffer
@@ -572,6 +574,14 @@ iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
 IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
+
+// Adjusts the offset and length of a buffer subrange and returns the new
+// subrange. Fails if the range is invalid.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_calculate_range(
+    iree_device_size_t base_offset, iree_device_size_t max_length,
+    iree_device_size_t offset, iree_device_size_t length,
+    iree_device_size_t* out_adjusted_offset,
+    iree_device_size_t* out_adjusted_length);
 
 // Tests whether the given buffers overlap, including support for subspans.
 // IREE_WHOLE_BUFFER may be used for |lhs_length| and/or |rhs_length| to use the

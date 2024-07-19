@@ -11,6 +11,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -48,11 +49,8 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
     }
     outCpu = triple.isX86() ? llvm::sys::getHostCPUName().str() : "";
     llvm::SubtargetFeatures features;
-    llvm::StringMap<bool> hostFeatures;
-    if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
-      for (auto &feature : hostFeatures) {
-        features.AddFeature(feature.first(), feature.second);
-      }
+    for (auto &feature : llvm::sys::getHostCPUFeatures()) {
+      features.AddFeature(feature.first(), feature.second);
     }
     outCpuFeatures = features.getString();
   } else {

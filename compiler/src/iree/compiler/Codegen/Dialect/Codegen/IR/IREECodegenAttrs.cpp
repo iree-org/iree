@@ -318,6 +318,10 @@ LoweringConfigAttr::getTilingLevelSizes(OpBuilder &builder, unsigned level,
       [&](int64_t t) -> OpFoldResult { return builder.getIndexAttr(t); });
 }
 
+bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
+  return !getTileSizeVals(level).empty();
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,
@@ -334,15 +338,17 @@ LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 
 LogicalResult
 CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                            LoweringConfigAttr loweringConfig,
+                            LoweringConfigAttrInterface loweringConfig,
                             TranslationInfoAttr translationInfo) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
-  if (failed(LoweringConfigAttr::verify(
-          emitError, loweringConfig.getTilingLevels(),
-          loweringConfig.getNativeVectorSize()))) {
-    return failure();
+  if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
+    if (failed(LoweringConfigAttr::verify(
+            emitError, defaultConfig.getTilingLevels(),
+            defaultConfig.getNativeVectorSize()))) {
+      return emitError() << "invalid lowering config: " << defaultConfig;
+    }
   }
   if (!translationInfo) {
     return emitError() << "missing translation info";
@@ -352,7 +358,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
           translationInfo.getCodegenSpec(), translationInfo.getWorkgroupSize(),
           translationInfo.getSubgroupSize(),
           translationInfo.getConfiguration()))) {
-    return failure();
+    return emitError() << "invalid translation info: " << translationInfo;
   }
   return success();
 }

@@ -42,7 +42,7 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 // the sequence of commands against a target command buffer implementation.
 // The command buffer can be replayed multiple times.
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
-    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, iree_arena_block_pool_t* block_pool,
     iree_allocator_t host_allocator,

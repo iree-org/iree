@@ -14,22 +14,12 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        "attention.mlir",
-        "contraction-packing.mlir",
-        "contraction-packing-and-dispatch.mlir",
-        # DISABLED: incorrectly assuming default flag values.
-        # "eltwise_reduction_eltwise.mlir",
-        "fold_tensor_slice_into_transfer.mlir",
-        # DISABLED: incorrectly assuming default flag values.
-        # "matmul.mlir",
         "matmul_library_call.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
-        "attention_codegen_spec.mlir",
-        "matmul_codegen_default_spec.mlir",
         "transform_library.mlir",
     ],
     tags = [
@@ -40,9 +30,7 @@ iree_lit_test_suite(
         "noubsan",
     ],
     tools = [
-        "//tools:iree-benchmark-module",
         "//tools:iree-compile",
-        "//tools:iree-opt",
         "//tools:iree-run-module",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",

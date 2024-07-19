@@ -29,7 +29,7 @@ def IREEGPU_IteratorTypeArrayAttr
                          "Iterator type should be an enum.">;
 
 //===----------------------------------------------------------------------===//
-// GPU Specific Lowering Config Attribute
+// GPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_LoweringConfigAttr :
@@ -38,6 +38,7 @@ def IREEGPU_LoweringConfigAttr :
         "getWorkgroupTileSizes",
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -55,8 +56,32 @@ def IREEGPU_LoweringConfigAttr :
         "The configured fields, including tiling levels">:$attributes
   );
   let extraClassDeclaration = [{
-    SmallVector<int64_t> getThreadTileSizes() const;
+    /// Helper to retrieve a target mma intrinsic if present.
+    ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
   }];
+}
+
+def IREEGPU_DerivedThreadConfig :
+    AttrDef<IREEGPU_Dialect, "DerivedThreadConfig", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+        "hasTilingLevel",
+      ]>
+    ]> {
+  let mnemonic = "derived_thread_config";
+  let summary = [{
+    drive lowering of an operation by deriving thread distribution when needed.
+  }];
+  let description = [{
+    Lowering config for a single thread tiling level that is inferred after
+    previous (often reduction) levels of tile + fuse. This is intended for
+    fused operations where it is much easier to compute the tile sizes to use
+    after previous levels of tile + fuse, rather than trying to pre-propagate
+    tiling configs.
+  }];
+  let assemblyFormat = "";
+  let parameters = (ins);
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,18 +202,13 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
 
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
-    SmallVector<int64_t> getADataDuplicate() const;
-    SmallVector<int64_t> getBDataDuplicate() const;
-    SmallVector<int64_t> getCDataDuplicate() const;
 
     // Partial nested layout for an MMA intrinsic's matrix input/output inside
     // a single subgroup.
-    //
-    // Note that this is just a container used by the following methods; it can
-    // contain both the shape and the order.
     struct SingleSubgroupLayout {
       SmallVector<int64_t, 2> outer;
       SmallVector<int64_t, 2> thread;
+      SmallVector<int64_t, 2> tstrides;
       SmallVector<int64_t, 2> element;
     };
 
@@ -196,17 +216,9 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
     // subgroup. Shape at each outer/thread/element level is a 2-D value,
     // following canonical matmul order--(M, K) for A, (K, N) for B, and
     // (M, N) for C.
-    SingleSubgroupLayout getASingleSubgroupLayoutCount() const;
-    SingleSubgroupLayout getBSingleSubgroupLayoutCount() const;
-    SingleSubgroupLayout getCSingleSubgroupLayoutCount() const;
-
-    // Returns the A/B/C matrix's partial nested layout order inside a single
-    // subgroup. Order at each outer/thread/element level is a 2-value
-    // permuation vector, following canonical matmul order--(M, K) for A,
-    // (K, N) for B, and (M, N) for C.
-    SingleSubgroupLayout getASingleSubgroupLayoutOrder() const;
-    SingleSubgroupLayout getBSingleSubgroupLayoutOrder() const;
-    SingleSubgroupLayout getCSingleSubgroupLayoutOrder() const;
+    SingleSubgroupLayout getASingleSubgroupLayout() const;
+    SingleSubgroupLayout getBSingleSubgroupLayout() const;
+    SingleSubgroupLayout getCSingleSubgroupLayout() const;
   }];
 }
 
@@ -350,14 +362,46 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   let assemblyFormat = "`<` struct(params) `>`";
 
   let extraClassDeclaration = [{
-    int getPreferredSubgroupSize() const {
-      return getWgp().getSubgroupSizeChoices().asArrayRef().front();
+    // Subgroup size related APIs
+
+    int getMinSubgroupSize() const {
+      return *llvm::min_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
+    int getMaxSubgroupSize() const {
+      return *llvm::max_element(getWgp().getSubgroupSizeChoices().asArrayRef());
+    }
+    // Returns the preferred subgroup size. If the target supports multiple
+    // subgroup sizes, pickLargest controls whether to return the largest one.
+    //
+    // AMD RDNA GPUs supports multiple subgroup sizes and the preferred one
+    // differ given the API--HIP prefers 32 while Vulkan prefers 64.
+    // TODO: We should be able to force Vulkan side to use 32 consistently
+    // too with subgroup size control; it might have perf implications though.
+    int getPreferredSubgroupSize(bool pickLargest=false) const {
+      if (pickLargest) {
+        return getMaxSubgroupSize();
+      }
+      return getMinSubgroupSize();
+    }
+
+    // Hardware feature related APIs
 
     bool supportsSubgroupShuffle() const {
       return bitEnumContainsAll(getWgp().getSubgroup().getValue(),
                                 SubgroupOps::Shuffle);
     }
+
+    // Vendor querying APIs
+
+    bool isAMD() const {
+      return getArch().starts_with("gfx") || getArch().starts_with("rdna");
+    }
+    bool isApple() const { return getArch().starts_with("apple"); }
+    bool isARM() const { return getArch().starts_with("valhall"); }
+    bool isNVIDIA() const { return getArch().starts_with("sm_"); }
+    bool isQualcomm() const { return getArch().starts_with("adreno"); }
+
+    // CUDA specific querying APIs
 
     std::optional<int> getCUDAComputeCapability() const;
     // Returns true if this target supports TensoreCore MMA ops with TF32

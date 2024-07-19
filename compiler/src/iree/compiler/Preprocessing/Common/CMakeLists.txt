@@ -29,6 +29,8 @@ iree_cc_library(
     "ApplyPDLPatterns.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertConvToChannelsLast.cpp"
+    "FoldAttentionWithTranspose.cpp"
+    "GeneralizeLinalgMatMul.cpp"
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
     "PadLinalgOps.cpp"
@@ -64,6 +66,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

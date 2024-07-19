@@ -18,7 +18,7 @@ def IREECodegen_Dialect : Dialect {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 
   let summary = [{
-    A dialect representing attributes used by the IREE Code generation.
+    A dialect for common functionality used by IREE code generation.
   }];
   let description = [{
     This dialect is primarily meant to hold attributes that carry the

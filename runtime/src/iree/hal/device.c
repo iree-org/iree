@@ -169,9 +169,9 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
                                                   queue_affinity, 1, &command,
                                                   &command_buffer));
 
-  iree_status_t status =
-      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
-                                    signal_semaphore_list, 1, &command_buffer);
+  iree_status_t status = iree_hal_device_queue_execute(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list, 1,
+      &command_buffer, /*binding_tables=*/NULL);
 
   iree_hal_command_buffer_release(command_buffer);
 
@@ -218,9 +218,9 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
                                                   queue_affinity, 1, &command,
                                                   &command_buffer));
 
-  iree_status_t status =
-      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
-                                    signal_semaphore_list, 1, &command_buffer);
+  iree_status_t status = iree_hal_device_queue_execute(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list, 1,
+      &command_buffer, /*binding_tables=*/NULL);
 
   iree_hal_command_buffer_release(command_buffer);
 
@@ -281,7 +281,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(
       !wait_semaphore_list.count ||
@@ -313,9 +314,20 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     }
   }
 
+  // Validate command buffer bindings against the provided binding tables.
+  // This will error out if a binding table is required but not provided or if
+  // any binding in the table does not match the requirements of the command
+  // buffer as recorded.
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_command_buffer_validate_binding_table(
+            command_buffers[i], binding_tables ? &binding_tables[i] : NULL));
+  }
+
   iree_status_t status = _VTABLE_DISPATCH(device, queue_execute)(
       device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      command_buffer_count, command_buffers);
+      command_buffer_count, command_buffers, binding_tables);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -329,7 +341,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
-                                    signal_semaphore_list, 0, NULL);
+                                    signal_semaphore_list, 0, NULL, NULL);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

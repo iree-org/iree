@@ -1,8 +1,7 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
 module {
-  func.func @matmul_4x4096x9216() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_4x4096x9216() {
     %c36864 = arith.constant 36864 : index
     %c667974912 = arith.constant 667974912 : index
     %c209920 = arith.constant 209920 : index
@@ -32,9 +31,8 @@ module {
 
 // Matvec does not go down matmul pipelines.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
 module {
-  func.func @matmul_1x4096x9216() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_1x4096x9216() {
     %c36864 = arith.constant 36864 : index
     %c667974912 = arith.constant 667974912 : index
     %c209920 = arith.constant 209920 : index
@@ -64,12 +62,11 @@ module {
 
 // Multi-reduction-dimension transposed-B matmul.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 module {
-  func.func @multi_reduction_transposed_b_matmul() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @multi_reduction_transposed_b_matmul() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>>

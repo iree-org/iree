@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_multi_mma.mlir",
+            "distribute_lane_forall.mlir",
             "distribute_multi_mma.mlir",
             "drop_multi_mma_unit_dims.mlir",
             "lower_multi_mma.mlir",

@@ -527,10 +527,10 @@ iree_status_t iree_hal_cuda_device_create_stream_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_stream_command_buffer_create(
-      base_device, device->cuda_symbols, device->nccl_symbols,
-      device->tracing_context, mode, command_categories, binding_capacity,
-      device->dispatch_cu_stream, &device->block_pool, device->host_allocator,
-      out_command_buffer);
+      iree_hal_device_allocator(base_device), device->cuda_symbols,
+      device->nccl_symbols, device->tracing_context, mode, command_categories,
+      binding_capacity, device->dispatch_cu_stream, &device->block_pool,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
@@ -541,20 +541,33 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
 
   switch (device->params.command_buffer_mode) {
-    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
-      return iree_hal_cuda_graph_command_buffer_create(
-          base_device, device->cuda_symbols, device->tracing_context,
-          device->cu_context, mode, command_categories, queue_affinity,
-          binding_capacity, &device->block_pool, device->host_allocator,
-          out_command_buffer);
-    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
+    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH: {
+      // TODO(indirect-cmd): when we can record indirect graphs we won't need
+      // to use deferred command buffers - this is here to emulate indirect
+      // command buffers.
+      if (binding_capacity > 0) {
+        return iree_hal_deferred_command_buffer_create(
+            iree_hal_device_allocator(base_device), mode, command_categories,
+            binding_capacity, &device->block_pool,
+            iree_hal_device_host_allocator(base_device), out_command_buffer);
+      } else {
+        return iree_hal_cuda_graph_command_buffer_create(
+            iree_hal_device_allocator(base_device), device->cuda_symbols,
+            device->tracing_context, device->cu_context, mode,
+            command_categories, queue_affinity, binding_capacity,
+            &device->block_pool, device->host_allocator, out_command_buffer);
+      }
+    }
+    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM: {
       return iree_hal_deferred_command_buffer_create(
-          base_device, mode, command_categories, binding_capacity,
-          &device->block_pool, iree_hal_device_host_allocator(base_device),
-          out_command_buffer);
-    default:
+          iree_hal_device_allocator(base_device), mode, command_categories,
+          binding_capacity, &device->block_pool,
+          iree_hal_device_host_allocator(base_device), out_command_buffer);
+    }
+    default: {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid command buffer mode");
+    }
   }
 }
 
@@ -757,7 +770,8 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -766,7 +780,7 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
       device->pending_queue_actions,
       iree_hal_cuda_device_collect_tracing_context, device->tracing_context,
       wait_semaphore_list, signal_semaphore_list, command_buffer_count,
-      command_buffers);
+      command_buffers, binding_tables);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
     status = iree_hal_cuda_pending_queue_actions_issue(

@@ -42,6 +42,8 @@ iree_cc_library(
     MLIRArmNeonDialect
     MLIRArmSMEDialect
     MLIRArmSMEToLLVMIRTranslation
+    MLIRArmSVEDialect
+    MLIRArmSVEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
     MLIRIR
     MLIRLLVMDialect
@@ -96,6 +98,7 @@ iree_cc_library(
     "LLVMTargetOptions.cpp"
   DEPS
     LLVMAnalysis
+    LLVMCore
     LLVMMC
     LLVMPasses
     LLVMSupport

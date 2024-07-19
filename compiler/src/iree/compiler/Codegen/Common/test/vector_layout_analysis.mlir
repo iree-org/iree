@@ -231,8 +231,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer = [4, 16],
   elements_per_thread = [4, 1],
 
-  subgroup_basis = [1, 1],
-  thread_basis   = [4, 16]
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 4]
 >
 
 // Propagate and enforce through reduction along dim 0.
@@ -243,13 +243,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [false, true], thread_basis = [4, 16], thread_active_ids = [false, true]}}
+    // expected-remark @above {{thread_strides = [4]}}
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{thread_basis = [4, 16]}}
+    // expected-remark @above {{thread_strides = [1, 4]}}
     %root_red = vector.multi_reduction<add>, %root, %cst0_1 [0]  : vector<16x16xf16> to vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [false, true], thread_basis = [4, 16], thread_active_ids = [false, true]}}
+    // expected-remark @above {{thread_strides = [4]}}
     %c = arith.mulf %root_red, %a : vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [false, true], thread_basis = [4, 16], thread_active_ids = [false, true]}}
+    // expected-remark @above {{thread_strides = [4]}}
     func.return %c : vector<16xf16>
   }
 
@@ -269,8 +269,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer = [4, 16],
   elements_per_thread = [4, 1],
 
-  subgroup_basis = [1, 1],
-  thread_basis   = [4, 16]
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 4]
 >
 
 // Propagate and enforce through reduction along dim 1.
@@ -281,13 +281,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [true, false], thread_basis = [4, 16], thread_active_ids = [true, false]}}
+    // expected-remark @above {{thread_strides = [1]}}
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<16x16xf16>, vector<16x16xf16>
-    // expected-remark @above {{thread_basis = [4, 16]}}
+    // expected-remark @above {{thread_strides = [1, 4]}}
     %root_red = vector.multi_reduction<add>, %root, %cst0_1 [1]  : vector<16x16xf16> to vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [true, false], thread_basis = [4, 16], thread_active_ids = [true, false]}}
+    // expected-remark @above {{thread_strides = [1]}}
     %c = arith.mulf %root_red, %a : vector<16xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids = [true, false], thread_basis = [4, 16], thread_active_ids = [true, false]}}
+    // expected-remark @above {{thread_strides = [1]}}
     func.return %c : vector<16xf16>
   }
 
@@ -307,8 +307,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer = [4, 8, 2],
   elements_per_thread = [4, 1, 2],
 
-  subgroup_basis = [2, 1, 1],
-  thread_basis   = [4, 8, 2]
+  subgroup_strides = [1, 2, 2],
+  thread_strides   = [1, 4, 32]
 >
 
 // Propagate and enforce through reduction along dim 1.
@@ -319,13 +319,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
-    // expected-remark-re @below {{{{.*}}[2, 1, 1], {{.*}}[1, 2, 4], {{.*}}[1, 1, 1], {{.*}}[4, 8, 2], {{.*}}[4, 1, 2]}}
+    // expected-remark-re @below {{thread_strides = [1, 4, 32]}}
     %root = vector.transfer_read %arr[%c0, %c0, %c0], %cst_0 {
       in_bounds = [true, true, true],
       "__vector_layout_test_anchor_result_0" = #layout
     } : memref<32x32x32xf16>, vector<32x16x16xf16>
     %t = vector.transpose %root, [1, 2, 0] : vector<32x16x16xf16> to vector<16x16x32xf16>
-    // expected-remark-re @above {{{{.*}}[1, 1, 2], {{.*}}[2, 4, 1], {{.*}}[1, 1, 1], {{.*}}[8, 2, 4], {{.*}}[1, 2, 4], {{.*}}[2, 0, 1], {{.*}}[2, 0, 1]}}
+    // expected-remark-re @above {{thread_strides = [4, 32, 1]}}
     vector.transfer_write %t, %arr[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x16x32xf16>, memref<32x32x32xf16>
     func.return
   }
@@ -345,12 +345,13 @@ builtin.module attributes { transform.with_named_sequence } {
   outers_per_batch = [1, 1],
   threads_per_outer = [32, 4],
   elements_per_thread = [1, 32],
-  subgroup_basis = [1, 1],
-  thread_basis = [32, 4]
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 32]
 >
 
 // Propagate and enforce layout through broadcast transpose and broadcast.
-// Main thing we want to see here is the subgroup_active_ids and thread_active_ids
+// Main thing we want to see here is the subgroup_strides and thread_strides
 // are being determined properly.
 builtin.module attributes { transform.with_named_sequence } {
   func.func @broadcast_transpose(%quant :  memref<128x128xi4>, %scale : memref<128xf16>, %arr: memref<128x128xf16>) -> () {
@@ -358,19 +359,19 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0_i4 = arith.constant 0 : i4
     %c0 = arith.constant 0 : index
     %0 = vector.transfer_read %quant[%c0, %c0], %c0_i4 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<128x128xi4>, vector<128x128xi4>
-    // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [1, 32]}}
     %1 = vector.transfer_read %scale[%c0],   %cst {in_bounds = [true]} : memref<128xf16>, vector<128xf16>
-    // expected-remark @above {{subgroup_active_ids = [true, false], thread_basis = [32, 4], thread_active_ids = [true, false]}}
+    // expected-remark @above {{thread_strides = [1]}}
     %2 = vector.broadcast %1 : vector<128xf16> to vector<128x128xf16>
-    // expected-remark-re @above {{threads_per_outer = [4, 32], elements_per_thread = [32, 1], subgroup_order = [1, 0], {{.*}}thread_order = [1, 0], {{.*}}thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [32, 1]}}
     %3 = vector.transpose %2, [1, 0] : vector<128x128xf16> to vector<128x128xf16>
-    // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [1, 32]}}
     %4 = arith.extui %0 : vector<128x128xi4> to vector<128x128xi32>
-    // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [1, 32]}}
     %5 = arith.uitofp %4 : vector<128x128xi32> to vector<128x128xf16>
-    // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [1, 32]}}
     %6 = arith.mulf %5, %3 : vector<128x128xf16>
-    // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
+    // expected-remark @above {{thread_strides = [1, 32]}}
     vector.transfer_write %6, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<128x128xf16>, memref<128x128xf16>
     func.return
   }
@@ -391,8 +392,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer = [4, 8, 2],
   elements_per_thread = [4, 1, 2],
 
-  subgroup_basis = [2, 1, 1],
-  thread_basis   = [4, 8, 2]
+  subgroup_strides = [1, 2, 2],
+  thread_strides   = [1, 4, 32]
 >
 
 /// Invalid anchor tests
@@ -423,8 +424,8 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer = [8, 2],
   elements_per_thread = [2, 2],
 
-  subgroup_basis = [1, 1],
-  thread_basis   = [8, 2]
+  subgroup_strides = [0, 0],
+  thread_strides   = [1, 8]
 >
 
 // Size mismatch anchor.
@@ -432,7 +433,7 @@ builtin.module attributes { transform.with_named_sequence } {
   // expected-note @below {{when applied to this op}}
   func.func @invalid_size_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
     %c = arith.addf %a, %b : vector<16x16xf16>
-    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [1, 1], threads_per_outer = [8, 2], elements_per_thread = [2, 2], subgroup_basis = [1, 1], thread_basis = [8, 2]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
+    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [1, 1], threads_per_outer = [8, 2], elements_per_thread = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
     func.return {"__vector_layout_test_anchor_operand_0" = #layout2} %c : vector<16x16xf16>
   }
 

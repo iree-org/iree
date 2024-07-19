@@ -242,6 +242,10 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>> createPadDynamicAlloc();
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 
+/// Pass to propagate reshapes by expansion through all ops without explicit
+/// lowering configurations.
+std::unique_ptr<OperationPass<>> createPropagateReshapesByExpansionPass();
+
 /// Pass to reconcile TranslationInfo across multiple functions in a dispatch
 /// and set the appropriate values on the surrounding HAL ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -288,6 +292,9 @@ createTransformDialectInterpreterPass(StringRef transformSequenceName = "");
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<InterfacePass<FunctionOpInterface>> createTypePropagationPass();
 
+/// Pass to vectorize memref.copy ops.
+std::unique_ptr<OperationPass<void>> createVectorizeMemrefCopyPass();
+
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<InterfacePass<FunctionOpInterface>> createVectorizePadPass();
@@ -329,6 +336,9 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 
 /// Method to register all passes.
 void registerCodegenCommonPasses();
+
+/// Populate Encoding to Nop pass and canonicalizer pass to the pipeline
+void addEncodingToNopPasses(FunctionLikeNest &passManager);
 
 } // namespace mlir::iree_compiler
 

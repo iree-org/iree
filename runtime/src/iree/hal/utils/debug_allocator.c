@@ -167,9 +167,9 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
         .semaphores = &semaphore,
         .payload_values = &signal_value,
     };
-    status = iree_hal_device_queue_execute(device, IREE_HAL_QUEUE_AFFINITY_ANY,
-                                           iree_hal_semaphore_list_empty(),
-                                           signal_list, 1, &command_buffer);
+    status = iree_hal_device_queue_execute(
+        device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+        signal_list, 1, &command_buffer, /*binding_tables=*/NULL);
   }
 
   if (iree_status_is_ok(status)) {

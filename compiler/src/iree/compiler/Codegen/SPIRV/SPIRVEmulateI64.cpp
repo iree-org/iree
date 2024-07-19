@@ -11,9 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -153,10 +154,10 @@ populateIreeI64EmulationPatterns(arith::WideIntEmulationConverter &converter,
 }
 
 static bool supportsI64(FunctionOpInterface op) {
-  spirv::TargetEnvAttr attr = getSPIRVTargetEnvAttr(op);
-  assert(attr && "Not a valid spirv module");
-  spirv::TargetEnv env(attr);
-  return env.allows(spirv::Capability::Int64);
+  IREE::GPU::TargetAttr attr = getGPUTargetAttr(op);
+  assert(attr && "Missing GPU target");
+  return IREE::GPU::bitEnumContainsAll(attr.getWgp().getCompute().getValue(),
+                                       IREE::GPU::ComputeBitwidths::Int64);
 }
 
 //===----------------------------------------------------------------------===//

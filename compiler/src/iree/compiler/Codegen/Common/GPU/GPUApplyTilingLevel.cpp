@@ -8,7 +8,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -65,11 +67,8 @@ collectTiledAndFusedOps(Operation *op,
 static LogicalResult
 applyTileAndFuseToEachRoot(RewriterBase &rewriter,
                            llvm::SmallDenseSet<TilingInterface> &payloadOps,
-                           bool threadTiling) {
+                           IREE::GPU::TilingLevel tilingLevel) {
   MLIRContext *context = rewriter.getContext();
-  unsigned tilingLevel =
-      threadTiling ? static_cast<unsigned>(IREE::GPU::TilingLevel::Thread)
-                   : static_cast<unsigned>(IREE::GPU::TilingLevel::Reduction);
   for (TilingInterface tilingInterfaceOp : payloadOps) {
     mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
 
@@ -87,7 +86,8 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
     rewriter.setInsertionPoint(tilingInterfaceOp);
     SmallVector<OpFoldResult> tileSizes =
         getLoweringConfig(tilingInterfaceOp)
-            .getTilingLevelSizes(rewriter, tilingLevel, tilingInterfaceOp);
+            .getTilingLevelSizes(rewriter, llvm::to_underlying(tilingLevel),
+                                 tilingInterfaceOp);
 
     // Pad the tile sizes with zero.
     auto zero = rewriter.getIndexAttr(0);
@@ -101,18 +101,26 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
 
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tileSizes);
-    if (threadTiling) {
+    if (tilingLevel == IREE::GPU::TilingLevel::Thread ||
+        tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
       tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
 
       // TODO: Add some helpers to construct this based on the enum type rather
       // than doing it here.
       SmallVector<DeviceMappingAttrInterface> mapping;
-      for (auto [idx, size] : llvm::enumerate(tileSizes)) {
+      int idx = 0;
+      for (auto size : tileSizes) {
         if (!isConstantIntValue(size, 0)) {
           unsigned mappingId =
-              static_cast<unsigned>(gpu::MappingId::LinearDim0) + idx;
-          mapping.push_back(gpu::GPUThreadMappingAttr::get(
-              context, static_cast<gpu::MappingId>(mappingId)));
+              static_cast<unsigned>(gpu::MappingId::LinearDim0) + idx++;
+          if (tilingLevel == IREE::GPU::TilingLevel::Thread) {
+            mapping.push_back(gpu::GPUThreadMappingAttr::get(
+                context, static_cast<gpu::MappingId>(mappingId)));
+          } else {
+            // Else it must be subgroup tiling.
+            mapping.push_back(gpu::GPUWarpMappingAttr::get(
+                context, static_cast<gpu::MappingId>(mappingId)));
+          }
         }
       }
       tilingOptions.setMapping(mapping);
@@ -167,14 +175,13 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
 static llvm::SmallDenseSet<TilingInterface>
 getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
   llvm::SmallDenseSet<TilingInterface> targets;
-  unsigned opaqueLevel = static_cast<unsigned>(tilingLevel);
+  unsigned opaqueLevel = llvm::to_underlying(tilingLevel);
   funcOp->walk([&](TilingInterface target) {
     // TODO: This would probably be easier with a lowering config interface
     // method that checks whether a particular level is tiled.
     if (IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
             getLoweringConfig(target)) {
-      if (!loweringConfig.getStaticTilingLevelSizes(opaqueLevel, target)
-               .empty()) {
+      if (loweringConfig.hasTilingLevel(opaqueLevel)) {
         targets.insert(target);
       }
     }
@@ -186,7 +193,8 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
 
   if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
-      tilingLevel != IREE::GPU::TilingLevel::Thread) {
+      tilingLevel != IREE::GPU::TilingLevel::Thread &&
+      tilingLevel != IREE::GPU::TilingLevel::Subgroup) {
     funcOp.emitError() << "unsupported tiling level: "
                        << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
     return signalPassFailure();
@@ -194,10 +202,9 @@ void GPUApplyTilingLevelPass::runOnOperation() {
 
   llvm::SmallDenseSet<TilingInterface> targetOps =
       getTiledOps(funcOp, tilingLevel);
-  bool useThread = tilingLevel == IREE::GPU::TilingLevel::Thread;
 
   IRRewriter rewriter(funcOp);
-  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, useThread))) {
+  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel))) {
     funcOp.emitError() << "tiling of level "
                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
@@ -210,6 +217,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     RewritePatternSet patterns(context);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);

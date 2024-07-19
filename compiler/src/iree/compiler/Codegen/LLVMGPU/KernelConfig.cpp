@@ -15,10 +15,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -26,6 +28,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -70,12 +73,14 @@ llvm::cl::opt<int> clGPUMatmulCThreshold(
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
 
+static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+    "iree-llvmgpu-enable-prefetch",
+    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
+    llvm::cl::init(false));
+
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
-constexpr StringLiteral kCudaTarget = "cuda";
-constexpr StringLiteral kRocmTarget = "rocm";
 
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
@@ -91,6 +96,10 @@ struct TileWorkgroupSizePair {
 constexpr unsigned softwarePipelineDepthSimt = 0;
 
 } // namespace
+
+bool isROCmBackend(IREE::GPU::TargetAttr target) {
+  return target.getArch().starts_with("gfx");
+}
 
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
@@ -299,13 +308,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(
+        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+        /*transposedLhs*/ false, /*transposedRhs*/ false,
+        /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -354,6 +364,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+
+  // Prefetch shared memory if requested.
+  if (clLLVMGPUEnablePrefetch) {
+    attrs.emplace_back(
+        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        UnitAttr::get(context));
+  }
+
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -362,9 +380,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 }
 
 [[maybe_unused]] static void
-debugPrintContractionInfo(unsigned numLoops,
+debugPrintContractionInfo(StringRef label, unsigned numLoops,
                           linalg::ContractionDimensions contractionDims,
-                          ArrayRef<int64_t> workgroupTileSizes) {
+                          ArrayRef<int64_t> sizes) {
   ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
                                   contractionDims.n, contractionDims.k};
   std::string dimSymbols(numLoops, '*');
@@ -377,8 +395,8 @@ debugPrintContractionInfo(unsigned numLoops,
   llvm::interleaveComma(dimSymbols, llvm::dbgs());
   llvm::dbgs() << "]\n";
 
-  DBGS() << "Workgroup tile sizes: [";
-  llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+  DBGS() << label << ": [";
+  llvm::interleaveComma(sizes, llvm::dbgs());
   llvm::dbgs() << "]\n";
 }
 
@@ -400,6 +418,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       contractionDims->n.size() < 1) {
     return failure();
   }
+
+  LLVM_DEBUG(debugPrintContractionInfo("Problem size", op.getNumLoops(),
+                                       *contractionDims, bounds));
 
   // For now we are not being smart and trying to reshape dimensions to allow
   // for better usage of intrinsics, and instead are tiling all dimensions
@@ -427,6 +448,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
+
+  if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isBitExtendOp(lhsOp))
+      lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
+  }
+  if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isBitExtendOp(rhsOp))
+      rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
+  }
 
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
@@ -465,14 +495,25 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG("Matmul Vector Distribution Config");
 
-  // First try to find a schedule with an exactly matching intrinsic.
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  bool transposedLhs =
+      kDim !=
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nDim !=
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+
+  // First try to find a schedule with an exactly matching intrinsic.
+  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
                           /*canUpcastAcc=*/true);
   }
 
@@ -485,11 +526,13 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     bool mustBeAligned = false;
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
                           /*canUpcastAcc=*/false, mustBeAligned);
     if (!schedule) {
       // Then try again by allowing upcasting accumulator.
       schedule =
           deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                            targetSubgroupSize, transposedLhs, transposedRhs,
                             /*canUpcastAcc=*/true, mustBeAligned);
     }
   }
@@ -537,8 +580,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
-  LLVM_DEBUG(debugPrintContractionInfo(op.getNumLoops(), *contractionDims,
-                                       workgroupTileSizes));
+  LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
+                                       *contractionDims, workgroupTileSizes));
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
@@ -551,6 +594,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+
+  // Prefetch shared memory if requested.
+  if (clLLVMGPUEnablePrefetch) {
+    attrs.emplace_back(
+        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        UnitAttr::get(context));
+  }
+
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
@@ -562,6 +613,10 @@ static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *computeOp) {
+  // We haven't properly plumbed through MMA op layouts and conversions for CUDA
+  // to target NVIDIA GPUs. So disable the vector distribution pass for it.
+  if (!isROCmBackend(target))
+    return failure();
 
   if (!clGPUEnableVectorDistribution) {
     LDBG("Vector Distribution not enabled, skipping...");
@@ -1174,15 +1229,6 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 // Warp Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-bool isROCmBackend(mlir::FunctionOpInterface entryPoint) {
-  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (auto backend = targetAttr.getBackend()) {
-      return backend.getValue() == "rocm";
-    }
-  }
-  return false;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult
 setWarpReductionConfig(IREE::GPU::TargetAttr target,
@@ -1353,8 +1399,8 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(entryPoint) &&
-      llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
+  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+      isMatvecLike(op)) {
     int64_t lastParallelBound = bounds[parallelDims.back()];
     int64_t numParallelReductions = 1;
     const int64_t maxParallelFactor = groupSize / 4;

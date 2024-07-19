@@ -6,18 +6,16 @@
 
 #include "compiler/plugins/target/WebGPUSPIRV/SPIRVToWGSL.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/wgsl_executable_def_builder.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -42,18 +40,6 @@ struct WebGPUSPIRVOptions {
             "Include debug information like variable names in outputs."));
   }
 };
-
-// TODO(scotttodd): provide a proper target environment for WebGPU.
-static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
-  // TODO(scotttodd): find list of SPIR-V extensions supported by WebGPU/WGSL
-  auto triple = spirv::VerCapExtAttr::get(
-      spirv::Version::V_1_0, {spirv::Capability::Shader},
-      {spirv::Extension::SPV_KHR_storage_buffer_storage_class}, context);
-  return spirv::TargetEnvAttr::get(
-      triple, spirv::getDefaultResourceLimits(context),
-      spirv::ClientAPI::WebGPU, spirv::Vendor::Unknown,
-      spirv::DeviceType::Unknown, spirv::TargetEnvAttr::kUnknownDeviceID);
-}
 
 // TODO: WebGPUOptions for choosing the version/extensions/etc.
 class WebGPUTargetDevice : public TargetDevice {
@@ -94,20 +80,20 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    executableTargetAttrs.push_back(
-        getExecutableTarget(context, getWebGPUTargetEnv(context)));
+    executableTargetAttrs.push_back(getExecutableTarget(context));
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context,
-                      spirv::TargetEnvAttr targetEnv) const {
+  getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     auto addConfig = [&](StringRef name, Attribute value) {
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    addConfig(spirv::getTargetEnvAttrName(), targetEnv);
+    if (auto target = GPU::getWebGPUTargetDetails(context)) {
+      addConfig("iree.gpu.target", target);
+    }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("webgpu-spirv"), b.getStringAttr("webgpu-wgsl-fb"),
@@ -120,7 +106,8 @@ public:
   //     pipeline created by buildTranslationPassPipeline)
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
-                    spirv::SPIRVDialect, gpu::GPUDialect>();
+                    spirv::SPIRVDialect, gpu::GPUDialect,
+                    IREE::GPU::IREEGPUDialect>();
   }
 
   void

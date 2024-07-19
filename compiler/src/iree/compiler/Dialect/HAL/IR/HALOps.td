@@ -1881,6 +1881,58 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
   let hasVerifier = 1;
 }
 
+def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
+  SameVariadicOperandSize,
+]> {
+  let summary = [{enqueues command buffer execution}];
+  let description = [{
+    Executes a command buffer on a device queue with the given binding table.
+    No commands will execute until the wait fence has been reached and the
+    signal fence will be signaled when all commands have completed.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_CommandBuffer:$command_buffer,
+    Variadic<HAL_BufferType>:$binding_buffers,
+    Variadic<HAL_DeviceSize>:$binding_offsets,
+    Variadic<HAL_DeviceSize>:$binding_lengths
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `commands` `(` $command_buffer `)`
+    `bindings` `(` `[`
+    custom<BindingTable>($binding_buffers,
+                         type($binding_buffers),
+                         $binding_offsets,
+                         $binding_lengths)
+    `]` `)`
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Value":$device,
+      "Value":$queueAffinity,
+      "Value":$waitFence,
+      "Value":$signalFence,
+      "Value":$commandBuffer,
+      "ArrayRef<BindingTableValue>":$bindings
+    )>,
+  ];
+
+  let hasVerifier = 1;
+}
+
 def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
   let summary = [{flushes locally-pending submissions to the queue}];
   let description = [{

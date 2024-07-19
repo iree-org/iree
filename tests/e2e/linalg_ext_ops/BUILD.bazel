@@ -4,7 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -13,24 +12,77 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ALL_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "attention.mlir",
+        "reverse.mlir",
+        "scan.mlir",
+        "scatter.mlir",
+        "sort.mlir",
+        "top-k.mlir",
+        "winograd_input.mlir",
+        "winograd_output.mlir",
+    ],
+    include = ["*.mlir"],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_local-task",
+    srcs = ALL_SRCS,
+    driver = "local-task",
+    tags = [
+        # attention fails with a wasm target, just disable all tests there for now
+        #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+VMVX_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "reverse.mlir",
+        "scan.mlir",
+        "scatter.mlir",
+        "sort.mlir",
+        "top-k.mlir",
+        "winograd_input.mlir",
+        "winograd_output.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "attention.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task",
+    srcs = VMVX_SRCS,
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+LLVM_GPU_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "reverse.mlir",
+        "scan.mlir",
+        "scatter.mlir",
+        "sort.mlir",
+        "top-k.mlir",
+        "winograd_input.mlir",
+        "winograd_output.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "attention.mlir",
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-    ),
+    srcs = LLVM_GPU_SRCS,
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -42,6 +94,59 @@ iree_check_single_backend_test_suite(
     ],
     target_backend = "cuda",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip",
+    srcs = LLVM_GPU_SRCS,
+    driver = "hip",
+    target_backend = "rocm",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_metal-spirv_vulkan",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "reverse.mlir",
+            "scan.mlir",
+            "scatter.mlir",
+            "sort.mlir",
+            "winograd_input.mlir",
+            "winograd_output.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "attention.mlir",
+            "top-k.mlir",
+        ],
+    ),
+    driver = "metal",
+    target_backend = "metal-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "scan.mlir",
+            "scatter.mlir",
+            "sort.mlir",
+            "winograd_input.mlir",
+            "winograd_output.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "attention.mlir",
+            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
+            "top-k.mlir",
+        ],
+    ),
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+# TODO: Remove topk-split-reduction tests? The flag looks like an unfinished experiment.
 
 iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
@@ -77,97 +182,4 @@ iree_check_single_backend_test_suite(
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
-)
-
-iree_cmake_extra_content(
-    content = """
-# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
-if(NOT EMSCRIPTEN)
-""",
-    inline = True,
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_llvm-cpu_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "attention.mlir",
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-        include = ["*.mlir"],
-    ),
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vmvx_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-    ),
-    driver = "local-task",
-    target_backend = "vmvx",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "scatter.mlir",
-            # Top-k test disabled due to miscompile on vulkan.
-            #    "top-k.mlir",
-            "sort.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
-            # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
-            # Re-enable this once we have new devices with up-to-date drivers.
-            "top-k.mlir",
-            "scan.mlir",
-        ],
-    ),
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-test_suite(
-    name = "check",
-    tests = [
-        ":check_cuda",
-        ":check_llvm-cpu_local-task",
-        ":check_vmvx_local-task",
-        ":check_vulkan-spirv_vulkan",
-    ],
 )

@@ -464,6 +464,7 @@ setup(
     install_requires=[
         "numpy",
         "PyYAML",
+        "sympy",
     ],
     extras_require={
         "onnx": [

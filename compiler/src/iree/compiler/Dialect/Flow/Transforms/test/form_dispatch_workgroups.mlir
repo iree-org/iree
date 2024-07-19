@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-workgroups))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-convert-dispatch-regions-to-workgroups))" --split-input-file %s | FileCheck %s
 
 util.func public @existing_count_region(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
   %c1 = arith.constant 1 : index

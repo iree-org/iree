@@ -226,7 +226,8 @@ struct GenericOpTypePropagation
       }
       signatureConverter.addInputs(index, legalizedArgType.value());
     }
-    rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
+    rewriter.applySignatureConversion(&modifiedOpRegion.front(),
+                                      signatureConverter);
 
     // 6. Introduce scalar conversion operations to convert back to the
     // original scalar type.
@@ -368,7 +369,8 @@ struct IREELinalgExtScatterTypePropagation
     }
     signatureConverter.addInputs(0, legalizedArgType.value());
     signatureConverter.addInputs(1, legalizedArgType.value());
-    rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
+    rewriter.applySignatureConversion(&modifiedOpRegion.front(),
+                                      signatureConverter);
 
     {
       // Introduce scalar conversion operations to convert back to the original
@@ -444,7 +446,8 @@ struct IREELinalgExtSortTypePropagation
       }
       signatureConverter.addInputs(index, legalizedArgType.value());
     }
-    rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
+    rewriter.applySignatureConversion(&modifiedOpRegion.front(),
+                                      signatureConverter);
 
     {
       // Introduce scalar conversion operations to convert back to the original
@@ -536,7 +539,8 @@ struct LegalizeResultElementType : public ConversionPattern {
         doSignatureConversion |= argType != legalizedType;
       }
       if (doSignatureConversion) {
-        rewriter.applySignatureConversion(&newOpRegion, signatureConverter);
+        rewriter.applySignatureConversion(&newOpRegion.front(),
+                                          signatureConverter);
       }
     }
     rewriter.replaceOp(op, newOp->getResults());

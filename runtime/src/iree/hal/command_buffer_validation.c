@@ -14,7 +14,6 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/detail.h"
-#include "iree/hal/device.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/pipeline_layout.h"
@@ -23,7 +22,7 @@
 // Returns success iff the queue supports the given command categories.
 static iree_status_t iree_hal_command_buffer_validate_categories(
     const iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_command_category_t required_categories) {
   if (IREE_UNLIKELY(!validation_state->is_recording)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -54,13 +53,13 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
 // Returns success iff the buffer is compatible with the device.
 static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     const iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_buffer_t* buffer,
     iree_hal_buffer_compatibility_t required_compatibility,
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
       iree_hal_allocator_query_buffer_compatibility(
-          iree_hal_device_allocator(validation_state->device),
+          validation_state->device_allocator,
           (iree_hal_buffer_params_t){
               .type = iree_hal_buffer_memory_type(buffer),
               .usage = iree_hal_buffer_allowed_usage(buffer) & intended_usage,
@@ -89,11 +88,121 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_command_buffer_validate_binding_requirements(
+    iree_hal_command_buffer_t* command_buffer,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_binding_t binding,
+    iree_hal_buffer_binding_requirements_t requirements) {
+  // Check for binding presence.
+  if (requirements.usage == IREE_HAL_BUFFER_USAGE_NONE) {
+    // Binding slot is unused and its value in the table is ignored.
+    return iree_ok_status();
+  } else if (!binding.buffer) {
+    // Binding is used and required.
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "binding table slot requires a buffer but none was provided");
+  }
+
+  // Ensure the buffer is compatible with the device.
+  // NOTE: this check is very slow! We may want to disable this outside of debug
+  // mode or try to fast path it if the buffer is known-good.
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
+      command_buffer, validation_state, binding.buffer,
+      requirements.required_compatibility, requirements.usage));
+
+  // Verify buffer compatibility.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
+      iree_hal_buffer_allowed_usage(binding.buffer), requirements.usage));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
+      iree_hal_buffer_allowed_access(binding.buffer), requirements.access));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(binding.buffer), requirements.type));
+
+  // Verify that the binding range is valid and that any commands that reference
+  // it are in range.
+  if (requirements.max_byte_offset > 0) {
+    iree_device_size_t end = binding.offset + requirements.max_byte_offset;
+    if (IREE_UNLIKELY(end > binding.offset + binding.length)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "at least one command attempted to access an "
+          "address outside of the valid bound buffer "
+          "range (length=%" PRIdsz ", end(inc)=%" PRIdsz
+          ", binding offset=%" PRIdsz ", binding length=%" PRIdsz
+          ", binding end(inc)=%" PRIdsz ")",
+          requirements.max_byte_offset, end - 1, binding.offset, binding.length,
+          binding.offset + binding.length - 1);
+    }
+  }
+
+  // Ensure the offset and length have an alignment matching the value length.
+  if (requirements.min_byte_alignment &&
+      (binding.offset % requirements.min_byte_alignment) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "binding offset does not match the required "
+                            "alignment of one or more command (offset=%" PRIdsz
+                            ", min_byte_alignment=%" PRIhsz ")",
+                            binding.offset, requirements.min_byte_alignment);
+  }
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_command_buffer_validate_buffer_requirements(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_buffer_binding_requirements_t requirements) {
+  // If the buffer is directly specified we can validate it inline.
+  if (buffer_ref.buffer) {
+    iree_hal_buffer_binding_t binding = {
+        .buffer = buffer_ref.buffer,
+        .offset = 0,
+        .length = buffer_ref.offset + buffer_ref.length,
+    };
+    return iree_hal_command_buffer_validate_binding_requirements(
+        command_buffer, validation_state, binding, requirements);
+  }
+
+  // Ensure the buffer binding table slot is within range. Note that the
+  // binding table provided may have more bindings than required so we only
+  // verify against the declared command buffer capacity.
+  if (IREE_UNLIKELY(buffer_ref.buffer_slot >=
+                    command_buffer->binding_capacity)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "indirect buffer reference slot %u is out range of the declared "
+        "binding capacity of the command buffer %u",
+        buffer_ref.buffer_slot, command_buffer->binding_capacity);
+  }
+  command_buffer->binding_count =
+      iree_max(command_buffer->binding_count, buffer_ref.buffer_slot + 1);
+
+  // Merge the binding requirements into the table.
+  iree_hal_buffer_binding_requirements_t* table_requirements =
+      &validation_state->binding_requirements[buffer_ref.buffer_slot];
+  table_requirements->required_compatibility |=
+      requirements.required_compatibility;
+  table_requirements->usage |= requirements.usage;
+  table_requirements->access |= requirements.access;
+  table_requirements->type |= requirements.type;
+  table_requirements->max_byte_offset = iree_max(
+      table_requirements->max_byte_offset, requirements.max_byte_offset);
+  if (requirements.min_byte_alignment) {
+    table_requirements->min_byte_alignment =
+        iree_device_size_lcm(table_requirements->min_byte_alignment,
+                             requirements.min_byte_alignment);
+  }
+
+  return iree_ok_status();
+}
+
 // Returns success iff the currently bound descriptor sets are valid for the
 // given executable entry point.
 static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point) {
   // TODO(benvanik): validate buffers referenced have compatible memory types
   // and access rights.
@@ -102,10 +211,12 @@ static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
 }
 
 void iree_hal_command_buffer_initialize_validation(
-    iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* out_validation_state) {
-  out_validation_state->device = device;
+  out_validation_state->device_allocator = device_allocator;
   out_validation_state->is_recording = false;
+  out_validation_state->debug_group_depth = 0;
 }
 
 iree_status_t iree_hal_command_buffer_begin_validation(
@@ -210,13 +321,16 @@ iree_status_t iree_hal_command_buffer_wait_events_validation(
 iree_status_t iree_hal_command_buffer_discard_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* buffer) {
+    iree_hal_buffer_ref_t buffer_ref) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
-      iree_hal_buffer_memory_type(buffer),
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
+  const iree_hal_buffer_binding_requirements_t buffer_reqs = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = buffer_ref.offset + buffer_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, buffer_ref, buffer_reqs));
 
   return iree_ok_status();
 }
@@ -224,27 +338,10 @@ iree_status_t iree_hal_command_buffer_discard_buffer_validation(
 iree_status_t iree_hal_command_buffer_fill_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
+    iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, target_buffer,
-      IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
-
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
-      iree_hal_buffer_memory_type(target_buffer),
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(target_buffer),
-      IREE_HAL_MEMORY_ACCESS_WRITE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_validate_range(target_buffer, target_offset, length));
 
   // Ensure the value length is supported.
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
@@ -254,15 +351,26 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
                             pattern_length);
   }
 
-  // Ensure the offset and length have an alignment matching the value length.
-  if ((target_offset % pattern_length) != 0 || (length % pattern_length) != 0) {
+  if ((target_ref.offset % pattern_length) != 0 ||
+      (target_ref.length % pattern_length) != 0) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "fill offset and/or length do not match the natural alignment of the "
-        "fill value (target_offset=%" PRIdsz ", length=%" PRIdsz
+        "binding offset and/or length do not match the required alignment of "
+        "one or more command (offset=%" PRIdsz ", length=%" PRIdsz
         ", pattern_length=%" PRIhsz ")",
-        target_offset, length, pattern_length);
+        target_ref.offset, target_ref.length, pattern_length);
   }
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+      .access = IREE_HAL_MEMORY_ACCESS_WRITE,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+      .min_byte_alignment = pattern_length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
 
   return iree_ok_status();
 }
@@ -271,26 +379,19 @@ iree_status_t iree_hal_command_buffer_update_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     const void* source_buffer, iree_host_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length) {
+    iree_hal_buffer_ref_t target_ref) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, target_buffer,
-      IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
-      iree_hal_buffer_memory_type(target_buffer),
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(target_buffer),
-      IREE_HAL_MEMORY_ACCESS_WRITE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_validate_range(target_buffer, target_offset, length));
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+      .access = IREE_HAL_MEMORY_ACCESS_WRITE,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
 
   return iree_ok_status();
 }
@@ -298,69 +399,54 @@ iree_status_t iree_hal_command_buffer_update_buffer_validation(
 iree_status_t iree_hal_command_buffer_copy_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, source_buffer,
-      IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, target_buffer,
-      IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(source_buffer),
-      IREE_HAL_MEMORY_ACCESS_READ));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(source_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_validate_range(source_buffer, source_offset, length));
-
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(target_buffer),
-      IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(target_buffer),
-      IREE_HAL_MEMORY_ACCESS_WRITE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_validate_range(target_buffer, target_offset, length));
-
-  // At least source or destination must be device-visible to enable
-  // host->device, device->host, and device->device.
-  // TODO(benvanik): host->host copies.
-  if (!iree_any_bit_set(iree_hal_buffer_memory_type(source_buffer),
-                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
-      !iree_any_bit_set(iree_hal_buffer_memory_type(target_buffer),
-                        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-#if IREE_STATUS_MODE
-    iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t source_memory_type_str = iree_hal_memory_type_format(
-        iree_hal_buffer_memory_type(source_buffer), &temp0);
-    iree_string_view_t target_memory_type_str = iree_hal_memory_type_format(
-        iree_hal_buffer_memory_type(target_buffer), &temp1);
-    return iree_make_status(
-        IREE_STATUS_PERMISSION_DENIED,
-        "at least one buffer must be device-visible for a copy; "
-        "source_buffer=%.*s, target_buffer=%.*s",
-        (int)source_memory_type_str.size, source_memory_type_str.data,
-        (int)target_memory_type_str.size, target_memory_type_str.data);
-#else
-    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
-#endif  // IREE_STATUS_MODE
+  if (source_ref.length != target_ref.length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "copy spans between source and target must match "
+                            "(source_length=%" PRIdsz ", target_length=%" PRIdsz
+                            ")",
+                            source_ref.length, target_ref.length);
   }
 
+  const iree_hal_buffer_binding_requirements_t source_reqs = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE,
+      .access = IREE_HAL_MEMORY_ACCESS_READ,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = source_ref.offset + source_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, source_ref, source_reqs));
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+      .access = IREE_HAL_MEMORY_ACCESS_WRITE,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
+
   // Check for overlap - just like memcpy we don't handle that.
-  if (iree_hal_buffer_test_overlap(source_buffer, source_offset, length,
-                                   target_buffer, target_offset, length) !=
-      IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "source and target ranges overlap within the same buffer");
+  // Note that it's only undefined behavior if violated so we are ok if tricky
+  // situations (subspans of subspans of binding table subranges etc) make it
+  // through. This is only possible if both buffers are directly referenced -
+  // we _could_ try to catch this for indirect references by stashing the
+  // overlap check metadata for validation when the binding table is available
+  // but that's too costly to be worth it.
+  if (source_ref.buffer && target_ref.buffer) {
+    if (iree_hal_buffer_test_overlap(source_ref.buffer, source_ref.offset,
+                                     source_ref.length, target_ref.buffer,
+                                     target_ref.offset, target_ref.length) !=
+        IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "source and target ranges overlap within the same buffer");
+    }
   }
 
   return iree_ok_status();
@@ -370,8 +456,8 @@ iree_status_t iree_hal_command_buffer_collective_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_channel_t* channel, iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+    iree_hal_buffer_ref_t send_ref, iree_hal_buffer_ref_t recv_ref,
+    iree_device_size_t element_count) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
@@ -430,17 +516,15 @@ iree_status_t iree_hal_command_buffer_collective_validation(
 
   // TODO(benvanik): add queue cap/usage for COLLECTIVE source/dest?
   if (info_bits & IREE_HAL_COLLECTIVE_REQUIRES_SEND_BINDING) {
-    if (!send_binding.buffer) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "collective operation requires a send buffer binding");
-    } else {
-      IREE_RETURN_IF_ERROR(
-          iree_hal_command_buffer_validate_buffer_compatibility(
-              command_buffer, validation_state, send_binding.buffer,
-              IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-              IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ));
-    }
+    const iree_hal_buffer_binding_requirements_t send_reqs = {
+        .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+        .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ,
+        .access = IREE_HAL_MEMORY_ACCESS_READ,
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .max_byte_offset = send_ref.offset + send_ref.length,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+        command_buffer, validation_state, send_ref, send_reqs));
   } else {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -448,17 +532,15 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   }
 
   if (info_bits & IREE_HAL_COLLECTIVE_REQUIRES_RECV_BINDING) {
-    if (!recv_binding.buffer) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "collective operation requires a recv buffer binding");
-    } else {
-      IREE_RETURN_IF_ERROR(
-          iree_hal_command_buffer_validate_buffer_compatibility(
-              command_buffer, validation_state, recv_binding.buffer,
-              IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-              IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE));
-    }
+    const iree_hal_buffer_binding_requirements_t recv_reqs = {
+        .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+        .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE,
+        .access = IREE_HAL_MEMORY_ACCESS_WRITE,
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .max_byte_offset = recv_ref.offset + recv_ref.length,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+        command_buffer, validation_state, recv_ref, recv_reqs));
   } else {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -491,39 +573,27 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
 
-  // TODO(benvanik): allow indirect bindings on primary command buffers?
-  const bool has_binding_table =
-      iree_all_bits_set(iree_hal_command_buffer_mode(command_buffer),
-                        IREE_HAL_COMMAND_BUFFER_MODE_NESTED);
+  // TODO(benvanik): use pipeline layout to derive usage and access bits.
+  // For now we conservatively say _any_ access may be performed (read/write).
+  iree_hal_buffer_binding_requirements_t requirements = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
+      .access = IREE_HAL_MEMORY_ACCESS_ANY,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+  };
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    const iree_hal_descriptor_set_binding_t* binding = &bindings[i];
-    // TODO(benvanik): validate binding index.
-    // TODO(benvanik): validate binding buffer parameters/access.
-    // TODO(benvanik): validate binding range (if possible).
-
-    // Validate that indirect buffer references are supported and in bounds.
-    if (!binding->buffer) {
-      if (!has_binding_table) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "bindings[%" PRIhsz
-                                "] is indirect but the command buffer does not "
-                                "support binding tables",
-                                i);
-      } else if (binding->buffer_slot >= command_buffer->binding_capacity) {
-        return iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "bindings[%" PRIhsz
-            "] references binding table slot %u but table capacity is %u",
-            i, binding->buffer_slot, command_buffer->binding_capacity);
-      }
-    }
+    // TODO(benvanik): validate binding ordinal against pipeline layout.
+    requirements.max_byte_offset = bindings[i].offset + bindings[i].length;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_command_buffer_validate_buffer_requirements(
+            command_buffer, validation_state, bindings[i], requirements),
+        "set[%u] binding[%u] (arg[%" PRIhsz "])", set, bindings[i].ordinal, i);
   }
 
   return iree_ok_status();
@@ -545,26 +615,34 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer,
-    iree_device_size_t workgroups_offset) {
+    iree_hal_buffer_ref_t workgroups_ref) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, workgroups_buffer,
-      IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS));
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
-      iree_hal_buffer_memory_type(workgroups_buffer),
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(workgroups_buffer),
-      IREE_HAL_MEMORY_ACCESS_READ));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(workgroups_buffer),
-      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_range(
-      workgroups_buffer, workgroups_offset, sizeof(uint32_t) * 3));
+  if ((workgroups_ref.offset % sizeof(uint32_t)) != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "workgroup count offset does not match the required natural alignment "
+        "of uint32_t (offset=%" PRIdsz ", min_byte_alignment=%" PRIhsz ")",
+        workgroups_ref.offset, sizeof(uint32_t));
+  } else if (workgroups_ref.length < 3 * sizeof(uint32_t)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "workgroup count buffer does not have the capacity "
+                            "to store the required 3 uint32_t values "
+                            "(length=%" PRIdsz ", min_length=%" PRIhsz ")",
+                            workgroups_ref.length, 3 * sizeof(uint32_t));
+  }
+
+  const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
+      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS,
+      .access = IREE_HAL_MEMORY_ACCESS_READ,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = workgroups_ref.offset + workgroups_ref.length,
+      .min_byte_alignment = sizeof(uint32_t),
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, workgroups_ref, workgroups_reqs));
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
       command_buffer, validation_state, executable, entry_point));
@@ -572,24 +650,24 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_command_buffer_execute_commands_validation(
+iree_status_t iree_hal_command_buffer_binding_table_validation(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_command_buffer_t* commands,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_buffer_binding_table_t binding_table) {
-  if (iree_all_bits_set(command_buffer->mode,
-                        IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "command buffers can only be nested one level "
-                            "(nested cannot execute nested)");
-  }
-  if (!iree_all_bits_set(commands->mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "only nested command buffers can be executed as "
-                            "part of a primary command buffer");
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->binding_count);
+
+  // NOTE: we only validate from [0, binding_count) and don't care if there are
+  // extra bindings present.
+  for (uint32_t i = 0; i < command_buffer->binding_count; ++i) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_command_buffer_validate_binding_requirements(
+            command_buffer, validation_state, binding_table.bindings[i],
+            validation_state->binding_requirements[i]),
+        "binding table slot %u", i);
   }
 
-  // TODO(benvanik): validate bindings as with push descriptor sets.
-
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

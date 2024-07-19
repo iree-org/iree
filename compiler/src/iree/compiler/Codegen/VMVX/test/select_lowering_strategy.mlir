@@ -168,7 +168,7 @@ func.func @elem_pack_ukernels() attributes {hal.executable.target = #executable_
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x2048xf32>>
-  %1:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_encoding.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+  %1:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
   %2 = affine.apply #map()[%1#0]
   %3 = affine.apply #map1()[%1#1]
   %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%2, %3, %1#0, %1#1}
@@ -179,12 +179,12 @@ func.func @elem_pack_ukernels() attributes {hal.executable.target = #executable_
     %15 = arith.addf %in, %in : f32
     linalg.yield %15 : f32
   } -> tensor<1024x2048xf32>
-  %8:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_encoding.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+  %8:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
   %9 = affine.apply #map()[%8#0]
   %10 = affine.apply #map1()[%8#1]
   %11 = tensor.empty(%9, %10, %8#0, %8#1) : tensor<?x?x?x?xf32>
   %pack = tensor.pack %7 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %11 : tensor<1024x2048xf32> -> tensor<?x?x?x?xf32>
-  %12:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_encoding.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+  %12:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
   %13 = affine.apply #map()[%12#0]
   %14 = affine.apply #map1()[%12#1]
   flow.dispatch.tensor.store %pack, %4, offsets = [0, 0, 0, 0], sizes = [%13, %14, %12#0, %12#1], strides = [1, 1, 1, 1] : tensor<?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%13, %14, %12#0, %12#1}

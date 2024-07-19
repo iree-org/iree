@@ -32,13 +32,16 @@ iree_cc_library(
   SRCS
     "AnnotateDispatches.cpp"
     "BubbleUpExpandShapes.cpp"
+    "Canonicalizer.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
+    "ConvertDispatchRegionsToWorkgroups.cpp"
     "ConvertMeshToFlow.cpp"
     "ConvertRegionToWorkgroups.cpp"
+    "ConvertTensorToFlow.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchWithTransformDialect.cpp"
@@ -47,16 +50,15 @@ iree_cc_library(
     "ExportBenchmarkFuncs.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
-    "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
-    "FusionOfTensorOps.cpp"
+    "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
-    "InterchangeTransposeGenericOps.cpp"
+    "MaterializeDefaultWorkgroupCountRegion.cpp"
     "OutlineConstants.cpp"
     "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
@@ -66,6 +68,7 @@ iree_cc_library(
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TopLevelSCFToCFG.cpp"
+    "TransposeGenericOps.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -114,6 +117,7 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

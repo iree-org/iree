@@ -434,6 +434,12 @@ def PolynomialApproximationPass :
       "mlir::iree_compiler::createPolynomialApproximationPass()";
 }
 
+def PropagateReshapesByExpansionPass :
+    Pass<"iree-codegen-propagate-reshapes-by-expansion", ""> {
+  let summary = "Propagates reshaping operations by expansion.";
+  let constructor = "mlir::iree_compiler::createPropagateReshapesByExpansionPass()";
+}
+
 def RematerializeParallelOps :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
@@ -522,6 +528,12 @@ def TypePropagation :
     InterfacePass<"iree-codegen-type-propagation", "mlir::FunctionOpInterface"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
   let constructor = "mlir::iree_compiler::createTypePropagationPass()";
+}
+
+def VectorizeMemrefCopyPass :
+    Pass<"iree-codegen-vectorize-memref-copy", ""> {
+  let summary = "Vectorizes memref copy operations.";
+  let constructor = "mlir::iree_compiler::createVectorizeMemrefCopyPass()";
 }
 
 #endif // IREE_CODEGEN_COMMON_PASSES

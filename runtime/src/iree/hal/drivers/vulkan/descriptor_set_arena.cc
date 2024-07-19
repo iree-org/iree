@@ -23,9 +23,8 @@ namespace vulkan {
 namespace {
 
 static void PopulateDescriptorSetWriteInfos(
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings, VkDescriptorSet dst_set,
-    Arena* arena, iree_host_size_t* out_info_count,
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings,
+    VkDescriptorSet dst_set, Arena* arena, iree_host_size_t* out_info_count,
     VkWriteDescriptorSet** out_infos) {
   arena->Reset();
   auto buffer_infos =
@@ -72,7 +71,7 @@ static void PopulateDescriptorSetWriteInfos(
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_info.pNext = nullptr;
     write_info.dstSet = dst_set;
-    write_info.dstBinding = binding.binding;
+    write_info.dstBinding = binding.ordinal;
     write_info.dstArrayElement = 0;
     write_info.descriptorCount = 1;
     write_info.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -103,7 +102,7 @@ DescriptorSetArena::~DescriptorSetArena() {
 iree_status_t DescriptorSetArena::BindDescriptorSet(
     VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
     uint32_t set, iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    const iree_hal_buffer_ref_t* bindings) {
   // Always prefer using push descriptors when available as we can avoid the
   // additional API overhead of updating/resetting pools.
   if (logical_device_->enabled_extensions().push_descriptors) {
@@ -201,7 +200,7 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
 void DescriptorSetArena::PushDescriptorSet(
     VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
     uint32_t set, iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    const iree_hal_buffer_ref_t* bindings) {
   IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::PushDescriptorSet");
   VkPipelineLayout device_pipeline_layout =
       iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
