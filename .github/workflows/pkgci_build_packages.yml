@@ -72,8 +72,8 @@ jobs:
           sudo chown -R "$(whoami)" "${cache_dir}"
       - name: Validate runtime wheel
         run: |
-          pip install --upgrade pip
-          pip install --no-index -f $PWD -v iree-runtime
+          python -m pip install --upgrade pip
+          python -m pip install --no-index -f $PWD -v iree-runtime
           echo "Testing default runtime package:"
           python -m iree.runtime._package_test
           echo "Testing tracy runtime package:"
@@ -84,10 +84,10 @@ jobs:
             python -m iree.runtime._package_test
       - name: Validate compiler wheel
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           # Pre-fetch optional deps (constrain to not consult a package index).
-          pip install onnx>=1.16.0
-          pip install --no-index -f $PWD -v iree-compiler[onnx]
+          python -m pip install onnx>=1.16.0
+          python -m pip install --no-index -f $PWD -v iree-compiler[onnx]
           echo "Testing compiler package:"
           python -m iree.compiler._package_test
       - name: Upload wheel artifacts
