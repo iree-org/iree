@@ -594,6 +594,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_PRESET=test" \
+            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
             ${CONTAINER} \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
