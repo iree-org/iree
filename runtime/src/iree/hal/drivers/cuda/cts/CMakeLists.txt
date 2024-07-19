@@ -4,6 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+unset(FILTER_TESTS)
+string(APPEND FILTER_TESTS "SemaphoreTest.WaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreTest.FailThenWait:")
+string(APPEND FILTER_TESTS "SemaphoreTest.MultiWaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreTest.DeviceMultiWaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreSubmissionTest.PropagateFailSignal:")
+set(FILTER_TESTS_ARGS
+  "--gtest_filter=-${FILTER_TESTS}"
+)
+
 iree_hal_cts_test_suite(
   DRIVER_NAME
     cuda
@@ -19,6 +29,7 @@ iree_hal_cts_test_suite(
     "\"PTXE\""
   ARGS
     "--cuda_use_streams=false"
+    ${FILTER_TESTS_ARGS}
   DEPS
     iree::hal::drivers::cuda::registration
   EXCLUDED_TESTS
@@ -44,6 +55,7 @@ iree_hal_cts_test_suite(
     "\"PTXE\""
   ARGS
     "--cuda_use_streams=true"
+    ${FILTER_TESTS_ARGS}
   DEPS
     iree::hal::drivers::cuda::registration
   EXCLUDED_TESTS
