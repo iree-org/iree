@@ -1,5 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))" --split-input-file %s | FileCheck %s
 
+// test
+
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 module {
   func.func @pad_only_dispatch() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
