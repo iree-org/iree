@@ -63,6 +63,66 @@ func.func @fold_extract_slice_consumer_into_xfer_write_3(%arg0: vector<1x64x128x
 
 // -----
 
+func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1: tensor<4x5xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = vector.transfer_write %v, %t1[%c0, %c0] {in_bounds = [true, true]} : vector<4x5xf32>, tensor<4x5xf32>
+  %1 = tensor.insert_slice %0 into %t2[%a, %b] [4, 5] [1, 1] : tensor<4x5xf32> into tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_static
+// CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x5xf32>, tensor<?x?xf32>
+
+// -----
+
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+
+// CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_scalable
+// CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x[4]xf32>, tensor<?x?xf32>
+func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
+  attributes {hal.executable.target = #aarch64_sve}
+{
+  %vscale = vector.vscale
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c4_vscale = arith.muli %c4, %vscale : index
+  %extract_slice = tensor.extract_slice %t1[0, 0] [4, %c4_vscale] [1, 1] : tensor<?x?xf32> to tensor<4x?xf32>
+  %0 = vector.transfer_write %v, %extract_slice[%c0, %c0] {in_bounds = [true, true]} : vector<4x[4]xf32>, tensor<4x?xf32>
+  %1 = tensor.insert_slice %0 into %t2[%a, %b] [4, %c4_vscale] [1, 1] : tensor<4x?xf32> into tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_dynamic
+// CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x8xf32>, tensor<?x?xf32>
+func.func @fold_insert_slice_into_transfer_write_dynamic(%v: vector<4x8xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index, %size: index) -> tensor<?x?xf32>
+{
+  %c0 = arith.constant 0 : index
+  %slice_size = affine.min affine_map<(d0) -> (d0, 8)>(%size)
+  %extract_slice = tensor.extract_slice %t1[0, 0] [4, %slice_size] [1, 1] : tensor<?x?xf32> to tensor<4x?xf32>
+  %0 = vector.transfer_write %v, %extract_slice[%c0, %c0] {in_bounds = [true, true]} : vector<4x8xf32>, tensor<4x?xf32>
+  %1 = tensor.insert_slice %0 into %t2[%a, %b] [4, %slice_size] [1, 1] : tensor<4x?xf32> into tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -70,6 +130,7 @@ func.func @fold_extract_slice_consumer_into_xfer_write_3(%arg0: vector<1x64x128x
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
+
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<()[s0] -> (s0 * -64 + 968, 64)>

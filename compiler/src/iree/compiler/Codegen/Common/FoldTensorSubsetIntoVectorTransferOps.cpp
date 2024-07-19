@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -117,6 +119,47 @@ public:
   }
 };
 
+/// Returns true if `writeOp` fully overwrites its destination.
+static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
+  if (writeOp.hasOutOfBoundsDim())
+    return false;
+  if (writeOp.getVectorType().getRank() != writeOp.getShapedType().getRank())
+    return false;
+  if (writeOp.getMask())
+    return false;
+
+  std::optional<iree_compiler::VscaleRange> vscaleRange;
+  auto vecType = writeOp.getVectorType();
+  if (vecType.isScalable()) {
+    auto targetAttr =
+        iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(writeOp);
+    vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+  }
+
+  auto dest = writeOp.getSource();
+  auto destShape = writeOp.getShapedType().getShape();
+  auto destDimSize =
+      [&](unsigned dimIndex) -> FailureOr<iree_compiler::DimBoundSize> {
+    auto size = destShape[dimIndex];
+    if (size != ShapedType::kDynamic)
+      return iree_compiler::DimBoundSize{size};
+    return iree_compiler::computeDimUpperBound(dest, dimIndex, vscaleRange);
+  };
+
+  auto vecShape = vecType.getShape();
+  auto vecScalableFlags = vecType.getScalableDims();
+  for (unsigned d = 0, e = destShape.size(); d < e; ++d) {
+    auto dimSize = destDimSize(d);
+    if (failed(dimSize))
+      return false;
+    if (dimSize->scalable && !vecScalableFlags[d])
+      return false;
+    if (vecShape[d] != dimSize->baseSize)
+      return false;
+  }
+  return true;
+}
+
 /// Fold tensor.insert_slice into vector.transfer_write if the transfer_write
 /// could directly write to the insert_slice's destination. E.g.:
 ///
@@ -150,20 +193,12 @@ public:
     // TODO: support 0-d corner case.
     if (xferOp.getTransferRank() == 0)
       return failure();
-
-    if (xferOp.hasOutOfBoundsDim())
-      return failure();
-    if (xferOp.getVectorType().getRank() != xferOp.getShapedType().getRank())
-      return failure();
-    if (xferOp.getMask())
+    if (!xferOp.getPermutationMap().isIdentity())
       return failure();
     // Fold only if the TransferWriteOp completely overwrites the `source` with
     // a vector. I.e., the result of the TransferWriteOp is a new tensor whose
     // content is the data of the vector.
-    if (!llvm::equal(xferOp.getVectorType().getShape(),
-                     xferOp.getShapedType().getShape()))
-      return failure();
-    if (!xferOp.getPermutationMap().isIdentity())
+    if (!isDestinationFullyOverwritten(xferOp))
       return failure();
 
     // Bail on illegal rank-reduction: we need to check that the rank-reduced
