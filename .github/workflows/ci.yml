@@ -697,8 +697,9 @@ jobs:
         include:
           - name: asan
             script: ./build_tools/cmake/build_and_test_asan.sh
-          - name: tsan
-            script: ./build_tools/cmake/build_and_test_tsan.sh
+          # Disabled to reduce self-hosted runners needed. See #17957
+          # - name: tsan
+          #   script: ./build_tools/cmake/build_and_test_tsan.sh
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
@@ -743,38 +744,39 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
-  gcc:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'gcc')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-gcc
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building IREE with gcc"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env CC=/usr/bin/gcc-9 \
-            --env CXX=/usr/bin/g++-9 \
-            --env CMAKE_BUILD_TYPE=Release \
-            --env "IREE_TARGET_BACKEND_WEBGPU_SPIRV=OFF" \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
+  # Disabled to reduce self-hosted runners needed. See #17957
+  # gcc:
+  #   needs: setup
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'gcc')
+  #   runs-on:
+  #     - self-hosted # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - cpu
+  #     - os-family=Linux
+  #   env:
+  #     BUILD_DIR: build-gcc
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@v4.1.7
+  #       with:
+  #         submodules: true
+  #     - name: "Building IREE with gcc"
+  #       env:
+  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh \
+  #           --env CC=/usr/bin/gcc-9 \
+  #           --env CXX=/usr/bin/g++-9 \
+  #           --env CMAKE_BUILD_TYPE=Release \
+  #           --env "IREE_TARGET_BACKEND_WEBGPU_SPIRV=OFF" \
+  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+  #           --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
+  #           gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+  #           ./build_tools/cmake/build_all.sh \
+  #           "${BUILD_DIR}"
 
   tracing:
     needs: setup
@@ -802,60 +804,62 @@ jobs:
             ./build_tools/cmake/build_runtime_tracing.sh \
             "${BUILD_DIR}"
 
-  debug:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'debug')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-debug
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building IREE in Debug configuration"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CMAKE_BUILD_TYPE=Debug" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
+  # Disabled to reduce self-hosted runners needed. See #17957
+  # debug:
+  #   needs: setup
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'debug')
+  #   runs-on:
+  #     - self-hosted # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - cpu
+  #     - os-family=Linux
+  #   env:
+  #     BUILD_DIR: build-debug
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@v4.1.7
+  #       with:
+  #         submodules: true
+  #     - name: "Building IREE in Debug configuration"
+  #       env:
+  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh \
+  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+  #           --env "CMAKE_BUILD_TYPE=Debug" \
+  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+  #           --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
+  #           gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+  #           ./build_tools/cmake/build_all.sh \
+  #           "${BUILD_DIR}"
 
-  byo_llvm:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'byo_llvm')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building and testing with bring-your-own-LLVM"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_and_test_byo_llvm.sh
+  # Disabled to reduce self-hosted runners needed. See #17957
+  # byo_llvm:
+  #   needs: setup
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'byo_llvm')
+  #   runs-on:
+  #     - self-hosted # must come first
+  #     - runner-group=${{ needs.setup.outputs.runner-group }}
+  #     - environment=${{ needs.setup.outputs.runner-env }}
+  #     - cpu
+  #     - os-family=Linux
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@v4.1.7
+  #       with:
+  #         submodules: true
+  #     - name: "Building and testing with bring-your-own-LLVM"
+  #       env:
+  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh \
+  #           --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+  #           --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+  #           gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+  #           ./build_tools/cmake/build_and_test_byo_llvm.sh
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -998,10 +1002,10 @@ jobs:
       - python_release_packages
       - sanitizers
       - small_runtime
-      - gcc
+      # - gcc
       - tracing
-      - debug
-      - byo_llvm
+      # - debug
+      # - byo_llvm
 
       # Crosscompilation
       # - cross_compile_and_test
