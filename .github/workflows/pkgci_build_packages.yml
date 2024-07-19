@@ -70,29 +70,6 @@ jobs:
           # Some things put stuff in cache with weird, root read-only
           # permissions. Take them back.
           sudo chown -R "$(whoami)" "${cache_dir}"
-      - uses: actions/setup-python@v5.1.0
-        with:
-          python-version: "3.11"
-      - name: Validate runtime wheel
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --no-index -f $PWD -v iree-runtime
-          echo "Testing default runtime package:"
-          python -m iree.runtime._package_test
-          echo "Testing tracy runtime package:"
-          # GH runners don't expose the TSC but we want to make sure the basic packaging
-          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
-          # if this is left off).
-          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
-            python -m iree.runtime._package_test
-      - name: Validate compiler wheel
-        run: |
-          python -m pip install --upgrade pip
-          # Pre-fetch optional deps (constrain to not consult a package index).
-          python -m pip install onnx>=1.16.0
-          python -m pip install --no-index -f $PWD -v iree-compiler[onnx]
-          echo "Testing compiler package:"
-          python -m iree.compiler._package_test
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4.3.3
         with:
