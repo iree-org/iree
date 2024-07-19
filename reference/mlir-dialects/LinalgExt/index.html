@@ -1798,15 +1798,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extreverse-linalgextreverseop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.reverse (LinalgExt::ReverseOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_linalg_extscan-linalgextscanop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_linalg_ext.scan (LinalgExt::ScanOp)
@@ -3921,15 +3912,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extreverse-linalgextreverseop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.reverse (LinalgExt::ReverseOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_linalg_extscan-linalgextscanop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_linalg_ext.scan (LinalgExt::ScanOp)
@@ -4083,7 +4065,6 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#iree_linalg_extfft-linalgextfftop">iree_linalg_ext.fft (LinalgExt::FftOp)</a></li>
 <li><a href="#iree_linalg_extim2col-linalgextim2colop">iree_linalg_ext.im2col (LinalgExt::Im2colOp)</a></li>
 <li><a href="#iree_linalg_extonline_attention-linalgextonlineattentionop">iree_linalg_ext.online_attention (LinalgExt::OnlineAttentionOp)</a></li>
-<li><a href="#iree_linalg_extreverse-linalgextreverseop">iree_linalg_ext.reverse (LinalgExt::ReverseOp)</a></li>
 <li><a href="#iree_linalg_extscan-linalgextscanop">iree_linalg_ext.scan (LinalgExt::ScanOp)</a></li>
 <li><a href="#iree_linalg_extscatter-linalgextscatterop">iree_linalg_ext.scatter (LinalgExt::ScatterOp)</a></li>
 <li><a href="#iree_linalg_extsort-linalgextsortop">iree_linalg_ext.sort (LinalgExt::SortOp)</a></li>
@@ -4619,23 +4600,24 @@ it over the entire softmax reduction dimension by:
 </tr>
 </tbody>
 </table>
-<h4 id="iree_linalg_extreverse-linalgextreverseop"><code>iree_linalg_ext.reverse</code> (LinalgExt::ReverseOp)<a class="headerlink" href="#iree_linalg_extreverse-linalgextreverseop" title="Permanent link">link</a></h4>
-<p><em>Reverse operator</em></p>
+<h4 id="iree_linalg_extscan-linalgextscanop"><code>iree_linalg_ext.scan</code> (LinalgExt::ScanOp)<a class="headerlink" href="#iree_linalg_extscan-linalgextscanop" title="Permanent link">link</a></h4>
+<p><em>Scan operator</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.reverse` attr-dict `dimensions` `(` $dimensions `)`
-              (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-              (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-              (`:` type($results)^)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scan` attr-dict
+              `dimension` `(` $dimension `)`
+              `inclusive` `(` $inclusive `)`
+              `ins` `(` $inputs `:` type($inputs) `)`
+              `outs` `(` $outputs `:` type($outputs) `)`
+              $region (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>A temporary solution for lowering reverse ops into IREE, allowing IREE to
-tile and distribute them.
-}</p>
+<p>Computes the inclusive/exclusive scan along a given dimension.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>dimensions</code></td><td>::mlir::DenseIntElementsAttr</td><td>64-bit signless integer elements attribute</td></tr>
+<tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+<tr><td><code>inclusive</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
 </table>
 
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
@@ -4658,60 +4640,6 @@ tile and distribute them.
 </tbody>
 </table>
 <h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h4 id="iree_linalg_extscan-linalgextscanop"><code>iree_linalg_ext.scan</code> (LinalgExt::ScanOp)<a class="headerlink" href="#iree_linalg_extscan-linalgextscanop" title="Permanent link">link</a></h4>
-<p><em>Scan operator</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scan` attr-dict
-              `dimension` `(` $dimension `)`
-              `inclusive` `(` $inclusive `)`
-              `ins` `(` $inputs `:` type($inputs) `)`
-              `outs` `(` $outputs `:` type($outputs) `)`
-              $region (`-&gt;` type($results)^)?
-</code></pre></div>
-<p>Computes the inclusive/exclusive scan along a given dimension.</p>
-<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
-<tr><td><code>inclusive</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
-</table>
-
-<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of shaped of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of shaped of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4766,14 +4694,14 @@ batch dims to be 1D. See more information in
   <a href="https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update">https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</a></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension_map</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>unique_indices</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
 </table>
 
-<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4792,7 +4720,7 @@ batch dims to be 1D. See more information in
 </tr>
 </tbody>
 </table>
-<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4821,13 +4749,13 @@ batch dims to be 1D. See more information in
 <p>See <a href="https://www.tensorflow.org/xla/operation_semantics#sort">https://www.tensorflow.org/xla/operation_semantics#sort</a>.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 </table>
 
-<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4846,7 +4774,7 @@ batch dims to be 1D. See more information in
 </tr>
 </tbody>
 </table>
-<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
+<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4886,13 +4814,13 @@ i1. If true, the two values are swapped:
 Note: when the two values are equal, the first occurence is always selected.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 </table>
 
-<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4911,7 +4839,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
+<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4937,7 +4865,7 @@ regions in <code>iree_linalg_ext</code> ops.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
+<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4976,7 +4904,7 @@ of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
 and then fed to a batch matmul op.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -4984,7 +4912,7 @@ and then fed to a batch matmul op.</p>
 <tr><td><code>kernel_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
+<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5003,7 +4931,7 @@ and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
+<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5041,7 +4969,7 @@ where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
 of this operator is first collapsed and then fed to a batch matmul op.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -5049,7 +4977,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
+<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5068,7 +4996,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5110,7 +5038,7 @@ This operator is followed by a tensor.extract_slice which extracts
 only the non-padded part of the output.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
@@ -5118,7 +5046,7 @@ only the non-padded part of the output.</p>
 <tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
+<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5137,7 +5065,7 @@ only the non-padded part of the output.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
