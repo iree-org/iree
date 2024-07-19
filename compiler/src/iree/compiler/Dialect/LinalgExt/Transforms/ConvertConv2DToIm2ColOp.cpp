@@ -11,12 +11,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
-#include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/AffineMap.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -26,15 +21,15 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
       attr, [](APInt element) { return element.getSExtValue() == 1; });
 }
 
-static Value createAdd(Location loc, Value x, Value y, bool isInt,
-                       OpBuilder &builder) {
+static Value createAdd(Location loc, Value x, Value y, OpBuilder &builder) {
+  bool isInt = llvm::isa<IntegerType>(x.getType());
   if (isInt)
     return builder.create<arith::AddIOp>(loc, x, y);
   return builder.create<arith::AddFOp>(loc, x, y);
 }
 
-static Value createMul(Location loc, Value x, Value y, bool isInt,
-                       OpBuilder &builder) {
+static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
+  bool isInt = llvm::isa<IntegerType>(x.getType());
   if (isInt)
     return builder.create<arith::MulIOp>(loc, x, y);
   return builder.create<arith::MulFOp>(loc, x, y);
@@ -128,13 +123,10 @@ public:
         loc, colTensorShape, inputType.getElementType());
     SmallVector<int64_t> strides(convOp.getStrides().getValues<int64_t>());
     SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
-    SmallVector<OpFoldResult> kernelSize = {
-        getAsIndexOpFoldResult(convOp->getContext(), fh),
-        getAsIndexOpFoldResult(convOp->getContext(), fw)};
-    SmallVector<OpFoldResult> kOffset = {
-        getAsIndexOpFoldResult(convOp->getContext(), 0)};
-    SmallVector<OpFoldResult> mOffset = {
-        getAsIndexOpFoldResult(convOp->getContext(), 0)};
+    SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
+                                            rewriter.getIndexAttr(fw)};
+    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> mOffset = {rewriter.getIndexAttr(0)};
     SmallVector<int64_t> batchPos = {0};
     SmallVector<int64_t> mPos = {1, 2};
     SmallVector<int64_t> kPos = {3};
@@ -164,21 +156,20 @@ public:
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                          parallel, reduction};
-    bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc, reshapedOutputType,
         /*inputs=*/ValueRange{img2ColTensor, reshapedFilter},
         /*outputs=*/ValueRange{reshapedOutput},
         ArrayRef<AffineMap>{lhsMap, rhsMap, resultMap}, genericIterators,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
                                            args[2].getType(),
                                            /*isUnsignedCast=*/false);
           Value rhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[1],
                                            args[2].getType(),
                                            /*isUnsignedCast=*/false);
-          Value mul = createMul(nestedLoc, lhs, rhs, isInt, nestedBuilder);
-          Value add = createAdd(nestedLoc, mul, args[2], isInt, nestedBuilder);
+          Value mul = createMul(nestedLoc, lhs, rhs, nestedBuilder);
+          Value add = createAdd(nestedLoc, mul, args[2], nestedBuilder);
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
         });
     Value result = genericOp.getResults().front();
@@ -244,13 +235,10 @@ public:
         loc, colTensorShape, inputType.getElementType());
     SmallVector<int64_t> strides(convOp.getStrides().getValues<int64_t>());
     SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
-    SmallVector<OpFoldResult> kernelSize = {
-        getAsIndexOpFoldResult(convOp->getContext(), fh),
-        getAsIndexOpFoldResult(convOp->getContext(), fw)};
-    SmallVector<OpFoldResult> kOffset = {
-        getAsIndexOpFoldResult(convOp->getContext(), 0)};
-    SmallVector<OpFoldResult> mOffset = {
-        getAsIndexOpFoldResult(convOp->getContext(), 0)};
+    SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
+                                            rewriter.getIndexAttr(fw)};
+    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> mOffset = {rewriter.getIndexAttr(0)};
     SmallVector<int64_t> batchPos = {0};
     SmallVector<int64_t> mPos = {2, 3};
     SmallVector<int64_t> kPos = {1};
@@ -283,21 +271,20 @@ public:
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                          parallel, reduction};
-    bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc, reshapedOutputType,
         /*inputs=*/ValueRange{reshapedFilter, img2ColTensor},
         /*outputs=*/ValueRange{reshapedOutput},
         ArrayRef<AffineMap>{lhsMap, rhsMap, resultMap}, genericIterators,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        [](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value lhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[0],
                                            args[2].getType(),
                                            /*isUnsignedCast=*/false);
           Value rhs = convertScalarToDtype(nestedBuilder, nestedLoc, args[1],
                                            args[2].getType(),
                                            /*isUnsignedCast=*/false);
-          Value mul = createMul(nestedLoc, lhs, rhs, isInt, nestedBuilder);
-          Value add = createAdd(nestedLoc, mul, args[2], isInt, nestedBuilder);
+          Value mul = createMul(nestedLoc, lhs, rhs, nestedBuilder);
+          Value add = createAdd(nestedLoc, mul, args[2], nestedBuilder);
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
         });
     Value result = genericOp.getResults().front();
@@ -315,14 +302,12 @@ struct ConvertConv2DToIm2ColOpPass
     : ConvertConv2DToIm2ColOpBase<ConvertConv2DToIm2ColOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>();
+        .insert<tensor::TensorDialect, IREE::LinalgExt::IREELinalgExtDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(context);
-    linalg::FillOp::getCanonicalizationPatterns(patterns, context);
-    tensor::populateFoldTensorEmptyPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
