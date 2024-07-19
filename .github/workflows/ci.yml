@@ -857,42 +857,43 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
 
-  cross_compile_and_test:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'cross_compile_and_test')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    strategy:
-      matrix:
-        target:
-          - platform: linux
-            arch: riscv_64
-            abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-            build_script: "./build_tools/cmake/build_riscv.sh"
-            test_script: "./build_tools/cmake/test_riscv.sh"
-          - platform: linux
-            arch: riscv_32
-            abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-            build_script: "./build_tools/cmake/build_riscv.sh"
-            test_script: "./build_tools/cmake/test_riscv.sh"
-          - platform: generic
-            arch: riscv_32
-            abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-            build_script: "./build_tools/cmake/build_riscv.sh"
-            test_script: "./tests/riscv32/smoke.sh"
-          - platform: emscripten
-            arch: wasm32
-            abi: wasm32
-            docker_image: "gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214"
-            build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
-            # No test script
+  # Disabled to reduce self-hosted runners needed. See #17957
+  # cross_compile_and_test:
+  #  needs: [setup, build_all]
+  #  if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'cross_compile_and_test')
+  #  runs-on:
+  #    - self-hosted # must come first
+  #    - runner-group=${{ needs.setup.outputs.runner-group }}
+  #    - environment=${{ needs.setup.outputs.runner-env }}
+  #    - cpu
+  #    - os-family=Linux
+  #  strategy:
+  #    matrix:
+  #      target:
+  #        - platform: linux
+  #          arch: riscv_64
+  #          abi: lp64d
+  #          docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
+  #          build_script: "./build_tools/cmake/build_riscv.sh"
+  #          test_script: "./build_tools/cmake/test_riscv.sh"
+  #        - platform: linux
+  #          arch: riscv_32
+  #          abi: ilp32d
+  #          docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
+  #          build_script: "./build_tools/cmake/build_riscv.sh"
+  #          test_script: "./build_tools/cmake/test_riscv.sh"
+  #        - platform: generic
+  #          arch: riscv_32
+  #          abi: ilp32
+  #          docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
+  #          build_script: "./build_tools/cmake/build_riscv.sh"
+  #          test_script: "./tests/riscv32/smoke.sh"
+  #        - platform: emscripten
+  #          arch: wasm32
+  #          abi: wasm32
+  #          docker_image: "gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214"
+  #          build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
+  #          # No test script
 
     env:
       PLATFORM: ${{ matrix.target.platform }}
