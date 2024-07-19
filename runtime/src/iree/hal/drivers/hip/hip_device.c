@@ -540,6 +540,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH:
+      printf("[hip] creating graph command buffer..\n");
       // TODO(indirect-cmd): when we can record indirect graphs we won't need
       // to use deferred command buffers - this is here to emulate indirect
       // command buffers.
@@ -556,6 +557,7 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
             &device->block_pool, device->host_allocator, out_command_buffer);
       }
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM:
+      printf("[hip] creating stream command buffer..\n");
       return iree_hal_deferred_command_buffer_create(
           iree_hal_device_allocator(base_device), mode, command_categories,
           binding_capacity, &device->block_pool,
