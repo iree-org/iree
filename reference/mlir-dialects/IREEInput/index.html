@@ -2562,6 +2562,93 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enums
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#descriptorflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorFlags
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorFlags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptorsetlayoutflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorSetLayoutFlags
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorSetLayoutFlags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptortype" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorType
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorType">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5007,6 +5094,93 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enums
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#descriptorflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorFlags
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorFlags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptorsetlayoutflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorSetLayoutFlags
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorSetLayoutFlags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptortype" class="md-nav__link">
+    <span class="md-ellipsis">
+      DescriptorType
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DescriptorType">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5140,6 +5314,21 @@ LLVM/MLIR's API surface is itself unstable.</p>
 <li><a href="#listtype">ListType</a></li>
 <li><a href="#ptrtype">PtrType</a></li>
 <li><a href="#varianttype">VariantType</a></li>
+</ul>
+</li>
+<li><a href="#enums">Enums</a><ul>
+<li><a href="#descriptorflags">DescriptorFlags</a><ul>
+<li><a href="#cases">Cases:</a></li>
+</ul>
+</li>
+<li><a href="#descriptorsetlayoutflags">DescriptorSetLayoutFlags</a><ul>
+<li><a href="#cases_1">Cases:</a></li>
+</ul>
+</li>
+<li><a href="#descriptortype">DescriptorType</a><ul>
+<li><a href="#cases_2">Cases:</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -6918,6 +7107,79 @@ by parameterizing them with a VariantType.</p>
 <p>Syntax: <code>!iree_input.variant</code></p>
 <p>The variant type is typically used to parameterize container types that
 can contain any legal primitive, reference or null in the IREE type system.</p>
+<h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
+<h3 id="descriptorflags">DescriptorFlags<a class="headerlink" href="#descriptorflags" title="Permanent link">link</a></h3>
+<p>valid Descriptor flags</p>
+<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;"><code>0</code></td>
+<td>None</td>
+</tr>
+<tr>
+<td style="text-align: center;">ReadOnly</td>
+<td style="text-align: center;"><code>1</code></td>
+<td>ReadOnly</td>
+</tr>
+</tbody>
+</table>
+<h3 id="descriptorsetlayoutflags">DescriptorSetLayoutFlags<a class="headerlink" href="#descriptorsetlayoutflags" title="Permanent link">link</a></h3>
+<p>valid DescriptorSetLayout flags</p>
+<h4 id="cases_1">Cases:<a class="headerlink" href="#cases_1" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;"><code>0</code></td>
+<td>None</td>
+</tr>
+<tr>
+<td style="text-align: center;">Indirect</td>
+<td style="text-align: center;"><code>1</code></td>
+<td>Indirect</td>
+</tr>
+</tbody>
+</table>
+<h3 id="descriptortype">DescriptorType<a class="headerlink" href="#descriptortype" title="Permanent link">link</a></h3>
+<p>valid DescriptorType</p>
+<h4 id="cases_2">Cases:<a class="headerlink" href="#cases_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">UniformBuffer</td>
+<td style="text-align: center;"><code>6</code></td>
+<td>uniform_buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;">StorageBuffer</td>
+<td style="text-align: center;"><code>7</code></td>
+<td>storage_buffer</td>
+</tr>
+</tbody>
+</table>
 
 
 
