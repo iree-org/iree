@@ -399,7 +399,7 @@ func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x6
 // CHECK-MASK: scf.for
 // CHECK-MASK:   scf.for
 // CHECK-MASK:     scf.for
-// CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x1x4x?xf32>
+// CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x67x120x176xf32>
 
 // -----
 
