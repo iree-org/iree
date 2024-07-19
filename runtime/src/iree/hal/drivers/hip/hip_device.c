@@ -19,7 +19,6 @@
 #include "iree/hal/drivers/hip/event_semaphore.h"
 #include "iree/hal/drivers/hip/graph_command_buffer.h"
 #include "iree/hal/drivers/hip/hip_allocator.h"
-#include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/memory_pools.h"
 #include "iree/hal/drivers/hip/nop_executable_cache.h"
 #include "iree/hal/drivers/hip/pending_queue_actions.h"
@@ -108,7 +107,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->arena_block_size = 32 * 1024;
   out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
-  out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
+  out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
   out_params->stream_tracing = false;
   out_params->async_allocations = true;
   out_params->allow_inline_execution = false;
