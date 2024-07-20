@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "conv2d_to_im2col.mlir"
     "conv2d_to_winograd.mlir"
     "convert_to_loops.mlir"
     "decompose_attention.mlir"

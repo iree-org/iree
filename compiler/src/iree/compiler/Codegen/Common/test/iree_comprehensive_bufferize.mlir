@@ -2170,30 +2170,6 @@ func.func @rank_reducing_no_op_subview() {
 
 // -----
 
-// CHECK-LABEL: func.func @reverse_dim(
-//   CHECK-DAG:   %[[alloc:.*]] = memref.alloc()
-//   CHECK-DAG:   %[[cst:.*]] = bufferization.to_memref
-//       CHECK:   iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>)
-//  CHECK-SAME:       ins(%[[cst]] :
-//  CHECK-SAME:       outs(%[[alloc]] :
-//       CHECK:   %[[load:.*]] = memref.load %[[alloc]]
-//       CHECK:   return %[[load]]
-func.func @reverse_dim(%pos: index) -> f32 {
-  %input = arith.constant dense<[[1.0, 2.0, 3.0],
-                                 [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
-
-  %init = bufferization.alloc_tensor() : tensor<2x3xf32>
-  %0 = iree_linalg_ext.reverse
-         dimensions(dense<0> : tensor<1xi64>)
-         ins(%input : tensor<2x3xf32>)
-         outs(%init : tensor<2x3xf32>) : tensor<2x3xf32>
-
-  %1 = tensor.extract %0[%pos, %pos] : tensor<2x3xf32>
-  return %1 : f32
-}
-
-// -----
-
 // CHECK-LABEL: func.func @fft_tensor(
 //       CHECK:   memref.alloc
 //       CHECK:   memref.alloc

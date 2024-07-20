@@ -25,7 +25,8 @@ def FuseAndHoistParallelLoopsPass :
   let summary = "Greedily fuses and hoists parallel loops.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::bufferization::BufferizationDialect"
   ];
 }
 

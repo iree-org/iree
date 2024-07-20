@@ -58,6 +58,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
+    MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces

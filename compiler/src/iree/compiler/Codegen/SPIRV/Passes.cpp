@@ -112,6 +112,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
+  funcPassManager.addPass(createCSEPass());
   if (useFuseTensorPadWithConsumerPass) {
     funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   }

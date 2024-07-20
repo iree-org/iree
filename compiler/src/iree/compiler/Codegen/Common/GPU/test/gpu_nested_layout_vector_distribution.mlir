@@ -965,16 +965,19 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[C16:.*]] = arith.constant 16 : i32
 // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : i32
 // CHECK-DAG: %[[C64:.*]] = arith.constant 64 : i32
+// CHECK-DAG: %[[IDENTITY:.*]] = arith.constant dense<0xFF800000> : vector<2x1x1xf32>
 // CHECK-DAG: %[[DARG0:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf32> -> vector<2x2x1x1x1x4xf32>
 // CHECK-DAG: %[[DARG1:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // Local reduction
-// CHECK: vector.multi_reduction <maximumf>, %[[DARG0]], %[[DARG1]] [1, 3, 5] : vector<2x2x1x1x1x4xf32> to vector<2x1x1xf32>
+// CHECK: vector.multi_reduction <maximumf>, %[[DARG0]], %[[IDENTITY]] [1, 3, 5] : vector<2x2x1x1x1x4xf32> to vector<2x1x1xf32>
 // Global reduction
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
-// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<2x1x1xf32> -> vector<32xf32>
+// Accumulator reduction
+// CHECK: %[[ACC_REDUC:.+]] = arith.maximumf %{{.*}}, %[[DARG1]] : vector<2x1x1xf32>
+// CHECK: iree_vector_ext.to_simd %[[ACC_REDUC]] : vector<2x1x1xf32> -> vector<32xf32>
 
 // -----
 
@@ -1016,3 +1019,5 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<1x4x1x1x1x4xf32> to vector<1x1x1xf32>
 // Global reduction
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
+// Accumulator reduction
+// CHECK: arith.maximumf %{{.*}}, %{{.*}} : vector<1x1x1xf32>

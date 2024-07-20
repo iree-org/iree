@@ -440,71 +440,6 @@ ScanOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
-// ReverseOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult ReverseOp::verify() {
-  Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected exactly one input");
-  }
-  if (getNumDpsInits() != 1) {
-    return op->emitOpError("expected exactly one output");
-  }
-  auto inputType = cast<ShapedType>(getInput().getType());
-  auto outputType = cast<ShapedType>(getOutput().getType());
-  if (inputType.getElementType() != outputType.getElementType()) {
-    return op->emitOpError(
-        "expected input/output element types to be identical");
-  }
-  ArrayRef<int64_t> inputShapes = inputType.getShape();
-  ArrayRef<int64_t> outputShapes = outputType.getShape();
-  if (inputShapes.size() != outputShapes.size()) {
-    return op->emitOpError("expexted input/output to have identical ranks");
-  }
-  if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
-                   [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
-                            std::get<0>(s) != std::get<1>(s);
-                   })) {
-    return op->emitOpError("incompatible input/output shapes");
-  }
-
-  int64_t rank = getOperandRank();
-  llvm::SmallSetVector<int64_t, 4> s;
-  for (auto dim : getDimensionsArray()) {
-    if (dim < 0 || dim >= rank) {
-      return op->emitOpError("all the dimensions must be within [0, ")
-             << rank << ")";
-    }
-    if (s.contains(dim)) {
-      return op->emitOpError("expected dimensions numbers are all unique");
-    }
-    s.insert(dim);
-  }
-
-  return success();
-}
-
-LogicalResult
-ReverseOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
-SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
-  Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getOperandRank()),
-          /*output=*/AffineMap(nullptr)};
-}
-
-SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
-  return {AffineMap(nullptr)};
-}
-
-//===----------------------------------------------------------------------===//
 // TopkOp
 //===----------------------------------------------------------------------===//
 
@@ -1275,11 +1210,15 @@ LogicalResult AttentionOp::verify() {
   }
   bool isTiled = numOutputs == 3;
 
-  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
-
   // Check if indexing maps can represent attention.
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+
+  FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
+  if (!scaleElementType) {
+    return attnOp->emitOpError("expected scale to be of floating point type");
+  }
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());
@@ -1579,7 +1518,6 @@ Im2colOp::reifyResultShapes(OpBuilder &b,
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
-DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)

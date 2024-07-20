@@ -526,46 +526,6 @@ func.func @reduce_window_max_4x6xf32() {
 
 // -----
 
-func.func @linalg_ext_reverse_dim0() {
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %c3 = arith.constant 3 : index
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x3xf32>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x3xf32>>
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
-  scf.for %arg0 = %2 to %c2 step %3 {
-    %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
-    scf.for %arg1 = %4 to %c3 step %5 {
-      %6 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32>> -> tensor<2x3xf32>
-      %7 = tensor.empty() : tensor<2x3xf32>
-      %8 = iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>) ins(%6 : tensor<2x3xf32>) outs(%7 : tensor<2x3xf32>) : tensor<2x3xf32>
-      %9 = affine.apply affine_map<()[s0] -> (-s0)>()[%arg0]
-      flow.dispatch.tensor.store %8, %1, offsets = [%9, %arg1], sizes = [2, 3], strides = [%c1, %c1] : tensor<2x3xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x3xf32>>
-    }
-  }
-  return
-}
-//      CHECK: func.func @linalg_ext_reverse_dim0()
-//  CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//  CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     scf.for %[[IV1:.+]] =
-//  CHECK-DAG:       %[[IN_TILE:.+]] = flow.dispatch.tensor.load %[[IN]]
-//  CHECK-DAG:       %[[OUT_TILE:.+]] = flow.dispatch.tensor.load %[[OUT]]
-//      CHECK:       %[[REV_TILE:.+]] = iree_linalg_ext.reverse
-// CHECK-SAME:           ins(%[[IN_TILE]] : tensor<2x3xf32>)
-// CHECK-SAME:           outs(%[[OUT_TILE]] : tensor<2x3xf32>)
-//      CHECK:       flow.dispatch.tensor.store %[[REV_TILE]], %[[OUT]]
-
-// -----
-
 func.func @sort1D() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<4xi32>>

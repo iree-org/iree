@@ -69,6 +69,12 @@ def DecomposeWinogradTransform :
                     "createDecomposeWinogradTransformPass()";
 }
 
+def ConvertConv2DToIm2ColOp :
+    InterfacePass<"iree-linalg-ext-convert-conv2d-to-im2col-op", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg convolution ops to im2col gemm based implementation.";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToIm2ColOpPass()";
+}
+
 def ConvertConv2DToWinograd :
     InterfacePass<"iree-linalg-ext-convert-conv2d-to-winograd", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to winograd based implementation. By default, "
