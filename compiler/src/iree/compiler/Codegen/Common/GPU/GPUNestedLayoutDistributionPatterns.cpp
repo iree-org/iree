@@ -480,7 +480,8 @@ struct DistributeMultiReduction final
       return failure();
     }
 
-    // Do reduction against accumulator.
+    // Do reduction against accumulator, which needs to be done after thread
+    // reduction.
     VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
         loc, shaped, threadReduced.value());
     Value accReduction = vector::makeArithReduction(
