@@ -120,6 +120,9 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType);
 
+/// Emit identity constant based on combiningKind and type.
+Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
+                                vector::CombiningKind kind, Type identityType);
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
