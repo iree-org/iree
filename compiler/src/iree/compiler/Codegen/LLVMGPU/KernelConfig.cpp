@@ -620,7 +620,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
   // Get iteration domain bounds.
-  OpBuilder b(op->getContext());
+  OpBuilder b(op);
   SmallVector<Range> itDomain = op.getIterationDomain(b);
   SmallVector<int64_t> bounds(itDomain.size());
   for (auto [slice, bound] : llvm::zip(itDomain, bounds)) {
