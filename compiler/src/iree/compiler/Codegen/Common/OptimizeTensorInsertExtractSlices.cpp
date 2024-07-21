@@ -116,6 +116,10 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
       return loopLike;
     loopLike = *newLoop;
 
+    // Replace hoisted out extract with corresponding induction variable.
+    rewriter.replaceAllUsesExcept(
+        extraction.getResult(), loopLike.getRegionIterArgs().back(), loopLike);
+
     BlockArgument iterArg = loopLike.getRegionIterArgs()[idx];
     OpResult loopResult = loopLike.getTiedLoopResult(iterArg);
     OpResult newLoopResult = loopLike.getLoopResults()->back();

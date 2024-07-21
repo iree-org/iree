@@ -158,9 +158,10 @@ func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor
 
 // CHECK-LABEL: @subset_hoisting_invariant_tensor
 // CHECK:   tensor.extract_slice
-// CHECK:   scf.for
-// CHECK:     tensor.extract_slice
+// CHECK:   scf.for {{.*}} iter_args(%[[IV:.+]] = {{.*}})
+// CHECK:     %[[SLICE:.+]] = tensor.extract_slice
 // CHECK-NOT: tensor.extract_slice
+// CHECK:     linalg.add ins(%[[IV]], %[[SLICE]] : {{.*}})
 // CHECK:   scf.yield
 // CHECK:   tensor.insert_slice
 
