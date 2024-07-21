@@ -108,17 +108,16 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
             ArrayRef<BlockArgument> innerNewBBArgs) -> SmallVector<Value> {
       return {insertion.getSourceOperand().get()};
     };
+
+    // replaceInitOperandUsesInLoop is set to true S.T we will use new IV
+    // instead of hoisted out extract.
     FailureOr<LoopLikeOpInterface> newLoop =
         loopLike.replaceWithAdditionalYields(
             rewriter, extraction.getResult(),
-            /*replaceInitOperandUsesInLoop=*/false, newYieldValuesFn);
+            /*replaceInitOperandUsesInLoop=*/true, newYieldValuesFn);
     if (failed(newLoop))
       return loopLike;
     loopLike = *newLoop;
-
-    // Replace hoisted out extract with corresponding induction variable.
-    rewriter.replaceAllUsesExcept(
-        extraction.getResult(), loopLike.getRegionIterArgs().back(), loopLike);
 
     BlockArgument iterArg = loopLike.getRegionIterArgs()[idx];
     OpResult loopResult = loopLike.getTiedLoopResult(iterArg);
