@@ -257,6 +257,26 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Workgroup Reordering Attr
+
+def IREEGPU_WorkgroupReorderAttr: AttrDef<IREEGPU_Dialect, "WorkgroupReorderOptions">{
+  let mnemonic = "workgroup_reorder";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  string description = [{
+    Options for workgroup reordering strategies to improve L2 cache hit rate.
+  }];
+
+  let parameters = (ins
+    OptionalParameter<"::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupEnum">:$reorder_option,
+    OptionalParameter<"std::optional<int64_t>", "the tile size to use in log2">:$log_tile_size
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+
+//===----------------------------------------------------------------------===//
 // Workgroup processor level description
 
 def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
@@ -322,7 +342,7 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
   let parameters = (ins
     "uint32_t":$wgp_count,
-
+    "uint32_t":$chiplet_count,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.

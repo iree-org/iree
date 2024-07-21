@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 
 #include <cstdint>
+#include <string>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -57,12 +58,14 @@ static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
                                 "No workgroup reordering"),
                      clEnumValN(ReorderWorkgroupsStrategy::Swizzle, "swizzle",
                                 "Swizzle"),
+                     clEnumValN(ReorderWorkgroupsStrategy::ChipletGroup,
+                                "chipletgroup", "ChipletGroup"),
                      clEnumValN(ReorderWorkgroupsStrategy::Transpose,
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
-static llvm::cl::opt<unsigned> clReorderWorkgroupsLogSwizzleTile(
-    "iree-codegen-reorder-workgroups-log-swizzle-tile",
+static llvm::cl::opt<unsigned> clReorderWorkgroupsLogTile(
+    "iree-codegen-reorder-workgroups-log-tile",
     llvm::cl::desc("Reorder workgroups: log tile size to use"),
     llvm::cl::init(3));
 
@@ -80,6 +83,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
       reorderStr = "transpose";
     } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
       reorderStr = "swizzle";
+    } else if (options.reorderStrategy ==
+               ReorderWorkgroupsStrategy::ChipletGroup) {
+      reorderStr = "chilpletgroup";
     } else {
       assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
              "Unhandled reorder option");
@@ -91,6 +97,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
             << options.enableReduceSharedMemoryBankConflicts << ", "
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", reorderWorkgroupsStrategy = " << reorderStr
+            << ", reorderWorkgroupsTileSize = " << options.reorderWgLogTileSize
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
@@ -202,6 +209,13 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
   return option.value_or(clReorderWorkgroupsStrategy);
 }
 
+// Reconciles log2 of the workgroup reordering tile size based on the pipeline
+// `option` and the CLI flag.
+static unsigned getReorderWorkgroupsLogTileSize(std::optional<int64_t> option) {
+  int64_t logTile = option.value_or(clReorderWorkgroupsLogTile);
+  assert(logTile >= 0);
+  return static_cast<unsigned>(logTile);
+}
 //===----------------------------------------------------------------------===//
 // Common Pass Recipes
 //===----------------------------------------------------------------------===//
@@ -447,9 +461,10 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
+  unsigned reorderWgLogTileSize =
+      getReorderWorkgroupsLogTileSize(options.reorderWgLogTileSize);
   funcPassManager.addPass(createReorderWorkgroups(
-      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
-      canReorderWorkgroups));
+      reorderStrategy, reorderWgLogTileSize, canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -496,9 +511,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
+  unsigned reorderWgLogTileSize =
+      getReorderWorkgroupsLogTileSize(options.reorderWgLogTileSize);
   funcPassManager.addPass(createReorderWorkgroups(
-      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
-      canReorderWorkgroups));
+      reorderStrategy, reorderWgLogTileSize, canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -564,9 +580,10 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
+  unsigned reorderWgLogTileSize =
+      getReorderWorkgroupsLogTileSize(options.reorderWgLogTileSize);
   funcPassManager.addPass(createReorderWorkgroups(
-      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
-      canReorderWorkgroups));
+      reorderStrategy, reorderWgLogTileSize, canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -723,9 +740,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
+  unsigned reorderWgLogTileSize =
+      getReorderWorkgroupsLogTileSize(options.reorderWgLogTileSize);
   funcPassManager.addPass(createReorderWorkgroups(
-      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
-      canReorderWorkgroups));
+      reorderStrategy, reorderWgLogTileSize, canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());

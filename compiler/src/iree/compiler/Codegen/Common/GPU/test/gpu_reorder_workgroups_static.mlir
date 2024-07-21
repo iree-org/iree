@@ -1,8 +1,11 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3})))))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logSwizzleTile=3})))))" \
 // RUN:   %s | FileCheck --check-prefix=SWIZZLE %s
 
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose})))))" \
 // RUN:   %s | FileCheck --check-prefix=TRANSPOSE %s
+
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logChipletgroupTile=3})))))" \
+// RUN:   %s | FileCheck --check-prefix=CHIPLETGROUP %s
 
 // Make sure we use static workgroup counts instead of introducting
 // `hal.interface.workgroup.count` ops. These are currently not supported on ROCm.
@@ -17,6 +20,25 @@
 // SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_X]]]
 // SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_Y]]]
 // SWIZZLE:                   return
+
+// CHIPLETGROUP-LABEL: hal.executable private @main_dispatch_0 {
+// CHIPLETGROUP-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
+// CHIPLETGROUP-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+// CHIPLETGROUP-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+// CHIPLETGROUP-NOT:               hal.interface.workgroup.count
+// CHIPLETGROUP-DAG:               %[[C250:.+]] = arith.constant 250 : index
+// CHIPLETGROUP-DAG:               %[[C500:.+]] = arith.constant 500 : index
+// CHIPLETGROUP:                   %[[MUL:.+]] = arith.muli %[[WG_Y]], %[[C250]] : index
+// CHIPLETGROUP:                   %[[ADD:.+]] = arith.addi %[[MUL]], %[[WG_X]] : index
+// CHIPLETGROUP:                   %[[CMP:.+]] = arith.cmpi ugt, %[[ADD]], %{{.+}} : index
+// CHIPLETGROUP:                   %[[SELECT:.+]] = arith.select %[[CMP]], %[[ADD]], %{{.+}} : index
+// CHIPLETGROUP:                   %[[REM:.+]] = arith.remui %[[SELECT]], %{{.+}} : index
+// CHIPLETGROUP:                   %[[ADDI:.+]] = arith.addi %{{.+}}, %[[REM]] : index
+// CHIPLETGROUP:                   %[[REMI:.+]] = arith.remui %[[SELECT]], %{{.+}} : index
+// CHIPLETGROUP:                   %[[DIV:.+]] = arith.divui %[[REMI]], %{{.+}} : index
+// CHIPLETGROUP-DAG:               affine.apply #{{.+}}()[%[[ADDI]]]
+// CHIPLETGROUP-DAG:               affine.apply #{{.+}}()[%[[DIV]]]
+// CHIPLETGROUP:                   return
 
 // TRANSPOSE-LABEL: hal.executable private @main_dispatch_0 {
 // TRANSPOSE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
@@ -33,8 +55,13 @@
 // TRANSPOSE-DAG:               affine.apply #{{.+}}()[%[[REM]]]
 // TRANSPOSE:                   return
 
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+{iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>,
+chip = <wgp_count = 304, chiplet_count = 8>>, ukernels = "none"}>
 hal.executable private @main_dispatch_0 {
-hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
   hal.executable.export public @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>], subgroup_size = 64 : index, translation_info = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>, workgroup_size = [64 : index, 16 : index, 1 : index]} {
   ^bb0(%arg0: !hal.device):
     %c250 = arith.constant 250 : index

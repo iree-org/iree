@@ -1,10 +1,17 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logSwizzleTile=3}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=SWIZZLE %s
 
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=TRANSPOSE %s
 
-func.func @matmul() {
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logChipletgroupTile=3}))" \
+// RUN:   --split-input-file %s | FileCheck --check-prefix=CHIPLETGROUP %s
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+{iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>,
+chip = <wgp_count = 304, chiplet_count = 8>>, ukernels = "none"}>
+func.func @matmul() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c96 = arith.constant 96 : index
@@ -54,6 +61,41 @@ func.func @matmul() {
 // SWIZZLE:         %[[S12:.*]] = arith.andi %[[S10]], %[[S11]] : i1
 // SWIZZLE:         %[[S13:.*]] = arith.select %[[S12]], %[[WG_X]], %[[S6]] : index
 // SWIZZLE:         %[[S14:.*]] = arith.select %[[S12]], %[[WG_Y]], %[[S7]] : index
+
+// CHIPLETGROUP-LABEL: func.func @matmul
+// CHIPLETGROUP:         %[[WG_X:.*]] = hal.interface.workgroup.id[0] : index
+// CHIPLETGROUP:         %[[WG_Y:.*]] = hal.interface.workgroup.id[1] : index
+// CHIPLETGROUP:         %[[WG_CNT_X:.*]] = hal.interface.workgroup.count[0] : index
+// CHIPLETGROUP:         %[[WG_CNT_Y:.*]] = hal.interface.workgroup.count[1] : index
+// CHIPLETGROUP:         %[[S0:.*]] = arith.muli %[[WG_Y]], %[[WG_CNT_X]] : index
+// CHIPLETGROUP:         %[[S1:.*]] = arith.addi %[[S0]], %[[WG_X]] : index
+// CHIPLETGROUP:         %[[CST4:.*]] = arith.constant 4 : index
+// CHIPLETGROUP:         %[[WG_CNT:.*]] = arith.muli %[[WG_CNT_X]], %[[WG_CNT_Y]] : index
+// CHIPLETGROUP:         %[[S3:.*]] = arith.divui %[[WG_CNT]], %[[CST4]] : index
+// CHIPLETGROUP:         %[[S4:.*]] = arith.remui %[[S1]], %[[CST4]] : index
+// CHIPLETGROUP:         %[[S5:.*]] = arith.divui %[[S1]], %[[CST4]] : index
+// CHIPLETGROUP:         %[[S6:.*]] = arith.muli %[[S4]], %[[S3]] : index
+// CHIPLETGROUP:         %[[S7:.*]] = arith.addi %[[S5]], %[[S6]] : index
+// CHIPLETGROUP:         %[[CST1:.*]] = arith.constant 1 : index
+// CHIPLETGROUP:         %[[S8:.*]] = arith.subi %[[WG_CNT]], %[[CST1]] : index
+// CHIPLETGROUP:         %[[S9:.*]] = arith.remui %[[WG_CNT]], %[[CST4]] : index
+// CHIPLETGROUP:         %[[S10:.*]] = arith.subi %[[S8]], %[[S9]] : index
+// CHIPLETGROUP:         %[[S11:.*]] = arith.cmpi ugt, %[[S1]], %[[S10]] : index
+// CHIPLETGROUP:         %[[S12:.*]] = arith.select %[[S11]], %[[S1]], %[[S7]] : index
+// CHIPLETGROUP:         %[[CST8:.*]] = arith.constant 8 : index
+// CHIPLETGROUP:         %[[S13:.*]] = arith.muli %[[CST8]], %[[WG_CNT_X]] : index
+// CHIPLETGROUP:         %[[S14:.*]] = arith.divui %[[S12]], %[[S13]] : index
+// CHIPLETGROUP:         %[[S15:.*]] = arith.muli %[[S14]], %[[CST8]] : index
+// CHIPLETGROUP:         %[[S16:.*]] = arith.subi %[[WG_CNT_Y]], %[[S15]] : index
+// CHIPLETGROUP:         %[[S17:.*]] = arith.minui %[[S16]], %[[CST8]] : index
+// CHIPLETGROUP:         %[[S18:.*]] = arith.remui %[[S12]], %[[S17]] : index
+// CHIPLETGROUP:         %[[S19:.*]] = arith.addi %[[S15]], %[[S18]] : index
+// CHIPLETGROUP:         %[[S20:.*]] = arith.remui %[[S12]], %[[S13]] : index
+// CHIPLETGROUP:         %[[S21:.*]] = arith.divui %[[S20]], %[[S17]] : index
+// CHIPLETGROUP:         %26 = affine.apply #map()[%[[S19]]]
+// CHIPLETGROUP:         %27 = affine.apply #map()[%workgroup_count_y_1]
+// CHIPLETGROUP:         %28 = affine.apply #map()[%[[S21]]]
+// CHIPLETGROUP:         %29 = affine.apply #map()[%workgroup_count_x_0]
 
 // TRANSPOSE-LABEL: func.func @matmul
 // TRANSPOSE:         %[[WG_X:.*]] = hal.interface.workgroup.id[0] : index
