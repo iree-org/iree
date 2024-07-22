@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -19,6 +20,13 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+/// Command line options used purely for development purposes. Not to be relied
+/// on in any way.
+static llvm::cl::opt<float> clAttentionSoftmaxMax(
+    "iree-linalgext-attention-softmax-max",
+    llvm::cl::desc("maximum expected value from attention softmax"),
+    llvm::cl::init(1.0));
 
 static Value scaleValueInPlace(OpBuilder &builder, Location loc,
                                AffineMap inputMap, AffineMap scaleMap,
@@ -244,7 +252,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldMax = getMax();
   Value oldSum = getSum();
   Type elementType = getElementTypeOrSelf(getOutput().getType());
-  Type reduceType = getElementTypeOrSelf(oldMax.getType());
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(getIndexingMapsArray());
@@ -346,36 +353,25 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
             return sizes[cast<AffineDimExpr>(dimExpr).getPosition()];
           }));
 
-      // We rescale `p` to use the full range and pass back the `pScale`.
-      Value maxEmpty = b.create<tensor::EmptyOp>(loc, mSizes, reduceType);
-      Value absMax =
-          reduce<arith::MaximumFOp>(b, loc, pMap, maxMap, p, maxEmpty);
-
       auto fpTy = cast<FloatType>(vETy);
       double largestDbl =
           APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
               .convertToDouble();
 
-      AffineMap scaleMap = AffineMap::get(/*dimCount=*/maxMap.getNumInputs(),
-                                          /*symbolCount=*/0, getContext());
-
       // We normalize p from [0, max] to [0, fp8.max] to guarantee we
       // use the full `fp8` range, then renormlize post Softmax@V matmul
       // to correct.
-      Value largestInv = b.create<arith::ConstantOp>(
-          loc, b.getFloatAttr(elementType, 1.0 / largestDbl));
-      pScale = scaleValueInPlace(b, loc, maxMap, scaleMap, absMax, largestInv);
+      pScale = b.create<arith::ConstantOp>(
+          loc, b.getFloatAttr(elementType, clAttentionSoftmaxMax / largestDbl));
 
       // Compute the pre matmul scale to handle fp8 quantization:
-      Value recInit = b.create<tensor::EmptyOp>(loc, mSizes, elementType);
-      Value largest = b.create<arith::ConstantOp>(
-          loc, b.getFloatAttr(elementType, largestDbl));
-      Value pScaleInv = reciprocalValue(b, loc, absMax, recInit);
-      pScaleInv =
-          scaleValueInPlace(b, loc, maxMap, scaleMap, pScaleInv, largest);
+      Value pScaleInv = b.create<arith::ConstantOp>(
+          loc, b.getFloatAttr(elementType, largestDbl / clAttentionSoftmaxMax));
 
-      p = scaleValueInPlace(b, loc, pMap, maxMap, p, pScaleInv);
-      norm = scaleValueInPlace(b, loc, normMap, maxMap, norm, pScaleInv);
+      AffineMap scaleMap = AffineMap::get(/*dimCount=*/maxMap.getNumInputs(),
+                                          /*symbolCount=*/0, getContext());
+      p = scaleValueInPlace(b, loc, pMap, scaleMap, p, pScaleInv);
+      norm = scaleValueInPlace(b, loc, normMap, scaleMap, norm, pScaleInv);
     }
 
     Value convertP = b.create<tensor::EmptyOp>(loc, sSizes, vETy);
@@ -391,7 +387,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // Update for for the FP8 dynamic scale:
   if (pScale) {
-    newAcc = scaleValueInPlace(b, loc, accMap, maxMap, newAcc, pScale);
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/maxMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    newAcc = scaleValueInPlace(b, loc, accMap, scaleMap, newAcc, pScale);
   }
 
   return SmallVector<Value>{newAcc, newMax, newSum};
