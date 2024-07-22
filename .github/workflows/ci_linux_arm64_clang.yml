@@ -28,7 +28,6 @@ jobs:
   # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
   linux_arm64_clang:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_arm64')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
