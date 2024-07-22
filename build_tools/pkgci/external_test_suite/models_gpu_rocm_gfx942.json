@@ -23,7 +23,6 @@
       // TODO(#17874): error: a handle passed as operand #0 and consumed by this operation points to a payload entity more than once
     "sharktank/llama/open-llama-3b-v2-f16",
 
-    "sharktank/punet/fp16",
     "sharktank/punet/int8"
   ],
   "expected_run_failures": []
