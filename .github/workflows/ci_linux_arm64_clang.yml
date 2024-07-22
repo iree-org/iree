@@ -21,6 +21,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
   # TODO: Switch to GitHub-hosted arm64 runners when available?
   # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
   linux_arm64_clang:
