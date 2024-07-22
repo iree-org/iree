@@ -126,8 +126,6 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         # "build_test_all_arm64",  # Currently disabled
         # "build_test_all_windows",  # Currently disabled
-        # "build_test_all_macos_arm64",  # Currently disabled
-        "build_test_all_macos_x86_64",
         "test_nvidia_gpu",
         # "test_nvidia_a100",  # Currently disabled
         "test_amd_mi250",
@@ -157,8 +155,6 @@ AMDGPU_PATHS = [
 # The file paths should be specified using Unix shell-style wildcards.
 # Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
-    # Currently disabled
-    # ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
     # Currently disabled
     # (
     #     "build_test_all_windows",

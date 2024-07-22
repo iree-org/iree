@@ -292,23 +292,6 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {postsubmit_job})
 
-    @unittest.skip("skip while `build_test_all_macos_arm64` job is disabled")
-    def test_get_enabled_jobs_metal(self):
-        trailers = {}
-        all_jobs = {"job1"}
-        is_pr = True
-        is_llvm_integrate_pr = False
-        modified_paths = ["runtime/src/iree/hal/drivers/metal/file"]
-        jobs = configure_ci.get_enabled_jobs(
-            trailers,
-            all_jobs,
-            modified_paths=modified_paths,
-            is_pr=is_pr,
-            is_llvm_integrate_pr=is_llvm_integrate_pr,
-        )
-        expected_jobs = {"job1", "build_test_all_macos_arm64"}
-        self.assertCountEqual(jobs, expected_jobs)
-
     @unittest.skip("skip while `build_test_all_windows` job is disabled")
     def test_get_enabled_jobs_windows(self):
         trailers = {}
