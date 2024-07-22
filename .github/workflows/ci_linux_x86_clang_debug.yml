@@ -28,7 +28,6 @@ jobs:
   # so run on self-hosted CPU build runners instead.
   linux_x86_clang_debug:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'debug')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
