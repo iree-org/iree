@@ -643,7 +643,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // TODO: Do we need a matvec-like attention pipeline? Probably not,
   // considering M is generally the largest dimension.
 
-  Value v = op.getValue();
+  Value vMatrix = op.getValue();
 
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
@@ -663,7 +663,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   //
   // We assume that the second matmul uses the element type of V for input
   // and f32 as output. It is possible to use other element types also.
-  Type vElementType = getElementTypeOrSelf(v);
+  Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType problem{bounds[mDim],
                              bounds[nDim],
