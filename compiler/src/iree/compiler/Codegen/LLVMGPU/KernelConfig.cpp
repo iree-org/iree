@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -610,6 +611,169 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 }
 
 static LogicalResult
+setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
+                                     mlir::FunctionOpInterface entryPoint,
+                                     IREE::LinalgExt::AttentionOp op) {
+  if (target.getWgp().getMma().empty())
+    return failure();
+
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // Get iteration domain bounds.
+  OpBuilder b(op);
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+
+  auto opInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(op.getIndexingMapsArray())
+          .value();
+
+  int64_t mDim = opInfo.getMDims().back();
+  int64_t k1Dim = opInfo.getK1Dims().back();
+  int64_t k2Dim = opInfo.getK2Dims().back();
+  int64_t nDim = opInfo.getNDims().back();
+
+  // Dynamic dims are expected to be taken care of earlier in the pipeline.
+  if (ShapedType::isDynamic(bounds[mDim]) ||
+      ShapedType::isDynamic(bounds[k1Dim]) ||
+      ShapedType::isDynamic(bounds[k2Dim]) ||
+      ShapedType::isDynamic(bounds[nDim])) {
+    return failure();
+  }
+
+  // TODO: Do we need a matvec-like attention pipeline? Probably not,
+  // considering M is generally the largest dimension.
+
+  Value vMatrix = op.getValue();
+
+  SmallVector<GPUMatmulShapeType> intrinsics;
+  intrinsics.reserve(target.getWgp().getMma().size());
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+  }
+  if (intrinsics.empty())
+    return failure();
+
+  // We select the tile sizes based on the second matmul. We can probably
+  // use a better heuristic, but all tile sizes can be determined from the
+  // second matmul.
+  //
+  // We assume that the second matmul uses the element type of V for input
+  // and f32 as output. It is possible to use other element types also.
+  Type vElementType = getElementTypeOrSelf(vMatrix);
+  Type f32Type = b.getF32Type();
+  GPUMatmulShapeType problem{bounds[mDim],
+                             bounds[nDim],
+                             bounds[k2Dim],
+                             /*lhsType=*/vElementType,
+                             /*rhsType=*/vElementType,
+                             /*accType=*/f32Type};
+
+  // TODO: Currently, we are forcing number of subgroups to be 1. This can be
+  // fixed by teaching vector distribution chained matmul.
+  GPUMMAHeuristicSeeds seeds = {/*bestSubgroupCountPerWorkgroup=*/1,
+                                /*bestMNTileCountPerSubgroup=*/8,
+                                /*bestKTileCountPerSubgroup=*/4};
+
+  LDBG("Attention Vector Distribution Config");
+
+  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  AffineMap sMap = opInfo.getSMap();
+  AffineMap vMap = op.getValueMap();
+
+  bool transposedLhs =
+      (k2Dim !=
+       llvm::cast<AffineDimExpr>(sMap.getResults().back()).getPosition());
+  bool transposedRhs =
+      (nDim !=
+       llvm::cast<AffineDimExpr>(vMap.getResults().back()).getPosition());
+
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  // First try to find a schedule with an exactly matching intrinsic.
+  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
+  if (!schedule) {
+    // Then try again by allowing upcasting accumulator.
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
+                          /*canUpcastAcc=*/true);
+  }
+
+  if (!schedule) {
+    LDBG("Failed to deduce Attention schedule");
+    return failure();
+  }
+
+  LDBG("Target Subgroup size: " << targetSubgroupSize);
+  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
+                           << schedule->kSize << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileCount << ", "
+                                 << schedule->nTileCount << ", "
+                                 << schedule->kTileCount << "]");
+  LDBG("Schedule: warp counts [" << schedule->mWarpCount << ", "
+                                 << schedule->nWarpCount << "]");
+
+  std::array<int64_t, 3> workgroupSize{
+      schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
+
+  SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
+  // Tile all batch dimensions with unit size.
+  for (int64_t batch : opInfo.getBatchDims()) {
+    workgroupTileSizes[batch] = 1;
+  }
+
+  // Tile all m, n, and k2 dimensions to 1 except the innermost. Unit dims
+  // from this tiling are folded before vectorization. k1 dimension cannot be
+  // tiled, so we leave it.
+  for (int64_t m : llvm::drop_end(opInfo.getMDims())) {
+    workgroupTileSizes[m] = 1;
+  }
+  for (int64_t n : llvm::drop_end(opInfo.getNDims())) {
+    workgroupTileSizes[n] = 1;
+  }
+  for (int64_t k2 : llvm::drop_end(opInfo.getK2Dims())) {
+    workgroupTileSizes[k2] = 1;
+  }
+
+  // Compute the M/N dimension tile size by multiply subgroup information.
+  workgroupTileSizes[mDim] =
+      schedule->mWarpCount * schedule->mTileCount * schedule->mSize;
+  workgroupTileSizes[nDim] =
+      schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
+
+  // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
+  workgroupTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSizes);
+
+  // Attach the MMA schedule as an attribute to the entry point export function
+  // for later access in the pipeline.
+  MLIRContext *context = op.getContext();
+  auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
+      context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
+      schedule->nWarpCount);
+  SmallVector<NamedAttribute, 1> attrs;
+  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+  auto configDict = DictionaryAttr::get(context, attrs);
+
+  // TODO: We do not turn prefetching on even when requested by the prefetching
+  // flag because there is a shared memory allocation the two matmuls, which
+  // the prefetching pass cannot understand.
+
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize,
+                                               targetSubgroupSize, configDict);
+}
+
+static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *computeOp) {
@@ -635,6 +799,11 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
     }
+  }
+
+  if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
+    LDBG("VectorDistribution: trying to find a suitable attention config");
+    return setAttentionVectorDistributionConfig(target, entryPoint, attnOp);
   }
 
   LDBG("VectorDistribution: failed to find a suitable config");
