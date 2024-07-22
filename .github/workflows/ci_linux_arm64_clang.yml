@@ -8,8 +8,8 @@ name: CI - Linux arm64 clang
 
 on:
   schedule:
-    # Weekdays at 13:00 UTC = 05:00 PST / 06:00 PDT.
-    - cron: "5 4 * * 1-5"
+    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
+    - cron: "15 9 * * 1-5"
   workflow_dispatch:
 
 concurrency:
