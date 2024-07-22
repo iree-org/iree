@@ -621,16 +621,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Get iteration domain bounds.
   OpBuilder b(op);
-  SmallVector<Range> itDomain = op.getIterationDomain(b);
-  SmallVector<int64_t> bounds(itDomain.size());
-  for (auto [slice, bound] : llvm::zip_equal(itDomain, bounds)) {
-    OpFoldResult size = slice.size;
-    if (std::optional<int64_t> constSize = getConstantIntValue(size)) {
-      bound = constSize.value();
-    } else {
-      bound = ShapedType::kDynamic;
-    }
-  }
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
 
   auto opInfo =
       IREE::LinalgExt::AttentionOpDetail::get(op.getIndexingMapsArray())
