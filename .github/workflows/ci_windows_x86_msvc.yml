@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - Windows
+name: CI - Windows x86 MSVC
 
 on:
   schedule:
@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_test_all_windows:
+  windows_x86_msvc:
     runs-on: windows-2022
     defaults:
       run:

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - macOS
+name: CI - macOS x86 clang
 
 on:
   schedule:
@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_test_all_macos:
+  macos_x86_clang:
     runs-on: macos-13
     env:
       BUILD_DIR: build-macos

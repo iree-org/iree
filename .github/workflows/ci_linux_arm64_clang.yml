@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - Linux arm64
+name: CI - Linux arm64 clang
 
 on:
   schedule:
@@ -23,7 +23,7 @@ concurrency:
 jobs:
   # TODO: Switch to GitHub-hosted arm64 runners when available?
   # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
-  build_test_all_arm64:
+  linux_arm64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_arm64')
     runs-on:
