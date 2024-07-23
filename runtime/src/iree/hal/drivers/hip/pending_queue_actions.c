@@ -193,10 +193,8 @@ typedef struct iree_hal_hip_entry_list_node_t {
 typedef struct iree_hal_hip_entry_list_t {
   iree_slim_mutex_t guard_mutex;
 
-  IREE_GUARDED_BY(guard_mutex);
-  iree_hal_hip_entry_list_node_t* head;
-  IREE_GUARDED_BY(guard_mutex);
-  iree_hal_hip_entry_list_node_t* tail;
+  iree_hal_hip_entry_list_node_t* head IREE_GUARDED_BY(guard_mutex);
+  iree_hal_hip_entry_list_node_t* tail IREE_GUARDED_BY(guard_mutex);
 } iree_hal_hip_entry_list_t;
 
 static iree_hal_hip_entry_list_node_t* iree_hal_hip_entry_list_pop(
@@ -263,11 +261,8 @@ typedef struct iree_hal_hip_completion_list_node_t {
 
 typedef struct iree_hal_hip_completion_list_t {
   iree_slim_mutex_t guard_mutex;
-
-  IREE_GUARDED_BY(guard_mutex);
-  iree_hal_hip_completion_list_node_t* head;
-  IREE_GUARDED_BY(guard_mutex);
-  iree_hal_hip_completion_list_node_t* tail;
+  iree_hal_hip_completion_list_node_t* head IREE_GUARDED_BY(guard_mutex);
+  iree_hal_hip_completion_list_node_t* tail IREE_GUARDED_BY(guard_mutex);
 } iree_hal_hip_completion_list_t;
 
 static iree_hal_hip_completion_list_node_t* iree_hal_hip_completion_list_pop(
