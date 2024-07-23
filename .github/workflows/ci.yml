@@ -128,7 +128,7 @@ jobs:
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
               gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
       - name: "Running GPU tests"
         env:
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
@@ -193,7 +193,7 @@ jobs:
   #             --env IREE_CUDA_DISABLE \
   #             --env IREE_HIP_DISABLE \
   #             gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-  #             ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+  #             ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
   #     - name: "Running GPU tests"
   #       env:
   #         IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80|^requires-gpu|^driver=vulkan$|^driver=cuda$
@@ -243,7 +243,7 @@ jobs:
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
         run: |
-          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
       - name: "Running GPU tests"
         env:
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
@@ -287,7 +287,7 @@ jobs:
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
         run: |
-          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
       - name: "Running GPU tests"
         env:
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
@@ -326,7 +326,7 @@ jobs:
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
         run: |
-          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
       - name: "Running GPU tests"
         env:
           CTEST_PARALLEL_LEVEL: 1
