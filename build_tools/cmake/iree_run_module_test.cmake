@@ -27,8 +27,9 @@ endfunction()
 #   EXPECTED_OUTPUT: A string representing the expected output from executing
 #       the module in the format accepted by `iree-run-module` or a file
 #       containing the same. Can also be an HTTPS URL to download large npy.
-#   LABELS: Additional labels to apply to the test. The package path and
-#       "driver=${DRIVER}" are added automatically.
+#   LABELS: Additional labels to apply to the test. The package path,
+#       "test-type=run-module-test", and "driver=${DRIVER}" labels are added
+#       automatically.
 #   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
 #       test is expected to fail. The test pass/fail status is inverted.
 #   UNSUPPORTED_PLATFORMS: List of platforms (see iree_get_platform) for which
