@@ -214,10 +214,23 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
+  auto inpElemType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType())
+          .getElementType();
+  auto kernelElemType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType())
+          .getElementType();
+
   // TODO: Generalize to other dimensions.
   // Try to search for pad value and check only filter dimension is blocked.
   SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
   for (const GPUMatmulShapeType &intrinsic : intrinsics) {
+
+    if (!(inpElemType == intrinsic.aType &&
+          kernelElemType == intrinsic.bType)) {
+      continue;
+    }
+
     std::optional<int64_t> mPadding, nPadding, kPadding;
     auto getPadding = [](int64_t value, int64_t padTo) {
       return llvm::divideCeil(value, padTo) * padTo - value;
