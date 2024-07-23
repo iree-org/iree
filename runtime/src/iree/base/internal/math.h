@@ -285,9 +285,7 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
   const int prefix##mantissa_mask IREE_ATTRIBUTE_UNUSED =                    \
       (1u << prefix##exp_shift) - 1;                                         \
   const int prefix##exp_mask IREE_ATTRIBUTE_UNUSED =                         \
-      (1u << prefix##sign_shift) - (1u << prefix##exp_shift);                \
-  const int prefix##exp_bias IREE_ATTRIBUTE_UNUSED =                         \
-      (1u << (prefix##exp_bits - 1)) - 1;
+      (1u << prefix##sign_shift) - (1u << prefix##exp_shift);
 
 // Generic conversion from any less-than-32-bit floating-point format to f32.
 // The `src` value is typed as a uint32_t for genericity but occupies only the
@@ -295,21 +293,25 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 // unused.
 static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
                                                  int mantissa_bits,
-                                                 bool have_infinity) {
+                                                 bool have_infinity,
+                                                 bool all_ones_is_nan,
+                                                 int exp_bias) {
   IREE_MATH_FP_FORMAT_CONSTANTS(src_, exp_bits, mantissa_bits)
   IREE_MATH_FP_FORMAT_CONSTANTS(f32_, 8, 23)
   const uint32_t src_sign = src & src_sign_mask;
   const uint32_t f32_sign = src_sign << (f32_sign_shift - src_sign_shift);
   const uint32_t src_exp = src & src_exp_mask;
   const uint32_t src_mantissa = src & src_mantissa_mask;
+  int arithmetic_src_exp = src_exp >> src_exp_shift;
   uint32_t f32_exp = 0;
   uint32_t f32_mantissa = 0;
   if (src_exp == src_exp_mask) {
     // No infinities => more large finite values.
-    if (!have_infinity && src_mantissa != src_mantissa_mask) {
+    if (!(have_infinity ||
+          (all_ones_is_nan && src_mantissa == src_mantissa_mask))) {
       float sign = (src & src_sign_mask) ? -1.0f : 1.0f;
-      return sign * 2 * (1u << src_exp_bits) *
-             ((1u << src_mantissa_bits) + src_mantissa);
+      return sign * (1u << (arithmetic_src_exp - exp_bias)) *
+             (1.0f + 1.0f * src_mantissa / (1u << src_mantissa_bits));
     }
     // NaN or Inf case.
     f32_exp = f32_exp_mask;
@@ -323,9 +325,9 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
     // Zero or subnormal. Generate zero. Leave zero mantissa.
   } else {
     // Normal finite value.
-    int arithmetic_src_exp = src_exp >> src_exp_shift;
-    int arithmetic_f32_exp = arithmetic_src_exp + (1 << (f32_exp_bits - 1)) -
-                             (1 << (src_exp_bits - 1));
+
+    const int f32_exp_bias = 127;
+    int arithmetic_f32_exp = arithmetic_src_exp + f32_exp_bias - exp_bias;
     f32_exp = arithmetic_f32_exp << f32_exp_shift;
     f32_mantissa = src_mantissa << (f32_mantissa_bits - src_mantissa_bits);
   }
@@ -340,7 +342,8 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
 // genericity but occupies only the bottom (1 + exp_bits + mantissa_bits) bits.
 // The upper bits of the return value are unused.
 static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
-    float value, int exp_bits, int mantissa_bits, bool have_infinity) {
+    float value, int exp_bits, int mantissa_bits, bool have_infinity,
+    bool all_ones_is_nan, int exp_bias) {
   IREE_MATH_FP_FORMAT_CONSTANTS(dst_, exp_bits, mantissa_bits)
   IREE_MATH_FP_FORMAT_CONSTANTS(f32_, 8, 23)
   uint32_t u32_value;
@@ -364,18 +367,21 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     // Zero or subnormal. Generate zero. Leave zero mantissa.
   } else {
     // Normal finite value.
+    const int f32_exp_bias = 127;
     int arithmetic_exp = (f32_exp >> f32_exp_shift) - f32_exp_bias;
     // Test if the exponent is too large for the destination type. If
     // the destination type does not have infinities, that frees up the
     // max exponent value for additional finite values.
-    if (arithmetic_exp > (1 << (dst_exp_bits - 1)) - have_infinity) {
+    const int max_finite_arithmetic_exp =
+        (1 << exp_bits) - 1 - exp_bias - have_infinity;
+    if (arithmetic_exp > max_finite_arithmetic_exp) {
       // Overflow. Generate Inf. Leave zero mantissa.
       dst_exp = dst_exp_mask;
       if (!have_infinity) {
         // Generate NaN.
         dst_mantissa = dst_mantissa_mask;
       }
-    } else if (arithmetic_exp < -(1 << (dst_exp_bits - 1))) {
+    } else if (arithmetic_exp <= -exp_bias) {
       // Underflow. Generate zero. Leave zero mantissa.
       dst_exp = 0;
     } else {
@@ -403,7 +409,7 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       }
       // In the !have_infinity case, arithmetic_exp might have been the top
       // value already, so incrementing it may have overflown it.
-      if (!have_infinity && arithmetic_exp > (1 << (dst_exp_bits - 1))) {
+      if (!have_infinity && arithmetic_exp > exp_bias + 1) {
         dst_exp = dst_exp_mask;
         dst_mantissa = dst_mantissa_mask;
       } else {
@@ -412,7 +418,7 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
         // handling is needed for this case: the above if() branch already set
         // biased_f32_mantissa=0, so we will be generating a 0 mantissa, as
         // needed for infinite values.
-        dst_exp = (arithmetic_exp + dst_exp_bias) << dst_exp_shift;
+        dst_exp = (arithmetic_exp + exp_bias) << dst_exp_shift;
         dst_mantissa =
             biased_f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
       }
@@ -423,16 +429,19 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
 }
 
 #define IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(NAME, INT_TYPE, EXP_BITS,     \
-                                          MANTISSA_BITS, HAVE_INFINITY) \
+                                          MANTISSA_BITS, HAVE_INFINITY, \
+                                          ALL_ONES_IS_NAN, EXP_BIAS)    \
   /* Converts a to a 32-bit C `float`. */                               \
   static inline float iree_math_##NAME##_to_f32(INT_TYPE src) {         \
     return iree_math_make_f32_from_bits(src, EXP_BITS, MANTISSA_BITS,   \
-                                        HAVE_INFINITY);                 \
+                                        HAVE_INFINITY, ALL_ONES_IS_NAN, \
+                                        EXP_BIAS);                      \
   }                                                                     \
   /* Truncates a 32-bit C `float`, rounding to nearest even. */         \
   static inline INT_TYPE iree_math_f32_to_##NAME(float value) {         \
     return iree_math_truncate_f32_to_bits_rounding_to_nearest_even(     \
-        value, EXP_BITS, MANTISSA_BITS, HAVE_INFINITY);                 \
+        value, EXP_BITS, MANTISSA_BITS, HAVE_INFINITY, ALL_ONES_IS_NAN, \
+        EXP_BIAS);                                                      \
   }                                                                     \
   /* Round-trip f32->f32 rounding via the narrow float type */          \
   static inline float iree_math_round_to_nearest_##NAME(float value) {  \
@@ -441,16 +450,30 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
 
 // IEEE half-precision a.k.a. float16,
 // https://en.wikipedia.org/wiki/Half-precision_floating-point_format
-IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f16, uint16_t, 5, 10, /*have_infinity=*/true)
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f16, uint16_t, 5, 10, /*have_infinity=*/true,
+                                  /*all_ones_is_nan=*/false,
+                                  /*exp_bias=*/15)
 
 // Bfloat16, https://en.wikipedia.org/wiki/Bfloat16_floating-point_format
-IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(bf16, uint16_t, 8, 7, /*have_infinity=*/true)
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(bf16, uint16_t, 8, 7, /*have_infinity=*/true,
+                                  /*all_ones_is_nan=*/false,
+                                  /*exp_bias=*/127)
 
 // F8E5M2 type, https://arxiv.org/abs/2209.05433
-IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2, uint8_t, 5, 2, /*have_infinity=*/true)
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2, uint8_t, 5, 2, /*have_infinity=*/true,
+                                  /*all_ones_is_nan=*/false,
+                                  /*exp_bias=*/15)
 
 // F8E4M3 type, https://arxiv.org/abs/2209.05433.
 IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3, uint8_t, 4, 3,
-                                  /*have_infinity=*/false)
+                                  /*have_infinity=*/false,
+                                  /*all_ones_is_nan=*/true, /*exp_bias=*/7)
+
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e5m2fnuz, uint8_t, 5, 2,
+                                  /*have_infinity=*/false,
+                                  /*all_ones_is_nan=*/false, /*exp_bias=*/16)
+IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(f8e4m3fnuz, uint8_t, 4, 3,
+                                  /*have_infinity=*/false,
+                                  /*all_ones_is_nan=*/false, /*exp_bias=*/8)
 
 #endif  // IREE_BASE_INTERNAL_MATH_H_

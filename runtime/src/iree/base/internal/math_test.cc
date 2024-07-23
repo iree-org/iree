@@ -414,6 +414,41 @@ TEST(F8E5M2ConversionTest, F32ToF8E5M2ToF32) {
 }
 
 //==============================================================================
+// F8E5M2FNUZ support
+//==============================================================================
+
+TEST(F8E5M2FNUZConversionTest, F32ToF8E5M2FNUZ) {
+  // See LLVM code, e.g. APFloat.h and its test.
+  constexpr float kF8E5M2FNUZMax = 57344.f;
+  constexpr float kF8E5M2FNUZMin = 1.f / 32768.f;  // Minimum normal value.
+  // Within range, normal truncation.
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e5m2fnuz(kF8E5M2FNUZMax));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e5m2fnuz(-kF8E5M2FNUZMax));
+  EXPECT_EQ(0x04, iree_math_f32_to_f8e5m2fnuz(kF8E5M2FNUZMin));
+  EXPECT_EQ(0x84, iree_math_f32_to_f8e5m2fnuz(-kF8E5M2FNUZMin));
+  EXPECT_EQ(0x38, iree_math_f32_to_f8e5m2fnuz(0.25f));
+  EXPECT_EQ(0xDA, iree_math_f32_to_f8e5m2fnuz(-100.375f));
+  EXPECT_EQ(0x7E, iree_math_f32_to_f8e5m2fnuz(49152.f));
+  EXPECT_EQ(0xFE, iree_math_f32_to_f8e5m2fnuz(-49152.f));
+  // Denormals flushed to zero in our implementation.
+  EXPECT_EQ(0, iree_math_f32_to_f8e5m2fnuz(kF8E5M2FNUZMin * 0.8f));
+}
+
+TEST(F8E5M2FNUZConversionTest, F32ToF8E5M2FNUZToF32) {
+  // See LLVM code, e.g. APFloat.h and its test.
+  constexpr float kF8E5M2FNUZMax = 57344.f;
+  constexpr float kF8E5M2FNUZMin = 1.f / 32768.f;  // Minimum normal value.
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0x7F), kF8E5M2FNUZMax);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0xFF), -kF8E5M2FNUZMax);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0x04), kF8E5M2FNUZMin);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0x84), -kF8E5M2FNUZMin);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0x38), 0.25f);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0xDA), -96.f);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0x7E), 49152.f);
+  EXPECT_EQ(iree_math_f8e5m2fnuz_to_f32(0xFE), -49152.f);
+}
+
+//==============================================================================
 // F8E4M3 support
 //==============================================================================
 
@@ -521,6 +556,42 @@ TEST(F8E4M3ConversionTest, F32ToF8E4M3ToF32) {
   // Check that the result is a Nan with nan != nan.
   float nan = iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(NAN));
   EXPECT_NE(nan, nan);
+}
+
+//==============================================================================
+// F8E4M3FNUZ support
+//==============================================================================
+
+TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZ) {
+  // See LLVM code, e.g. APFloat.h and its test.
+  constexpr float kF8E4M3FNUZMax = 240.f;
+  constexpr float kF8E4M3FNUZMin = 1.f / 128.f;  // Minimum normal value.
+  // Within range, normal truncation.
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e4m3fnuz(kF8E4M3FNUZMax));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e4m3fnuz(-kF8E4M3FNUZMax));
+  EXPECT_EQ(0x08, iree_math_f32_to_f8e4m3fnuz(kF8E4M3FNUZMin));
+  EXPECT_EQ(0x88, iree_math_f32_to_f8e4m3fnuz(-kF8E4M3FNUZMin));
+  EXPECT_EQ(0x78, iree_math_f32_to_f8e4m3fnuz(136.0f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3fnuz(152.0f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3fnuz(168.0f));
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e4m3fnuz(184.0f));
+  // Denormals flushed to zero in our implementation.
+  EXPECT_EQ(0, iree_math_f32_to_f8e4m3fnuz(kF8E4M3FNUZMin * 0.8f));
+}
+
+TEST(F8E4M3FNUZConversionTest, F32ToF8E4M3FNUZToF32) {
+  // See LLVM code, e.g. APFloat.h and its test.
+  constexpr float kF8E4M3FNUZMax = 240.f;
+  constexpr float kF8E4M3FNUZMin = 1.f / 128.f;  // Minimum normal value.
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x7F), kF8E4M3FNUZMax);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0xFF), -kF8E4M3FNUZMax);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x08), kF8E4M3FNUZMin);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x88), -kF8E4M3FNUZMin);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x78), 128);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x79), 144);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x7A), 160);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x7B), 176);
+  EXPECT_EQ(iree_math_f8e4m3fnuz_to_f32(0x7C), 192);
 }
 
 }  // namespace
