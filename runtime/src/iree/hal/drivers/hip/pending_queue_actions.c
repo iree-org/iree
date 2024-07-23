@@ -1381,10 +1381,8 @@ static int iree_hal_hip_completion_execute(
       completion_area->symbols, hipSetDevice(completion_area->device),
       "hipSetDevice");
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_hip_completion_wait_pending_completion_items(completion_area);
-    iree_hal_hip_post_error_to_completion_state(completion_area,
-                                                iree_status_code(status));
-    return -1;
+    iree_status_fprint(stderr, status);
+    iree_abort();
   }
 
   while (true) {
@@ -1413,9 +1411,8 @@ static int iree_hal_hip_completion_execute(
         &completion_area->worker_state, iree_memory_order_acquire);
     // Exit if HIP callbacks have posted any errors.
     if (IREE_UNLIKELY(worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR)) {
-      iree_hal_hip_completion_wait_pending_completion_items(completion_area);
-      IREE_TRACE_ZONE_END(z0);
-      return -1;
+      iree_status_fprint(stderr, status);
+      iree_abort();
     }
     // Check if we received request to stop processing and exit this thread.
     bool should_exit =
@@ -1425,11 +1422,8 @@ static int iree_hal_hip_completion_execute(
         iree_hal_hip_worker_process_completion(worklist, completion_area);
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-      iree_hal_hip_completion_wait_pending_completion_items(completion_area);
-      iree_hal_hip_post_error_to_completion_state(completion_area,
-                                                  iree_status_code(status));
-      IREE_TRACE_ZONE_END(z0);
-      return -1;
+      iree_status_fprint(stderr, status);
+      iree_abort();
     }
 
     if (IREE_UNLIKELY(should_exit &&
@@ -1471,10 +1465,10 @@ static int iree_hal_hip_worker_execute(
       working_area->symbols, hipSetDevice(working_area->device),
       "hipSetDevice");
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_hal_hip_worker_wait_pending_work_items(working_area);
-    iree_hal_hip_post_error_to_worker_state(working_area,
-                                            iree_status_code(status));
-    return -1;
+    // TODO: handle error propagation through semaphores properly.
+    // See: https://github.com/iree-org/iree/issues/17962
+    iree_status_fprint(stderr, status);
+    iree_abort();
   }
 
   while (true) {
@@ -1508,8 +1502,8 @@ static int iree_hal_hip_worker_execute(
                                                   iree_memory_order_acquire);
     // Exit if HIP callbacks have posted any errors.
     if (IREE_UNLIKELY(worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR)) {
-      iree_hal_hip_worker_wait_pending_work_items(working_area);
-      return -1;
+      iree_status_fprint(stderr, status);
+      iree_abort();
     }
     // Check if we received request to stop processing and exit this thread.
     bool should_exit =
@@ -1519,10 +1513,8 @@ static int iree_hal_hip_worker_execute(
     iree_status_t status = iree_hal_hip_worker_process_ready_list(
         working_area->host_allocator, worklist);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-      iree_hal_hip_worker_wait_pending_work_items(working_area);
-      iree_hal_hip_post_error_to_worker_state(working_area,
-                                              iree_status_code(status));
-      return -1;
+      iree_status_fprint(stderr, status);
+      iree_abort();
     }
 
     if (IREE_UNLIKELY(
