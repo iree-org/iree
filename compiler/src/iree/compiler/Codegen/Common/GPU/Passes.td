@@ -146,7 +146,8 @@ def GPUApplyTilingLevelPass :
     InterfacePass<"iree-codegen-gpu-apply-tiling-level", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile tensor ops based on tiling configs";
   let dependentDialects = [
-    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect", "::mlir::tensor::TensorDialect"
   ];
   let options = [
     Option<"tilingLevel", "tiling-level", "IREE::GPU::TilingLevel",

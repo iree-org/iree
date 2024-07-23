@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -24,7 +25,13 @@ include "mlir/IR/OpBase.td"
 def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     Pure,
     AllTypesMatch<["acc", "result"]>,
+    DestinationStyleOpInterface,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
+    DeclareOpInterfaceMethods<TilingInterface,
+       ["getIterationDomain",
+        "getLoopIteratorTypes",
+        "getTiledImplementation",
+        "getResultTilePosition"]>
     ]> {
   let summary = "Models a contraction of multiple mma operations";
   let description = [{
@@ -266,6 +273,16 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
 
     int64_t getAccOuterRank() {
       return getIndexingMapsArray()[2].getNumResults();
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      if (hasTensorSemantics()) {
+        return getAccMutable();
+      }
+      // There are no destinations with vector semantics.
+      return MutableOperandRange(*this, 0, 0);
     }
   }];
 

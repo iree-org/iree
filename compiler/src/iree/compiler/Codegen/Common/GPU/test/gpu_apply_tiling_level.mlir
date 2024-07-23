@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -345,3 +345,71 @@ module {
 //       THREAD:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<1x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_2>]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 8], subgroup = [2, 4]}>
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+
+module {
+  func.func @tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
+    %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+      indexing_maps = #contraction_accesses,
+      iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+      lowering_config = #config
+    } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
+    return %0 : tensor<?x?x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @tensor_multi_mma
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x4xf32>
+
+//   CHECK-DAG:   %[[MDIM:.+]] = tensor.dim %[[ACC]], %c0 : tensor<?x?x4xf32>
+//   CHECK-DAG:   %[[NDIM:.+]] = tensor.dim %[[ACC]], %c1 : tensor<?x?x4xf32>
+//   CHECK-DAG:   %[[KDIM:.+]] = tensor.dim %[[LHS]], %c1 : tensor<?x?x4xf16>
+//       CHECK:   scf.for %[[I:.+]] = %c0 to %[[KDIM]] step %c8 iter_args(%[[INIT:.+]] = %[[ACC]])
+//       CHECK:     %[[MIN:.+]] = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 8)>(%[[I]])[%[[KDIM]]]
+//       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
+//  CHECK-SAME:       [0, %[[I]], 0] [%[[MDIM]], %[[MIN]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
+//       CHECK:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
+//  CHECK-SAME:       [%[[I]], 0, 0] [%[[MIN]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
+//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
+//  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
+//       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]] {{.*}} lowering_config
+//       CHECK:     tensor.insert_slice %[[MMA]] into %[[INIT]]
+//  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1]
+//       CHECK:     scf.yield
+//       CHECK:   return
+
+// SUBGROUP-LABEL: func.func @tensor_multi_mma
+//  SUBGROUP-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
+//  SUBGROUP-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
+//  SUBGROUP-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x4xf32>
+
+//   SUBGROUP-DAG:   %[[MDIM:.+]] = tensor.dim %[[ACC]], %c0 : tensor<?x?x4xf32>
+//   SUBGROUP-DAG:   %[[NDIM:.+]] = tensor.dim %[[ACC]], %c1 : tensor<?x?x4xf32>
+//   SUBGROUP-DAG:   %[[KDIM:.+]] = tensor.dim %[[LHS]], %c1 : tensor<?x?x4xf16>
+
+//       SUBGROUP:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) = (0, 0) to (%[[MDIM]], %[[NDIM]]) step (2, 4)
+//  SUBGROUP-SAME:     shared_outs(%[[INIT:.+]] = %[[ACC]])
+//   SUBGROUP-DAG:     %[[MMIN:.+]] = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 2)>(%[[IDX]])[%[[MDIM]]]
+//   SUBGROUP-DAG:     %[[NMIN:.+]] = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 4)>(%[[IDY]])[%[[NDIM]]]
+
+//       SUBGROUP:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
+//  SUBGROUP-SAME:       [%[[IDX]], 0, 0] [%[[MMIN]], %[[KDIM]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
+//       SUBGROUP:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
+//  SUBGROUP-SAME:       [0, %[[IDY]], 0] [%[[KDIM]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
+//       SUBGROUP:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
+//  SUBGROUP-SAME:       [%[[IDX]], %[[IDY]], 0] [%[[MMIN]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
+//       SUBGROUP:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]] {{.*}} lowering_config
+//       SUBGROUP:     scf.forall.in_parallel
+//       SUBGROUP:       tensor.parallel_insert_slice %[[MMA]] into %[[INIT]]
+//       SUBGROUP:   return
