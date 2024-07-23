@@ -185,16 +185,67 @@ static void iree_hal_hip_queue_action_list_destroy(
 //===----------------------------------------------------------------------===//
 
 // Ready action atomic slist entry struct.
-typedef struct iree_hal_hip_atomic_slist_entry_t {
+typedef struct iree_hal_hip_entry_list_node_t {
   iree_hal_hip_queue_action_t* ready_list_head;
-  iree_atomic_slist_intrusive_ptr_t slist_next;
-} iree_hal_hip_atomic_slist_entry_t;
+  struct iree_hal_hip_entry_list_node_t* next;
+} iree_hal_hip_entry_list_node_t;
 
-// Ready action atomic slist.
-IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_hip_ready_action,
-                                iree_hal_hip_atomic_slist_entry_t,
-                                offsetof(iree_hal_hip_atomic_slist_entry_t,
-                                         slist_next));
+typedef struct iree_hal_hip_entry_list_t {
+  iree_slim_mutex_t guard_mutex;
+
+  IREE_GUARDED_BY(guard_mutex);
+  iree_hal_hip_entry_list_node_t* head;
+  IREE_GUARDED_BY(guard_mutex);
+  iree_hal_hip_entry_list_node_t* tail;
+} iree_hal_hip_entry_list_t;
+
+static iree_hal_hip_entry_list_node_t* iree_hal_hip_entry_list_pop(
+    iree_hal_hip_entry_list_t* list) {
+  iree_hal_hip_entry_list_node_t* out = NULL;
+  iree_slim_mutex_lock(&list->guard_mutex);
+  if (list->head) {
+    out = list->head;
+    list->head = list->head->next;
+    if (out == list->tail) {
+      list->tail = NULL;
+    }
+  }
+  iree_slim_mutex_unlock(&list->guard_mutex);
+  return out;
+}
+
+void iree_hal_hip_entry_list_push(iree_hal_hip_entry_list_t* list,
+                                  iree_hal_hip_entry_list_node_t* next) {
+  iree_slim_mutex_lock(&list->guard_mutex);
+  next->next = NULL;
+  if (list->tail) {
+    list->tail->next = next;
+    list->tail = next;
+  } else {
+    list->head = next;
+    list->tail = next;
+  }
+  iree_slim_mutex_unlock(&list->guard_mutex);
+}
+
+static void iree_hal_hip_ready_action_list_deinitialize(
+    iree_hal_hip_entry_list_t* list, iree_allocator_t host_allocator) {
+  iree_hal_hip_entry_list_node_t* head = list->head;
+  while (head) {
+    if (!head) break;
+    iree_hal_hip_queue_action_list_destroy(head->ready_list_head);
+    list->head = head->next;
+    iree_allocator_free(host_allocator, head);
+  }
+  iree_slim_mutex_deinitialize(&list->guard_mutex);
+}
+
+static void iree_hal_hip_ready_action_list_initialize(
+    iree_hal_hip_entry_list_t* list) {
+  list->head = NULL;
+  list->tail = NULL;
+  iree_slim_mutex_initialize(&list->guard_mutex);
+}
 
 // Ready action atomic slist entry struct.
 typedef struct iree_hal_hip_completion_list_node_t {
@@ -272,7 +323,7 @@ static void iree_hal_hip_completion_list_deinitialize(
 }
 
 static iree_hal_hip_queue_action_t* iree_hal_hip_atomic_slist_entry_pop_front(
-    iree_hal_hip_atomic_slist_entry_t* list) {
+    iree_hal_hip_entry_list_node_t* list) {
   IREE_ASSERT(list->ready_list_head);
 
   iree_hal_hip_queue_action_t* action = list->ready_list_head;
@@ -317,8 +368,8 @@ typedef struct iree_hal_hip_working_area_t {
   // Notification to the parent thread to indicate the worker committed exiting.
   // TODO: maybe remove this. We can just wait on the worker thread to exit.
   iree_notification_t exit_notification;
-  iree_hal_hip_ready_action_slist_t ready_worklist;  // atomic
-  iree_atomic_int32_t worker_state;                  // atomic
+  iree_hal_hip_entry_list_t ready_worklist;
+  iree_atomic_int32_t worker_state;  // atomic
   // TODO: use status to provide more context for the error.
   iree_atomic_intptr_t error_code;  // atomic
 
@@ -376,7 +427,7 @@ static void iree_hal_hip_working_area_initialize(
     iree_hal_hip_working_area_t* working_area) {
   iree_notification_initialize(&working_area->state_notification);
   iree_notification_initialize(&working_area->exit_notification);
-  iree_hal_hip_ready_action_slist_initialize(&working_area->ready_worklist);
+  iree_hal_hip_ready_action_list_initialize(&working_area->ready_worklist);
   iree_atomic_store_int32(&working_area->worker_state,
                           IREE_HAL_HIP_WORKER_STATE_IDLE_WAITING,
                           iree_memory_order_release);
@@ -393,7 +444,8 @@ static void iree_hal_hip_working_area_initialize(
 
 static void iree_hal_hip_working_area_deinitialize(
     iree_hal_hip_working_area_t* working_area) {
-  iree_hal_hip_ready_action_slist_deinitialize(&working_area->ready_worklist);
+  iree_hal_hip_ready_action_list_deinitialize(&working_area->ready_worklist,
+                                              working_area->host_allocator);
   iree_notification_deinitialize(&working_area->exit_notification);
   iree_notification_deinitialize(&working_area->state_notification);
   iree_slim_mutex_deinitialize(&working_area->pending_work_items_count_mutex);
@@ -1187,7 +1239,7 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
     return status;
   }
 
-  iree_hal_hip_atomic_slist_entry_t* entry = NULL;
+  iree_hal_hip_entry_list_node_t* entry = NULL;
   // TODO: avoid host allocator malloc; use some pool for the allocation.
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(actions->host_allocator, sizeof(*entry),
@@ -1205,8 +1257,7 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
   // Now push the ready list to the worker and have it to issue the actions to
   // the GPU.
   entry->ready_list_head = ready_list.head;
-  iree_hal_hip_ready_action_slist_push(&actions->working_area.ready_worklist,
-                                       entry);
+  iree_hal_hip_entry_list_push(&actions->working_area.ready_worklist, entry);
 
   // We can only overwrite the worker state if the previous state is idle
   // waiting; we cannot overwrite exit related states. so we need to perform
@@ -1270,21 +1321,19 @@ static bool iree_hal_hip_completion_committed_exiting(
 
 // Processes all ready actions in the given |worklist|.
 static iree_status_t iree_hal_hip_worker_process_ready_list(
-    iree_allocator_t host_allocator,
-    iree_hal_hip_ready_action_slist_t* worklist) {
+    iree_allocator_t host_allocator, iree_hal_hip_entry_list_t* worklist) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_ok_status();
   while (true) {
-    iree_hal_hip_atomic_slist_entry_t* entry =
-        iree_hal_hip_ready_action_slist_pop(worklist);
+    iree_hal_hip_entry_list_node_t* entry =
+        iree_hal_hip_entry_list_pop(worklist);
     if (!entry) break;
 
     // Process the current batch of ready actions.
     while (entry->ready_list_head) {
       iree_hal_hip_queue_action_t* action =
           iree_hal_hip_atomic_slist_entry_pop_front(entry);
-
       switch (action->state) {
         case IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE:
           status = iree_hal_hip_pending_queue_actions_issue_execution(action);
@@ -1303,7 +1352,7 @@ static iree_status_t iree_hal_hip_worker_process_ready_list(
       // Let common destruction path take care of destroying the worklist.
       // When we know all host stream callbacks are done and not touching
       // anything.
-      iree_hal_hip_ready_action_slist_push(worklist, entry);
+      iree_hal_hip_entry_list_push(worklist, entry);
       break;
     }
 
@@ -1486,7 +1535,7 @@ static int iree_hal_hip_completion_execute(
 // The main function for the ready-list processing worker thread.
 static int iree_hal_hip_worker_execute(
     iree_hal_hip_working_area_t* working_area) {
-  iree_hal_hip_ready_action_slist_t* worklist = &working_area->ready_worklist;
+  iree_hal_hip_entry_list_t* worklist = &working_area->ready_worklist;
 
   // Hip stores thread-local data based on the device. Some hip commands pull
   // the device from there, and it defaults to device 0 (e.g. hipEventCreate),
