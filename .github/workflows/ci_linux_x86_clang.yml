@@ -38,7 +38,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: build
+      BUILD_DIR: full-build-dir
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
@@ -54,8 +54,7 @@ jobs:
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
             --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
+            ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
