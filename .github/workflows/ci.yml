@@ -55,6 +55,7 @@ jobs:
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
+  # TODO(scotttodd): drop this job in favor of ci_linux_x86_clang.yml once no jobs depend on it
   build_all:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
