@@ -316,8 +316,8 @@ if(IREE_UK_TRY_X86_64_AVX512_BF16)
   string(JOIN "\n" IREE_UK_BUILD_X86_64_AVX512_BF16_TEST
     "#include <immintrin.h>"
     "int main() {"
-    "  __m256bh a;"
-    "  _mm512_cvtneps_pbh(a);"
+    "  __m512 a;"
+    "  __m256bh b = _mm512_cvtneps_pbh(a);"
     "  return 0;"
     "}"
   )
