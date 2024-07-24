@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -39,11 +40,16 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     std::optional<AffineMap> mapForInterchange;
 
     for (auto operand : genericOp.getDpsInputOperands()) {
+      auto producer = operand->get().getDefiningOp();
+      if (!llvm::hasSingleElement(producer->getUsers())) {
+        continue;
+      }
+
       // Check that the producer is a named op or a reduction op (i.e. not
       // elementwise op) with a single use.
-      auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
-      if (!producer || !llvm::hasSingleElement(producer->getUsers()) ||
-          linalg::isElementwise(producer))
+      if (!isa<IREE::LinalgExt::AttentionOp>(producer) &&
+          !(isa<linalg::LinalgOp>(producer) &&
+            !linalg::isElementwise(cast<linalg::LinalgOp>(producer))))
         continue;
 
       // check if the generic op has a non-identity map for the operand.
