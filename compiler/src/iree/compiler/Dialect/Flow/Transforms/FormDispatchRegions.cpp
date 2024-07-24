@@ -874,7 +874,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || isBitExtendOp(&op)) {
+          isa<linalg::FillOp>(op)) {
         continue;
       }
 
