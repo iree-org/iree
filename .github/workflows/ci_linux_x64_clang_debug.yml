@@ -4,9 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - Linux x86 clang debug
+name: CI - Linux x64 clang debug
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci_linux_x64_clang_debug.yml"
   schedule:
     # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
     - cron: "15 9 * * 1-5"
@@ -26,7 +31,7 @@ jobs:
 
   # This may run out of memory / disk space on standard GitHub-hosted runners,
   # so run on self-hosted CPU build runners instead.
-  linux_x86_clang_debug:
+  linux_x64_clang_debug:
     needs: setup
     runs-on:
       - self-hosted # must come first

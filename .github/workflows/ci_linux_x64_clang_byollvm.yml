@@ -4,9 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - Linux x86 clang BYO LLVM
+name: CI - Linux x64 clang BYO LLVM
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci_linux_x64_clang_byollvm.yml"
   schedule:
     # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
     - cron: "15 9 * * 1-5"
@@ -21,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux_x86_clang_byollvm:
+  linux_x64_clang_byollvm:
     runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
