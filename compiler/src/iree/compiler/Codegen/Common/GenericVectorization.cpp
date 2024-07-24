@@ -90,7 +90,8 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     for (auto operandDimPair : operandDimPairs) {
       Value operand = operandDimPair.first;
       unsigned operandDim = operandDimPair.second;
-      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange);
+      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange,
+                                           RoundUpVscaleMultiple::Yes);
       if (succeeded(maybeDimBound)) {
         break;
       }

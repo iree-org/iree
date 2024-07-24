@@ -237,12 +237,17 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
 using DimBound = vector::ConstantOrScalableBound;
 using DimBoundSize = DimBound::BoundSize;
 
+/// Should the scalable upper bound be rounded up to the nearest multiple of
+/// vscale?
+enum class RoundUpVscaleMultiple { No, Yes };
+
 /// Computes the upper bound of `dimNum` dim of the ShapedType value
 /// `shapedValue`. If the optional `vscaleRange` is provided then the computed
 /// bound can be a scalable quantity.
 FailureOr<DimBoundSize>
 computeDimUpperBound(Value shapedValue, unsigned dimNum,
-                     std::optional<VscaleRange> vscaleRange);
+                     std::optional<VscaleRange> vscaleRange,
+                     RoundUpVscaleMultiple = RoundUpVscaleMultiple::No);
 
 } // namespace mlir::iree_compiler
 
