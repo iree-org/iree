@@ -6,7 +6,7 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library", "iree_link_bitcode")
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -134,7 +134,7 @@ bitcode_specific_archs = [
     ] if arch in bitcode_specific_archs else []),
 ) for arch in bitcode_generic_archs]
 
-c_embed_data(
+iree_c_embed_data(
     name = "embed_ukernel_bitcode",
     srcs = [
         ":ukernel_bitcode_%s.bc" % arch

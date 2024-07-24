@@ -57,7 +57,7 @@ mkdir -p "${BINARY_DIR}"
 ###############################################################################
 
 COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
-EMBED_DATA_TOOL="${INSTALL_ROOT}/bin/generate_embed_data"
+EMBED_DATA_TOOL="${INSTALL_ROOT}/bin/iree-c-embed-data"
 INPUT_NAME="mnist"
 INPUT_PATH="${ROOT_DIR}/samples/models/mnist.mlir"
 

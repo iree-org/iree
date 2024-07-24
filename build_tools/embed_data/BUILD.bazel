@@ -6,7 +6,7 @@
 
 # Generates source files with embedded file contents.
 
-load(":build_defs.bzl", "c_embed_data")
+load(":build_defs.bzl", "iree_c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,11 +15,11 @@ package(
 )
 
 cc_binary(
-    name = "generate_embed_data",
-    srcs = ["generate_embed_data_main.cc"],
+    name = "iree-c-embed-data",
+    srcs = ["iree-c-embed-data-main.cc"],
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "testembed1",
     # do not sort
     srcs = [
@@ -31,7 +31,7 @@ c_embed_data(
     h_file_output = "testembed1.h",
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "testembed2",
     srcs = [
         "data/file3.bin",
@@ -42,8 +42,8 @@ c_embed_data(
 )
 
 cc_test(
-    name = "c_embed_data_test",
-    srcs = ["c_embed_data_test.cc"],
+    name = "iree_c_embed_data_test",
+    srcs = ["iree_c_embed_data_test.cc"],
     deps = [
         ":testembed1",
         ":testembed2",
