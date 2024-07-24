@@ -519,8 +519,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation",
-       "generateResultTileValue"]>]> {
+       "getTiledImplementation"]>]> {
   let summary = "Attention operator";
   let description = [{
     Computes the scaled dot product attention function:

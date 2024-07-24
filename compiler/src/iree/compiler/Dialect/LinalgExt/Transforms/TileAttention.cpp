@@ -374,22 +374,18 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Create fill for acc, max and sum.
   // TODO: Acc should not need a fill. The attention op should get a filled
   // input instead of an empty input.
-
-  Type f32Type = rewriter.getF32Type();
-  SmallVector<OpFoldResult> tileSizes =
-      llvm::map_to_vector(sizes, [](Range x) { return x.size; });
-  SmallVector<OpFoldResult> accSize =
-      applyPermutationMap<OpFoldResult>(attnOp.getOutputMap(), tileSizes);
-  SmallVector<OpFoldResult> rowRedSize =
-      applyPermutationMap<OpFoldResult>(maxMap, tileSizes);
-
-  Value accEmpty = rewriter.create<tensor::EmptyOp>(loc, accSize, f32Type);
-  Value zeroAcc =
-      rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(f32Type));
+  Value zeroAcc = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(attnOp.getOutputType().getElementType()));
   Value accFill =
-      rewriter.create<linalg::FillOp>(loc, ValueRange{zeroAcc}, accEmpty)
+      rewriter
+          .create<linalg::FillOp>(loc, ValueRange{zeroAcc}, attnOp.getOutput())
           .result();
 
+  SmallVector<OpFoldResult> rowRedSize =
+      llvm::map_to_vector(sizes, [](Range x) { return x.size; });
+  rowRedSize = applyPermutationMap<OpFoldResult>(maxMap, rowRedSize);
+
+  Type f32Type = rewriter.getF32Type();
   Value rowRedEmpty =
       rewriter.create<tensor::EmptyOp>(loc, rowRedSize, f32Type);
 
@@ -425,15 +421,13 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{sumMap, attnOp.getOutputMap(),
-                                                attnOp.getOutputMap()});
+      compressUnusedDims(SmallVector<AffineMap>{sumMap, attnOp.getOutputMap()});
 
   SmallVector<utils::IteratorType> iteratorTypes(compressedMaps[0].getNumDims(),
                                                  utils::IteratorType::parallel);
 
   auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, attnOp.getOutputType(), ValueRange{sum, x}, attnOp.getOutput(),
-      compressedMaps, iteratorTypes,
+      loc, x.getType(), sum, x, compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value one = b.create<arith::ConstantOp>(
             loc, b.getFloatAttr(args[0].getType(), 1.0));
@@ -442,9 +436,6 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
         reciprocal = convertScalarToDtype(b, loc, reciprocal, args[1].getType(),
                                           /*isUnsignedCast=*/false);
         Value result = b.create<arith::MulFOp>(loc, reciprocal, args[1]);
-        // Convert result to the same datatype as out.
-        result = convertScalarToDtype(b, loc, result, args[2].getType(),
-                                      /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, result);
       });
   ops.push_back(genericOp);

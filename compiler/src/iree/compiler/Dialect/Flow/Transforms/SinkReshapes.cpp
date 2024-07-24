@@ -17,7 +17,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -48,9 +47,8 @@ public:
 /// we just approximate it (and try to be optimistic)
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
-  return llvm::isa_and_nonnull<IREE::LinalgExt::AttentionOp, linalg::LinalgOp,
-                               tensor::UnPackOp, Encoding::UnsetEncodingOp>(
-      producer);
+  return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
+                               Encoding::UnsetEncodingOp>(producer);
 }
 
 /// Control function to check if an `tensor.expand_shape` (which is producer of
