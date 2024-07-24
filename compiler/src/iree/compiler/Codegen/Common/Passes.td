@@ -288,9 +288,7 @@ def GenericVectorization :
       "Enable folding casting ops into vector.contract.">,
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
-           "Max vector size allowed to avoid creating large vectors.">,
-    Option<"earlySubsetTransferFolding", "early-subset-transfer-folding", "bool",/*default=*/"true",
-      "Enable early folding of tensor subset ops into vector transfer ops.">
+           "Max vector size allowed to avoid creating large vectors.">
   ];
   let constructor =
       "mlir::iree_compiler::createGenericVectorizationPass()";
