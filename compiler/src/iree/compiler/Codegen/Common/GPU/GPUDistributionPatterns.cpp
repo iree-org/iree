@@ -64,6 +64,14 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
     }
 
     auto [laneDimX, laneDimY, laneDimZ] = layout.getLaneGrid();
+
+    // This is a huge hack to work around the layout not having stride
+    // information. 64 here is the subgroup size for AMDGPU. There is no
+    // way to fix this, we should depreciate this layout and use the newer one.
+    if (laneDimX * laneDimY * laneDimZ != 64) {
+      laneDimX *= 64 / (laneDimX * laneDimY * laneDimZ);
+    }
+
     SmallVector<Value> laneGrid = {
         rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimZ),
         rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimY),
