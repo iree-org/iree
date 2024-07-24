@@ -27,6 +27,12 @@ CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
+  # Enable HIP/ROCM and CUDA compiler and runtime.
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
+  "-DIREE_HAL_DRIVER_HIP=ON"
+  "-DIREE_TARGET_BACKEND_ROCM=ON"
+
   # The debug information will help get more helpful TSan reports (stacks).
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 
