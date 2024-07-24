@@ -219,9 +219,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // S = Q @ K
   // SMap = QMap @ KMap
-  Type sElementType = getOutput().getType().getElementType();
-  Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, sElementType);
-  Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(sElementType));
+  Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
+  Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
 

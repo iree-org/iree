@@ -49,31 +49,22 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     auto srcCElemFType = dyn_cast<FloatType>(srcCType.getElementType());
     auto dstCElemFType = dyn_cast<FloatType>(dstCElemType);
     if (!srcCElemFType || !dstCElemFType ||
-        srcCElemFType.getWidth() > dstCElemFType.getWidth()) {
+        srcCElemFType.getWidth() >= dstCElemFType.getWidth()) {
       return rewriter.notifyMatchFailure(
           contractOp, "unhandled non-floating point or non-upcasting case");
     }
 
-    Value lhs = contractOp.getLhs();
-    Value rhs = contractOp.getRhs();
+    if (srcAType.getElementType() != dstAElemType ||
+        srcBType.getElementType() != dstBElemType) {
+      return rewriter.notifyMatchFailure(contractOp, "a/b type mismatch");
+    }
 
     Location loc = contractOp.getLoc();
-    auto dstAType = srcAType.clone(dstAElemType);
-    auto dstBType = srcBType.clone(dstBElemType);
     auto dstCType = srcCType.clone(dstCElemFType);
-
-    if (srcAType.getElementType() != dstAElemType) {
-	lhs = rewriter.create<arith::TruncFOp>(loc, dstAType, lhs);
-    }
-
-    if (srcBType.getElementType() != dstBElemType) {
-	rhs = rewriter.create<arith::TruncFOp>(loc, dstBType, rhs);
-    }
-
     auto extOp =
         rewriter.create<arith::ExtFOp>(loc, dstCType, contractOp.getAcc());
     auto newContractOp = rewriter.create<vector::ContractionOp>(
-        loc, lhs, rhs, extOp,
+        loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
         contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(contractOp, srcCType,
                                                  newContractOp);
