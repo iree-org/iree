@@ -2197,14 +2197,14 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
-  // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
-  // the cases are f32 and i32, so we divide it by 4.
-  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn);
   SmallVector<int64_t> vecTileSizes = distConfig.minTileSizes;
+  LLVM_DEBUG(KD_DBGS() << "vecTileSizes: " << vecTileSizes << "\n");
   for (auto &i : vecTileSizes) {
     i = roundUpToPow2(std::min(i, vecSize),
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
+  LLVM_DEBUG(KD_DBGS() << "vecTileSizes: " << vecTileSizes << "\n");
 
   // Setting reduction tile sizes is a workaround to kick in peeling transform.
   // The tiling won't happen because the sizes are zeros. Also, no need for
