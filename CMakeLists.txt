@@ -249,20 +249,13 @@ set(IREE_HAL_EXECUTABLE_PLUGIN_EXTRA_DEPS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 
-# CUDA support is enabled by default if the platform supports the CUDA SDK and
-# not cross compiling. Note: a CUDA-compatible GPU with drivers is still
+# CUDA support is disabled by default. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
-set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
-endif()
+set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
-# HIP support is enabled by default if not cross compiling. Note: a HIP-compatible
-# GPU with drivers is still required to actually run HIP workloads.
-set(IREE_HAL_DRIVER_HIP_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-if(CMAKE_CROSSCOMPILING)
-  set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
-endif()
+# HIP support is disabled by default. Note: a HIP-compatible GPU with drivers is still
+# required to actually run HIP workloads.
+set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
 
 # Vulkan support is enabled by default if the platform might support Vulkan.
 # Apple platforms support Metal instead of Vulkan, though MoltenVK may work.
@@ -370,9 +363,9 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
-# By default, all compiler targets supported by the current platform are
-# enabled. Some compiler targets like CUDA will install external deps as
-# needed at configure time. This can be changed with:
+# By default, all compiler targets supported by the current platform and that don't
+# need a SDK are enabled. Some compiler targets like CUDA will install external
+# deps as needed at configure time. This can be changed with:
 #   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
 
@@ -388,15 +381,15 @@ cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv
 cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
 
 # Default target backends that are not yet fully supported but are being brought up.
-cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
-# Supported default target backends that are only available on certain
+# Supported target backends that are only available on certain
 # platforms.
 set(IREE_TARGET_BACKEND_CUDA_DEFAULT ${IREE_TARGET_BACKEND_DEFAULTS})
 if(NOT IREE_CUDA_AVAILABLE)
   set(IREE_TARGET_BACKEND_CUDA_DEFAULT OFF)
 endif()
-cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_TARGET_BACKEND_CUDA_DEFAULT} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
 # Non-default target backends either have additional dependencies or are
 # experimental/niche in some fashion.

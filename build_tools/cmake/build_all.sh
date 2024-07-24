@@ -38,6 +38,12 @@ declare -a CMAKE_ARGS=(
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 
+  # Enable HIP/ROCM and CUDA compiler and runtime.
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
+  "-DIREE_HAL_DRIVER_HIP=ON"
+  "-DIREE_TARGET_BACKEND_ROCM=ON"
+
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
