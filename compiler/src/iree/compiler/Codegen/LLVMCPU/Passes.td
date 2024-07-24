@@ -204,6 +204,11 @@ def LLVMCPUVirtualVectorLowering :
       "mlir::iree_compiler::createLLVMCPUVirtualVectorLoweringPass()";
 }
 
+def LLVMCPUVectorBitCastLoweringPass :
+    InterfacePass<"iree-llvmcpu-vector-bitcast-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to unroll vector.bitcast ops to a sequence of 1D vector.bitcast ops";
+}
+
 def LLVMCPUVectorTransferLowering :
     InterfacePass<"iree-llvmcpu-vector-transfer-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";

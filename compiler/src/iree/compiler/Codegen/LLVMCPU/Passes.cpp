@@ -312,6 +312,7 @@ void buildLLVMCPUVectorLoweringPipeline(
   // Potentially removes shape_cast and broadcast on unit dims before shape_cast
   // lowering.
   funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createLLVMCPUVectorBitCastLoweringPass());
 
   // 'vector.shape_cast' are very expensive operations that are even generated
   // by some of the lowerings above (e.g., transpose lowering). There are

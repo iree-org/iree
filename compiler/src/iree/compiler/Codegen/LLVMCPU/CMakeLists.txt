@@ -69,6 +69,7 @@ iree_cc_library(
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
+    "LLVMCPUVectorBitCastLowering.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransferLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
