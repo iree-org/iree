@@ -277,7 +277,7 @@ static iree_status_t iree_benchmark_executable_run(
       IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
           command_buffer, args->executable, FLAG_entry_point,
           args->workgroup_count[0], args->workgroup_count[1],
-          args->workgroup_count[2]));
+          args->workgroup_count[2], IREE_HAL_DISPATCH_FLAG_NONE));
       IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
           command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
           IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,

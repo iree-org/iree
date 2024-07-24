@@ -1502,7 +1502,8 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     HAL_Ordinal:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
-    HAL_Dim:$workgroup_z
+    HAL_Dim:$workgroup_z,
+    HAL_DispatchFlagsAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1514,6 +1515,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
         $workgroup_y `,`
         $workgroup_z
     `]` `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 }
@@ -1530,7 +1532,8 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     HAL_Executable:$executable,
     HAL_Ordinal:$entry_point,
     AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
-    HAL_DeviceSize:$workgroups_offset
+    HAL_DeviceSize:$workgroups_offset,
+    HAL_DispatchFlagsAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1539,6 +1542,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     `` `[` $entry_point `]`
     `workgroups` `(` $workgroups_buffer `:` type($workgroups_buffer) `)`
     `` `[` $workgroups_offset `]`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 }

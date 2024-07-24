@@ -266,9 +266,11 @@ util.func public @command_buffer_dispatch(
   //      CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups([%[[X]], %[[Y]], %[[Z]]])
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
       target(%executable: !hal.executable)[%ordinal]
       workgroups([%x, %y, %z])
+      flags("None")
   util.return
 }
 
@@ -296,9 +298,11 @@ util.func public @command_buffer_dispatch_indirect(
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]]]
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer : !hal.buffer)[%offset]
+      flags("None")
   util.return
 }
 
@@ -326,8 +330,10 @@ util.func public @command_buffer_dispatch_indirect_indirect(
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER_SLOT]] : index)[%[[OFFSET]]]
+  // CHECK-SAME:   flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer_slot : index)[%offset]
+      flags("None")
   util.return
 }

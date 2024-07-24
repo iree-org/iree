@@ -907,7 +907,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
                    iree_hal_module_state_t,                  //
-                   rriiii, v) {
+                   rriiiiI, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -917,15 +917,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
   uint32_t workgroup_x = (uint32_t)args->i3;
   uint32_t workgroup_y = (uint32_t)args->i4;
   uint32_t workgroup_z = (uint32_t)args->i5;
+  iree_hal_dispatch_flags_t flags = (iree_hal_dispatch_flags_t)args->i6;
 
   return iree_hal_command_buffer_dispatch(command_buffer, executable,
                                           entry_point, workgroup_x, workgroup_y,
-                                          workgroup_z);
+                                          workgroup_z, flags);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
                    iree_hal_module_state_t,                           //
-                   rriirI, v) {
+                   rriirII, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -938,9 +939,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
       workgroups_buffer_slot, workgroups_offset, 3 * sizeof(uint32_t));
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref_or_null(args->r4, &workgroups_ref.buffer));
+  iree_hal_dispatch_flags_t flags = (iree_hal_dispatch_flags_t)args->i6;
 
-  return iree_hal_command_buffer_dispatch_indirect(command_buffer, executable,
-                                                   entry_point, workgroups_ref);
+  return iree_hal_command_buffer_dispatch_indirect(
+      command_buffer, executable, entry_point, workgroups_ref, flags);
 }
 
 //===----------------------------------------------------------------------===//

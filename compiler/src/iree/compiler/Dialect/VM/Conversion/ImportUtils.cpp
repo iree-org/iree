@@ -127,11 +127,11 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
     // one of the vm constant ops.
     auto constValue = builder.create<mlir::arith::ConstantOp>(
         loc, inputType,
-        IntegerAttr::get(inputType,
-                         APInt(32, static_cast<int32_t>(intAttr.getInt()))));
+        IntegerAttr::get(inputType, APInt(inputType.getIntOrFloatBitWidth(),
+                                          intAttr.getValue().getSExtValue())));
     return {{constValue}};
-  }
-  if (auto elementsAttr = llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
+  } else if (auto elementsAttr =
+                 llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
     SmallVector<Value> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
@@ -140,8 +140,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
           cast<TypedAttr>(intAttr)));
     }
     return elementValues;
-  }
-  if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attrValue)) {
+  } else if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attrValue)) {
     SmallVector<Value> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
@@ -151,8 +150,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
-  }
-  if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
+  } else if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
     return {{builder.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
   }
 

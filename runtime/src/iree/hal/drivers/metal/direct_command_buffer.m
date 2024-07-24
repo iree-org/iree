@@ -1073,7 +1073,7 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
     int32_t entry_point, uint32_t workgroup_count_x, uint32_t workgroup_count_y,
-    uint32_t workgroup_count_z) {
+    uint32_t workgroup_count_z, iree_hal_dispatch_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_metal_dispatch_segment_t* segment = NULL;
@@ -1090,7 +1090,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, iree_hal_buffer_ref_t workgroups_ref) {
+    int32_t entry_point, iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_metal_dispatch_segment_t* segment = NULL;

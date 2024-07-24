@@ -353,10 +353,12 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
+        auto flags = forBuilder.getAttr<IREE::HAL::DispatchFlagsAttr>(
+            IREE::HAL::DispatchFlags::None);
         forBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
             loc, commandBuffer, executable, ordinal,
             workgroupCountOp.getWorkgroupX(), workgroupCountOp.getWorkgroupY(),
-            workgroupCountOp.getWorkgroupZ());
+            workgroupCountOp.getWorkgroupZ(), flags);
 
         // Barrier following the dispatch to block the next dispatch.
         auto sourceStage = IREE::HAL::ExecutionStageBitfield::CommandRetire |

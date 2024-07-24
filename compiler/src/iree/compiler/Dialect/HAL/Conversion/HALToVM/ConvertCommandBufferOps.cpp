@@ -396,6 +396,13 @@ public:
     auto importType = importOp.getFunctionType();
     auto [workgroupsBufferSlot, workgroupsBuffer] =
         splitBufferSlot(op.getLoc(), adaptor.getWorkgroupsBuffer(), rewriter);
+    auto flags = adaptor.getFlagsAttr()
+                     ? rewriter
+                           .create<IREE::VM::ConstI64Op>(
+                               op.getLoc(), adaptor.getFlagsAttr().getInt())
+                           .getResult()
+                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
+                           .getResult();
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getExecutable(),
@@ -405,6 +412,7 @@ public:
         workgroupsBuffer,
         castToImportType(adaptor.getWorkgroupsOffset(), rewriter.getI64Type(),
                          rewriter),
+        flags,
     };
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),

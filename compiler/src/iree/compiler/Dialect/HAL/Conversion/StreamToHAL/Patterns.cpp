@@ -731,9 +731,11 @@ struct CmdDispatchOpPattern
           entryPointAttr.getRootReference().getValue());
       Value ordinal = caseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
           loc, caseBuilder.getIndexType(), entryPointAttr);
+      auto flags = caseBuilder.getAttr<IREE::HAL::DispatchFlagsAttr>(
+          IREE::HAL::DispatchFlags::None);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
           loc, commandBuffer, executable, ordinal, caseWorkgroupCount[0],
-          caseWorkgroupCount[1], caseWorkgroupCount[2]);
+          caseWorkgroupCount[1], caseWorkgroupCount[2], flags);
 
       caseBuilder.create<scf::YieldOp>(loc);
     }

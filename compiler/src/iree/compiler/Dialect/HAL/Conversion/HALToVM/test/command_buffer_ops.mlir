@@ -334,15 +334,17 @@ util.func public @command_buffer_dispatch(
   %cmd: !hal.command_buffer,
   %executable: !hal.executable
 ) {
-  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
   %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %c100, %c200, %c300)
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call @hal.command_buffer.dispatch(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %c100, %c200, %c300, %[[FLAGS]])
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
       target(%executable : !hal.executable)[%ordinal]
       workgroups([%c100, %c200, %c300])
+      flags(None)
   util.return
 }
 
@@ -361,10 +363,12 @@ util.func public @command_buffer_dispatch_indirect(
   %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100)
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100, %[[FLAGS]])
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable : !hal.executable)[%ordinal]
       workgroups(%buffer : !hal.buffer)[%c100]
+      flags(None)
   util.return
 }
 
@@ -383,9 +387,11 @@ util.func public @command_buffer_dispatch_indirect_indirect(
   %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100)
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%[[CMD]], %[[EXECUTABLE]], %[[ORDINAL]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100, %[[FLAGS]])
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable : !hal.executable)[%ordinal]
       workgroups(%buffer_slot : index)[%c100]
+      flags(None)
   util.return
 }

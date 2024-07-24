@@ -309,7 +309,8 @@ vm.import private @command_buffer.dispatch(
   %entry_point : i32,
   %workgroup_x : i32,
   %workgroup_y : i32,
-  %workgroup_z : i32
+  %workgroup_z : i32,
+  %flags : i64
 )
 
 // Dispatches an execution request with the dispatch parameters loaded from the
@@ -320,7 +321,8 @@ vm.import private @command_buffer.dispatch.indirect(
   %entry_point : i32,
   %workgroups_buffer_slot : i32,
   %workgroups_buffer : !vm.ref<!hal.buffer>,
-  %workgroups_offset : i64
+  %workgroups_offset : i64,
+  %flags : i64
 )
 
 //===----------------------------------------------------------------------===//
