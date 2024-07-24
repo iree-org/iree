@@ -33,11 +33,13 @@ module {
 //       CHECK:         scf.for
 //       CHECK:           scf.for
 //       CHECK:             scf.for
+//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //       CHECK:               %[[RESULT_VEC:.+]] = scf.if %{{.+}} -> (vector<4xf32>) {
 //       CHECK:                 %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
 //       CHECK:                 scf.yield %[[VEC_LOAD]]
 //       CHECK:               }
-//       CHECK:               vector.store %[[RESULT_VEC]], %[[OUTPUT_SUBVIEW]]
+//       CHECK:               %[[DROP_UNIT_OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
+//       CHECK:               vector.store %[[RESULT_VEC]], %[[DROP_UNIT_OUTPUT_SLICE]]
 
 // -----
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
