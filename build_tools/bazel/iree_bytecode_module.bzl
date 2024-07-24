@@ -6,7 +6,7 @@
 
 """Rules for compiling IREE executables, modules, and archives."""
 
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
 
@@ -81,7 +81,7 @@ def iree_bytecode_module(
 
     # Embed the module for use in C.
     if c_identifier:
-        c_embed_data(
+        iree_c_embed_data(
             name = "%s_c" % (name),
             identifier = c_identifier,
             srcs = [module_name],

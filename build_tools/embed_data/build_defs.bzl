@@ -13,7 +13,7 @@ def clean_dep(dep):
     """
     return str(Label(dep))
 
-def c_embed_data(
+def iree_c_embed_data(
         name,
         srcs,
         c_file_output,
@@ -22,7 +22,7 @@ def c_embed_data(
         strip_prefix = None,
         flatten = False,
         identifier = None,
-        generator = clean_dep("//build_tools/embed_data:generate_embed_data"),
+        generator = clean_dep("//build_tools/embed_data:iree-c-embed-data"),
         **kwargs):
     """Embeds 'srcs' into a C module.
 
