@@ -432,77 +432,6 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
-  python_release_packages:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'python_release_packages')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    steps:
-      - name: Prefetch Docker
-        run: |
-          docker pull ghcr.io/nod-ai/manylinux_x86_64:main &
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Setting up Python"
-        uses: actions/setup-python@v5.1.0
-        with:
-          python-version: "3.9"
-      - name: Wait for docker pull
-        run: |
-          wait
-      - name: Build runtime wheels (Linux)
-        shell: bash
-        env:
-          packages: "iree-runtime"
-          output_dir: "${{ github.workspace }}/bindist"
-          # Note when upgrading: Build just one Python version synced to our
-          # minimum.
-          override_python_versions: cp39-cp39
-        run: |
-          output_dir="$PWD" ./build_tools/python_deploy/build_linux_packages.sh
-      - name: Validate runtime wheel (Linux)
-        shell: bash
-        run: |
-          pip install --upgrade pip
-          pip install --no-index -f $PWD -v iree-runtime
-          echo "Testing default runtime:"
-          python -m iree.runtime._package_test
-          echo "Testing tracy runtime:"
-          # GH runners don't expose the TSC but we want to make sure the basic packaging
-          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
-          # if this is left off).
-          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
-            python -m iree.runtime._package_test
-      # Note that it is just a trade-off decision to have this serialized
-      # as a separate step vs parallelized as a separate job. The runtime
-      # build is fast, pays the clone/docker overhead and provides early
-      # signal (since it runs in just a couple of minutes).
-      - name: Build compiler wheels (Linux)
-        shell: bash
-        env:
-          packages: "iree-compiler"
-          # Note when upgrading: Build just one Python version synced to our
-          # minimum.
-          override_python_versions: cp39-cp39
-        run: |
-          output_dir="$PWD" ./build_tools/python_deploy/build_linux_packages.sh
-      - name: Validate compiler wheel (Linux)
-        shell: bash
-        run: |
-          pip install --upgrade pip
-          # Pre-fetch optional deps that iree-compiler needs (but we constrain that
-          # to not consult a package index).
-          pip install onnx>=1.16.0
-          pip install --no-index -f $PWD -v iree-compiler[onnx]
-          echo "Testing default compiler:"
-          python -m iree.compiler._package_test
-
   sanitizers:
     needs: setup
     name: "sanitizers :: ${{ matrix.name }}"
@@ -815,7 +744,6 @@ jobs:
 
       # Configurations
       - build_test_runtime
-      - python_release_packages
       - sanitizers
       - small_runtime
       # - gcc
