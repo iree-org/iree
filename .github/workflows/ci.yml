@@ -432,45 +432,6 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
-  sanitizers:
-    needs: setup
-    name: "sanitizers :: ${{ matrix.name }}"
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'sanitizers')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: asan
-            script: ./build_tools/cmake/build_and_test_asan.sh
-          # Disabled to reduce self-hosted runners needed. See #17957
-          # - name: tsan
-          #   script: ./build_tools/cmake/build_and_test_tsan.sh
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building and testing"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          SCRIPT: ${{ matrix.script }}
-        run: |
-          # Note that this uses the latest version of the clang compiler, etc.
-          # This gives us access to the latest features and validates that IREE
-          # builds using the latest versions.
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
-            ${SCRIPT}
-
   small_runtime:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'small_runtime')
@@ -744,7 +705,6 @@ jobs:
 
       # Configurations
       - build_test_runtime
-      - sanitizers
       - small_runtime
       # - gcc
       - tracing

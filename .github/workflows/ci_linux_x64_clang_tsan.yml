@@ -1,0 +1,57 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Linux x64 clang TSan
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci_linux_x64_clang_tsan.yml"
+  schedule:
+    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
+    - cron: "15 9 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  linux_x64_clang_tsan:
+    needs: setup
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: true
+      - name: "Building and testing with TSan"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          # Note that this uses the latest version of the clang compiler, etc.
+          # This gives us access to the latest features and validates that IREE
+          # builds using the latest versions.
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
+            ./build_tools/cmake/build_and_test_tsan.sh
