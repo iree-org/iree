@@ -18,7 +18,7 @@ on:
         default: ""
 
 jobs:
-  test_nvidia_t4:
+  test:
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
@@ -27,6 +27,7 @@ jobs:
       - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      BUILD_DIR: build-tests
       VENV_DIR: ${{ github.workspace }}/.venv
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
