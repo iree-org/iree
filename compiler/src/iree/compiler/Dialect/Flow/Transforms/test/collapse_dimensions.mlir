@@ -40,8 +40,8 @@ util.func public @unpack_collapse(%arg0: tensor<2x320x128x128xf32>, %arg1: tenso
       indexing_maps = [#map, #map1, #map2, #map1, #map],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]
     }
-      ins(%arg0, %arg1, %unpack, %arg2 : tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>)
-      outs(%1 : tensor<2x320x128x128xf16>) {
+    ins(%arg0, %arg1, %unpack, %arg2 : tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>)
+    outs(%1 : tensor<2x320x128x128xf16>) {
     ^bb0(%in: f32, %in_0: f32, %in_1: f32, %in_2: f32, %out: f16):
       %3 = arith.addf %in_1, %in_2 : f32
       %4 = arith.addf %in, %in_0 : f32
@@ -56,8 +56,14 @@ util.func public @unpack_collapse(%arg0: tensor<2x320x128x128xf32>, %arg1: tenso
 }
 
 // CHECK-LABEL:  util.func public @unpack_collapse
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<2x320x128x128xf32>
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:    flow.dispatch.region
 //       CHECK:    %[[GEN:.+]] = linalg.generic
-//  CHECK-SAME:      tensor<2x320x16384xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED]], {{.*}} : tensor<2x320x16384xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x16384xf16>)
+//       CHECK:    flow.return %[[GEN]]
 
 // -----
 
@@ -94,10 +100,18 @@ util.func public @unpack_elementwise_collapse(%arg0: tensor<2x320x128x128xf32>, 
 }
 
 // CHECK-LABEL:  util.func public @unpack_elementwise_collapse
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<2x320x128x128xf32>
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:    flow.dispatch.region
 //       CHECK:    %[[ELEMENTWISE:.+]] = linalg.generic
-//  CHECK-SAME:      tensor<2x320x16384xf32>
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED]] : tensor<2x320x16384xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x16384xf32>)
 //       CHECK:    %[[GEN:.+]] = linalg.generic
-//  CHECK-SAME:      tensor<2x320x16384xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins({{.*}} : tensor<2x320x16384xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x16384xf16>)
+//       CHECK:    flow.return %[[GEN]]
 
 
 // -----
@@ -136,10 +150,15 @@ util.func public @prevent_collapse(%arg0: tensor<2x320x128x128xf32>, %arg1: tens
 }
 
 // CHECK-LABEL:  util.func public @prevent_collapse
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<2x320x128x128xf32>
 //       CHECK:    %[[ELEMENTWISE:.+]] = linalg.generic
-//  CHECK-SAME:      tensor<2x320x128x128xf32>
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[ARG0]] : tensor<2x320x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x128x128xf32>)
 //       CHECK:    %[[GEN:.+]] = linalg.generic
-//  CHECK-SAME:      tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins({{.*}} : tensor<2x320x128x128xf32>, tensor<320xf32>, tensor<2x320xf32>, tensor<320xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x128x128xf16>)
 
 // -----
 
@@ -176,12 +195,21 @@ util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<
 }
 
 // CHECK-LABEL:  util.func public @quantized_matmul
-//       CHECK:    %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:      linalg.generic
-//  CHECK-SAME:          iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:      linalg.generic
-//  CHECK-SAME:          iterator_types = ["parallel", "parallel", "reduction", "reduction"]
-//       CHECK:      flow.return
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<4096x32x128xi8>
+//  CHECK-SAME:    %[[ARG1:.*]]: tensor<1x1x32x128xf32>
+//       CHECK:    %[[CST:.*]] = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+//       CHECK:    %[[CST_0:.*]] = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape %[[ARG1]]
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[ARG0]], %[[CST]], %[[CST_0]] : tensor<4096x32x128xi8>, tensor<4096x32xf32>, tensor<4096x32xf32>)
+//  CHECK-SAME:      outs(%{{.*}} :  tensor<4096x32x128xf32>)
+//       CHECK:    %[[VAL2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+//       CHECK:      ins(%[[COLLAPSED]], %[[VAL0]] : tensor<1x32x128xf32>, tensor<4096x32x128xf32>)
+//       CHECK:      outs(%{{.*}} : tensor<1x4096xf32>)
+//       CHECK:    flow.return
 
 // -----
 
@@ -218,10 +246,25 @@ util.func public @elementwise_chain(%arg0: tensor<2x320x128x128xf32>) -> tensor<
 }
 
 // CHECK-LABEL:  util.func public @elementwise_chain
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL1:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL0]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL1]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL3:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL2]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    flow.return %[[VAL3]]
 
 // -----
 
@@ -258,10 +301,25 @@ util.func public @elementwise_dag(%arg0: tensor<2x320x128x128xf32>) -> tensor<2x
 }
 
 // CHECK-LABEL:  util.func public @elementwise_dag
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
-//       CHECK:    iterator_types = ["parallel"]
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL1:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL0]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL0]] : tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    %[[VAL3:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel"]
+//  CHECK-SAME:      ins(%[[VAL2]], %[[VAL1]] : tensor<10485760xf32>, tensor<10485760xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<10485760xf32>)
+//       CHECK:    flow.return %[[VAL3]]
 
 // -----
 
@@ -312,9 +370,30 @@ util.func public @elementwise_dag_transpose(%arg0: tensor<2x320x128x128xf32>) ->
 }
 
 // CHECK-LABEL:  util.func public @elementwise_dag_transpose
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
-//       CHECK:    iterator_types = ["parallel", "parallel", "parallel"]
+//       CHECK:    %[[COLLAPSED:.*]] = tensor.collapse_shape
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED]] : tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    %[[VAL1:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[VAL0]] : tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    %[[VAL2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[VAL1]] : tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    %[[VAL3:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[VAL1]] : tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    %[[VAL4:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[VAL3]], %[[VAL2]] : tensor<640x128x128xf32>, tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    %[[VAL5:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[VAL4]] : tensor<640x128x128xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
+//       CHECK:    flow.return %[[VAL5]]
