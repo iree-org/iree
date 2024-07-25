@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Test AMD MI250
+name: PkgCI Test AMD W7900
 on:
   workflow_call:
     inputs:
@@ -19,16 +19,16 @@ on:
 
 jobs:
   test:
-    runs-on: nodai-amdgpu-mi250-x86-64
+    runs-on: nodai-amdgpu-w7900-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
       VENV_DIR: ${{ github.workspace }}/.venv
       IREE_CPU_DISABLE: 1
-      IREE_VULKAN_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
-      IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
+      IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
     steps:
       - name: Checking out repository
         uses: actions/checkout@v4.1.7
@@ -53,9 +53,9 @@ jobs:
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: "Running GPU tests"
         env:
-          CTEST_PARALLEL_LEVEL: 2
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
-          IREE_AMD_RDNA3_TESTS_DISABLE: 1
+          CTEST_PARALLEL_LEVEL: 1
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
+          IREE_AMD_RDNA3_TESTS_DISABLE: 0
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 0

@@ -55,6 +55,18 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi250')
     uses: ./.github/workflows/pkgci_test_amd_mi250.yml
 
+  test_amd_mi300:
+    name: Test AMD MI300
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi300')
+    uses: ./.github/workflows/pkgci_test_amd_mi300.yml
+
+  test_amd_w7900:
+    name: Test AMD W7900
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
+    uses: ./.github/workflows/pkgci_test_amd_w7900.yml
+
   test_nvidia_t4:
     name: Test NVIDIA T4
     needs: [setup, build_packages]

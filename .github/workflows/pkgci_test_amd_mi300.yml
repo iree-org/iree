@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Test AMD MI250
+name: PkgCI Test AMD MI300
 on:
   workflow_call:
     inputs:
@@ -19,7 +19,7 @@ on:
 
 jobs:
   test:
-    runs-on: nodai-amdgpu-mi250-x86-64
+    runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
@@ -28,8 +28,13 @@ jobs:
       IREE_VULKAN_DISABLE: 1
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
-      IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
+      IREE_HIP_TEST_TARGET_CHIP: "gfx942"
+      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
+      - name: Pre Checkout MI300 Step
+        if: contains(matrix.name, 'gfx942')
+        run: |
+          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out repository
         uses: actions/checkout@v4.1.7
         with:

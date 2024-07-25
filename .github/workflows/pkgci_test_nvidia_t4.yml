@@ -67,10 +67,10 @@ jobs:
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: "Running GPU tests"
         env:
+          CTEST_PARALLEL_LEVEL: 2
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 1
           IREE_VULKAN_F16_DISABLE: 0
-          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
-          CTEST_PARALLEL_LEVEL: 2
         run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
