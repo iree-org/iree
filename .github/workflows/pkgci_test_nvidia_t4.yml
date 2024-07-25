@@ -18,7 +18,11 @@ on:
         default: ""
 
 jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
   test_nvidia_t4:
+    needs: setup
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
