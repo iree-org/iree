@@ -18,15 +18,11 @@ on:
         default: ""
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   test_nvidia_t4:
-    needs: setup
     runs-on:
       - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - environment=prod
       - gpu
       - os-family=Linux
     env:
@@ -46,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install cmake clang ninja-build
+          sudo apt install -y cmake clang ninja-build
           export CC=clang
           export CXX=clang
       - name: Querying GPU information

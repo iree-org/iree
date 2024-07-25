@@ -18,11 +18,7 @@ on:
         default: ""
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yml
-
   test:
-    needs: setup
     runs-on: nodai-amdgpu-mi250-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -40,10 +36,6 @@ jobs:
           submodules: false
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: Querying GPU information
-        run: |
-          ./build_tools/scripts/check_cuda.sh
-          ./build_tools/scripts/check_vulkan.sh
       - uses: actions/setup-python@v5.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
