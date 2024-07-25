@@ -134,7 +134,7 @@ fi
 
 # TODO(#12305): figure out how to run samples with custom binary outputs
 # on the CI. $IREE_BINARY_DIR may not be setup right or the object files may
-# not be getting deployed to the test_all/test_nvidia_gpu bots.
+# not be getting deployed to the test bots.
 excluded_tests+=(
   "iree/samples/custom_dispatch/cpu/embedded/example_hal.mlir.test"
   "iree/samples/custom_dispatch/cpu/embedded/example_stream.mlir.test"

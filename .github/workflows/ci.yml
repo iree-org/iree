@@ -89,70 +89,6 @@ jobs:
             gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
             ./build_tools/bazel/build_test_all.sh
 
-  test_nvidia_gpu:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_gpu')
-    env:
-      BUILD_DIR: build-tests
-      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
-      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-      INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
-      IREE_CPU_DISABLE: 1
-      IREE_VULKAN_DISABLE: 0
-      IREE_CUDA_DISABLE: 0
-      IREE_HIP_DISABLE: 1
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
-      - os-family=Linux
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: Querying GPU information
-        run: |
-          ./build_tools/scripts/check_cuda.sh
-          ./build_tools/scripts/check_vulkan.sh
-      - name: "Downloading install dir archive"
-        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
-      - name: "Extracting install directory"
-        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
-      - name: "Building tests"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-              --env IREE_CPU_DISABLE \
-              --env IREE_VULKAN_DISABLE \
-              --env IREE_CUDA_DISABLE \
-              --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}/bin
-      - name: "Running GPU tests"
-        env:
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
-          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
-          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-              --env IREE_VULKAN_DISABLE \
-              --env IREE_CUDA_DISABLE \
-              --env IREE_HIP_DISABLE \
-              --env IREE_CTEST_LABEL_REGEX \
-              --env IREE_NVIDIA_SM80_TESTS_DISABLE \
-              --env IREE_MULTI_DEVICE_TESTS_DISABLE \
-              --env IREE_VULKAN_F16_DISABLE=0 \
-              --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
-              --env CTEST_PARALLEL_LEVEL=2 \
-              --env NVIDIA_DRIVER_CAPABILITIES=all \
-              --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-              bash -euo pipefail -c \
-                "./build_tools/scripts/check_cuda.sh
-                ./build_tools/scripts/check_vulkan.sh
-                ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
-
   # Disabled while runner is offline.
   # test_nvidia_a100:
   #   needs: [setup, build_all]
@@ -606,7 +542,6 @@ jobs:
       - build_test_all_bazel
 
       # Accelerators
-      - test_nvidia_gpu
       # - test_nvidia_a100
       - test_amd_mi250
       - test_amd_mi300

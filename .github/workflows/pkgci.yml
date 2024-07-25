@@ -49,6 +49,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
     uses: ./.github/workflows/pkgci_regression_test.yml
 
+  test_nvidia_t4:
+    name: Test NVIDIA T4
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
+    uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
+
   test_tensorflow_cpu:
     name: Test TensorFlow CPU
     needs: [setup, build_packages]
