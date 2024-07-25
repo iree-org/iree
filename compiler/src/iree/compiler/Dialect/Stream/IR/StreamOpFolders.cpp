@@ -1435,6 +1435,7 @@ void AsyncAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
+  results.insert<ElideUnusedOp<AsyncAllocaOp>>(context);
   results.insert<SinkAllocaLikeOpToConsumers<AsyncAllocaOp>>(context);
 }
 
