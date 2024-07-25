@@ -43,6 +43,12 @@ jobs:
           submodules: false
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install cmake clang ninja-build
+          export CC=clang
+          export CXX=clang
       - name: Querying GPU information
         run: |
           ./build_tools/scripts/check_cuda.sh
@@ -61,34 +67,13 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: "Building tests"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-              --env IREE_CPU_DISABLE \
-              --env IREE_VULKAN_DISABLE \
-              --env IREE_CUDA_DISABLE \
-              --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-              ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
+        run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: "Running GPU tests"
         env:
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-              --env IREE_VULKAN_DISABLE \
-              --env IREE_CUDA_DISABLE \
-              --env IREE_HIP_DISABLE \
-              --env IREE_CTEST_LABEL_REGEX \
-              --env IREE_NVIDIA_SM80_TESTS_DISABLE \
-              --env IREE_MULTI_DEVICE_TESTS_DISABLE \
-              --env IREE_VULKAN_F16_DISABLE=0 \
-              --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
-              --env CTEST_PARALLEL_LEVEL=2 \
-              --env NVIDIA_DRIVER_CAPABILITIES=all \
-              --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
-              bash -euo pipefail -c \
-                "./build_tools/scripts/check_cuda.sh
-                ./build_tools/scripts/check_vulkan.sh
-                ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+          IREE_VULKAN_F16_DISABLE: 0
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          CTEST_PARALLEL_LEVEL: 2
+        run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
