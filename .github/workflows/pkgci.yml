@@ -49,6 +49,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
     uses: ./.github/workflows/pkgci_regression_test.yml
 
+  test_amd_mi250:
+    name: Test AMD MI250
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi250')
+    uses: ./.github/workflows/pkgci_test_amd_mi250.yml
+
   test_nvidia_t4:
     name: Test NVIDIA T4
     needs: [setup, build_packages]
