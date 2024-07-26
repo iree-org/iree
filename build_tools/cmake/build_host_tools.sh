@@ -18,6 +18,12 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
+# Enable CUDA and HIP/ROCM compiler and runtime by default. As with WebGPU
+# the dependencies get fetched.
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-ON}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-ON}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -34,14 +40,13 @@ declare -a CMAKE_ARGS=(
   "-DIREE_ENABLE_LLD=ON"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
   "-DIREE_BUILD_COMPILER=ON"
-  # Enable HIP/ROCM and CUDA compiler and runtime.
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
-  "-DIREE_HAL_DRIVER_HIP=ON"
-  "-DIREE_TARGET_BACKEND_ROCM=ON"
   "-DIREE_BUILD_TESTS=OFF"
   "-DIREE_BUILD_SAMPLES=OFF"
 
+  "-DIREE_HAL_DRIVER_CUDA=${IREE_HAL_DRIVER_CUDA}"
+  "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
+  "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
+  "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
   # Enable the WebGPU compiler build. All deps get fetched as needed, but some
   # of the deps are too large to enable by default for all developers.
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON"

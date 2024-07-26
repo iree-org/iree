@@ -12,6 +12,9 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
+# Enable CUDA and HIP/ROCM runtime by default.
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
 
 source build_tools/cmake/setup_build.sh
 # Note: not using ccache since the runtime build should be fast already.
@@ -25,6 +28,6 @@ source build_tools/cmake/setup_build.sh
   -DIREE_FORCE_LTO_COMPAT_BINUTILS_ON_LINUX=size \
   -DIREE_FORCE_GCC_BINUTILS_ON_LINUX=ON \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_HAL_DRIVER_CUDA=ON \
-  -DIREE_HAL_DRIVER_HIP=ON
+  -DIREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA}" \
+  -DIREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP}"
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
