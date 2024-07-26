@@ -20,10 +20,10 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -451,11 +451,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type initElemType = getElementTypeOrSelf(init);
 
   if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isBitExtendOp(lhsOp))
+    if (IREE::LinalgExt::isBitExtendOp(lhsOp))
       lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
   }
   if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isBitExtendOp(rhsOp))
+    if (IREE::LinalgExt::isBitExtendOp(rhsOp))
       rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
   }
 
