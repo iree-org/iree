@@ -18,9 +18,10 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 IREE_BUILD_PYTHON_BINDINGS="${IREE_BUILD_PYTHON_BINDINGS:-ON}"
-# Enable CUDA and HIP/ROCM runtime by default.
-IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
-IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
+# Enable CUDA and HIP runtime by default if not on Darwin.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh

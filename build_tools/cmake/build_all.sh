@@ -23,12 +23,13 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # needed, but some of the deps are too large to enable by default for all
 # developers.
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
-# Enable CUDA and HIP/ROCM compiler and runtime by default. As with WebGPU
-# the dependencies get fetched.
-IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
-IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
-IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-ON}"
-IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-ON}"
+# Enable CUDA and HIP/ROCM compiler and runtime by default if not on Darwin.
+# As with WebGPU the dependencies get fetched.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${platform_supported}}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${platform_supported}}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
