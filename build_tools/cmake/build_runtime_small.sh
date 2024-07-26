@@ -12,9 +12,10 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
-# Enable CUDA and HIP/ROCM runtime by default.
-IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
-IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
+# Enable CUDA and HIP runtime by default if not on Darwin.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
 
 source build_tools/cmake/setup_build.sh
 # Note: not using ccache since the runtime build should be fast already.
