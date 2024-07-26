@@ -1184,7 +1184,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
   if (roundUp == RoundUpVscaleMultiple::No)
     return failure();
   // If the upper bound map is of the form `add(subExpr, cst)` (cst <= 0),
-  // round it up to `subExpr`, which is _likely_ to be a vscale multiple.
+  // round it up to `subExpr` (and try matching the bound again).
   auto binOp = dyn_cast<AffineBinaryOpExpr>(maybeDimBound->map.getResult(0));
   if (!binOp || binOp.getKind() != AffineExprKind::Add)
     return failure();
