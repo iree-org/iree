@@ -1751,7 +1751,7 @@ static LogicalResult setConvolutionConfig(IREE::GPU::TargetAttr target,
   if (isNCHW)
     workgroupTileSizes.append({4, 1, 1});
   else if (isNHWC)
-    workgroupTileSizes.append({1, 1, 4});
+    workgroupTileSizes.append({1, 1, 16});
   tileSizes.push_back(workgroupTileSizes);
 
   // Tile along OH by size 1 to enable downsizing 2-D convolution to 1-D.
