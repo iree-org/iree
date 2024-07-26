@@ -60,7 +60,7 @@ class CompilerTest(unittest.TestCase):
     # See: https://github.com/iree-org/iree/issues/4436
     def testCompileMultipleBackends(self):
         binary = iree.compiler.tools.compile_str(
-            SIMPLE_MUL_ASM, target_backends=["llvm-cpu", "vulkan-spirv"]
+            SIMPLE_MUL_ASM, target_backends=["llvm-cpu", "vmvx"]
         )
         logging.info("Flatbuffer size = %d", len(binary))
         self.assertTrue(binary)
