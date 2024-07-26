@@ -18,6 +18,9 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 IREE_BUILD_PYTHON_BINDINGS="${IREE_BUILD_PYTHON_BINDINGS:-ON}"
+# Enable CUDA and HIP/ROCM runtime by default.
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-ON}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-ON}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -35,9 +38,8 @@ args=(
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
-  # Enable HIP and CUDA runtime.
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_HAL_DRIVER_HIP=ON"
+  "-DIREE_HAL_DRIVER_CUDA=${IREE_HAL_DRIVER_CUDA}"
+  "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
 
   "-DIREE_BUILD_PYTHON_BINDINGS=${IREE_BUILD_PYTHON_BINDINGS}"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
