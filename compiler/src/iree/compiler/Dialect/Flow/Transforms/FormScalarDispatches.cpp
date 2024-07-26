@@ -152,24 +152,6 @@ formDispatchRegionFromSlice(RewriterBase &rewriter, Operation *rootOp,
   return newDispatchOp.value();
 }
 
-// Insert all operations into the set that define op's operands or define values
-// used inside of op's regions
-static void
-insertAllOperationsUsedAbove(Operation *op,
-                             llvm::SetVector<Operation *> &operations) {
-  mlir::visitUsedValuesDefinedAbove(op->getRegions(), [&](OpOperand *operand) {
-    if (auto definingOp = operand->get().getDefiningOp()) {
-      operations.insert(definingOp);
-    }
-  });
-
-  for (Value val : op->getOperands()) {
-    if (auto definingOp = val.getDefiningOp()) {
-      operations.insert(definingOp);
-    }
-  }
-}
-
 void FormScalarDispatchesPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
@@ -224,10 +206,24 @@ void FormScalarDispatchesPass::runOnOperation() {
       }
 
       if (!isSliceRoot(scalarWorkloadLimit, prevOp)) {
+        if (fusedOpsSet.contains(prevOp)) {
+          continue;
+        }
         // If this op is not being fused, any operations that defines values
         // used by this op cannot be horizontally fused
-        if (!fusedOpsSet.contains(prevOp)) {
-          insertAllOperationsUsedAbove(prevOp, ineligibleRoots);
+        // Insert all operations into the set that define op's operands or
+        // define values used inside of op's regions
+        mlir::visitUsedValuesDefinedAbove(
+            prevOp->getRegions(), [&](OpOperand *operand) {
+              if (auto definingOp = operand->get().getDefiningOp()) {
+                ineligibleRoots.insert(definingOp);
+              }
+            });
+
+        for (Value val : prevOp->getOperands()) {
+          if (auto definingOp = val.getDefiningOp()) {
+            ineligibleRoots.insert(definingOp);
+          }
         }
         continue;
       }
