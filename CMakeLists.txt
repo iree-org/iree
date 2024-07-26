@@ -363,9 +363,9 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
-# By default, all compiler targets supported by the current platform and that don't
-# need a SDK are enabled. Some compiler targets like CUDA will install external
-# deps as needed at configure time. This can be changed with:
+# We try to keep the default build as simple as possible and disable heavy targets.
+# Some compiler targets like CUDA will install external deps as needed at configure time.
+# This can be changed with:
 #   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
 

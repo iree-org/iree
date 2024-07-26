@@ -168,8 +168,8 @@ for common configurations.
 
 By default, the CMake build includes:
 
-* All [compiler targets](../developers/building/cmake-options.md#iree_target_backend_)
-  (`llvm-cpu`, `cuda`, `vulkan-spirv`, etc.)
+* All small to medium size [compiler targets](../developers/building/cmake-options.md#iree_target_backend_)
+  (`llvm-cpu`, `vulkan-spirv`, etc.)
 * All [runtime HAL drivers](../developers/building/cmake-options.md#iree_hal_driver_)
   (`local-task`, `cuda`, `vulkan`, etc.)
 * All [compiler input formats](../developers/building/cmake-options.md#iree_input_)
@@ -178,6 +178,7 @@ By default, the CMake build includes:
 
 The default build does _not_ include:
 
+* CUDA and ROCM/HIP targets
 * Python and other language bindings for the compiler or runtime
 * Advanced features like AddressSanitizer or tracing instrumentation
 * Experimental components
@@ -201,17 +202,17 @@ The default build does _not_ include:
             -DIREE_HAL_DRIVER_LOCAL_TASK=ON
         ```
 
-    === "Disable just CUDA"
+    === "Enable CUDA"
 
         This configure command will
 
-        * Disable just the CUDA compiler target backend
-        * Disable just the CUDA runtime HAL driver
+        * Enable the CUDA compiler target backend
+        * Enable the CUDA runtime HAL driver
 
         ``` shell
         cmake -G Ninja -B ../iree-build/ -S . \
-            -DIREE_TARGET_BACKEND_CUDA=OFF \
-            -DIREE_HAL_DRIVER_CUDA=OFF
+            -DIREE_TARGET_BACKEND_CUDA=ON \
+            -DIREE_HAL_DRIVER_CUDA=ON
         ```
 
 ### Extensions and integrations
