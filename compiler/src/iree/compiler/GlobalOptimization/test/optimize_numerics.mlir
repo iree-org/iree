@@ -8,7 +8,7 @@ util.func public @matmul_i8_i8_i32_unsigned(%arg0 : tensor<5x3xf32>, %arg1 : ten
   %lhs = util.numeric.optional_narrow %arg0 : tensor<5x3xf32> as ui7 {max_value = 127 : ui7, min_value = 0 : ui7}
   %rhs = util.numeric.optional_narrow %arg1 : tensor<3x1xf32> as ui7 {max_value = 127 : ui7, min_value = 0 : ui7}
   %init = util.numeric.optional_narrow %arg2 : tensor<5x1xf32> as ui0
-  // CHECK: %[[RESULT:.*]] = linalg.matmul_unsigned ins(%[[LHS]], %[[RHS]] : tensor<5x3xi8>, tensor<3x1xi8>) outs(%[[INIT]] : tensor<5x1xi32>)
+  // CHECK: %[[RESULT:.*]] = linalg.matmul {cast = #linalg.type_fn<cast_unsigned>} ins(%[[LHS]], %[[RHS]] : tensor<5x3xi8>, tensor<3x1xi8>) outs(%[[INIT]] : tensor<5x1xi32>)
   %2 = linalg.matmul ins(%lhs, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%init : tensor<5x1xf32>) -> tensor<5x1xf32>
   // CHECK: arith.uitofp %[[RESULT]] : tensor<5x1xi32> to tensor<5x1xf32>
   util.return %2 : tensor<5x1xf32>

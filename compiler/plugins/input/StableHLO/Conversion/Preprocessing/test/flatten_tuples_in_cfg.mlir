@@ -15,7 +15,7 @@ module @flatten_func {
 
   // CHECK: func.func private @callee(%arg0: i1, %arg1: tensor<f32>, %arg2: tensor<f32>, %arg3: tensor<f32>) -> (tensor<f32>, tensor<f32>)
   func.func private @callee(%arg0: i1, %arg1: tuple<tensor<f32>, tuple<tensor<f32>, tensor<f32>>>) -> tuple<tensor<f32>, tensor<f32>> {
-    // CHECK-NEXT: cf.cond_br %arg0, ^[[BB:.+]](%arg2, %arg3 : tensor<f32>, tensor<f32>), ^bb2(%arg1 : tensor<f32>)
+    // CHECK-NEXT: cf.cond_br %arg0, ^[[BB:.+]](%arg2, %arg3 : tensor<f32>, tensor<f32>), ^bb2
     // CHECK:      ^[[BB]](%[[V0:[^:]+]]: tensor<f32>, %[[V1:[^:]+]]: tensor<f32>)
     // CHECK-NEXT:   return %[[V0]], %[[V1]] : tensor<f32>, tensor<f32>
     %0 = stablehlo.get_tuple_element %arg1[0] : (tuple<tensor<f32>, tuple<tensor<f32>, tensor<f32>>>) -> tensor<f32>

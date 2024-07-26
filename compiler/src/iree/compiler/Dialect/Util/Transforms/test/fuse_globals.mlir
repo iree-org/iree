@@ -12,6 +12,9 @@ util.func @foo(%arg0: index) -> (index, index) {
   %0 = util.global.load @fusable0 : index
   // CHECK: %[[VALUE1:.+]] = util.global.load @fusable0 : index
   %1 = util.global.load @fusable1 : index
+  // CHECK: util.optimization_barrier
+  // CHECK-SAME: op.attr = @fusable0
+  util.optimization_barrier {op.attr = @fusable1} %1 : index
   // CHECK: util.return %[[VALUE0]], %[[VALUE1]]
   util.return %0, %1 : index, index
 }

@@ -206,6 +206,11 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
   options.memCpyFn = memCpyFn;
+  // Turning off checkParallelRegions assumes that we are not relying too much
+  // on bufferization being conservative. If we are, then this could cause race
+  // conditions. Turning this option off could be a good step in diagnosing
+  // data races on GPU.
+  options.checkParallelRegions = false;
 
   if (failed(runIREEOneShotBufferize(funcOp, options))) {
     return signalPassFailure();

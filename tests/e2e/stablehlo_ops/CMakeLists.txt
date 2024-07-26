@@ -83,6 +83,8 @@ iree_check_single_backend_test_suite(
     "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
+  LABELS
+    "nowasm"
 )
 
 iree_check_single_backend_test_suite(

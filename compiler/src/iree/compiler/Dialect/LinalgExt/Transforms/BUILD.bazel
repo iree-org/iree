@@ -31,6 +31,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "AggregatedOpInterfaceImpl.cpp",
+        "ConvertConv2DToIm2ColOp.cpp",
         "ConvertConv2DToWinograd.cpp",
         "ConvertToLoops.cpp",
         "DecomposeAttention.cpp",

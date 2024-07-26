@@ -8,6 +8,12 @@ if(NOT IREE_TARGET_BACKEND_CUDA OR NOT IREE_HAL_DRIVER_CUDA)
   return()
 endif()
 
+# TODO(#17933): fix cuda_ukernel_unkernel.cu.bc compilation on MSVC (use compiler-rt?)
+if(MSVC)
+  message(STATUS "IREE custom_dispatch/cuda/kernels example ignored -- #17933 required to make MSVC work")
+  return()
+endif()
+
 # NOTE: this is not how one should actually build their PTX files. Do not use
 # this as an authoritative source for compilation settings or CMake goo. If you
 # choose to go the route of custom CUDA kernels you must bring your own build

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
@@ -35,91 +36,6 @@ static size_t count(R &&range) {
   return std::distance(range.begin(), range.end());
 }
 
-struct Global {
-  size_t ordinal = 0;
-  IREE::Util::GlobalOpInterface op;
-  bool isIndirect = false;
-  SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps;
-  SmallVector<IREE::Util::GlobalStoreOpInterface> storeOps;
-
-  bool isCandidate() { return !isIndirect && op.isGlobalPrivate(); }
-};
-
-enum class GlobalAction {
-  PRESERVE,
-  UPDATE,
-  DELETE,
-};
-
-struct GlobalTable {
-  mlir::ModuleOp moduleOp;
-  SmallVector<StringRef> globalOrder;
-  DenseMap<StringRef, Global> globalMap;
-
-  size_t size() const { return globalOrder.size(); }
-
-  explicit GlobalTable(mlir::ModuleOp moduleOp) : moduleOp(moduleOp) {
-    rebuild();
-  }
-
-  void rebuild() {
-    globalOrder.clear();
-    globalMap.clear();
-    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
-      auto globalName = globalOp.getGlobalName();
-      globalMap[globalName] = Global{globalOrder.size(), globalOp};
-      globalOrder.push_back(globalName);
-    }
-    for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
-      callableOp.walk([&](Operation *op) {
-        if (auto addressOp =
-                dyn_cast<IREE::Util::GlobalAddressOpInterface>(op)) {
-          globalMap[addressOp.getGlobalName()].isIndirect = true;
-        } else if (auto loadOp =
-                       dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
-          globalMap[loadOp.getGlobalName()].loadOps.push_back(loadOp);
-        } else if (auto storeOp =
-                       dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
-          globalMap[storeOp.getGlobalName()].storeOps.push_back(storeOp);
-        }
-      });
-    }
-  }
-
-  bool forEach(std::function<GlobalAction(Global &global)> fn) {
-    bool didChange = false;
-    for (size_t i = 0; i < size();) {
-      auto globalName = globalOrder[i];
-      auto action = fn(globalMap[globalName]);
-      switch (action) {
-      case GlobalAction::PRESERVE: {
-        ++i;
-        break;
-      }
-      case GlobalAction::UPDATE: {
-        didChange |= true;
-        ++i;
-        break;
-      }
-      case GlobalAction::DELETE: {
-        didChange |= true;
-        auto &global = globalMap[globalName];
-        assert(global.op.isGlobalPrivate() && "can't delete public globals");
-        assert(global.loadOps.empty() && "must not be used");
-        for (auto storeOp : global.storeOps) {
-          storeOp.erase();
-        }
-        global.op.erase();
-        globalMap.erase(globalName);
-        globalOrder.erase(globalOrder.begin() + i);
-        break;
-      }
-      }
-    }
-    return didChange;
-  }
-};
-
 // Inlines constant stores into global initializers if always stored to the
 // same value.
 //
@@ -137,8 +53,9 @@ struct GlobalTable {
 //  util.global @a = 5 : i32
 static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (global.isIndirect)
+    if (global.isIndirect) {
       return GlobalAction::PRESERVE;
+    }
 
     // Find the constant value used in all stores.
     // All stores must match the initial value of the global _or_ the global
@@ -162,18 +79,16 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
         break;
       }
     }
-    if (!constantValue)
+    if (!constantValue || constantValue == global.op.getGlobalInitialValue()) {
       return GlobalAction::PRESERVE;
+    }
 
     // Propagate constant into the initial value. Note that there may have been
     // a previous initial value that is being replaced.
     global.op.setGlobalInitialValue(constantValue);
 
     // Remove all of the stores.
-    for (auto storeOp : global.storeOps) {
-      storeOp.erase();
-    }
-    global.storeOps.clear();
+    global.eraseStores();
 
     return GlobalAction::UPDATE;
   });
@@ -191,8 +106,9 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
 //  util.global.mutable @chained0 : i32
 static bool renameChainedGlobals(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate())
+    if (!global.isCandidate()) {
       return GlobalAction::PRESERVE;
+    }
 
     // Find the other symbol this global is chained with by looking for uniform
     // stores. Note that we don't care about initializers.
@@ -213,22 +129,16 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
         break;
       }
     }
-    if (!aliasName)
+    if (!aliasName) {
       return GlobalAction::PRESERVE;
+    }
 
     // Replace all loads from the global with the aliased global.
-    auto &aliasGlobal = globalTable.globalMap[aliasName.getValue()];
-    for (auto loadOp : global.loadOps) {
-      loadOp.setGlobalAttr(aliasName);
-      aliasGlobal.loadOps.push_back(loadOp);
-    }
-    global.loadOps.clear();
+    auto &aliasGlobal = globalTable.lookup(aliasName.getValue());
+    globalTable.renameGlobalUses(global, aliasGlobal);
 
     // Erase all stores to the global.
-    for (auto storeOp : global.storeOps) {
-      storeOp.erase();
-    }
-    global.storeOps.clear();
+    global.eraseStores();
 
     return GlobalAction::DELETE;
   });
@@ -246,10 +156,11 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
 //  util.global @a = 5 : i32
 static bool updateGlobalImmutability(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate())
+    if (!global.isCandidate()) {
       return GlobalAction::PRESERVE;
-    if (!global.storeOps.empty())
+    } else if (!global.storeOps.empty()) {
       return GlobalAction::PRESERVE;
+    }
     bool didChangeAny = global.op.isGlobalMutable() != false;
     global.op.setGlobalMutable(false);
     for (auto loadOp : global.loadOps) {
@@ -279,22 +190,24 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
-  if (!op)
+  if (!op) {
     return nullptr;
+  }
   return op->getResult(0);
 }
 
 // Inlines constant global values that are known to not change.
 static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (global.isIndirect)
+    if (global.isIndirect) {
       return GlobalAction::PRESERVE;
-    if (!global.storeOps.empty())
+    } else if (!global.storeOps.empty()) {
       return GlobalAction::PRESERVE;
-    if (global.op.isGlobalMutable())
+    } else if (global.op.isGlobalMutable()) {
       return GlobalAction::PRESERVE;
-    if (!global.op.getGlobalInitialValue())
+    } else if (!global.op.getGlobalInitialValue()) {
       return GlobalAction::PRESERVE;
+    }
 
     if (llvm::isa<IREE::Util::ReferenceTypeInterface>(
             global.op.getGlobalType())) {
@@ -329,8 +242,9 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     }
 
     // If not all loads could be removed we need to preserve the global.
-    if (!global.loadOps.empty())
+    if (!global.loadOps.empty() || !global.referencingOps.empty()) {
       return GlobalAction::PRESERVE;
+    }
 
     // Only delete if private.
     return global.op.isGlobalPrivate() ? GlobalAction::DELETE
@@ -343,9 +257,10 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
 // are discarded.
 static bool eraseUnusedGlobals(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate())
+    if (!global.canDCE()) {
       return GlobalAction::PRESERVE;
-    if (global.loadOps.empty()) {
+    }
+    if (global.loadOps.empty() && global.referencingOps.empty()) {
       // No loads; remove entirely.
       return GlobalAction::DELETE;
     }
@@ -356,22 +271,20 @@ static bool eraseUnusedGlobals(GlobalTable &globalTable) {
 // Deduplicates immutable globals with constant initial values.
 // This is a simplified and safer version of the global fusion pass.
 static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
-  auto *context = globalTable.moduleOp.getContext();
+  auto *context = globalTable.getContext();
 
   // Build sets of all equivalent globals.
   llvm::EquivalenceClasses<StringRef> ec;
   DenseMap<Attribute, StringRef> leaderMap;
-  for (auto globalIt : globalTable.globalMap) {
-    auto &global = globalIt.getSecond();
-    if (!global.isCandidate())
-      continue;
-    if (!global.storeOps.empty()) {
+  globalTable.forEach([&](Global &global) {
+    if (!global.isCandidate()) {
+      return GlobalAction::PRESERVE;
+    } else if (!global.storeOps.empty()) {
       // Stores - not eligible for deduplication.
-      continue;
-    }
-    if (!global.op.getGlobalInitialValue()) {
+      return GlobalAction::PRESERVE;
+    } else if (!global.op.getGlobalInitialValue()) {
       // No initial value, not constant.
-      continue;
+      return GlobalAction::PRESERVE;
     }
     auto it = leaderMap.insert({
         ArrayAttr::get(
@@ -381,62 +294,61 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
                 DictionaryAttr::get(
                     context, llvm::to_vector(global.op->getDialectAttrs())),
             }),
-        global.op.getGlobalName(),
+        global.getName(),
     });
     if (it.second) {
       // Inserted new.
-      ec.insert(global.op.getGlobalName());
+      ec.insert(global.getName());
     } else {
       // Existing global with the same value.
-      ec.unionSets(global.op.getGlobalName(), it.first->second);
+      ec.unionSets(global.getName(), it.first->second);
     }
-  }
+    return GlobalAction::PRESERVE;
+  });
 
-  bool didChange = false;
+  SmallVector<StringRef> deadGlobalNames;
   for (auto it = ec.begin(), end = ec.end(); it != end; ++it) {
-    if (!it->isLeader())
-      continue; // Ignore non-leader sets.
-    if (++ec.member_begin(it) == ec.member_end())
+    if (!it->isLeader()) {
+      // Ignore non-leader sets.
       continue;
-    IREE::Util::GlobalOpInterface baseGlobalOp =
-        globalTable.globalMap[it->getData()].op;
+    } else if (++ec.member_begin(it) == ec.member_end()) {
+      continue;
+    }
+    auto *baseGlobal = &globalTable.lookup(it->getData());
 
     // Build fused location from all of the globals.
     SmallVector<Location> locs;
     for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
-      Global &global = globalTable.globalMap[*mi];
+      Global &global = globalTable.lookup(*mi);
       locs.push_back(global.op.getLoc());
-      if (global.op->isBeforeInBlock(baseGlobalOp)) {
-        baseGlobalOp = global.op;
+      if (global.ordinal < baseGlobal->ordinal) {
+        baseGlobal = &global;
       }
     }
-    auto fusedLoc = FusedLoc::get(baseGlobalOp.getContext(), locs);
+    auto fusedLoc = FusedLoc::get(context, locs);
 
     // Update base global location.
+    IREE::Util::GlobalOpInterface baseGlobalOp = baseGlobal->op;
     baseGlobalOp->setLoc(fusedLoc);
 
     // Replace all other globals to point at the new one.
-    auto baseGlobalNameAttr = FlatSymbolRefAttr::get(
-        baseGlobalOp.getContext(), baseGlobalOp.getGlobalName());
     for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
-      Global &global = globalTable.globalMap[*mi];
-      if (global.op == baseGlobalOp)
+      Global &global = globalTable.lookup(*mi);
+      if (global.op == baseGlobalOp) {
         continue;
-      for (auto loadOp : global.loadOps) {
-        loadOp.setGlobalAttr(baseGlobalNameAttr);
       }
-      global.op.erase();
+      globalTable.renameGlobalUses(global, *baseGlobal);
+      deadGlobalNames.push_back(global.getName());
     }
-
-    didChange |= true;
+  }
+  if (deadGlobalNames.empty()) {
+    return false; // no change
   }
 
-  if (didChange) {
-    // We could keep the table up to date to avoid the rebuilds by merging all
-    // loads into the base global.
-    globalTable.rebuild();
+  for (auto globalName : deadGlobalNames) {
+    globalTable.eraseGlobal(globalName);
   }
-  return didChange;
+  return true; // did change
 }
 
 class FoldGlobalsPass : public FoldGlobalsBase<FoldGlobalsPass> {
@@ -511,8 +423,9 @@ public:
         didChange = true;
       }
 
-      if (!didChange)
+      if (!didChange) {
         break;
+      }
     }
 
     afterFoldingGlobals =

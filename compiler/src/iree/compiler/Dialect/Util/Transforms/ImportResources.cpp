@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Pass/Pass.h"

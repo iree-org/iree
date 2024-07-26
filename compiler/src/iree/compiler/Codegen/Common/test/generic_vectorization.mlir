@@ -64,12 +64,12 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-LABEL: func.func @single_static_pack_infer_vector_size
 // CHECK:         tensor.pack
 
-// CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0) -> (-d0 + 13, 2)>
-// CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0) -> (-d0 + 51, 4)>
-// CHECK-MASK: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 * 2)>
-// CHECK-MASK: #[[$MAP3:.+]] = affine_map<(d0, d1) -> (d1 * -2 + 101, d0 * 2)>
-// CHECK-MASK: #[[$MAP4:.+]] = affine_map<(d0) -> (d0 * 16)>
-// CHECK-MASK: #[[$MAP5:.+]] = affine_map<(d0, d1) -> (d1 * -16 + 201, d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (-d0 + 13, 2)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0) -> (-d0 + 51, 4)>
+// CHECK-MASK-DAG: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1) -> (d1 * -2 + 101, d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP4:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP5:.+]] = affine_map<(d0, d1) -> (d1 * -16 + 201, d0 * 16)>
 // CHECK-MASK-LABEL: func.func @single_static_pack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK:         %[[C0:.+]] = arith.constant 0 : i8
@@ -79,9 +79,8 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-MASK:             %[[WRITE_SZ1:.+]] = affine.min #[[$MAP1]]
 // CHECK-MASK:             %[[READ_SZ0:.+]] = affine.min #[[$MAP3]]
 // CHECK-MASK:             %[[READ_SZ1:.+]] = affine.min #[[$MAP5]]
-// CHECK-MASK:             %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][{{.+}}] [%[[READ_SZ0]], %[[READ_SZ1]]]
 // CHECK-MASK:             %[[READ_MASK:.+]] = vector.create_mask %[[READ_SZ0]], %[[READ_SZ1]] : vector<8x32xi1>
-// CHECK-MASK:             %[[READ:.+]] = vector.transfer_read %[[SLICE]][%{{.+}}], %[[C0]], %[[READ_MASK]]
+// CHECK-MASK:             %[[READ:.+]] = vector.transfer_read %[[SRC]][%{{.+}}], %[[C0]], %[[READ_MASK]]
 // CHECK-MASK:             %[[CAST:.+]] = vector.shape_cast %[[READ]] : vector<8x32xi8> to vector<4x2x2x16xi8>
 // CHECK-MASK:             %[[TRANSP:.+]] = vector.transpose %[[CAST]], [2, 0, 3, 1]
 // CHECK-MASK:             %[[EMPTY:.+]] = tensor.empty(%[[WRITE_SZ0]], %[[WRITE_SZ1]]) : tensor<?x?x16x2xi8>
@@ -130,12 +129,12 @@ func.func @single_dynamic_pack_infer_vector_size(%arg0: tensor<?x?xi8>, %arg1: t
 // CHECK-LABEL: func.func @single_dynamic_pack_infer_vector_size
 // CHECK:         tensor.pack
 
-// CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
-// CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
-// CHECK-MASK: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 * 2)>
-// CHECK-MASK: #[[$MAP3:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -2 + s0, d0 * 2)>
-// CHECK-MASK: #[[$MAP4:.+]] = affine_map<(d0) -> (d0 * 16)>
-// CHECK-MASK: #[[$MAP5:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -16 + s0, d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
+// CHECK-MASK-DAG: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -2 + s0, d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP4:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP5:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -16 + s0, d0 * 16)>
 // CHECK-MASK-LABEL: func.func @single_dynamic_pack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK:         %[[C0:.+]] = arith.constant 0 : i8
@@ -145,9 +144,8 @@ func.func @single_dynamic_pack_infer_vector_size(%arg0: tensor<?x?xi8>, %arg1: t
 // CHECK-MASK:             %[[WRITE_SZ1:.+]] = affine.min #[[$MAP1]]
 // CHECK-MASK:             %[[READ_SZ0:.+]] = affine.min #[[$MAP3]]
 // CHECK-MASK:             %[[READ_SZ1:.+]] = affine.min #[[$MAP5]]
-// CHECK-MASK:             %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][{{.+}}] [%[[READ_SZ0]], %[[READ_SZ1]]]
 // CHECK-MASK:             %[[READ_MASK:.+]] = vector.create_mask %[[READ_SZ0]], %[[READ_SZ1]] : vector<8x32xi1>
-// CHECK-MASK:             %[[READ:.+]] = vector.transfer_read %[[SLICE]][%{{.+}}], %[[C0]], %[[READ_MASK]]
+// CHECK-MASK:             %[[READ:.+]] = vector.transfer_read %[[SRC]][%{{.+}}], %[[C0]], %[[READ_MASK]]
 // CHECK-MASK:             %[[CAST:.+]] = vector.shape_cast %[[READ]] : vector<8x32xi8> to vector<4x2x2x16xi8>
 // CHECK-MASK:             %[[TRANSP:.+]] = vector.transpose %[[CAST]], [2, 0, 3, 1]
 // CHECK-MASK:             %[[EMPTY:.+]] = tensor.empty(%[[WRITE_SZ0]], %[[WRITE_SZ1]]) : tensor<?x?x16x2xi8>
@@ -204,13 +202,13 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
   }
   return %3 : tensor<32x?x64x16x2xbf16>
 }
-// CHECK-MASK: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
-// CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (4, -d0 + s0 ceildiv 16)>
-// CHECK-MASK: #[[$MAP2:.+]] = affine_map<(d0) -> (-d0 + 64, 6)>
-// CHECK-MASK: #[[$MAP3:.+]] = affine_map<(d0, d1) -> (d1 * -2 + 128, d0 * 2)>
-// CHECK-MASK: #[[$MAP4:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -16 + s0, d0 * 16)>
-// CHECK-MASK: #[[$MAP5:.+]] = affine_map<(d0) -> (d0 * 16)>
-// CHECK-MASK: #[[$MAP6:.+]] = affine_map<(d0) -> (d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (4, -d0 + s0 ceildiv 16)>
+// CHECK-MASK-DAG: #[[$MAP2:.+]] = affine_map<(d0) -> (-d0 + 64, 6)>
+// CHECK-MASK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1) -> (d1 * -2 + 128, d0 * 2)>
+// CHECK-MASK-DAG: #[[$MAP4:.+]] = affine_map<(d0, d1)[s0] -> (d1 * -16 + s0, d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP5:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-MASK-DAG: #[[$MAP6:.+]] = affine_map<(d0) -> (d0 * 2)>
 // CHECK-MASK-LABEL: func.func @generic_pack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK-DAG:     %[[C0_BF16:.+]] = arith.constant 0.000000e+00 : bf16
@@ -229,9 +227,8 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
 // CHECK-MASK-DAG:       %[[SRC_SZ0:.+]] = affine.min #[[$MAP4]]
 // CHECK-MASK-DAG:       %[[SRC_SZ2:.+]] = affine.min #[[$MAP3]]
 // CHECK-MASK-DAG:       %[[ITER_SLICE:.+]] = tensor.extract_slice %[[GENERIC_EMPTY]]
-// CHECK-MASK-DAG:       %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][{{.+}}] [%[[SRC_SZ0]], 2, %[[SRC_SZ2]]]
 // CHECK-MASK-DAG:       %[[READ_MASK:.+]] = vector.create_mask %[[SRC_SZ0]], %[[C2]], %[[SRC_SZ2]] : vector<64x2x12xi1>
-// CHECK-MASK:           %[[GENERIC_READ:.+]] = vector.transfer_read %[[SRC_SLICE]]{{.+}} %[[READ_MASK]]
+// CHECK-MASK:           %[[GENERIC_READ:.+]] = vector.transfer_read %[[SRC]]{{.+}} %[[READ_MASK]]
 // CHECK-MASK-DAG:       %[[WRITE_MASK:.+]] = vector.create_mask %[[C2]], %[[SRC_SZ2]], %[[SRC_SZ0]] : vector<2x12x64xi1>
 // CHECK-MASK:           %[[TRUNC:.+]] = arith.truncf %[[GENERIC_READ]]
 // CHECK-MASK:           %[[TRANSP:.+]] = vector.transpose %[[TRUNC]], [1, 2, 0]
@@ -278,10 +275,10 @@ func.func @single_dynamic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>,
   }
   return %0 : tensor<?x?xf32>
 }
-// CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (16, -d0 + s0)>
-// CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (32, -d0 + s0)>
-// CHECK-MASK: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 16)>
-// CHECK-MASK: #[[$MAP3:.+]] = affine_map<(d0) -> (d0 ceildiv 16)>
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (16, -d0 + s0)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (32, -d0 + s0)>
+// CHECK-MASK-DAG: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 16)>
+// CHECK-MASK-DAG: #[[$MAP3:.+]] = affine_map<(d0) -> (d0 ceildiv 16)>
 // CHECK-MASK-LABEL: func.func @single_dynamic_unpack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -292,9 +289,8 @@ func.func @single_dynamic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>,
 // CHECK-MASK-DAG:       %[[DEST_SZ0:.+]] = affine.min #[[$MAP0]]
 // CHECK-MASK-DAG:       %[[DEST_SZ1:.+]] = affine.min #[[$MAP1]]
 // CHECK-MASK-DAG:       %[[SRC_SZ1:.+]] = affine.apply #[[$MAP3]]
-// CHECK-MASK:           %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
 // CHECK-MASK:           %[[READ_MASK:.+]] = vector.create_mask %[[C1]], %[[SRC_SZ1]], %[[C16]], %[[C16]] : vector<1x2x16x16xi1>
-// CHECK-MASK:           %[[READ:.+]] = vector.transfer_read %[[SRC_SLICE]]{{.+}}, %[[READ_MASK]]
+// CHECK-MASK:           %[[READ:.+]] = vector.transfer_read %[[SRC]]{{.+}}, %[[READ_MASK]]
 // CHECK-MASK:           %[[TRANSP:.+]] = vector.transpose %[[READ]], [0, 2, 1, 3]
 // CHECK-MASK:           %[[SHAPE_CAST:.+]] = vector.shape_cast %[[TRANSP]] : vector<1x16x2x16xf32> to vector<16x32xf32>
 // CHECK-MASK:           %[[EMPTY:.+]] = tensor.empty(%[[DEST_SZ0]], %[[DEST_SZ1]]) : tensor<?x?xf32>
@@ -338,10 +334,10 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
   }
   return %0 : tensor<?x?xf32>
 }
-// CHECK-MASK: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
-// CHECK-MASK: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 32)>
-// CHECK-MASK: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 16)>
-// CHECK-MASK: #[[$MAP3:.+]] = affine_map<(d0) -> (d0 ceildiv 16)>
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 32)>
+// CHECK-MASK-DAG: #[[$MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 16)>
+// CHECK-MASK-DAG: #[[$MAP3:.+]] = affine_map<(d0) -> (d0 ceildiv 16)>
 // CHECK-MASK-LABEL: func.func @generic_unpack_infer_vector_size
 // CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -352,9 +348,8 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK-DAG:       %[[DEST_SZ0:.+]] = affine.min #[[$MAP0]]
 // CHECK-MASK-DAG:       %[[DEST_SZ1:.+]] = affine.min #[[$MAP1]]
 // CHECK-MASK-DAG:       %[[SRC_SZ1:.+]] = affine.apply #[[$MAP3]]
-// CHECK-MASK:           %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
 // CHECK-MASK:           %[[READ_MASK:.+]] = vector.create_mask %[[C1]], %[[SRC_SZ1]], %[[C16]], %[[C16]] : vector<1x2x16x16xi1>
-// CHECK-MASK:           %[[READ:.+]] = vector.transfer_read %[[SRC_SLICE]]{{.+}}, %[[READ_MASK]]
+// CHECK-MASK:           %[[READ:.+]] = vector.transfer_read %[[SRC]]{{.+}}, %[[READ_MASK]]
 // CHECK-MASK:           %[[TRANSP:.+]] = vector.transpose %[[READ]], [0, 2, 1, 3]
 // CHECK-MASK:           %[[SHAPE_CAST:.+]] = vector.shape_cast %[[TRANSP]] : vector<1x16x2x16xf32> to vector<16x32xf32>
 // CHECK-MASK:           %[[EMPTY:.+]] = tensor.empty(%[[DEST_SZ0]], %[[DEST_SZ1]]) : tensor<?x?xf32>
@@ -366,3 +361,84 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK:           %[[GENERIC_SRC:.+]] = vector.transfer_read %[[UNPACK_WRITE]]{{.+}}, %[[GENERIC_MASK]]
 // CHECK-MASK:           %[[EXP:.+]] = math.exp %[[GENERIC_SRC]]
 // CHECK-MASK:           vector.transfer_write %[[EXP]]{{.+}}, %[[GENERIC_MASK]]
+
+// -----
+
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
+
+func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x67x120x176xf32>) -> tensor<1x67x120x176xf32>
+  attributes {hal.executable.target = #aarch64_sve}
+{
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c67 = arith.constant 67 : index
+  %c120 = arith.constant 120 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %vscale = vector.vscale
+  %c4_vscale = arith.muli %vscale, %c4 : index
+  %0 = scf.for %arg1 = %c0 to %c67 step %c1 iter_args(%arg2 = %arg0) -> (tensor<1x67x120x176xf32>) {
+    %1 = scf.for %arg3 = %c0 to %c120 step %c4 iter_args(%arg4 = %arg2) -> (tensor<1x67x120x176xf32>) {
+      %2 = affine.apply #map()[%c4_vscale]
+      %3 = scf.for %arg5 = %c0 to %2 step %c4_vscale iter_args(%arg6 = %arg4) -> (tensor<1x67x120x176xf32>) {
+        %extracted_slice = tensor.extract_slice %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x67x120x176xf32> to tensor<1x1x4x?xf32>
+        %4 = linalg.fill ins(%cst : f32) outs(%extracted_slice : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
+        %inserted_slice = tensor.insert_slice %4 into %arg6[0, %arg1, %arg3, %arg5] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x67x120x176xf32>
+        scf.yield %inserted_slice : tensor<1x67x120x176xf32>
+      }
+      scf.yield %3 : tensor<1x67x120x176xf32>
+    }
+    scf.yield %1 : tensor<1x67x120x176xf32>
+  }
+  return %0 : tensor<1x67x120x176xf32>
+}
+
+// CHECK-MASK-LABEL: func.func @dynamic_fill_with_scalable_tiling_infer_vector_size
+// CHECK-MASK: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1x1x4x[4]xf32>
+// CHECK-MASK: scf.for
+// CHECK-MASK:   scf.for
+// CHECK-MASK:     scf.for
+// CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x67x120x176xf32>
+
+// -----
+
+#map = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
+#map1 = affine_map<(d0)[s0] -> (-d0 + s0, 32)>
+func.func @tiled_linalg_copy(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %dim_0 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %0 = scf.for %arg3 = %c0 to %dim step %c16 iter_args(%arg4 = %arg1) -> (tensor<?x?xf32>) {
+    %1 = scf.for %arg5 = %c0 to %dim_0 step %c32 iter_args(%arg6 = %arg4) -> (tensor<?x?xf32>) {
+      %2 = affine.min #map(%arg3)[%dim]
+      %3 = affine.min #map1(%arg5)[%dim_0]
+      %extracted_slice_0 = tensor.extract_slice %arg0[%arg3, %arg5] [%2, %3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg1[%arg3, %arg5] [%2, %3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+      %copy = linalg.copy ins(%extracted_slice_0 : tensor<?x?xf32>) outs(%extracted_slice_1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      %inserted_slice = tensor.insert_slice %copy into %arg6[%arg3, %arg5] [%2, %3] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
+      scf.yield %inserted_slice : tensor<?x?xf32>
+    }
+    scf.yield %1 : tensor<?x?xf32>
+  }
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-MASK-DAG: #[[$MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
+// CHECK-MASK-DAG: #[[$MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 32)>
+// CHECK-MASK-LABEL: func.func @tiled_linalg_copy
+// CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<?x?xf32>, %[[DST:[a-zA-Z0-9]+]]
+// CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-MASK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-MASK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK-MASK-DAG:     %[[C32:.+]] = arith.constant 32 : index
+// CHECK-MASK:         scf.for %[[IV0:.+]] = %[[C0]]
+// CHECK-MASK:           scf.for %[[IV1:.+]] = %[[C0]] {{.*}} iter_args(%[[ITER_ARG:.+]] = {{.*}})
+// CHECK-MASK-DAG:         %[[DST_SZ0:.+]] = affine.min #[[$MAP0]]
+// CHECK-MASK-DAG:         %[[DST_SZ1:.+]] = affine.min #[[$MAP1]]
+// CHECK-MASK:             %[[DST_SLICE:.+]] = tensor.extract_slice %[[DST]][%[[IV0]], %[[IV1]]] [%[[DST_SZ0]], %[[DST_SZ1]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK-MASK:             %[[MASK:.+]] = vector.create_mask %[[DST_SZ0]], %[[DST_SZ1]] : vector<16x32xi1>
+// CHECK-MASK:             %[[READ:.+]] = vector.transfer_read %[[SRC]][%[[IV0]], %[[IV1]]],{{.*}} %[[MASK]]{{.*}} : tensor<?x?xf32>, vector<16x32xf32>
+// CHECK-MASK:             vector.transfer_write %[[READ]], %[[DST_SLICE]]{{.+}}, %[[MASK]]

@@ -155,6 +155,29 @@ IREE_API_EXPORT iree_status_t iree_io_stream_copy(
     iree_io_stream_pos_t length);
 
 //===----------------------------------------------------------------------===//
+// Lifetime management utilities
+//===----------------------------------------------------------------------===//
+
+typedef void(IREE_API_PTR* iree_io_stream_release_fn_t)(
+    void* user_data, iree_io_stream_t* stream);
+
+// A callback issued when a memory stream is released.
+typedef struct {
+  // Callback function pointer.
+  iree_io_stream_release_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_io_stream_release_callback_t;
+
+// Returns a no-op file release callback that implies that no cleanup is
+// required.
+static inline iree_io_stream_release_callback_t
+iree_io_stream_release_callback_null(void) {
+  iree_io_stream_release_callback_t callback = {NULL, NULL};
+  return callback;
+}
+
+//===----------------------------------------------------------------------===//
 // iree_io_stream_t implementation details
 //===----------------------------------------------------------------------===//
 
@@ -190,6 +213,8 @@ struct iree_io_stream_t {
   const iree_io_stream_vtable_t* vtable;
   iree_io_stream_mode_t mode;
 };
+
+IREE_API_EXPORT void iree_io_stream_destroy(iree_io_stream_t* stream);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -313,8 +313,6 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         LinalgOpTiedOpInterface<IREE::LinalgExt::FftOp>>(*context);
     IREE::LinalgExt::ScanOp::attachInterface<
         LinalgOpTiedOpInterface<IREE::LinalgExt::ScanOp>>(*context);
-    IREE::LinalgExt::ReverseOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::ReverseOp>>(*context);
     IREE::LinalgExt::TopkOp::attachInterface<
         LinalgOpTiedOpInterface<IREE::LinalgExt::TopkOp>>(*context);
     IREE::LinalgExt::WinogradInputTransformOp::attachInterface<

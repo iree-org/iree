@@ -38,39 +38,6 @@ namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// GenericOpInterchangePattern
-//===----------------------------------------------------------------------===//
-
-struct GenericOpInterchangePattern
-    : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<unsigned> interchange;
-    bool needInterchange = false;
-    unsigned numParallelLoop = genericOp.getNumParallelLoops();
-    if (numParallelLoop == 0)
-      return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isParallelIterator(iter.value())) {
-        interchange.push_back(iter.index());
-        if (iter.index() >= numParallelLoop)
-          needInterchange = true;
-      }
-    }
-    // If all the parallel loops are outter loops skip the pattern.
-    if (!needInterchange)
-      return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isReductionIterator(iter.value())) {
-        interchange.push_back(iter.index());
-      }
-    }
-    return interchangeGenericOp(rewriter, genericOp, interchange);
-  }
-};
-
-//===----------------------------------------------------------------------===//
 // ElementwiseOpInterchangePattern
 //===----------------------------------------------------------------------===//
 
@@ -236,8 +203,7 @@ struct FusionPreprocessingPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ElementwiseOpInterchangePattern,
-                 FoldSuccessiveTensorInsertSliceOps,
-                 GenericOpInterchangePattern, GatherFusionPattern>(
+                 FoldSuccessiveTensorInsertSliceOps, GatherFusionPattern>(
         &getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its

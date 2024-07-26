@@ -152,10 +152,12 @@ getDefaultEnabledUkernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName) {
   auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
-  if (!enabledUkernels) {
-    return false;
+  StringRef enabledUkernelsStr;
+  if (enabledUkernels) {
+    enabledUkernelsStr = enabledUkernels->getValue();
+  } else {
+    enabledUkernelsStr = "default";
   }
-  StringRef enabledUkernelsStr = enabledUkernels->getValue();
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
     enabledUkernelsStr = getDefaultEnabledUkernels(targetAttr);
@@ -1153,6 +1155,29 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   }
   // TODO: Implement for other architectures.
   return std::nullopt;
+}
+
+FailureOr<DimBoundSize>
+computeDimUpperBound(Value shapedValue, unsigned dimNum,
+                     std::optional<VscaleRange> vscaleRange) {
+  if (!vscaleRange.has_value()) {
+    FailureOr<int64_t> maybeDimBoundSize =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {shapedValue, dimNum},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (succeeded(maybeDimBoundSize))
+      return DimBoundSize{/*baseSize=*/*maybeDimBoundSize,
+                          /*scalable=*/false};
+    return failure();
+  }
+  FailureOr<DimBound> maybeDimBound =
+      vector::ScalableValueBoundsConstraintSet::computeScalableBound(
+          shapedValue, dimNum,
+          /*vscaleMin=*/vscaleRange->min,
+          /*vscaleMax=*/vscaleRange->max, presburger::BoundType::UB);
+  if (succeeded(maybeDimBound))
+    return maybeDimBound->getSize();
+  return failure();
 }
 
 } // namespace mlir::iree_compiler

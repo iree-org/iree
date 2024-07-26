@@ -71,6 +71,7 @@ util.func public @fence_join_duplicate_fences(%fence0: !hal.fence, %fence1: !hal
 
 // CHECK-LABEL: @fence_elide_signaled
 util.func public @fence_elide_signaled(%device: !hal.device) -> !hal.fence {
+  // CHECK: %[[NULL_FENCE:.+]] = util.null : !hal.fence
   // CHECK-NOT: hal.fence.create
   %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
   // Ok to have other things inbetween so long as they don't touch the fence.
@@ -78,8 +79,7 @@ util.func public @fence_elide_signaled(%device: !hal.device) -> !hal.fence {
   util.call @external_nop_call() : () -> ()
   // CHECK-NOT: hal.fence.signal
   hal.fence.signal<%fence : !hal.fence>
-  // CHECK: %[[FENCE:.+]] = util.null : !hal.fence
-  // CHECK: util.return %[[FENCE]]
+  // CHECK: util.return %[[NULL_FENCE]]
   util.return %fence : !hal.fence
 }
 util.func private @external_nop_call()

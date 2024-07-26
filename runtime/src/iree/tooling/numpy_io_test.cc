@@ -48,8 +48,8 @@ class NumpyIOTest : public ::testing::Test {
       IREE_CHECK_OK(iree_io_memory_stream_wrap(
           IREE_IO_STREAM_MODE_READABLE | IREE_IO_STREAM_MODE_SEEKABLE,
           iree_make_byte_span((void*)file_toc[i].data, file_toc[i].size),
-          iree_io_memory_stream_release_callback_null(),
-          iree_allocator_system(), &stream));
+          iree_io_stream_release_callback_null(), iree_allocator_system(),
+          &stream));
       return StreamPtr(stream, iree_io_stream_release);
     }
     return StreamPtr{nullptr, iree_io_stream_release};

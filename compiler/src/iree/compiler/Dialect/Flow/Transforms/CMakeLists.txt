@@ -58,7 +58,6 @@ iree_cc_library(
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
-    "InterchangeTransposeGenericOps.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "OutlineConstants.cpp"
     "OutlineDispatchExterns.cpp"
@@ -69,6 +68,7 @@ iree_cc_library(
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TopLevelSCFToCFG.cpp"
+    "TransposeGenericOps.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
