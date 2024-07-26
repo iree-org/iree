@@ -41,23 +41,36 @@ namespace {
 // ElementwiseOpInterchangePattern
 //===----------------------------------------------------------------------===//
 
+// If possible, interchange indexing maps to make input maps all identity.
 struct ElementwiseOpInterchangePattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1)
+    if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1 ||
+        genericOp.getNumDpsInputs() == 0)
       return failure();
 
-    AffineMap indexingMap = genericOp.getIndexingMapsArray().back();
-    if (indexingMap.isIdentity())
+    // All input maps must be equal and non-identity. All maps, including
+    // output, must be be permutations. Permutation maps are checked by
+    // isElementwise but may be removed.
+    AffineMap inputMap = genericOp.getIndexingMapsArray().front();
+    auto *initOperand = genericOp.getDpsInitOperand(0);
+    if (inputMap.isIdentity() || !inputMap.isPermutation() ||
+        !genericOp.getMatchingIndexingMap(initOperand).isPermutation()) {
       return failure();
+    }
+    for (auto *operand : genericOp.getDpsInputOperands()) {
+      if (genericOp.getMatchingIndexingMap(operand) != inputMap) {
+        return failure();
+      }
+    }
 
-    ArrayRef<AffineExpr> exprs = indexingMap.getResults();
+    // Make all inputs identity.
+    ArrayRef<AffineExpr> exprs = inputMap.getResults();
     auto perm = llvm::map_to_vector(exprs, [](AffineExpr e) -> unsigned {
       return cast<AffineDimExpr>(e).getPosition();
     });
-
     return linalg::interchangeGenericOp(rewriter, genericOp, perm);
   }
 };
