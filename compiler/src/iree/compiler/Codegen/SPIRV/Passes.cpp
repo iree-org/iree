@@ -598,15 +598,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
 
-  auto getWarpSize = [](mlir::FunctionOpInterface func) -> int {
-    // TODO: This kind of call back function is a really really bad idea
-    // This should be easier to resolve than doing this.
-    return *getGPUSubgroupSize(func, /*pickLargest=*/true);
-  };
-
   // Handle vector reduction operations specifically.
   funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/false, getWarpSize));
+      /*expandSubgroupReduction=*/false, /*pickLargestSubgroupSize=*/true));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(funcPassManager);
