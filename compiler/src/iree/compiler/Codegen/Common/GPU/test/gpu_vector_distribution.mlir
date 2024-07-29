@@ -643,7 +643,7 @@ func.func @unresolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16x
   %vcst = arith.constant dense<0.0> : vector<32x16xf16>
   // CHECK-COUNT-8: vector.load %[[MEM]]
   %vec = vector.transfer_read  %a[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout1} : memref<32x16xf16>, vector<32x16xf16>
-  // CHECK: iree_vector_ext.layout_conflict_resolution {{.*}}
+  // CHECK: iree_vector_ext.to_layout {{.*}}
   %vec2 = arith.addf %vec, %vcst : vector<32x16xf16>
   // CHECK-COUNT-16: vector.store {{.*}}, vector<1xf16>
   vector.transfer_write %vec2, %b[%c0, %c0] {in_bounds = [true, true],
