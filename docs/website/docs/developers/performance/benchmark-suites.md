@@ -37,8 +37,6 @@ Execution benchmarks:
 
 - `android-cpu`: benchmarks for mobile CPUs
 - `android-gpu`: benchmarks for mobile GPUs
-- `cuda`: benchmarks for CUDA with a small model set
-- `cuda-large`: benchmarks for CUDA with a large model set
 - `vulkan-nvidia`: benchmarks for Vulkan on NVIDIA graphics cards
 - `x86_64`: benchmarks for x86_64 CPUs with a small model set
 - `x86_64-large`: benchmarks for x86_64 with a large model set
@@ -121,7 +119,6 @@ Note that:
 - `<target_device_name>` selects a benchmark group targets a specific device:
     - Common options:
         - `c2-standard-60` for x86_64 CPU benchmarks.
-        - `a2-highgpu-1g` for NVIDIA GPU benchmarks.
     - All device names are defined under
         [build_tools/python/e2e_test_framework/device_specs](https://github.com/iree-org/iree/tree/main/build_tools/python/e2e_test_framework/device_specs).
 - To run x86_64 benchmarks, right now `--cpu_uarch` needs to be provided and

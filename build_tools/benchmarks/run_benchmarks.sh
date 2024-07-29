@@ -31,20 +31,7 @@ TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
 SHARD_INDEX="${4:-${IREE_SHARD_INDEX}}"
 BENCHMARK_RESULTS="${5:-${IREE_BENCHMARK_RESULTS}}"
 
-if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
-  ${DOCKER_WRAPPER} \
-    --gpus all \
-    --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:a3b7b78c66c6fe3383b01c7662982c63f708637af1f92a7890b3256c2f178aa7 \
-      ./build_tools/benchmarks/run_benchmarks_on_linux.py \
-        --benchmark_tool_dir="${BENCHMARK_TOOLS_DIR}" \
-        --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-        --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
-        --target_device_name="${TARGET_DEVICE_NAME}" \
-        --shard_index="${SHARD_INDEX}" \
-        --output="${BENCHMARK_RESULTS}" \
-        --verbose
-elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
+if [[ "${TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
   ${DOCKER_WRAPPER} \
     gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \

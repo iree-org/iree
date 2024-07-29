@@ -35,8 +35,7 @@ case "${RUNNER_TYPE}" in
 esac
 BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy${BASE_IMAGE_ARCH}-v20231030}"
 
-# We create the image using n1 machines with attached T4 GPUs. This image works
-# for the A100 machines as well though.
+# We create the image using n1 machines with attached T4 GPUs.
 GPU_MACHINE_TYPE="n1-standard-16"
 X86_64_MACHINE_TYPE="e2-medium"
 ARM64_MACHINE_TYPE="t2a-standard-8"

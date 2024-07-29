@@ -30,23 +30,23 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_benchmark_presets_from_pr_labels(self):
         presets_str = configure_ci.get_benchmark_presets(
             trailers={},
-            labels=["benchmarks:x86_64", "benchmarks:cuda"],
+            labels=["benchmarks:x86_64"],
             is_pr=True,
             is_llvm_integrate_pr=False,
         )
 
-        self.assertEqual(presets_str, "comp-stats,cuda,x86_64")
+        self.assertEqual(presets_str, "comp-stats,x86_64")
 
     def test_get_benchmark_presets_from_trailers_and_labels(self):
         presets_str = configure_ci.get_benchmark_presets(
-            trailers={"benchmark-extra": "android-cpu,cuda-large,x86_64-large"},
+            trailers={"benchmark-extra": "android-cpu,x86_64-large"},
             labels=["benchmarks:vulkan-nvidia"],
             is_pr=True,
             is_llvm_integrate_pr=False,
         )
 
         self.assertEqual(
-            presets_str, "android-cpu,comp-stats,cuda-large,vulkan-nvidia,x86_64-large"
+            presets_str, "android-cpu,comp-stats,vulkan-nvidia,x86_64-large"
         )
 
     def test_get_benchmark_presets_from_default_group(self):

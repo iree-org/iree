@@ -14,10 +14,6 @@ ANDROID_CPU = "android-cpu"
 ANDROID_CPU_DT_ONLY = "android-cpu-dt-only"
 # Default Android GPU execution benchmarks.
 ANDROID_GPU = "android-gpu"
-# Default CUDA execution benchmarks.
-CUDA = "cuda"
-# Large CUDA execution benchmarks.
-CUDA_LARGE = "cuda-large"
 # Default RISC-V execution benchamrks.
 RISCV = "riscv"
 # Default Vulkan NVIDIA execution benchamrks.
@@ -39,7 +35,6 @@ DEFAULT_PRESETS = [
     ANDROID_CPU,
     ANDROID_CPU_DT_ONLY,
     ANDROID_GPU,
-    CUDA,
     RISCV,
     VULKAN_NVIDIA,
     X86_64,
@@ -47,7 +42,6 @@ DEFAULT_PRESETS = [
 ]
 # Large execution benchmark presets.
 LARGE_PRESETS = [
-    CUDA_LARGE,
     X86_64_LARGE,
 ]
 

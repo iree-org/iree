@@ -147,14 +147,6 @@ function create_template() {
         --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
       )
       ;;
-    a100)
-      cmd+=(
-        --machine-type=a2-highgpu-1g
-        --maintenance-policy=TERMINATE
-        --accelerator=count=1,type=nvidia-tesla-a100
-        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-      )
-      ;;
     cpu)
       cmd+=(
         --machine-type=n1-standard-96
@@ -194,7 +186,7 @@ function create_template() {
 
 for group in presubmit postsubmit; do
   # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
-  for type in gpu a100 cpu c2s601t arm64; do
+  for type in gpu cpu c2s601t arm64; do
     create_template "${group}" "${type}"
   done
 done

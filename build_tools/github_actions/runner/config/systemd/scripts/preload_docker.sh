@@ -27,10 +27,6 @@ grep 'gcr.io/iree-oss/base-bleeding-edge@' /tmp/prod_digests.txt | xargs docker 
 
 RUNNER_TYPE="$(get_attribute github-runner-type)"
 
-if [[ "${RUNNER_TYPE}" == gpu || "${RUNNER_TYPE}" == a100 ]]; then
+if [[ "${RUNNER_TYPE}" == gpu ]]; then
   grep 'gcr.io/iree-oss/nvidia@' /tmp/prod_digests.txt | xargs docker pull
-fi
-
-if [[ "${RUNNER_TYPE}" == a100 ]]; then
-  grep 'gcr.io/iree-oss/nvidia-bleeding-edge@' /tmp/prod_digests.txt | xargs docker pull
 fi
