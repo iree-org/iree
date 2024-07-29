@@ -187,7 +187,8 @@ struct ConvertTensorFromElementsPattern
     }
     auto tensorType = op.getType();
     if (!tensorType.hasRank()) {
-      return failure();
+      return rewriter.notifyMatchFailure(op,
+                                         "unranked result type not supported");
     }
 
     if (op.getNumOperands() == 1) {
