@@ -1214,6 +1214,9 @@ LogicalResult AttentionOp::verify() {
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+  if (failed(maybeOpInfo)) {
+    return attnOp->emitOpError("failed to verify op's indexing maps");
+  }
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
@@ -1317,6 +1320,18 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
   fillSizes(queryShape, queryDims);
   fillSizes(valueShape, valueDims);
   return bounds;
+}
+
+SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin(),
+                                maps.end() + getNumDpsInputs() - 1);
+}
+
+SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs() - 1,
+                                maps.end());
 }
 
 //===----------------------------------------------------------------------===//
