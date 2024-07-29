@@ -166,7 +166,7 @@ function(iree_check_test)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
   if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
-    list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}")
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}")
   endif()
 
   if(_BYTECODE_MODULE_BUILD_ENABLED)

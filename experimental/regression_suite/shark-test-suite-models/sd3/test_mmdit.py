@@ -82,7 +82,7 @@ def SD3_MMDIT_COMMON_RUN_FLAGS(
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
-    f"--iree-rocm-target-chip={rocm_chip}",
+    f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-global-opt-propagate-transposes=true",
