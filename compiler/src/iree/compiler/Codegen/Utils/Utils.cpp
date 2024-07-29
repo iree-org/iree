@@ -1159,7 +1159,8 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 FailureOr<DimBoundSize>
 computeDimUpperBound(Value shapedValue, unsigned dimNum,
-                     std::optional<VscaleRange> vscaleRange) {
+                     std::optional<VscaleRange> vscaleRange,
+                     RoundUpVscaleMultiple roundUp) {
   if (!vscaleRange.has_value()) {
     FailureOr<int64_t> maybeDimBoundSize =
         ValueBoundsConstraintSet::computeConstantBound(
@@ -1175,9 +1176,25 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
           shapedValue, dimNum,
           /*vscaleMin=*/vscaleRange->min,
           /*vscaleMax=*/vscaleRange->max, presburger::BoundType::UB);
-  if (succeeded(maybeDimBound))
-    return maybeDimBound->getSize();
-  return failure();
+  if (failed(maybeDimBound))
+    return failure();
+  auto boundSize = maybeDimBound->getSize();
+  if (succeeded(boundSize))
+    return boundSize;
+  if (roundUp == RoundUpVscaleMultiple::No)
+    return failure();
+  // If the upper bound map is of the form `add(subExpr, cst)` (cst <= 0),
+  // round it up to `subExpr` (and try matching the bound again).
+  auto binOp = dyn_cast<AffineBinaryOpExpr>(maybeDimBound->map.getResult(0));
+  if (!binOp || binOp.getKind() != AffineExprKind::Add)
+    return failure();
+  auto cst = dyn_cast<AffineConstantExpr>(binOp.getRHS());
+  if (!cst || cst.getValue() > 0)
+    return failure();
+  DimBound roundedDimBound{AffineMap::get(maybeDimBound->map.getNumDims(),
+                                          maybeDimBound->map.getNumSymbols(),
+                                          binOp.getLHS())};
+  return roundedDimBound.getSize();
 }
 
 } // namespace mlir::iree_compiler
