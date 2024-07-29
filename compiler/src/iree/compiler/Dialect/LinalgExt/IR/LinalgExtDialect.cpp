@@ -97,10 +97,7 @@ public:
     return (llvm::cast<ConcreteType>(op).getMatchingIndexingMap(operand));
   }
 
-  SmallVector<AffineMap> getIndexingMaps(mlir::Operation *op) const {
-    // Note: this is different from linalg's implementation
-    // of `getIndexingMaps`. Call interface methods to get
-    // the vector of indexing maps for operands and results.
+  SmallVector<AffineMap> getIndexingMapsArray(mlir::Operation *op) const {
     auto inputMaps = getIndexingMapsForOperands(op);
     llvm::append_range(inputMaps, getIndexingMapsForResults(op));
     return inputMaps;

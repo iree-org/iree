@@ -1,9 +1,9 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-clone-producers-into-dispatch-regions, iree-flow-convert-dispatch-regions-to-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-clone-producers-into-dispatch-regions), cse, canonicalize, cse)" %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
+util.func public @linalgext_scatter_dispatch() -> tensor<8192x16x8x128xf32> {
   %0 = tensor.empty() : tensor<4x1xi32>
   %1 = tensor.empty() : tensor<4x1xi64>
   %2 = tensor.empty() : tensor<4x1x16x8x128xf32>
@@ -36,22 +36,24 @@ util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
   util.return %9 : tensor<8192x16x8x128xf32>
 }
 
-// CHECK:     util.func public @linalgext_scatter_fusion
-// CHECK:       %[[RESULT:.+]] = flow.dispatch.workgroups
-// CHECK:         %[[INDICES:.+]] = linalg.generic
-// CHECK:         %[[UPDATE:.+]] = linalg.generic
-// CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
-// CHECK-SAME:      ins(%[[UPDATE]], %[[INDICES]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
-// CHECK:       flow.dispatch.workgroups
-// CHECK:         %[[GEN2:.+]] = linalg.generic
-// CHECK-SAME:      ins(%[[INPUT:.+]] : tensor<8192x16x8x128xf32>)
+// CHECK-LABEL:     util.func public @linalgext_scatter_dispatch
+//       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:         %[[INDICES:.+]] = linalg.generic
+//       CHECK:         %[[UPDATE:.+]] = linalg.generic
+//       CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:           ins(%[[UPDATE]], %[[INDICES]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
+//       CHECK:         flow.return %[[SCATTER_RESULT]]
+//       CHECK:       flow.dispatch.region
+//       CHECK:         %[[GEN2:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[INPUT:.+]] : tensor<8192x16x8x128xf32>)
+//       CHECK:         flow.return %[[GEN2]]
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
+util.func public @linalgext_scatter_clone() -> tensor<8192x16x8x128xf32> {
   %6 = tensor.empty() : tensor<4x1xi32>
   %2 = tensor.empty() : tensor<4x1x16x8x128xf32>
   %4 = tensor.empty() : tensor<10x8192x16x8x128xf32>
@@ -69,8 +71,53 @@ util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
   util.return %8 : tensor<8192x16x8x128xf32>
 }
 
-// CHECK:     util.func public @linalgext_scatter_fusion
-// CHECK:       %[[RESULT:.+]] = flow.dispatch.workgroups
-// CHECK:         %[[OUTS:.+]] = tensor.extract_slice
-// CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
-// CHECK-SAME:      outs(%[[OUTS]] : tensor<8192x16x8x128xf32>)
+// CHECK-LABEL:     util.func public @linalgext_scatter_clone
+//       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:         %[[OUTS:.+]] = tensor.extract_slice
+//       CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:           outs(%[[OUTS]] : tensor<8192x16x8x128xf32>)
+//       CHECK:         flow.return %[[SCATTER_RESULT]]
+
+// -----
+
+util.func public @attention_dispatch(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x?xf16>, %arg2: tensor<?x?x?xf16>, %arg3: f16, %arg4: tensor<?x?x?xf16>, %arg5: tensor<?x?x?xf16>, %arg6: tensor<?x?x?xf16>) -> tensor<?x?x?xf16> {
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<?x?x?xf16>) outs(%arg4 : tensor<?x?x?xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.mulf %in, %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<?x?x?xf16>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<?x?x?xf16>) outs(%arg4 : tensor<?x?x?xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.mulf %in, %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<?x?x?xf16>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<?x?x?xf16>) outs(%arg4 : tensor<?x?x?xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.mulf %in, %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<?x?x?xf16>
+
+  %3 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]} ins(%0, %1, %2, %arg3 : tensor<?x?x?xf16>, tensor<?x?x?xf16>, tensor<?x?x?xf16>, f16) outs(%arg4 : tensor<?x?x?xf16>) -> tensor<?x?x?xf16>
+
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3 : tensor<?x?x?xf16>) outs(%arg4 : tensor<?x?x?xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.mulf %in, %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<?x?x?xf16>
+  util.return %4 : tensor<?x?x?xf16>
+}
+
+// CHECK-LABEL:     util.func public @attention_dispatch
+//       CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region
+//  CHECK-NEXT:         %[[GEN0:.+]] = linalg.generic
+//       CHECK:         flow.return %[[GEN0]]
+//       CHECK:       %[[DISPATCH1:.+]] = flow.dispatch.region
+//  CHECK-NEXT:         %[[GEN1:.+]] = linalg.generic
+//       CHECK:         flow.return %[[GEN1]]
+//       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:         %[[GEN:.+]] = linalg.generic
+//       CHECK:         %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:           ins(%[[GEN]], %[[DISPATCH0]], %[[DISPATCH1]]
+//       CHECK:         %[[GEN2:.+]] = linalg.generic
+//  CHECK-SAME:           ins(%[[ATTN]]
+//       CHECK:         flow.return %[[GEN2]]
