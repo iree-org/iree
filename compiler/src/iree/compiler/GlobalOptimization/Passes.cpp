@@ -170,8 +170,6 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.
-    // TODO(hanchung): Make it controlable through flags. It is fine for now
-    // because it is an experimental path.
     mainPassManager.addPass(createSetEncodingPass(clPadFactor));
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
