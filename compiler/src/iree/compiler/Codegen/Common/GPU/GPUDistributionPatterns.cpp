@@ -804,6 +804,11 @@ struct DistributeLayoutConflictResolutions final
     if (!targetLayout)
       return failure();
 
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
+    }
+
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
     SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
     if (currentVecShape.size() != targetVecShape.size())
@@ -854,6 +859,11 @@ struct DistributeLayoutConflictToSharedMemory final
     if (!targetLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
                                          "Target layout must be LayoutAttr.");
+    }
+
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
     }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
@@ -1002,6 +1012,28 @@ struct DistributeLayoutConflictToSharedMemory final
   }
 };
 
+struct DistributeTrivialLayoutConversions final
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorLayoutInterface currentLayout =
+        dyn_cast<LayoutAttr>(signature[toLayoutOp.getInput()]);
+    VectorLayoutInterface targetLayout =
+        dyn_cast<LayoutAttr>(signature[toLayoutOp.getResult()]);
+
+    if (currentLayout != targetLayout) {
+      return rewriter.notifyMatchFailure(toLayoutOp,
+                                         "Non-trivial layout conversion.");
+    }
+
+    rewriter.replaceOp(toLayoutOp, toLayoutOp.getOperand());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -1013,6 +1045,7 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
+  patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,

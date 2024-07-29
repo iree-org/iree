@@ -139,9 +139,6 @@ private:
   DataFlowSolver solver;
 };
 
-LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                         Operation *root);
-
 }; // namespace iree_compiler
 }; // namespace mlir
 
