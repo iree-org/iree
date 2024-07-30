@@ -124,7 +124,7 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
-        "test_nvidia_gpu",
+        "test_nvidia_t4",
         # "test_nvidia_a100",  # Currently disabled
         "test_amd_mi250",
         "test_amd_mi300",
@@ -155,7 +155,7 @@ AMDGPU_PATHS = [
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     # The runners with GPUs for these jobs can be unstable or in short supply,
     # so limit jobs to only code paths most likely to affect the tests.
-    ("test_nvidia_gpu", NVGPU_PATHS),
+    ("test_nvidia_t4", NVGPU_PATHS),
     # Due to the outstock of A100, only run this test in postsubmit.
     # ("test_nvidia_a100", NVGPU_PATHS),
     ("test_amd_mi250", AMDGPU_PATHS),
