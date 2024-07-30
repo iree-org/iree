@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-global-opt-raise-special-ops -canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-raise-special-ops --iree-flow-canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
@@ -678,14 +678,14 @@ util.func public @unsigned_matmul_extsi(%arg0 : tensor<10x20xi32>,
   %2 = tensor.empty() : tensor<10x40xi32>
   %3 = arith.constant 0 : i32
   %4 = linalg.fill ins(%3 : i32) outs(%2 : tensor<10x40xi32>) -> tensor<10x40xi32>
-  %5 = linalg.matmul_unsigned ins(%arg0, %1 : tensor<10x20xi32>, tensor<20x40xi32>)
+  %5 = linalg.matmul {cast = #linalg.type_fn<cast_unsigned>} ins(%arg0, %1 : tensor<10x20xi32>, tensor<20x40xi32>)
       outs(%4 : tensor<10x40xi32>) -> tensor<10x40xi32>
   util.return %5 : tensor<10x40xi32>
 }
 // CHECK-LABEL: util.func public @unsigned_matmul_extsi
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi32>
 //       CHECK:   %[[GEN:.+]] = linalg.generic
-//       CHECK:   %[[RESULT:.+]] = linalg.matmul_unsigned ins(%[[ARG0]], %[[GEN]]
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul {cast = #linalg.type_fn<cast_unsigned>} ins(%[[ARG0]], %[[GEN]]
 //       CHECK:   util.return %[[RESULT]]
 
 // -----

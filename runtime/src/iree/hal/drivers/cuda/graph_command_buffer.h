@@ -42,6 +42,11 @@ bool iree_hal_cuda_graph_command_buffer_isa(
 CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
     iree_hal_command_buffer_t* command_buffer);
 
+// This is to be called after the given |command_buffer| has been submitted
+// in order to notify the tracing system that there are events to collect.
+void iree_hal_cuda_graph_tracing_notify_submitted_commands(
+    iree_hal_command_buffer_t* command_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

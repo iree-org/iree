@@ -313,6 +313,14 @@ IREE_VM_ABI_FIXED_STRUCT(riiii, {
   int32_t i4;
 });
 
+IREE_VM_ABI_FIXED_STRUCT(riiIi, {
+  iree_vm_ref_t r0;
+  int32_t i1;
+  int32_t i2;
+  int64_t i3;
+  int32_t i4;
+});
+
 IREE_VM_ABI_FIXED_STRUCT(riiI, {
   iree_vm_ref_t r0;
   int32_t i1;
@@ -347,36 +355,40 @@ IREE_VM_ABI_FIXED_STRUCT(riIiirII, {
   int64_t i7;
 });
 
-IREE_VM_ABI_FIXED_STRUCT(rriirIIrIII, {
-  iree_vm_ref_t r0;
-  iree_vm_ref_t r1;
-  int32_t i2;
-  int32_t i3;
-  iree_vm_ref_t r4;
-  int64_t i5;
-  int64_t i6;
-  iree_vm_ref_t r7;
-  int64_t i8;
-  int64_t i9;
-  int64_t i10;
-});
-
-IREE_VM_ABI_FIXED_STRUCT(rriiii, {
+IREE_VM_ABI_FIXED_STRUCT(rriiiirrIIIII, {
   iree_vm_ref_t r0;
   iree_vm_ref_t r1;
   int32_t i2;
   int32_t i3;
   int32_t i4;
   int32_t i5;
+  iree_vm_ref_t r6;
+  iree_vm_ref_t r7;
+  int64_t i8;
+  int64_t i9;
+  int64_t i10;
+  int64_t i11;
+  int64_t i12;
 });
 
-IREE_VM_ABI_FIXED_STRUCT(rrIIii, {
+IREE_VM_ABI_FIXED_STRUCT(rriiiiI, {
+  iree_vm_ref_t r0;
+  iree_vm_ref_t r1;
+  int32_t i2;
+  int32_t i3;
+  int32_t i4;
+  int32_t i5;
+  int64_t i6;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(rrIIiii, {
   iree_vm_ref_t r0;
   iree_vm_ref_t r1;
   int64_t i2;
   int64_t i3;
   int32_t i4;
   int32_t i5;
+  int32_t i6;
 });
 
 IREE_VM_ABI_FIXED_STRUCT(rrirI, {
@@ -387,13 +399,35 @@ IREE_VM_ABI_FIXED_STRUCT(rrirI, {
   int64_t i4;
 });
 
-IREE_VM_ABI_FIXED_STRUCT(rrIrII, {
+IREE_VM_ABI_FIXED_STRUCT(rriirII, {
+  iree_vm_ref_t r0;
+  iree_vm_ref_t r1;
+  int32_t i2;
+  int32_t i3;
+  iree_vm_ref_t r4;
+  int64_t i5;
+  int64_t i6;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(rrIrIIi, {
   iree_vm_ref_t r0;
   iree_vm_ref_t r1;
   int64_t i2;
   iree_vm_ref_t r3;
   int64_t i4;
   int64_t i5;
+  int32_t i6;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(riirIrII, {
+  iree_vm_ref_t r0;
+  int32_t i1;
+  int32_t i2;
+  iree_vm_ref_t r3;
+  int64_t i4;
+  iree_vm_ref_t r5;
+  int64_t i6;
+  int64_t i7;
 });
 
 IREE_VM_ABI_FIXED_STRUCT(rrIii, {
@@ -659,9 +693,10 @@ IREE_VM_ABI_DECLARE_SHIM(rif, v);
 IREE_VM_ABI_DECLARE_SHIM(riii, r);
 IREE_VM_ABI_DECLARE_SHIM(riiI, r);
 IREE_VM_ABI_DECLARE_SHIM(riii, v);
+IREE_VM_ABI_DECLARE_SHIM(riiIi, r);
 IREE_VM_ABI_DECLARE_SHIM(rIiiI, r);
 IREE_VM_ABI_DECLARE_SHIM(riIiirII, r);
-IREE_VM_ABI_DECLARE_SHIM(rriirIIrIII, v);
+IREE_VM_ABI_DECLARE_SHIM(rriiiirrIIIII, v);
 IREE_VM_ABI_DECLARE_SHIM(rrrrCrD, r);
 IREE_VM_ABI_DECLARE_SHIM(ririi, v);
 IREE_VM_ABI_DECLARE_SHIM(rr, i);
@@ -675,11 +710,13 @@ IREE_VM_ABI_DECLARE_SHIM(rrCrIID, v);
 IREE_VM_ABI_DECLARE_SHIM(rriCiD, v);
 IREE_VM_ABI_DECLARE_SHIM(rriiCID, v);
 IREE_VM_ABI_DECLARE_SHIM(rriCiirIID, v);
-IREE_VM_ABI_DECLARE_SHIM(rriiii, v);
-IREE_VM_ABI_DECLARE_SHIM(rrIIii, v);
+IREE_VM_ABI_DECLARE_SHIM(rriiiiI, v);
+IREE_VM_ABI_DECLARE_SHIM(rrIIiii, v);
 IREE_VM_ABI_DECLARE_SHIM(rrirCID, v);
 IREE_VM_ABI_DECLARE_SHIM(rrirI, v);
-IREE_VM_ABI_DECLARE_SHIM(rrIrII, v);
+IREE_VM_ABI_DECLARE_SHIM(rriirII, v);
+IREE_VM_ABI_DECLARE_SHIM(rrIrIIi, v);
+IREE_VM_ABI_DECLARE_SHIM(riirIrII, v);
 IREE_VM_ABI_DECLARE_SHIM(rrIii, v);
 IREE_VM_ABI_DECLARE_SHIM(rrrIii, v);
 IREE_VM_ABI_DECLARE_SHIM(rIrriiiI, r);

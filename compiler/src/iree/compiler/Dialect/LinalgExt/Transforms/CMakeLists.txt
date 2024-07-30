@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h.inc"
   SRCS
     "AggregatedOpInterfaceImpl.cpp"
+    "ConvertConv2DToIm2ColOp.cpp"
     "ConvertConv2DToWinograd.cpp"
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"

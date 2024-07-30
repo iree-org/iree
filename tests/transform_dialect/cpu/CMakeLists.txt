@@ -14,19 +14,13 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "contraction-packing-and-dispatch.mlir"
-    "contraction-packing.mlir"
-    "fold_tensor_slice_into_transfer.mlir"
     "matmul_library_call.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    iree-benchmark-module
     iree-compile
-    iree-opt
     iree-run-module
   DATA
-    matmul_codegen_default_spec.mlir
     transform_library.mlir
   LABELS
     "hostonly"

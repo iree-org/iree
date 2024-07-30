@@ -23,7 +23,7 @@
 // compiled binary.
 #rocm_target = #hal.device.target<"rocm", [
   #rocm_gfx1100_target
-]>
+]> : !hal.device
 
 module @example attributes {hal.device.targets = [#rocm_target]} {
 

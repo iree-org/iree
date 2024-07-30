@@ -10,14 +10,15 @@
   ], flags = Indirect>
 ]>
 hal.executable private @interface_binding {
-  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb-ptr", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Int64, Shader, PhysicalStorageBufferAddresses],
-                                                            [SPV_KHR_physical_storage_buffer]>, #spirv.resource_limits<>>,
-      hal.bindings.indirect}>) {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb-ptr", {hal.bindings.indirect}>) {
     hal.executable.export @interface_binding layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    builtin.module {
+    builtin.module attributes {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+        [Int64, Shader, PhysicalStorageBufferAddresses],
+        [SPV_KHR_physical_storage_buffer]>, #spirv.resource_limits<>>
+    } {
       func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>

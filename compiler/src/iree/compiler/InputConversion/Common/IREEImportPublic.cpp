@@ -209,13 +209,15 @@ class TensorImportPattern
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
-          /*name=*/nullptr);
+          /*name=*/nullptr,
+          /*affinity=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
-          adaptor.getTargetDims(), /*wait_fence=*/Value{}, /*name=*/nullptr);
+          adaptor.getTargetDims(), /*wait_fence=*/Value{}, /*name=*/nullptr,
+          /*affinity=*/nullptr);
     }
     return success();
   }
@@ -237,14 +239,16 @@ class TensorExportPattern
       // the work.
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
           srcOp, resultType, adaptor.getSource(),
-          TypeAttr::get(adaptor.getSource().getType()), /*name=*/nullptr);
+          TypeAttr::get(adaptor.getSource().getType()), /*name=*/nullptr,
+          /*affinity=*/nullptr);
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
           srcOp, resultType, adaptor.getSource(),
           TypeAttr::get(adaptor.getSource().getType()), adaptor.getSourceDims(),
-          /*name=*/nullptr);
+          /*name=*/nullptr,
+          /*affinity=*/nullptr);
     }
     return success();
   }
@@ -349,10 +353,8 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
 
     // Allowlist of function attributes to retain when importing funcs.
     constexpr const char *kRetainedAttributes[] = {
-        "iree.reflection",
-        "vm.fallback",
-        "vm.signature",
-        "vm.version",
+        "iree.reflection", "stream.affinity", "vm.fallback",
+        "vm.signature",    "vm.version",
     };
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,

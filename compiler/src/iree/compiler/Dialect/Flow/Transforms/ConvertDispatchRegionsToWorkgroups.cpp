@@ -45,6 +45,8 @@ void ConvertDispatchRegionsToWorkgroupsPass::runOnOperation() {
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });
 
+  numDispatches += regionOps.size();
+
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
   for (auto regionOp : regionOps) {
     auto maybeWorkgroupOp =

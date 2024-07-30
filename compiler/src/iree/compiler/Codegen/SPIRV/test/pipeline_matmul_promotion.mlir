@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -11,12 +11,7 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 hal.executable @matmul_f32_128x256x64 {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
-      max_compute_shared_memory_size = 49152,
-      max_compute_workgroup_invocations = 1024,
-      max_compute_workgroup_size = [65535, 65535, 65535],
-      subgroup_size = 32>>}>) {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -91,12 +86,7 @@ hal.executable @matmul_f32_128x256x64 {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 hal.executable @matmul_f16_128x256x64 {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, Float16], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
-      max_compute_shared_memory_size = 49152,
-      max_compute_workgroup_invocations = 1024,
-      max_compute_workgroup_size = [65535, 65535, 65535],
-      subgroup_size = 32>>}>) {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f16_128x256x64 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -177,12 +167,7 @@ hal.executable @matmul_f16_128x256x64 {
   translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0, store_stage = 1}>>
 
 hal.executable @matmul_f16_32x1280x1280 {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, Float16, StorageBuffer16BitAccess], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
-      max_compute_shared_memory_size = 49152,
-      max_compute_workgroup_invocations = 1024,
-      max_compute_workgroup_size = [65535, 65535, 65535],
-      subgroup_size = 32>>}>) {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f16_32x1280x1280 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

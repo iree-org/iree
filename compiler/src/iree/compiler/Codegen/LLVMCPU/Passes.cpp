@@ -106,6 +106,7 @@ static llvm::cl::opt<bool> clForceArmStreaming(
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createConvertToDestinationPassingStylePass());
   funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -501,11 +502,11 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   funcPassManager.addPass(createLLVMCPUTileAndFusePass(
       static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
-  if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  }
+  // The below two passes are nop if the "mmt4d" is explicitly excluded in the
+  // ukernels attribute.
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTilePass(
       static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
 
@@ -545,11 +546,11 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  }
+  // The below two passes are nop if pack/unpack is not specified in ukernels
+  // attribute. By default, they are disabled.
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
 
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
@@ -749,7 +750,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added
       // way to late and should insted be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)
-      .addPass([&]() { return createCPUMaterializeEncodingPass(); })
+      .addPass(createCPUMaterializeDeviceEncodingPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);

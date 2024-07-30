@@ -49,11 +49,14 @@ void createTorchToIREEPipeline(
       mlir::torch::TorchConversion::createConvertCustomQuantOpPass());
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
+  pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
+  pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTMTensorToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToArithPass());
   pm.addPass(torch::createConvertTorchConversionToMLProgramPass());

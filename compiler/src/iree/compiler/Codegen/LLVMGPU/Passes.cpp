@@ -222,6 +222,7 @@ tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
+  funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createConvertToDestinationPassingStylePass(
       useWARForCooperativeMatrixCodegen));
@@ -240,12 +241,16 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
+  // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
   funcPassManager.addPass(createGenericVectorizationPass(options));
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  // Run subset hoisting to convert iter_args to vectors.
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -289,12 +294,11 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 //===---------------------------------------------------------------------===//
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
+  tileAndDistributeToWorkgroup(funcPassManager);
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
-
-  tileAndDistributeToWorkgroup(funcPassManager);
 
   // Step 2. Tile and fuse tileable ops to reduction loops.
   {
@@ -724,6 +728,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
+  funcPassManager.addPass(
+      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -745,6 +751,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ReductionDims;
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
   }
+
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
@@ -774,8 +784,11 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
 
-  // Vector SIMD -> Vector SIMT
+  // Preprocessing for vector distribution.
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
+  funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
+
+  // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistribute());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -832,18 +845,9 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
 
-  auto getSubgroupSizeFn = [](mlir::FunctionOpInterface func) -> int {
-    // TODO: This kind of call back function is a really really bad idea
-    // This should be easier to resolve than doing this.
-    if (std::optional<int64_t> maybeSubgroupSize = getSubgroupSize(func)) {
-      return maybeSubgroupSize.value();
-    }
-    return kDefaultSubgroupSize;
-  };
-
   // vector -> simt gpu + vector
   funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/true, getSubgroupSizeFn));
+      /*expandSubgroupReduction=*/true, /*pickLargestSubgroupSize=*/false));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
@@ -1040,9 +1044,9 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+    addEncodingToNopPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 

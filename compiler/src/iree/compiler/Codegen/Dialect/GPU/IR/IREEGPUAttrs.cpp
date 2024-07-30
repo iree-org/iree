@@ -203,6 +203,7 @@ getContractionLayout(vector::ContractionOp contract, ConcreteMmaLayout layout) {
 
 static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
                                            MMAIntrinsic type) {
+  Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
   Type f16 = Float16Type::get(context);
   Type f32 = Float32Type::get(context);
 
@@ -210,11 +211,17 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   Type i32 = IntegerType::get(context, 32);
 
   switch (type) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    return OpaqueMmaLayout{16, 16, 4, f32, f32, f32};
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
     return OpaqueMmaLayout{16, 16, 16, f16, f16, f32};
   }
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
     return OpaqueMmaLayout{32, 32, 8, f16, f16, f32};
+  }
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32: {
+    return OpaqueMmaLayout{16, 16, 32, f8E4M3FNUZ, f8E4M3FNUZ, f32};
   }
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     return OpaqueMmaLayout{16, 16, 32, i8, i8, i32};
@@ -251,6 +258,24 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
       LayoutDimensionAttr::get(context, LayoutDimension::VECTORZ);
   (void)laneZ, (void)vectorZ;
   switch (type) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
+    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 1]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
+    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
+
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 1});
+    auto aMLayout = outer;
+    auto aKLayout = inner;
+    auto bKLayout = inner;
+    auto bNLayout = outer;
+    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
+    auto cNLayout = outer;
+    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
+                             bNLayout,     cMLayout, cNLayout};
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
     // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
     // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
@@ -290,6 +315,7 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
     // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 8]>
@@ -404,6 +430,12 @@ MMAAttr::getABCVectorTypes() const {
   // amd_matrix_instruction_calculator tells us about the number of 32-bit
   // registers. So need to adjust accordingly. All vectors should be 1-D.
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    auto aType = VectorType::get({1}, getAType());
+    auto bType = VectorType::get({1}, getBType());
+    auto cType = VectorType::get({4}, getCType());
+    return std::make_tuple(aType, bType, cType);
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
@@ -416,6 +448,7 @@ MMAAttr::getABCVectorTypes() const {
     auto cType = VectorType::get({16}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     auto aType = VectorType::get({8}, getAType());
     auto bType = VectorType::get({8}, getBType());
@@ -450,8 +483,10 @@ MMAAttr::getContractionLayout(vector::ContractionOp contract) const {
 
 int64_t MMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
   case MMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32:
   case MMAIntrinsic::MFMA_I8_32x32x16_I32:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16:
@@ -465,8 +500,10 @@ int64_t MMAAttr::getBlockSize() const {
 
 int64_t MMAAttr::getSubgroupSize() const {
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
   case MMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32:
   case MMAIntrinsic::MFMA_I8_32x32x16_I32: {
     return 64;
@@ -482,6 +519,10 @@ int64_t MMAAttr::getSubgroupSize() const {
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
+            /*element=*/{1, 1}};
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
             /*element=*/{1, 4}};
@@ -490,6 +531,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*strides=*/{1, 32},
             /*element=*/{1, 4}};
   }
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
             /*element=*/{1, 8}};
@@ -509,6 +551,10 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
+            /*element=*/{1, 1}};
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{4, 1}};
@@ -517,6 +563,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
             /*element=*/{4, 1}};
   }
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{8, 1}};
@@ -536,7 +583,9 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{4, 1}};
@@ -571,8 +620,20 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
     return failure();
   }
   switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    // Update the lhs and rhs to extract the first element since vector<1xT> is
+    // not supoorted by amgpu.mfma op.
+    lhs = builder.create<vector::ExtractOp>(loc, lhs, ArrayRef{int64_t{0}});
+    rhs = builder.create<vector::ExtractOp>(loc, rhs, ArrayRef{int64_t{0}});
+    auto [m, n, k] = getMNKShape();
+    return builder
+        .create<amdgpu::MFMAOp>(loc, resultType, m, n, k, getBlockSize(), lhs,
+                                rhs, acc)
+        .getResult();
+  }
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
   case MMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32:
   case MMAIntrinsic::MFMA_I8_16x16x32_I32:
   case MMAIntrinsic::MFMA_I8_32x32x16_I32: {
     auto [m, n, k] = getMNKShape();

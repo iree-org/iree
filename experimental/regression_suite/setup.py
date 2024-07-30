@@ -11,15 +11,22 @@ setup(
     version=f"0.1dev1",
     packages=find_namespace_packages(
         include=[
-            "ireers",
+            "ireers_tools",
         ],
     ),
     install_requires=[
         "numpy",
         "pytest",
         "pytest-xdist",
+        "pytest-depends",
+        "pytest-retry",
+        "pytest-timeout",
+        "pytest-xdist",
+        "pytest-check",
         "PyYAML",
+        "tabulate",
         "tqdm",
+        "azure-storage-blob",
     ],
     extras_require={},
 )

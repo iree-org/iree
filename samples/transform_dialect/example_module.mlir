@@ -35,7 +35,7 @@ module attributes {
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         iree.gpu.target = #target
       }>
-    ]>
+    ]> : !hal.device
   ]
 } {
   hal.executable private @example_module_dispatch_0 {

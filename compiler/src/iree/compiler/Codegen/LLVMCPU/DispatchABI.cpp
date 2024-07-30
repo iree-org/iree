@@ -609,10 +609,10 @@ static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
   auto scopeAttr = getLocalScopeAttr(forOp);
   builder.create<LLVM::DbgValueOp>(
       loc, value,
-      LLVM::DILocalVariableAttr::get(scopeAttr, builder.getStringAttr(name),
-                                     scopeAttr.getFile(),
-                                     /*line=*/1, /*arg=*/argNum + 1,
-                                     /*alignInBits=*/0, type));
+      LLVM::DILocalVariableAttr::get(
+          scopeAttr, builder.getStringAttr(name), scopeAttr.getFile(),
+          /*line=*/1, /*arg=*/argNum + 1,
+          /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
   return value;
 }
 
@@ -626,10 +626,10 @@ static Value buildValueDI(Operation *forOp, Value value, Twine name,
   auto scopeAttr = getLocalScopeAttr(forOp);
   builder.create<LLVM::DbgValueOp>(
       loc, value,
-      LLVM::DILocalVariableAttr::get(scopeAttr, builder.getStringAttr(name),
-                                     scopeAttr.getFile(),
-                                     /*line=*/1, /*arg=*/0,
-                                     /*alignInBits=*/0, type));
+      LLVM::DILocalVariableAttr::get(
+          scopeAttr, builder.getStringAttr(name), scopeAttr.getFile(),
+          /*line=*/1, /*arg=*/0,
+          /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
   return value;
 }
 

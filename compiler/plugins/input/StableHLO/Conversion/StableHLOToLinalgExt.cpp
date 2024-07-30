@@ -7,6 +7,7 @@
 // Implements IREE-specific logic for lowering StableHLO/CHLO dialects to
 // LinalgExt dialect.
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <memory>
@@ -427,7 +428,6 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 struct ReverseOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReverseOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReverseOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -435,14 +435,45 @@ struct ReverseOpConversion final
     if (!ty)
       return failure();
 
+    Value input = op.getOperand();
+    auto inputTy = cast<ShapedType>(input.getType());
+    auto resultTy = cast<ShapedType>(op.getType());
+    ArrayRef<int64_t> dims = op.getDimensions();
     Location loc = op.getLoc();
-    SmallVector<OpFoldResult> mixedSizes =
-        tensor::getMixedSizes(rewriter, loc, adaptor.getOperands()[0]);
-    Value emptyTensor =
-        rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
-    rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
-        op, typeConverter->convertType(op.getType()), adaptor.getOperands(),
-        emptyTensor, rewriter.getI64TensorAttr(op.getDimensions()));
+    int64_t inputTyRank = inputTy.getRank();
+
+    // First fill the output buffer with the init value.
+    SmallVector<OpFoldResult> inputMixedSizes =
+        tensor::getMixedSizes(rewriter, loc, input);
+    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, inputMixedSizes, inputTy.getElementType());
+    SmallVector<AffineMap> affineMaps = {
+        rewriter.getMultiDimIdentityMap(resultTy.getRank())};
+
+    rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+        op, resultTy, ArrayRef<Value>({}), ValueRange{emptyTensor}, affineMaps,
+        getNParallelLoopsAttrs(resultTy.getRank()),
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+          llvm::SmallVector<Value> indices;
+          for (unsigned int i = 0; i < inputTyRank; i++) {
+            Value index =
+                rewriter.create<linalg::IndexOp>(nestedLoc, i).getResult();
+            if (std::find(dims.begin(), dims.end(), i) != dims.end()) {
+              auto one = rewriter.create<arith::ConstantIndexOp>(nestedLoc, 1);
+              Value axisDimSize = rewriter.create<tensor::DimOp>(loc, input, i);
+              auto sizeMinusOne =
+                  rewriter.create<arith::SubIOp>(nestedLoc, axisDimSize, one);
+              index = rewriter.create<arith::SubIOp>(nestedLoc, sizeMinusOne,
+                                                     index);
+            }
+            indices.push_back(index);
+          }
+
+          auto extract = nestedBuilder.create<tensor::ExtractOp>(
+              nestedLoc, input, indices);
+          nestedBuilder.create<linalg::YieldOp>(op.getLoc(),
+                                                extract.getResult());
+        });
     return success();
   }
 };

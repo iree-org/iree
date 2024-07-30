@@ -440,71 +440,6 @@ ScanOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
-// ReverseOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult ReverseOp::verify() {
-  Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected exactly one input");
-  }
-  if (getNumDpsInits() != 1) {
-    return op->emitOpError("expected exactly one output");
-  }
-  auto inputType = cast<ShapedType>(getInput().getType());
-  auto outputType = cast<ShapedType>(getOutput().getType());
-  if (inputType.getElementType() != outputType.getElementType()) {
-    return op->emitOpError(
-        "expected input/output element types to be identical");
-  }
-  ArrayRef<int64_t> inputShapes = inputType.getShape();
-  ArrayRef<int64_t> outputShapes = outputType.getShape();
-  if (inputShapes.size() != outputShapes.size()) {
-    return op->emitOpError("expexted input/output to have identical ranks");
-  }
-  if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
-                   [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
-                            std::get<0>(s) != std::get<1>(s);
-                   })) {
-    return op->emitOpError("incompatible input/output shapes");
-  }
-
-  int64_t rank = getOperandRank();
-  llvm::SmallSetVector<int64_t, 4> s;
-  for (auto dim : getDimensionsArray()) {
-    if (dim < 0 || dim >= rank) {
-      return op->emitOpError("all the dimensions must be within [0, ")
-             << rank << ")";
-    }
-    if (s.contains(dim)) {
-      return op->emitOpError("expected dimensions numbers are all unique");
-    }
-    s.insert(dim);
-  }
-
-  return success();
-}
-
-LogicalResult
-ReverseOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
-SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
-  Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getOperandRank()),
-          /*output=*/AffineMap(nullptr)};
-}
-
-SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
-  return {AffineMap(nullptr)};
-}
-
-//===----------------------------------------------------------------------===//
 // TopkOp
 //===----------------------------------------------------------------------===//
 
@@ -1266,52 +1201,33 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 
 LogicalResult AttentionOp::verify() {
-  Operation *op = getOperation();
+  AttentionOp attnOp = *this;
 
-  int numInputs = getNumDpsInputs();
   int numOutputs = getNumDpsInits();
-
-  if (numInputs != 4) {
-    return op->emitOpError(
-        "expected 4 input operands: Query, Key, Value and Scale");
-  }
-
   if (numOutputs != 1 && numOutputs != 3) {
-    return op->emitOpError(
+    return attnOp->emitOpError(
         "expected 1 or 3 output operands: Output, [Max and Sum]");
   }
-
   bool isTiled = numOutputs == 3;
 
-  if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
-        return isa<ShapedType>(input.getType());
-      })) {
-    return op->emitOpError(
-        "expected Query, Key, Value inputs to be of shaped type");
-  }
-
-  ShapedType queryType = getQueryType();
-  ShapedType keyType = getKeyType();
-  ShapedType valueType = getValueType();
-  ShapedType outputType = getOutputType();
-  Type queryElementType = queryType.getElementType();
-  Type keyElementType = keyType.getElementType();
-  Type valueElementType = valueType.getElementType();
-  Type outputElementType = outputType.getElementType();
+  // Check if indexing maps can represent attention.
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+  FailureOr<AttentionOpDetail> maybeOpInfo =
+      AttentionOpDetail::get(indexingMaps);
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
-    return op->emitOpError("expected scale to be of floating point type");
+    return attnOp->emitOpError("expected scale to be of floating point type");
   }
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());
   SmallVector<bool> foundDims(getIterationDomainRank(), false);
   auto checkShape = [&shape, &foundDims,
-                     &op](StringRef operandName, ArrayRef<int64_t> valShape,
-                          AffineMap indexingMap) -> LogicalResult {
+                     &attnOp](StringRef operandName, ArrayRef<int64_t> valShape,
+                              AffineMap indexingMap) -> LogicalResult {
     if (indexingMap.getNumResults() != valShape.size()) {
-      return op->emitError("Rank Mismatch for ")
+      return attnOp->emitError("Rank Mismatch for ")
              << operandName << ". Expected: " << indexingMap.getNumResults()
              << " Got: " << valShape.size();
     }
@@ -1326,7 +1242,7 @@ LogicalResult AttentionOp::verify() {
         shape[pos] = valShape[i];
       }
       if (shape[pos] != valShape[i]) {
-        return op->emitError("Shape Mismatch for ")
+        return attnOp->emitError("Shape Mismatch for ")
                << operandName << ". Expected: " << shape[pos]
                << " Got: " << valShape[i];
       }
@@ -1336,32 +1252,20 @@ LogicalResult AttentionOp::verify() {
 
   if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
       failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValueType().getShape(), getValueMap()))) {
+      failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
+      failed(
+          checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
     return failure();
   }
 
-  if (queryElementType != keyElementType ||
-      queryElementType != valueElementType ||
-      queryElementType != scaleElementType) {
-    return op->emitOpError(
-        "element types of (Q)uery, (K)ey and (V)alue and scale should be "
-        "same");
-  }
-  if (!isTiled) {
-    // Vanilla attention.
-    if (queryElementType != outputElementType) {
-      return op->emitOpError("expected element type for Output ")
-             << queryElementType << "but found " << outputElementType
-             << " instead";
-    }
-  }
   if (isTiled) {
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
     Type sumElementType = getSumType()->getElementType();
+    Type outputElementType = getOutputType().getElementType();
     if (outputElementType != maxElementType ||
         maxElementType != sumElementType) {
-      return op->emitOpError(
+      return attnOp->emitOpError(
           "element types of tiled output, max and sum should be same");
     }
 
@@ -1385,52 +1289,34 @@ LogicalResult AttentionOp::reifyResultShapes(
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
-  MLIRContext *ctx = getContext();
+  return SmallVector<AffineMap>(
+      getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
 
-  AffineExpr batch, m, k1, k2, n;
-  bindDims(ctx, batch, m, k1, k2, n);
+SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t, 4> bounds(getIterationDomainRank());
+  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
-  AffineMap qMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, k1}, ctx);
-  AffineMap kMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, k1}, ctx);
+  // batch(s), m, k1
+  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  // batch(s), k2, n
+  ArrayRef<int64_t> valueShape = getValueType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
 
-  AffineMap vMap;
-  if (getTransposeV()) {
-    vMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, n, k2}, ctx);
-  } else {
-    vMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, n}, ctx);
-  }
-
-  AffineMap resMap =
-      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, n}, ctx);
-
-  SmallVector<AffineMap> results = {qMap, kMap, vMap, resMap};
-
-  if (getMax()) {
-    AffineMap maxMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
-    results.push_back(maxMap);
-  }
-
-  if (getSum()) {
-    AffineMap sumMap =
-        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
-    results.push_back(sumMap);
-  }
-
-  // Remove batch dim for tiled operands.
-  // TODO: This is a weird expectation from TileAndDecomposeAttention.
-  bool isTiled = getNumResults() == 3;
-  if (isTiled) {
-    for (AffineMap &map : results) {
-      map = map.dropResult(0);
+  auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
+    for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
+      int pos = cast<AffineDimExpr>(dim).getPosition();
+      if (dimsFound[pos]) {
+        continue;
+      }
+      bounds[pos] = size;
+      dimsFound[pos] = true;
     }
-  }
-
-  return results;
+  };
+  fillSizes(queryShape, queryDims);
+  fillSizes(valueShape, valueDims);
+  return bounds;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1658,7 +1544,6 @@ Im2colOp::reifyResultShapes(OpBuilder &b,
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
-DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)

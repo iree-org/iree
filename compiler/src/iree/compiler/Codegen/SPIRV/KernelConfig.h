@@ -17,9 +17,9 @@
 
 #include <array>
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
@@ -64,7 +64,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
 /// with the given best workgroup size and tile size hints.
 LogicalResult setMatmulOpConfig(
-    spirv::ResourceLimitsAttr limits, linalg::LinalgOp linalgOp,
+    IREE::GPU::TargetAttr target, linalg::LinalgOp linalgOp,
     std::array<int64_t, 2> bestWorkgroupSizeXY,
     std::array<int64_t, 3> bestThreadTileSizeMNK, bool enablePromotion = false,
     unsigned softwarePipelineDepth = defaultSimtSoftwarePipelineDepth,
@@ -75,7 +75,7 @@ LogicalResult setMatmulOpConfig(
 /// with tile sizes for cooperative matrix, if possible for the given matmul
 /// size.
 LogicalResult setCooperativeMatrixConfig(
-    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op,
+    IREE::GPU::TargetAttr target, linalg::LinalgOp op,
     const unsigned numSubgroupsPerWorkgroup,
     const unsigned numMNTilesPerSubgroup,
     unsigned softwarePipelineDepth = defaultCoopMatrixSoftwarePipelineDepth,
@@ -91,15 +91,15 @@ LogicalResult setCooperativeMatrixConfig(
 /// Returns success when a configuration is successfullly attached as attribute.
 /// Returns failure otherwise.
 
-LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setAdrenoCodeGenConfig(IREE::GPU::TargetAttr target,
                                      Operation *rootOp);
-LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setAppleCodeGenConfig(IREE::GPU::TargetAttr target,
                                     Operation *rootOp);
-LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setAMDCodeGenConfig(IREE::GPU::TargetAttr target,
                                   Operation *rootOp);
-LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setMaliCodeGenConfig(IREE::GPU::TargetAttr target,
                                    Operation *rootOp);
-LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
+LogicalResult setNVIDIACodeGenConfig(IREE::GPU::TargetAttr target,
                                      Operation *rootOp);
 
 } // namespace detail

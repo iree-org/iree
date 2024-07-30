@@ -1,11 +1,10 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-codegen-materialize-user-configs, iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=vp_android_baseline_2022@vulkan --pass-pipeline='builtin.module(iree-codegen-materialize-user-configs, iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 8, 1] subgroup_size = 64>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
-  func.func @matmul_128x1024x256() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_128x1024x256() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -17,7 +16,7 @@ module {
     %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>> -> tensor<256x1024xf32>
     %5 = tensor.empty() : tensor<128x1024xf32>
     %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
-    %7 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation} ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%6 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
+    %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%6 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
     flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1] : tensor<128x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
     return
   }

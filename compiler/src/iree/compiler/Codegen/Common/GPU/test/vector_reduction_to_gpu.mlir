@@ -2,7 +2,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s --check-prefix=CDNA3
 
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_reduce() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -69,7 +69,7 @@ module {
 
 // Make sure memref.load from uniform buffers are hoisted out as uniform code.
 
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 module {
   func.func @reduce_uniform_buffer_offset() attributes {translation_info = #translation_info} {
@@ -125,7 +125,7 @@ module {
 
 
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @reduce_storage_buffer_offset() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -176,7 +176,7 @@ module {
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @shared_memory_copy() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -209,7 +209,7 @@ module {
 
 // Check that we multi-row matvec gets distributed across subgroup threads.
 
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 64>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 module {
@@ -258,7 +258,7 @@ module {
 //  CDNA3-NEXT:   return
 
 // -----
-#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_nd_write() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index

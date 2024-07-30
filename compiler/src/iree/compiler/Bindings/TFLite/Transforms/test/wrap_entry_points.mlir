@@ -15,21 +15,21 @@
 
 
 // CHECK-LABEL: util.func private @_tflite_dynamicEntry_calculate_shapes() {
+//       CHECK:   %[[NULL_BUFFER:.+]] = util.null : !hal.buffer
 
 // Only recalculate shapes if the shapes are dirty.
 //       CHECK:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
 //  CHECK-NEXT:   cf.cond_br %[[IS_DIRTY]], ^bb1, ^bb2
 
 //       CHECK: ^bb1:
-//  CHECK-NEXT:   %[[NULL:.+]] = util.null : !hal.buffer
 
 // Tie input0 shapes.
 //  CHECK-NEXT:   %[[IN0_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape_dim0 : index
-//  CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.import %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
+//  CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.import %[[NULL_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
 
 // Tie input1 shapes.
 //  CHECK-NEXT:   %[[IN1_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape_dim0 : index
-//  CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
+//  CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[NULL_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
 
 // The actual model code used to (eventually) compute shapes.
 //  CHECK-NEXT:   %[[OUT0:.+]] = arith.addf %[[IN0]], %[[IN1]]

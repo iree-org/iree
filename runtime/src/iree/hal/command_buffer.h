@@ -384,6 +384,12 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
 IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
     iree_hal_collective_element_type_t element_type);
 
+// Bitfield specifying flags controlling a dispatch operation.
+enum iree_hal_dispatch_flag_bits_t {
+  IREE_HAL_DISPATCH_FLAG_NONE = 0,
+};
+typedef uint64_t iree_hal_dispatch_flags_t;
+
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
   uint8_t r;
@@ -449,6 +455,11 @@ static inline iree_hal_buffer_binding_table_t
 iree_hal_buffer_binding_table_empty(void) {
   iree_hal_buffer_binding_table_t table = {0, NULL};
   return table;
+}
+
+static inline bool iree_hal_buffer_binding_table_is_empty(
+    iree_hal_buffer_binding_table_t binding_table) {
+  return binding_table.count == 0;
 }
 
 // Returns an unretained buffer specified in |buffer_ref| or from
@@ -746,7 +757,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z);
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
+    iree_hal_dispatch_flags_t flags);
 
 // Dispatches an execution request with deferred workgroup counts.
 // This is the same as iree_hal_command_buffer_dispatch but the workgroup counts
@@ -760,7 +772,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref);
+    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags);
 
 //===----------------------------------------------------------------------===//
 // Validation support
@@ -917,12 +929,13 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
-      uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z);
+      uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
+      iree_hal_dispatch_flags_t flags);
 
   iree_status_t(IREE_API_PTR* dispatch_indirect)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
-      iree_hal_buffer_ref_t workgroups_ref);
+      iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);
 

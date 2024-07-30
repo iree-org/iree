@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-convert-gpu-target)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-spirv-convert-gpu-target))))' %s | FileCheck %s
 
 hal.executable @dispatch {
 hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
@@ -18,7 +18,8 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 }
 }
 
-//      CHECK: spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
+//      CHECK: builtin.module attributes
+// CHECK-SAME: spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
 // CHECK-SAME:   [Shader, Float64, Float16, Int64, Int16, Int8,
 // CHECK-SAME:    StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16,
 // CHECK-SMAE:    StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8,

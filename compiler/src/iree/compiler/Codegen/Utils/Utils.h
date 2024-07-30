@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
@@ -232,6 +233,21 @@ struct VscaleRange {
 
 std::optional<VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+using DimBound = vector::ConstantOrScalableBound;
+using DimBoundSize = DimBound::BoundSize;
+
+/// Should the scalable upper bound be rounded up to the nearest multiple of
+/// vscale?
+enum class RoundUpVscaleMultiple { No, Yes };
+
+/// Computes the upper bound of `dimNum` dim of the ShapedType value
+/// `shapedValue`. If the optional `vscaleRange` is provided then the computed
+/// bound can be a scalable quantity.
+FailureOr<DimBoundSize>
+computeDimUpperBound(Value shapedValue, unsigned dimNum,
+                     std::optional<VscaleRange> vscaleRange,
+                     RoundUpVscaleMultiple = RoundUpVscaleMultiple::No);
 
 } // namespace mlir::iree_compiler
 

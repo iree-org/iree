@@ -41,7 +41,6 @@ iree_lit_test_suite(
     "inject_dispatch_tracing.mlir"
     "inject_tensor_tracing.mlir"
     "insert_dispatch_debug_targets.mlir"
-    "interchange_transpose_generic_ops.mlir"
     "outline_constants.mlir"
     "outline_dispatch_externs.mlir"
     "outline_dispatch_regions.mlir"
@@ -53,6 +52,7 @@ iree_lit_test_suite(
     "tensor_pad_to_tensor_insert_slice.mlir"
     "top_level_scf_to_cfg.mlir"
     "transform_dispatch_region_formation.mlir"
+    "transpose_generic_ops.mlir"
     "verify_input_ir.mlir"
   TOOLS
     FileCheck

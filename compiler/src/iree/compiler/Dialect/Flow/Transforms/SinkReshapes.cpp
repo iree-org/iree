@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -76,7 +77,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
 
   // Do not sink reshapes across dequantize operations since they are
   // cloned into their consumers.
-  if (isBitExtendOp(consumer)) {
+  if (LinalgExt::isBitExtendOp(consumer)) {
     return false;
   }
 

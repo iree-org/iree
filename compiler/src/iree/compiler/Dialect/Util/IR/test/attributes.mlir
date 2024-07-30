@@ -42,6 +42,14 @@ builtin.module @composite attributes {
 
 // -----
 
+// CHECK-LABEL: @null
+builtin.module @null attributes {
+  // CHECK: util.buffer = #util.null : !util.buffer
+  util.buffer = #util.null : !util.buffer
+} {}
+
+// -----
+
 // CHECK-LABEL: @uninitialized
 builtin.module @uninitialized attributes {
   // CHECK: util.i32 = #util.uninitialized : i32

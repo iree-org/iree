@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -35,39 +36,6 @@ namespace mlir::iree_compiler::IREE::Flow {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// GenericOpInterchangePattern
-//===----------------------------------------------------------------------===//
-
-struct GenericOpInterchangePattern
-    : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<unsigned> interchange;
-    bool needInterchange = false;
-    unsigned numParallelLoop = genericOp.getNumParallelLoops();
-    if (numParallelLoop == 0)
-      return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isParallelIterator(iter.value())) {
-        interchange.push_back(iter.index());
-        if (iter.index() >= numParallelLoop)
-          needInterchange = true;
-      }
-    }
-    // If all the parallel loops are outter loops skip the pattern.
-    if (!needInterchange)
-      return failure();
-    for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
-      if (linalg::isReductionIterator(iter.value())) {
-        interchange.push_back(iter.index());
-      }
-    }
-    return interchangeGenericOp(rewriter, genericOp, interchange);
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // ElementwiseOpInterchangePattern
@@ -195,7 +163,7 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
 
     // Check if the producerOp is fusible
     if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) || !isBitExtendOp(producerOp)) {
+        !isElementwise(producerOp) || !LinalgExt::isBitExtendOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
@@ -235,8 +203,7 @@ struct FusionPreprocessingPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ElementwiseOpInterchangePattern,
-                 FoldSuccessiveTensorInsertSliceOps,
-                 GenericOpInterchangePattern, GatherFusionPattern>(
+                 FoldSuccessiveTensorInsertSliceOps, GatherFusionPattern>(
         &getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its

@@ -2,7 +2,12 @@
 // RUN:   --pass-pipeline='builtin.module(func.func(iree-spirv-emulate-i64))' %s | \
 // RUN:   FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 module {
   func.func @buffer_types() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index
@@ -30,7 +35,12 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 module {
   func.func @emulate_1d_vector() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c95232 = arith.constant 95232 : index
@@ -72,7 +82,13 @@ module {
 //       CHECK:   return
 
 // -----
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, Int64], []>, #spirv.resource_limits<>>}>
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int64|int32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 module {
   func.func @no_emulation() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index

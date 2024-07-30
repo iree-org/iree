@@ -86,10 +86,7 @@ def OpGroupResourceOps : OpDocGroup {
 let opDocGroup = OpGroupResourceOps in {
 
 def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Util_SizeAwareOp,
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
@@ -123,8 +120,8 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     (`uninitialized` $uninitialized^)?
+    (`on` `(` $affinity^ `)`)?
     attr-dict `:`
     type($result) `{` $storage_size `}`
   }];
@@ -148,10 +145,7 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
 }
 
 def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   AlwaysSpeculatable,
@@ -209,10 +203,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 }
 
 def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemFree]>,
@@ -645,10 +636,7 @@ let opDocGroup = OpGroupParameterOps in {
 def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
   AttrSizedOperandSegments,
   AllTypesMatch<["results"]>,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -702,10 +690,7 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
 }
 
 def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -757,10 +742,7 @@ def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
 }
 
 def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -813,10 +795,7 @@ def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
 
 def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -872,10 +851,7 @@ def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
 
 def Stream_ParameterScatterOp : Stream_Op<"parameter.scatter", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -982,10 +958,7 @@ def Stream_FileConstantOp : Stream_PureOp<"file.constant", [
 }
 
 def Stream_FileReadOp : Stream_Op<"file.read", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -1040,10 +1013,7 @@ def Stream_FileReadOp : Stream_Op<"file.read", [
 }
 
 def Stream_FileWriteOp : Stream_Op<"file.write", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -1550,7 +1520,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $value `,` $target `[` $start_indices `for` $lengths `]` `:`
+    $value `,` $target (`[` $start_indices `for` $lengths^ `]`)? `:`
     type($value)
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
@@ -1772,21 +1742,18 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
 } // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
-// Resource transfer ops
+// Async (stream.async*) ops
 //===----------------------------------------------------------------------===//
 
-def OpGroupResourceTransferOps : OpDocGroup {
-  let summary = "Resource transfer ops";
+def OpGroupAsyncOps : OpDocGroup {
+  let summary = "Async ops";
   let description = "";
 }
 
-let opDocGroup = OpGroupResourceTransferOps in {
+let opDocGroup = OpGroupAsyncOps in {
 
 def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
@@ -2250,7 +2217,10 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
 }
 
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinityAttr",
+    "setAffinityAttr",
+  ]>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
@@ -2460,7 +2430,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   let hasCanonicalizer = 1;
 }
 
-} // OpGroupResourceTransferOps
+} // OpGroupAsyncOps
 
 //===----------------------------------------------------------------------===//
 // Async control flow ops
@@ -2855,15 +2825,15 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
 } // OpGroupAsyncControlFlowOps
 
 //===----------------------------------------------------------------------===//
-// Explicit command ops
+// Explicit command (stream.cmd.*) ops
 //===----------------------------------------------------------------------===//
 
-def OpGroupExplicitCommandOps : OpDocGroup {
+def OpGroupCmdOps : OpDocGroup {
   let summary = "Explicit command ops";
   let description = "";
 }
 
-let opDocGroup = OpGroupExplicitCommandOps in {
+let opDocGroup = OpGroupCmdOps in {
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_CmdPhaseOp,
@@ -3531,7 +3501,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let hasCanonicalizer = 1;
 }
 
-} // OpGroupExplicitCommandOps
+} // OpGroupCmdOps
 
 //===----------------------------------------------------------------------===//
 // Synchronization ops
@@ -3753,7 +3723,6 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
-  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -3777,8 +3746,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
-    Stream_Timepoint:$await_timepoint,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
+    Stream_Timepoint:$await_timepoint
   );
   let results = (outs
     Variadic<AnyTypeOf<[
@@ -3788,7 +3756,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
     custom<ShapedTypeList>(type($resource_operands),

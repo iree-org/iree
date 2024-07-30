@@ -16,10 +16,10 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -68,33 +68,24 @@ constexpr char coopMatTypeAttrName[] = "iree.spirv.coopmatrix.type";
 constexpr char coopMatShapeAttrName[] = "iree.spirv.coopmatrix.shape";
 
 /// Sets the chosen cooperative matrix type/shape for CodeGen onto the
-/// hal.executable.export op for the given `funcOp`.
+/// the given `funcOp`.
 void setSPIRVCooperativeMatrixInfo(mlir::FunctionOpInterface funcOp,
                                    linalg::LinalgOp rootOp,
                                    ArrayRef<int64_t> shape) {
-  auto exportOp = getEntryPoint(funcOp);
-  if (!exportOp) {
-    return;
-  }
-
   Builder b(funcOp.getContext());
-  exportOp.value()->setAttr(coopMatShapeAttrName,
-                            b.getDenseI64ArrayAttr(shape));
+  funcOp->setAttr(coopMatShapeAttrName, b.getDenseI64ArrayAttr(shape));
   auto inputType = cast<ShapedType>(rootOp.getDpsInputs().front().getType());
   auto outputType = cast<ShapedType>(rootOp.getDpsInits().front().getType());
   auto elementTypes = b.getTypeArrayAttr(
       {inputType.getElementType(), outputType.getElementType()});
-  exportOp.value()->setAttr(coopMatTypeAttrName, elementTypes);
+  funcOp->setAttr(coopMatTypeAttrName, elementTypes);
 }
 
-/// Returns the chosen cooperative matrix shape for CodeGen from the
-/// hal.executable.export op for the given `funcOp`. Returns an empty
-/// ArrayRef if cannot query.
+/// Returns the chosen cooperative matrix shape for CodeGen from the given
+/// `funcOp`. Returns an empty ArrayRef if cannot query.
 ArrayRef<int64_t>
 getSPIRVCooperativeMatrixShape(mlir::FunctionOpInterface funcOp) {
-  auto exportOp = getEntryPoint(funcOp);
-  auto attr =
-      exportOp.value()->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
+  auto attr = funcOp->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
   if (!attr)
     return {};
   return attr.asArrayRef();
@@ -336,8 +327,8 @@ class SPIRVTileToCooperativeOpsPass final
     : public SPIRVTileToCooperativeOpsBase<SPIRVTileToCooperativeOpsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, linalg::LinalgDialect,
-                    vector::VectorDialect>();
+    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
+                    linalg::LinalgDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {
@@ -371,11 +362,13 @@ public:
     // Then tile and distribute to subgroups.
 
     {
-      std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+      std::optional<int> subgroupSize =
+          getGPUSubgroupSize(funcOp, /*pickLargest=*/true);
       if (!subgroupSize) {
         funcOp.emitError("failed to query subgroup size");
         return signalPassFailure();
       }
+
       SmallVector<int64_t> subgroupTileSizes = getTileSizes(rootOp, 1);
       if (failed(tileToSubgroup(funcOp, subgroupCounts, *subgroupSize,
                                 subgroupTileSizes))) {

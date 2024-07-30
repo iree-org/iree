@@ -7,7 +7,7 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 # Variables and string substitutions don't work here because of course they don't
-load("%IREE_REPO_ALIAS%//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("%IREE_REPO_ALIAS%//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -42,14 +42,14 @@ cc_library(
     includes = ["include"],
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "libdevice_embedded",
     srcs = [
         LIBDEVICE_REL_PATH,
     ],
     c_file_output = "iree_cuda/libdevice_embedded.c",
     flatten = True,
-    generator = "%IREE_REPO_ALIAS%//build_tools/embed_data:generate_embed_data",
+    generator = "%IREE_REPO_ALIAS%//build_tools/embed_data:iree-c-embed-data",
     h_file_output = "iree_cuda/libdevice_embedded.h",
     includes = [
         "iree_cuda",

@@ -5,7 +5,9 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"cuda", [#hal.executable.target<"cuda", "cuda-nvptx-fb">]>
+    #hal.device.target<"cuda", [
+      #hal.executable.target<"cuda", "cuda-nvptx-fb">
+    ]> : !hal.device
   ]
 } {
 

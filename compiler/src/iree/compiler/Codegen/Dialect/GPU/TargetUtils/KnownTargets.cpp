@@ -122,8 +122,10 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
 const WgpDetails *getCDNA3WgpDetails() {
   static const MMAIntrinsic cdna3MMAOps[] = {
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F16_16x16x16_F32,
       MMAIntrinsic::MFMA_F16_32x32x8_F32,
+      MMAIntrinsic::MFMA_F8E4M3FNUZ_16x16x32_F32,
       MMAIntrinsic::MFMA_I8_16x16x32_I32,
       MMAIntrinsic::MFMA_I8_32x32x16_I32,
   };
@@ -563,7 +565,7 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 //===----------------------------------------------------------------------===//
 
 TargetAttr getMetalTargetDetails(MLIRContext *context) {
-  return createTargetAttr(*getAppleTargetDetails(), /*arch=*/"",
+  return createTargetAttr(*getAppleTargetDetails(), /*arch=*/"apple",
                           /*features=*/"spirv:v1.3,cap:Shader", context);
 }
 
@@ -602,6 +604,8 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // maximum. But the VK_KHR_spirv_1_4 extension is commonly available so we use
   // SPIR-V 1.4. For non-mobile GPUs we target Vulkan 1.3, which accepts
   // SPIR-V 1.6 as the maximum.
+
+  // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeAMDGPUTarget(target),
@@ -654,7 +658,8 @@ TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
                          StringRef features, MLIRContext *context) {
   return llvm::StringSwitch<TargetAttr>(targetAPI)
       .Case("cuda", getCUDATargetDetails(aliasTarget, features, context))
-      .Case("rocm", getHIPTargetDetails(aliasTarget, features, context))
+      .Case("hip", getHIPTargetDetails(aliasTarget, features, context))
+      .Case("vulkan", getVulkanTargetDetails(aliasTarget, context))
       .Default(nullptr);
 }
 

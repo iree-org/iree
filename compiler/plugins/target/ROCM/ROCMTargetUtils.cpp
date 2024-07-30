@@ -166,31 +166,20 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
                             StringRef targetChip) {
   // Link target chip ISA version as global.
   const int kLenOfChipPrefix = 3;
-  auto chipId = targetChip.substr(kLenOfChipPrefix);
-  // i.e gfx90a -> 9000 series.
-  int chipArch = stoi(chipId.substr(0, chipId.size() - 1).str()) * 100;
+  StringRef chipId = targetChip.substr(kLenOfChipPrefix);
+  int major = 0;
+  int minor = 0;
+  if (chipId.drop_back(2).getAsInteger(10, major))
+    return failure();
+  if (chipId.take_back(2).getAsInteger(16, minor))
+    return failure();
   // Oldest GFX arch supported is gfx60x.
-  if (chipArch < 6000)
+  if (major < 6)
     return failure();
   // Latest GFX arch supported is gfx115x.
-  if (chipArch > 11500)
+  if (major > 11 || (major == 11 && minor > 0x5f))
     return failure();
-  // Get chip code from suffix. i.e gfx1103 -> `3`.
-  // gfx90a -> `a` == `10`.
-  // gfx90c -> `c` == `12`.
-  auto chipSuffix = chipId.substr(chipId.size() - 1);
-  uint32_t chipCode = 0;
-  if (chipSuffix == "a") {
-    chipCode = chipArch + 10;
-  } else if (chipSuffix == "c") {
-    chipCode = chipArch + 12;
-  } else {
-    if (!std::isdigit(chipSuffix[0]))
-      return mlir::emitError(loc)
-             << "error linking module with globals: unrecognized chip suffix '"
-             << chipSuffix << "' for " << targetChip;
-    chipCode = chipArch + stoi(chipSuffix.str());
-  }
+  int chipCode = major * 1000 + minor;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
 

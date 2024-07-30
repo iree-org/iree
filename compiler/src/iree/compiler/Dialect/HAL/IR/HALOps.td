@@ -98,11 +98,6 @@ let opDocGroup = OpGroupPseudoOps in {
 
 def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{imports a tensor from a HAL buffer view}];
@@ -125,13 +120,15 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
     Optional<HAL_Fence>:$wait_fence,
-    OptionalAttr<StrAttr>:$name
+    OptionalAttr<StrAttr>:$name,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTensor:$target
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     $source
     ($name^)?
@@ -145,14 +142,16 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
       "Value":$waitFence,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
   ];
 
@@ -167,11 +166,6 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{exports a tensor to a HAL buffer view}];
@@ -190,13 +184,15 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    OptionalAttr<StrAttr>:$name
+    OptionalAttr<StrAttr>:$name,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     $source
     ($name^)?
     `:`
@@ -211,7 +207,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$sourceEncoding,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
   ];
 
@@ -273,13 +270,15 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
     AnyTensor:$source,
     HAL_ShapeDynamicDims:$source_dims,
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
-    Optional<HAL_Fence>:$wait_fence
+    Optional<HAL_Fence>:$wait_fence,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTensor:$result
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     $source `:` type($source) (`{` $source_dims^ `}`)?
     `to`
@@ -1163,6 +1162,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     HAL_Device:$device,
     HAL_CommandBufferModeBitfieldAttr:$modes,
     HAL_CommandCategoryBitfieldAttr:$command_categories,
+    HAL_DeviceQueueAffinity:$queue_affinity,
     Optional<Index>:$binding_capacity
   );
   let results = (outs
@@ -1173,6 +1173,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     `device` `(` $device `:` type($device) `)`
     `mode` `(` $modes `)`
     `categories` `(` $command_categories `)`
+    `affinity` `(` $queue_affinity `)`
     (`bindings` `(` $binding_capacity^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
@@ -1289,7 +1290,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_BufferType:$target_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
     HAL_FillPatternType:$pattern
@@ -1306,7 +1307,49 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
   let hasCanonicalizer = 1;
 }
 
-// TODO(benvanik): update buffer op.
+def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
+  // TODO(benvanik): figure out the right way to model host effects - this is
+  // a host read but a device write; if we make it just MemRead then it gets
+  // DCEd because it has no result. For now we report both to keep analysis
+  // appeased even if incorrect.
+  MemoryEffects<[MemRead, MemWrite]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
+]> {
+  let summary = [{command buffer buffer update recording operation}];
+  let description = [{
+    Copies a range of a host buffer into a device buffer. The host buffer
+    contents will be captured at the time of the call and embedded in the
+    command buffer.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    Util_BufferType:$source_buffer,
+    Util_Size:$source_size,
+    Util_Size:$source_offset,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `source` `(` $source_buffer `:` type($source_buffer) `{` $source_size `}` `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return idx == 1 ? getSourceSize() : Value{}; }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
 
 def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let summary = [{command buffer buffer copy recording operation}];
@@ -1316,9 +1359,9 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_BufferType:$source_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    HAL_BufferType:$target_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -1352,10 +1395,10 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
     Optional<I32>:$param,
     // TODO(benvanik): change this to take descriptor set + binding instead.
     // This would let us use indirect bindings.
-    Optional<HAL_BufferType>:$send_buffer,
+    Optional<AnyTypeOf<[Index, HAL_BufferType]>>:$send_buffer,
     Optional<HAL_DeviceSize>:$send_offset,
     Optional<HAL_DeviceSize>:$send_length,
-    Optional<HAL_BufferType>:$recv_buffer,
+    Optional<AnyTypeOf<[Index, HAL_BufferType]>>:$recv_buffer,
     Optional<HAL_DeviceSize>:$recv_offset,
     Optional<HAL_DeviceSize>:$recv_length
   );
@@ -1458,7 +1501,8 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     HAL_Ordinal:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
-    HAL_Dim:$workgroup_z
+    HAL_Dim:$workgroup_z,
+    HAL_DispatchFlagsAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1470,6 +1514,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
         $workgroup_y `,`
         $workgroup_z
     `]` `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 }
@@ -1485,8 +1530,9 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
     HAL_Ordinal:$entry_point,
-    HAL_BufferType:$workgroups_buffer,
-    HAL_DeviceSize:$workgroups_offset
+    AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
+    HAL_DeviceSize:$workgroups_offset,
+    HAL_DispatchFlagsAttr:$flags
   );
 
   let assemblyFormat = [{
@@ -1495,6 +1541,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     `` `[` $entry_point `]`
     `workgroups` `(` $workgroups_buffer `:` type($workgroups_buffer) `)`
     `` `[` $workgroups_offset `]`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 }
@@ -1555,6 +1602,41 @@ def OpGroupDeviceOps : OpDocGroup {
 }
 
 let opDocGroup = OpGroupDeviceOps in {
+
+def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{resolves device handles based on affinity}];
+  let description = [{
+    Examples:
+    ```
+    // Returns a HAL device.
+    = hal.device.resolve on(#something) : !hal.device
+    // Returns a HAL device, allocator, and (optional) queue affinity.
+    = hal.device.resolve on(#something) : !hal.device, !hal.allocator, i64
+    // Returns a HAL allocator and (optional) queue affinity.
+    = hal.device.resolve on(#something) : !hal.allocator, i64
+    // Returns "any" device. Should only be used as a fallback.
+    = hal.device.resolve : !hal.device
+    ```
+  }];
+
+  let arguments = (ins
+    OptionalAttr<HAL_DeviceAffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyTypeOf<[
+      HAL_Device,
+      HAL_Allocator,
+      I64,
+    ]>>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    attr-dict `:` type($results)
+  }];
+}
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,

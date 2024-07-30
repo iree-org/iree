@@ -331,7 +331,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   auto [result, newMax, newSum] = createAttentionBody(
       keySlice, valueSlice, querySlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
-      tiledAttnOp.getTransposeV(), loc, rewriter);
+      tiledAttnOp.isTransposeV(), loc, rewriter);
 
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }

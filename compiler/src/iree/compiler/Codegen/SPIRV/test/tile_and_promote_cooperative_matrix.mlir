@@ -1,20 +1,19 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope \
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-gpu-test-target=volta@vulkan \
 // RUN:   --pass-pipeline='builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}, cse))' \
 // RUN:   %s | FileCheck %s
 
-// RUN: iree-opt --split-input-file --mlir-print-local-scope \
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-gpu-test-target=volta@vulkan \
 // RUN:   --pass-pipeline='builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}, cse))' \
 // RUN:   %s | FileCheck %s --check-prefix=PROMOTEC
 
 // Single tile per workgroup means no subview ops for promotion.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [2147483647, 65535, 65535], cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 8, n_size = 8, k_size = 32, a_type = i8, b_type = i8, c_type = i32, result_type = i32, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1]>
 module {
-  func.func @matmul_f16_32x32x32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @matmul_f16_32x32x32() attributes {translation_info = #translation} {
     %c32 = arith.constant 32 : index
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
@@ -65,7 +64,6 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [2147483647, 65535, 65535], cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 8, n_size = 8, k_size = 32, a_type = i8, b_type = i8, c_type = i32, result_type = i32, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
@@ -73,7 +71,7 @@ module {
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
 module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
     %c32 = arith.constant 32 : index
     %c128 = arith.constant 128 : index
     %c512 = arith.constant 512 : index
@@ -175,7 +173,6 @@ module {
 // Cooperative matrix fusable elementwise ops do not need promote C.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [2147483647, 65535, 65535], cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 8, n_size = 8, k_size = 32, a_type = i8, b_type = i8, c_type = i32, result_type = i32, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
@@ -183,7 +180,7 @@ module {
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
 module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
     %c32 = arith.constant 32 : index
     %c128 = arith.constant 128 : index
     %c512 = arith.constant 512 : index
@@ -255,14 +252,13 @@ module {
 // No need to promote C if there is no fused element wise ops.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [2147483647, 65535, 65535], cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 8, n_size = 8, k_size = 32, a_type = i8, b_type = i8, c_type = i32, result_type = i32, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>, #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
 module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
     %c32 = arith.constant 32 : index
     %c128 = arith.constant 128 : index
     %c512 = arith.constant 512 : index
@@ -336,13 +332,12 @@ module {
 // No need to promote again with allocations from bufferization.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
 module {
-  func.func @batch_matmul_f16_1x64x128x512() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @batch_matmul_f16_1x64x128x512() attributes {translation_info = #translation} {
     %c4096 = arith.constant 4096 : index
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
@@ -408,14 +403,13 @@ module {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
 module {
-  func.func @matmul_f16_f512x4096x64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
     %c512 = arith.constant 512 : index
     %c4096 = arith.constant 4096 : index
     %c0 = arith.constant 0 : index
@@ -494,14 +488,13 @@ module {
 // Transposed+broadcasted elementwise ops does not need promoting C matrix.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
 module {
-  func.func @matmul_f16_f512x4096x64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
     %c512 = arith.constant 512 : index
     %c4096 = arith.constant 4096 : index
     %c0 = arith.constant 0 : index
@@ -580,14 +573,13 @@ module {
 // Inlined large constant array needs promoting C matrix.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR], [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64, cooperative_matrix_properties_khr = [#spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
 module {
-  func.func @matmul_f16_128x262144x2304() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb, translation_info = #translation} {
+  func.func @matmul_f16_128x262144x2304() attributes {translation_info = #translation} {
     %c128 = arith.constant 128 : index
     %c262144 = arith.constant 262144 : index
     %c96565312 = arith.constant 96565312 : index

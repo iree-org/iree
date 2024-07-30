@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -112,7 +113,7 @@ public:
       : promoteCMatrix(promoteCMatrix), skipThreadLevel(skipThreadLevel) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
+    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   LogicalResult initializeOptions(
@@ -198,9 +199,10 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  std::optional<int> subgroupSize =
+      getGPUSubgroupSize(funcOp, /*pickLargest=*/true);
   if (!subgroupSize) {
-    funcOp->emitError("failed to query subgroup size");
+    funcOp.emitError("failed to query subgroup size");
     return signalPassFailure();
   }
 

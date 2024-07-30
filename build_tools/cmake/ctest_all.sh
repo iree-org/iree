@@ -123,6 +123,7 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
+    "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(

@@ -17,4 +17,4 @@ To get started with contributing, please take a look at the
 ## Community guidelines
 
 This project follows the
-[OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
+[LF Projects code of conduct](https://lfprojects.org/policies/code-of-conduct/).

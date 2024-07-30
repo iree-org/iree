@@ -27,6 +27,7 @@ class MatrixElemTypeId(enum.Enum):
     I32 = "i32"
     F32 = "f32"
     F16 = "f16"
+    F8E4M3FNUZ = "f8E4M3FNUZ"
     BF16 = "bf16"
 
 
@@ -260,6 +261,11 @@ def get_rocm_test_compilation_infos(
     schedules = []
     if intrinsic == "MFMA":
         schedules = [
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 2),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 2, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 2, 1, 1),
+            MMASchedule("MFMA_F32_16x16x4_F32", 2, 2, 1, 1, 2),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
             MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
@@ -271,6 +277,10 @@ def get_rocm_test_compilation_infos(
             MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
             MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
             MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 2, 4, 2, 1),
             MMASchedule("MFMA_I8_16x16x32_I32", 1, 1, 1, 1, 1),
             MMASchedule("MFMA_I8_16x16x32_I32", 2, 2, 1, 1, 2),
             MMASchedule("MFMA_I8_16x16x32_I32", 4, 1, 4, 1, 1),
@@ -299,10 +309,17 @@ def get_rocm_test_compilation_infos(
     for schedule in schedules:
         # Skip schedules with an intrinsic which element type does not
         # match the requested one.
-        if lhs_rhs_type.value.upper() not in schedule.intrinsic:
+        # Extracts the input type from strings containing either 'MFMA' or 'WMMA'
+        # followed by an underscore.
+        extract_input_type = lambda s: re.search(r"(?:MFMA|WMMA)_([^_]+)_", s).group(1)
+        if lhs_rhs_type.value.upper() != extract_input_type(schedule.intrinsic):
             continue
 
-        if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
+        if schedule.intrinsic == "MFMA_F32_16x16x4_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 4
+        elif schedule.intrinsic == "MFMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
@@ -310,7 +327,10 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
-        elif schedule.intrinsic == "MFMA_I8_16x16x32_I32":
+        elif (
+            schedule.intrinsic == "MFMA_I8_16x16x32_I32"
+            or schedule.intrinsic == "MFMA_F8E4M3FNUZ_16x16x32_F32"
+        ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
@@ -454,6 +474,20 @@ def int_or_DYN(s: DimSize):
     return s.value or "DYN"
 
 
+# Gets friendlier form/type that we can use as arg types which we can cast into the target_type.
+def cast_argtype_if_required(target_type: MatrixElemTypeId):
+    if target_type == MatrixElemTypeId.F8E4M3FNUZ:
+        return MatrixElemTypeId.F32
+    return target_type
+
+
+# Gets the op needed to cast/convert from the friendly form/type into the target_type.
+def get_castback_from_arg_op(target_type: MatrixElemTypeId):
+    if target_type == MatrixElemTypeId.F8E4M3FNUZ:
+        return "arith.truncf"
+    return ValueError(f"Unhandled castback type of {t}")
+
+
 # Describes the fully resolved shape dimensions of all 3 input matrices,
 # LHS, RHS, and Accumulator, in a testcase.
 # Each value is a string, which may either represent a positive integer such as "123",
@@ -559,8 +593,10 @@ def generate_function(
     rhs_c = int_or_question_mark(shapes.rhs_cols)
     acc_r = int_or_question_mark(shapes.acc_rows)
     acc_c = int_or_question_mark(shapes.acc_cols)
-    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
-    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
+
+    casted_lhs_rhs_type = cast_argtype_if_required(lhs_rhs_type)
+    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{casted_lhs_rhs_type.value}>"
+    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{casted_lhs_rhs_type.value}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
     if transpose_rhs:
@@ -603,13 +639,22 @@ def generate_function(
         )
         func_definition = func_definition + compilation_info_string
         generate_function.compilation_index += 1
-
+    compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+    if casted_lhs_rhs_type != lhs_rhs_type:
+        castback_op = get_castback_from_arg_op(lhs_rhs_type)
+        compute_lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
+        compute_rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
+        compute = (
+            f"  %lhs_casted = {castback_op} %lhs: {lhs_tensor_type} to {compute_lhs_tensor_type}\n"
+            f"  %rhs_casted = {castback_op} %rhs: {rhs_tensor_type} to {compute_rhs_tensor_type}\n"
+            f"  %result = {op_name} {compilation_info_attr}ins(%lhs_casted, %rhs_casted: {compute_lhs_tensor_type}, {compute_rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}"
+        )
     if shape.accumulate:
         signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
         import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
         func_definition = func_definition + (
             f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-            f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+            f"{compute}\n"
             f"  return %result: {acc_tensor_type}\n"
             f"}}\n"
         )
@@ -627,7 +672,7 @@ def generate_function(
                 f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+                f"{compute}"
                 f"  return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
@@ -639,7 +684,7 @@ def generate_function(
                 f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
                 f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
                 f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+                f"{compute}"
                 f"  return %result: {acc_tensor_type}\n"
                 f"}}\n"
             )
@@ -733,8 +778,9 @@ def generate_call(
         rhs_shape = [shape.k, shape.n]
         transpose_rhs = 0
 
-    op = op + generate_random_matrix("lhs", lhs_shape, lhs_rhs_type)
-    op = op + generate_random_matrix("rhs", rhs_shape, lhs_rhs_type)
+    casted_lhs_rhs_type = cast_argtype_if_required(lhs_rhs_type)
+    op = op + generate_random_matrix("lhs", lhs_shape, casted_lhs_rhs_type)
+    op = op + generate_random_matrix("rhs", rhs_shape, casted_lhs_rhs_type)
     if shape.accumulate:
         op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
         # TODO(#16168): there's a bug with in-place input->output aliasing and
@@ -822,7 +868,7 @@ def parse_arguments():
     parser.add_argument(
         "--lhs_rhs_type",
         type=str,
-        choices=["i32", "i8", "f32", "f16", "bf16"],
+        choices=["i32", "i8", "f32", "f16", "f8E4M3FNUZ", "bf16"],
         help="Numeric type of input matrices",
         required=True,
     )
@@ -915,6 +961,8 @@ def write_calls_file(functions, calls, filename, requirements):
 def infer_acc_type(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId):
     if acc_type != MatrixElemTypeId.NONE:
         return acc_type
+    if lhs_rhs_type == MatrixElemTypeId.F8E4M3FNUZ:
+        return MatrixElemTypeId.F32
     if lhs_rhs_type == MatrixElemTypeId.I8:
         return MatrixElemTypeId.I32
     return lhs_rhs_type

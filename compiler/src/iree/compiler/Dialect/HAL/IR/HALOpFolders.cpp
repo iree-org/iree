@@ -90,12 +90,14 @@ struct DeduplicateTensorBarrierSources
     for (auto source : op.getSources()) {
       auto it =
           uniqueSources.insert(std::make_pair(source, orderedSources.size()));
-      if (it.second)
+      if (it.second) {
         orderedSources.push_back(source);
+      }
       resultMapping.push_back(it.first->second);
     }
-    if (orderedSources.size() == op.getSources().size())
+    if (orderedSources.size() == op.getSources().size()) {
       return failure();
+    }
     auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
                                                   op.getSignalFence());
     SmallVector<Value> newResults;
@@ -132,10 +134,10 @@ struct FoldBufferViewCreateSubspan
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
     auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
-      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+      newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.getSourceOffset(),
           op.getSourceOffset());
       needsUpdate = true;
@@ -220,10 +222,10 @@ struct FoldCommandBufferFillBufferSubspans
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
     auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
-      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+      newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.getSourceOffset(),
           op.getTargetOffset());
       needsUpdate = true;
@@ -248,6 +250,46 @@ void CommandBufferFillBufferOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Folds hal.buffer.subspans into buffer update offsets.
+struct FoldCommandBufferUpdateBufferSubspans
+    : public OpRewritePattern<CommandBufferUpdateBufferOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferUpdateBufferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newTargetBuffer = op.getTargetBuffer();
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+            op.getTargetBuffer().getDefiningOp())) {
+      newTargetBuffer = subspanOp.getSourceBuffer();
+      newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getTargetOffset());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate)
+      return failure();
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getTargetBufferMutable().assign(newTargetBuffer);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CommandBufferUpdateBufferOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferUpdateBufferSubspans>(context);
+}
+
+namespace {
+
 /// Folds hal.buffer.subspans into buffer copy offsets.
 struct FoldCommandBufferCopyBufferSubspans
     : public OpRewritePattern<CommandBufferCopyBufferOp> {
@@ -260,20 +302,20 @@ struct FoldCommandBufferCopyBufferSubspans
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
     auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
-      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+      newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.getSourceOffset(),
           op.getSourceOffset());
       needsUpdate = true;
     }
     auto newTargetBuffer = op.getTargetBuffer();
     auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
-      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+      newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.getSourceOffset(),
           op.getTargetOffset());
       needsUpdate = true;
@@ -317,10 +359,10 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
       auto *definingOp = bindingBuffers[i].getDefiningOp();
       if (!definingOp)
         continue;
-      if (auto subspanOp = dyn_cast<BufferSubspanOp>(definingOp)) {
+      if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
         needsUpdate = true;
         bindingBuffers[i] = subspanOp.getSourceBuffer();
-        bindingOffsets[i] = rewriter.createOrFold<mlir::arith::AddIOp>(
+        bindingOffsets[i] = rewriter.createOrFold<arith::AddIOp>(
             subspanOp.getLoc(), subspanOp.getSourceOffset(), bindingOffsets[i]);
       }
     }

@@ -13,16 +13,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -260,27 +260,17 @@ void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 
 /// Returns true when the target environment support integer dot product ops.
 bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
-  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(fn);
-  if (!targetEnvAttr) {
-    // Alternatively, check if the function op itself has a target env
-    // attribute. This may be preferred in tests.
-    targetEnvAttr =
-        fn->getAttrOfType<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
-    if (!targetEnvAttr)
-      return false;
-  }
-
-  spirv::TargetEnv targetEnv(targetEnvAttr);
-  if (!targetEnv.allows(spirv::Extension::SPV_KHR_integer_dot_product))
+  // First check if the function op itself has a target env attribute. This may
+  // be preferred in tests.
+  auto targetEnvAttr =
+      fn->getAttrOfType<IREE::GPU::TargetAttr>("iree.gpu.target");
+  if (!targetEnvAttr)
+    targetEnvAttr = getGPUTargetAttr(fn);
+  if (!targetEnvAttr)
     return false;
 
-  // Query all the dot prod capabilities except for the packed one -- none of
-  // the vectorization patterns need it.
-  if (!targetEnv.allows(spirv::Capability::DotProduct))
-    return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit))
-    return false;
-  if (!targetEnv.allows(spirv::Capability::DotProductInputAll))
+  if (!IREE::GPU::bitEnumContainsAll(targetEnvAttr.getWgp().getDot().getValue(),
+                                     IREE::GPU::DotProductOps::DP4xI8ToI32))
     return false;
 
   return true;
@@ -292,7 +282,7 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
     registry.insert<linalg::LinalgDialect, vector::VectorDialect,
-                    scf::SCFDialect>();
+                    scf::SCFDialect, spirv::SPIRVDialect>();
   }
 
   void runOnOperation() override {
