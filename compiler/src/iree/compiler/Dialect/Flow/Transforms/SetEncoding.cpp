@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -324,16 +324,14 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    {
-      RewritePatternSet patterns(context);
-      patterns.insert<setContractionOpEncoding>(context, padFactor);
-      linalg::FillOp::getCanonicalizationPatterns(patterns, context);
-      patterns.insert<FoldFillWithSetEncoding>(context);
-      memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(context);
+    patterns.insert<setContractionOpEncoding>(context, padFactor);
+    linalg::FillOp::getCanonicalizationPatterns(patterns, context);
+    patterns.insert<FoldFillWithSetEncoding>(context);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };
