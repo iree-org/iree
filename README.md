@@ -34,6 +34,7 @@ Python iree-runtime | [![PyPI version](https://badge.fury.io/py/iree-runtime.svg
 
 #### Build status
 
+[![CI](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 [![PkgCI](https://github.com/iree-org/iree/actions/workflows/pkgci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/pkgci.yml?query=branch%3Amain+event%3Apush)
 
 | Host platform | Build status |

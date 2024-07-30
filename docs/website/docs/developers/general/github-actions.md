@@ -116,6 +116,7 @@ Workflow file | Build status | Event triggers
 
 Workflow file | Build status | Event triggers
 -- | --: | --
+[`ci.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml) | [![cI](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
 [`build_package.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/build_package.yml) | [![Build Release Packages](https://github.com/iree-org/iree/actions/workflows/build_package.yml/badge.svg)](https://github.com/iree-org/iree/actions/workflows/build_package.yml) | `schedule`
 [`publish_website.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/publish_website.yml) | [![publish_website](https://github.com/iree-org/iree/actions/workflows/publish_website.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/publish_website.yml?query=branch%3Amain+event%3Apush) | `push`
 [`samples.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/samples.yml) | [![Samples](https://github.com/iree-org/iree/actions/workflows/samples.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/samples.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
