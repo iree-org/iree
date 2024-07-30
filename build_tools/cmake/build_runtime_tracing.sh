@@ -13,6 +13,10 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TRACING_BUILD_DIR:-build-tracing}}"
 TRACING_PROVIDER="${TRACING_PROVIDER:-tracy}"
+# Enable CUDA and HIP runtime by default if not on Darwin.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
 
 source build_tools/cmake/setup_build.sh
 # Note: not using ccache since the runtime build should be fast already.
@@ -25,5 +29,7 @@ source build_tools/cmake/setup_build.sh
   -DIREE_ENABLE_LLD=ON \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER} \
-  -DIREE_BUILD_COMPILER=OFF
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA}" \
+  -DIREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP}"
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0

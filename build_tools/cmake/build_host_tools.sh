@@ -18,6 +18,13 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
+# Enable CUDA and HIP/ROCM compiler and runtime by default if not on Darwin.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${platform_supported}}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${platform_supported}}"
+
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -37,6 +44,10 @@ declare -a CMAKE_ARGS=(
   "-DIREE_BUILD_TESTS=OFF"
   "-DIREE_BUILD_SAMPLES=OFF"
 
+  "-DIREE_HAL_DRIVER_CUDA=${IREE_HAL_DRIVER_CUDA}"
+  "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
+  "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
+  "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
   # Enable the WebGPU compiler build. All deps get fetched as needed, but some
   # of the deps are too large to enable by default for all developers.
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON"

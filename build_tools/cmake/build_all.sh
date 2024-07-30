@@ -23,6 +23,13 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # needed, but some of the deps are too large to enable by default for all
 # developers.
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
+# Enable CUDA and HIP/ROCM compiler and runtime by default if not on Darwin.
+# As with WebGPU the dependencies get fetched.
+platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${platform_supported}}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${platform_supported}}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -38,6 +45,7 @@ declare -a CMAKE_ARGS=(
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 
+
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
@@ -50,6 +58,10 @@ declare -a CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
+  "-DIREE_HAL_DRIVER_CUDA=${IREE_HAL_DRIVER_CUDA}"
+  "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
+  "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
+  "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
 )
 
