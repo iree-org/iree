@@ -26,23 +26,6 @@ namespace mlir::iree_compiler {
 std::unique_ptr<Pass> createCPUMaterializeHostEncodingPass();
 std::unique_ptr<Pass> createCPUMaterializeDeviceEncodingPass();
 
-/// Like createLLVMCPUMaterializeEncodingPass, but specifically for
-/// encoding.upper_bound_tile_size, converting it to constants.
-///
-/// Unlike createLLVMCPUMaterializeEncodingPass, this does not require the
-/// op to have a specific HAL target attribute. Instead, this will iterate over
-/// all HAL target attributes, use the maximum of all padding sizes from each
-/// target. This is needed because in top-level functions outside of HAL
-/// executables, there are upper_bound_tile_size ops (created by SetEncoding,
-/// and computing buffer allocation sizes) and there isn't one specific HAL
-/// target.
-///
-/// In the VMVX case where padding sizes are not compile-time constants, this
-/// converts upper_bound_tile_size to some specific constant size (currently 16)
-/// that is the largest tile size that we can use in VMVX, and can be adjusted
-// as needed.
-std::unique_ptr<Pass> createCPUMaterializeUpperBoundTileSizePass();
-
 /// Adds CPU bufferization passes to the pipeline.
 void addCPUBufferizePasses(OpPassManager &funcPassManager);
 

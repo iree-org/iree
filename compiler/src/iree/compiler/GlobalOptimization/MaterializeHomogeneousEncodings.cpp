@@ -72,7 +72,6 @@ public:
     }
 
     OpPassManager passManager(moduleOp.getOperationName());
-    passManager.addPass(createCPUMaterializeUpperBoundTileSizePass());
     passManager.addPass(createCPUMaterializeHostEncodingPass());
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();

@@ -54,18 +54,6 @@ struct MaterializeEncodingIntoNopPass
       return signalPassFailure();
     }
 
-    {
-      RewritePatternSet patterns(context);
-      populateMaterializeUpperBoundTileSizePatterns(patterns,
-                                                    materializeEncodingFn);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
-        operation.emitOpError(
-            "encoding padding sizes materialization pattern failed");
-        return signalPassFailure();
-      }
-    }
-
     // Add patterns to resolve dims ops and cleanups.
     {
       RewritePatternSet patterns(context);
