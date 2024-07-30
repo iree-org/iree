@@ -9,6 +9,7 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -218,6 +219,10 @@ public:
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasPureTensorSemantics()) {
       return failure();
+    }
+    if (getCompilationInfo(linalgOp)) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "the op has preset compilation strategy, skip SetEncoding");
     }
     if (failed(isSupportedContractionOp(rewriter, linalgOp))) {
       return failure();

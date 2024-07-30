@@ -524,6 +524,36 @@ util.func public @fold_fill_with_tensor_pad(%arg0 : index, %arg1 : index, %arg2 
 
 // -----
 
+#compilation0 = #iree_codegen.compilation_info<
+    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0]]>,
+    translation_info  = <CPUDefault>>
+
+#compilation1 = #iree_codegen.compilation_info<
+    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0]]>,
+    translation_info  = <CPUDefault>>
+
+
+util.func public @preset_compilation_info(
+    %arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>,
+    %arg2 : tensor<?x?xf32>,
+    %arg3 : tensor<?x?x?xf32>,
+    %arg4 : tensor<?x?x?xf32>,
+    %arg5 : tensor<?x?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?x?xf32>) {
+  %0 = linalg.matmul {compilation_info = #compilation0} ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %1 = linalg.batch_matmul {compilation_info = #compilation1} ins(%arg3, %arg4 : tensor<?x?x?xf32>, tensor<?x?x?xf32>)
+      outs(%arg5 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  util.return %0, %1 : tensor<?x?xf32>, tensor<?x?x?xf32>
+}
+// CHECK-LABEL: util.func public @preset_compilation_info
+// CHECK-NOT:     set_encoding
+// CHECK-NOT:     unset_encoding
+// CHECK:         linalg.matmul
+// CHECK:         linalg.batch_matmul
+
+// -----
+
 util.func public @batch_matmul_truncf_f16f16f32(%arg0 : tensor<64x100x250xf32>, %arg1 : tensor<64x250x500xf32>,
       %arg2 : tensor<64x100x500xf32>) -> tensor<64x100x500xf32> {
   %0 = tensor.empty() : tensor<64x250x500xf16>

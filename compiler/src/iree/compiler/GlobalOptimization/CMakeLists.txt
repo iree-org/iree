@@ -92,7 +92,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
-    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
