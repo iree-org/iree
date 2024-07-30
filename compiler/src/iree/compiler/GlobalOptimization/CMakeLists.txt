@@ -61,7 +61,6 @@ iree_cc_library(
     "PropagateLinalgTranspose.cpp"
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
-    "SetEncoding.cpp"
     "SimplifyPackUnpack.cpp"
     "Utils.cpp"
   DEPS

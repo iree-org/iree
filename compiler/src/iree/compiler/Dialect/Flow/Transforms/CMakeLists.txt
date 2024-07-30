@@ -64,6 +64,7 @@ iree_cc_library(
     "OutlineDispatchRegions.cpp"
     "Passes.cpp"
     "RegionOpUtils.cpp"
+    "SetEncoding.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"

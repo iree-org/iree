@@ -168,9 +168,12 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
+    FunctionLikeNest(mainPassManager).addPass([&]() {
+      return IREE::Flow::createSetEncodingPass(
+          IREE::Flow::SetEncodingPassOptions{clPadFactor});
+    });
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.
-    mainPassManager.addPass(createSetEncodingPass(clPadFactor));
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }
