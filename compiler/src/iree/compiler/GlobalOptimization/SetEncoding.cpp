@@ -277,9 +277,10 @@ public:
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
       SmallVector<int64_t> roundDimsTo(3, padFactor);
-      auto encoding = EncodingAttr::get(
-          linalgOp.getContext(), operandIndex, opType, elemTypes, src.getType(),
-          narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
+                                        opType, elemTypes, src.getType(),
+                                        narrowSizes.M, narrowSizes.N, maps,
+                                        /*bcastMap=*/std::nullopt, roundDimsTo);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
