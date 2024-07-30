@@ -123,7 +123,8 @@ static llvm::cl::opt<bool> clEnableDataTiling(
                    "in dispatch regions, hoist them out of region, and enable "
                    "fusion for the set_encodings. This is still an "
                    "experimental path. The current main data tiling path is "
-                   "iree-opt-data-tiling, which is on by default"),
+                   "iree-opt-data-tiling, which is on by default. To use this "
+                   "path, --iree-opt-data-tiling=false must be set as well"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int> clPadFactor(
