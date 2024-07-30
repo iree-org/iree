@@ -32,7 +32,6 @@ CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
-  "-DIREE_BUILD_MICROBENCHMARKS=ON"
 )
 
 echo "::group::Configuring CMake"
@@ -45,10 +44,6 @@ echo "::endgroup::"
 
 echo "::group::Building test deps"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
-echo "::endgroup::"
-
-echo "::group::Building microbenchmark suites"
-"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
 echo "::endgroup::"
 
 if (( IREE_USE_CCACHE == 1 )); then
