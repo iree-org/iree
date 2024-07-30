@@ -3901,12 +3901,12 @@ the IREE compiler, then enable the ROCm compiler target with the
 may want to include this path in your system's <code>PATH</code> environment variable.</p>
 </div>
 <h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
-<p>Next you will need to get an IREE runtime that includes the ROCm HAL driver.</p>
+<p>Next you will need to get an IREE runtime that includes the HIP HAL driver.</p>
 <h4 id="build-the-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the runtime from source<a class="headerlink" href="#build-the-runtime-from-source" title="Permanent link">link</a></h4>
 <p>Please make sure you have followed the
 <a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-IREE from source, then enable the experimental ROCm HAL driver with the
-<code>IREE_EXTERNAL_HAL_DRIVERS=rocm</code> option.</p>
+IREE from source, then enable the HIP HAL driver with the <code>IREE_HAL_DRIVER_HIP</code>
+option.</p>
 <h2 id="compile-and-run-a-program-model">Compile and run a program model<a class="headerlink" href="#compile-and-run-a-program-model" title="Permanent link">link</a></h2>
 <p>With the compiler and runtime ready, we can now compile programs and run them
 on GPUs.</p>
@@ -3973,7 +3973,7 @@ no architecture is specified then we will default to <code>gfx908</code>.</p>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>Run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--device<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">    </span>--device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>--module<span class="o">=</span>mobilenet_rocm.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
