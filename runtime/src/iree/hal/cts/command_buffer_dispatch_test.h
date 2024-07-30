@@ -154,7 +154,8 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
       command_buffer, executable_, /*entry_point=*/0,
-      /*workgroup_x=*/1, /*workgroup_y=*/1, /*workgroup_z=*/1));
+      /*workgroup_x=*/1, /*workgroup_y=*/1, /*workgroup_z=*/1,
+      IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
       command_buffer,
       /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |

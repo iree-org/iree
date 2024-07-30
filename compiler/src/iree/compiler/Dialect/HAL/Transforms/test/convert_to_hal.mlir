@@ -109,7 +109,7 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME: mode("OneShot|AllowInlineExecution")
-  // CHECK-SAME: categories("Transfer|Dispatch") : !hal.command_buffer
+  // CHECK-SAME: categories("Transfer|Dispatch")
   %timepoint = stream.cmd.execute
       with(%arg0_resource as %arg0_capture: !stream.resource<external>{%c16},
             %arg1_resource as %arg1_capture: !stream.resource<external>{%c16},

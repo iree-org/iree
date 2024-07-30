@@ -186,6 +186,14 @@ def HAL_DescriptorSetLayoutFlagsAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_DispatchFlags_None : I64BitEnumAttrCase<"None", 0x0000>;
+def HAL_DispatchFlagsAttr :
+    I64BitEnumAttr<"DispatchFlags", "valid dispatch flags", [
+      HAL_DispatchFlags_None,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_ExecutionStage_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_ExecutionStage_CommandIssue : I32BitEnumAttrCase<"CommandIssue", 0x0001>;
 def HAL_ExecutionStage_CommandProcess : I32BitEnumAttrCase<"CommandProcess", 0x0002>;
