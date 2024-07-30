@@ -11,7 +11,9 @@
     "onnx/node/generated/test_dequantizelinear"
   ],
   "skip_run_tests": [
-    "onnx/node/generated/test_det_nd"
+    "onnx/node/generated/test_det_nd",
+    "onnx/node/generated/test_group_normalization_epsilon_expanded",
+    "onnx/node/generated/test_group_normalization_example_expanded"
   ],
   "expected_compile_failures": [
     "onnx/node/generated/test_adagrad",
@@ -187,9 +189,7 @@
     "onnx/node/generated/test_gridsample_volumetric_nearest_align_corners_1",
     "onnx/node/generated/test_gridsample_zeros_padding",
     "onnx/node/generated/test_group_normalization_epsilon",
-    "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example",
-    "onnx/node/generated/test_group_normalization_example_expanded",
     "onnx/node/generated/test_gru_batchwise",
     "onnx/node/generated/test_gru_defaults",
     "onnx/node/generated/test_gru_seq_length",
