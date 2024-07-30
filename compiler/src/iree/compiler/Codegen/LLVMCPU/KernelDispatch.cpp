@@ -2193,9 +2193,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
-  // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
-  // the cases are f32 and i32, so we divide it by 4.
-  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn);
   SmallVector<int64_t> vecTileSizes = distConfig.minTileSizes;
   for (auto &i : vecTileSizes) {
     i = roundUpToPow2(std::min(i, vecSize),
