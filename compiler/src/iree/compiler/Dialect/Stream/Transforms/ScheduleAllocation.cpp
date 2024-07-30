@@ -1363,6 +1363,17 @@ static ResourceRange deriveResourceRangeFromResult(Value resultValue,
                        offset, resultSize);
 }
 
+// Returns true if |op| is guaranteed to only be executed once in the program.
+// This naively checks that the op is in the entry block of an initializer. If
+// we really wanted to do this analysis we should do it in a dedicated pass that
+// checks the whole call graph in order to detect if the op is in a function
+// called from an initializer or in a conditional.
+static bool isExecutedOnce(Operation *op) {
+  auto parentOp =
+      dyn_cast<IREE::Util::InitializerOpInterface>(op->getParentOp());
+  return parentOp && op->getBlock() == &parentOp.getInitializerRegion().front();
+}
+
 // TODO(benvanik): find a way to split this up. We could probably do this in
 // several passes each time pulling out different resource types, however the
 // analysis we perform needs to see the original form and getting a shared
@@ -1689,6 +1700,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   // the results (besides the timepoint) as they are all aliased.
   auto newExecuteOp = executeBuilder.create<IREE::Stream::CmdExecuteOp>(
       executeOp.getLoc(), newAwaitTimepoint, newOperands, newOperandSizes);
+  newExecuteOp.setOnce(isExecutedOnce(executeOp));
   if (executeOp.getAffinity().has_value()) {
     newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
   }

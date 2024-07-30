@@ -3328,6 +3328,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
+    UnitAttr:$once,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -3338,6 +3339,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
+    (`once` $once^)?
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     `with` ``

@@ -3537,6 +3537,7 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
   auto newOp = rewriter.create<CmdExecuteOp>(getLoc(), getAwaitTimepoint(),
                                              newOperandsValues, newOperandSizes,
                                              getOperation()->getAttrs());
+  newOp.setOnce(getOnce());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   auto &block = newBody.front();

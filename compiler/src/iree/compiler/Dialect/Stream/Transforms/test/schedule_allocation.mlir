@@ -57,6 +57,25 @@ util.func public @extractConstants(%timepoint: !stream.timepoint, %operand: !str
 
 // -----
 
+// Tests that execution regions in initializers are marked as `once` indicating
+// that they are one-shot. The analysis today only checks for ops within the
+// first block of an initializer and treats all others as reusable.
+
+// CHECK-LABEL: util.initializer
+util.initializer {
+  %c254_i32 = arith.constant 254 : i32
+  %size = arith.constant 128 : index
+  // CHECK: = stream.cmd.execute once
+  %result, %result_timepoint = stream.async.execute with() -> !stream.resource<transient>{%size} {
+    %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  util.optimization_barrier %result : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // Tests that explicit allocations are preserved.
 
 // CHECK-LABEL: @explicitAllocs
