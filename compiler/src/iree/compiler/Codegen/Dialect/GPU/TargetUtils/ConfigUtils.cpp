@@ -79,6 +79,10 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   if (!im2colOp.hasPureTensorSemantics()) {
     return {};
   }
+  // TODO(Max191): Add `getStaticLoopRanges` to TilingInterface, and use it
+  // here instead of `im2colOp.getOutputType().getShape()`. Then we can also
+  // get rid of the specialization for Im2colOp vs LinalgOp and just use
+  // TilingInterface ops.
   SmallVector<int64_t> loopRanges(im2colOp.getOutputType().getShape());
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(im2colOp->getResultTypes()[0])
