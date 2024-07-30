@@ -51,7 +51,7 @@ def run_sdxl_rocm_benchmark(rocm_chip, gpu_number):
         "iree-compile",
         f"{benchmark_dir}/sdxl_pipeline_bench_f16.mlir",
         "--iree-hal-target-backends=rocm",
-        f"--iree-rocm-target-chip={rocm_chip}",
+        f"--iree-hip-target={rocm_chip}",
         "--iree-global-opt-propagate-transposes=true",
         "--iree-codegen-llvmgpu-use-vector-distribution",
         "--iree-codegen-gpu-native-math-precision=true",

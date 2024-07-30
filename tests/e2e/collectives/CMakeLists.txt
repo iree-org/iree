@@ -13,7 +13,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
   set(COMMON_ARGS
     "--target_backend=cuda"
     "--driver=cuda"
-    "--iree_compiler_args=--iree-hal-cuda-llvm-target-arch=sm_53"
+    "--iree_compiler_args=--iree-cuda-target=sm_53"
   )
 
   set(COMMON_LABELS
@@ -66,7 +66,7 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHI
   set(COMMON_ARGS
     "--target_backend=rocm"
     "--driver=hip"
-    "--iree_compiler_args=--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+    "--iree_compiler_args=--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
   )
 
   set(COMMON_LABELS

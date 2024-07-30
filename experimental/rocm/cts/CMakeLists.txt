@@ -6,7 +6,7 @@
 
 unset(COMPILER_FLAGS)
 list(APPEND COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}")
+  "--iree-hip-target=${IREE_ROCM_TARGET_CHIP}")
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
