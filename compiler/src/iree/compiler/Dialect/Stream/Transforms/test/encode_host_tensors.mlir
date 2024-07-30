@@ -87,7 +87,7 @@ util.func public @sizeof_result_encoding_dynamic(%arg0: index, %arg1: index) -> 
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
 util.func public @sizeof_lhs_encoding_with_bcast_across_batch_dim_dynamic(%arg0: index, %arg1: index) -> index {
-  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], bcast_map = #map3, round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
+  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], bcast_map = #map3, round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
   util.return %0 : index
 }
 // CHECK-LABEL: @sizeof_lhs_encoding_with_bcast_across_batch_dim_dynamic
@@ -108,7 +108,7 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_batch_dim_dynamic(%arg0:
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
 util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic(%arg0: index, %arg1: index) -> index {
-  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], bcast_map = #map3, round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
+  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], bcast_map = #map3, round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
   util.return %0 : index
 }
 // CHECK-LABEL: @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic
