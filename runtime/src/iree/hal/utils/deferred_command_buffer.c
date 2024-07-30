@@ -771,12 +771,14 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint32_t workgroup_x;
   uint32_t workgroup_y;
   uint32_t workgroup_z;
+  iree_hal_dispatch_flags_t flags;
 } iree_hal_cmd_dispatch_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
+    iree_hal_dispatch_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -790,6 +792,7 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch(
   cmd->workgroup_x = workgroup_x;
   cmd->workgroup_y = workgroup_y;
   cmd->workgroup_z = workgroup_z;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -799,7 +802,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch(
     const iree_hal_cmd_dispatch_t* cmd) {
   return iree_hal_command_buffer_dispatch(
       target_command_buffer, cmd->executable, cmd->entry_point,
-      cmd->workgroup_x, cmd->workgroup_y, cmd->workgroup_z);
+      cmd->workgroup_x, cmd->workgroup_y, cmd->workgroup_z, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -811,12 +814,13 @@ typedef struct iree_hal_cmd_dispatch_indirect_t {
   iree_hal_executable_t* executable;
   int32_t entry_point;
   iree_hal_buffer_ref_t workgroups_ref;
+  iree_hal_dispatch_flags_t flags;
 } iree_hal_cmd_dispatch_indirect_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref) {
+    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -834,6 +838,7 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch_indirect(
   cmd->executable = executable;
   cmd->entry_point = entry_point;
   cmd->workgroups_ref = workgroups_ref;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -845,7 +850,8 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch_indirect(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->workgroups_ref, &workgroups_ref));
   return iree_hal_command_buffer_dispatch_indirect(
-      target_command_buffer, cmd->executable, cmd->entry_point, workgroups_ref);
+      target_command_buffer, cmd->executable, cmd->entry_point, workgroups_ref,
+      cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//

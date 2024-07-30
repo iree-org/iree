@@ -27,13 +27,13 @@ struct DataLayoutPropagationPass
         patterns, [](OpOperand *opOperand) {
           Operation *producer = opOperand->get().getDefiningOp();
           Operation *consumer = opOperand->getOwner();
-          (void)consumer;
-          // Currently only bubble up/push down pack/unpack through
-          // collapse/expand shape ops.
-          // TODO(#17734): The propagation through expand_shape ops is broken.
-          // Enable the propagation once we find it useful and the upstream
-          // issue is fixed.
-          return isa<tensor::CollapseShapeOp>(producer);
+          if (isa<tensor::PackOp>(consumer)) {
+            return isa<tensor::CollapseShapeOp>(producer);
+          }
+          if (isa<tensor::UnPackOp>(producer)) {
+            return isa<tensor::ExpandShapeOp>(consumer);
+          }
+          return false;
         });
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");

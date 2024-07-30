@@ -431,15 +431,16 @@ LogicalResult ReturnOp::verify() {
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, StringAttr name) {
+                           TypeAttr targetEncoding, StringAttr name,
+                           Attribute affinity) {
   build(builder, result, resultType, source, targetEncoding,
-        /*waitFence=*/Value{}, name);
+        /*waitFence=*/Value{}, name, affinity);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
                            TypeAttr targetEncoding, Value waitFence,
-                           StringAttr name) {
+                           StringAttr name, Attribute affinity) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
@@ -454,20 +455,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, targetEncoding, dynamicDims,
-        waitFence, name);
-}
-
-Value TensorImportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-::std::optional<unsigned>
-TensorImportOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  return {0}; // source
-}
-
-SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
-  return {0}; // source
+        waitFence, name, affinity);
 }
 
 static LogicalResult verifyTypeStorageCompatibility(Operation *op,
@@ -530,23 +518,12 @@ LogicalResult TensorImportOp::verify() {
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr sourceEncoding, StringAttr name) {
+                           TypeAttr sourceEncoding, StringAttr name,
+                           Attribute affinity) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, sourceEncoding, dynamicDims, name);
-}
-
-Value TensorExportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-::std::optional<unsigned>
-TensorExportOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  return {0}; // source
-}
-
-SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
-  return {0}; // source
+  build(builder, result, resultType, source, sourceEncoding, dynamicDims, name,
+        affinity);
 }
 
 LogicalResult TensorExportOp::verify() {
@@ -991,6 +968,32 @@ void CommandBufferCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.command_buffer.update_buffer
+//===----------------------------------------------------------------------===//
+
+IREE::Util::SubrangeOperand
+CommandBufferUpdateBufferOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 1) {
+    return IREE::Util::SubrangeOperand{getSourceBuffer(), getSourceSize(),
+                                       getSourceOffset(), getLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void CommandBufferUpdateBufferOp::setSubrangeOperand(
+    unsigned operandIndex, IREE::Util::SubrangeOperand operand) {
+  if (operandIndex == 1) {
+    getSourceBufferMutable().assign(operand.resource);
+    getSourceSizeMutable().assign(operand.resourceSize);
+    getSourceOffsetMutable().assign(operand.offset);
+  } else {
+    assert(false && "only source is a subrange");
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // hal.command_buffer.push_descriptor_set
 //===----------------------------------------------------------------------===//
 
@@ -1031,6 +1034,23 @@ void CommandBufferPushDescriptorSetOp::build(
 void DescriptorSetLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "descriptor_set_layout");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.device.resolve
+//===----------------------------------------------------------------------===//
+
+void DeviceResolveOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  for (auto result : getResults()) {
+    if (isa<IREE::HAL::DeviceType>(result.getType())) {
+      setNameFn(result, "device");
+    } else if (isa<IREE::HAL::AllocatorType>(result.getType())) {
+      setNameFn(result, "allocator");
+    } else if (isa<IntegerType>(result.getType())) {
+      setNameFn(result, "queue_affinity");
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1454,17 +1474,9 @@ Value ExecutableVariantOp::createConditionOp(OpBuilder &builder) {
 
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
-  // TODO(multi-device): condition on device target ID and other queries that
-  // may be useful for disambiguating two devices that support the same
-  // executable targets. Today executable targets are unique per device target
-  // but that need not always be the case.
-  auto i1Type = builder.getI1Type();
-  Value selected = builder
-                       .create<IREE::HAL::DeviceQueryOp>(
-                           getLoc(), i1Type, i1Type, device,
-                           builder.getStringAttr("hal.executable.format"),
-                           getTarget().getFormat(), builder.getZeroAttr(i1Type))
-                       .getValue();
+  Value selected = IREE::HAL::DeviceQueryOp::createI1(
+      getLoc(), device, "hal.executable.format",
+      getTarget().getFormat().getValue(), builder);
 
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();

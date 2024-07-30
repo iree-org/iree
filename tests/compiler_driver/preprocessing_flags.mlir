@@ -13,7 +13,7 @@ func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : te
 //       CHECK: ConvertConv2DToImg2ColPass (iree-preprocessing-convert-conv2d-to-img2col)
 //       CHECK: PadLinalgOpsPass (iree-preprocessing-pad-linalg-ops)
 // CHECK-LABEL: module
-//  CHECK-NEXT:   util.func public @test(
+//       CHECK:   util.func public @test(
 //   CHECK-DAG:     %[[ARG0:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input0" : !hal.buffer_view -> tensor<10x20xf32>
 //   CHECK-DAG:     %[[ARG1:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input1" : !hal.buffer_view -> tensor<20x30xf32>
 //   CHECK-DAG:     %[[ARG2:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input2" : !hal.buffer_view -> tensor<10x30xf32>

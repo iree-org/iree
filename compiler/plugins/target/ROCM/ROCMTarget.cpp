@@ -226,7 +226,7 @@ public:
     targetRegistry.getTargetBackend("rocm")->getDefaultExecutableTargets(
         context, "rocm", configAttr, executableTargetAttrs);
 
-    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("rocm"),
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("hip"),
                                             configAttr, executableTargetAttrs);
   }
 
@@ -238,7 +238,7 @@ class ROCMTargetBackend final : public TargetBackend {
 public:
   ROCMTargetBackend(const ROCmOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "rocm"; }
+  std::string getLegacyDefaultDeviceID() const override { return "hip"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
@@ -702,8 +702,8 @@ struct ROCMSession final
     : PluginSession<ROCMSession, ROCmOptions,
                     PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    // #hal.device.target<"rocm", ...
-    targets.add("rocm",
+    // #hal.device.target<"hip", ...
+    targets.add("hip",
                 [&]() { return std::make_shared<ROCMTargetDevice>(options); });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {

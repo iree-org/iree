@@ -48,21 +48,6 @@ public:
   // various stages.
 };
 
-// Builds an expression that returns an i1 indicating whether the given
-// |device| matches the device ID string pattern and executable target
-// requirements.
-Value buildDeviceIDAndExecutableFormatsMatch(
-    Location loc, Value device, StringRef deviceIDPattern,
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
-    OpBuilder &builder);
-
-// Builds a match expression that returns an i1 indicating whether the given
-// |device| supports any one of the |executableTargetAttrs|.
-Value buildExecutableFormatMatch(
-    Location loc, Value device,
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
-    OpBuilder &builder);
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETDEVICE_H_

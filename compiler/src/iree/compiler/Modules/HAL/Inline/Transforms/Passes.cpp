@@ -53,6 +53,12 @@ void buildHALInlineStaticTransformPassPipeline(
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
+  IREE::HAL::AssignmentOptions assignmentOptions;
+  assignmentOptions.legacyTargetBackends = targetOptions.legacyTargetBackends;
+  assignmentOptions.targetDevices = targetOptions.targetDevices;
+  assignmentOptions.defaultDevice = targetOptions.defaultDevice;
+  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                                  assignmentOptions);
   IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                                targetOptions);
 

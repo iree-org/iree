@@ -1,4 +1,5 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=CHECK-INLINE
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
@@ -60,25 +61,117 @@
 
 // -----
 
-// CHECK-LABEL: "device.targets"
-"device.targets"() {
-  // CHECK-SAME: target_0 = #hal.device.target<"a">
-  target_0 = #hal.device.target<"a">,
-  // CHECK-SAME: target_1 = #hal.device.target<"b", {config}>,
-  target_1 = #hal.device.target<"b", {config}>,
-  // CHECK-SAME: target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
-  target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
-  // CHECK-SAME: target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
-  target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
+// CHECK-LABEL: "device.aliases"
+"device.aliases"() {
+  // CHECK-SAME: alias_0 = #hal.device.alias<"a"> : !hal.device
+  alias_0 = #hal.device.alias<"a"> : !hal.device,
+  // CHECK-SAME: alias_1 = #hal.device.alias<"b", {}> : !hal.device
+  alias_1 = #hal.device.alias<"b", {}> : !hal.device,
+  // CHECK-SAME: alias_2 = #hal.device.alias<"c"[4]> : !hal.device
+  alias_2 = #hal.device.alias<"c"[4]> : !hal.device,
+  // CHECK-SAME: alias_3 = #hal.device.alias<"d", {config = 123 : index}>
+  alias_3 = #hal.device.alias<"d", {config = 123 : index}> : !hal.device
 } : () -> ()
 
 // -----
 
-"affinity.queue"() {
-  // CHECK: any = #hal.affinity.queue<*>
-  any = #hal.affinity.queue<*>,
-  // CHECK: q0 = #hal.affinity.queue<[0]>
-  q0 = #hal.affinity.queue<[0]>,
-  // CHECK: q123 = #hal.affinity.queue<[1, 2, 3]>
-  q123 = #hal.affinity.queue<[1, 2, 3]>
+// CHECK-LABEL: "device.targets"
+"device.targets"() {
+  // CHECK-SAME: target_0 = #hal.device.target<"a"> : !hal.device
+  target_0 = #hal.device.target<"a"> : !hal.device,
+  // CHECK-SAME: target_1 = #hal.device.target<"b", {config}> : !hal.device,
+  target_1 = #hal.device.target<"b", {config}> : !hal.device,
+  // CHECK-SAME: target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device,
+  target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device,
+  // CHECK-SAME: target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device
+  target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device
 } : () -> ()
+
+// -----
+
+// CHECK: util.global private @device_a = #hal.device.target<"a"> : !hal.device
+util.global private @device_a = #hal.device.target<"a"> : !hal.device
+// CHECK: util.global private @device_0 = #hal.device.ordinal<0> : !hal.device
+util.global private @device_0 = #hal.device.ordinal<0> : !hal.device
+
+// -----
+
+//      CHECK: util.global private @main = #hal.device.select<[
+// CHECK-SAME:   #hal.device.target<"a"> : !hal.device
+// CHECK-SAME: ]> : !hal.device
+util.global private @main = #hal.device.select<[
+  #hal.device.target<"a"> : !hal.device
+]> : !hal.device
+//      CHECK: util.global private @optional = #hal.device.select<[
+// CHECK-SAME:   #hal.device.target<"b"> : !hal.device,
+// CHECK-SAME:   #hal.device.ordinal<1> : !hal.device,
+// CHECK-SAME:   #hal.device.fallback<@main> : !hal.device
+// CHECK-SAME: ]> : !hal.device
+util.global private @optional = #hal.device.select<[
+  #hal.device.target<"b"> : !hal.device,
+  #hal.device.ordinal<1> : !hal.device,
+  #hal.device.fallback<@main> : !hal.device
+]> : !hal.device
+
+// -----
+
+util.global private @device : !hal.device
+"device.affinity"() {
+  // CHECK: device_any = #hal.device.affinity<@device>
+  device_any = #hal.device.affinity<@device>,
+  // CHECK: device_queue_0 = #hal.device.affinity<@device, [0]>
+  device_queue_0 = #hal.device.affinity<@device, [0]>,
+  // CHECK: device_queue_123 = #hal.device.affinity<@device, [1, 2, 3]>
+  device_queue_123 = #hal.device.affinity<@device, [1, 2, 3]>
+} : () -> ()
+
+// -----
+
+"device.promise"() {
+  // CHECK: device_any = #hal.device.promise<@device>
+  device_any = #hal.device.promise<@device>,
+  // CHECK: device_queue_0 = #hal.device.promise<@device, [0]>
+  device_queue_0 = #hal.device.promise<@device, [0]>,
+  // CHECK: device_queue_123 = #hal.device.promise<@device, [1, 2, 3]>
+  device_queue_123 = #hal.device.promise<@device, [1, 2, 3]>
+} : () -> ()
+
+// -----
+
+// Tests that differing device affinities blocks inlining.
+// Here the @inline_target is using the default affinity specified on the
+// module and only functions also using the default affinity or a matching
+// specified affinity will be inlined. The #hal.device.affinity controls this
+// behavior and in the future we could allow inlining of compatible devices,
+// the same device on differing queues, etc.
+
+builtin.module attributes {
+  stream.affinity = #hal.device.affinity<@device_a>
+} {
+  util.global private @device_a : !hal.device
+  util.global private @device_b : !hal.device
+  // CHECK-INLINE: util.func public @inline_target
+  util.func public @inline_target() -> (i32, i32) {
+    // CHECK-INLINE-NOT: util.call @compat_inlinable
+    // CHECK-INLINE: %[[A:.+]] = arith.constant 0
+    %a = util.call @compat_inlinable() : () -> i32
+    // CHECK-INLINE: %[[B:.+]] = util.call @noncompat_inlinable
+    %b = util.call @noncompat_inlinable() : () -> i32
+    // CHECK-INLINE: util.return %[[A]], %[[B]]
+    util.return %a, %b : i32, i32
+  }
+  // CHECK-INLINE-NOT: util.func private @compat_inlinable
+  util.func private @compat_inlinable() -> i32 attributes {
+    stream.affinity = #hal.device.affinity<@device_a>
+  } {
+    %c0 = arith.constant 0 : i32
+    util.return %c0 : i32
+  }
+  // CHECK-INLINE: util.func private @noncompat_inlinable
+  util.func private @noncompat_inlinable() -> i32 attributes {
+    stream.affinity = #hal.device.affinity<@device_b>
+  } {
+    %c1 = arith.constant 1 : i32
+    util.return %c1 : i32
+  }
+}

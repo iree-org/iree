@@ -46,9 +46,41 @@ struct PipelineHooks {
   std::function<void(PipelinePhase phase, OpPassManager &)> afterPhase;
 };
 
+struct AssignmentOptions : public PassPipelineOptions<AssignmentOptions> {
+  // TODO(benvanik): remove the legacy flag once users are switched to devices.
+  ListOption<std::string> legacyTargetBackends{
+      *this,
+      "legacy-target-backends",
+      llvm::cl::desc("DEPRECATED: Target backend names."),
+      llvm::cl::ZeroOrMore,
+  };
+  ListOption<std::string> targetDevices{
+      *this,
+      "target-devices",
+      llvm::cl::desc("Target device specifications."),
+      llvm::cl::ZeroOrMore,
+  };
+  Option<std::string> defaultDevice{
+      *this,
+      "default-device",
+      llvm::cl::desc("Which device is considered the default when no device "
+                     "affinity is specified. Either the device name when names "
+                     "are specified or the numeric ordinal of the device."),
+      llvm::cl::init(""),
+  };
+};
+
+// Assigns devices from flags and coarse module-level specification.
+// Frontends are encouraged to create and assign devices themselves in order to
+// support more complex configurations (multiple devices, fallbacks, etc).
+void buildHALDeviceAssignmentPassPipeline(
+    OpPassManager &passManager, const TargetRegistry &targetRegistry,
+    const AssignmentOptions &assignmentOptions);
+
 // Adds a set of passes to the given pass manager that run the head of the HAL
-// pipeline to assign devices, materialize interfaces, and translate
-// executables. The host portion of the program is annotated but not modified.
+// pipeline to materialize interfaces, import externally specified executables,
+// and translate executables. The host portion of the program is annotated but
+// not modified.
 void buildHALConfigurationPassPipeline(OpPassManager &passManager,
                                        const TargetRegistry &targetRegistry,
                                        const TargetOptions &targetOptions,

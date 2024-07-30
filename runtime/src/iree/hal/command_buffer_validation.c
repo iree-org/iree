@@ -603,7 +603,8 @@ iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
+    iree_hal_dispatch_flags_t flags) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
@@ -615,7 +616,7 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref) {
+    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 

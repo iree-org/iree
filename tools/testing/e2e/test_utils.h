@@ -133,7 +133,7 @@ iree_status_t iree_test_utils_run_all_test_functions(
     iree_allocator_t host_allocator);
 
 // Returns OK if there are declared requirements on |module| and they are all
-// met and otherwise UNAVAILABLE indicating that the module should not be run.
+// met and otherwise NOT_FOUND indicating that the module should not be run.
 iree_status_t iree_test_utils_check_module_requirements(
     iree_vm_module_t* module);
 

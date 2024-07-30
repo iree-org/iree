@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
     "iree-run-module-inputs.mlir"
+    "iree-run-module-multi.mlir"
     "iree-run-module-outputs.mlir"
     "iree-run-module.mlir"
     "multiple_args.mlir"

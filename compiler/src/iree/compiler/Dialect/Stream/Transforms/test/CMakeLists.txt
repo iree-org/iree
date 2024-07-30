@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_affinities.mlir"
     "annotate_dispatch_arguments.mlir"
     "convert_to_stream.mlir"
     "dump_statistics.mlir"
@@ -41,6 +42,7 @@ iree_lit_test_suite(
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
+    "verify_affinities.mlir"
     "verify_async_access_ranges.mlir"
   TOOLS
     FileCheck
