@@ -4032,6 +4032,7 @@ MaterializeUpperBoundTileSize pass.</p>
   IntegerAttr,   # matmul_narrow_M
   IntegerAttr,   # matmul_narrow_N
   ArrayAttr,   # user_indexing_maps
+  AffineMapAttr,   # bcast_map
   DenseArrayAttr   # round_dims_to
 &gt;
 </code></pre></div>
@@ -4087,6 +4088,11 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">user_indexing_maps</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>Indexing maps of the operation using this tensor</td>
+</tr>
+<tr>
+<td style="text-align: center;">bcast_map</td>
+<td style="text-align: center;"><code>AffineMapAttr</code></td>
+<td>Indexing map that represents the broadcasting dims in the producer</td>
 </tr>
 <tr>
 <td style="text-align: center;">round_dims_to</td>
