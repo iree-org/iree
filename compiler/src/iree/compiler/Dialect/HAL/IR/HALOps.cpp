@@ -730,6 +730,33 @@ DispatchExternOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.device.memoize
+//===----------------------------------------------------------------------===//
+
+void DeviceMemoizeOp::build(OpBuilder &builder, OperationState &state,
+                            TypeRange resultTypes, Value device,
+                            Value queueAffinity,
+                            ArrayRef<NamedAttribute> attributes) {
+  state.addTypes(resultTypes);
+  state.addOperands(device);
+  state.addOperands(queueAffinity);
+  state.addAttributes(attributes);
+  state.addRegion();
+}
+
+void DeviceMemoizeOp::getSuccessorRegions(
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
+  // Unconditional control flow into the region and back to the parent, so
+  // return the correct RegionSuccessor purely based on the index being None or
+  // 0.
+  if (!point.isParent()) {
+    regions.push_back(RegionSuccessor({}));
+  } else {
+    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // hal.allocator.allocate
 //===----------------------------------------------------------------------===//
 

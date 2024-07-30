@@ -17,6 +17,7 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
@@ -494,6 +495,57 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   }];
 
   let hasVerifier = 1;
+}
+
+def HAL_DeviceMemoizeOp : HAL_Op<"device.memoize", [
+  RecursiveMemoryEffects,
+  DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+  SingleBlockImplicitTerminator<"IREE::HAL::ReturnOp">,
+]> {
+  let summary = [{memoizes resources for a particular device and queue affinity}];
+  let description = [{
+    Executes the nested region once per device and affinity mask and memoizes
+    the results such that future references return the previously memoized
+    values. The initial execution may happen on demand or be hoisted to module
+    initialization time.
+
+    Any uses of the device or affinity specified within the nested region will
+    be substituted with the appropriate device and affinity during memoization.
+    All other implicitly captured values must be either constant or global
+    values available at the time the memoization occurs.
+
+    It is valid for the nested region contents to be inlined in place and never
+    memoized. This can be useful when diagnosing memoization issues and can be
+    forced with the `--iree-hal-memoization=false` flag.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `->` type($results)
+    attr-dict-with-keyword
+    $body
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "TypeRange":$resultTypes,
+      "Value":$device,
+      "Value":$queueAffinity,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
 }
 
 } // OpGroupPseudoOps

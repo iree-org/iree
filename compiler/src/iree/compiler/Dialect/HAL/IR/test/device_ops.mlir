@@ -202,3 +202,22 @@ util.func public @device_queue_flush(
       affinity(%affinity)
   util.return
 }
+
+// -----
+
+// CHECK-LABEL: @device_memoize
+util.func public @device_memoize(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
+    %device: !hal.device, %affinity: i64) -> !hal.command_buffer {
+  // CHECK: hal.device.memoize<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
+  %result = hal.device.memoize<%device : !hal.device> affinity(%affinity) -> !hal.command_buffer {
+    // CHECK-NEXT: hal.command_buffer.create
+    %cmd = hal.command_buffer.create device(%device : !hal.device)
+                                       mode(OneShot)
+                                 categories("Transfer|Dispatch")
+                                   affinity(%affinity) : !hal.command_buffer
+    // CHECK-NEXT: hal.return
+    hal.return %cmd : !hal.command_buffer
+  }
+  util.return %result : !hal.command_buffer
+}

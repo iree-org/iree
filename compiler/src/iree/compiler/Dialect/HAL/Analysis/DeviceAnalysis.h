@@ -48,7 +48,7 @@ public:
 
   // Returns a set of possible device globals of the given `!hal.device` value,
   // if analyzed.
-  std::optional<SetVector<IREE::Util::GlobalOpInterface>>
+  std::optional<SmallVector<IREE::Util::GlobalOpInterface>>
   lookupDeviceGlobals(Value deviceValue);
 
   // Returns a set of possible targets of the given `!hal.device` value, if

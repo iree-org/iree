@@ -69,7 +69,32 @@ LogicalResult DeviceAnalysis::run() {
   return solver.run();
 }
 
-std::optional<SetVector<IREE::Util::GlobalOpInterface>>
+// Sorts |globalOps| in the natural affinity sort order.
+// We unfortunately have to do this as the PVS elements we source from are
+// unsorted.
+static void
+sortGlobalOps(SmallVectorImpl<IREE::Util::GlobalOpInterface> &globalOps) {
+  // HACK: this should probably do a type id ordering followed by a
+  // type-specific ordering (interface compare method?). We just need this to be
+  // stable as the globals come from multiple DenseSets that have run-to-run
+  // ordering variance. This is very inefficient but is only used when there are
+  // multiple possible devices and we try to avoid that anyway.
+  if (globalOps.size() <= 1) {
+    return;
+  }
+  llvm::stable_sort(globalOps, [](IREE::Util::GlobalOpInterface lhs,
+                                  IREE::Util::GlobalOpInterface rhs) {
+    std::string lhsStr;
+    llvm::raw_string_ostream lhsStream(lhsStr);
+    lhs.print(lhsStream);
+    std::string rhsStr;
+    llvm::raw_string_ostream rhsStream(rhsStr);
+    rhs.print(rhsStream);
+    return lhsStr < rhsStr;
+  });
+}
+
+std::optional<SmallVector<IREE::Util::GlobalOpInterface>>
 DeviceAnalysis::lookupDeviceGlobals(Value deviceValue) {
   auto globalPVS = solver.lookupElementFor<DeviceGlobalValuePVS>(
       Position::forValue(deviceValue));
@@ -77,10 +102,11 @@ DeviceAnalysis::lookupDeviceGlobals(Value deviceValue) {
       globalPVS->isUndefContained()) {
     return std::nullopt;
   }
-  SetVector<IREE::Util::GlobalOpInterface> globalOps;
+  SmallVector<IREE::Util::GlobalOpInterface> globalOps;
   for (auto globalOp : globalPVS->getAssumedSet()) {
-    globalOps.insert(globalOp);
+    globalOps.push_back(globalOp);
   }
+  sortGlobalOps(globalOps);
   return globalOps;
 }
 
