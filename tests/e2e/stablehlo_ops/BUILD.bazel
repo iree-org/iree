@@ -327,7 +327,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_meta-spirv_metal",
+    name = "check_metal-spirv_metal",
     srcs = enforce_glob(
         # keep sorted
         [

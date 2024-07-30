@@ -555,7 +555,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_meta-spirv_metal
+    check_metal-spirv_metal
   SRCS
     "abs.mlir"
     "add.mlir"

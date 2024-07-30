@@ -98,6 +98,7 @@ iree_check_single_backend_test_suite(
     "negate.mlir"
     "pad.mlir"
     "reciprocal.mlir"
+    "reduce.mlir"
     "reshape.mlir"
     "rsqrt.mlir"
     "select.mlir"
@@ -195,6 +196,7 @@ iree_check_single_backend_test_suite(
     "log.mlir"
     "logical_left_shift.mlir"
     "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
     "matmul.mlir"
     "max_pool.mlir"
     "maximum.mlir"
@@ -218,6 +220,59 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  INPUT_TYPE
+    "tosa"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_metal
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "equal.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
+    "matmul.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "mul_shift.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "metal-spirv"
+  DRIVER
+    "metal"
   INPUT_TYPE
     "tosa"
 )
@@ -344,6 +399,60 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip_stream
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "equal.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
+    "matmul.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+  INPUT_TYPE
+    "tosa"
+  RUNNER_ARGS
+    "--hip_use_streams=true"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 iree_check_single_backend_test_suite(
@@ -402,59 +511,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_metal-spirv_metal
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "arithmetic_right_shift.mlir"
-    "bitwise_and.mlir"
-    "bitwise_or.mlir"
-    "bitwise_xor.mlir"
-    "ceil.mlir"
-    "clamp.mlir"
-    "clz.mlir"
-    "const.mlir"
-    "equal.mlir"
-    "exp.mlir"
-    "floor.mlir"
-    "fully_connected.mlir"
-    "gather.mlir"
-    "greater.mlir"
-    "greater_equal.mlir"
-    "if.mlir"
-    "log.mlir"
-    "logical_left_shift.mlir"
-    "logical_right_shift.mlir"
-    "logical_right_shift_16.mlir"
-    "matmul.mlir"
-    "max_pool.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "mul.mlir"
-    "mul_shift.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reciprocal.mlir"
-    "reduce.mlir"
-    "reshape.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sigmoid.mlir"
-    "sub.mlir"
-    "table.mlir"
-    "tanh.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "metal-spirv"
-  DRIVER
-    "metal"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_rocm-rocm
   SRCS
     "abs.mlir"
@@ -506,75 +562,3 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=tosa"
 )
-
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
-
-unset(IREE_HIP_TEST_COMPILER_FLAGS)
-list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_hip_stream
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "arithmetic_right_shift.mlir"
-    "bitwise_and.mlir"
-    "bitwise_or.mlir"
-    "bitwise_xor.mlir"
-    "ceil.mlir"
-    "clamp.mlir"
-    "clz.mlir"
-    "const.mlir"
-    "equal.mlir"
-    "exp.mlir"
-    "floor.mlir"
-    "fully_connected.mlir"
-    "gather.mlir"
-    "greater.mlir"
-    "greater_equal.mlir"
-    "if.mlir"
-    "log.mlir"
-    "logical_left_shift.mlir"
-    "logical_right_shift.mlir"
-    "logical_right_shift_16.mlir"
-    "matmul.mlir"
-    "max_pool.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "mul.mlir"
-    #"mul_shift.mlir" (compilation failure)
-    "negate.mlir"
-    "pad.mlir"
-    "reciprocal.mlir"
-    #"reduce.mlir" (compilation failure)
-    "reshape.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sigmoid.mlir"
-    "sub.mlir"
-    "table.mlir"
-    "tanh.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-    ${IREE_HIP_TEST_COMPILER_FLAGS}
-  INPUT_TYPE
-    "tosa"
-  RUNNER_ARGS
-    "--hip_use_streams=true"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-amd"
-)
-
-endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
