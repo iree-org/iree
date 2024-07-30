@@ -8455,7 +8455,8 @@ and results and is able to load/store at will.</p>
 <h4 id="streamcmdexecute-streamcmdexecuteop"><code>stream.cmd.execute</code> (Stream::CmdExecuteOp)<a class="headerlink" href="#streamcmdexecute-streamcmdexecuteop" title="Permanent link">link</a></h4>
 <p><em>Executes a dependency-aware sequence of streamable ops</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.execute` (`on` `(` $affinity^ `)`)?
+<div class="highlight"><pre><span></span><code>operation ::= `stream.cmd.execute` (`once` $once^)?
+              (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
               `with` ``
               custom&lt;ExplicitResourceRegion&gt;($resource_operands,
@@ -8477,6 +8478,7 @@ execution may begin immediately.</p>
 <h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>once</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
 </table>
 
