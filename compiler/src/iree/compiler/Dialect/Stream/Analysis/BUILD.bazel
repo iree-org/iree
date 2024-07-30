@@ -15,12 +15,14 @@ package(
 iree_compiler_cc_library(
     name = "Analysis",
     srcs = [
+        "Affinity.cpp",
         "Partitioning.cpp",
         "Partitioning/ReferencePartitioning.cpp",
         "ResourceHazards.cpp",
         "ResourceUsage.cpp",
     ],
     hdrs = [
+        "Affinity.h",
         "Partitioning.h",
         "ResourceHazards.h",
         "ResourceUsage.h",

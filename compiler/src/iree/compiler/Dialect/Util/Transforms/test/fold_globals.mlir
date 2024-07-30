@@ -102,7 +102,11 @@ util.func @foo(%arg0: index) -> (index, index, index) {
 util.global private mutable @used0 = 5 : index
 // CHECK: util.global private mutable @used1 : index
 util.global private mutable @used1 : index
-util.func @foo(%arg0: index, %arg1: index) -> (index, index) {
+// CHECK: util.global private @referenced : index
+util.global private @referenced : index
+util.func @foo(%arg0: index, %arg1: index) -> (index, index) attributes {
+  some.attr = @referenced
+} {
   // CHECK: %[[VALUE0:.+]] = util.global.load @used0 : index
   %0 = util.global.load @used0 : index
   // CHECK: %[[VALUE1:.+]] = util.global.load @used1 : index
@@ -130,15 +134,38 @@ util.initializer {
 
 // -----
 
+builtin.module attributes {
+  some.attr = @only_ref_on_module
+} {
+  // CHECK: @only_ref_on_module
+  util.global private @only_ref_on_module : index
+}
+
+// -----
+
+builtin.module @named_module attributes {
+  some.attr = @named_module::@only_ref_on_module
+} {
+  // CHECK: @only_ref_on_module
+  util.global private @only_ref_on_module : index
+}
+
+// -----
+
 // CHECK: util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
 util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
-util.func @foo() -> (index, index) {
+util.func @foo() -> (index, index) attributes {
+  some.attr = @dupeCst1
+} {
   // CHECK-DAG: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
   %0 = util.global.load @dupeCst0 : index
   // CHECK-DAG: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
   %1 = util.global.load @dupeCst1 : index
+  // CHECK-DAG: util.optimization_barrier
+  // CHECK-SAME: op.attr = @dupeCst0
+  util.optimization_barrier {op.attr = @dupeCst1} %1 : index
   // CHECK: return %[[VALUE0]], %[[VALUE1]]
   util.return %0, %1 : index, index
 }

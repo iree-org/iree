@@ -32,8 +32,8 @@ namespace mlir::iree_compiler::IREE::VMVX {
 // Variant configuration
 // ---------------------------------------------------------------------------
 
-static void
-buildVMVXConfigurationPassPipelineImpl(OpPassManager &modulePassManager) {
+void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
+  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     // ---------------------------------------------------------------------------
@@ -43,16 +43,11 @@ buildVMVXConfigurationPassPipelineImpl(OpPassManager &modulePassManager) {
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
-      .addPass([&]() { return createCPUMaterializeEncodingPass(); })
+      .addPass(createCPUMaterializeDeviceEncodingPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
   modulePassManager.addPass(createVMVXSelectLoweringStrategyPass());
-}
-
-void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  buildVMVXConfigurationPassPipelineImpl(modulePassManager);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +56,6 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
 
 static void
 buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
-
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
@@ -87,6 +81,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
       .addPass(createCSEPass)
       .addPass([]() { return createConvertVectorToSCFPass(); })
       .addPass(createCanonicalizerPass)
+      .addPass(arith::createArithExpandOpsPass)
       .addPass(memref::createExpandOpsPass);
 
   // Handle tensor-type constants.

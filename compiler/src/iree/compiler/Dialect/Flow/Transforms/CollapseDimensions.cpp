@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "llvm/Support/Casting.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -105,9 +105,26 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
            (rDimsSet.count(prePos) && rDimsSet.count(nextPos));
   };
 
+  // Find all dims that are used to iterate over operands that aren't produced
+  // outside of the dispatch
+  auto regionOp = cast<DispatchRegionOp>(genericOp->getParentOp());
+  llvm::SmallSet<unsigned, 8> preservedDims;
+  for (OpOperand *operand : genericOp.getDpsInputOperands()) {
+    auto definingOp = operand->get().getDefiningOp();
+    if (!definingOp ||
+        definingOp->getParentOfType<DispatchRegionOp>() != regionOp)
+      continue;
+    for (AffineExpr expr :
+         genericOp.getMatchingIndexingMap(operand).getResults()) {
+      preservedDims.insert(cast<AffineDimExpr>(expr).getPosition());
+    }
+  }
+
   ReassociationIndices range;
   AffineExpr preExpr;
   // Find the largest sequence of dimensions that are
+  // - Not used to index operands with defining ops
+  // AND
   // - Either preserved in all maps, or
   // - are completely absent
   // This sequence can be collapsed. To find the sequence,
@@ -119,8 +136,10 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
   //    and repeat till the last element of sequence and the next result
   //    expression is not found as a sequence in all maps.
   for (auto nextExpr : genericOp.getIndexingMapsArray().front().getResults()) {
+    unsigned position = cast<AffineDimExpr>(nextExpr).getPosition();
     if (!range.empty()) {
-      if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
+      if (preservedDims.contains(position) ||
+          !hasAllMapsSameSequence(preExpr, nextExpr) ||
           !hasSameIteratorType(preExpr, nextExpr)) {
         if (range.size() > 1) {
           contiguousLoops.push_back({range.begin(), range.end()});
@@ -128,7 +147,7 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
         range.clear();
       }
     }
-    range.push_back(cast<AffineDimExpr>(nextExpr).getPosition());
+    range.push_back(position);
     preExpr = nextExpr;
   }
   if (range.size() > 1)
@@ -167,6 +186,15 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
     return false;
   }
 
+  // TODO(#17948) GPU codegen fails when trying to collapse the
+  // dimensions of an elementwise op in the case of elementwise(contraction).
+  // For now, don't collapse when there is a linalgOp producer.
+  if (llvm::any_of(genericOp.getDpsInputs(), [](Value val) -> bool {
+        return val.getDefiningOp<linalg::LinalgOp>();
+      })) {
+    return false;
+  }
+
   // TODO(guray) Collapsing caused performance regression in a cpu
   // benchmark, so we disable it.
   if (genericOp.hasIndexSemantics())
@@ -176,7 +204,6 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
 }
 
 /// Traverses all the the Ops in DispatchRegionOps and finds linalg.generic Op
-/// without any producers.
 static FailureOr<linalg::GenericOp>
 findRootGenericOp(DispatchRegionOp regionOp) {
   if (!llvm::hasSingleElement(regionOp.getBody())) {
@@ -196,15 +223,6 @@ findRootGenericOp(DispatchRegionOp regionOp) {
   }
   for (auto returnVal : returnOp->getOperands().drop_front()) {
     if (returnVal.getDefiningOp() != collapsibleOp.getOperation()) {
-      return failure();
-    }
-  }
-
-  // Check that the operands of the generic op are defined outside the dispatch.
-  for (OpOperand *inputOperands : collapsibleOp.getDpsInputOperands()) {
-    Operation *definingOp = inputOperands->get().getDefiningOp();
-    if (definingOp &&
-        definingOp->getParentOfType<DispatchRegionOp>() == regionOp) {
       return failure();
     }
   }
@@ -398,11 +416,11 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
   return newDispatchOp;
 }
 
-/// Traverses DispatchRegionOps to find linalg genericOps that has no
-/// producers and tries to collapse its dimensions.
+/// Traverses DispatchRegionOps to find linalg genericOps and collapses
+/// dimensions without modifying operands with producers
 static bool collapseDimensions(IRRewriter &rewriter,
                                DispatchRegionOp &regionOp) {
-  // Step 1. Find the root linalg.generic Op with no producer
+  // Step 1. Find the root linalg.generic Op
   std::optional<linalg::GenericOp> genericOp = findRootGenericOp(regionOp);
   if (!genericOp.has_value())
     return false;

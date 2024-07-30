@@ -1476,7 +1476,7 @@ public:
       : VectorLayoutOptions(root, fullConversion) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    return setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 
@@ -1647,17 +1647,16 @@ transform_dialect::SetContractionLayoutAttributes::apply(
              << "invalid opaque mma layout for annotation " << mmaType;
     }
 
-    contract->setAttr("iree.amdgpu.mma", mmaType);
+    Location loc = contract.getLoc();
     auto [aLayout, bLayout, cLayout] = *maybeLayouts;
-    contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
-    contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);
-    contract->setAttr("__vector_layout_test_anchor_operand_2", cLayout);
+
+    // Set packed read layout for specified indices.
     ArrayRef<int64_t> operandIndices = getReadLayoutIndices();
     if (!operandIndices.empty()) {
       SmallVector<Value> operands;
       SmallVector<VectorExt::VectorLayoutInterface> layouts;
       for (int64_t index : operandIndices) {
-        operands.push_back(index == 0 ? contract.getLhs() : contract.getRhs());
+        operands.push_back(contract.getOperand(index));
         layouts.push_back(index == 0 ? aLayout : bLayout);
       }
       rewriter.setInsertionPoint(contract);
@@ -1675,14 +1674,26 @@ transform_dialect::SetContractionLayoutAttributes::apply(
         Operation *parentOp = operand.getDefiningOp();
         if (!parentOp || (parentOp->getNumResults() != 1))
           continue;
-        parentOp->setAttr("__vector_layout_test_anchor_result_0", readLayout);
-        Value resolvedOperand =
-            rewriter.create<VectorExt::LayoutConflictResolutionOp>(
-                contract.getLoc(), operand.getType(), operand, layout,
-                readLayout);
+        Value resolvedOperand = rewriter.create<VectorExt::ToLayoutOp>(
+            loc, operand.getType(), operand, readLayout);
         contract.setOperand(operandIndices[i], resolvedOperand);
       }
     }
+
+    // Set layout anchors.
+    rewriter.setInsertionPoint(contract);
+    Value newLhs = rewriter.create<VectorExt::ToLayoutOp>(
+        loc, contract.getLhsType(), contract.getLhs(), aLayout);
+    Value newRhs = rewriter.create<VectorExt::ToLayoutOp>(
+        loc, contract.getRhsType(), contract.getRhs(), bLayout);
+    Value newAcc = rewriter.create<VectorExt::ToLayoutOp>(
+        loc, contract.getAccType(), contract.getAcc(), cLayout);
+    contract.setOperand(0, newLhs);
+    contract.setOperand(1, newRhs);
+    contract.setOperand(2, newAcc);
+
+    // Set intrinsic type.
+    contract->setAttr("iree.amdgpu.mma", mmaType);
   }
 
   return DiagnosedSilenceableFailure::success();

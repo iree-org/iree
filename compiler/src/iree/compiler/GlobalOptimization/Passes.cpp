@@ -63,6 +63,12 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
         clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
     llvm::cl::init(DemotionOption::None));
 
+static llvm::cl::opt<int> clPadFactor(
+    "iree-global-opt-pad-factor",
+    llvm::cl::desc("provides padding size hints that will be attached to "
+                   "encodings."),
+    llvm::cl::init(32));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -136,7 +142,7 @@ void buildGlobalOptimizationPassPipeline(
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
       })
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Propagate transposes immediately before set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
@@ -150,13 +156,13 @@ void buildGlobalOptimizationPassPipeline(
             return createPropagateLinalgTransposePass(
                 transformOptions.options.aggressiveTransposePropagation);
           })
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   if (clEnableFuseHorizontalContractions) {
     FunctionLikeNest(mainPassManager)
         .addPass(createFuseHorizontalContractionsPass)
-        .addPass(mlir::createCanonicalizerPass)
+        .addPass(IREE::Flow::createCanonicalizerPass)
         .addPass(mlir::createCSEPass);
   }
 
@@ -164,14 +170,11 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.
-    // TODO(hanchung): Make it controlable through flags. It is fine for now
-    // because it is an experimental path.
-    const int64_t kPadFactor = clEnableEarlyMaterialization ? 0 : 16;
-    mainPassManager.addPass(createSetEncodingPass(kPadFactor));
+    mainPassManager.addPass(createSetEncodingPass(clPadFactor));
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }
-    mainPassManager.addPass(createCanonicalizerPass());
+    mainPassManager.addPass(IREE::Flow::createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());
     FunctionLikeNest(mainPassManager).addPass(createDataLayoutPropagationPass);
@@ -183,7 +186,7 @@ void buildGlobalOptimizationPassPipeline(
   // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
   FunctionLikeNest(mainPassManager)
       .addPass(createGlobalLoopInvariantCodeMotionPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   // Simplify util.global accesses early on; this can help with dispatch
@@ -196,7 +199,7 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(IREE::Util::createApplyPatternsPass());
   mainPassManager.addPass(IREE::Util::createFoldGlobalsPass());
   mainPassManager.addPass(IREE::Util::createIPOPass());
-  mainPassManager.addPass(createCanonicalizerPass());
+  mainPassManager.addPass(IREE::Flow::createCanonicalizerPass());
   mainPassManager.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
@@ -214,7 +217,7 @@ void buildGlobalOptimizationPassPipeline(
   }
 
   FunctionLikeNest(mainPassManager)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   FunctionLikeNest(mainPassManager)

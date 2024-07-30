@@ -38,7 +38,7 @@ typedef struct iree_hal_hip_pending_queue_actions_t
 
 // Creates a pending actions queue.
 iree_status_t iree_hal_hip_pending_queue_actions_create(
-    const iree_hal_hip_dynamic_symbols_t* symbols,
+    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_hip_pending_queue_actions_t** out_actions);
 
@@ -59,7 +59,7 @@ typedef void(IREE_API_PTR* iree_hal_hip_pending_action_cleanup_callback_t)(
 // before releasing all retained resources.
 iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
     iree_hal_device_t* device, hipStream_t dispatch_stream,
-    hipStream_t callback_stream, iree_hal_hip_pending_queue_actions_t* actions,
+    iree_hal_hip_pending_queue_actions_t* actions,
     iree_hal_hip_pending_action_cleanup_callback_t cleanup_callback,
     void* callback_user_data,
     const iree_hal_semaphore_list_t wait_semaphore_list,

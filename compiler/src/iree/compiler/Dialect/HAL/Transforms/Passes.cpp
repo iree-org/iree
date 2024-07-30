@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
@@ -27,10 +26,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // TODO(benvanik): replace the global iree-hal-target-backends flag with this.
-  // ListOption<std::string> targets{
-  //     *this, "targets", llvm::cl::desc("One or more HAL devices to target."),
-  //     llvm::cl::ZeroOrMore};
   Option<bool> serializeExecutables{
       *this,
       "serialize-executables",
@@ -44,6 +39,13 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Whether to link hal.executable ops together."),
       llvm::cl::init(true),
   };
+};
+
+static llvm::cl::opt<bool> clMemoization{
+    "iree-hal-memoization",
+    llvm::cl::desc(
+        "Whether to memoize device resources such as command buffers."),
+    llvm::cl::init(false),
 };
 
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
@@ -181,6 +183,42 @@ static void addExecutableSubstitutionPasses(OpPassManager &passManager,
 }
 
 //===----------------------------------------------------------------------===//
+// --iree-hal-device-assignment-pipeline
+//===----------------------------------------------------------------------===//
+
+void buildHALDeviceAssignmentPassPipeline(
+    OpPassManager &passManager, const TargetRegistry &targetRegistry,
+    const AssignmentOptions &assignmentOptions) {
+  // The HAL must know its targets early on in the process. This pass discovers/
+  // derives/specifies the target devices and annotates the module with that
+  // information. This allows subsequent passes to lookup which devices they are
+  // targeting.
+  if (!assignmentOptions.legacyTargetBackends.empty()) {
+    // Today we just assign devices from parameters but we should instead be
+    // performing analysis at the flow level and then doing magic device
+    // database lookups here.
+    passManager.addPass(IREE::HAL::createAssignLegacyTargetDevicesPass(
+        {&targetRegistry, assignmentOptions.legacyTargetBackends}));
+  }
+  if (!assignmentOptions.targetDevices.empty()) {
+    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
+        {assignmentOptions.targetDevices}));
+  }
+
+  // Create globals for each device (if needed).
+  passManager.addPass(IREE::HAL::createMaterializeTargetDevicesPass(
+      {assignmentOptions.defaultDevice}));
+
+  // Resolve #hal.device.promise and #hal.device.alias attributes.
+  passManager.addPass(IREE::HAL::createResolveDevicePromisesPass());
+  passManager.addPass(
+      IREE::HAL::createResolveDeviceAliasesPass({&targetRegistry}));
+
+  // Verify devices are valid.
+  passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
+}
+
+//===----------------------------------------------------------------------===//
 // --iree-hal-configuration-pipeline
 //===----------------------------------------------------------------------===//
 
@@ -196,23 +234,12 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
   // and initial interface analysis (we rely on CSE and such having been run).
   addCleanupPatterns(passManager);
 
-  //----------------------------------------------------------------------------
-  // Device assignment and interface materialization
-  //----------------------------------------------------------------------------
+  // Verify devices are valid.
+  passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
 
-  // The HAL must know its targets early on in the process. This pass discovers/
-  // derives/specifies the target devices and annotates the module with that
-  // information. This allows subsequent passes to lookup which devices they are
-  // targeting.
-  if (!targetOptions.targets.empty()) {
-    // Today we just assign devices from parameters but we should instead be
-    // performing analysis at the flow level and then doing magic device
-    // database lookups here.
-    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        {&targetRegistry, targetOptions.targets}));
-  }
-  passManager.addPass(
-      IREE::HAL::createVerifyTargetEnvironmentPass({targetRegistry}));
+  //----------------------------------------------------------------------------
+  // Device-specific interface materialization
+  //----------------------------------------------------------------------------
 
   // Add dispatch instrumentation prior to materializing interfaces so we can
   // more easily mutate the stream dispatch ops and exports.
@@ -271,16 +298,19 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
-  if (hooks.beforePhase)
+  if (hooks.beforePhase) {
     hooks.beforePhase(PipelinePhase::ExecutableSources, passManager);
+  }
 
   if (compileFrom < PipelinePhase::ExecutableSources) {
+    AssignmentOptions assignmentOptions;
+    assignmentOptions.legacyTargetBackends = targetOptions.legacyTargetBackends;
+    assignmentOptions.targetDevices = targetOptions.targetDevices;
+    assignmentOptions.defaultDevice = targetOptions.defaultDevice;
+    buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                         assignmentOptions);
     buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                       targetOptions, hooks);
-
-    FunctionLikeNest(passManager).addPass([]() {
-      return createCPUMaterializeUpperBoundTileSizePass();
-    });
 
     // Preprocess executables using an external tool. The tool may mutate one or
     // more variants and even insert or remove variants.
@@ -290,17 +320,20 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     }
   }
 
-  if (hooks.afterPhase)
+  if (hooks.afterPhase) {
     hooks.afterPhase(PipelinePhase::ExecutableSources, passManager);
-  if (compileTo == PipelinePhase::ExecutableSources)
+  }
+  if (compileTo == PipelinePhase::ExecutableSources) {
     return;
+  }
 
   //----------------------------------------------------------------------------
   // Executable translation
   //----------------------------------------------------------------------------
 
-  if (hooks.beforePhase)
+  if (hooks.beforePhase) {
     hooks.beforePhase(PipelinePhase::ExecutableConfigurations, passManager);
+  }
 
   if (compileFrom < PipelinePhase::ExecutableConfigurations) {
     // Select a translation strategy for each hal.executable.variant and
@@ -343,10 +376,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     }
   }
 
-  if (hooks.afterPhase)
+  if (hooks.afterPhase) {
     hooks.afterPhase(PipelinePhase::ExecutableConfigurations, passManager);
-  if (compileTo == PipelinePhase::ExecutableConfigurations)
+  }
+  if (compileTo == PipelinePhase::ExecutableConfigurations) {
     return;
+  }
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
@@ -359,8 +394,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
 
-  if (hooks.beforePhase)
+  if (hooks.beforePhase) {
     hooks.beforePhase(PipelinePhase::ExecutableTargets, passManager);
+  }
 
   if (compileFrom < PipelinePhase::ExecutableTargets) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
@@ -376,10 +412,12 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
         IREE::HAL::createCaptureExecutableSourcesPass({"2.translated"}));
   }
 
-  if (hooks.afterPhase)
+  if (hooks.afterPhase) {
     hooks.afterPhase(PipelinePhase::ExecutableTargets, passManager);
-  if (compileTo == PipelinePhase::ExecutableTargets)
+  }
+  if (compileTo == PipelinePhase::ExecutableTargets) {
     return;
+  }
 
   // Substitute hal.executables we've translated with those specified on the
   // command line. This developer feature allows for splicing in hand-authored
@@ -397,6 +435,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
   passManager.addPass(IREE::HAL::createConvertToHALPass());
+
+  // If memoization is disabled then inline any regions that were created during
+  // conversion.
+  if (!clMemoization) {
+    FunctionLikeNest(passManager)
+        .addPass(IREE::HAL::createInlineMemoizeRegionsPass);
+  } else {
+    passManager.addPass(IREE::HAL::createOutlineMemoizeRegionsPass());
+  }
 
   // If any devices require the legacy synchronous execution behavior then
   // make all async operations blocking.
@@ -456,6 +503,14 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       .addPass(IREE::HAL::createElideRedundantCommandsPass);
 
+  // Initialize device globals now that we've done the analysis that is easier
+  // with them in their original target specification.
+  passManager.addPass(IREE::HAL::createInitializeDevicesPass({targetRegistry}));
+
+  // Combine the initializers we emitted during resource cache
+  // materialization.
+  passManager.addPass(IREE::Util::createCombineInitializersPass());
+
   // TODO: Maybe this should be a part of Affine lowering pass.
   // Remove if it is added there.
   // https://github.com/llvm/llvm-project/issues/78458
@@ -467,10 +522,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): remove the need for this; some cleanup passes such as
   // SimplifyGlobalAccesses are currently broken with scf present.
   FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
-
-  // Combine the initializers we emitted during resource cache
-  // materialization.
-  passManager.addPass(IREE::Util::createCombineInitializersPass());
 
   //----------------------------------------------------------------------------
   // Executable serialization
@@ -558,6 +609,14 @@ void registerHALPasses() {
   registerPasses();
 
   // Pipelines.
+  PassPipelineRegistration<AssignmentOptions>(
+      "iree-hal-device-assignment-pipeline",
+      "Runs HAL target device assignment pipeline.",
+      [](OpPassManager &passManager,
+         const AssignmentOptions &assignmentOptions) {
+        buildHALDeviceAssignmentPassPipeline(
+            passManager, TargetRegistry::getGlobal(), assignmentOptions);
+      });
   PassPipelineRegistration<>("iree-hal-configuration-pipeline",
                              "Runs HAL target configuration pipeline.",
                              [](OpPassManager &passManager) {

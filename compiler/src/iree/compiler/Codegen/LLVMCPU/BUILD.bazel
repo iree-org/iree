@@ -140,6 +140,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncTransforms",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:IndexToLLVM",
         "@llvm-project//mlir:LLVMCommonConversion",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgDialect",

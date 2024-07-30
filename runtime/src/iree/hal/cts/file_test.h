@@ -16,9 +16,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
 using ::testing::ContainerEq;
 
@@ -26,7 +24,7 @@ namespace {
 constexpr iree_device_size_t kMinimumAlignment = 128;
 }  // namespace
 
-class file_test : public CTSTestBase<> {
+class FileTest : public CTSTestBase<> {
  protected:
   void CreatePatternedDeviceBuffer(iree_device_size_t buffer_size,
                                    uint8_t pattern,
@@ -86,7 +84,7 @@ class file_test : public CTSTestBase<> {
 };
 
 // Reads the entire file into a buffer and check the contents match.
-TEST_F(file_test, ReadEntireFile) {
+TEST_F(FileTest, ReadEntireFile) {
   iree_device_size_t file_size = 128;
   iree_hal_file_t* file = NULL;
   CreatePatternedMemoryFile(IREE_HAL_MEMORY_ACCESS_READ, file_size, 0xDEu,
@@ -133,8 +131,6 @@ TEST_F(file_test, ReadEntireFile) {
   iree_hal_file_release(file);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_FILE_TEST_H_

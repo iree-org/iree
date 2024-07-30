@@ -37,11 +37,41 @@ jobs:
     with:
       package_version: 0.dev1
 
+  unit_test:
+    name: Unit Test
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'unit_test')
+    uses: ./.github/workflows/pkgci_unit_test.yml
+
   regression_test:
     name: Regression Test
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
     uses: ./.github/workflows/pkgci_regression_test.yml
+
+  test_amd_mi250:
+    name: Test AMD MI250
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi250')
+    uses: ./.github/workflows/pkgci_test_amd_mi250.yml
+
+  test_amd_mi300:
+    name: Test AMD MI300
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi300')
+    uses: ./.github/workflows/pkgci_test_amd_mi300.yml
+
+  test_amd_w7900:
+    name: Test AMD W7900
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
+    uses: ./.github/workflows/pkgci_test_amd_w7900.yml
+
+  test_nvidia_t4:
+    name: Test NVIDIA T4
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
+    uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
 
   test_tensorflow_cpu:
     name: Test TensorFlow CPU

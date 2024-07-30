@@ -123,6 +123,7 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
+    "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
@@ -133,7 +134,7 @@ fi
 
 # TODO(#12305): figure out how to run samples with custom binary outputs
 # on the CI. $IREE_BINARY_DIR may not be setup right or the object files may
-# not be getting deployed to the test_all/test_nvidia_gpu bots.
+# not be getting deployed to the test bots.
 excluded_tests+=(
   "iree/samples/custom_dispatch/cpu/embedded/example_hal.mlir.test"
   "iree/samples/custom_dispatch/cpu/embedded/example_stream.mlir.test"

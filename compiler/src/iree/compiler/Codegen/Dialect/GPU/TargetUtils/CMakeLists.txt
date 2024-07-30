@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

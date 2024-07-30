@@ -10,15 +10,15 @@
 #include "iree/base/api.h"
 #include "iree/base/string_view.h"
 #include "iree/hal/api.h"
+#include "iree/hal/buffer_view_util.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
-class command_buffer_dispatch_test : public CTSTestBase<> {
+class CommandBufferDispatchTest
+    : public CTSTestBase<::testing::TestWithParam<RecordingType>> {
  protected:
   void PrepareAbsExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -76,58 +76,77 @@ class command_buffer_dispatch_test : public CTSTestBase<> {
   iree_hal_executable_t* executable_ = NULL;
 };
 
-TEST_F(command_buffer_dispatch_test, DispatchAbs) {
+// Dispatches absf(x) on a subrange (elements 1-2) of a 4 element input buffer.
+// input_buffer  = [-2.5 -2.5 -2.5 -2.5]
+// output_buffer = [-9.0  2.5  2.5 -9.0]
+TEST_P(CommandBufferDispatchTest, DispatchAbs) {
   PrepareAbsExecutable();
+
+  // Create input buffer.
+  iree_hal_buffer_t* input_buffer = NULL;
+  CreateFilledDeviceBuffer<float>(4 * sizeof(float), -2.5f, &input_buffer);
+
+  // Create output buffer.
+  iree_hal_buffer_t* output_buffer = NULL;
+  CreateFilledDeviceBuffer<float>(4 * sizeof(float), -9.0f, &output_buffer);
+
+  iree_hal_buffer_ref_t descriptor_set_bindings[2];
+  iree_hal_buffer_binding_t bindings[2];
+  iree_hal_buffer_binding_table_t binding_table =
+      iree_hal_buffer_binding_table_empty();
+  switch (GetParam()) {
+    case RecordingType::kDirect:
+      descriptor_set_bindings[0] = {
+          /*binding=*/0,
+          /*buffer_slot=*/0,
+          /*buffer=*/input_buffer,
+          /*offset=*/1 * sizeof(float),
+          /*length=*/2 * sizeof(float),
+      };
+      descriptor_set_bindings[1] = {
+          /*binding=*/1,
+          /*buffer_slot=*/0,
+          /*buffer=*/output_buffer,
+          /*offset=*/1 * sizeof(float),
+          /*length=*/2 * sizeof(float),
+      };
+      break;
+    case RecordingType::kIndirect:
+      binding_table.count = IREE_ARRAYSIZE(descriptor_set_bindings);
+      binding_table.bindings = bindings;
+      bindings[0] = {
+          /*buffer=*/input_buffer,
+          /*offset=*/1 * sizeof(float),
+          /*length=*/2 * sizeof(float),
+      };
+      descriptor_set_bindings[0] = {
+          /*binding=*/0,
+          /*buffer_slot=*/0,
+          /*buffer=*/NULL,
+          /*offset=*/0,
+          /*length=*/2 * sizeof(float),
+      };
+      bindings[1] = {
+          /*buffer=*/output_buffer,
+          /*offset=*/1 * sizeof(float),
+          /*length=*/2 * sizeof(float),
+      };
+      descriptor_set_bindings[1] = {
+          /*binding=*/1,
+          /*buffer_slot=*/1,
+          /*buffer=*/NULL,
+          /*offset=*/0,
+          /*length=*/2 * sizeof(float),
+      };
+      break;
+  }
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_,
-      IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
-          IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-
+      binding_table.count, &command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-
-  // Create input and output buffers.
-  iree_hal_buffer_params_t input_params = {0};
-  input_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  input_params.usage =
-      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
-  iree_hal_buffer_view_t* input_buffer_view = NULL;
-  float input_data[1] = {-2.5f};
-  IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
-      device_, device_allocator_,
-      /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_params,
-      iree_make_const_byte_span((void*)input_data, sizeof(input_data)),
-      &input_buffer_view));
-  iree_hal_buffer_params_t output_params = {0};
-  output_params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  output_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                        IREE_HAL_BUFFER_USAGE_TRANSFER |
-                        IREE_HAL_BUFFER_USAGE_MAPPING;
-  iree_hal_buffer_t* output_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, output_params, sizeof(float), &output_buffer));
-
-  iree_hal_buffer_ref_t descriptor_set_bindings[] = {
-      {
-          /*binding=*/0,
-          /*buffer_slot=*/0,
-          iree_hal_buffer_view_buffer(input_buffer_view),
-          /*offset=*/0,
-          iree_hal_buffer_view_byte_length(input_buffer_view),
-      },
-      {
-          /*binding=*/1,
-          /*buffer_slot=*/0,
-          output_buffer,
-          iree_hal_buffer_byte_offset(output_buffer),
-          iree_hal_buffer_byte_length(output_buffer),
-      },
-  };
 
   IREE_ASSERT_OK(iree_hal_command_buffer_push_descriptor_set(
       command_buffer, pipeline_layout_, /*set=*/0,
@@ -135,7 +154,8 @@ TEST_F(command_buffer_dispatch_test, DispatchAbs) {
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
       command_buffer, executable_, /*entry_point=*/0,
-      /*workgroup_x=*/1, /*workgroup_y=*/1, /*workgroup_z=*/1));
+      /*workgroup_x=*/1, /*workgroup_y=*/1, /*workgroup_z=*/1,
+      IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
       command_buffer,
       /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |
@@ -149,23 +169,26 @@ TEST_F(command_buffer_dispatch_test, DispatchAbs) {
 
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer, binding_table));
 
-  float output_value = 0.0f;
+  float output_values[4] = {0.0f};
   IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
       device_, output_buffer,
-      /*source_offset=*/0, &output_value, sizeof(output_value),
+      /*source_offset=*/0, output_values, sizeof(output_values),
       IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
-  EXPECT_EQ(2.5f, output_value);
+  EXPECT_THAT(output_values, ::testing::ElementsAre(-9.0f, 2.5f, 2.5f, -9.0f));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(output_buffer);
-  iree_hal_buffer_view_release(input_buffer_view);
+  iree_hal_buffer_release(input_buffer);
   CleanupExecutable();
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+INSTANTIATE_TEST_SUITE_P(CommandBufferTest, CommandBufferDispatchTest,
+                         ::testing::Values(RecordingType::kDirect,
+                                           RecordingType::kIndirect),
+                         GenerateTestName());
+
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_COMMAND_BUFFER_DISPATCH_TEST_H_

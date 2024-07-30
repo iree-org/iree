@@ -1,7 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-codegen-spirv-configuration-pipeline, func.func(iree-spirv-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan --pass-pipeline='builtin.module(iree-codegen-spirv-configuration-pipeline, func.func(iree-spirv-lower-executable-target-pass))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 1, 32]]>
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [65535, 65535, 65535]>>}>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -12,7 +11,7 @@
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
-  func.func @matmul_i4_quant_weight() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @matmul_i4_quant_weight() {
     %c32 = arith.constant 32 : index
     %c128 = arith.constant 128 : index
     %c0 = arith.constant 0 : index

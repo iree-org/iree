@@ -29,6 +29,7 @@ namespace {
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
+  SmallVector<bool> vectorScalableFlags;
 };
 
 /// Returns a VectorizationTileSizes which contains the inferred bounded result
@@ -41,13 +42,25 @@ static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 /// Returns std::nullopt if vector sizes can't be inferred.
 static std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
-  LLVM_DEBUG(VEC_DBGS() << "Inferring sizes for:\n"
-                        << linalgOp << " with OpResult.resultNumber="
-                        << opResult->getResultNumber() << "\n");
+  LLVM_DEBUG({
+    VEC_DBGS() << "Inferring sizes for:\n" << linalgOp;
+    if (opResult) {
+      VEC_DBGS() << " with OpResult.resultNumber="
+                 << opResult->getResultNumber();
+    }
+    VEC_DBGS() << '\n';
+  });
+
+  std::optional<VscaleRange> vscaleRange;
+  if (!opResult) {
+    // Note: Inferring scalable sizes is not supported is `opResult` is set
+    // (which is used to compute sizes for tensor.pack/unpack).
+    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
+    vscaleRange = getDefaultVscaleRange(targetAttr);
+  }
 
   VectorizationTileSizes result;
   unsigned numDims = linalgOp.getNumLoops();
-
   for (int dim = 0; dim < numDims; ++dim) {
     // Map dimension `dim` to an operand dimension that we will use to
     // traverse the U-D chain to get `dim` vector size information.
@@ -63,22 +76,22 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     // Trivial case: `dim` size is available in the operand type.
     int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
                           .getShape()[firstOperandDim];
+    bool dimScalable = false;
     if (!ShapedType::isDynamic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
+      result.vectorScalableFlags.push_back(dimScalable);
       LLVM_DEBUG(VEC_DBGS() << "Inferred iteration size '" << dimSize
                             << "' for dimension '" << dim << "'\n");
       continue;
     }
 
     // Use ValueBounds analysis to infer `dim` size upper bound.
-    FailureOr<int64_t> maybeDimBound;
+    FailureOr<DimBoundSize> maybeDimBound;
     for (auto operandDimPair : operandDimPairs) {
       Value operand = operandDimPair.first;
       unsigned operandDim = operandDimPair.second;
-      maybeDimBound = ValueBoundsConstraintSet::computeConstantBound(
-          presburger::BoundType::UB, {operand, operandDim},
-          /*stopCondition=*/nullptr, /*closedUB=*/true);
-
+      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange,
+                                           RoundUpVscaleMultiple::Yes);
       if (succeeded(maybeDimBound)) {
         break;
       }
@@ -88,13 +101,19 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
       return std::nullopt;
     }
 
-    dimSize = maybeDimBound.value();
+    dimSize = maybeDimBound->baseSize;
+    dimScalable = maybeDimBound->scalable;
     result.vectorSizes.push_back(dimSize);
+    result.vectorScalableFlags.push_back(dimScalable);
+
     LLVM_DEBUG(VEC_DBGS() << "Inferred iteration size '" << dimSize
+                          << (dimScalable ? " x vscale" : "")
                           << "' for dimension '" << dim << "'\n");
   }
 
   if (opResult) {
+    assert(!llvm::is_contained(result.vectorScalableFlags, true) &&
+           "inferring scalable bounds with `opResult` not supported!");
     result.destShape = linalgOp.getIndexingMapMatchingResult(opResult.value())
                            .compose(result.vectorSizes);
   }
@@ -244,12 +263,14 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
 
   // Try to infer the vector sizes from the IR.
   std::optional<SmallVector<int64_t>> vectorSizes;
+  SmallVector<bool> scalableFlags;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
         std::optional<VectorizationTileSizes> result =
             inferSizesFromIR(linalgOp, /*opResult=*/std::nullopt);
         if (result) {
           vectorSizes = result->vectorSizes;
+          scalableFlags = result->vectorScalableFlags;
         }
       })
       .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
@@ -269,9 +290,8 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
       .Default([&](Operation *) {});
 
   if (vectorSizes) {
-    // This can't identify scalable flags, so pad them with `false`.
-    return std::make_pair(vectorSizes.value(),
-                          SmallVector<bool>(vectorSizes->size(), false));
+    scalableFlags.resize(vectorSizes->size(), false);
+    return std::make_pair(vectorSizes.value(), scalableFlags);
   }
   return std::nullopt;
 }

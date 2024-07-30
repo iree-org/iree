@@ -8,8 +8,11 @@ set(IREE_ALL_CTS_TESTS
   "allocator"
   "buffer_mapping"
   "command_buffer"
+  "command_buffer_copy_buffer"
   "command_buffer_dispatch"
+  "command_buffer_fill_buffer"
   "command_buffer_push_constants"
+  "command_buffer_update_buffer"
   "descriptor_set_layout"
   "driver"
   "event"
@@ -93,6 +96,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    command_buffer_copy_buffer_test_library
+  HDRS
+    "command_buffer_copy_buffer_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     command_buffer_dispatch_test_library
   HDRS
     "command_buffer_dispatch_test.h"
@@ -106,9 +122,35 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    command_buffer_fill_buffer_test_library
+  HDRS
+    "command_buffer_fill_buffer_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     command_buffer_push_constants_test_library
   HDRS
     "command_buffer_push_constants_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    command_buffer_update_buffer_test_library
+  HDRS
+    "command_buffer_update_buffer_test.h"
   DEPS
     ::cts_test_base
     iree::base

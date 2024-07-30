@@ -15,9 +15,11 @@ iree_cc_library(
     Analysis
   HDRS
     "Explorer.h"
+    "GlobalTable.h"
     "Position.h"
   SRCS
     "Explorer.cpp"
+    "GlobalTable.cpp"
     "Position.cpp"
   DEPS
     LLVMSupport

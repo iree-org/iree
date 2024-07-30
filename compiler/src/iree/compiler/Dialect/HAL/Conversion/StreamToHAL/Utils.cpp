@@ -22,7 +22,7 @@ static llvm::cl::opt<bool> clExternalResourcesMappable(
 namespace mlir::iree_compiler {
 
 Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -34,7 +34,7 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
 
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -46,7 +46,7 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
 }
 
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{
@@ -58,7 +58,7 @@ Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
 
 std::tuple<Value, Value>
 lookupAllocatorAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
       op->getLoc(),
       TypeRange{

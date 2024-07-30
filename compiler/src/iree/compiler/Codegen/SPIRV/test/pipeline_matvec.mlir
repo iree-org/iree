@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=pascal@vulkan \
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' \
 // RUN:   %s | FileCheck %s
 
@@ -13,16 +13,10 @@
 ]>
 hal.executable @i4_dequant_unit_matmul_f16 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [
-          Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform,
-          GroupNonUniformArithmetic, GroupNonUniformShuffle
-        ], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU,
-        #spirv.resource_limits<
-          max_compute_shared_memory_size = 32768,
-          max_compute_workgroup_invocations = 1024,
-          max_compute_workgroup_size = [1024, 1024, 64],
-          subgroup_size = 32
-        >>
+    iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+      subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
     }>) {
     hal.executable.export @i4_dequant_unit_matmul_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -130,17 +124,11 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 ]>
 hal.executable @i4_dequant_matvec_f16_subgroup_64 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [
-          Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform,
-          GroupNonUniformArithmetic, GroupNonUniformShuffle
-        ], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU,
-        #spirv.resource_limits<
-          max_compute_shared_memory_size = 32768,
-          max_compute_workgroup_invocations = 1024,
-          max_compute_workgroup_size = [1024, 1024, 64],
-          subgroup_size = 64
-        >>
-    }>) {
+    iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+      compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+      subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+  }>) {
     hal.executable.export @i4_dequant_matvec_f16_subgroup_64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice

@@ -369,67 +369,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
   }];
 }
 
-def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-  DeclareOpInterfaceMethods<LinalgFusionInterface>,
-  DeclareOpInterfaceMethods<
-      TilingInterface,
-      ["generateScalarImplementation",
-       "getIterationDomain",
-       "getLoopIteratorTypes",
-       "getResultTilePosition",
-       "getTiledImplementation"]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface>]> {
-  let summary = "Reverse operator";
-  let description = [{
-    A temporary solution for lowering reverse ops into IREE, allowing IREE to
-    tile and distribute them.
-    }
-  }];
-
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       I64ElementsAttr:$dimensions
-  );
-  let results = (outs Variadic<AnyRankedTensor>:$results);
-  let assemblyFormat = [{
-    attr-dict `dimensions` `(` $dimensions `)`
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-    (`:` type($results)^)?
-  }];
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-    ShapedType getOperandType() {
-      return cast<ShapedType>(getInput().getType());
-    }
-    int64_t getOperandRank() {
-      return getOperandType().getRank();
-    }
-    ArrayRef<int64_t> getOprerandShape() {
-      return getOperandType().getShape();
-    }
-    SmallVector<int64_t> getDimensionsArray() {
-      SmallVector<int64_t> ret;
-      for (const APInt& elem : getDimensions()) {
-        ret.push_back(elem.getLimitedValue());
-      }
-      return ret;
-    }
-
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
-  }];
-}
-
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
@@ -511,8 +450,10 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 // Attention
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -539,60 +480,59 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     FlashAttention 2 and optionally results in the current `max` and `sum`
     statistics while processing the current tile.
 
-    If transpose_v is speciifed, the V tensor passed as input is assumed to
-    be transposed:
+    With indexing_maps we can also infer when variables are transposed.
+    for example, if V has indexing_map of (m, k1, k2, n) -> (n, k2) instead
+    of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
+    and we can expect computation to look like:
 
     attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
-
-    TODO: We should be moving to using a indexing map like approach so we
-    can generalize which tensor is transposed and which is not.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs,
+  let arguments = (ins AnyShaped:$query,
+                       AnyShaped:$key,
+                       AnyShaped:$value,
+                       AnyFloat:$scale,
                        Variadic<AnyShaped>:$outputs,
-                       DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
+                       AffineMapArrayAttr:$indexing_maps
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>,
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let hasFolder = 1;
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $inputs `:` type($inputs) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($results)^)?
   }];
 
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getQuery() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getKey() {
-      return getDpsInputOperand(1)->get();
-    }
-    Value getValue() {
-      return getDpsInputOperand(2)->get();
-    }
-    Value getScale() {
-      return getDpsInputOperand(3)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-    std::optional<Value> getMax() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return getDpsInitOperand(1)->get();
-    }
-    std::optional<Value> getSum() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return getDpsInitOperand(2)->get();
+  let extraClassDeclaration = [{
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
 
+    SmallVector<AffineMap> getIndexingMapsArray();
+
+    SmallVector<int64_t, 4> getStaticLoopRanges();
+
+    AffineMap getQueryMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[0]);
+    }
+    AffineMap getKeyMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[1]);
+    }
+    AffineMap getValueMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[2]);
+    }
+    AffineMap getOutputMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[3]);
+    }
+    int64_t getIterationDomainRank() {
+      return getQueryMap().getNumDims();
+    }
     ShapedType getQueryType() {
       return cast<ShapedType>(getQuery().getType());
     }
@@ -607,6 +547,34 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     }
     ShapedType getOutputType() {
       return cast<ShapedType>(getOutput().getType());
+    }
+
+    // Helper functions used for tile_and_decompose_attn.
+    // TODO: Remove once we completely move to
+    //       online_attn decompose pipeline.
+
+    std::optional<AffineMap> getMaxMap() {
+      if (getNumResults() < 2)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[4]);
+    }
+    std::optional<AffineMap> getSumMap() {
+      if (getNumResults() < 3)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[5]);
+    }
+    Value getOutput() {
+      return getDpsInitOperand(0)->get();
+    }
+    std::optional<Value> getMax() {
+      if (getNumResults() < 2)
+        return std::nullopt;
+      return getDpsInitOperand(1)->get();
+    }
+    std::optional<Value> getSum() {
+      if (getNumResults() < 3)
+        return std::nullopt;
+      return getDpsInitOperand(2)->get();
     }
     std::optional<ShapedType> getMaxType() {
       std::optional<Value> maxVal = getMax();
@@ -642,39 +610,13 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       return sumType->getRank();
     }
 
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
-
-    SmallVector<AffineMap> getIndexingMapsArray();
-
-    AffineMap getQueryMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[0]);
-    }
-    AffineMap getKeyMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[1]);
-    }
-    AffineMap getValueMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[2]);
-    }
-    AffineMap getOutputMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[3]);
-    }
-    std::optional<AffineMap> getMaxMap() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
-    }
-    std::optional<AffineMap> getSumMap() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[5]);
-    }
-
-    int64_t getIterationDomainRank() {
-      return getQueryMap().getNumDims();
+    // Since we expect map_V to be (b, m, k1, k2, n) -> (b, k2, n), this function
+    // returns true if n is not the fastest dim.
+    bool isTransposeV() {
+      AffineMap vMap = getValueMap();
+      auto vFastDim = llvm::cast<AffineDimExpr>(vMap.getResults().back());
+      int64_t nDim = vMap.getNumInputs() - 1;
+      return nDim != vFastDim.getPosition();
     }
   }];
 }

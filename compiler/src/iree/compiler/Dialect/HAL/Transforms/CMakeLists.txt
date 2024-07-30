@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AssignLegacyTargetDevices.cpp"
     "AssignTargetDevices.cpp"
     "CaptureExecutableSources.cpp"
     "ConfigureExecutables.cpp"
@@ -24,28 +25,35 @@ iree_cc_library(
     "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
     "FixupLegacySync.cpp"
+    "InitializeDevices.cpp"
+    "InlineMemoizeRegions.cpp"
     "LinkExecutables.cpp"
     "MaterializeDispatchInstrumentation.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
+    "MaterializeTargetDevices.cpp"
     "MemoizeDeviceQueries.cpp"
+    "OutlineMemoizeRegions.cpp"
     "Passes.cpp"
     "Passes.h.inc"
     "PreprocessExecutables.cpp"
     "PruneExecutables.cpp"
     "RepeatDispatches.cpp"
+    "ResolveDeviceAliases.cpp"
+    "ResolveDevicePromises.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
     "StripExecutableContents.cpp"
     "SubstituteExecutables.cpp"
     "TranslateExecutables.cpp"
-    "VerifyTargetEnvironment.cpp"
+    "VerifyDevices.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithDialect
+    MLIRAsmParser
     MLIRBufferizationDialect
     MLIRControlFlowDialect
     MLIRFuncDialect

@@ -120,6 +120,9 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType);
 
+/// Emit identity constant based on combiningKind and type.
+Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
+                                vector::CombiningKind kind, Type identityType);
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
@@ -151,6 +154,12 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target);
 /// Returns the GPU target attribute from the executable target wrapping |op|
 /// if found. Returns null TargetAttr othersise.
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
+
+/// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
+/// exists; otherwise returns the subgroup size from the GPU target description.
+/// Returns std::nullopt if none found.
+std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func,
+                                      bool pickLargest);
 
 } // namespace mlir::iree_compiler
 

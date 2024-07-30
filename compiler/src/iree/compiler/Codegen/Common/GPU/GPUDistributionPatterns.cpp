@@ -163,31 +163,32 @@ struct DistributeElementwise final
 
 /// Given a projected permutation, get a reduced permutation, i.e. without
 /// the projected dimensions.
-static SmallVector<int64_t> getReducedPermutation(AffineMap permutationMap) {
+static SmallVector<int64_t>
+getReducedPermutation(AffineMap permutationMap,
+                      llvm::SmallBitVector &unusedDims) {
   assert(permutationMap.isProjectedPermutation() &&
          "permutation map should be a projected permutation.");
   // TODO: The permutation map may also have broadcasting. Currently, we do not
   // handle it. This can be fixed by adding a "BROADCAST" dimension in the
   // layout.
 
+  unusedDims.clear();
+  unusedDims.resize(permutationMap.getNumDims(), true);
+
+  for (AffineExpr dimExpr : permutationMap.getResults()) {
+    int64_t pos = cast<AffineDimExpr>(dimExpr).getPosition();
+    unusedDims[pos] = false;
+  }
+
   SmallVector<int64_t> permutation;
   permutation.reserve(permutationMap.getNumResults());
 
-  unsigned leadingUnitDims =
-      permutationMap.getNumDims() - permutationMap.getNumResults();
-  for (AffineExpr dim : permutationMap.getResults()) {
-    // Get this dim's position in the permutation map.
-    auto dimExpr = dyn_cast<AffineDimExpr>(dim);
-    if (!dimExpr) {
-      llvm::report_fatal_error("permutation map is not a projected "
-                               "permutation.");
-    }
-
-    unsigned pos = dimExpr.getPosition();
-    assert(pos >= leadingUnitDims && "invalid permutation map");
-    pos -= leadingUnitDims;
+  AffineMap reducedMap = compressUnusedDims(permutationMap);
+  for (AffineExpr dimExpr : reducedMap.getResults()) {
+    int64_t pos = cast<AffineDimExpr>(dimExpr).getPosition();
     permutation.push_back(pos);
   }
+
   return permutation;
 }
 
@@ -208,8 +209,9 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     // lowering. When accessing memory, we use the memoryLayout, because that
     // is how the data is accessed in memory. The data is stored in the vector
     // according to vectorLayout.
+    llvm::SmallBitVector unusedDims;
     SmallVector<int64_t> permutation =
-        getReducedPermutation(xferOp.getPermutationMap());
+        getReducedPermutation(xferOp.getPermutationMap(), unusedDims);
     LayoutAttr memoryLayout =
         cast<LayoutAttr>(vectorLayout.permute(permutation));
 
@@ -219,8 +221,8 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     LayoutIterator iterator(vectorLayout, steps);
 
     iterator.apply([&](const LayoutIterator::State &state) {
-      SmallVector<Value> memoryIndices =
-          getMemoryIndices(state, memoryLayout, xferOp.getIndices(), rewriter);
+      SmallVector<Value> memoryIndices = getMemoryIndices(
+          state, memoryLayout, xferOp.getIndices(), unusedDims, rewriter);
       SmallVector<int64_t> accIndices = state.computeSIMTIndex();
       accumulator = accessUnit(xferOp, memoryIndices, accIndices, accumulator,
                                vectorLayout, memoryLayout, rewriter);
@@ -232,17 +234,22 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
   SmallVector<Value> getMemoryIndices(const LayoutIterator::State &state,
                                       LayoutAttr memoryLayout,
                                       SmallVector<Value> indices,
+                                      llvm::SmallBitVector &projectedDims,
                                       RewriterBase &rewriter) const {
     SmallVector<Value> simdIndices =
         computeSIMDIndex(state, memoryLayout, laneId, rewriter);
     SmallVector<Value> memoryIndices(indices);
 
     // The memory layout has some projected leading dims that indices doesn't.
-    int leadingProjectedDims = memoryIndices.size() - simdIndices.size();
-    for (int i = leadingProjectedDims, e = memoryIndices.size(); i < e; ++i) {
+    int currSimd = 0;
+    for (int i = 0, e = memoryIndices.size(); i < e; ++i) {
+      if (projectedDims[i]) {
+        continue;
+      }
+
       memoryIndices[i] = rewriter.create<arith::AddIOp>(
-          rewriter.getUnknownLoc(), memoryIndices[i],
-          simdIndices[i - leadingProjectedDims]);
+          rewriter.getUnknownLoc(), memoryIndices[i], simdIndices[currSimd]);
+      ++currSimd;
     }
 
     return memoryIndices;
@@ -743,7 +750,7 @@ struct DistributeBroadcastLayoutAttr final
 ///     sequence of multiplications and additions.
 ///
 struct DistributeLayoutConflictResolutions final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   VectorValue reshapeVector(Location loc, RewriterBase &rewriter,
@@ -785,10 +792,9 @@ struct DistributeLayoutConflictResolutions final
     return newVector;
   }
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
     VectorValue vector = resolutionOp.getInput();
     VectorValue result = resolutionOp.getOutput();
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
@@ -797,6 +803,11 @@ struct DistributeLayoutConflictResolutions final
     LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
     if (!targetLayout)
       return failure();
+
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
+    }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
     SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
@@ -830,13 +841,12 @@ struct DistributeLayoutConflictResolutions final
 /// especially used when we don't have an optimized way
 /// to resolve the conflict.
 struct DistributeLayoutConflictToSharedMemory final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
     auto loc = resolutionOp.getLoc();
     VectorValue vector = resolutionOp.getInput();
     VectorValue result = resolutionOp.getOutput();
@@ -849,6 +859,11 @@ struct DistributeLayoutConflictToSharedMemory final
     if (!targetLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
                                          "Target layout must be LayoutAttr.");
+    }
+
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
     }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
@@ -997,6 +1012,28 @@ struct DistributeLayoutConflictToSharedMemory final
   }
 };
 
+struct DistributeTrivialLayoutConversions final
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorLayoutInterface currentLayout =
+        dyn_cast<LayoutAttr>(signature[toLayoutOp.getInput()]);
+    VectorLayoutInterface targetLayout =
+        dyn_cast<LayoutAttr>(signature[toLayoutOp.getResult()]);
+
+    if (currentLayout != targetLayout) {
+      return rewriter.notifyMatchFailure(toLayoutOp,
+                                         "Non-trivial layout conversion.");
+    }
+
+    rewriter.replaceOp(toLayoutOp, toLayoutOp.getOperand());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -1008,6 +1045,7 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
+  patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,

@@ -57,6 +57,25 @@ util.func public @extractConstants(%timepoint: !stream.timepoint, %operand: !str
 
 // -----
 
+// Tests that execution regions in initializers are marked as `once` indicating
+// that they are one-shot. The analysis today only checks for ops within the
+// first block of an initializer and treats all others as reusable.
+
+// CHECK-LABEL: util.initializer
+util.initializer {
+  %c254_i32 = arith.constant 254 : i32
+  %size = arith.constant 128 : index
+  // CHECK: = stream.cmd.execute once
+  %result, %result_timepoint = stream.async.execute with() -> !stream.resource<transient>{%size} {
+    %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  util.optimization_barrier %result : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // Tests that explicit allocations are preserved.
 
 // CHECK-LABEL: @explicitAllocs
@@ -223,27 +242,29 @@ util.func public @producedResults(%size0: index, %size1: index) {
 // execution region. We expect them to be placed into packed slices and
 // allocated with the async stream-ordered alloca/dealloca ops.
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @locals
 // CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index, %[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint)
 util.func public @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
   %c254_i32 = arith.constant 254 : i32
   %c255_i32 = arith.constant 255 : i32
-  //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack on(#hal.affinity.queue<[0]>) slices({
+  //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack on(#hal.device.affinity<@device>) slices({
   // CHECK-NEXT:   [0, 0] = %[[SIZE0]],
   // CHECK-NEXT:   [1, 1] = %[[SIZE1]]
   // CHECK-NEXT: })
-  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.affinity.queue<[0]>) await(%[[AWAIT_TIMEPOINT]]) => !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) await(%[[AWAIT_TIMEPOINT]]) => !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
   // CHECK-NEXT: %[[AWAIT_JOIN:.+]] = stream.timepoint.join max(%[[AWAIT_TIMEPOINT]], %[[ALLOCA_TIMEPOINT]])
-  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute on(#hal.affinity.queue<[0]>) await(%[[AWAIT_JOIN]])
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute on(#hal.device.affinity<@device>) await(%[[AWAIT_JOIN]])
   // CHECK-SAME: with(%[[ALLOCA]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
-  %result_timepoint = stream.async.execute on(#hal.affinity.queue<[0]>) await(%await_timepoint) => with() {
+  %result_timepoint = stream.async.execute on(#hal.device.affinity<@device>) await(%await_timepoint) => with() {
     // CHECK: stream.cmd.fill %c254_i32, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size0}
     // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size1}
     stream.yield
   } => !stream.timepoint
-  // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca on(#hal.affinity.queue<[0]>) await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca on(#hal.device.affinity<@device>) await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
   // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA_TIMEPOINT]], %[[EXEC_TIMEPOINT]]) => !stream.timepoint
   // CHECK: util.return %[[JOIN]]
   util.return %result_timepoint : !stream.timepoint

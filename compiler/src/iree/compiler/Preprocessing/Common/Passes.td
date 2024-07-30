@@ -51,6 +51,11 @@ def ConvertConvToChannelsLastPass :
   ];
 }
 
+def FoldAttentionWithTransposePass :
+    Pass<"iree-preprocessing-fold-attention-with-transpose", ""> {
+  let summary = "Fold attention operation with transpose";
+}
+
 def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
   let summary = "transform dialect interpreter";
   let description = [{
@@ -79,8 +84,8 @@ def MakeSingleDispatchForFunctionPass :
   ];
 }
 
-def PadToIntrinsics :
-    InterfacePass<"iree-preprocessing-pad-to-intrinsics", "mlir::FunctionOpInterface"> {
+def PadToIntrinsicsPass :
+    Pass<"iree-preprocessing-pad-to-intrinsics", "ModuleOp"> {
   let summary = "Pad linalg ops such that we can use target's intrinsics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
@@ -127,6 +132,14 @@ def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
                          "Transpose RHS input matrix.")
            )}]>
   ];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
+def GeneralizeLinalgMatMulPass :
+    InterfacePass<"iree-preprocessing-generalize-linalg-matmul-experimental", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg matmul ops to linalg.generics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
   ];

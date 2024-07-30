@@ -1102,7 +1102,7 @@ public:
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    return setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 
@@ -1152,7 +1152,7 @@ static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
                               mlir::FunctionOpInterface funcOp) {
   funcOp.walk([&](Operation *op) {
     // Do not emit remarks for conflict operations.
-    if (isa<VectorExt::LayoutConflictResolutionOp>(op)) {
+    if (isa<VectorExt::ToLayoutOp>(op)) {
       return;
     }
 
@@ -1176,9 +1176,6 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
-  if (setAnchorOpsFromAttributes(analysis, target).failed()) {
-    return emitDefaultSilenceableFailure(target);
-  }
   if (failed(analysis.run())) {
     target.emitError("layout analysis failed");
     return emitDefaultSilenceableFailure(target);

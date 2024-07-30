@@ -85,11 +85,15 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 
   auto opTypeAttr = IREE::Encoding::EncodingOpTypeAttr::get(
       context, IREE::Encoding::EncodingOpType::matmul);
+  // TODO(#17718): Handle the broadcast map for transpose cases. It is on the
+  // experimental path, so it is not clear what needs to be done here. For now
+  // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
-      newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
+      newIndexingMaps, encoding.getBcastMap(),
+      DenseI64ArrayAttr::get(context, newRoundDimsTo));
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 

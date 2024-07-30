@@ -83,6 +83,8 @@ iree_check_single_backend_test_suite(
     "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
+  LABELS
+    "nowasm"
 )
 
 iree_check_single_backend_test_suite(
@@ -264,7 +266,6 @@ iree_check_single_backend_test_suite(
     "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_minus_one.mlir"
-    "fft.mlir"
     "finite.mlir"
     "floor.mlir"
     "gather.mlir"
@@ -283,7 +284,6 @@ iree_check_single_backend_test_suite(
     "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
-    "reverse.mlir"
     "rng_normal.mlir"
     "rng_uniform.mlir"
     "round.mlir"

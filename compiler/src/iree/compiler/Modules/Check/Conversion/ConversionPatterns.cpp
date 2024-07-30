@@ -7,6 +7,7 @@
 #include "iree/compiler/Modules/Check/Conversion/ConversionPatterns.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -68,8 +69,7 @@ static LogicalResult applyDefaultCheckBufferRewrite(
   state.addAttributes(srcOp->getAttrs());
 
   // Add device argument.
-  // TODO(multi-device): support multiple devices in check tests .
-  Value device = IREE::HAL::DeviceType::resolveAny(srcOp->getLoc(), rewriter);
+  Value device = lookupDeviceFor(srcOp, rewriter);
   state.addOperands({device});
 
   for (auto [srcOperand, dstOperand] :

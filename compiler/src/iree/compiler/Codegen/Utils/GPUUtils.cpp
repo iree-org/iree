@@ -38,8 +38,10 @@ static constexpr unsigned kShuffleBitWidth = 32;
 static llvm::cl::opt<std::string> clTestTarget(
     "iree-gpu-test-target",
     llvm::cl::desc(
-        "The target for IR LIT tests; the interpretation depends on the target "
-        "API. e.g., \"gfx942\" for HIP, \"sm_80\" for CUDA"),
+        "The target for IR LIT tests. Format is '<arch>:<feature>@<api>', "
+        "where <feature> and <api> are optional; e.g., "
+        "'gfx942:+sramecc,-xnack@hip'. If <api> is missing, it will be deduced "
+        "from <arch>; e.g., 'gfx*' defaults to HIP, 'sm_*' defaults to CUDA"),
     llvm::cl::init(""));
 
 namespace mlir::iree_compiler {
@@ -502,9 +504,8 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
 }
 
 /// Emit identity variable.
-static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
-                                       vector::CombiningKind kind,
-                                       Type identityType) {
+Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
+                                vector::CombiningKind kind, Type identityType) {
   auto vectorType = llvm::dyn_cast<VectorType>(identityType);
   Type elementType = identityType;
   if (vectorType) {
@@ -956,41 +957,57 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
+static IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
+  if (clTestTarget.empty())
+    return nullptr;
+
+  auto [archAndFeatures, backend] = StringRef(clTestTarget).split("@");
+  if (backend.empty()) {
+    // Guess what the target API is based on common scheme. This does not work
+    // for cases like "ampere" which can be accepted by both CUDA and Vulkan;
+    // it's very limited. So it's targeting common cases to make writing tests
+    // simpler.
+    if (StringRef(clTestTarget).starts_with("sm_"))
+      backend = "cuda";
+    else if (StringRef(clTestTarget).starts_with("gfx"))
+      backend = "hip";
+    else if (StringRef(clTestTarget).starts_with("adreno"))
+      backend = "vulkan";
+    else if (StringRef(clTestTarget).starts_with("apple"))
+      backend = "vulkan";
+    else if (StringRef(clTestTarget).starts_with("valhall"))
+      backend = "vulkan";
+  }
+  auto [arch, features] = StringRef(archAndFeatures).split(':');
+  // Use the target specified in the command line for testing purposes.
+  return IREE::GPU::getFullTarget(backend, arch, features, context);
+}
+
 IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   if (auto config = target.getConfiguration()) {
     if (auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target"))
       return attr;
   }
-  if (!clTestTarget.empty()) {
-    auto [arch, features] = StringRef(clTestTarget).split(':');
-    // Use the target specified in the command line for testing purposes.
-    return IREE::GPU::getFullTarget(target.getBackend(), arch, features,
-                                    target.getContext());
-  }
-
-  return nullptr;
+  return getCLGPUTarget(target.getContext());
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
     return getGPUTargetAttr(target);
   }
-  if (!clTestTarget.empty()) {
-    // Guess what the target API is based on common scheme. This does not work
-    // for cases like "ampere" which can be accepted by both CUDA and Vulkan.
-    // So it's very limited. However, it makes writing tests simpler. Maybe we
-    // should consider making it explicit in the clTestTarget what API we are
-    // targeting.
-    StringRef backend;
-    if (StringRef(clTestTarget).starts_with("sm_"))
-      backend = "cuda";
-    else if (StringRef(clTestTarget).starts_with("gfx"))
-      backend = "rocm";
-    auto [arch, features] = StringRef(clTestTarget).split(':');
-    // Use the target specified in the command line for testing purposes.
-    return IREE::GPU::getFullTarget(backend, arch, features, op->getContext());
-  }
-  return nullptr;
+  return getCLGPUTarget(op->getContext());
+}
+
+std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func,
+                                      bool pickLargest) {
+  // First try to see if there is a subgroup size chosen in the CodeGen pipeline
+  // configuration.
+  if (std::optional<int64_t> subgroupSize = getSubgroupSize(func))
+    return subgroupSize.value();
+  // Then try to find the subgroup size from the target description.
+  if (IREE::GPU::TargetAttr target = getGPUTargetAttr(func))
+    return target.getPreferredSubgroupSize(pickLargest);
+  return std::nullopt;
 }
 
 } // namespace mlir::iree_compiler

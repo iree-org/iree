@@ -558,7 +558,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
+    iree_hal_dispatch_flags_t flags) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
   if ((workgroup_x | workgroup_y | workgroup_z) == 0) {
@@ -574,7 +575,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, workgroup_x, workgroup_y, workgroup_z));
+                entry_point, workgroup_x, workgroup_y, workgroup_z, flags));
   });
 #if IREE_HAL_VERBOSE_TRACING_ENABLE
   // TODO(benvanik): add a tracing.h helper that does the snprintf directly
@@ -594,7 +595,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
       command_buffer, executable, entry_point, workgroup_x, workgroup_y,
-      workgroup_z);
+      workgroup_z, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -602,7 +603,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref) {
+    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -610,10 +611,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_indirect_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, workgroups_ref));
+                entry_point, workgroups_ref, flags));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch_indirect)(
-      command_buffer, executable, entry_point, workgroups_ref);
+      command_buffer, executable, entry_point, workgroups_ref, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

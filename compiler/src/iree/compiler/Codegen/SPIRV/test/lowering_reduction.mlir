@@ -2,7 +2,12 @@
 // RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-decompose-softmax), iree-spirv-select-lowering-strategy-pass, func.func(iree-spirv-lower-executable-target-pass))' \
 // RUN:   %s | FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], cooperative_matrix_properties_khr = []>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536>>
+}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 module {
@@ -81,7 +86,12 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536>>
+}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
@@ -155,7 +165,12 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 64],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 module {
   func.func @softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c0 = arith.constant 0 : index
@@ -175,19 +190,19 @@ module {
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32{{.+}}>, vector<4xf32>
-//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maxnumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maxnumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -196,16 +211,16 @@ module {
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read
@@ -253,7 +268,12 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>, api=Vulkan, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+    subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+}>
 module {
   func.func @dynamic_softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
     %c32_i64 = arith.constant 32 : i64
@@ -277,7 +297,7 @@ module {
 
 // CHECK-LABEL: func.func @dynamic_softmax
 // CHECK-DAG:     %[[ADD_PAD:.+]] = arith.constant dense<0.000000e+00> : vector<1xf16>
-// CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFC00> : vector<1xf16>
+// CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFE00> : vector<1xf16>
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG:     %[[C0_F16:.+]] = arith.constant 0.000000e+00 : f16
@@ -296,7 +316,7 @@ module {
 // CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
 // CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
 // CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
-// CHECK:           %[[MAX:.+]] = arith.maximumf %[[NEW]], %[[ACC]] : vector<1xf16>
+// CHECK:           %[[MAX:.+]] = arith.maxnumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:           gpu.barrier
 

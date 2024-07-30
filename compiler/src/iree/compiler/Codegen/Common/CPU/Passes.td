@@ -13,16 +13,16 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for CPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def CPUMaterializeEncoding :
-    InterfacePass<"iree-codegen-cpu-materialize-encoding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend";
-  let constructor = "mlir::iree_compiler::createCPUMaterializeEncodingPass()";
+def CPUMaterializeHostEncoding :
+    Pass<"iree-codegen-cpu-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+  let constructor = "mlir::iree_compiler::createCPUMaterializeHostEncodingPass()";
 }
 
-def CPUMaterializeUpperBoundTileSize :
-    InterfacePass<"iree-codegen-cpu-materialize-upper-bound-tile-size", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize upper_bound_tile_size to constants.";
-  let constructor = "mlir::iree_compiler::createCPUMaterializeUpperBoundTileSizePass()";
+def CPUMaterializeDeviceEncoding :
+    InterfacePass<"iree-codegen-cpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+  let constructor = "mlir::iree_compiler::createCPUMaterializeDeviceEncodingPass()";
 }
 
 def CPULowerToUKernels :

@@ -6,12 +6,15 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
 
@@ -51,18 +54,6 @@ struct MaterializeEncodingIntoNopPass
       return signalPassFailure();
     }
 
-    {
-      RewritePatternSet patterns(context);
-      populateMaterializeUpperBoundTileSizePatterns(patterns,
-                                                    materializeEncodingFn);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
-        operation.emitOpError(
-            "encoding padding sizes materialization pattern failed");
-        return signalPassFailure();
-      }
-    }
-
     // Add patterns to resolve dims ops and cleanups.
     {
       RewritePatternSet patterns(context);
@@ -82,6 +73,12 @@ struct MaterializeEncodingIntoNopPass
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMaterializeEncodingIntoNopPass() {
   return std::make_unique<MaterializeEncodingIntoNopPass>();
+}
+
+void addEncodingToNopPasses(FunctionLikeNest &passManager) {
+  passManager.addPass(createMaterializeEncodingIntoNopPass)
+      .addPass(createBufferizeCopyOnlyDispatchesPass)
+      .addPass(createCanonicalizerPass);
 }
 
 } // namespace mlir::iree_compiler

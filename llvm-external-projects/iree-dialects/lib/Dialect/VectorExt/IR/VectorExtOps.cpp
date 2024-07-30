@@ -17,15 +17,9 @@ using VectorValue = TypedValue<VectorType>;
 // LayoutConflictResolutionOp
 //===----------------------------------------------------------------------===//
 
-// Validate that the desired layout has the same shape as the input.
-LogicalResult LayoutConflictResolutionOp::verify() {
-  if (getSourceLayout().isValidLayout(getInput()).failed()) {
-    return failure();
-  }
-  if (getDesiredLayout().isValidLayout(getOutput()).failed()) {
-    return failure();
-  }
-  return success();
+// Validate that the layout has the same shape as the input.
+LogicalResult ToLayoutOp::verify() {
+  return getLayout().isValidLayout(getInput());
 }
 
 // to_simd -> to_simt

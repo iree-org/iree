@@ -50,40 +50,6 @@ using IREE::Encoding::EncodingAttr;
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-/// Pads `value` enough for any actual tile sizes that could result from
-/// materialization of `encodingAttr`.
-static Value pad(OpBuilder &builder, Location loc, Value source,
-                 EncodingAttr encodingAttr) {
-  RankedTensorType sourceType = cast<RankedTensorType>(source.getType());
-  Type elemType = sourceType.getElementType();
-  size_t rank = sourceType.getRank();
-  RankedTensorType tensorTypeWithEncoding =
-      RankedTensorType::get(sourceType.getShape(), elemType, encodingAttr);
-  SmallVector<OpFoldResult> lowPad(rank, builder.getIndexAttr(0));
-  SmallVector<Type> resultTypes(rank, builder.getIndexType());
-
-  ValueRange encodingPaddingSizes =
-      builder
-          .create<IREE::Encoding::UpperBoundTileSizeOp>(
-              loc, resultTypes, TypeAttr::get(tensorTypeWithEncoding))
-          .getResults();
-  SmallVector<OpFoldResult> highPad(rank);
-  AffineExpr tileExpr, shapeExpr;
-  bindSymbols(builder.getContext(), tileExpr, shapeExpr);
-  AffineExpr highPadExpr = shapeExpr.ceilDiv(tileExpr) * tileExpr - shapeExpr;
-  for (size_t i = 0; i < rank; ++i) {
-    highPad[i] = affine::makeComposedFoldedAffineApply(
-        builder, loc, highPadExpr,
-        getAsOpFoldResult({encodingPaddingSizes[i],
-                           builder.create<tensor::DimOp>(loc, source, i)}));
-  }
-
-  Value zero = builder.create<arith::ConstantOp>(loc, elemType,
-                                                 builder.getZeroAttr(elemType));
-  return builder.create<tensor::PadOp>(loc, /*resultType=*/nullptr, source,
-                                       lowPad, highPad, zero);
-}
-
 Value setEncoding(OpBuilder &builder, Location loc, Value source,
                   EncodingAttr encodingAttr) {
   auto sourceType = cast<RankedTensorType>(source.getType());
@@ -139,35 +105,6 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   }
 
   return narrow;
-}
-
-static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               int64_t operandIndex,
-                               ArrayRef<Type> operandElemTypes,
-                               MatmulNarrowSizes narrow,
-                               ArrayRef<AffineMap> indexingMaps,
-                               IREE::Encoding::EncodingOpType opType) {
-  MLIRContext *ctx = builder.getContext();
-  // No need to specify original_type in the encoding poadded to pad(), because
-  // the operand there is the `source` tensor, so it will default to reading its
-  // original shape.
-  auto encodingForPad = EncodingAttr::get(
-      ctx, operandIndex, opType, operandElemTypes,
-      /*originalType=*/Type{}, narrow.M, narrow.N, indexingMaps);
-  Value padded = pad(builder, loc, source, encodingForPad);
-  // For setEncoding() below, we potentially need to specify an encoding with an
-  // explicit original_type, because the operand there is the padded tensor
-  // returned by pad() above, but we want setEncoding to be aware of the
-  // original source tensor shape, not the padded tensor shape. To limit IR
-  // verbosity, we only specify the original original_type when it differs from
-  // the tensor type that the encoding is applied to.
-  auto encodingForSetEncoding = encodingForPad;
-  if (padded.getType() != source.getType()) {
-    encodingForSetEncoding = EncodingAttr::get(
-        ctx, operandIndex, opType, operandElemTypes,
-        /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
-  }
-  return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
 
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
@@ -336,31 +273,19 @@ public:
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
-    Value encodedLhs, encodedRhs, encodedOut;
 
     auto opType = IREE::Encoding::EncodingOpType::matmul;
-    if (!padFactor) {
-      encodedLhs =
-          padAndSetEncoding(rewriter, loc, lhs, IREE::Encoding::MATMUL_LHS,
-                            elemTypes, narrowSizes, maps, opType);
-      encodedRhs =
-          padAndSetEncoding(rewriter, loc, rhs, IREE::Encoding::MATMUL_RHS,
-                            elemTypes, narrowSizes, maps, opType);
-      encodedOut =
-          padAndSetEncoding(rewriter, loc, out, IREE::Encoding::MATMUL_RESULT,
-                            elemTypes, narrowSizes, maps, opType);
-    } else {
-      auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-        SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
-        auto encoding = EncodingAttr::get(
-            linalgOp.getContext(), operandIndex, opType, elemTypes,
-            src.getType(), narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
-        return setEncoding(rewriter, loc, src, encoding);
-      };
-      encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
-      encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
-      encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
-    }
+    auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
+      SmallVector<int64_t> roundDimsTo(3, padFactor);
+      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
+                                        opType, elemTypes, src.getType(),
+                                        narrowSizes.M, narrowSizes.N, maps,
+                                        /*bcastMap=*/std::nullopt, roundDimsTo);
+      return setEncoding(rewriter, loc, src, encoding);
+    };
+    Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
+    Value encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
+    Value encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
     Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
                           ValueRange{encodedLhs, encodedRhs, encodedOut})
                         ->getResult(0);
@@ -381,7 +306,7 @@ public:
   }
 
 private:
-  int64_t padFactor = 0;
+  int64_t padFactor = 32;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`

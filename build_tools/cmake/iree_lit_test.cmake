@@ -18,8 +18,8 @@ include(CMakeParseArguments)
 # TOOLS: Tools that should be included on the PATH
 # DATA: Additional data dependencies invoked by the test (e.g. binaries
 #   called in the RUN line)
-# LABELS: Additional labels to apply to the test. The package path is added
-#     automatically.
+# LABELS: Additional labels to apply to the test. Package path and
+#     "test-type=lit-test" labels are added automatically.
 function(iree_lit_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -75,6 +75,7 @@ function(iree_lit_test)
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  list(APPEND _RULE_LABELS "test-type=lit-test")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
