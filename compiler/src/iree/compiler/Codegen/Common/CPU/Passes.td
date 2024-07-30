@@ -25,12 +25,6 @@ def CPUMaterializeDeviceEncoding :
   let constructor = "mlir::iree_compiler::createCPUMaterializeDeviceEncodingPass()";
 }
 
-def CPUMaterializeUpperBoundTileSize :
-    Pass<"iree-codegen-cpu-materialize-upper-bound-tile-size", "mlir::ModuleOp"> {
-  let summary = "Materialize upper_bound_tile_size to constants.";
-  let constructor = "mlir::iree_compiler::createCPUMaterializeUpperBoundTileSizePass()";
-}
-
 def CPULowerToUKernels :
     Pass<"iree-codegen-cpu-lower-to-ukernels", ""> {
   let summary =

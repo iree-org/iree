@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
@@ -312,12 +311,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                          assignmentOptions);
     buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                       targetOptions, hooks);
-
-    // HACK: this should not be here and will be going away. It exists for
-    // lowering iree_linalg_ext.upper_bound_tile_size ops that exist on the
-    // host. We should be using stream ops for performing such calculations that
-    // we can attach affinities to and understand what devices are being used.
-    passManager.addPass(createCPUMaterializeUpperBoundTileSizePass());
 
     // Preprocess executables using an external tool. The tool may mutate one or
     // more variants and even insert or remove variants.

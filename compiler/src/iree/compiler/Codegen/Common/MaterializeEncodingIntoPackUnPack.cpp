@@ -289,38 +289,6 @@ static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
       *innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
 }
 
-static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
-    RewriterBase &rewriter,
-    IREE::Encoding::UpperBoundTileSizeOp upperBoundTileSizeOp,
-    MaterializeEncodingFn materializeEncodingFn) {
-  Location loc = upperBoundTileSizeOp.getLoc();
-  RankedTensorType tensorType = upperBoundTileSizeOp.getTensorType();
-  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(tensorType);
-  if (failed(materializeEncodingInfo)) {
-    return rewriter.notifyMatchFailure(upperBoundTileSizeOp,
-                                       "unhandled source encoding");
-  }
-  ArrayRef<int64_t> innerTileSizes = materializeEncodingInfo->innerTileSizes;
-  ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo->innerDimsPos;
-  SmallVector<Value> results(tensorType.getRank());
-  for (unsigned i = 0; i < innerTileSizes.size(); ++i) {
-    int64_t tileSize = innerTileSizes[i];
-    if (ShapedType::isDynamic(tileSize)) {
-      tileSize = 16;
-    }
-    results[innerDimsPos[i]] =
-        rewriter.create<arith::ConstantIndexOp>(loc, tileSize);
-  }
-  // For the dims that have no inner tiles, use 1 as tile size to avoid padding.
-  for (unsigned i = 0; i < results.size(); ++i) {
-    if (!results[i]) {
-      results[i] = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    }
-  }
-  return results;
-}
-
 static FailureOr<Operation *>
 lowerContractionOpWithEncoding(RewriterBase &rewriter,
                                linalg::LinalgOp linalgOp, ValueRange operands,
@@ -788,36 +756,6 @@ struct UnsetEncodingOpToUnPackOpConversion
   }
 };
 
-/// Convert `upper_bound_tile_size` op to `constant` op. If the
-/// `materializeEncodingFn` returns a failure, the pattern will materialize it
-/// to the same shape.
-struct UpperBoundTileSizeToConstantOpConversion
-    : public OpRewritePattern<IREE::Encoding::UpperBoundTileSizeOp> {
-  UpperBoundTileSizeToConstantOpConversion(
-      MLIRContext *context, MaterializeEncodingFn materializeEncodingFn)
-      : OpRewritePattern<IREE::Encoding::UpperBoundTileSizeOp>(context),
-        materializeEncodingFn(materializeEncodingFn) {}
-
-  LogicalResult
-  matchAndRewrite(IREE::Encoding::UpperBoundTileSizeOp upperBoundTileSizeOp,
-                  PatternRewriter &rewriter) const override {
-
-    auto constants = lowerUpperBoundTileSizeOpToConstants(
-        rewriter, upperBoundTileSizeOp, materializeEncodingFn);
-    if (failed(constants)) {
-      SmallVector<Value> results(upperBoundTileSizeOp.getNumResults(),
-                                 rewriter.create<arith::ConstantIndexOp>(
-                                     upperBoundTileSizeOp.getLoc(), 1));
-      rewriter.replaceOp(upperBoundTileSizeOp, results);
-      return success();
-    }
-    rewriter.replaceOp(upperBoundTileSizeOp, *constants);
-    return success();
-  }
-
-  MaterializeEncodingFn materializeEncodingFn;
-};
-
 /// Generic pattern to convert operation that is in Destination Passing Style.
 template <typename OpTy>
 struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
@@ -957,12 +895,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
                   MaterializeFlowDispatchTensorStoreOp,
                   MaterializeInterfaceBindingEncoding>(
       context, typeConverter, materializeEncodingValueFn);
-}
-
-void populateMaterializeUpperBoundTileSizePatterns(
-    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn) {
-  patterns.insert<UpperBoundTileSizeToConstantOpConversion>(
-      patterns.getContext(), materializeEncodingFn);
 }
 
 } // namespace mlir::iree_compiler

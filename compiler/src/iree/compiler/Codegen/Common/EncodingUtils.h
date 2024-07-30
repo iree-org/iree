@@ -96,9 +96,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-void populateMaterializeUpperBoundTileSizePatterns(
-    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
-
 // Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 // result of a matvec.
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);

@@ -336,8 +336,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
         UnhoistableOpInterfaceHelper<
-            IREE::Encoding::SetEncodingOp,
-            IREE::Encoding::UpperBoundTileSizeOp>::registerOpInterface(context);
+            IREE::Encoding::SetEncodingOp>::registerOpInterface(context);
       });
   // Register hoistable type interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider

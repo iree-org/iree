@@ -443,55 +443,6 @@ getMaterializeEncodingFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
       };
 }
 
-// Like getMaterializeEncodingFn, but iterating over an array of targets and
-// returning the max of all tile sizes from each target, checking that other
-// materialization info (permutations) agree.
-//
-// This is useful to compute padding amounts, in the materialization of
-// UpperBoundTileSizeOp, in top-level functions that are not part of one HAL
-// executable variant. There, the padding amounts only control the size of
-// allocated buffers, so it's OK to over-estimate (only wasting some memory)
-// but not under-estimate (would cause buffer overruns) padding amounts.
-static MaterializeEncodingFn getUpperBoundMaterializeEncodingFn(
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
-  return
-      [targetAttrs](
-          RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-        FailureOr<MaterializeEncodingInfo> result; // Defaults to failure.
-        for (auto targetAttr : targetAttrs) {
-          FailureOr<MaterializeEncodingInfo> info =
-              materializeEncodingForTarget(tensorType, targetAttr);
-          if (failed(info)) {
-            // No info at this iteration. Ignore and continue.
-            continue;
-          }
-          if (failed(result)) {
-            // No preexisting result. Use this iteration's info and continue.
-            result = info;
-            continue;
-          }
-          // Merge this iteration's info into preexisting result info.
-          // Check that permutations match, then record the max of tile sizes.
-          if (info->innerDimsPos != result->innerDimsPos ||
-              info->outerDimsPerm != result->outerDimsPerm) {
-            return failure();
-          }
-          if (info->innerTileSizes.size() != result->innerTileSizes.size()) {
-            return failure();
-          }
-          for (unsigned i = 0; i < info->innerTileSizes.size(); ++i) {
-            if (ShapedType::isDynamic(info->innerTileSizes[i])) {
-              result->innerTileSizes[i] = ShapedType::kDynamic;
-            } else {
-              result->innerTileSizes[i] =
-                  std::max(result->innerTileSizes[i], info->innerTileSizes[i]);
-            }
-          }
-        }
-        return result;
-      };
-}
-
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
@@ -663,68 +614,6 @@ struct CPUMaterializeDeviceEncodingPass
 
 std::unique_ptr<Pass> createCPUMaterializeDeviceEncodingPass() {
   return std::make_unique<CPUMaterializeDeviceEncodingPass>();
-}
-
-// NOTE: this runs on host modules.
-struct CPUMaterializeUpperBoundTileSizePass
-    : public CPUMaterializeUpperBoundTileSizeBase<
-          CPUMaterializeUpperBoundTileSizePass> {
-  CPUMaterializeUpperBoundTileSizePass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect>();
-  }
-
-  void runOnOperation() override {
-    auto moduleOp = getOperation();
-
-    // Run required analysis passes.
-    IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
-    if (failed(affinityAnalysis.run())) {
-      return signalPassFailure();
-    }
-    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
-    if (failed(deviceAnalysis.run())) {
-      return signalPassFailure();
-    }
-
-    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
-      // Gather the required executable targets for the function. Note that it's
-      // possible there are more required for ops nested within the function but
-      // this pass is a hack and can't handle that :shrug:.
-      auto executableTargets = getFuncExecutableTargetAttrs(
-          funcOp, affinityAnalysis, deviceAnalysis);
-      if (!executableTargets) {
-        funcOp.emitOpError()
-            << "could not determine executable targets for the function";
-        return signalPassFailure();
-      } else if (executableTargets->empty()) {
-        // Probably no tensors.
-        continue;
-      }
-
-      // Get patterns specialized for the executable targets used by the
-      // function.
-      RewritePatternSet patterns(&getContext());
-      MaterializeEncodingFn materializeEncodingFn =
-          getUpperBoundMaterializeEncodingFn(executableTargets->getArrayRef());
-      if (!materializeEncodingFn)
-        return signalPassFailure();
-      populateMaterializeUpperBoundTileSizePatterns(patterns,
-                                                    materializeEncodingFn);
-
-      // Run patterns on the function.
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        funcOp.emitOpError(
-            "encoding padding sizes materialization pattern failed");
-        return signalPassFailure();
-      }
-    }
-  }
-};
-
-std::unique_ptr<Pass> createCPUMaterializeUpperBoundTileSizePass() {
-  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>();
 }
 
 } // namespace mlir::iree_compiler
