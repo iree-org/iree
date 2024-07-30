@@ -845,18 +845,9 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
 
-  auto getSubgroupSizeFn = [](mlir::FunctionOpInterface func) -> int {
-    // TODO: This kind of call back function is a really really bad idea
-    // This should be easier to resolve than doing this.
-    if (std::optional<int64_t> maybeSubgroupSize = getSubgroupSize(func)) {
-      return maybeSubgroupSize.value();
-    }
-    return kDefaultSubgroupSize;
-  };
-
   // vector -> simt gpu + vector
   funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/true, getSubgroupSizeFn));
+      /*expandSubgroupReduction=*/true, /*pickLargestSubgroupSize=*/false));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
