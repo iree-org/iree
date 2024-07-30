@@ -2551,6 +2551,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#haldevicememoize-haldevicememoizeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      hal.device.memoize (HAL::DeviceMemoizeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#haldispatchextern-haldispatchexternop" class="md-nav__link">
     <span class="md-ellipsis">
       hal.dispatch.extern (HAL::DispatchExternOp)
@@ -6342,6 +6351,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#haldevicememoize-haldevicememoizeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      hal.device.memoize (HAL::DeviceMemoizeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#haldispatchextern-haldispatchexternop" class="md-nav__link">
     <span class="md-ellipsis">
       hal.dispatch.extern (HAL::DispatchExternOp)
@@ -7292,6 +7310,7 @@ input.</p>
 </ul>
 </li>
 <li><a href="#pseudo-ops">Pseudo Ops</a><ul>
+<li><a href="#haldevicememoize-haldevicememoizeop">hal.device.memoize (HAL::DeviceMemoizeOp)</a></li>
 <li><a href="#haldispatchextern-haldispatchexternop">hal.dispatch.extern (HAL::DispatchExternOp)</a></li>
 <li><a href="#haltensoralias-haltensoraliasop">hal.tensor.alias (HAL::TensorAliasOp)</a></li>
 <li><a href="#haltensorbarrier-haltensorbarrierop">hal.tensor.barrier (HAL::TensorBarrierOp)</a></li>
@@ -11105,6 +11124,62 @@ possibly lazy-initialized pipeline layout.</p>
 </table>
 <h3 id="pseudo-ops">Pseudo Ops<a class="headerlink" href="#pseudo-ops" title="Permanent link">link</a></h3>
 <p>Pseudo ops for conversion support.</p>
+<h4 id="haldevicememoize-haldevicememoizeop"><code>hal.device.memoize</code> (HAL::DeviceMemoizeOp)<a class="headerlink" href="#haldevicememoize-haldevicememoizeop" title="Permanent link">link</a></h4>
+<p><em>Memoizes resources for a particular device and queue affinity</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.device.memoize` `&lt;` $device `:` type($device) `&gt;`
+              `affinity` `(` $queue_affinity `)`
+              `-&gt;` type($results)
+              attr-dict-with-keyword
+              $body
+</code></pre></div>
+<p>Executes the nested region once per device and affinity mask and memoizes
+the results such that future references return the previously memoized
+values. The initial execution may happen on demand or be hoisted to module
+initialization time.</p>
+<p>Any uses of the device or affinity specified within the nested region will
+be substituted with the appropriate device and affinity during memoization.
+All other implicitly captured values must be either constant or global
+values available at the time the memoization occurs.</p>
+<p>It is valid for the nested region contents to be inlined in place and never
+memoized. This can be useful when diagnosing memoization issues and can be
+forced with the <code>--iree-hal-memoization=false</code> flag.</p>
+<p>Traits: <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ReturnOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>RegionBranchOpInterface</code></p>
+<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_46">Results:<a class="headerlink" href="#results_46" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
 <h4 id="haldispatchextern-haldispatchexternop"><code>hal.dispatch.extern</code> (HAL::DispatchExternOp)<a class="headerlink" href="#haldispatchextern-haldispatchexternop" title="Permanent link">link</a></h4>
 <p><em>A dispatch of workgroups across a 3-dimensional grid</em></p>
 <p>Syntax:</p>
@@ -11204,7 +11279,7 @@ used for execution.</p>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
 </table>
 
-<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
+<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11231,7 +11306,7 @@ used for execution.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_46">Results:<a class="headerlink" href="#results_46" title="Permanent link">link</a></h5>
+<h5 id="results_47">Results:<a class="headerlink" href="#results_47" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11289,7 +11364,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 <tr><td><code>affinity</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
+<h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11316,7 +11391,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_47">Results:<a class="headerlink" href="#results_47" title="Permanent link">link</a></h5>
+<h5 id="results_48">Results:<a class="headerlink" href="#results_48" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11342,7 +11417,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 <p>Defines a barrier that is used to indicate availability of an entire set of
 tensors by signaling a fence. The source tensors are returned for chaining.</p>
 <p>Interfaces: <code>TiedOpInterface</code></p>
-<h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
+<h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11361,7 +11436,7 @@ tensors by signaling a fence. The source tensors are returned for chaining.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_48">Results:<a class="headerlink" href="#results_48" title="Permanent link">link</a></h5>
+<h5 id="results_49">Results:<a class="headerlink" href="#results_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11406,7 +11481,7 @@ types, etc.</p>
 <tr><td><code>affinity</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
+<h5 id="operands_66">Operands:<a class="headerlink" href="#operands_66" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11425,7 +11500,7 @@ types, etc.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_49">Results:<a class="headerlink" href="#results_49" title="Permanent link">link</a></h5>
+<h5 id="results_50">Results:<a class="headerlink" href="#results_50" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11472,7 +11547,7 @@ types, etc.</p>
 <tr><td><code>affinity</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="operands_66">Operands:<a class="headerlink" href="#operands_66" title="Permanent link">link</a></h5>
+<h5 id="operands_67">Operands:<a class="headerlink" href="#operands_67" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11495,7 +11570,7 @@ types, etc.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_50">Results:<a class="headerlink" href="#results_50" title="Permanent link">link</a></h5>
+<h5 id="results_51">Results:<a class="headerlink" href="#results_51" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
