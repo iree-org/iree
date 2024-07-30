@@ -7,10 +7,11 @@ func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf1
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<16xf16>
-  %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0.0> : vector<16x16xf16>
+  %root = arith.constant dense<0.0> : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout : vector<16x16xf16>
   // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
   // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] {{.*}} : vector<16xf16>
-  %c = arith.mulf %root, %b : vector<16x16xf16>
+  %c = arith.mulf %rootl, %b : vector<16x16xf16>
   // CHECK-DAG: %[[DENOM:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
   // CHECK-DAG: %[[DIVD:.*]] = arith.divf %[[C]], %[[DENOM]] {{.*}} : vector<16xf16>
   %divd = arith.divf %c, %denom : vector<16x16xf16>
@@ -28,10 +29,11 @@ func.func @distribute_elementwise_i32(%a: vector<16x16xi32>, %b: vector<16x16xi3
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<2> : vector<16xi32>
-  %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<2> : vector<16x16xi32>
+  %root = arith.constant dense<2> : vector<16x16xi32>
+  %rootl = iree_vector_ext.to_layout %root to #layout : vector<16x16xi32>
   // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
   // CHECK-DAG: %[[C:.*]] = arith.muli %[[B]], %[[ROOT]] {{.*}} : vector<16xi32>
-  %c = arith.muli %root, %b : vector<16x16xi32>
+  %c = arith.muli %rootl, %b : vector<16x16xi32>
   // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
   // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] {{.*}} : vector<16xi32>
   %d = arith.addi %c, %a : vector<16x16xi32>
@@ -55,10 +57,11 @@ func.func @distribute_elementwise_nested_layout_f16(%a: vector<128x128x128xf16>,
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<8x2x4x1x4x4x1x8x2xf16>
-  %root = arith.constant {"__vector_layout_test_anchor_result_0" = #nested} dense<0.0> : vector<128x128x128xf16>
+  %root = arith.constant dense<0.0> : vector<128x128x128xf16>
+  %rootl = iree_vector_ext.to_layout %root to #nested : vector<128x128x128xf16>
   // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<128x128x128xf16> -> vector<8x2x4x1x4x4x1x8x2xf16>
   // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] {{.*}} : vector<8x2x4x1x4x4x1x8x2xf16>
-  %c = arith.mulf %root, %b : vector<128x128x128xf16>
+  %c = arith.mulf %rootl, %b : vector<128x128x128xf16>
   // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<128x128x128xf16> -> vector<8x2x4x1x4x4x1x8x2xf16>
   // CHECK-DAG: %[[D:.*]] = arith.addf %[[C]], %[[A]] fastmath<reassoc,nnan> {{.*}} : vector<8x2x4x1x4x4x1x8x2xf16>
   %d = arith.addf %c, %a fastmath<reassoc,nnan> : vector<128x128x128xf16>
@@ -73,9 +76,10 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
   %c128 = arith.constant 128 : index
   %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<16xi32>
-  %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0> : vector<16x16xi32>
+  %root = arith.constant dense<0> : vector<16x16xi32>
+  %rootl = iree_vector_ext.to_layout %root to #layout : vector<16x16xi32>
   // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<16xi32>)
-  %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %root) -> (vector<16x16xi32>) {
+  %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %rootl) -> (vector<16x16xi32>) {
     // These should be ideally folded if canonicalization was ever ran.
     // Canonicalization currently breaks other tests. If canonicalization
     // is ever ran, this should be updated.
@@ -109,11 +113,11 @@ func.func @distribute_transfer_read_row_major(%alloc: memref<4x4xf16>) -> vector
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0], %cst
-          {in_bounds = [false, false],
-           "__vector_layout_test_anchor_result_0" = #layout_row_major}
+          {in_bounds = [false, false]}
                   : memref<4x4xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
   // CHECK-COUNT-4: vector.load {{.*}}, vector<8xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 // CHECK-LABEL: @distribute_transfer_read_col_major
@@ -121,11 +125,11 @@ func.func @distribute_transfer_read_col_major(%alloc: memref<32x32xf16>) -> vect
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0], %cst
-          {in_bounds = [true, true],
-           "__vector_layout_test_anchor_result_0" = #layout_col_major}
+          {in_bounds = [true, true]}
                   : memref<32x32xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
   // CHECK-COUNT-8: vector.load {{.*}}, vector<1xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 // CHECK-LABEL: @distribute_transfer_read_row_major_with_broadcast
@@ -134,11 +138,11 @@ func.func @distribute_transfer_read_row_major_with_broadcast(%a: index, %b: inde
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-           "__vector_layout_test_anchor_result_0" = #layout_row_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
   // CHECK-COUNT-4: vector.load {{.*}}, vector<8xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 // CHECK-LABEL: @distribute_transfer_read_col_major_with_broadcast
@@ -147,11 +151,11 @@ func.func @distribute_transfer_read_col_major_with_broadcast(%a: index, %b: inde
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-           "__vector_layout_test_anchor_result_0" = #layout_col_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
   // CHECK-COUNT-8: vector.load {{.*}}, vector<1xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 // CHECK-LABEL: @distribute_transfer_read_row_major_transpose
@@ -160,11 +164,11 @@ func.func @distribute_transfer_read_row_major_transpose(%a: index, %b: index, %a
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
-           "__vector_layout_test_anchor_result_0" = #layout_row_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
   // CHECK-COUNT-32: vector.load {{.*}}, vector<1xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 // CHECK-LABEL: @distribute_transfer_read_col_major_transpose
@@ -173,11 +177,11 @@ func.func @distribute_transfer_read_col_major_transpose(%a: index, %b: index, %a
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
-           "__vector_layout_test_anchor_result_0" = #layout_col_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
   // CHECK-COUNT-2: vector.load {{.*}}, vector<4xf16>
-  func.return %root : vector<16x16xf16>
+  func.return %rootl : vector<16x16xf16>
 }
 
 builtin.module attributes { transform.with_named_sequence } {
@@ -198,9 +202,9 @@ builtin.module attributes { transform.with_named_sequence } {
 
 func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0]
-          {in_bounds = [true, true],
-           "__vector_layout_test_anchor_operand_0" = #layout_row_major}
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0]
+          {in_bounds = [true, true]}
                   : vector<16x16xf16>, memref<64x64xf16>
   func.return
 }
@@ -228,9 +232,9 @@ func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc:
 
 func.func @distribute_transfer_write_col_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0]
-          {in_bounds = [true, true],
-           "__vector_layout_test_anchor_operand_0" = #layout_col_major}
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0]
+          {in_bounds = [true, true]}
                   : vector<16x16xf16>, memref<64x64xf16>
   func.return
 }
@@ -239,10 +243,10 @@ func.func @distribute_transfer_write_col_major(%root: vector<16x16xf16>, %alloc:
 
 func.func @distribute_transfer_write_row_major_with_broadcast(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0, %a, %b]
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-           "__vector_layout_test_anchor_operand_0" = #layout_row_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : vector<16x16xf16>, memref<32x32x32x32xf16>
   func.return
 }
@@ -251,10 +255,10 @@ func.func @distribute_transfer_write_row_major_with_broadcast(%root: vector<16x1
 
 func.func @distribute_transfer_write_col_major_with_broadcast(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0, %a, %b]
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-           "__vector_layout_test_anchor_operand_0" = #layout_col_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : vector<16x16xf16>, memref<32x32x32x32xf16>
   func.return
 }
@@ -263,10 +267,10 @@ func.func @distribute_transfer_write_col_major_with_broadcast(%root: vector<16x1
 
 func.func @distribute_transfer_write_row_major_transpose(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0, %a, %b]
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
-           "__vector_layout_test_anchor_operand_0" = #layout_row_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : vector<16x16xf16>, memref<32x32x32x32xf16>
   func.return
 }
@@ -275,10 +279,10 @@ func.func @distribute_transfer_write_row_major_transpose(%root: vector<16x16xf16
 
 func.func @distribute_transfer_write_col_major_transpose(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %c0, %a, %b]
+  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
-           "__vector_layout_test_anchor_operand_0" = #layout_col_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : vector<16x16xf16>, memref<32x32x32x32xf16>
   func.return
 }
@@ -288,10 +292,10 @@ func.func @distribute_transfer_write_col_major_transpose(%root: vector<16x16xf16
 
 func.func @distribute_transfer_write_with_non_contiguous_broadcast(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  vector.transfer_write %root, %alloc[%c0, %a, %c0, %b]
+  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  vector.transfer_write %rootl, %alloc[%c0, %a, %c0, %b]
           {in_bounds = [true, true],
-           permutation_map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
-           "__vector_layout_test_anchor_operand_0" = #layout_row_major}
+           permutation_map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>}
                   : vector<16x16xf16>, memref<32x32x32x32xf16>
   func.return
 }
@@ -319,11 +323,9 @@ builtin.module attributes { transform.with_named_sequence } {
 module {
   func.func @distribute_reduction_f16(%source: vector<16x16xf16>, %init: vector<16xf16>) -> vector<16xf16>
   attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation_info} {
-    %result = vector.multi_reduction <maximumf>, %source, %init {
-                  "__vector_layout_test_anchor_operand_0" = #layout2d,
-                  "__vector_layout_test_anchor_operand_1" = #layout1d,
-                  "__vector_layout_test_anchor_result_0" = #layout1d
-                } [0] : vector<16x16xf16> to vector<16xf16>
+    %sourcel = iree_vector_ext.to_layout %source to #layout2d : vector<16x16xf16>
+    %result = vector.multi_reduction <maximumf>, %sourcel, %init [0]
+                    : vector<16x16xf16> to vector<16xf16>
     func.return %result : vector<16xf16>
   }
 }
@@ -368,11 +370,9 @@ module {
 module {
   func.func @distribute_reduction_f32(%source: vector<16x16xf32>, %init: vector<16xf32>) -> vector<16xf32>
   attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation_info} {
-    %result = vector.multi_reduction <maximumf>, %source, %init {
-                  "__vector_layout_test_anchor_operand_0" = #layout2d,
-                  "__vector_layout_test_anchor_operand_1" = #layout1d,
-                  "__vector_layout_test_anchor_result_0" = #layout1d
-                } [0] : vector<16x16xf32> to vector<16xf32>
+    %sourcel = iree_vector_ext.to_layout %source to #layout2d : vector<16x16xf32>
+    %result = vector.multi_reduction <maximumf>, %sourcel, %init [0]
+                : vector<16x16xf32> to vector<16xf32>
     func.return %result : vector<16xf32>
   }
 }
@@ -424,9 +424,10 @@ func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16
   // CHECK-NOT: vector.transpose
   %b_t = vector.transpose %b, [1, 0] : vector<16x32xf16> to vector<32x16xf16>
   // CHECK: %[[ADD:.*]] = arith.addf %{{.*}}, %{{.*}} : vector<4xf16>
-  %c = arith.addf %a, %b_t {"__vector_layout_test_anchor_result_0" = #transpose_test_layout} : vector<32x16xf16>
+  %c = arith.addf %a, %b_t : vector<32x16xf16>
+  %cl = iree_vector_ext.to_layout %c to #transpose_test_layout : vector<32x16xf16>
   // CHECK: iree_vector_ext.to_simd %[[ADD]] : vector<4xf16> -> vector<32x16xf16>
-  func.return %c : vector<32x16xf16>
+  func.return %cl : vector<32x16xf16>
 }
 
 #row_broadcast_layout = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX], [2, 16]>
@@ -437,10 +438,8 @@ func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16
 #layout_broadcast_2d_t = #iree_vector_ext.layout<#col_broadcast_layout, #row_broadcast_layout>
 
 func.func @distribute_broadcast_row_col(%source: vector<32xf32>) -> vector<32x32xf32> {
-  %result = vector.broadcast %source {
-          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d_t,
-          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d}
-          : vector<32xf32> to vector<32x32xf32>
+  %result = vector.broadcast %source : vector<32xf32> to vector<32x32xf32>
+  %resultl = iree_vector_ext.to_layout %result to #layout_broadcast_2d : vector<32x32xf32>
   // CHECK-DAG: %[[S00:.*]] = vector.extract %[[SOURCE:.*]][0, 0]
   // CHECK-DAG: vector.insert %[[S00]], %{{.*}} [0, 0, 0]
   // CHECK-DAG: vector.insert %[[S00]], %{{.*}} [1, 0, 0]
@@ -466,14 +465,12 @@ func.func @distribute_broadcast_row_col(%source: vector<32xf32>) -> vector<32x32
   // CHECK-DAG: %[[S13:.*]] = vector.extract %[[ACC:.*]][1, 3]
   // CHECK-DAG: vector.insert %[[S13]], %{{.*}} [0, 1, 3]
   // CHECK-DAG: vector.insert %[[S13]], %{{.*}} [1, 1, 3]
-  func.return %result : vector<32x32xf32>
+  func.return %resultl : vector<32x32xf32>
 }
 
 func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32xf32> {
-  %result = vector.broadcast %source {
-          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d,
-          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d_t}
-          : vector<32xf32> to vector<32x32xf32>
+  %result = vector.broadcast %source : vector<32xf32> to vector<32x32xf32>
+  %resultl = iree_vector_ext.to_layout %result to #layout_broadcast_2d_t : vector<32x32xf32>
   // CHECK-DAG: %[[S0:.*]] = vector.extract %[[SOURCE:.*]][0]
   // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 0]
   // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 1]
@@ -493,7 +490,7 @@ func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32
   // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 1]
   // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 2]
   // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 3]
-  func.return %result : vector<32x32xf32>
+  func.return %resultl : vector<32x32xf32>
 }
 
 #layout_broadcast_vectory_1d = #iree_vector_ext.layout<
@@ -510,10 +507,8 @@ func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32
 // This previously caused a bug, since calculating SIMT index for broadcast
 // needs to know the range of vectorx.
 func.func @distribute_broadcast_vectory(%source: vector<4xf32>) -> vector<4x4xf32> {
-  %result = vector.broadcast %source {
-          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_vectory_1d,
-          "__vector_layout_test_anchor_result_0" = #layout_broadcast_vectory_2d}
-          : vector<4xf32> to vector<4x4xf32>
+  %result = vector.broadcast %source : vector<4xf32> to vector<4x4xf32>
+  %resultl = iree_vector_ext.to_layout %result to #layout_broadcast_vectory_2d : vector<4x4xf32>
   // CHECK-DAG: %[[S00:.*]] = vector.extract %[[SOURCE:.*]][0, 0] : f32 from vector<1x4xf32>
   // CHECK-DAG: %[[S01:.*]] = vector.extract %[[SOURCE:.*]][0, 1] : f32 from vector<1x4xf32>
   // CHECK-DAG: %[[S02:.*]] = vector.extract %[[SOURCE:.*]][0, 2] : f32 from vector<1x4xf32>
@@ -534,7 +529,7 @@ func.func @distribute_broadcast_vectory(%source: vector<4xf32>) -> vector<4x4xf3
   // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 7] : f32 into vector<1x1x16xf32>
   // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 11] : f32 into vector<1x1x16xf32>
   // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 15] : f32 into vector<1x1x16xf32>
-  func.return %result : vector<4x4xf32>
+  func.return %resultl : vector<4x4xf32>
 }
 
 builtin.module attributes { transform.with_named_sequence } {
@@ -557,14 +552,54 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // We assume in this test that we have distributed it the IR at a subgroup level.
 
+#layoutA = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>
+#layoutB = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>
+#layoutC = #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>
+
+#layoutA2 = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>
+#layoutB2 = #iree_vector_ext.layout<<[ BATCHX,  LANEY,  VECTORX], [1, 1, 16]>, <[ BATCHY,  LANEX], [1, 16]>>
+#layoutC2 = #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>
+
 // CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + (s0 floordiv 32) * 16)>
 // CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 16)>
 // CHECK-LABEL: func.func @resolve_wmma_layout_conflict_with_shared_memory
-func.func @resolve_wmma_layout_conflict_with_shared_memory (%15 : vector<16x16xf16>, %14 : vector<16x16xf16>, %16 : vector<16x16xf32>, %35 : vector<16x16xf16>, %33 : vector<16x16xf32>) -> vector<16x16xf32> attributes {translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 2, 1] subgroup_size = 32>} {
-  %17 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>, iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>} %15, %14, %16 {__vector_layout_test_anchor_operand_0 = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>, __vector_layout_test_anchor_operand_1 = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>, __vector_layout_test_anchor_operand_2 = #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>} : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
-  %28 = arith.truncf %17 : vector<16x16xf32> to vector<16x16xf16>
-  %36 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %35, %28, %33 {__vector_layout_test_anchor_operand_0 = #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>, __vector_layout_test_anchor_operand_1 = #iree_vector_ext.layout<<[ BATCHX,  LANEY,  VECTORX], [1, 1, 16]>, <[ BATCHY,  LANEX], [1, 16]>>, __vector_layout_test_anchor_operand_2 = #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>, iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>} : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
-  func.return %36 : vector<16x16xf32>
+func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf16>,
+                                                           %14 : vector<16x16xf16>,
+                                                           %16 : vector<16x16xf32>,
+                                                           %35 : vector<16x16xf16>,
+                                                           %33 : vector<16x16xf32>)
+                                                           -> vector<16x16xf32>
+  attributes {translation_info = #iree_codegen.translation_info<None
+                                                                workgroup_size = [32, 2, 1]
+                                                                subgroup_size = 32>} {
+
+  %A = iree_vector_ext.to_layout %15 to #layoutA : vector<16x16xf16>
+  %B = iree_vector_ext.to_layout %14 to #layoutB : vector<16x16xf16>
+  %C = iree_vector_ext.to_layout %16 to #layoutC : vector<16x16xf32>
+
+  %M1 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                                          affine_map<(d0, d1, d2) -> (d1, d2)>,
+                                          affine_map<(d0, d1, d2) -> (d0, d1)>],
+                         iterator_types = ["parallel", "parallel", "reduction"],
+                         kind = #vector.kind<add>,
+                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>}
+        %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
+
+  %TM1 = arith.truncf %M1 : vector<16x16xf32> to vector<16x16xf16>
+
+  %A2 = iree_vector_ext.to_layout %35  to #layoutA2 : vector<16x16xf16>
+  %B2 = iree_vector_ext.to_layout %TM1 to #layoutB2 : vector<16x16xf16>
+  %C2 = iree_vector_ext.to_layout %33  to #layoutC2 : vector<16x16xf32>
+
+  %M2 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                                          affine_map<(d0, d1, d2) -> (d2, d1)>,
+                                          affine_map<(d0, d1, d2) -> (d0, d1)>],
+                         iterator_types = ["parallel", "parallel", "reduction"],
+                         kind = #vector.kind<add>,
+                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>}
+       %A2, %B2, %C2  : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
+
+  func.return %M2 : vector<16x16xf32>
 }
 // CHECK-NOT: iree_vector_ext.layout_conflict_resolution
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
@@ -622,17 +657,18 @@ func.func @resolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16xf1
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
   // CHECK-COUNT-8: vector.load %[[MEM]]
-  %vec = vector.transfer_read  %a[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout1} : memref<32x16xf16>, vector<32x16xf16>
+  %vec = vector.transfer_read  %a[%c0, %c0], %cst : memref<32x16xf16>, vector<32x16xf16>
+  %vecl = iree_vector_ext.to_layout %vec to #layout1 : vector<32x16xf16>
   // CHECK: %[[V0:.*]] = vector.insert_strided_slice {{.*}} : vector<1xf16> into vector<1x1x8xf16>
   // CHECK: %[[R0:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 0], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
   // CHECK: %[[R1:.*]] = vector.insert_strided_slice %[[R0]], %[[CST0]] {offsets = [0, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
   // CHECK: %[[R2:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 4], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
   // CHECK: %[[R3:.*]] = vector.insert_strided_slice %[[R2]], %[[R1]] {offsets = [1, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
   // CHECK: %[[R4:.*]] = arith.addf %[[R3]], %[[R3]] {{.*}} : vector<2x1x4xf16>
-  %vec2 = arith.addf %vec, %vec : vector<32x16xf16>
+  %vec2 = arith.addf %vecl, %vecl : vector<32x16xf16>
   // CHECK-COUNT-8: vector.store {{.*}}, vector<1xf16>
-  vector.transfer_write %vec2, %b[%c0, %c0] {in_bounds = [true, true],
-           "__vector_layout_test_anchor_operand_0" = #layout0} : vector<32x16xf16>, memref<32x16xf16>
+  %vec2l = iree_vector_ext.to_layout %vec2 to #layout0 : vector<32x16xf16>
+  vector.transfer_write %vec2l, %b[%c0, %c0] {in_bounds = [true, true]} : vector<32x16xf16>, memref<32x16xf16>
   func.return
 }
 
@@ -642,12 +678,13 @@ func.func @unresolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16x
   %cst = arith.constant 0.0 : f16
   %vcst = arith.constant dense<0.0> : vector<32x16xf16>
   // CHECK-COUNT-8: vector.load %[[MEM]]
-  %vec = vector.transfer_read  %a[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout1} : memref<32x16xf16>, vector<32x16xf16>
+  %vec = vector.transfer_read  %a[%c0, %c0], %cst : memref<32x16xf16>, vector<32x16xf16>
+  %vecl = iree_vector_ext.to_layout %vec to #layout1 : vector<32x16xf16>
   // CHECK: iree_vector_ext.to_layout {{.*}}
-  %vec2 = arith.addf %vec, %vcst : vector<32x16xf16>
+  %vec2 = arith.addf %vecl, %vcst : vector<32x16xf16>
   // CHECK-COUNT-16: vector.store {{.*}}, vector<1xf16>
-  vector.transfer_write %vec2, %b[%c0, %c0] {in_bounds = [true, true],
-           "__vector_layout_test_anchor_operand_0" = #layout2} : vector<32x16xf16>, memref<32x16xf16>
+  %vec2l = iree_vector_ext.to_layout %vec2 to #layout2 : vector<32x16xf16>
+  vector.transfer_write %vec2l, %b[%c0, %c0] {in_bounds = [true, true]} : vector<32x16xf16>, memref<32x16xf16>
   func.return
 }
 
