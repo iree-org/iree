@@ -232,19 +232,19 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maxnumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maxnumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -253,16 +253,16 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

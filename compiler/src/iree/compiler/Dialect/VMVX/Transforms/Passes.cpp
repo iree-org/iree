@@ -81,6 +81,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
       .addPass(createCSEPass)
       .addPass([]() { return createConvertVectorToSCFPass(); })
       .addPass(createCanonicalizerPass)
+      .addPass(arith::createArithExpandOpsPass)
       .addPass(memref::createExpandOpsPass);
 
   // Handle tensor-type constants.
