@@ -581,22 +581,6 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 #-------------------------------------------------------------------------------
-# Experimental ROCM HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    rocm
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm"
-  DRIVER_TARGET
-    iree::experimental::rocm::registration
-  REGISTER_FN
-    iree_hal_rocm_driver_module_register
-)
-
-#-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
 # Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
 #-------------------------------------------------------------------------------
