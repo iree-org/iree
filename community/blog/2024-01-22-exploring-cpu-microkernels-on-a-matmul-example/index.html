@@ -3644,9 +3644,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ir-dump-after-cpumaterializeencoding" class="md-nav__link">
+  <a href="#ir-dump-after-cpumaterializehostencoding" class="md-nav__link">
     <span class="md-ellipsis">
-      IR Dump After CPUMaterializeEncoding
+      IR Dump After CPUMaterializeHostEncoding
     </span>
   </a>
   
@@ -4122,7 +4122,7 @@ for all the unused code paths within each microkernel.</p>
 [...]
 // -----// IR Dump After Inliner (inline) //----- //
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt;
+#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
     %0 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[0] : index
@@ -4140,15 +4140,15 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   }
 }
 </code></pre></div>
-<h3 id="ir-dump-after-cpumaterializeencoding">IR Dump After CPUMaterializeEncoding<a class="headerlink" href="#ir-dump-after-cpumaterializeencoding" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code>// -----// IR Dump After CPUMaterializeEncoding (iree-codegen-cpu-materialize-encoding) //----- //
+<h3 id="ir-dump-after-cpumaterializehostencoding">IR Dump After CPUMaterializeHostEncoding<a class="headerlink" href="#ir-dump-after-cpumaterializehostencoding" title="Permanent link">link</a></h3>
+<div class="highlight"><pre><span></span><code>// -----// IR Dump After CPUMaterializeHostEncoding (iree-codegen-cpu-materialize-host-encoding) //----- //
 [...]
 // -----// IR Dump After Canonicalizer (canonicalize) //----- //
 [...]
 // -----// IR Dump After CSE (cse) //----- //
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
 #map = affine_map&lt;()[s0] -&gt; (s0 ceildiv 16)&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt;
+#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
     %cst = arith.constant 0.000000e+00 : f32

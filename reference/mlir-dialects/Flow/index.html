@@ -2017,6 +2017,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensortransfer-flowtensortransferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      flow.tensor.transfer (Flow::TensorTransferOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorupdate-flowtensorupdateop" class="md-nav__link">
     <span class="md-ellipsis">
       flow.tensor.update (Flow::TensorUpdateOp)
@@ -2036,7 +2045,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_21" class="md-nav__link">
+  <a href="#attributes_22" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -4722,6 +4731,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensortransfer-flowtensortransferop" class="md-nav__link">
+    <span class="md-ellipsis">
+      flow.tensor.transfer (Flow::TensorTransferOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorupdate-flowtensorupdateop" class="md-nav__link">
     <span class="md-ellipsis">
       flow.tensor.update (Flow::TensorUpdateOp)
@@ -4741,7 +4759,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_21" class="md-nav__link">
+  <a href="#attributes_22" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5029,12 +5047,13 @@ workload size, shapes of inputs and outputs, etc.</p>
 <li><a href="#flowtensorstore-flowtensorstoreop">flow.tensor.store (Flow::TensorStoreOp)</a></li>
 <li><a href="#flowtensortie_shape-flowtensortieshapeop">flow.tensor.tie_shape (Flow::TensorTieShapeOp)</a></li>
 <li><a href="#flowtensortrace-flowtensortraceop">flow.tensor.trace (Flow::TensorTraceOp)</a></li>
+<li><a href="#flowtensortransfer-flowtensortransferop">flow.tensor.transfer (Flow::TensorTransferOp)</a></li>
 <li><a href="#flowtensorupdate-flowtensorupdateop">flow.tensor.update (Flow::TensorUpdateOp)</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_21">Attributes</a><ul>
+<li><a href="#attributes_22">Attributes</a><ul>
 <li><a href="#dummyattr">DummyAttr</a></li>
 <li><a href="#namedparameterattr">NamedParameterAttr</a></li>
 </ul>
@@ -6994,6 +7013,61 @@ values being traced.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="flowtensortransfer-flowtensortransferop"><code>flow.tensor.transfer</code> (Flow::TensorTransferOp)<a class="headerlink" href="#flowtensortransfer-flowtensortransferop" title="Permanent link">link</a></h4>
+<p><em>Transfers a tensor to a target by copying if needed</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.transfer` $operand `:` type($result) (`{` $argument_dims^ `}`)?
+              `to` $target
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Transfers the tensor from whichever context it may be in to the specified
+target context. If the contexts are compatible and can access each others
+memory the operation may be elided and otherwise will become one or more
+copies to transfer the tensor in cases where staging through an intermediate
+context is required.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>target</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
+</table>
+
+<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operand</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>argument_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h4 id="flowtensorupdate-flowtensorupdateop"><code>flow.tensor.update</code> (Flow::TensorUpdateOp)<a class="headerlink" href="#flowtensorupdate-flowtensorupdateop" title="Permanent link">link</a></h4>
 <p><em>Updates a tensor with the contents of another tensor</em></p>
 <p>Syntax:</p>
@@ -7007,7 +7081,7 @@ given offset indices.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
+<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7038,7 +7112,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
+<h5 id="results_34">Results:<a class="headerlink" href="#results_34" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7053,7 +7127,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_21">Attributes<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h2>
+<h2 id="attributes_22">Attributes<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h2>
 <h3 id="dummyattr">DummyAttr<a class="headerlink" href="#dummyattr" title="Permanent link">link</a></h3>
 <p>Syntax: <code>#flow.dummy</code></p>
 <h3 id="namedparameterattr">NamedParameterAttr<a class="headerlink" href="#namedparameterattr" title="Permanent link">link</a></h3>
