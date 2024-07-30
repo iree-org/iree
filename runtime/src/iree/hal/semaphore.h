@@ -210,6 +210,11 @@ IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_semaphore_vtable_t);
 IREE_API_EXPORT void iree_hal_semaphore_destroy(
     iree_hal_semaphore_t* semaphore);
 
+// Erases the i-th semaphore from the list in-place with O(1).
+// Expects that the index |i| is in bounds.
+IREE_API_EXPORT void iree_hal_semaphore_list_erase(
+    iree_hal_semaphore_list_t* semaphore_list, iree_host_size_t i);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -206,3 +206,30 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+static void iree_hal_semaphore_list_swap_elements(
+    iree_hal_semaphore_list_t* semaphore_list, iree_host_size_t i,
+    iree_host_size_t j) {
+  IREE_ASSERT(i >= 0 && i < semaphore_list->count);
+  IREE_ASSERT(j >= 0 && j < semaphore_list->count);
+  if (IREE_UNLIKELY(i == j)) {
+    return;
+  }
+
+  iree_hal_semaphore_t* tmp_semaphore = semaphore_list->semaphores[i];
+  uint64_t tmp_payload_value = semaphore_list->payload_values[i];
+
+  semaphore_list->semaphores[i] = semaphore_list->semaphores[j];
+  semaphore_list->payload_values[i] = semaphore_list->payload_values[j];
+
+  semaphore_list->semaphores[j] = tmp_semaphore;
+  semaphore_list->payload_values[j] = tmp_payload_value;
+}
+
+IREE_API_EXPORT void iree_hal_semaphore_list_erase(
+    iree_hal_semaphore_list_t* semaphore_list, iree_host_size_t i) {
+  IREE_ASSERT(semaphore_list->count > 0);
+  iree_hal_semaphore_list_swap_elements(semaphore_list, i,
+                                        semaphore_list->count - 1);
+  --semaphore_list->count;
+}

@@ -23,7 +23,6 @@
 #include "iree/hal/drivers/cuda/event_semaphore.h"
 #include "iree/hal/drivers/cuda/graph_command_buffer.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
-#include "iree/hal/drivers/utils/semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -867,8 +866,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
         if (value >= values[i]) {
           // No need to wait on this timepoint as it has already occurred and
           // we can remove it from the wait list.
-          iree_hal_semaphore_list_remove_element(&action->wait_semaphore_list,
-                                                 i);
+          iree_hal_semaphore_list_erase(&action->wait_semaphore_list, i);
           --i;
           continue;
         }
@@ -899,7 +897,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
 
         // Remove the wait timepoint as we have a corresponding event that we
         // will wait on.
-        iree_hal_semaphore_list_remove_element(&action->wait_semaphore_list, i);
+        iree_hal_semaphore_list_erase(&action->wait_semaphore_list, i);
         --i;
       }
     }
