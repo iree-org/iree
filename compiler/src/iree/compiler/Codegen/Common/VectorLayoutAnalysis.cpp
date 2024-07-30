@@ -217,9 +217,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   Value input = opOperand.get();
   // Create a resolution operation. This conflict should be handeled later by
   // someone else, not this analysis.
-  Operation *resolveOp =
-      builder.create<IREE ::VectorExt::LayoutConflictResolutionOp>(
-          input.getLoc(), input.getType(), input, vectorLayout, rhs);
+  Operation *resolveOp = builder.create<IREE::VectorExt::ToLayoutOp>(
+      input.getLoc(), input.getType(), input, rhs);
   Value resolvedValue = resolveOp->getResult(0);
   opOperand.set(resolvedValue);
 
@@ -1015,9 +1014,9 @@ void VectorLayoutAnalysis::debugAnnotateLayouts() {
         continue;
       }
 
-      // Do not annotate resolve_conflict operations since they already have
+      // Do not annotate to_layout operations since they already have
       // this information in their attributes.
-      if (isa<IREE::VectorExt::LayoutConflictResolutionOp>(op)) {
+      if (isa<IREE::VectorExt::ToLayoutOp>(op)) {
         continue;
       }
 

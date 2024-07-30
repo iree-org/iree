@@ -750,7 +750,7 @@ struct DistributeBroadcastLayoutAttr final
 ///     sequence of multiplications and additions.
 ///
 struct DistributeLayoutConflictResolutions final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   VectorValue reshapeVector(Location loc, RewriterBase &rewriter,
@@ -792,10 +792,9 @@ struct DistributeLayoutConflictResolutions final
     return newVector;
   }
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
     VectorValue vector = resolutionOp.getInput();
     VectorValue result = resolutionOp.getOutput();
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
@@ -837,13 +836,12 @@ struct DistributeLayoutConflictResolutions final
 /// especially used when we don't have an optimized way
 /// to resolve the conflict.
 struct DistributeLayoutConflictToSharedMemory final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
     auto loc = resolutionOp.getLoc();
     VectorValue vector = resolutionOp.getInput();
     VectorValue result = resolutionOp.getOutput();

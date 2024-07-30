@@ -1676,10 +1676,8 @@ transform_dialect::SetContractionLayoutAttributes::apply(
         if (!parentOp || (parentOp->getNumResults() != 1))
           continue;
         parentOp->setAttr("__vector_layout_test_anchor_result_0", readLayout);
-        Value resolvedOperand =
-            rewriter.create<VectorExt::LayoutConflictResolutionOp>(
-                contract.getLoc(), operand.getType(), operand, layout,
-                readLayout);
+        Value resolvedOperand = rewriter.create<VectorExt::ToLayoutOp>(
+            contract.getLoc(), operand.getType(), operand, layout);
         contract.setOperand(operandIndices[i], resolvedOperand);
       }
     }

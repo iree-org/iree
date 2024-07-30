@@ -1152,7 +1152,7 @@ static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
                               mlir::FunctionOpInterface funcOp) {
   funcOp.walk([&](Operation *op) {
     // Do not emit remarks for conflict operations.
-    if (isa<VectorExt::LayoutConflictResolutionOp>(op)) {
+    if (isa<VectorExt::ToLayoutOp>(op)) {
       return;
     }
 

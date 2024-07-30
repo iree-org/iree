@@ -24,23 +24,24 @@ class IREEVectorExt_PureOp<string mnemonic, list<Trait> traits = []> :
 // Layout ops.
 //===----------------------------------------------------------------------===//
 
-def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conflict_resolution"> {
-  let summary = "Layout Conflict Resolution operator";
+def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
+  Pure,
+  AllTypesMatch<["input", "output"]>
+  ]> {
+  let summary = "Layout conversion operator";
   let description = [{
-    The layout conflict resolution operator takes a vector and a
-    desired layout and transforms the vector to one with the
-    desired layout.
+    The layout conversion operator takes a shaped value and a layout and
+    transforms the value to have that layout.
   }];
   let arguments = (ins
     AnyVector:$input,
-    VectorLayoutInterface:$sourceLayout,
-    VectorLayoutInterface:$desiredLayout
+    VectorLayoutInterface:$layout
   );
   let results = (outs
     AnyVector:$output
   );
   let extraClassDeclaration = [{}];
-  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let assemblyFormat = "$input `to` $layout attr-dict `:` type($input)";
   let hasVerifier = 1;
 }
 
