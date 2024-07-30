@@ -1568,22 +1568,13 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#iree_encodingupper_bound_tile_size-encodingupperboundtilesizeop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_encoding.upper_bound_tile_size (Encoding::UpperBoundTileSizeOp)
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -3763,22 +3754,13 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#iree_encodingupper_bound_tile_size-encodingupperboundtilesizeop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_encoding.upper_bound_tile_size (Encoding::UpperBoundTileSizeOp)
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -3883,10 +3865,9 @@ implement data-tiling.</p>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_encodingset_encoding-encodingsetencodingop">iree_encoding.set_encoding (Encoding::SetEncodingOp)</a></li>
 <li><a href="#iree_encodingunset_encoding-encodingunsetencodingop">iree_encoding.unset_encoding (Encoding::UnsetEncodingOp)</a></li>
-<li><a href="#iree_encodingupper_bound_tile_size-encodingupperboundtilesizeop">iree_encoding.upper_bound_tile_size (Encoding::UpperBoundTileSizeOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_1">Attributes</a><ul>
+<li><a href="#attributes">Attributes</a><ul>
 <li><a href="#encodingattr">EncodingAttr</a></li>
 <li><a href="#encodingoptypeattr">EncodingOpTypeAttr</a></li>
 </ul>
@@ -3986,41 +3967,7 @@ For now in IREE the default layout is row-major.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_encodingupper_bound_tile_size-encodingupperboundtilesizeop"><code>iree_encoding.upper_bound_tile_size</code> (Encoding::UpperBoundTileSizeOp)<a class="headerlink" href="#iree_encodingupper_bound_tile_size-encodingupperboundtilesizeop" title="Permanent link">link</a></h3>
-<p><em>Returns an upper bound on tile sizes</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_encoding.upper_bound_tile_size` attr-dict $tensorType `-&gt;` type($results)
-</code></pre></div>
-<p>This returns the largest tile sizes that might result from materialization
-of the given encoding. This can be used outside of target-specific code, so
-there may be multiple targets, and this will return the maximum tile size
-from iterating over all of them. The evaluation happens in the
-MaterializeUpperBoundTileSize pass.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>tensorType</code></td><td>::mlir::TypeAttr</td><td>type attribute of ranked tensor of any type values</td></tr>
-</table>
-
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
+<h2 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">link</a></h2>
 <h3 id="encodingattr">EncodingAttr<a class="headerlink" href="#encodingattr" title="Permanent link">link</a></h3>
 <p>information to decide how to data-tile a tensor</p>
 <p>Syntax:</p>
