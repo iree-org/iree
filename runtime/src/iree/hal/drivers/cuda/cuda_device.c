@@ -61,8 +61,6 @@ typedef struct iree_hal_cuda_device_t {
   // TODO: Support multiple device streams.
   // The CUstream used to issue device kernels and allocations.
   CUstream dispatch_cu_stream;
-  // The CUstream used to issue host callback functions.
-  CUstream callback_cu_stream;
 
   iree_hal_cuda_tracing_context_t* tracing_context;
 
@@ -129,7 +127,7 @@ static iree_status_t iree_hal_cuda_device_check_params(
 static iree_status_t iree_hal_cuda_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* params, CUdevice cu_device,
-    CUstream dispatch_stream, CUstream callback_stream, CUcontext context,
+    CUstream dispatch_stream, CUcontext context,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
@@ -152,11 +150,10 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->cu_context = context;
   device->cu_device = cu_device;
   device->dispatch_cu_stream = dispatch_stream;
-  device->callback_cu_stream = callback_stream;
   device->host_allocator = host_allocator;
 
   iree_status_t status = iree_hal_cuda_pending_queue_actions_create(
-      cuda_symbols, &device->block_pool, host_allocator,
+      cuda_symbols, cu_device, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
@@ -230,20 +227,13 @@ iree_status_t iree_hal_cuda_device_create(
     status = IREE_CURESULT_TO_STATUS(
         cuda_symbols, cuStreamCreate(&dispatch_stream, CU_STREAM_NON_BLOCKING));
   }
-  // Create the default callback stream for the device.
-  CUstream callback_stream = NULL;
-  if (iree_status_is_ok(status)) {
-    status = IREE_CURESULT_TO_STATUS(
-        cuda_symbols, cuStreamCreate(&callback_stream, CU_STREAM_NON_BLOCKING));
-  }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_device_create_internal(
-        driver, identifier, params, device, dispatch_stream, callback_stream,
-        context, cuda_symbols, nccl_symbols, host_allocator, out_device);
+        driver, identifier, params, device, dispatch_stream, context,
+        cuda_symbols, nccl_symbols, host_allocator, out_device);
   } else {
     // Release resources we have accquired thus far.
-    if (callback_stream) cuda_symbols->cuStreamDestroy(callback_stream);
     if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
     if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
   }
@@ -331,7 +321,6 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->dispatch_cu_stream));
-  IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->callback_cu_stream));
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuDevicePrimaryCtxRelease(device->cu_device));
 
@@ -776,8 +765,7 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_cuda_pending_queue_actions_enqueue_execution(
-      base_device, device->dispatch_cu_stream, device->callback_cu_stream,
-      device->pending_queue_actions,
+      base_device, device->dispatch_cu_stream, device->pending_queue_actions,
       iree_hal_cuda_device_collect_tracing_context, device->tracing_context,
       wait_semaphore_list, signal_semaphore_list, command_buffer_count,
       command_buffers, binding_tables);
