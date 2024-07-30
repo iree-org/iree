@@ -1901,9 +1901,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop" class="md-nav__link">
+  <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_vector_ext.layout_conflict_resolution (VectorExt::LayoutConflictResolutionOp)
+      iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
     </span>
   </a>
   
@@ -3674,9 +3674,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop" class="md-nav__link">
+  <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
     <span class="md-ellipsis">
-      iree_vector_ext.layout_conflict_resolution (VectorExt::LayoutConflictResolutionOp)
+      iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
     </span>
   </a>
   
@@ -3737,7 +3737,7 @@ beyond what is currently available in the Vector Dialect.</p>
 <ul>
 <li><a href="#iree_vector_ext-dialect">'iree_vector_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
-<li><a href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop">iree_vector_ext.layout_conflict_resolution (VectorExt::LayoutConflictResolutionOp)</a></li>
+<li><a href="#iree_vector_extto_layout-vectorexttolayoutop">iree_vector_ext.to_layout (VectorExt::ToLayoutOp)</a></li>
 <li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
 <li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
 </ul>
@@ -3747,19 +3747,20 @@ beyond what is currently available in the Vector Dialect.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
-<h3 id="iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop"><code>iree_vector_ext.layout_conflict_resolution</code> (VectorExt::LayoutConflictResolutionOp)<a class="headerlink" href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop" title="Permanent link">link</a></h3>
-<p><em>Layout Conflict Resolution operator</em></p>
+<h3 id="iree_vector_extto_layout-vectorexttolayoutop"><code>iree_vector_ext.to_layout</code> (VectorExt::ToLayoutOp)<a class="headerlink" href="#iree_vector_extto_layout-vectorexttolayoutop" title="Permanent link">link</a></h3>
+<p><em>Layout conversion operator</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.layout_conflict_resolution` $input attr-dict `:` type($input) `-&gt;` type($output)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` $layout attr-dict `:` type($input)
 </code></pre></div>
-<p>The layout conflict resolution operator takes a vector and a
-desired layout and transforms the vector to one with the
-desired layout.</p>
+<p>The layout conversion operator takes a shaped value and a layout and
+transforms the value to have that layout.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>sourceLayout</code></td><td>::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface</td><td>VectorLayoutInterface instance</td></tr>
-<tr><td><code>desiredLayout</code></td><td>::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface</td><td>VectorLayoutInterface instance</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface</td><td>VectorLayoutInterface instance</td></tr>
 </table>
 
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
