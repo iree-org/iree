@@ -9,12 +9,11 @@
     "--device=hip"
   ],
   "skip_compile_tests": [
-    "onnx/node/generated/test_dequantizelinear"
-  ],
-  "skip_run_tests": [
+    "onnx/node/generated/test_dequantizelinear",
     "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example_expanded"
   ],
+  "skip_run_tests": [],
   "expected_compile_failures": [
     "onnx/node/generated/test_adagrad",
     "onnx/node/generated/test_adagrad_multiple",
