@@ -10,14 +10,14 @@
   "skip_compile_tests": [
     "onnx/node/generated/test_dequantizelinear",
     "onnx/node/generated/test_group_normalization_example_expanded",
-    "onnx/node/generated/test_scatter_elements_with_negative_indices"
+    "onnx/node/generated/test_group_normalization_epsilon_expanded",
   ],
   "skip_run_tests": [
     "onnx/node/generated/test_gather_elements_negative_indices",
     "onnx/node/generated/test_gridsample_zeros_padding",
-    "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_resize_downsample_scales_linear_align_corners",
-    "onnx/node/generated/test_resize_downsample_scales_linear_half_pixel_symmetric"
+    "onnx/node/generated/test_resize_downsample_scales_linear_half_pixel_symmetric",
+    "onnx/node/generated/test_scatter_elements_with_negative_indices"
   ],
   "expected_compile_failures": [
     "onnx/node/generated/test_adagrad",
