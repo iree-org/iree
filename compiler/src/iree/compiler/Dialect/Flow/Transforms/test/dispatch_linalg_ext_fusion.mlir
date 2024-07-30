@@ -114,10 +114,12 @@ util.func public @attention_dispatch(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?
 //       CHECK:       %[[DISPATCH1:.+]] = flow.dispatch.region
 //  CHECK-NEXT:         %[[GEN1:.+]] = linalg.generic
 //       CHECK:         flow.return %[[GEN1]]
+//       CHECK:       %[[DISPATCH2:.+]] = flow.dispatch.region
+//  CHECK-NEXT:         %[[GEN2:.+]] = linalg.generic
+//       CHECK:         flow.return %[[GEN2]]
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:         %[[GEN:.+]] = linalg.generic
 //       CHECK:         %[[ATTN:.+]] = iree_linalg_ext.attention
-//  CHECK-SAME:           ins(%[[GEN]], %[[DISPATCH0]], %[[DISPATCH1]]
+//  CHECK-SAME:           ins(%[[DISPATCH0]], %[[DISPATCH1]], %[[DISPATCH2]]
 //       CHECK:         %[[GEN2:.+]] = linalg.generic
 //  CHECK-SAME:           ins(%[[ATTN]]
 //       CHECK:         flow.return %[[GEN2]]
