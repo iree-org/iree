@@ -271,3 +271,30 @@ module {
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+module {
+  func.func @inferred_im2col()
+      attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [16, 32, 1] subgroup_size = 64, {}>} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x34x34x128xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x128x8xf16>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0, %c0, %c0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x128xf16>> -> tensor<2x34x34x128xf16>
+    %3 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0, %c0], sizes = [2, 128, 8], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x128x8xf16>> -> tensor<2x128x8xf16>
+    %4 = iree_linalg_ext.im2col {lowering_config = #config} strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3] m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [2, 3] k_pos = [1] ins(%2 : tensor<2x34x34x128xf16>) outs(%3 : tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
+    flow.dispatch.tensor.store %4, %1, offsets = [%c0, %c0, %c0], sizes = [2, 128, 8], strides = [1, 1, 1] : tensor<2x128x8xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x128x8xf16>>
+    return
+  }
+}
+
+// Verify that no loops are generated without a reduction configuration.
+// CHECK-LABEL: func.func @inferred_im2col
+//   CHECK-NOT:   scf.for
+
+// THREAD-LABEL: func.func @inferred_im2col
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0) to (2, 128, 8) step (1, 1, 4)
+//       THREAD:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<1x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_2>]
