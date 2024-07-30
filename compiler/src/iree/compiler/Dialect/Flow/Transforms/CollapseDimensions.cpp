@@ -169,13 +169,20 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
   if (genericOp.hasIndexSemantics())
     return false;
 
-  // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax
-  // ops that have been fused. Don't collapse ops which have operands with >= 2
-  // reduction dimensions.
-  if (llvm::any_of(genericOp.getDpsInputOperands(), [](OpOperand *operand) {
-        auto genericOperand = operand->get().getDefiningOp<linalg::GenericOp>();
-        return genericOperand && genericOperand.getNumReductionLoops() >= 2;
-      })) {
+  // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
+  if (llvm::any_of(genericOp.getDpsInputOperands(),
+                   [&](OpOperand *operand) -> bool {
+                     auto genericOperand =
+                         operand->get().getDefiningOp<linalg::GenericOp>();
+                     if (!genericOperand)
+                       return false;
+
+                     if (genericOperand.getNumReductionLoops() == 0)
+                       return false;
+
+                     return genericOp.getMatchingIndexingMap(operand)
+                         .isProjectedPermutation();
+                   })) {
     return false;
   }
 
@@ -197,17 +204,7 @@ getProducerLoopToConsumerLoopsMap(OpOperand &operand) {
   }
 
   AffineMap consumerOperandMap = consumer.getMatchingIndexingMap(&operand);
-  if (!consumerOperandMap.isPermutation()) {
-    return failure();
-  }
-
-  // Compute the producer loops -> consumer loops map. This allows you to find
-  // which producer loop maps to which consumer loop.
-  AffineMap inverseConsumerOperandMap =
-      inverseAndBroadcastProjectedPermutation(consumerOperandMap);
-  if (!inverseConsumerOperandMap ||
-      !inverseConsumerOperandMap.isProjectedPermutation(
-          /*allowZeroInResults=*/true)) {
+  if (!consumerOperandMap.isProjectedPermutation()) {
     return failure();
   }
 
@@ -216,9 +213,50 @@ getProducerLoopToConsumerLoopsMap(OpOperand &operand) {
   if (!producerResultMap.isProjectedPermutation()) {
     return failure();
   }
+
+  AffineMap inverseProducerResultMap =
+      inverseAndBroadcastProjectedPermutation(producerResultMap);
+  if (!inverseProducerResultMap) {
+    return failure();
+  }
+
   AffineMap producerLoopToConsumerLoop =
-      inverseConsumerOperandMap.compose(producerResultMap);
+      inverseProducerResultMap.compose(consumerOperandMap);
   return producerLoopToConsumerLoop;
+}
+
+static FailureOr<AffineMap>
+getConsumerLoopToProducerLoopsMap(OpOperand &operand) {
+  linalg::GenericOp consumer = dyn_cast<linalg::GenericOp>(operand.getOwner());
+  if (!consumer) {
+    return failure();
+  }
+  linalg::GenericOp producer =
+      dyn_cast_or_null<linalg::GenericOp>(operand.get().getDefiningOp());
+  if (!producer) {
+    return failure();
+  }
+
+  AffineMap consumerOperandMap = consumer.getMatchingIndexingMap(&operand);
+  if (!consumerOperandMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap producerResultMap =
+      producer.getIndexingMapMatchingResult(cast<OpResult>(operand.get()));
+  if (!producerResultMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap inverseConsumerOperandMap =
+      inverseAndBroadcastProjectedPermutation(consumerOperandMap);
+  if (!inverseConsumerOperandMap) {
+    return failure();
+  }
+
+  AffineMap consumerLoopToProducerLoop =
+      inverseConsumerOperandMap.compose(producerResultMap);
+  return consumerLoopToProducerLoop;
 }
 
 //===---------------------------------------------------------------------===//
@@ -353,10 +391,10 @@ CollapseInfo::getTransformedCollapsableLoops(AffineMap map) const {
 
   CollapsableLoopsSet transformedLoops;
   for (auto index : collapsableLoops) {
-    assert(index < map.getNumResults() && "index has no valid map");
+    assert(index < map.getNumResults() && "index has no valid mapping");
     auto dimExpr = dyn_cast<AffineDimExpr>(map.getResult(index));
     if (!dimExpr) {
-      return failure();
+      continue;
     }
 
     transformedLoops.insert(dimExpr.getPosition());
@@ -683,19 +721,17 @@ static void updateProducersFromConsumers(
 
       // Get a mapping from the consumer's iteration space to the producer's.
       CollapseInfo &producerInfo = opMap[genericProducer];
-      FailureOr<AffineMap> producerToConsumerMap =
-          getProducerLoopToConsumerLoopsMap(*operand);
-      if (failed(producerToConsumerMap)) {
+      FailureOr<AffineMap> consumerToProducerMap =
+          getConsumerLoopToProducerLoopsMap(*operand);
+      if (failed(consumerToProducerMap)) {
         producerInfo.clear();
         continue;
       }
-      AffineMap consumerToProducerMap = inverseAndBroadcastProjectedPermutation(
-          producerToConsumerMap.value());
 
       // Use the map to get the consumer's collapsable loops in terms of the
       // producer.
-      auto consumerCollapsable =
-          consumerInfo.getTransformedCollapsableLoops(consumerToProducerMap);
+      auto consumerCollapsable = consumerInfo.getTransformedCollapsableLoops(
+          consumerToProducerMap.value());
       if (failed(consumerCollapsable)) {
         producerInfo.clear();
         continue;

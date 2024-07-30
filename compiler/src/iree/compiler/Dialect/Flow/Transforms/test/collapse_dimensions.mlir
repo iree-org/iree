@@ -397,3 +397,52 @@ util.func public @elementwise_dag_transpose(%arg0: tensor<2x320x128x128xf32>) ->
 //  CHECK-SAME:      ins(%[[VAL4]] : tensor<640x128x128xf32>)
 //  CHECK-SAME:      outs(%{{.*}} : tensor<640x128x128xf32>)
 //       CHECK:    flow.return %[[VAL5]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+
+util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>) -> tensor<1x1x4096xf32> {
+  %cst = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+  %cst_0 = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+  %0 = flow.dispatch.region -> (tensor<1x1x4096xf32>) {
+    %cst_1 = arith.constant 0.000000e+00 : f32
+    %1 = tensor.empty() : tensor<1x1x4096xf32>
+    %2 = tensor.empty() : tensor<4096x32x128xf32>
+    %3 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<1x1x4096xf32>) -> tensor<1x1x4096xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0: tensor<4096x32x128xi8>) outs(%2 : tensor<4096x32x128xf32>) {
+    ^bb0(%in: i8, %out: f32):
+      %6 = arith.extui %in : i8 to i32
+      %7 = arith.uitofp %6 : i32 to f32
+      linalg.yield %7 : f32
+    } -> tensor<4096x32x128xf32>
+    %5 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg1, %4 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%3 : tensor<1x1x4096xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %6 = arith.mulf %in, %in_2 : f32
+      %7 = arith.addf %6, %out : f32
+      linalg.yield %7 : f32
+    } -> tensor<1x1x4096xf32>
+    flow.return %5 : tensor<1x1x4096xf32>
+  }
+  util.return %0 : tensor<1x1x4096xf32>
+}
+
+// CHECK-LABEL:  util.func public @quantized_matmul
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<4096x32x128xi8>
+//  CHECK-SAME:    %[[ARG1:.*]]: tensor<1x1x32x128xf32>
+//   CHECK-DAG:    %[[COLLAPSED0:.*]] = tensor.collapse_shape %[[ARG0]]
+//   CHECK-DAG:    %[[COLLAPSED1:.*]] = tensor.collapse_shape %[[ARG1]]
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED0]] : tensor<4096x4096xi8>)
+//  CHECK-SAME:      outs(%{{.*}} :  tensor<4096x4096xf32>)
+//       CHECK:    %[[VAL2:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"]
+//       CHECK:      ins(%[[COLLAPSED1]], %[[VAL0]] : tensor<1x4096xf32>, tensor<4096x4096xf32>)
+//       CHECK:      outs(%{{.*}} : tensor<1x4096xf32>)
+//       CHECK:    flow.return
