@@ -743,6 +743,11 @@ isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
+  // Don't fuse attention with it's producer
+  if (isa<LinalgExt::AttentionOp>(consumer)) {
+    return false;
+  }
+
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)
         .Case<tensor::PadOp>([&](auto padOp) { return true; })
