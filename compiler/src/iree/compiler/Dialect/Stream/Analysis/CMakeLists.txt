@@ -14,10 +14,12 @@ iree_cc_library(
   NAME
     Analysis
   HDRS
+    "Affinity.h"
     "Partitioning.h"
     "ResourceHazards.h"
     "ResourceUsage.h"
   SRCS
+    "Affinity.cpp"
     "Partitioning.cpp"
     "Partitioning/ReferencePartitioning.cpp"
     "ResourceHazards.cpp"

@@ -477,95 +477,6 @@ def HAL_InterfaceBindingArrayAttr :
                        "HAL binding array attribute">;
 
 //===----------------------------------------------------------------------===//
-// #hal.device.target<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_DeviceTargetAttr :
-    AttrDef<HAL_Dialect, "DeviceTarget"> {
-  let mnemonic = "device.target";
-  let summary = [{generic device target specification}];
-  let description = [{
-    Specifies the properties of a target runtime device.
-    Target devices are specified with a canonical identifier matching those used
-    by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
-    several target executable formats specified with `#hal.executable.target`.
-    An optional configuration dictionary allows for overriding backend defaults.
-
-    Example:
-    ```mlir
-    #hal.device.target<"llvm-cpu", {
-      device_configuration = ...
-    }, [
-      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
-      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
-    ]>
-    ```
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$deviceID,
-    AttrParameter<"DictionaryAttr", "">:$configuration,
-    ArrayRefParameter<"ExecutableTargetAttr", "">:$executable_targets
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$deviceID)>,
-  ];
-
-  let extraClassDeclaration = [{
-    // Returns a symbol-compatible name that pseudo-uniquely identifies this
-    // target. Callers must perform deduplication when required.
-    std::string getSymbolNameFragment();
-
-    // Returns true if there's an attribute with the given name in the
-    // configuration dictionary.
-    bool hasConfigurationAttr(StringRef name);
-
-    // Returns a list of target devices that may be active for the given
-    // operation. This will recursively walk parent operations until one with
-    // the `hal.device.targets` attribute is found.
-    static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
-
-    // Returns true if there is any UnitAttr with |name| in any device
-    // configuration for the given |op|.
-    static bool lookupConfigAttrAny(Operation *op, StringRef name);
-
-    // Returns true if all device configurations found for the given |op| have
-    // a UnitAttr with |name|.
-    static bool lookupConfigAttrAll(Operation *op, StringRef name);
-
-    // Returns the AND of boolean attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<bool>
-    lookupConfigAttrAnd(Operation *op, StringRef name);
-
-    // Returns the OR of boolean attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<bool>
-    lookupConfigAttrOr(Operation *op, StringRef name);
-
-    // Returns the range of integer attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<StaticRange<APInt>>
-    lookupConfigAttrRange(Operation *op, StringRef name);
-
-    // Returns zero or more executable targets that this device supports.
-    void getExecutableTargets(
-        SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
-
-    // Returns a list of all target executable configurations that may be
-    // required for the given operation.
-    static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>
-    lookupExecutableTargets(Operation *op);
-  }];
-  let hasCustomAssemblyFormat = 1;
-}
-
-//===----------------------------------------------------------------------===//
 // #hal.executable.target<*>
 //===----------------------------------------------------------------------===//
 
@@ -743,41 +654,318 @@ def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
 }
 
 //===----------------------------------------------------------------------===//
-// #hal.affinity.queue<*>
+// #hal.device.alias<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
+def HAL_DeviceAliasAttr : AttrDef<HAL_Dialect, "DeviceAlias", [
+  TypedAttrInterface,
+]> {
+  let mnemonic = "device.alias";
+  let summary = [{device target named alias}];
+  let description = [{
+    Specifies a device target by named alias whose configuration will be
+    expanded based on compiler configuration and flags. Any configuration
+    provided will override any defaults provided by the configuration.
+
+    Example:
+    ```mlir
+    // Default `vulkan` device:
+    #hal.device.alias<"vulkan"> : !hal.device
+    // Default `vulkan` device with configuration overrides:
+    #hal.device.alias<"vulkan", {
+      device_config = 123 : index
+    }> : !hal.device
+    // The 3rd default `vulkan` device detected at runtime (ordinal = 3):
+    #hal.device.alias<"vulkan"[3]> : !hal.device
+    ```
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"StringAttr", "">:$deviceID,
+    OptionalParameter<"std::optional<int64_t>", "">:$ordinal,
+    OptionalParameter<"DictionaryAttr", "">:$configuration
+  );
+
+  let builders = [
+    AttrBuilder<(ins "StringRef":$deviceID)>,
+  ];
+
+  let assemblyFormat = [{
+    `<`
+    $deviceID
+    `` (`[` $ordinal^ `]`)?
+    (`,` $configuration^)?
+    `>`
+  }];
+
+  let extraClassDeclaration = [{
+    Type getType() { return IREE::HAL::DeviceType::get(getContext()); }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.target<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
+  DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
+]> {
+  let mnemonic = "device.target";
+  let summary = [{generic device target specification}];
+  let description = [{
+    Specifies the properties of a target runtime device.
+    Target devices are specified with a canonical identifier matching those used
+    by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
+    several target executable formats specified with `#hal.executable.target`.
+    An optional configuration dictionary allows for overriding backend defaults.
+
+    If used to initialize a device global returns the first device matching the
+    target requirements or null if no devices match. An optional `ordinal`
+    index may be provided that selects the N-th matching device and is used to
+    select between multiple homogeneous devices.
+
+    Example:
+    ```mlir
+    #hal.device.target<"llvm-cpu", {
+      device_configuration = ...
+    }, [
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
+    ]> : !hal.device
+    ```
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$deviceID,
+    AttrParameter<"DictionaryAttr", "">:$configuration,
+    ArrayRefParameter<"ExecutableTargetAttr", "">:$executable_targets
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$deviceID)>,
+  ];
+
+  let extraClassDeclaration = [{
+    Type getType() { return IREE::HAL::DeviceType::get(getContext()); }
+
+    // Returns a symbol-compatible name that pseudo-uniquely identifies this
+    // target. Callers must perform deduplication when required.
+    std::string getSymbolNameFragment();
+
+    // Returns true if there's an attribute with the given name in the
+    // configuration dictionary.
+    bool hasConfigurationAttr(StringRef name);
+    // Returns the configuration attribute with the given name if found.
+    Attribute getConfigurationAttr(StringRef name);
+
+    // Returns zero or more executable targets that this device supports.
+    void getExecutableTargets(
+        SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
+
+    // Builds an expression that returns an i1 indicating whether the given
+    // |device| matches the device ID string pattern and executable target
+    // requirements.
+    static Value buildDeviceIDAndExecutableFormatsMatch(
+        Location loc, Value device, StringRef deviceIDPattern,
+        ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
+        OpBuilder &builder);
+
+    // Builds a match expression that returns an i1 indicating whether the given
+    // |device| supports any one of the |executableTargetAttrs|.
+    static Value buildExecutableFormatMatch(
+        Location loc, Value device,
+        ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
+        OpBuilder &builder);
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.ordinal<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceOrdinalAttr : AttrDef<HAL_Dialect, "DeviceOrdinal", [
+  DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
+]> {
+  let mnemonic = "device.ordinal";
+  let summary = [{specifies a device by runtime registration ordinal}];
+  let description = [{
+    Represents the device registered with the runtime in the order it was
+    registered with ordinal 0 being the first registered. Returns null during
+    initialization if the device ordinal is out of range.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"int64_t", "">:$ordinal
+  );
+
+  let assemblyFormat = [{
+    `<` $ordinal `>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.fallback<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceFallbackAttr : AttrDef<HAL_Dialect, "DeviceFallback", [
+  DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
+]> {
+  let mnemonic = "device.fallback";
+  let summary = [{specifies a reference to another device}];
+  let description = [{
+    Specifies by symbol a device that has already been initialized.
+    Returns null during initialization if the device specified as a fallback is
+    null.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"FlatSymbolRefAttr", "">:$name
+  );
+
+  let assemblyFormat = [{
+    `<` $name `>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.select<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
+  DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
+]> {
+  let mnemonic = "device.select";
+  let summary = [{selects a device from one or more options}];
+  let description = [{
+    Selects a HAL device at runtime by either enumerating and querying for
+    target support or matching the given existing device by affinity.
+    Devices are selected in the order listed. Fails during initialization if no
+    device can be selected.
+
+    Examples:
+    ```mlir
+    // Selects a single device matching the given target.
+    #hal.device.select<[
+      #hal.device.target<"..."> : !hal.device
+    ]> : !hal.device
+    // Selects a specific device with the given symbol.
+    #hal.device.select<[
+      #hal.device.fallback<@device_0> : !hal.device
+    ]> : !hal.device
+    // Selects a specific device by ordinal as registered at runtime.
+    #hal.device.select<[
+      #hal.device.ordinal<0> : !hal.device
+    ]> : !hal.device
+    // Selects an optional device if available and otherwise @fallback.
+    #hal.device.select<[
+      #hal.device.target<"some_optional_device"> : !hal.device,
+      #hal.device.fallback<@fallback> : !hal.device
+    ]> : !hal.device
+    ```
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"ArrayAttr", "">:$devices
+  );
+
+  let builders = [
+    AttrBuilder<(ins
+      "ArrayRef<Attribute>":$values
+    )>,
+  ];
+
+  let assemblyFormat = [{
+    `<` $devices `>`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.affinity<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
     "joinOR",
     "joinAND",
   ]>,
   Util_HoistableAttrInterface,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
 ]> {
-  let mnemonic = "affinity.queue";
-  let summary = [{specifies a set of allowed queues for an operation}];
+  let mnemonic = "device.affinity";
+  let summary = [{specifies a named device and optional queue affinity}];
   let description = [{
-    WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
-    This may change in the future to either be a nested attribute on a larger
-    affinity struct or be defined by an implementation of the affinity attr
-    interface. For now this allows higher levels of the stack to specify
-    queues such that the stream dialect can understand them and they can be
-    lowered into the HAL dialect.
-
     Specifies that an annotated operation or scope is only allowed to execute on
-    the set of queues (0-64) provided. Operations will not run on other queues.
+    a specific device and optionally a set of queues (0-64) provided.
+    Operations will not run on other queues. If the queue mask is omitted then
+    any queue on the device is allowed to execute the specified operations.
 
     Example:
     ```mlir
-    // any queue
-    #hal.affinity.queue<*>
-    // queues 4 and 5
-    #hal.affinity.queue<[4, 5]>
+    // Any queue on @device_a.
+    #hal.device.affinity<@device_a>
+    // Queues 4 and 5 on @device_b.
+    #hal.device.affinity<@device_b, [4, 5]>
     ```
   }];
 
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$mask
+    AttrParameter<"SymbolRefAttr", "">:$device,
+    AttrParameter<"int64_t", "">:$queue_mask
+  );
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.promise<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
+]> {
+  let mnemonic = "device.promise";
+  let summary = [{promises a named device and optional queue affinity}];
+  let description = [{
+    Specifies that an annotated operation or scope is only allowed to execute on
+    a specific device that has not yet been declared and optionally a set of
+    queues (0-64) provided. Operations will not run on other queues. If the
+    queue mask is omitted then any queue on the device is allowed to execute the
+    specified operations.
+
+    This is used in input programs to assign operations to particular devices
+    prior to the devices being declared. This allows device categories to be
+    referenced in the program as produced from the frontend and for those
+    device specifications to be provided later on during compilation.
+    Verification is performed as part of the ResolveDevicePromisesPass.
+
+    Example:
+    ```mlir
+    // Any queue on whatever @device_a will be after declaration.
+    #hal.device.promise<@device_a>
+    // Queues 4 and 5 on whatever @device_b will be after declaration.
+    #hal.device.promise<@device_b, [4, 5]>
+    ```
+  }];
+
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$device,
+    AttrParameter<"int64_t", "">:$queue_mask
   );
 
   let hasCustomAssemblyFormat = 1;

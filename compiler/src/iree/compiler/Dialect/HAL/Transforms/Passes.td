@@ -42,26 +42,8 @@ def ConvertToHALPass :
 // Device management
 //===----------------------------------------------------------------------===//
 
-def VerifyTargetEnvironmentPass :
-    Pass<"iree-hal-verify-target-environment", "mlir::ModuleOp"> {
-  let summary = "Verifies that the target execution environment is valid.";
-  let description = [{
-    Verifies that the target execution environment is valid.
-    `#hal.device.target` and `#hal.executable.target` attribute placement and
-    definition will be checked that they reference the available target backends
-    and that they are structurally valid.
-  }];
-  let options = [
-    Option<
-      "targetRegistry", "target-registry",
-      "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
-    >,
-  ];
-}
-
-def AssignTargetDevicesPass :
-    Pass<"iree-hal-assign-target-devices", "mlir::ModuleOp"> {
+def AssignLegacyTargetDevicesPass :
+    Pass<"iree-hal-assign-legacy-target-devices", "mlir::ModuleOp"> {
   let summary = "Assigns the HAL devices the module will target to the given list of targets.";
   let description = [{
     Assigns target HAL devices to the module based on the given list.
@@ -70,12 +52,137 @@ def AssignTargetDevicesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     ListOption<
       "targetBackends", "targetBackends",
       "std::string",
       "List of target backends to assign as device targets."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def AssignTargetDevicesPass :
+    Pass<"iree-hal-assign-target-devices", "mlir::ModuleOp"> {
+  let summary = "Assigns the HAL devices the module will target to the given list of target specifications.";
+  let description = [{
+    Assigns target HAL devices to the module based on the given list of target
+    specifications.
+
+    Targets can be specified in several ways depending on whether there are
+    multiple devices, named devices, or devices imported from external files.
+    Human-friendly device aliases can be used as shorthand for
+    `IREE::HAL::TargetDevice` implementations providing their own configuration.
+    The aliases are identical to those used by `#hal.device.alias<>`.
+
+    If multiple targets are specified they will be available as multiple
+    distinct devices. A single device may select from one or more targets such
+    that the first enumerated that matches at runtime will be selected. For
+    example a `gpu` device may select between CUDA, HIP, or Vulkan at runtime
+    based on what kind of device the user has and what HAL implementations were
+    compiled into the runtime.
+
+    Examples using the canonical flag:
+    ```mlir
+    // Two devices, one the local host device and the other a Vulkan device:
+    --iree-hal-target-device=local
+    --iree-hal-target-device=vulkan
+
+    // One device selecting between Vulkan if available and otherwise use the
+    // local host device:
+    --iree-hal-target-device=vulkan,local
+
+    // Two CUDA devices selected by runtime ordinal; at runtime two --device=
+    // flags are required to configure both devices:
+    --iree-hal-target-device=cuda[0]
+    --iree-hal-target-device=cuda[1]
+
+    // A fully-defined target specification:
+    --iree-hal-target-device=#hal.device.target<"cuda", {...}, [#hal.executable.target<...>]>
+
+    // Named device for defining a reference by #hal.device.promise<@some_name>:
+    --iree-hal-target-device=some_name=vulkan
+    ```
+  }];
+  let options = [
+    ListOption<
+      "targetDevices", "targetDevices",
+      "std::string",
+      "List of target device specifications."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def MaterializeTargetDevicesPass :
+    Pass<"iree-hal-materialize-target-devices", "mlir::ModuleOp"> {
+  let summary = "Materializes global device handles based on a `hal.device.targets` spec.";
+  let description = [{
+    Materializes global `!hal.device` ops for the devices specified by the
+    `hal.device.targets` attribute on the module. An optional default device can
+    be specified to assign to ops that do not have a default device specified.
+  }];
+  let options = [
+    Option<
+      "defaultDevice", "defaultDevice",
+      "std::string", "",
+      "Which device is considered the default when no device affinity is specified."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
+def ResolveDevicePromisesPass :
+    Pass<"iree-hal-resolve-device-promises", "mlir::ModuleOp"> {
+  let summary = "Resolves `#hal.device.promise` attributes to their devices.";
+  let description = [{
+    Resolves promised device affinities to the materialized device globals that
+    were promised. Verifies that all promises are resolved.
+  }];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def ResolveDeviceAliasesPass :
+    Pass<"iree-hal-resolve-device-aliases", "mlir::ModuleOp"> {
+  let summary = "Resolves `#hal.device.alias` attributes to their expanded configurations.";
+  let description = [{
+    Resolves device aliases to the concrete targets using defaults, flags, and
+    registered device configurations.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def VerifyDevicesPass :
+    Pass<"iree-hal-verify-devices", "mlir::ModuleOp"> {
+  let summary = "Verifies that all devices can be targeted with the available compiler plugins.";
+  let description = [{
+    Verifies that `#hal.device.target` and `#hal.executable.target` attributes
+    reference targets that are registered with the compiler.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -213,7 +320,7 @@ def ConfigureExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -229,7 +336,7 @@ def ConfigureTargetExecutableVariantsPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -251,7 +358,7 @@ def TranslateExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -268,7 +375,7 @@ def TranslateTargetExecutableVariantsPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -300,7 +407,7 @@ def LinkExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -318,7 +425,7 @@ def LinkTargetExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -354,7 +461,7 @@ def SerializeExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "debugLevel", "debug-level",
@@ -386,7 +493,7 @@ def SerializeTargetExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -435,6 +542,28 @@ def MaterializeDispatchInstrumentationPass :
     "mlir::arith::ArithDialect",
     "IREE::HAL::HALDialect",
     "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
+def InitializeDevicesPass :
+    Pass<"iree-hal-initialize-devices", "mlir::ModuleOp"> {
+  let summary = "Initializes global device handles based on their specification.";
+  let description = [{
+    Initializes each global `!hal.device` based on the specification attribute
+    by building initializers that enumerate and select the appropriate device.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
+    >,
+  ];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::scf::SCFDialect",
+    "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",
   ];
 }

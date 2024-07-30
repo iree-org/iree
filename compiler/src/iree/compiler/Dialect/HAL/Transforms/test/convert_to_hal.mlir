@@ -2,6 +2,8 @@
 
 // Tests an end-to-end simple single-dispatch `dispatch(arg0, arg1) -> result`.
 
+util.global private @device : !hal.device
+
 #executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 
@@ -33,9 +35,7 @@
 // CHECK: hal.executable private @ex
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_aarch64 target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_0) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
-    } {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_0) {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
@@ -53,8 +53,7 @@ hal.executable private @ex {
         #hal.interface.binding<0, 4>,
         #hal.interface.binding<1, 5>,
         #hal.interface.binding<1, 6>
-      ],
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      ]
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
@@ -69,7 +68,9 @@ hal.executable private @ex {
 
 // CHECK: util.func public @simpleDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view
-util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+  stream.affinity = #hal.device.affinity<@device>
+} {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   %c16 = arith.constant 16 : index
@@ -79,8 +80,7 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
 
   // CHECK: %[[ARG0_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG0]] : !hal.buffer_view> : !hal.buffer
 
-  // (annoyingly out of order)
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
+  // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device : !hal.device
   // CHECK-DAG: %[[ALLOCATOR:.+]] = hal.device.allocator<%[[DEVICE]] : !hal.device> : !hal.allocator
 
   // CHECK: hal.buffer.assert<%[[ARG0_BUFFER]] : !hal.buffer>

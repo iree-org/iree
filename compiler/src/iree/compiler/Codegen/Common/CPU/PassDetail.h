@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_PASS_DETAIL_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_PASS_DETAIL_H_
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 

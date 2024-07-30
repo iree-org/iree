@@ -16,8 +16,6 @@ iree_cc_library(
   HDRS
     "Patterns.h"
   SRCS
-    "ConvertConstantOps.cpp"
-    "ConvertStructuralOps.cpp"
     "Patterns.cpp"
   DEPS
     LLVMSupport

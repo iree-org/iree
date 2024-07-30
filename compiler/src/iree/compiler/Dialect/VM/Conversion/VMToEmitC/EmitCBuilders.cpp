@@ -299,6 +299,11 @@ void structPtrMemberAssign(OpBuilder builder, Location location,
 
 Value ireeMakeCstringView(OpBuilder builder, Location location,
                           std::string str) {
+  std::string escapedStr;
+  llvm::raw_string_ostream os(escapedStr);
+  os.write_escaped(str);
+  auto quotedStr = std::string("\"") + escapedStr + std::string("\"");
+
   auto ctx = builder.getContext();
   return builder
       .create<emitc::CallOpaqueOp>(
@@ -306,7 +311,7 @@ Value ireeMakeCstringView(OpBuilder builder, Location location,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
           /*callee=*/StringAttr::get(ctx, "iree_make_cstring_view"),
           /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, str)}),
+          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, quotedStr)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{})
       .getResult(0);

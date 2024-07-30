@@ -33,6 +33,13 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+class DeviceTargetAttr;
+class TargetRegistry;
+
+using BuildDeviceTargetMatchFn = std::function<Value(
+    Location loc, Value device, IREE::HAL::DeviceTargetAttr targetAttr,
+    OpBuilder &builder)>;
+
 #include "iree/compiler/Dialect/HAL/IR/HALAttrInterfaces.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc" // IWYU pragma: export
@@ -113,7 +120,8 @@ struct DescriptorSetLayoutType
 
 struct DeviceType
     : public Type::TypeBase<DeviceType, Type, TypeStorage,
-                            mlir::OpTrait::IREE::Util::ImplicitlyCaptured> {
+                            mlir::OpTrait::IREE::Util::ImplicitlyCaptured,
+                            IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.device";
