@@ -9,12 +9,12 @@ icon: octicons/check-circle-16
 We use [GitHub Actions](https://docs.github.com/en/actions) for continuous
 automation (CI) and continuous delivery (CD) workflows:
 
-* Code formating and linting
-* Building from source and running tests
-* Building packages for testing and releases
-* Testing packages across a variety of platforms
-* Publishing the <https://iree.dev> website
-* Updating dependencies
+* Code formating and linting.
+* Building from source and running tests.
+* Building packages for testing and releases.
+* Testing packages across a variety of platforms.
+* Publishing the <https://iree.dev> website.
+* Updating dependencies.
 
 Workflows are defined directly in the repository at
 [`.github/workflows/`](https://github.com/iree-org/iree/tree/main/.github/workflows),
@@ -31,13 +31,16 @@ hardware accelerators.
 _(Read more on
 <https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions>)_
 
-* _Workflows_ are configurable automated processes that run one or more _jobs_
+* _Workflows_ are configurable automated processes that run one or more _jobs_.
 * _Jobs_ are a set of _steps_ in a workflow that are executed on the same
-  _runner_
-* _Steps_ are lists of commands or meta actions to run in a shell environment
+  _runner_.
+* _Steps_ are lists of commands or meta actions to run in a shell environment.
 * _Runners_ are servers (physical or virtual machines) that run _workflows_
-  when triggered
-* _Events_ are specific activities in a repository that trigger a _workflow run_
+  when triggered.
+* _Events_ are specific activities in a repository that trigger a
+  _workflow run_.
+
+<img src="https://docs.github.com/assets/cb-25535/mw-1440/images/help/actions/overview-actions-simple.webp">
 
 ## :material-list-status: Workflow descriptions and status
 
@@ -50,12 +53,13 @@ graph LR
   accTitle: Package tests
   accDescr {
     Package tests start with a build_package step.
-    After build_package, individual jobs are run in parallel nvidia t4 tests,
-    AMD mi300 tests, etc.
+    After build_package, individual jobs are run in parallel for NVIDIA t4
+    tests, AMD mi300 tests, etc.
   }
 
   build_packages --> test_nvidia_t4
   build_packages --> test_amd_mi300
+  build_packages --> test_etc
 ```
 
 * Treat test workflows as code that downstream users would write - the
@@ -174,6 +178,21 @@ we most commonly use:
     * Where possible, jobs should allow this trigger so maintainers can test
       workflows without needing to send pull requests.
 
+!!! example - "Example workflow triggers"
+
+    * [`ci_linux_x64_clang_asan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_asan.yml)
+      runs on `pull_request` and `push` events despite building the compiler
+      and needing to use large build machines because it is generally useful
+      for all C/C++ compiler and runtime changes.
+    * [`ci_linux_x64_clang_tsan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml)
+      is similar to the ASan build but it runs on the `schedule` event because
+      it is only situationally useful and we want to limit use of large build
+      machines. It would run on GitHub-hosted runners if they could handle it
+      without running out of disk space.
+    * [`ci_linux_arm64_clang.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_arm64_clang.yml)
+      uses the `schedule` event since GitHub does not offer free Linux arm64
+      runners.
+
 #### :octicons-check-circle-16: Required and optional checks
 
 Any workflow that runs on the `pull_request` event can be either optional
@@ -246,6 +265,11 @@ We group runners into categories:
       reliably, and how access is limited to the group that maintains the
       hardware, any jobs using these self-hosted runners must be optional and
       easy to disable.
+    * Self-hosted runners can either be ephemeral (one job per runner,
+      compatible with
+      [autoscaling](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/autoscaling-with-self-hosted-runners)),
+      or persistent. Persistent runners can retain local build and artifact
+      caches to improve workflow time substantially.
 
 !!! info - "Contributing self-hosted runners"
 
