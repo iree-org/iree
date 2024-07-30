@@ -187,9 +187,13 @@ def HAL_DescriptorSetLayoutFlagsAttr :
 }
 
 def HAL_DispatchFlags_None : I64BitEnumAttrCase<"None", 0x0000>;
+// HACK: workaround tblgen bug on enums that only have a None value. This can be
+// repurposed for any use in the future as the runtime does not know about it.
+def HAL_DispatchFlags_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_DispatchFlagsAttr :
     I64BitEnumAttr<"DispatchFlags", "valid dispatch flags", [
       HAL_DispatchFlags_None,
+      HAL_DispatchFlags_Reserved,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
