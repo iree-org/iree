@@ -67,22 +67,34 @@ public:
                                                   subgroupSize);
   }
 
-  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(RewriterBase &rewriter) {
     MLIRContext *context = root->getContext();
-    WalkResult walkResult = root->walk([&](Operation *op) {
-      LogicalResult setResult =
-          llvm::TypeSwitch<Operation *, LogicalResult>(op)
-              .Case([&](vector::ContractionOp contract) {
-                return setContractionAnchor(context, analysis, contract);
-              })
-              .Case([&](vector::TransferReadOp transfer) {
-                return setTransferReadAnchor(context, analysis, transfer);
-              })
-              .Default([](Operation *) { return success(); });
-      return failed(setResult) ? WalkResult::interrupt()
-                               : WalkResult::advance();
+    SmallVector<vector::TransferReadOp> reads;
+    SmallVector<vector::ContractionOp> contracts;
+
+    root->walk([&](Operation *op) {
+      llvm::TypeSwitch<Operation *>(op)
+          .Case([&](vector::TransferReadOp transfer) {
+            reads.push_back(transfer);
+          })
+          .Case([&](vector::ContractionOp contract) {
+            contracts.push_back(contract);
+          });
     });
-    return failure(walkResult.wasInterrupted());
+
+    for (vector::TransferReadOp read : reads) {
+      if (failed(setTransferReadAnchor(context, rewriter, read))) {
+        return failure();
+      }
+    }
+
+    for (vector::ContractionOp contract : contracts) {
+      if (failed(setContractionAnchor(context, rewriter, contract))) {
+        return failure();
+      }
+    }
+
+    return success();
   }
 
   RewritePatternSet &getPatterns() { return patterns; }
@@ -92,7 +104,7 @@ private:
   // supported mma type from the cached list of mma types and populates the
   // necessary distribution pattern for those contractions.
   LogicalResult setContractionAnchor(MLIRContext *context,
-                                     VectorLayoutAnalysis &analysis,
+                                     RewriterBase &rewriter,
                                      vector::ContractionOp contract) {
     // TODO: Add SIMT fallback.
     if (!schedule) {
@@ -105,19 +117,29 @@ private:
     }
 
     auto [aLayout, bLayout, cLayout] = *layouts;
-    if (analysis.setAnchor(contract.getLhs(), aLayout).failed()) {
-      return failure();
-    }
-    if (analysis.setAnchor(contract.getRhs(), bLayout).failed()) {
-      return failure();
-    }
-    if (analysis.setAnchor(contract.getAcc(), cLayout).failed()) {
-      return failure();
-    }
-    if (analysis.setAnchor(contract.getResult(), cLayout).failed()) {
-      return failure();
-    }
+    Location loc = contract.getLoc();
+
+    // Set layouts for lhs, rhs and acc.
+    rewriter.setInsertionPoint(contract);
+    Value layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+        loc, contract.getLhsType(), contract.getLhs(), aLayout);
+    Value layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+        loc, contract.getRhsType(), contract.getRhs(), bLayout);
+    Value layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+        loc, contract.getAccType(), contract.getAcc(), cLayout);
+    contract->setOperand(0, layoutedLhs);
+    contract->setOperand(1, layoutedRhs);
+    contract->setOperand(2, layoutedAcc);
+
+    // Set layout for result.
+    rewriter.setInsertionPointAfter(contract);
+    auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+        loc, contract.getResultType(), contract.getResult(), cLayout);
+    rewriter.replaceAllUsesExcept(contract, toLayout.getResult(), toLayout);
+
+    // Set intrinsic kind.
     contract->setAttr("iree.amdgpu.mma", schedule.getIntrinsic());
+
     if (printLayout) {
       llvm::outs() << "contract A vector layout: " << aLayout << "\n";
       llvm::outs() << "contract B vector layout: " << bLayout << "\n";
@@ -168,7 +190,7 @@ private:
   //
   //    *_order = [0, 1]>
   LogicalResult setTransferReadAnchor(MLIRContext *context,
-                                      VectorLayoutAnalysis &analysis,
+                                      RewriterBase &rewriter,
                                       vector::TransferReadOp transfer) {
 
     // Get the forward slice of the transfer to approximate whether it will take
@@ -332,9 +354,13 @@ private:
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
         context, subgroupCounts, batchSizes, outerSizes, threadCounts,
         elementSizes, subgroupStrides, threadStrides);
-    if (analysis.setAnchor(transfer.getResult(), layout).failed()) {
-      return failure();
-    }
+
+    Location loc = transfer.getLoc();
+    rewriter.setInsertionPointAfter(transfer);
+    auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+        loc, transfer.getResult().getType(), transfer.getResult(), layout);
+    rewriter.replaceAllUsesExcept(transfer, toLayout.getResult(), toLayout);
+
     if (printLayout) {
       llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
                    << "\n";
@@ -403,16 +429,18 @@ public:
     AffineExpr linearId =
         x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
 
-    OpBuilder builder(func);
-    builder.setInsertionPointToStart(&func.getFunctionBody().front());
+    IRRewriter rewriter(func);
+    rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
     SmallVector<OpFoldResult> threadGrid = {
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                              gpu::Dimension::z)};
+        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                               gpu::Dimension::x),
+        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                               gpu::Dimension::y),
+        rewriter.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                               gpu::Dimension::z)};
 
     Value linearThreadIdVal = affine::makeComposedAffineApply(
-        builder, func.getLoc(), linearId, threadGrid);
+        rewriter, func.getLoc(), linearId, threadGrid);
 
     std::optional<int64_t> subgroupSize = getSubgroupSize(func);
     if (!subgroupSize) {
@@ -424,6 +452,13 @@ public:
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
                                            linearThreadIdVal,
                                            subgroupSize.value(), testLayout);
+
+    // Set anchor layouts.
+    if (failed(options.setAnchorOps(rewriter))) {
+      func->emitError() << "failed to set anchors";
+      return signalPassFailure();
+    }
+
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();

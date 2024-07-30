@@ -1023,17 +1023,6 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
 ///        VectorLayoutAnalysis
 /// ==========================================================================
 
-LogicalResult VectorLayoutAnalysis::setAnchor(Value val,
-                                              VectorLayoutInterface layout) {
-  auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
-  assert(typedVal && "expected value to be a vector type");
-  if (layout.isValidLayout(typedVal).failed()) {
-    return failure();
-  }
-  anchors[typedVal] = cast<VectorLayoutInterface>(layout);
-  return success();
-}
-
 LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
