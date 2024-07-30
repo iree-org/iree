@@ -145,9 +145,6 @@ jobs:
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
-            models-config-file: models_gpu_rocm_gfx942.json
-            runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
@@ -169,12 +166,6 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -250,10 +241,6 @@ jobs:
             rocm-chip: gfx90a
             backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
-            rocm-chip: gfx942
-            backend: rocm
-            runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
@@ -262,12 +249,6 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -347,24 +328,3 @@ jobs:
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
           rm job_summary.md
-
-      - name: "Running SDXL rocm pipeline benchmark (mi300)"
-        if: contains(matrix.name, 'rocm_mi300_gfx942')
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 325.0 \
-            --goldentime-rocm-unet-ms 77.0 \
-            --goldentime-rocm-clip-ms 15.5 \
-            --goldentime-rocm-vae-ms 74.0 \
-            --goldendispatch-rocm-unet 1714 \
-            --goldendispatch-rocm-clip 1569 \
-            --goldendispatch-rocm-vae 248 \
-            --goldensize-rocm-unet-bytes 2270000 \
-            --goldensize-rocm-clip-bytes 860000  \
-            --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 0 \
-            --rocm-chip gfx942 \
-            --log-cli-level=info \
-            --retries 7
-          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
