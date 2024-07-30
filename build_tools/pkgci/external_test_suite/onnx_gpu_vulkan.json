@@ -187,6 +187,7 @@
     "onnx/node/generated/test_gridsample_volumetric_nearest_align_corners_1",
     "onnx/node/generated/test_gridsample_zeros_padding",
     "onnx/node/generated/test_group_normalization_epsilon",
+    "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example",
     "onnx/node/generated/test_group_normalization_example_expanded",
     "onnx/node/generated/test_gru_batchwise",
