@@ -29,7 +29,7 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-DAG:   #[[$MAP:.+]]  = affine_map<(d0) -> (d0 mod 16)>
-// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 4)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0) -> ((d0 floordiv 16) * 4 - ((d0 floordiv 16) floordiv 4) * 16)>
 // CHECK-LABEL: func @distribute_multi_mma_16x16x16
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xf16>
