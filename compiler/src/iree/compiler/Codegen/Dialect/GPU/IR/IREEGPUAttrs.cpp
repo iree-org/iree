@@ -694,13 +694,13 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     AffineExpr tidExpr = builder.getAffineDimExpr(0);
     AffineMap vtidMap = AffineMap::get(
         /*dims=*/1, /*syms=*/0,
-        tidExpr.floorDiv(dimStride) % dimSize * element);
+        (tidExpr.floorDiv(dimStride) % dimSize) * element);
     Value vtid = builder.create<affine::AffineApplyOp>(loc, vtidMap, laneId);
     vtids.push_back(vtid);
   }
 
   int64_t idx = 0;
-  for (auto element : subgroupLayout.element) {
+  for (int64_t element : subgroupLayout.element) {
     canonicalSizes.push_back(builder.getIndexAttr(element));
     canonicalOffsets.push_back(vtids[idx++]);
   }
