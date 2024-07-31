@@ -44,8 +44,9 @@ namespace {
 /// code.
 struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
-                    LLVM::LLVMDialect, NVVM::NVVMDialect>();
+    registry
+        .insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
+                NVVM::NVVMDialect, affine::AffineDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -83,6 +84,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      populateVectorToSCFConversionPatterns(
+          patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
@@ -146,6 +149,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
       configureGpuToNVVMConversionLegality(target);
+      target.addLegalOp<LLVM::FMAOp>();
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
       }
