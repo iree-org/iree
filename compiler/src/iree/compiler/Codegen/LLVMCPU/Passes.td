@@ -131,7 +131,18 @@ def LLVMCPUTilePass :
   ];
 }
 
-def LLVMCPUTileAndFusePass :
+def LLVMCPUTileReductionAndFuseInputOperands :
+    InterfacePass<"iree-llvmcpu-tile-reduction-and-fuse-input-operands", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile the reduction dim and fuse with input operands.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTileReductionAndFuseInputOperandsPass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
+def LLVMCPUTileAndFuse :
     InterfacePass<"iree-llvmcpu-tile-and-fuse", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile and fuse TilingInterface operations.";
   let options = [

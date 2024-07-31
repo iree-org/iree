@@ -57,6 +57,7 @@ iree_lit_test_suite(
             "split_reduction.mlir",
             "synchronize_symbol_visibility.mlir",
             "tile.mlir",
+            "tile-reduction-and-fuse-input-operands.mlir",
             "tile-root-fuse-consumer-producer.mlir",
             "tile_and_fuse.mlir",
             "transform_dialect_bufferize.mlir",
