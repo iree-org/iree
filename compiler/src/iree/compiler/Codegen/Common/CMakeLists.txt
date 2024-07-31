@@ -131,6 +131,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
+    "TopkLowering.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"

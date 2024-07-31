@@ -181,6 +181,10 @@ createGenericVectorizationPass();
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
 
+/// Creates a pass to perform scf lowering of LinAlg TopkOp.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createTopkLoweringPass();
+
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createOptimizeTensorInsertExtractSlicesPass();
 
