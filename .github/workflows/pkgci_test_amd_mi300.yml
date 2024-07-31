@@ -42,7 +42,6 @@ jobs:
       #                  manipulates permission of github actions
       #                  directory to be able to clean after every PR
       - name: "Pre Checkout MI300 Step"
-        if: contains(matrix.name, 'gfx942')
         run: |
           sudo chmod -R 777 ~/actions-runner/_work
       - name: "Checking out repository"
@@ -122,7 +121,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
-            -k ${{ matrix.backend }} \
+            -k rocm \
             -rpfE \
             --capture=no \
             --log-cli-level=info \
@@ -133,7 +132,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
-            -k ${{ matrix.backend }} \
+            -k rocm \
             -rpfE \
             --capture=no \
             --log-cli-level=info \
