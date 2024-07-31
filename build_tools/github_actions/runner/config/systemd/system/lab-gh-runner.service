@@ -1,0 +1,16 @@
+[Unit]
+Description=GitHub Actions Runner
+After=network.target
+
+[Service]
+User=runner
+Group=runner
+EnvironmentFile=/etc/environment
+ExecStart=/runner-root/config/systemd/scripts/start_runner.sh
+Restart=no
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=lab-runner-setup.target
