@@ -20,6 +20,7 @@
 namespace mlir::iree_compiler {
 
 static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
+static const char kTopkSCFLowerAttrName[] = "enable_topk_scf_lowering";
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
@@ -76,4 +77,26 @@ bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
   return config && config.contains(kLoopPeelingAttrName);
 }
 
+/// Creates a string attribute containing the name of the attribute that is
+/// used to enable SCF lowerig for Topk operations.
+void setEnableTopkSCFLowerAttrName(IREE::LinalgExt::TopkOp topkOp) {
+  for (NamedAttribute attr : topkOp->getAttrs()) {
+    if (attr.getName() == kTopkSCFLowerAttrName)
+      // Already set.
+      return;
+  }
+  StringAttr topkSCFLowerName = StringAttr::get(topkOp->getContext(), kTopkSCFLowerAttrName);
+  StringAttr val = StringAttr::get(topkOp->getContext(), "");
+  topkOp->setAttr(topkSCFLowerName, val);
+}
+
+/// Checks whether SCF lowering has been enabled for the Topk operation. This
+/// is calculated based on compilation flag and Topk input shape.
+bool isTopkSCFLowerEnabled(IREE::LinalgExt::TopkOp topkOp) {
+  for (NamedAttribute attr : topkOp->getAttrs()) {
+    if (attr.getName() == kTopkSCFLowerAttrName)
+      return true;
+  }
+  return false;
+}
 } // namespace mlir::iree_compiler

@@ -105,6 +105,11 @@ llvm::cl::opt<bool> clEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+    clSCFLowerTopk("iree-llvmcpu-scf-lower-topk",
+                    llvm::cl::desc("Lower TopK, using SCF codegen if appropriate."),
+                    llvm::cl::init(false));
+
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 // Encodes the pre-processing strategy to be applied on a Linalg operation
@@ -2487,6 +2492,27 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::TopkOp topkOp) {
+  unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
+      topkOp.getInputType().getElementType());
+  int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
+  SmallVector<int64_t> vecTileSizes{0, typeVectorSize};
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      topkOp, DistributionHeuristicConfig{});
+  SmallVector<int64_t> lbs, ubs;
+  getRangeBounds(cast<TilingInterface>(topkOp.getOperation()), lbs, ubs);
+  int64_t numLoops = lbs.size();
+  SmallVector<int64_t> zeros(numLoops, 0);
+  distTileSizes = {1, 0};
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes, zeros, zeros};
+  LogicalResult result = setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, topkOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+  setEnableTopkSCFLowerAttrName(topkOp);
+  return result;
+}
+
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2497,6 +2523,43 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   TileSizesListType tileSizes = {distTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
+}
+
+// Returns true if TopkOp can be lowered with SCF dialect,
+// otherwise false.
+static bool
+canTopkBeLoweredUsingSCF(IREE::LinalgExt::TopkOp topkOp) {
+  if (!clSCFLowerTopk)
+    return false;
+  auto arg0 = topkOp.getInputs()[0];
+  auto shapedTy = llvm::cast<ShapedType>(arg0.getType());
+  SmallVector<int64_t> vectorSizes;
+  vectorSizes.append(shapedTy.getShape().begin(),
+                      shapedTy.getShape().end());
+  auto out0 = topkOp.getResults()[0];
+  auto resShapedTy = llvm::cast<ShapedType>(out0.getType());
+  ArrayRef<int64_t> resShape = resShapedTy.getShape();
+  if (resShapedTy.isDynamicShape(resShape))
+    return false;
+
+  auto inShapedTy = topkOp.getInputType();
+  ArrayRef<int64_t> inShape = inShapedTy.getShape();
+
+  // Validate input
+  auto inElemTy = topkOp.getInputType().getElementType();
+  if (auto intType = llvm::dyn_cast_if_present<IntegerType>(inElemTy)) {
+    // Do nothing. Expected type.
+  } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(inElemTy)) {
+    // Do nothing. Expected type.
+  } else {
+    // Unexpected type.
+    return false;
+  }
+
+  if (failed(vector::isValidMaskedInputVector(
+          inShape.take_front(topkOp.getInputRank()), vectorSizes)))
+    return false;
+  return true;
 }
 
 /// Redirects to methods that set the configuration based on operation type.
@@ -2513,6 +2576,13 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
               tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::TopkOp>([&](auto op) {
+          if (canTopkBeLoweredUsingSCF(op))
+            return setRootConfig(entryPointFn, op);
+          else
+            return setRootConfig(entryPointFn,
+                                 static_cast<TilingInterface>(op));
+        })
         .Case<IREE::LinalgExt::WinogradFilterTransformOp,
               IREE::LinalgExt::WinogradInputTransformOp,
               IREE::LinalgExt::WinogradOutputTransformOp>(

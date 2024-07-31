@@ -66,6 +66,8 @@ void eraseTranslationInfo(mlir::FunctionOpInterface funcOp);
 //===----------------------------------------------------------------------===//
 
 static const char kConfigAttrName[] = "lowering_config";
+static const char kTranslationInfoAttrName[] = "translation_info";
+static const char kCompilationInfoAttrName[] = "compilation_info";
 
 /// Returns the lowering configuration set for an operation. Returns `nullptr`
 /// if no value is set.  It expects that the attribute is stored using the

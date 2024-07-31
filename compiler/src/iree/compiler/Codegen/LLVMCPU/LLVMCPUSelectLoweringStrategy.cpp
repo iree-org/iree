@@ -83,7 +83,7 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   auto moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     // Set the strategy with default heuristics.
-    if (failed(initCPULaunchConfig(funcOp))) {
+    if (failed(initCPULaunchConfig(funcOp))) { // Lubo
       funcOp.emitOpError("failed to set lowering configuration");
       return signalPassFailure();
     }

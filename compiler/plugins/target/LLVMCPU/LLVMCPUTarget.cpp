@@ -237,7 +237,7 @@ public:
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
     bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
-    buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
+    buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME); // Lubo
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
