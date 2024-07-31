@@ -12,6 +12,7 @@ CPU_PLATFORM="${CPU_PLATFORM}"
 GPU_PLATFORM="${GPU_PLATFORM}"
 MACHINE_TYPE="${MACHINE_TYPE}"
 RUNNER_NAME="${RUNNER_NAME}"
+REGISTER_TOKEN="${REGISTER_TOKEN}"
 
 HOSTNAME="$(hostname)"
 RUNNER_SCOPE="${RUNNER_SCOPE:-openxla}"
@@ -19,6 +20,7 @@ RUNNER_TRUST="${RUNNER_TRUST:-minimal}"
 RUNNER_GROUP="${RUNNER_GROUP:-postsubmit}"
 RUNNER_ENV="${RUNNER_ENV:-prod}"
 OS_FAMILY="${OS_FAMILY:-ubuntu}"
+RUNNER_DIR="${RUNNER_DIR:-actions-runner}"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
@@ -47,4 +49,4 @@ declare -a args=(
   --labels "${RUNNER_LABELS}"
 )
 
-./config.sh --token "${REGISTER_TOKEN}" "${args[@]}"
+"${RUNNER_DIR}/config.sh" --token "${REGISTER_TOKEN}" "${args[@]}"
