@@ -14,7 +14,7 @@ RUNNER_ROOT="${RUNNER_ROOT:-/runner-root}"
 
 sudo adduser --system --group --home "${RUNNER_ROOT}" runner
 
-sudo cp "${SCRIPT_DIR}" "${RUNNER_ROOT}/config"
+sudo cp -r "${SCRIPT_DIR}" "${RUNNER_ROOT}/config"
 sudo chown -R runner:runner "${RUNNER_ROOT}/config"
 
 sudo chown runner:runner "${GCLOUD_CRED_FILE}"
