@@ -10,7 +10,4 @@ set -euo pipefail
 
 source /runner-root/config/functions.sh
 
-RUNNER_GROUP="$(get_attribute github-runner-group)"
-
 "/runner-root/config/hooks/validate_trigger.${RUNNER_GROUP}.sh"
-/runner-root/config/hooks/chown_workdir.sh

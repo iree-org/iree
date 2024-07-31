@@ -12,6 +12,8 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 GCLOUD_CRED_FILE="$(realpath "${GCLOUD_CRED_FILE}")"
 RUNNER_ROOT="${RUNNER_ROOT:-/runner-root}"
 
+sudo apt-get install jq
+
 sudo adduser --system --group --home "${RUNNER_ROOT}" runner
 
 sudo cp -r "${SCRIPT_DIR}" "${RUNNER_ROOT}/config"
