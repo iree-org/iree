@@ -62,7 +62,6 @@ jobs:
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
       LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
@@ -162,7 +161,6 @@ jobs:
           # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       IREE_TEST_FILES: ~/iree_tests_cache
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
@@ -256,7 +254,6 @@ jobs:
             runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       IREE_TEST_FILES: ~/iree_tests_cache
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
@@ -285,6 +282,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -e experimental/regression_suite
 
       # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests
