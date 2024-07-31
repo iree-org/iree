@@ -139,7 +139,9 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
@@ -243,7 +245,9 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
