@@ -921,7 +921,8 @@ public:
   }
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
+    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect,
+                    affine::AffineDialect>();
   }
 
   void runOnOperation() override;
