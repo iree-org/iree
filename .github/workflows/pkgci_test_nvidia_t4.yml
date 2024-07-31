@@ -63,6 +63,13 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: "Installing build dependencies"
+        run: |
+          sudo apt update
+          sudo apt install cmake clang ninja-build
+          export CC=clang
+          export CXX=clang++
+
       - name: "Building tests"
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: "Running GPU tests"
