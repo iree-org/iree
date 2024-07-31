@@ -9,7 +9,9 @@
     "--device=hip"
   ],
   "skip_compile_tests": [
-    "onnx/node/generated/test_dequantizelinear"
+    "onnx/node/generated/test_dequantizelinear",
+    "onnx/node/generated/test_group_normalization_epsilon_expanded",
+    "onnx/node/generated/test_group_normalization_example_expanded"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
@@ -87,16 +89,13 @@
     "onnx/node/generated/test_castlike_STRING_to_FLOAT_expanded",
     "onnx/node/generated/test_center_crop_pad_crop",
     "onnx/node/generated/test_center_crop_pad_crop_and_pad",
-    "onnx/node/generated/test_center_crop_pad_crop_and_pad_expanded",
     "onnx/node/generated/test_center_crop_pad_crop_axes_chw",
     "onnx/node/generated/test_center_crop_pad_crop_axes_chw_expanded",
     "onnx/node/generated/test_center_crop_pad_crop_axes_hwc",
     "onnx/node/generated/test_center_crop_pad_crop_axes_hwc_expanded",
-    "onnx/node/generated/test_center_crop_pad_crop_expanded",
     "onnx/node/generated/test_center_crop_pad_crop_negative_axes_hwc",
     "onnx/node/generated/test_center_crop_pad_crop_negative_axes_hwc_expanded",
     "onnx/node/generated/test_center_crop_pad_pad",
-    "onnx/node/generated/test_center_crop_pad_pad_expanded",
     "onnx/node/generated/test_col2im",
     "onnx/node/generated/test_col2im_5d",
     "onnx/node/generated/test_col2im_dilations",
@@ -153,9 +152,7 @@
     "onnx/node/generated/test_gridsample_volumetric_nearest_align_corners_0",
     "onnx/node/generated/test_gridsample_volumetric_nearest_align_corners_1",
     "onnx/node/generated/test_group_normalization_epsilon",
-    "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example",
-    "onnx/node/generated/test_group_normalization_example_expanded",
     "onnx/node/generated/test_gru_batchwise",
     "onnx/node/generated/test_gru_defaults",
     "onnx/node/generated/test_gru_seq_length",
