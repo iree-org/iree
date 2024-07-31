@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 
+#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -244,24 +245,108 @@ deriveAllowedResourceBufferBits(Location loc,
   return success();
 }
 
-void StreamConversionMapping::mapCommandBuffer(
-    IREE::Stream::CmdExecuteOp executeOp, Value commandBuffer) {
-  assert(
-      commandBuffers.insert(std::make_pair(executeOp, commandBuffer)).second &&
-      "multiple command buffers cannot be registered for the same op");
+BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
+                           ValueRange bufferValues, ValueRange bufferSizes,
+                           IndexSet &indexSet) {
+  auto resourceValues = executeOp.getResourceOperands();
+  auto capturedValues = executeOp.getBody().getArguments();
 
-  // Map all ops nested within the command buffer so we can query later.
-  executeOp.walk([&](Operation *op) {
-    commandBuffers.insert(std::make_pair(op, commandBuffer));
-    return WalkResult::advance();
-  });
+  // TODO(benvanik): support stream.cmd.call with indirect bindings; today the
+  // simple analysis that happens here can't handle generating binding tables
+  // for them as the target would need to know if it's taking a buffer or a
+  // binding table slot. A `variant<!hal.buffer, i32>` may let us do that.
+  executeOp->walk([&](IREE::Stream::CmdCallOp) { hasUnsupportedOps = true; });
+  if (hasUnsupportedOps) {
+    return;
+  }
+
+  // Categorize each resource value and add it to the table.
+  for (auto [resourceValue, capturedValue, bufferValue, bufferSize] :
+       llvm::zip_equal(resourceValues, capturedValues, bufferValues,
+                       bufferSizes)) {
+    switch (IREE::HAL::categorizeValue(resourceValue)) {
+    default:
+    case IREE::HAL::ValueOrigin::Unknown:
+    case IREE::HAL::ValueOrigin::MutableGlobal: {
+      // Indirect reference. Add to the table unless it already exists.
+      Value slot = indexSet.get(indirectBuffers.size());
+      if (indirectSlots.try_emplace(capturedValue, slot).second) {
+        // TODO(benvanik): subset the range bound by the min/max used within the
+        // consumer region. This would require emitting ops that track that
+        // information (probably via util.range.min/max). For now we bind the
+        // entire buffer range and let the individual commands subrange them.
+        IREE::HAL::BindingTableValue bindingTableValue;
+        bindingTableValue.buffer = bufferValue;
+        bindingTableValue.byteOffset = indexSet.get(0);
+        bindingTableValue.byteLength = bufferSize;
+        indirectBuffers.push_back(bindingTableValue);
+      }
+      break;
+    }
+    case IREE::HAL::ValueOrigin::LocalConstant:
+    case IREE::HAL::ValueOrigin::ImmutableGlobal: {
+      // Direct reference; not in the table.
+      break;
+    }
+    }
+  }
 }
 
-Value StreamConversionMapping::lookupCommandBufferFor(Operation *cmdOp) const {
-  auto it = commandBuffers.find(cmdOp);
-  assert(it != commandBuffers.end() &&
+std::optional<Value> BindingTable::lookupResourceSlot(Value resourceValue) {
+  auto it = indirectSlots.find(resourceValue);
+  if (it != indirectSlots.end()) {
+    return it->second; // found a slot
+  }
+  return std::nullopt;
+}
+
+IREE::HAL::BindingTableValue CommandBufferConversionMapping::resolveBinding(
+    Location loc, Value resourceValue, Value bufferValue, Value useOffset,
+    Value useLength, OpBuilder &builder) {
+  IREE::HAL::BindingTableValue bindingTableValue;
+
+  // Try to resolve the resource to a slot. If not found then it's a direct
+  // reference and we use the buffer provided.
+  auto slot = bindingTable.lookupResourceSlot(resourceValue);
+  if (slot.has_value()) {
+    bindingTableValue.buffer = slot.value();
+  } else {
+    bindingTableValue.buffer = bufferValue;
+  }
+
+  // TODO(benvanik): adjust range by the binding table base index. Today all
+  // binding table entries are the full buffers starting at zero.
+  bindingTableValue.byteOffset = useOffset;
+  bindingTableValue.byteLength = useLength;
+
+  return bindingTableValue;
+}
+
+void StreamConversionMapping::mapCommandBuffer(
+    IREE::Stream::CmdExecuteOp executeOp, Value commandBuffer,
+    BindingTable bindingTable) {
+  // Wrap metadata for the mapping.
+  auto commandBufferMapping = std::make_shared<CommandBufferConversionMapping>(
+      commandBuffer, std::move(bindingTable));
+
+  // Map all ops nested within the command buffer so we can query later.
+  opCommandBufferMap.insert(
+      std::make_pair(executeOp, commandBufferMapping.get()));
+  executeOp.walk([&](Operation *op) {
+    opCommandBufferMap.insert(std::make_pair(op, commandBufferMapping.get()));
+    return WalkResult::advance();
+  });
+
+  // Keep the mapping data alive until conversion completes.
+  commandBuffers.push_back(std::move(commandBufferMapping));
+}
+
+CommandBufferConversionMapping &
+StreamConversionMapping::lookupCommandBufferFor(Operation *cmdOp) const {
+  auto it = opCommandBufferMap.find(cmdOp);
+  assert(it != opCommandBufferMap.end() &&
          "command buffer must have been registered during conversion");
-  return it->second;
+  return *it->second;
 }
 
 } // namespace mlir::iree_compiler

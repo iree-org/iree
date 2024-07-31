@@ -23,6 +23,13 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static llvm::cl::opt<bool> clIndirectCommandBuffers{
+    "iree-hal-indirect-command-buffers",
+    llvm::cl::desc("Whether to turn buffer bindings into indirect references "
+                   "when recording command buffers."),
+    llvm::cl::init(false),
+};
+
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -558,10 +565,13 @@ struct CmdFillOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFillOp fillOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(fillOp);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(fillOp);
+    auto targetBinding = commandBufferMapping.resolveBinding(
+        fillOp.getLoc(), fillOp.getTarget(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getTargetLength(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFillBufferOp>(
-        fillOp, commandBuffer, adaptor.getTarget(), adaptor.getTargetOffset(),
-        adaptor.getTargetLength(), adaptor.getValue());
+        fillOp, commandBufferMapping.getHandle(), targetBinding.buffer,
+        targetBinding.byteOffset, targetBinding.byteLength, adaptor.getValue());
     return success();
   }
 };
@@ -572,10 +582,17 @@ struct CmdCopyOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCopyOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(op);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
+    auto sourceBinding = commandBufferMapping.resolveBinding(
+        op.getLoc(), op.getSource(), adaptor.getSource(),
+        adaptor.getSourceOffset(), adaptor.getLength(), rewriter);
+    auto targetBinding = commandBufferMapping.resolveBinding(
+        op.getLoc(), op.getTarget(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getLength(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCopyBufferOp>(
-        op, commandBuffer, adaptor.getSource(), adaptor.getSourceOffset(),
-        adaptor.getTarget(), adaptor.getTargetOffset(), adaptor.getLength());
+        op, commandBufferMapping.getHandle(), sourceBinding.buffer,
+        sourceBinding.byteOffset, targetBinding.buffer,
+        targetBinding.byteOffset, adaptor.getLength());
     return success();
   }
 };
@@ -604,43 +621,44 @@ struct CmdCollectiveOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCollectiveOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(op);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
 
-    Value sendBuffer;
-    Value sendOffset;
-    Value sendLength;
-    Value recvBuffer;
-    Value recvOffset;
-    Value recvLength;
+    IREE::HAL::BindingTableValue sendBinding;
+    IREE::HAL::BindingTableValue recvBinding;
     switch (adaptor.getOp().getKind()) {
     default:
       assert(adaptor.getResources().size() == 2 && "should have verified");
-      sendBuffer = adaptor.getResources()[0];
-      sendOffset = adaptor.getResourceOffsets()[0];
-      sendLength = adaptor.getResourceLengths()[0];
-      recvBuffer = adaptor.getResources()[1];
-      recvOffset = adaptor.getResourceOffsets()[1];
-      recvLength = adaptor.getResourceLengths()[1];
+      sendBinding = commandBufferMapping.resolveBinding(
+          op.getLoc(), op.getResources()[0], adaptor.getResources()[0],
+          adaptor.getResourceOffsets()[0], adaptor.getResourceLengths()[0],
+          rewriter);
+      recvBinding = commandBufferMapping.resolveBinding(
+          op.getLoc(), op.getResources()[1], adaptor.getResources()[1],
+          adaptor.getResourceOffsets()[1], adaptor.getResourceLengths()[1],
+          rewriter);
       break;
     case IREE::Stream::CollectiveKind::Send:
       assert(adaptor.getResources().size() == 1 && "should have verified");
-      sendBuffer = adaptor.getResources()[0];
-      sendOffset = adaptor.getResourceOffsets()[0];
-      sendLength = adaptor.getResourceLengths()[0];
+      sendBinding = commandBufferMapping.resolveBinding(
+          op.getLoc(), op.getResources()[0], adaptor.getResources()[0],
+          adaptor.getResourceOffsets()[0], adaptor.getResourceLengths()[0],
+          rewriter);
       break;
     case IREE::Stream::CollectiveKind::Recv:
       assert(adaptor.getResources().size() == 1 && "should have verified");
-      recvBuffer = adaptor.getResources()[0];
-      recvOffset = adaptor.getResourceOffsets()[0];
-      recvLength = adaptor.getResourceLengths()[0];
+      recvBinding = commandBufferMapping.resolveBinding(
+          op.getLoc(), op.getResources()[0], adaptor.getResources()[0],
+          adaptor.getResourceOffsets()[0], adaptor.getResourceLengths()[0],
+          rewriter);
       break;
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCollectiveOp>(
-        op, commandBuffer, adaptor.getChannel(),
+        op, commandBufferMapping.getHandle(), adaptor.getChannel(),
         convertCollectiveAttr(adaptor.getOp()), adaptor.getElementCount(),
-        adaptor.getParam(), sendBuffer, sendOffset, sendLength, recvBuffer,
-        recvOffset, recvLength);
+        adaptor.getParam(), sendBinding.buffer, sendBinding.byteOffset,
+        sendBinding.byteLength, recvBinding.buffer, recvBinding.byteOffset,
+        recvBinding.byteLength);
     return success();
   }
 };
@@ -652,7 +670,7 @@ struct CmdDispatchOpPattern
   matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = dispatchOp.getLoc();
-    auto commandBuffer = mapping->lookupCommandBufferFor(dispatchOp);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(dispatchOp);
 
     // TODO(multi-device): reusable command buffers done at the stream level may
     // make this difficult. For now we assume each stream region being lowered
@@ -664,7 +682,8 @@ struct CmdDispatchOpPattern
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
     Value device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
-        loc, rewriter.getType<IREE::HAL::DeviceType>(), commandBuffer);
+        loc, rewriter.getType<IREE::HAL::DeviceType>(),
+        commandBufferMapping.getHandle());
 
     // Prepare for variant switch table by gathering the conditions selecting
     // each variant.
@@ -685,8 +704,8 @@ struct CmdDispatchOpPattern
                               IREE::HAL::ExecutableExportOp exportOp,
                               OpBuilder &builder) {
       // Record push constants and buffer bindings.
-      recordParameters(loc, affinityAttr, device, commandBuffer, exportOp,
-                       dispatchOp, adaptor, builder);
+      recordParameters(loc, affinityAttr, device, commandBufferMapping,
+                       exportOp, dispatchOp, adaptor, builder);
 
       // Dispatch with a target-specific workgroup count.
       auto workgroupCount = exportOp.calculateWorkgroupCount(
@@ -699,8 +718,8 @@ struct CmdDispatchOpPattern
       auto flags = builder.getAttr<IREE::HAL::DispatchFlagsAttr>(
           IREE::HAL::DispatchFlags::None);
       return builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, ordinal, workgroupCount[0],
-          workgroupCount[1], workgroupCount[2], flags);
+          loc, commandBufferMapping.getHandle(), executable, ordinal,
+          workgroupCount[0], workgroupCount[1], workgroupCount[2], flags);
     };
 
     // If there is only one variant we can emit that directly without a
@@ -746,7 +765,8 @@ struct CmdDispatchOpPattern
   }
 
   void recordParameters(Location loc, IREE::Stream::AffinityAttr affinityAttr,
-                        Value device, Value commandBuffer,
+                        Value device,
+                        CommandBufferConversionMapping &commandBufferMapping,
                         IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Stream::CmdDispatchOp dispatchOp,
                         OpAdaptor adaptor, OpBuilder &builder) const {
@@ -771,35 +791,57 @@ struct CmdDispatchOpPattern
         pushConstants.push_back(operand);
       }
       builder.create<IREE::HAL::CommandBufferPushConstantsOp>(
-          loc, commandBuffer, pipelineLayout,
+          loc, commandBufferMapping.getHandle(), pipelineLayout,
           builder.getIndexAttr(pushConstantBase), pushConstants);
     }
 
-    // Push descriptor bindings.
-    int64_t currentSet = -1;
-    SmallVector<IREE::HAL::DescriptorSetBindingValue> bindings;
-    auto flushSet = [&]() {
-      builder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-          loc, commandBuffer, pipelineLayout, currentSet, bindings);
-      bindings.clear();
-    };
+    // Push descriptor bindings set by set.
+    // We build a table of all sets in the layout then populate the bindings as
+    // we walk the flattened/unordered resource list. After we've collected all
+    // of the bindings we issue the command for that set.
     auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
         exportOp, dispatchOp.getResources().size());
+    int64_t maxSet = llvm::max_element(bindingAttrs, [](auto lhs, auto rhs) {
+                       return lhs.getSet() < rhs.getSet();
+                     })->getSet();
+    SmallVector<SmallVector<IREE::HAL::DescriptorSetBindingValue>> setBindings;
+    setBindings.resize(maxSet + 1);
     for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
-      int64_t set = bindingAttr.getSet();
-      if (currentSet != -1 && currentSet != set)
-        flushSet();
-      currentSet = set;
+      auto setLayoutFlags =
+          layoutAttr.getSetLayout(bindingAttr.getSet())
+              .getFlags()
+              .value_or(IREE::HAL::DescriptorSetLayoutFlags::None);
       IREE::HAL::DescriptorSetBindingValue binding;
       binding.ordinal =
           builder.create<arith::ConstantIndexOp>(loc, bindingAttr.getBinding());
-      binding.buffer = adaptor.getResources()[i];
-      binding.byteOffset = adaptor.getResourceOffsets()[i];
-      binding.byteLength = adaptor.getResourceLengths()[i];
-      bindings.push_back(binding);
+      if (bitEnumContainsAll(setLayoutFlags,
+                             IREE::HAL::DescriptorSetLayoutFlags::Indirect)) {
+        // Indirect binding resolved through the cached command buffer binding
+        // table. The buffer recorded in the descriptor is a slot ordinal into
+        // the binding table. Note that the range may be adjusted based on the
+        // range bound to the slot in the table.
+        auto resolvedBinding = commandBufferMapping.resolveBinding(
+            loc, dispatchOp.getResources()[i], adaptor.getResources()[i],
+            adaptor.getResourceOffsets()[i], adaptor.getResourceLengths()[i],
+            builder);
+        binding.buffer = resolvedBinding.buffer;
+        binding.byteOffset = resolvedBinding.byteOffset;
+        binding.byteLength = resolvedBinding.byteLength;
+      } else {
+        // Direct binding referencing the buffer and range provided on the op.
+        binding.buffer = adaptor.getResources()[i];
+        binding.byteOffset = adaptor.getResourceOffsets()[i];
+        binding.byteLength = adaptor.getResourceLengths()[i];
+      }
+      setBindings[bindingAttr.getSet()].push_back(binding);
     }
-    if (currentSet != -1)
-      flushSet();
+    for (auto [set, bindings] : llvm::enumerate(setBindings)) {
+      if (!bindings.empty()) {
+        builder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+            loc, commandBufferMapping.getHandle(), pipelineLayout, set,
+            bindings);
+      }
+    }
   }
 };
 
@@ -840,11 +882,11 @@ struct CmdCallOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(callOp);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(callOp);
 
     // Always pass the command buffer as the first arg.
     SmallVector<Value> operands;
-    operands.push_back(commandBuffer);
+    operands.push_back(commandBufferMapping.getHandle());
     size_t resourceIndex = 0;
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
@@ -917,14 +959,28 @@ struct CmdExecuteOpPattern
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(executeOp, rewriter);
 
-    // If there are any wait timepoints it means there's prior queued execution
-    // that we may need to wait behind and we can't execute inline. HAL
-    // implementations may be able to flush eagerly if they are able to tell
-    // that all conditions are met during recording but we leave that to them.
-    auto modes = IREE::HAL::CommandBufferModeBitfield::OneShot;
-    if (!executeOp.getAwaitTimepoint()) {
-      modes =
-          modes | IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
+    // Calculate the indirect buffer references used within the command buffer
+    // by analyzing captured resources. This analysis will be used by subsequent
+    // conversion to decide between embedding the direct buffer references or
+    // indirect ones. We only do this if the execution region is reused.
+    IndexSet indexSet(loc, rewriter);
+    BindingTable bindingTable;
+    if (!executeOp.getOnce() && clIndirectCommandBuffers) {
+      bindingTable = BindingTable(executeOp, adaptor.getResourceOperands(),
+                                  adaptor.getResourceOperandSizes(), indexSet);
+    }
+    auto bindingTableValues = llvm::to_vector(bindingTable.getValues());
+
+    // If the execute op is one-shot or there's no indirect bindings then mark
+    // the command buffer one-shot.
+    IREE::HAL::CommandBufferModeBitfield modes =
+        IREE::HAL::CommandBufferModeBitfield::None;
+    if (!bindingTable.isSupported() || bindingTable.empty()) {
+      modes = modes | IREE::HAL::CommandBufferModeBitfield::OneShot;
+      if (!executeOp.getAwaitTimepoint()) {
+        modes =
+            modes | IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
+      }
     }
 
     // Derive the command buffer type based on the kind of operations present.
@@ -932,27 +988,56 @@ struct CmdExecuteOpPattern
     // (like dedicated DMA controllers).
     auto commandCategories = deriveCommandCategories(executeOp.getBody());
 
-    // Create a new command buffer for recording.
-    auto commandBuffer =
-        rewriter
-            .create<IREE::HAL::CommandBufferCreateOp>(
-                loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device,
-                modes, commandCategories, queueAffinity,
-                /*binding_capacity=*/Value{})
-            .getResult();
-    mapping->mapCommandBuffer(executeOp, commandBuffer);
+    // Create, record, and finalize a command buffer at the current rewriter
+    // insertion point. Returns the command buffer handle.
+    auto recordCommandBuffer =
+        [&](Value device, Value queueAffinity,
+            ConversionPatternRewriter &rewriter) -> Value {
+      // Create a new command buffer for recording.
+      Value bindingTableCapacity =
+          bindingTable.empty() ? Value{}
+                               : rewriter.create<arith::ConstantIndexOp>(
+                                     loc, bindingTable.size());
+      Value commandBuffer = rewriter.create<IREE::HAL::CommandBufferCreateOp>(
+          loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device, modes,
+          commandCategories, queueAffinity, bindingTableCapacity);
+      mapping->mapCommandBuffer(executeOp, commandBuffer,
+                                std::move(bindingTable));
 
-    // Run through the execution region and serialize execution by inserting
-    // barriers. Nested regions may elide barriers as needed.
-    auto &bodyBlock = executeOp.getBody().front();
-    insertSerializationBarriers(loc, bodyBlock, commandBuffer,
-                                OpBuilder::atBlockBegin(&bodyBlock));
+      // Run through the execution region and serialize execution by inserting
+      // barriers. Nested regions may elide barriers as needed.
+      auto &bodyBlock = executeOp.getBody().front();
+      insertSerializationBarriers(loc, bodyBlock, commandBuffer,
+                                  OpBuilder::atBlockBegin(&bodyBlock));
 
-    // Begin/end recording and inline the execution region between them.
-    auto endOp =
-        rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
-    rewriter.inlineBlockBefore(&executeOp.getBody().front(), endOp,
-                               adaptor.getResourceOperands());
+      // Begin/end recording and inline the execution region between them.
+      auto endOp = rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(
+          loc, commandBuffer);
+      rewriter.inlineBlockBefore(&executeOp.getBody().front(), endOp,
+                                 adaptor.getResourceOperands());
+
+      // Return the command buffer handle.
+      return commandBuffer;
+    };
+
+    // If reusable then we can memoize the command buffer by nesting it within
+    // a memoization region and otherwise we inline the recording directly into
+    // the original execution site.
+    Value commandBuffer;
+    if (!bitEnumContainsAll(modes,
+                            IREE::HAL::CommandBufferModeBitfield::OneShot)) {
+      auto memoizeOp = rewriter.create<IREE::HAL::DeviceMemoizeOp>(
+          loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device,
+          queueAffinity);
+      auto ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(&memoizeOp.getBody().emplaceBlock());
+      rewriter.create<IREE::HAL::ReturnOp>(
+          loc, recordCommandBuffer(device, queueAffinity, rewriter));
+      rewriter.restoreInsertionPoint(ip);
+      commandBuffer = memoizeOp.getResult(0);
+    } else {
+      commandBuffer = recordCommandBuffer(device, queueAffinity, rewriter);
+    }
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -961,9 +1046,15 @@ struct CmdExecuteOpPattern
         loc, device, executeOp.getResultTimepoint(), rewriter);
 
     // Queue execution.
-    rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(loc, device, queueAffinity,
-                                                     waitFence, signalFence,
-                                                     ValueRange{commandBuffer});
+    if (bindingTableValues.empty()) {
+      rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(
+          loc, device, queueAffinity, waitFence, signalFence,
+          ValueRange{commandBuffer});
+    } else {
+      rewriter.create<IREE::HAL::DeviceQueueExecuteIndirectOp>(
+          loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
+          bindingTableValues);
+    }
 
     rewriter.replaceOp(executeOp, signalFence);
     return success();
@@ -976,12 +1067,13 @@ struct CmdSerialOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto commandBuffer = mapping->lookupCommandBufferFor(serialOp);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(serialOp);
 
     // Run through the execution region and serialize execution by inserting
     // barriers. Nested regions may elide barriers as needed.
     auto &bodyBlock = serialOp.getBody().front();
-    insertSerializationBarriers(serialOp.getLoc(), bodyBlock, commandBuffer,
+    insertSerializationBarriers(serialOp.getLoc(), bodyBlock,
+                                commandBufferMapping.getHandle(),
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Inline the serial execution region.
