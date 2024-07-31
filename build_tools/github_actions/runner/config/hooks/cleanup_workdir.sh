@@ -10,4 +10,5 @@
 # actions. This isn't really necessary with ephemeral runners, but it also
 # doesn't hurt and we will have some runners that aren't ephemeral.
 
+rm -rf /runner-root/actions-runner/_work/iree/iree/
 mkdir -p /runner-root/actions-runner/_work/iree/iree/
