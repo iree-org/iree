@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -30,15 +29,14 @@
 namespace mlir::iree_compiler {
 
 namespace {
-class TopkLoweringPass
-    : public TopkLoweringBase<TopkLoweringPass> {
+class TopkLoweringPass : public TopkLoweringBase<TopkLoweringPass> {
 public:
   using TopkLoweringBase::TopkLoweringBase;
   TopkLoweringPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
-                    vector::VectorDialect>();
+    registry
+        .insert<IREE::LinalgExt::IREELinalgExtDialect, vector::VectorDialect>();
   }
   void runOnOperation() override;
 };
@@ -523,10 +521,9 @@ insertElemInOutput(Location loc, OpBuilder b, Value elemToInsertIfNeeded,
 }
 
 /// Vectorize a `topKOp` with (1) static result and input types
-static LogicalResult
-lowerAsLinalgExtTopkUsingSCF(RewriterBase &rewriter, IREE::LinalgExt::TopkOp topkOp,
-                         ArrayRef<int64_t> inputVectorSizes,
-                         SmallVectorImpl<Value> &newResults) {
+static LogicalResult lowerAsLinalgExtTopkUsingSCF(
+    RewriterBase &rewriter, IREE::LinalgExt::TopkOp topkOp,
+    ArrayRef<int64_t> inputVectorSizes, SmallVectorImpl<Value> &newResults) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(topkOp);
   Location loc = topkOp.getLoc();
@@ -881,7 +878,7 @@ void TopkLoweringPass::runOnOperation() {
       }
       SmallVector<Value> results;
       if (failed(lowerAsLinalgExtTopkUsingSCF(rewriter, topkOp, vectorSizes,
-                                          results))) {
+                                              results))) {
         VEC_LDBG("TopK Vectorization failed\n");
         return;
       }

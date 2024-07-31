@@ -45,6 +45,7 @@ VMVX_SRCS = enforce_glob(
         "scatter.mlir",
         "sort.mlir",
         "top-k.mlir",
+        "top-k-scf-lowering.mlir",
         "winograd_input.mlir",
         "winograd_output.mlir",
     ],
@@ -68,12 +69,14 @@ LLVM_GPU_SRCS = enforce_glob(
         "scatter.mlir",
         "sort.mlir",
         "top-k.mlir",
+        "top-k-scf-lowering.mlir",
         "winograd_input.mlir",
         "winograd_output.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "attention.mlir",
+        "top-k-scf-lowering.mlir",
     ],
 )
 
@@ -114,6 +117,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "top-k.mlir",
+            "top-k-scf-lowering.mlir",
         ],
     ),
     driver = "metal",
@@ -135,6 +139,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "top-k.mlir",
+            "top-k-scf-lowering.mlir",
         ],
     ),
     driver = "vulkan",
@@ -147,6 +152,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
     srcs = [
         "top-k.mlir",
+        "top-k-scf-lowering.mlir",
     ],
     compiler_flags = ["--iree-flow-topk-split-reduction=2"],
     driver = "cuda",
@@ -165,6 +171,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction-double",
     srcs = [
         "top-k.mlir",
+        "top-k-scf-lowering.mlir",
     ],
     compiler_flags = ["--iree-flow-topk-split-reduction=3,2"],
     driver = "cuda",

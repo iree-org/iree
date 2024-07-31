@@ -105,10 +105,10 @@ llvm::cl::opt<bool> clEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
-llvm::cl::opt<bool>
-    clSCFLowerTopk("iree-llvmcpu-scf-lower-topk",
-                    llvm::cl::desc("Lower TopK, using SCF codegen if appropriate."),
-                    llvm::cl::init(false));
+llvm::cl::opt<bool> clSCFLowerTopk(
+    "iree-llvmcpu-scf-lower-topk",
+    llvm::cl::desc("Lower TopK, using SCF codegen if appropriate."),
+    llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -2527,15 +2527,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 // Returns true if TopkOp can be lowered with SCF dialect,
 // otherwise false.
-static bool
-canTopkBeLoweredUsingSCF(IREE::LinalgExt::TopkOp topkOp) {
+static bool canTopkBeLoweredUsingSCF(mlir::FunctionOpInterface entryPointFn,
+                                     IREE::LinalgExt::TopkOp topkOp) {
   if (!clSCFLowerTopk)
     return false;
   auto arg0 = topkOp.getInputs()[0];
   auto shapedTy = llvm::cast<ShapedType>(arg0.getType());
   SmallVector<int64_t> vectorSizes;
-  vectorSizes.append(shapedTy.getShape().begin(),
-                      shapedTy.getShape().end());
+  vectorSizes.append(shapedTy.getShape().begin(), shapedTy.getShape().end());
   auto out0 = topkOp.getResults()[0];
   auto resShapedTy = llvm::cast<ShapedType>(out0.getType());
   ArrayRef<int64_t> resShape = resShapedTy.getShape();
@@ -2559,6 +2558,16 @@ canTopkBeLoweredUsingSCF(IREE::LinalgExt::TopkOp topkOp) {
   if (failed(vector::isValidMaskedInputVector(
           inShape.take_front(topkOp.getInputRank()), vectorSizes)))
     return false;
+
+  unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
+      topkOp.getInputType().getElementType());
+  int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
+
+  // Make sure the number of elements of the input's last dim is multiple of
+  // the number of elements in a register.
+  if (vectorSizes[vectorSizes.size() - 1] % typeVectorSize != 0)
+    return false;
+
   return true;
 }
 
@@ -2577,7 +2586,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<IREE::LinalgExt::TopkOp>([&](auto op) {
-          if (canTopkBeLoweredUsingSCF(op))
+          if (canTopkBeLoweredUsingSCF(entryPointFn, op))
             return setRootConfig(entryPointFn, op);
           else
             return setRootConfig(entryPointFn,

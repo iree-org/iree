@@ -1,5 +1,3 @@
-// Lubo Fix this!
-// Lubo fix also tests!
 // Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -384,7 +382,7 @@ void GenericVectorizationPass::runOnOperation() {
     scalableVecDims.resize(vectorSizes.size());
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
-  }
+  };
 
   {
     // Canonicalize mask related ops before we lower them.

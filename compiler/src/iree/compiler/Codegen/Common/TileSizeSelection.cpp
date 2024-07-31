@@ -30,7 +30,6 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //       [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
   int numTileLevels = loweringConfig.getTilingLevels().size();
-  llvm::errs() << "\nLubo3:"<< numTileLevels<<"\n";
   switch (numTileLevels) {
   case 4:
     tilingLevelToActualLevelMap[VectorInnerParallelTiles] = 3;
@@ -184,7 +183,6 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
 
 /// Returns the actual level in the configuration for this level of tiling.
 unsigned TilingConfig::getActualLevel(TilingLevel level) {
-  llvm::errs() << "\nLubo4:"<< level <<"\n";
   assert(level < InvalidLevel && "Unexpected invalid tiling level");
   unsigned actualLevel = tilingLevelToActualLevelMap[level];
   assert(actualLevel != InvalidLevel &&
