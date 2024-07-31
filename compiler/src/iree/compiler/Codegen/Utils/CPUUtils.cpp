@@ -85,7 +85,8 @@ void setEnableTopkSCFLowerAttrName(IREE::LinalgExt::TopkOp topkOp) {
       // Already set.
       return;
   }
-  StringAttr topkSCFLowerName = StringAttr::get(topkOp->getContext(), kTopkSCFLowerAttrName);
+  StringAttr topkSCFLowerName =
+      StringAttr::get(topkOp->getContext(), kTopkSCFLowerAttrName);
   StringAttr val = StringAttr::get(topkOp->getContext(), "");
   topkOp->setAttr(topkSCFLowerName, val);
 }

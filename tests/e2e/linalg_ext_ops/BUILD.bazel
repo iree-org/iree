@@ -20,6 +20,7 @@ ALL_SRCS = enforce_glob(
         "scatter.mlir",
         "sort.mlir",
         "top-k.mlir",
+        "top-k-scf-lowering.mlir",
         "winograd_input.mlir",
         "winograd_output.mlir",
     ],
