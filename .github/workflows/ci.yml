@@ -356,25 +356,6 @@ jobs:
   #           "${DOCKER_IMAGE}" \
   #           "${TEST_SCRIPT}"
 
-  # Android cross-compilation and test is separated from cross_compile_and_test
-  # because some tests need to run on physical devices instead of emulators. And
-  # we need a fine-control on which tests only run on postsubmit as some devices
-  # are not scalable (while we want to test with Android emulator on ARM VMs on
-  # presubmit), which requires dynamic matrix generation (because "if" condition
-  # can't access matrix variable to skip certain matrix jobs for presubmit).
-  build_and_test_android:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_and_test_android')
-    uses: ./.github/workflows/build_and_test_android.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-      is-pr: ${{ fromJson(needs.setup.outputs.is-pr) }}
-      install-dir: ${{ needs.build_all.outputs.install-dir }}
-      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
-
   ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
@@ -402,7 +383,6 @@ jobs:
 
       # Crosscompilation
       # - cross_compile_and_test
-      - build_and_test_android
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
