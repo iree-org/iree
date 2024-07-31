@@ -35,11 +35,11 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
     transforms the value to have that layout.
   }];
   let arguments = (ins
-    AnyVector:$input,
+    AnyShaped:$input,
     VectorLayoutInterface:$layout
   );
   let results = (outs
-    AnyVector:$output
+    AnyShaped:$output
   );
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input `to` $layout attr-dict `:` type($input)";

@@ -795,8 +795,8 @@ struct DistributeLayoutConflictResolutions final
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+    VectorValue vector = cast<VectorValue>(resolutionOp.getInput());
+    VectorValue result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout)
       return failure();
@@ -848,8 +848,8 @@ struct DistributeLayoutConflictToSharedMemory final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     auto loc = resolutionOp.getLoc();
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+    VectorValue vector = cast<VectorValue>(resolutionOp.getInput());
+    VectorValue result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
@@ -1019,10 +1019,12 @@ struct DistributeTrivialLayoutConversions final
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    VectorValue input = cast<VectorValue>(toLayoutOp.getInput());
+    VectorValue output = cast<VectorValue>(toLayoutOp.getOutput());
     VectorLayoutInterface currentLayout =
-        dyn_cast<LayoutAttr>(signature[toLayoutOp.getInput()]);
+        dyn_cast<LayoutAttr>(signature[input]);
     VectorLayoutInterface targetLayout =
-        dyn_cast<LayoutAttr>(signature[toLayoutOp.getResult()]);
+        dyn_cast<LayoutAttr>(signature[output]);
 
     if (currentLayout != targetLayout) {
       return rewriter.notifyMatchFailure(toLayoutOp,

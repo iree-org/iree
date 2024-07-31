@@ -52,13 +52,13 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
-LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
-  ArrayRef<int64_t> shape = vector.getType().getShape();
+LogicalResult LayoutAttr::isValidLayout(ShapedType shapeTy,
+                                        Location loc) const {
+  ArrayRef<int64_t> shape = shapeTy.getShape();
   if (shape.size() != getRank()) {
-    return emitError(vector.getLoc(), "Rank of vector (" +
-                                          std::to_string(shape.size()) +
-                                          ") does not match rank of layout (" +
-                                          std::to_string(getRank()) + ").");
+    return emitError(loc, "Rank of vector (" + std::to_string(shape.size()) +
+                              ") does not match rank of layout (" +
+                              std::to_string(getRank()) + ").");
   }
   for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = layout.getShapes();
@@ -72,13 +72,12 @@ LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);
-      return emitError(vector.getLoc(),
-                       "Vector shape: [" + shapeStr +
-                           "] does not match the layout (" + layoutStr +
-                           ") at dim " + std::to_string(idx) +
-                           ". Dimension expected by layout: " +
-                           std::to_string(expectedShape) +
-                           " actual: " + std::to_string(shape[idx]));
+      return emitError(loc, "Vector shape: [" + shapeStr +
+                                "] does not match the layout (" + layoutStr +
+                                ") at dim " + std::to_string(idx) +
+                                ". Dimension expected by layout: " +
+                                std::to_string(expectedShape) +
+                                " actual: " + std::to_string(shape[idx]));
     }
   }
   return success();
@@ -321,14 +320,14 @@ int64_t NestedLayoutAttr::getRank() const {
   return getBatchesPerSubgroup().size();
 }
 
-LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
+LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
+                                              Location loc) const {
   int64_t rank = getRank();
-  ArrayRef<int64_t> shape = vector.getType().getShape();
+  ArrayRef<int64_t> shape = shapeTy.getShape();
   if (shape.size() != rank) {
-    return emitError(vector.getLoc(), "Rank of vector (" +
-                                          std::to_string(shape.size()) +
-                                          ") does not match rank of layout (" +
-                                          std::to_string(rank) + ").");
+    return emitError(loc, "Rank of vector (" + std::to_string(shape.size()) +
+                              ") does not match rank of layout (" +
+                              std::to_string(rank) + ").");
   }
   // Multiply all shapes in the layout.
   for (int i = 0, e = rank; i < e; ++i) {
@@ -343,13 +342,12 @@ LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);
-      return emitError(vector.getLoc(),
-                       "Vector shape: [" + shapeStr +
-                           "] does not match the layout (" + layoutStr +
-                           ") at dim " + std::to_string(i) +
-                           ". Dimension expected by layout: " +
-                           std::to_string(expectedShape) +
-                           " actual: " + std::to_string(shape[i]));
+      return emitError(loc, "Vector shape: [" + shapeStr +
+                                "] does not match the layout (" + layoutStr +
+                                ") at dim " + std::to_string(i) +
+                                ". Dimension expected by layout: " +
+                                std::to_string(expectedShape) +
+                                " actual: " + std::to_string(shape[i]));
     }
   }
   return success();
