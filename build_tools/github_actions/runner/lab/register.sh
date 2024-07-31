@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set -euo pipefail
+set -xeuo pipefail
 
 CPU_PLATFORM="${CPU_PLATFORM}"
 GPU_PLATFORM="${GPU_PLATFORM}"
@@ -17,7 +17,7 @@ REGISTER_TOKEN="${REGISTER_TOKEN}"
 HOSTNAME="$(hostname)"
 RUNNER_SCOPE="${RUNNER_SCOPE:-openxla}"
 RUNNER_TRUST="${RUNNER_TRUST:-minimal}"
-RUNNER_GROUP="${RUNNER_GROUP:-postsubmit}"
+RUNNER_GROUP="${RUNNER_GROUP:-presubmit}"
 RUNNER_ENV="${RUNNER_ENV:-prod}"
 OS_FAMILY="${OS_FAMILY:-ubuntu}"
 RUNNER_DIR="${RUNNER_DIR:-actions-runner}"
@@ -29,8 +29,6 @@ declare -a RUNNER_LABELS_ARRAY=(
   "hostname=${HOSTNAME}"
   "trust=${RUNNER_TRUST}"
   "runner-group=${RUNNER_GROUP}"
-  # JUST FOR TESTING!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  "runner-group=presubmit"
   "cpu-platform=${CPU_PLATFORM}"
   "gpu-platform=${GPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
