@@ -297,3 +297,13 @@ util.func @mergeIndexSwitchesIntoEmptyDefault(%case: index) {
   }
   util.return
 }
+
+// -----
+
+// CHECK-LABEL: @extfTruncf
+util.func @extfTruncf(%arg0: f32) -> f32 {
+  %f64 = arith.extf %arg0 : f32 to f64
+  %f32 = arith.truncf %f64 : f64 to f32
+  // CHECK: util.return %arg0
+  util.return %f32 : f32
+}

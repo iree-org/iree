@@ -495,6 +495,24 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
   }
 };
 
+struct ExtFTruncFPattern : public OpRewritePattern<arith::TruncFOp> {
+  ExtFTruncFPattern(MLIRContext *context) : OpRewritePattern(context, 1000) {}
+  LogicalResult matchAndRewrite(arith::TruncFOp truncf,
+                                PatternRewriter &rewriter) const override {
+    Value operand = truncf.getOperand();
+    auto extf = operand.getDefiningOp<arith::ExtFOp>();
+    if (!extf)
+      return failure();
+
+    auto parentOperand = extf.getOperand();
+    if (truncf.getType() != parentOperand.getType())
+      return failure();
+
+    rewriter.replaceOp(truncf, parentOperand);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
@@ -506,6 +524,11 @@ void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
       context);
 
   patterns.insert<IndexSwitchToIfPattern, MergeIndexSwitchPattern>(context);
+
+  // Some inputs can result in extf-truncf of a value. For extf and truncf this
+  // is a non-changing operation. This is not-true for truncf-extf which would
+  // result in clipping the values.
+  patterns.insert<ExtFTruncFPattern>(context);
 }
 
 } // namespace mlir::iree_compiler::IREE::Util
