@@ -415,6 +415,7 @@ public:
   }
 
   void runOnOperation() override {
+    return;
     RewritePatternSet patterns(&getContext());
     patterns.insert<FromAllocation, FromGlobal, FromHalInterfaceBindingSubspan,
                     FromMemRefSubView>(&getContext());
