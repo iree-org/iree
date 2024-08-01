@@ -139,17 +139,21 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             models-config-file: models_gpu_rocm_gfx942.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -163,7 +167,7 @@ jobs:
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
@@ -243,21 +247,24 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
