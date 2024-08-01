@@ -52,7 +52,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt update
-          sudo apt install cmake clang ninja-build libstdc++-12-dev
+          sudo apt install -y cmake clang ninja-build libstdc++-12-dev
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
 
