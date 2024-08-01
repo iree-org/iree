@@ -140,11 +140,9 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
   }
 }
 
-unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
-  AffineMap map = getMapForOperandIndex();
-  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
-  assert(idx.has_value());
-  return idx.value();
+std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+  return getMapForOperandIndex().getResultPosition(
+      getAffineDimExpr(dimPos, getContext()));
 }
 
 ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
