@@ -169,4 +169,18 @@ iree_gentbl_cc_library(
     ],
 )
 
-# TODO: Add docgen for IREEVectorExt dialect.
+iree_tablegen_doc(
+    name = "IREEVectorExtDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=iree_vector_ext",
+            ],
+            "IREEVectorExtDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtOps.td",
+    deps = [":td_files"],
+)

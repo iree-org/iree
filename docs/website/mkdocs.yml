@@ -168,6 +168,7 @@ nav:
               - IO/Parameters: "reference/mlir-dialects/IOParameters.md"
               - IREECodegen: "reference/mlir-dialects/IREECodegen.md"
               - IREEGPU: "reference/mlir-dialects/IREEGPU.md"
+              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
               - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"

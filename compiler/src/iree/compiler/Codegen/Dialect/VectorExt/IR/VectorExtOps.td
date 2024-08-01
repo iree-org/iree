@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VECTOREXT_OPS
 
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
+include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
