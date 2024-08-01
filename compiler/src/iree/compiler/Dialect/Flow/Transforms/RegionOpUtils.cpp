@@ -671,42 +671,6 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
   return hoistedOp;
 }
 
-bool isBroadcastingOp(Operation *op) {
-  if (isa<linalg::BroadcastOp>(op)) {
-    return true;
-  }
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) {
-    return false;
-  }
-
-  // Only allow a single input and init.
-  if (genericOp.getNumDpsInits() != 1 || genericOp.getNumDpsInputs() != 1) {
-    return false;
-  }
-
-  // Check that the all loops are parallel.
-  unsigned numLoops = genericOp.getNumLoops();
-  unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  if (numLoops != numParallelLoops) {
-    return false;
-  }
-
-  // Check that indexing maps are broadcasting.
-  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
-  auto inMap =
-      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
-  auto outMap =
-      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
-  if (inMap.getNumResults() >= outMap.getNumResults()) {
-    return false;
-  }
-  if (!inMap.isProjectedPermutation() || outMap.isIdentity()) {
-    return false;
-  }
-  return true;
-}
-
 //===---------------------------------------------------------------------===//
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
