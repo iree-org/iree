@@ -117,6 +117,23 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableDataTiling(
+    "iree-flow-experimental-data-tiling",
+    llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
+                   "in dispatch regions, hoist them out of region, and enables "
+                   "fusion for the set_encodings. This is still an "
+                   "experimental path. The current main data tiling path is "
+                   "iree-opt-data-tiling, which is on by default. To use this "
+                   "path, --iree-opt-data-tiling=false must be set as wells"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<int> clPadFactor(
+    "iree-flow-pad-factor",
+    llvm::cl::desc("Provides padding size hints that will be attached to "
+                   "encodings. This only affects the experimental data tiling "
+                   "path in Flow with iree-flow-experimental-data-tiling."),
+    llvm::cl::init(32));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -249,6 +266,11 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
       .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
+      .addPredicatedPass(clEnableDataTiling,
+                         [&]() {
+                           return createSetEncodingPass(
+                               SetEncodingPassOptions{clPadFactor});
+                         })
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values
