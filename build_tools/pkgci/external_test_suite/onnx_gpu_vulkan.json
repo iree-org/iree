@@ -554,7 +554,6 @@
     "onnx/node/generated/test_and_bcast3v1d",
     "onnx/node/generated/test_and_bcast4v2d",
     "onnx/node/generated/test_and_bcast4v4d",
-    "onnx/node/generated/test_asin",
     "onnx/node/generated/test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_True",
     "onnx/node/generated/test_bernoulli",
     "onnx/node/generated/test_bernoulli_double",
