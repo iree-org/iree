@@ -179,7 +179,7 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
   MaterializeEncodingInfo encodingInfo;
   auto cDims = getEncodingContractionDims(encoding);
   // The following expects M, N, K, and Batch sizes of at most 1 for now
-  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() <= 1 &&
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
          cDims->batch.size() <= 1 &&
          "Expected at most one M, N, K, and Batch dimension");
   std::optional<unsigned> batchDim =
