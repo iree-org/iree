@@ -124,3 +124,35 @@ util.func public @bubble_through_broadcast(
 // CHECK:         flow.return %[[BROADCAST]]
 // CHECK:       }
 // CHECK:       util.return %[[DISPATCH]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+module {
+  util.func public @hoist_below(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>> {
+    %0 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
+      %2 = tensor.empty() : tensor<2x11008x128xf32>
+      %3 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg0 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32>) outs(%2 : tensor<2x11008x128xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %4 = arith.addf %in, %in_0 : f32
+        linalg.yield %4 : f32
+      } -> tensor<2x11008x128xf32>
+      flow.return %3 : tensor<2x11008x128xf32>
+    }
+    %1 = iree_encoding.set_encoding %0 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+    util.return %1 : tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+  }
+}
+
+// CHECK-LABEL: @hoist_below
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xf32>
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<2x11008x128xf32>
+// CHECK:         %[[ADD:.+]] = linalg.generic {{.*}} ins(%[[ARG0]], %[[ARG0]] : {{.*}} outs(%[[INIT]] :
+// CHECK:         flow.return %[[ADD]]
+// CHECK:       }
+// CHECK:       %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH]]
+// CHECK:       util.return %[[SET_ENCODING]]
