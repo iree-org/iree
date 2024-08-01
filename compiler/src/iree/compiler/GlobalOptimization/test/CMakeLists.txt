@@ -31,7 +31,6 @@ iree_lit_test_suite(
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
-    "set_encoding.mlir"
     "transformation_pipeline.mlir"
     "transpose_and_decompose_concat.mlir"
   TOOLS

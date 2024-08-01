@@ -624,6 +624,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     compileOptions->targetOptions.f32Extension = true;
     compileOptions->targetOptions.f64Extension = true;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
+    compileOptions->inputOptions.demoteF64ToF32 = false;
     if (requestedTargetDevice == "vmvx" || !hasRequestedTargetDevice) {
       targetDevice = targetRegistry->getTargetDevice("vmvx");
     } else {

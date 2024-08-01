@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmgpu-vector-distribute, canonicalize, cse))' -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmgpu-configure-vector-layouts, iree-llvmgpu-vector-distribute, canonicalize, cse))' -split-input-file %s | FileCheck %s
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
