@@ -60,6 +60,12 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
+def LLVMGPUConfigureVectorLayouts :
+    InterfacePass<"iree-llvmgpu-configure-vector-layouts", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to set layouts for vector distribution";
+  let constructor = "mlir::iree_compiler::createLLVMGPUConfigureVectorLayouts()";
+}
+
 def LLVMGPULowerExecutableTarget :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
@@ -125,11 +131,6 @@ def LLVMGPUVectorDistribute :
     InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute vectorized functions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorDistribute()";
-  let options = [
-    Option<"testLayout", "test-layout", "bool", /*default=*/"false",
-           "Annotate vector ops with deduced layouts without real conversion "
-           "for testing purposes">
-  ];
 }
 
 def LLVMGPUVectorLowering :
