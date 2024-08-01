@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --canonicalize --split-input-file %s | FileCheck %s
+// RUN: iree-opt --canonicalize --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @to_simt_to_simd_fold
 // CHECK-SAME: (%[[SIMD:.*]]: vector<64x64xf32>) -> vector<64x64xf32>

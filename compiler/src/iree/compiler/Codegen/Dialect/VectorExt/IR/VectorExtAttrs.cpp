@@ -6,18 +6,18 @@
 
 #include <numeric>
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 
@@ -496,14 +496,14 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtEnums.cpp.inc" // IWYU pragma: keep
 
 #define GET_ATTRDEF_CLASSES
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc" // IWYU pragma: keep
 
 void IREEVectorExtDialect::registerAttributes() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc"
       >();
 }

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include <numeric>
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -197,5 +197,5 @@ LayoutIterator LayoutIterator::getBatchIterator() const {
 
 // clang-format off
 #define GET_OP_CLASSES
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
