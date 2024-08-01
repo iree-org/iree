@@ -11,10 +11,10 @@
         <link rel="canonical" href="https://iree.dev/reference/mlir-dialects/IREEVectorExt/">
       
       
-        <link rel="prev" href="../IREEInput/">
+        <link rel="prev" href="../IREEGPU/">
       
       
-        <link rel="next" href="../../glossary/">
+        <link rel="next" href="../LinalgExt/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -1399,8 +1399,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -1432,6 +1434,8 @@
       
         
       
+        
+      
     
     
       
@@ -1440,13 +1444,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3_2" checked>
         
           
           <label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
@@ -1460,7 +1462,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4_3_2">
             <span class="md-nav__icon md-icon"></span>
             Internal dialects
@@ -1660,6 +1662,199 @@
                 
   
   
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    IREEVectorExt
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    IREEVectorExt
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simd-vectorexttosimdop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.to_simd (VectorExt::ToSIMDOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simt-vectorexttosimtop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.to_simt (VectorExt::ToSIMTOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attributes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Attributes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layoutdimensionattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutDimensionAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nestedlayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      NestedLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#perdimlayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PerDimLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enums
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layoutdimension" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutDimension
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LayoutDimension">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
@@ -1773,14 +1968,10 @@
                 
   
   
-    
   
   
-  
     
     
-      
-        
       
         
       
@@ -1792,11 +1983,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_3" >
         
           
           <label class="md-nav__link" for="__nav_4_3_3" id="__nav_4_3_3_label" tabindex="0">
@@ -1810,7 +2003,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_3_3">
             <span class="md-nav__icon md-icon"></span>
             Public dialects
@@ -1833,109 +2026,6 @@
   
 
       </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    IREEVectorExt
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  <span class="md-ellipsis">
-    IREEVectorExt
-  </span>
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Operations
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_vector_extto_simd-vectorexttosimdop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_vector_ext.to_simd (VectorExt::ToSIMDOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_vector_extto_simt-vectorexttosimtop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_vector_ext.to_simt (VectorExt::ToSIMTOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3705,6 +3795,96 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#attributes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Attributes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layoutdimensionattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutDimensionAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nestedlayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      NestedLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#perdimlayoutattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PerDimLayoutAttr
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enums
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layoutdimension" class="md-nav__link">
+    <span class="md-ellipsis">
+      LayoutDimension
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LayoutDimension">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cases:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3720,7 +3900,7 @@
                   
 
   
-    <a href="https://github.com/iree-org/iree/tree/main/llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/VectorExt/IR" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3740,6 +3920,20 @@ beyond what is currently available in the Vector Dialect.</p>
 <li><a href="#iree_vector_extto_layout-vectorexttolayoutop">iree_vector_ext.to_layout (VectorExt::ToLayoutOp)</a></li>
 <li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
 <li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
+</ul>
+</li>
+<li><a href="#attributes_1">Attributes</a><ul>
+<li><a href="#layoutattr">LayoutAttr</a></li>
+<li><a href="#layoutdimensionattr">LayoutDimensionAttr</a></li>
+<li><a href="#nestedlayoutattr">NestedLayoutAttr</a></li>
+<li><a href="#perdimlayoutattr">PerDimLayoutAttr</a></li>
+</ul>
+</li>
+<li><a href="#enums">Enums</a><ul>
+<li><a href="#layoutdimension">LayoutDimension</a><ul>
+<li><a href="#cases">Cases:</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -3872,6 +4066,333 @@ distributed vectors.</p>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
 <td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
+<h3 id="layoutattr">LayoutAttr<a class="headerlink" href="#layoutattr" title="Permanent link">link</a></h3>
+<p>high-dimensional vector register layout for a given vector</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_vector_ext.layout&lt;
+  ::llvm::ArrayRef&lt;PerDimLayoutAttr&gt;   # layouts
+&gt;
+</code></pre></div>
+<p>This contains a complete specification of the layout for a given vector,
+whereas the attribute above only specifies the per dimension layout.</p>
+<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">layouts</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;PerDimLayoutAttr&gt;</code></td>
+<td>layout for each dimension of the vector</td>
+</tr>
+</tbody>
+</table>
+<h3 id="layoutdimensionattr">LayoutDimensionAttr<a class="headerlink" href="#layoutdimensionattr" title="Permanent link">link</a></h3>
+<p>Describes the dimension of the high-dimensional layout</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_vector_ext.dimension&lt;
+  ::mlir::iree_compiler::IREE::VectorExt::LayoutDimension   # value
+&gt;
+</code></pre></div>
+<p>Enum cases:
+* BATCHX (<code>BATCHX</code>)
+* BATCHY (<code>BATCHY</code>)
+* VECTORX (<code>VECTORX</code>)
+* VECTORY (<code>VECTORY</code>)
+* VECTORZ (<code>VECTORZ</code>)
+* LANEX (<code>LANEX</code>)
+* LANEY (<code>LANEY</code>)
+* LANEZ (<code>LANEZ</code>)</p>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::VectorExt::LayoutDimension</code></td>
+<td>an enum of type LayoutDimension</td>
+</tr>
+</tbody>
+</table>
+<h3 id="nestedlayoutattr">NestedLayoutAttr<a class="headerlink" href="#nestedlayoutattr" title="Permanent link">link</a></h3>
+<p>A layout representing a mapping from GPU thread hierarchy to a shape</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_vector_ext.nested_layout&lt;
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # subgroupsPerWorkgroup
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # batchesPerSubgroup
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # outersPerBatch
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # threadsPerOuter
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # elementsPerThread
+  ::llvm::ArrayRef&lt;int64_t&gt;,   # subgroupStrides
+  ::llvm::ArrayRef&lt;int64_t&gt;   # threadStrides
+&gt;
+</code></pre></div>
+<p>This layout explicitly defines how a shape is mapped to a compute
+hierarchy. We consider the following levels of hierarchy, inspired by GPUs:</p>
+<ol>
+<li>Subgroups per Workgroup</li>
+<li>Threads per Subgroup</li>
+<li>Elements per Thread</li>
+</ol>
+<p>Conceptually, each higher level of hierarchy can be viewed as multiple
+tiles of the lower level of hierarchy; each lower level of hierarchy is
+nested in the higher level of hierarchy. The last level represents the
+final elements in memory.</p>
+<p>The conceptual mapping is leveraged during compilation for tiling and
+distributing to hardware for parallel computation. Concretely, the mapping
+is done on each dimension of the original vector shape. For example, for
+vector shape 16x16x16, we have 3 dimensions, so at each level of the
+hierarchy we would have 3 tile sizes. Similarly for vector shape 32x32, we
+would have 2-D tile sizes per compute hierarchy level.</p>
+<p>We now describe each level of tiling. Each level of tiling represents a
+count of tiles over the next level (rather than a list of tile sizes).</p>
+<ol>
+<li>Subgroups per Workgroup</li>
+</ol>
+<p>This level of tiling is also known as "subgroup/warp distribution". It
+represents how subgroups are distributed in a workgroup.</p>
+<p>The subgroups are placed contiguously with their shape and ordering
+determined by:
+  - <code>subgroups_per_workgroup</code>: Sizes of this level of tiling
+  - <code>subgroup_order</code>: Ordering of dimensions, from outermost to innermost</p>
+<p>For example, subgroups_per_workgroup=[4, 2], subgroup_order=[1, 0] will
+arrange the subgroups in the order:</p>
+<p>0 4
+1 5
+2 6
+3 7</p>
+<p>The total number of subgroups used (computed by multiplying each dim in
+subgroups_per_workgroup) should be a multiple of number of subgroups in the
+harware. If the total number of subgroups used exceeds the number of
+subgroups of the hardware, then the subgroup used (say x) is
+x mod num_subgroups:</p>
+<p>num_subgroups = 4</p>
+<p>0 4               0 0
+1 5    x mod 4    1 1
+2 6    -------&gt;   2 2
+3 7               3 3</p>
+<ol>
+<li>Threads per Subgroup:</li>
+</ol>
+<p>Threads in a subgroup are distributed in three levels.</p>
+<p>The first level, batches, are a way to represent instruction unrolling. For
+example, an intrinsic which can only take 4x4 shape at a time, uses batches
+to unroll a 16x16 shape to the native intrinsice shape.</p>
+<p>Batches can be thought of as loops around the original layout:</p>
+<p>for b_0 in range(batch_0):
+  for b_1 in range(batch_1):
+    ...</p>
+<p><code>batches_per_subgroup</code> represents the range of each loop.</p>
+<p>The second level, outers, is a way to represent thread layout duplication
+required by a particular intrinsic. For example, some AMDGPU matrix
+multiplication variants require threads to be distributed
+like:</p>
+<p>0 1 2 3 4
+5 6 7 8 9
+--------- --&gt; Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5
+0 1 2 3 4     outers_per_batch=[2, 1]
+5 6 7 8 9     threads_per_outer=[2, 5]</p>
+<p><code>outers_per_batch</code> represents the number of outers in a batch.</p>
+<p>Finally, threads are distributed in a single outer. The thread
+distribution is represented by:</p>
+<ul>
+<li>threads_per_outer: Sizes of this level of tiling</li>
+<li>thread_order: Ordering of dimensions, from outermost to innermost</li>
+</ul>
+<p>Examples of thread distribution over a 8x4 shape:</p>
+<p>{
+  batches_per_subgroup = [2, 1]
+  outers_per_batch = [2, 2]
+  threads_per_outer = [2, 2]</p>
+<p>thread_order = [1, 0]
+}</p>
+<p>Distributed tile:</p>
+<p>{
+  [0 2]|[0 2]      0,1,2,3 --&gt; thread ids
+  [1 3]|[1 3]
+  ------------     [x z]   --&gt; a single outer tile
+  [0 2]|[0 2]      [y w]
+  [1 3]|[1 3]
+}{
+  [0 2]|[0 2]      { ... } --&gt; a single batch tile
+  [1 3]|[1 3]</p>
+<hr />
+<p>[0 2]|[0 2]
+  [1 3]|[1 3]
+}</p>
+<p>So, the thread distribution looks like:</p>
+<p>[0 2 0 2]
+[1 3 1 3]
+[0 2 0 2]
+[1 3 1 3]
+[0 2 0 2]
+[1 3 1 3]
+[0 2 0 2]
+[1 3 1 3]</p>
+<p>The total number of threads used (computed by multiplying each dim in
+threads_per_outer) should be a multiple of subgroup size of the
+harware. If the total number of threads used exceeds the subgroup size of
+the hardware, then the threads used (say tid) is tid mod subgroup_size:</p>
+<p>subgroup_size = 4</p>
+<p>0 1                0 0
+2 3    tid mod 4   1 1
+4 5    --------&gt;   2 2
+6 7                3 3</p>
+<ol>
+<li>Elements per Thread</li>
+</ol>
+<p>The final level of tiling, representing the minimum shape of vector that
+is treated as an atom.</p>
+<p><code>elements_per_thread</code> represents the native size of the vector.</p>
+<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">subgroupsPerWorkgroup</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>subgroups_per_workgroup</td>
+</tr>
+<tr>
+<td style="text-align: center;">batchesPerSubgroup</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>batches_per_subgroup</td>
+</tr>
+<tr>
+<td style="text-align: center;">outersPerBatch</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>outers_per_batch</td>
+</tr>
+<tr>
+<td style="text-align: center;">threadsPerOuter</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>threads_per_outer</td>
+</tr>
+<tr>
+<td style="text-align: center;">elementsPerThread</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>elements_per_thread</td>
+</tr>
+<tr>
+<td style="text-align: center;">subgroupStrides</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>subgroup_strides</td>
+</tr>
+<tr>
+<td style="text-align: center;">threadStrides</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>thread_strides</td>
+</tr>
+</tbody>
+</table>
+<h3 id="perdimlayoutattr">PerDimLayoutAttr<a class="headerlink" href="#perdimlayoutattr" title="Permanent link">link</a></h3>
+<p>high-dimensional vector register layout for a given vector dimension</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_vector_ext.per_dim_layout&lt;
+  ::llvm::ArrayRef&lt;LayoutDimensionAttr&gt;,   # labels
+  ::llvm::ArrayRef&lt;int64_t&gt;   # shapes
+&gt;
+</code></pre></div>
+<p>This attribute describes the per dimension register layout for a given vector
+that could be prescribed by an operator such as matrix multiplication.
+This is a way to explicitly represent the layout in the IR
+when it is in the SIMD form prior to converting to the SIMT form so that
+we can reason about layouts, propagating layouts and layout conflicts.</p>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">labels</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;LayoutDimensionAttr&gt;</code></td>
+<td>labels for the high dimensional layout dims</td>
+</tr>
+<tr>
+<td style="text-align: center;">shapes</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>shapes for the high dimensional layout dims</td>
+</tr>
+</tbody>
+</table>
+<h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
+<h3 id="layoutdimension">LayoutDimension<a class="headerlink" href="#layoutdimension" title="Permanent link">link</a></h3>
+<p>Describes the dimension of the high-dimensional layout</p>
+<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">BATCHX</td>
+<td style="text-align: center;"><code>0</code></td>
+<td>BATCHX</td>
+</tr>
+<tr>
+<td style="text-align: center;">BATCHY</td>
+<td style="text-align: center;"><code>1</code></td>
+<td>BATCHY</td>
+</tr>
+<tr>
+<td style="text-align: center;">VECTORX</td>
+<td style="text-align: center;"><code>2</code></td>
+<td>VECTORX</td>
+</tr>
+<tr>
+<td style="text-align: center;">VECTORY</td>
+<td style="text-align: center;"><code>3</code></td>
+<td>VECTORY</td>
+</tr>
+<tr>
+<td style="text-align: center;">VECTORZ</td>
+<td style="text-align: center;"><code>4</code></td>
+<td>VECTORZ</td>
+</tr>
+<tr>
+<td style="text-align: center;">LANEX</td>
+<td style="text-align: center;"><code>5</code></td>
+<td>LANEX</td>
+</tr>
+<tr>
+<td style="text-align: center;">LANEY</td>
+<td style="text-align: center;"><code>6</code></td>
+<td>LANEY</td>
+</tr>
+<tr>
+<td style="text-align: center;">LANEZ</td>
+<td style="text-align: center;"><code>7</code></td>
+<td>LANEZ</td>
 </tr>
 </tbody>
 </table>
