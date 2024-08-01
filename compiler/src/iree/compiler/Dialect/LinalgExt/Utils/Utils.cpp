@@ -278,7 +278,7 @@ bool isBroadcastingOp(linalg::LinalgOp op) {
   if (inMap.getNumResults() >= outMap.getNumResults()) {
     return false;
   }
-  if (!inMap.isProjectedPermutation() || outMap.isIdentity()) {
+  if (!inMap.isProjectedPermutation() || !outMap.isIdentity()) {
     return false;
   }
   return llvm::hasSingleElement(op.getBlock()->getOperations());
