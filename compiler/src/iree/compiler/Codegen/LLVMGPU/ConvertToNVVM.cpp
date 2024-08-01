@@ -44,8 +44,9 @@ namespace {
 /// code.
 struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
-                    LLVM::LLVMDialect, NVVM::NVVMDialect>();
+    registry
+        .insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
+                NVVM::NVVMDialect, affine::AffineDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -83,6 +84,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      populateVectorToSCFConversionPatterns(
+          patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
@@ -144,8 +147,22 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);
       populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
+
+      /// Target specification.
       LLVMConversionTarget target(getContext());
-      configureGpuToNVVMConversionLegality(target);
+      target.addIllegalOp<func::FuncOp>();
+      target.addLegalDialect<::mlir::LLVM::LLVMDialect>();
+      target.addLegalDialect<::mlir::NVVM::NVVMDialect>();
+      target.addIllegalDialect<gpu::GPUDialect>();
+      target.addIllegalOp<
+          LLVM::CopySignOp, LLVM::CosOp, LLVM::ExpOp, LLVM::Exp2Op,
+          LLVM::FAbsOp, LLVM::FCeilOp, LLVM::FFloorOp, LLVM::FRemOp,
+          LLVM::LogOp, LLVM::Log10Op, LLVM::Log2Op, LLVM::PowOp,
+          LLVM::RoundEvenOp, LLVM::RoundOp, LLVM::SinOp, LLVM::SqrtOp>();
+
+      // TODO: Remove once we support replacing non-root ops.
+      target.addLegalOp<gpu::YieldOp, gpu::GPUModuleOp, gpu::ModuleEndOp>();
+
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
       }
