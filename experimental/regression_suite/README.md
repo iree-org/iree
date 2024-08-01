@@ -9,7 +9,7 @@ the normal tool flows of `iree-compile`, `iree-run-module`,
 
 If you have IREE tools on your path or have a virtual environment setup:
 
-```
+```bash
 pip install -e experimental/regression_suite
 PATH=../iree-build/tools:$PATH \
 pytest experimental/regression_suite
@@ -39,13 +39,16 @@ case is to run the regression suite from built compilers and tools from a
 GitHub presubmit or postsubmit run. This can be done in one step by setting
 up a venv:
 
-```
+```bash
 deactivate  # If have any venv active.
 python ./build_tools/pkgci/setup_venv.py \
   /tmp/iree_gh_venv \
-  --fetch-gh-workflow=<<RUN_ID>> \
+  --fetch-gh-workflow=${RUN_ID} \
   [--compiler-variant=asserts] [--runtime-variant=asserts]
 source /tmp/iree_gh_venv/bin/activate
+
+# Then install the regression suite and run pytest as usual:
+pip install -e experimental/regression_suite
 ```
 
 In the above, `<<RUN_ID>>` is the value in any GitHub action presubmit/postsubmit
