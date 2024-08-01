@@ -43,54 +43,38 @@ static AffineMap getBcastMapOrIdentity(RewriterBase &rewriter,
                       : rewriter.getMultiDimIdentityMap(encodedType.getRank());
 }
 
-static LogicalResult
-bubbleUpSetEncodingThroughBroadcastOp(RewriterBase &rewriter,
-                                      IREE::Encoding::SetEncodingOp encodingOp,
-                                      linalg::BroadcastOp broadcastOp) {
-  if (!broadcastOp->hasOneUse()) {
-    return failure();
-  }
-  RankedTensorType encodedType = encodingOp.getResultType();
-
-  // Create new encoding and set encoding on broadcast input.
-  AffineMap bcastMap = getBcastMapOrIdentity(rewriter, encodedType);
-  bcastMap = bcastMap.dropResults(broadcastOp.getDimensions());
-  Value input = broadcastOp.getInput();
-  auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
-  auto newEncoding = encoding.clone(bcastMap);
-  auto inputType = cast<RankedTensorType>(input.getType());
-  auto resType = RankedTensorType::get(inputType.getShape(),
-                                       inputType.getElementType(), newEncoding);
-  Location loc = broadcastOp->getLoc();
-  IREE::Encoding::SetEncodingOp newSetEncoding =
-      rewriter.create<IREE::Encoding::SetEncodingOp>(loc, resType, input);
-
-  // Create encoded broadcast op.
-  SmallVector<OpFoldResult> mixedSizes =
-      tensor::getMixedSizes(rewriter, loc, encodingOp.getSource());
-  Value encodedBCastInit = rewriter.create<tensor::EmptyOp>(
-      loc, mixedSizes, encodedType.getElementType(), encoding);
-  SmallVector<Value> encodedBCastOperands = {newSetEncoding.getResult(),
-                                             encodedBCastInit};
-  auto encodedBroadcast = clone(
-      rewriter, broadcastOp, encodingOp.getResultType(), encodedBCastOperands);
-
-  rewriter.replaceOp(encodingOp, encodedBroadcast);
-  return success();
-}
-
+/// Bubbles a SetEncodingOp up through a linalg::GenericOp. The `genericOp`
+/// must:
+///  1. Have a single result.
+///  2. Have single use.
+///  3. Have all parallel iterators.
+///  4. Have an identity output indexing map.
+///  5. Have a tensor.empty init operand.
+///  6. Have as many indexing map dims as there are results in the encoding's
+///     bcast_map.
+///
+/// This function creates SetEncoding ops on all of the inputs to the
+/// `genericOp`, and replaces the op with an encoded version. If any of
+/// the above conditions are false, then it returns failure.
 static LogicalResult
 bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
                                     IREE::Encoding::SetEncodingOp encodingOp,
                                     linalg::GenericOp genericOp) {
   if (!genericOp->hasOneUse()) {
-    return failure();
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "genericOp must have one use");
   }
   if (genericOp.getNumDpsInits() != 1) {
-    return failure();
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "genericOp must have a single init");
   }
   if (genericOp.getNumReductionLoops() != 0) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        genericOp, "genericOp must have all parallel loops");
+  }
+  if (!genericOp.getDpsInitOperand(0)->get().getDefiningOp<tensor::EmptyOp>()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "init operand must be tensor.empty");
   }
   AffineMap outputMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
@@ -100,9 +84,9 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
 
   RankedTensorType encodedType = encodingOp.getResultType();
   AffineMap bcastMap = getBcastMapOrIdentity(rewriter, encodedType);
-  if (outputMap.getNumDims() != bcastMap.getNumDims()) {
+  if (outputMap.getNumDims() != bcastMap.getNumResults()) {
     return rewriter.notifyMatchFailure(
-        genericOp, "output map dims do not match bcast_map dims");
+        genericOp, "output map numDims do not match bcast_map numResults");
   }
 
   // Set encodings on each input
@@ -140,26 +124,16 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
 static LogicalResult bubbleUpSetEncoding(RewriterBase &rewriter,
                                          OpOperand &operand) {
   auto setEncoding = cast<Encoding::SetEncodingOp>(operand.getOwner());
-  Operation *producer = operand.get().getDefiningOp();
+  auto producer = operand.get().getDefiningOp<linalg::GenericOp>();
   if (!producer) {
     return failure();
   }
-
   // Only bubble through dequantization ops and broadcasting ops for now.
-  if (!LinalgExt::isBitExtendOp(producer) && !isBroadcastingOp(producer)) {
+  if (!LinalgExt::isBitExtendOp(producer) &&
+      !LinalgExt::isBroadcastingOp(producer)) {
     return failure();
   }
-
-  return TypeSwitch<Operation *, LogicalResult>(producer)
-      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
-        return bubbleUpSetEncodingThroughGenericOp(rewriter, setEncoding,
-                                                   genericOp);
-      })
-      .Case<linalg::BroadcastOp>([&](linalg::BroadcastOp broadcastOp) {
-        return bubbleUpSetEncodingThroughBroadcastOp(rewriter, setEncoding,
-                                                     broadcastOp);
-      })
-      .Default([](Operation *op) { return failure(); });
+  return bubbleUpSetEncodingThroughGenericOp(rewriter, setEncoding, producer);
 }
 
 namespace {
@@ -193,36 +167,6 @@ struct HoistSetEncodingOp
   }
 };
 
-/// Pattern to bubble SetEncoding ops upwards through producers. This pattern
-/// runs until bubbling is not possible, or until the SetEncoding op is outside
-/// of a dispatch.
-struct HoistUnsetEncodingOp
-    : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpRewritePattern<IREE::Encoding::UnsetEncodingOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
-                                PatternRewriter &rewriter) const override {
-    if (isNonNullAndOutsideDispatch(encodingOp)) {
-      return failure();
-    }
-    if (!encodingOp->hasOneUse()) {
-      return failure();
-    }
-    // First check for extract_slice op, and hoist the extract_slice.
-    SmallVector<Operation *> users(encodingOp->getUsers());
-    auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(users.front());
-    if (!extractSliceOp) {
-      return hoistOutOfDispatch(rewriter, encodingOp);
-    }
-    if (!extractSliceOp->hasOneUse()) {
-      return failure();
-    }
-    if (failed(hoistOutOfDispatch(rewriter, extractSliceOp))) {
-      return failure();
-    }
-    return hoistOutOfDispatch(rewriter, encodingOp);
-  }
-};
 } // namespace
 
 /// Create dispatch.region Ops based on a fusion heuristic.
@@ -232,7 +176,6 @@ void HoistEncodingOpsPass::runOnOperation() {
 
   RewritePatternSet patterns(ctx);
   patterns.insert<HoistSetEncodingOp>(ctx);
-  //   patterns.insert<HoistUnsetEncodingOp>(ctx);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {

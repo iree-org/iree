@@ -116,16 +116,6 @@ bool isClonableIntoDispatchOp(Operation *op);
 FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
                                           Operation *op);
 
-/// Returns true if the operation is a BroadcastOp or a GenericOp performing
-/// a broadcast.
-/// This function checks that the genericOp:
-///     1. Has a single input and output.
-///     2. Has all parallel loops.
-///     3. Has an identity output map.
-///     4. Has a projected permutation input map.
-///     5. The input map has fewer results than the output map.
-bool isBroadcastingOp(Operation *op);
-
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
 
