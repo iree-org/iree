@@ -39,11 +39,13 @@ iree_cc_library(
     ::IREEVectorExtInterfacesGen
     ::IREEVectorExtOpsGen
     LLVMSupport
+    MLIRAffineDialect
     MLIRIR
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRVectorDialect
+    iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )
 
