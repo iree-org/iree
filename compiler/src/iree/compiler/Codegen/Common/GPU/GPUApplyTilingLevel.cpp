@@ -107,7 +107,7 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
 
       // TODO: Add some helpers to construct this based on the enum type rather
       // than doing it here.
-      SmallVector<DeviceMappingAttrInterface> mapping;
+      SmallVector<Attribute> mapping;
       int idx = 0;
       for (auto size : tileSizes) {
         if (!isConstantIntValue(size, 0)) {

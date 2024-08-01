@@ -7,12 +7,12 @@
 #ifndef IREE_DIALECTS_DIALECT_VECTOREXT_INTERFACES_H_
 #define IREE_DIALECTS_DIALECT_VECTOREXT_INTERFACES_H_
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpDefinition.h"
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/IR/Value.h>
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
 
 /// Include the generated interface declarations.
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc"
 
 #endif // IREE_DIALECTS_DIALECT_VECTOREXT_INTERFACES_H

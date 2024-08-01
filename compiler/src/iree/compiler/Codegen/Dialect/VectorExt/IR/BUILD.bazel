@@ -14,192 +14,176 @@ package(
 )
 
 exports_files([
-    "IREEGPUAttrs.td",
-    "IREEGPUDialect.td",
-    "IREEGPUEnums.td",
-    "IREEGPUInterfaces.td",
+    "VectorExtAttrs.td",
+    "VectorExtBase.td",
+    "VectorExtOps.td",
+    "VectorExtInterfaces.td",
 ])
 
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "IREEGPUAttrs.td",
-            "IREEGPUDialect.td",
-            "IREEGPUEnums.td",
-            "IREEGPUInterfaces.td",
-            "IREEGPUOps.td",
+            "VectorExtAttrs.td",
+            "VectorExtBase.td",
+            "VectorExtOps.td",
+            "VectorExtInterfaces.td",
         ],
         include = ["*.td"],
     ),
     deps = [
-        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:td_files",
-        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-        "@llvm-project//mlir:DialectUtilsTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:SCFTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-        "@llvm-project//mlir:VectorInterfacesTdFiles",
     ],
 )
 
 iree_compiler_cc_library(
-    name = "IREEGPUDialect",
+    name = "IREEVectorExtDialect",
     srcs = [
-        "IREEGPUAttrs.cpp",
-        "IREEGPUDialect.cpp",
-        "IREEGPUInterfaces.cpp",
-        "IREEGPUOps.cpp",
+        "VectorExtAttrs.cpp",
+        "VectorExtDialect.cpp",
+        "VectorExtOps.cpp",
     ],
     hdrs = [
-        "IREEGPUAttrs.h",
-        "IREEGPUDialect.h",
-        "IREEGPUEnums.h",
-        "IREEGPUInterfaces.h",
-        "IREEGPUOps.h",
+        "VectorExtDialect.h",
+        "VectorExtInterfaces.h",
+        "VectorExtOps.h",
     ],
     textual_hdrs = [
-        "IREEGPUAttrs.cpp.inc",
-        "IREEGPUAttrs.h.inc",
-        "IREEGPUDialect.cpp.inc",
-        "IREEGPUDialect.h.inc",
-        "IREEGPUEnums.cpp.inc",
-        "IREEGPUEnums.h.inc",
-        "IREEGPUInterfaces.cpp.inc",
-        "IREEGPUInterfaces.h.inc",
-        "IREEGPUOps.cpp.inc",
-        "IREEGPUOps.h.inc",
+        "VectorExtDialect.h.inc",
+        "VectorExtDialect.cpp.inc",
+        "VectorExtAttrs.h.inc",
+        "VectorExtAttrs.cpp.inc",
+        "VectorExtEnums.h.inc",
+        "VectorExtEnums.cpp.inc",
+        "VectorExtAttrInterfaces.h.inc",
+        "VectorExtAttrInterfaces.cpp.inc",
+        "VectorExtOps.h.inc",
+        "VectorExtOps.cpp.inc",
     ],
     deps = [
-        ":IREEGPUAttrs",
-        ":IREEGPUDialectGen",
-        ":IREEGPUEnums",
-        ":IREEGPUInterfaces",
-        ":IREEGPUOpsGen",
-        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
-        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:ConfigUtils",
-        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
+        ":IREEVectorExtAttrsGen",
+        ":IREEVectorExtDialectGen",
+        ":IREEVectorExtEnumsGen",
+        ":IREEVectorExtInterfacesGen",
+        ":IREEVectorExtOpsGen",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:VectorDialect",
-        "@llvm-project//mlir:VectorInterfaces",
     ],
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUDialectGen",
+    name = "IREEVectorExtDialectGen",
     tbl_outs = [
         (
             ["--gen-dialect-decls"],
-            "IREEGPUDialect.h.inc",
+            "VectorExtDialect.h.inc",
         ),
         (
             ["--gen-dialect-defs"],
-            "IREEGPUDialect.cpp.inc",
+            "VectorExtDialect.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUDialect.td",
+    td_file = "VectorExtBase.td",
     deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUEnums",
+    name = "IREEVectorExtEnumsGen",
     tbl_outs = [
         (
             ["--gen-enum-decls"],
-            "IREEGPUEnums.h.inc",
+            "VectorExtEnums.h.inc",
         ),
         (
             ["--gen-enum-defs"],
-            "IREEGPUEnums.cpp.inc",
+            "VectorExtEnums.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUEnums.td",
-    deps = [":td_files"],
+    td_file = "VectorExtAttrs.td",
+    deps = [
+        ":td_files",
+    ],
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUAttrs",
+    name = "IREEVectorExtAttrsGen",
     tbl_outs = [
         (
             ["--gen-attrdef-decls"],
-            "IREEGPUAttrs.h.inc",
+            "VectorExtAttrs.h.inc",
         ),
         (
             ["--gen-attrdef-defs"],
-            "IREEGPUAttrs.cpp.inc",
+            "VectorExtAttrs.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUAttrs.td",
+    td_file = "VectorExtAttrs.td",
     deps = [
         ":td_files",
-        "@llvm-project//mlir:SCFDeviceMappingInterfacesIncGen",
     ],
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUInterfaces",
+    name = "IREEVectorExtInterfacesGen",
     tbl_outs = [
         (
             ["--gen-attr-interface-decls"],
-            "IREEGPUInterfaces.h.inc",
+            "VectorExtAttrInterfaces.h.inc",
         ),
         (
             ["--gen-attr-interface-defs"],
-            "IREEGPUInterfaces.cpp.inc",
+            "VectorExtAttrInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUInterfaces.td",
+    td_file = "VectorExtInterfaces.td",
     deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUOpsGen",
+    name = "IREEVectorExtOpsGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "IREEGPUOps.h.inc",
+            "VectorExtOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "IREEGPUOps.cpp.inc",
+            "VectorExtOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUOps.td",
+    td_file = "VectorExtOps.td",
     deps = [
         ":td_files",
     ],
 )
 
 iree_tablegen_doc(
-    name = "IREEGPUDialectDocGen",
+    name = "IREEVectorExtDialectDocGen",
     tbl_outs = [
         (
             [
                 "--gen-dialect-doc",
-                "--dialect=iree_gpu",
+                "--dialect=iree_vector_ext",
             ],
-            "IREEGPUDialect.md",
+            "IREEVectorExtDialect.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEGPUOps.td",
+    td_file = "VectorExtOps.td",
     deps = [":td_files"],
 )

@@ -41,7 +41,6 @@ iree_cc_library(
     ::IREEGPUEnums
     ::IREEGPUInterfaces
     ::IREEGPUOpsGen
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect
@@ -58,6 +57,7 @@ iree_cc_library(
     MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )

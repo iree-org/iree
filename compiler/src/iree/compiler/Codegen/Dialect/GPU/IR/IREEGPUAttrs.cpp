@@ -7,11 +7,11 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include <numeric>
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -677,27 +677,30 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   OpFoldResult one = builder.getIndexAttr(1);
   canonicalStrides.append(rankReducedShape.size(), one);
 
+  // Each thread grabs `element` contiguous data, so the vtid needs to be
+  // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
   // tid: lane id
-  // vtid = (tid floordiv stride_i) mod size_i.
+  // vtid = ((tid floordiv stride_i) mod size_i) * element_i.
   SmallVector<OpFoldResult> vtids;
-  for (auto [dimSize, dimStride] :
-       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.tstrides)) {
+  for (auto [dimSize, dimStride, element] :
+       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.tstrides,
+                       subgroupLayout.element)) {
     if (dimSize == 1) {
       vtids.push_back(zero);
     }
 
-    // (tid floordiv stride) mod size
+    // ((tid floordiv stride) mod size) * element.
     AffineExpr tidExpr = builder.getAffineDimExpr(0);
     AffineMap vtidMap = AffineMap::get(
-        /*dims=*/1, /*syms=*/0, tidExpr.floorDiv(dimStride) % dimSize);
+        /*dims=*/1, /*syms=*/0,
+        (tidExpr.floorDiv(dimStride) % dimSize) * element);
     Value vtid = builder.create<affine::AffineApplyOp>(loc, vtidMap, laneId);
     vtids.push_back(vtid);
   }
 
   int64_t idx = 0;
-  for (auto [thread, element] :
-       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.element)) {
+  for (int64_t element : subgroupLayout.element) {
     canonicalSizes.push_back(builder.getIndexAttr(element));
     canonicalOffsets.push_back(vtids[idx++]);
   }

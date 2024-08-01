@@ -4,19 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "mlir/IR/DialectImplementation.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include <numeric>
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "mlir/IR/DialectImplementation.h"
 
 using namespace mlir;
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.cpp.inc"
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrInterfaces.cpp.inc"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
@@ -41,7 +41,7 @@ void IREEVectorExtDialect::initialize() {
 
 #define GET_OP_LIST
   addOperations<
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc"
       >();
 }
 

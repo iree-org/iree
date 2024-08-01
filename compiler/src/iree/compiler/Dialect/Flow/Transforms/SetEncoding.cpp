@@ -9,40 +9,27 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/GlobalOptimization/Utils.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/BuiltinAttributeInterfaces.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/TypeRange.h"
-#include "mlir/IR/Types.h"
-#include "mlir/Support/LogicalResult.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "iree-flow-set-encoding"
 
-namespace mlir::iree_compiler::GlobalOptimization {
+namespace mlir::iree_compiler::IREE::Flow {
+#define GEN_PASS_DEF_SETENCODINGPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
 
@@ -291,15 +278,10 @@ public:
                         ->getResult(0);
 
     // Sizes are computed by original output size.
-    FailureOr<SmallVector<OpFoldResult>> outSizes =
-        IREE::LinalgExt::getDims(rewriter, loc, out);
-    if (failed(outSizes)) {
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "failed to get shape of result");
-    }
-
+    SmallVector<OpFoldResult> outSizes =
+        tensor::getMixedSizes(rewriter, loc, out);
     Value result =
-        unsetEncodingAndExtractSlice(rewriter, loc, opTiled, outSizes.value());
+        unsetEncodingAndExtractSlice(rewriter, loc, opTiled, outSizes);
 
     rewriter.replaceOp(linalgOp, result);
     return success();
@@ -335,19 +317,13 @@ struct FoldFillWithSetEncoding
   }
 };
 
-struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Encoding::IREEEncodingDialect>();
-  }
-  explicit SetEncodingPass(int64_t factor) { this->padFactor.setValue(factor); }
+class SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
 
-  void runOnOperation() override;
-};
-} // namespace
+public:
+  using Base::Base;
 
-void SetEncodingPass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  {
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.insert<setContractionOpEncoding>(context, padFactor);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
@@ -358,10 +334,7 @@ void SetEncodingPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
+};
+} // namespace
 
-std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor) {
-  return std::make_unique<SetEncodingPass>(padFactor);
-}
-
-} // namespace mlir::iree_compiler::GlobalOptimization
+} // namespace mlir::iree_compiler::IREE::Flow

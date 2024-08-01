@@ -158,7 +158,7 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
     if (!global.isCandidate()) {
       return GlobalAction::PRESERVE;
-    } else if (!global.storeOps.empty()) {
+    } else if (!global.storeOps.empty() && !global.onlyInitialized) {
       return GlobalAction::PRESERVE;
     }
     bool didChangeAny = global.op.isGlobalMutable() != false;
@@ -365,27 +365,28 @@ public:
   void runOnOperation() override {
     auto *context = &getContext();
     RewritePatternSet patterns(context);
-
     for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(patterns);
     }
     for (auto op : context->getRegisteredOperations()) {
       op.getCanonicalizationPatterns(patterns, context);
     }
-
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
     auto moduleOp = getOperation();
-    beforeFoldingGlobals =
-        count(moduleOp.getOps<IREE::Util::GlobalOpInterface>());
+    GlobalTable globalTable(moduleOp);
+    beforeFoldingGlobals = globalTable.size();
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
         signalPassFailure();
+        return;
       }
 
-      GlobalTable globalTable(moduleOp);
       bool didChange = false;
+
+      // Rebuild the global table after potential pattern changes.
+      globalTable.rebuild();
 
       LLVM_DEBUG(llvm::dbgs() << "==== inlineConstantGlobalStores ====\n");
       if (inlineConstantGlobalStores(globalTable)) {
@@ -424,6 +425,7 @@ public:
       }
 
       if (!didChange) {
+        // No changes; complete fixed-point iteration.
         break;
       }
     }

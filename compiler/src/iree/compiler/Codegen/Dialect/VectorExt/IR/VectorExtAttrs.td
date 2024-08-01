@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_VECTOREXT_ATTRS
 #define IREE_DIALECT_VECTOREXT_ATTRS
 
-include "iree-dialects/Dialect/VectorExt/IR/VectorExtBase.td"
+include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 
 //===---------------------------------------------------------------------===//
 // Vector layout attributes
