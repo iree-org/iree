@@ -71,10 +71,9 @@ Value calculateStorageElementCountInBytes(Location loc,
     auto roundDimsTo = encoding.getRoundDimsToArray();
     FailureOr<linalg::ContractionDimensions> cDims =
         IREE::Encoding::getEncodingContractionDims(encoding);
-    auto indexingMap = encoding.getMapForOperandIndex();
     auto pad = [&](int dim, int value) {
       std::optional<unsigned> maybeMappedDim =
-          indexingMap.getResultPosition(builder.getAffineDimExpr(dim));
+          encoding.mapDimToOperandIndex(dim);
       if (!maybeMappedDim) {
         return;
       }
