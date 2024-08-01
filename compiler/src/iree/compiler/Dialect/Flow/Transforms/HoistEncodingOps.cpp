@@ -56,6 +56,11 @@ static AffineMap getBcastMapOrIdentity(RewriterBase &rewriter,
 /// This function creates SetEncoding ops on all of the inputs to the
 /// `genericOp`, and replaces the op with an encoded version. If any of
 /// the above conditions are false, then it returns failure.
+///
+/// Note: The bcast_map on the set_encoding op must be identity or absent.
+///       The implementation should work for cases where it is not, but it is
+///       unexpected in IREE compilation to find such cases, and it will not
+///       be well tested.
 static LogicalResult
 bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
                                     IREE::Encoding::SetEncodingOp encodingOp,
@@ -84,6 +89,9 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
 
   RankedTensorType encodedType = encodingOp.getResultType();
   AffineMap bcastMap = getBcastMapOrIdentity(rewriter, encodedType);
+  if (!bcastMap.isIdentity()) {
+    return rewriter.notifyMatchFailure(genericOp, "bcast_map map not identity");
+  }
   if (outputMap.getNumDims() != bcastMap.getNumResults()) {
     return rewriter.notifyMatchFailure(
         genericOp, "output map numDims do not match bcast_map numResults");
@@ -157,13 +165,13 @@ struct HoistSetEncodingOp
     if (isNonNullAndOutsideDispatch(encodingOp)) {
       return failure();
     }
-    // Try to hoist the SetEncodingOp out of the dispatch region.
-    if (succeeded(hoistOutOfDispatch(rewriter, encodingOp))) {
+    // Try to bubble the SetEncodingOp past its producer op.
+    if (succeeded(bubbleUpSetEncoding(rewriter, encodingOp->getOpOperand(0)))) {
       return success();
     }
 
-    // Otherwise, try to bubble the SetEncodingOp past its producer op.
-    return bubbleUpSetEncoding(rewriter, encodingOp->getOpOperand(0));
+    // Otherwise, try to hoist the SetEncodingOp out of the dispatch region.
+    return hoistOutOfDispatch(rewriter, encodingOp);
   }
 };
 
