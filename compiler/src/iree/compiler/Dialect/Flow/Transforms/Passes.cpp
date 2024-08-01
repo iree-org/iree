@@ -118,20 +118,20 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableDataTiling(
-    "iree-flow-dev-data-tiling",
-    llvm::cl::desc("Enable data-tiling at flow level, i.e., it set encodings "
-                   "in dispatch regions, hoist them out of region, and enable "
+    "iree-flow-experimental-data-tiling",
+    llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
+                   "in dispatch regions, hoist them out of region, and enables "
                    "fusion for the set_encodings. This is still an "
                    "experimental path. The current main data tiling path is "
                    "iree-opt-data-tiling, which is on by default. To use this "
-                   "path, --iree-opt-data-tiling=false must be set as well"),
+                   "path, --iree-opt-data-tiling=false must be set as wells"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int> clPadFactor(
     "iree-flow-pad-factor",
-    llvm::cl::desc("provides padding size hints that will be attached to "
+    llvm::cl::desc("Provides padding size hints that will be attached to "
                    "encodings. This only affects the experimental data tiling "
-                   "path in Flow with iree-flow-dev-data-tiling"),
+                   "path in Flow with iree-flow-experimental-data-tiling."),
     llvm::cl::init(32));
 
 namespace mlir::iree_compiler::IREE::Flow {
