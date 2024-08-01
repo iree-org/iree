@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 #row_layout1 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX, VECTORY], [2, 4, 4]>
 #col_layout1 = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [4, 2, 4]>
@@ -11,9 +11,9 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   return %2 : vector<32x32xf16>
 }
 
-// CHECK-DAG: #[[LAYOUT0:.+]] = #iree_vector_ext.layout<<[ BATCHY,  LANEY,  VECTORX], [4, 2, 4]>, <[ BATCHX,  LANEX,  VECTORY], [2, 4, 4]>>
+// CHECK-DAG: #[[$LAYOUT0:.+]] = #iree_vector_ext.layout<<[ BATCHY,  LANEY,  VECTORX], [4, 2, 4]>, <[ BATCHX,  LANEX,  VECTORY], [2, 4, 4]>>
 // CHECK-LABEL: func.func @specify_layout
-// CHECK:      iree_vector_ext.to_layout {{.*}} to #[[LAYOUT0]]
+// CHECK:      iree_vector_ext.to_layout {{.*}} to #[[$LAYOUT0]]
 
 // -----
 
@@ -50,7 +50,7 @@ func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   return %result : vector<32x32xf16>
 }
 
-// CHECK: #[[LAYOUT0:.+]] = #iree_vector_ext.nested_layout<
+// CHECK: #[[$LAYOUT0:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-SAME: subgroups_per_workgroup = [1, 1],
 // CHECK-SAME: batches_per_subgroup = [2, 4],
 // CHECK-SAME: outers_per_batch = [4, 1],
@@ -59,7 +59,7 @@ func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 // CHECK-SAME: subgroup_strides = [0, 0],
 // CHECK-SAME: thread_strides = [1, 4]>
 
-// CHECK: #[[LAYOUT1:.+]] = #iree_vector_ext.nested_layout<
+// CHECK: #[[$LAYOUT1:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-SAME: subgroups_per_workgroup = [1, 1],
 // CHECK-SAME: batches_per_subgroup = [4, 2],
 // CHECK-SAME: outers_per_batch = [1, 4],
@@ -70,8 +70,8 @@ func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 
 // CHECK-LABEL: func.func @specify_nested
 // CHECK:      vector.transfer_read
-// CHECK-SAME:         layout0 = #[[LAYOUT0]]
-// CHECK-SAME:         layout1 = #[[LAYOUT1]]
+// CHECK-SAME:         layout0 = #[[$LAYOUT0]]
+// CHECK-SAME:         layout1 = #[[$LAYOUT1]]
 
 // -----
 

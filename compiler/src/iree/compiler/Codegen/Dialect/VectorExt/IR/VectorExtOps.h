@@ -7,8 +7,9 @@
 #ifndef IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_
 #define IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.h"
+#include "llvm/ADT/MapVector.h"
 #include "mlir/Bytecode/BytecodeImplementation.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Attributes.h"
@@ -17,7 +18,6 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "llvm/ADT/MapVector.h"
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --split-input-file --verify-diagnostics %s
+// RUN: iree-opt --split-input-file --verify-diagnostics %s
 
 #row_layout1 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX, VECTORY], [1, 1, 1]>
 #col_layout1 = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [4, 2, 4]>
