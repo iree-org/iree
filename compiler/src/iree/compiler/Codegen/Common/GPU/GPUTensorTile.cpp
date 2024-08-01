@@ -280,10 +280,16 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
       }
     }
     std::reverse(idDims.begin(), idDims.end());
-    ArrayAttr mapping = rewriter.getArrayAttr(idDims);
-    auto tilingResult =
-        linalg::tileToForallOp(rewriter, tilingOp, numThreads, mapping);
-    rewriter.replaceOp(tilingOp, tilingResult->tileOp->getResults());
+    scf::SCFTilingOptions options;
+    options.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+    options.setMapping(idDims);
+    options.setNumThreads(numThreads);
+    FailureOr<scf::SCFTilingResult> tilingResult =
+        scf::tileUsingSCF(rewriter, tilingOp, options);
+    if (failed(tilingResult)) {
+      return tilingOp->emitOpError("failed to tile to scf.forall");
+    }
+    rewriter.replaceOp(tilingOp, tilingResult->replacements);
   }
   return success();
 }
