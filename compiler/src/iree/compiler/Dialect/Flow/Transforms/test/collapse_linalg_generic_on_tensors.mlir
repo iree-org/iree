@@ -397,29 +397,6 @@ util.func public @collapse11(%input : !type_in) -> !type_out {
 
 // -----
 
-!type = tensor<16x32xi32>
-util.func public @dont_collapse_dueto_index(%height : index, %width : index) -> !type {
-  %init_source = tensor.empty() : !type
-  %source = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      outs(%init_source : !type) {
-    ^bb0(%b0 : i32):
-      %outer = linalg.index 0 : index
-      %inner = linalg.index 1 : index
-      %strided = arith.muli %outer, %width : index
-      %linearized = arith.addi %inner, %strided : index
-      %linearized_i32 = arith.index_cast %linearized : index to i32
-      linalg.yield %linearized_i32 : i32
-  } -> !type
-  util.return %source : !type
-}
-
-// CHECK-LABEL: util.func public @dont_collapse
-//       CHECK:   linalg.generic {indexing_maps = [#[[$MAP:.+]]], iterator_types = ["parallel", "parallel"]}
-
-// -----
-
 !type = tensor<2x4x8x16x32x64xf32>
 util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 

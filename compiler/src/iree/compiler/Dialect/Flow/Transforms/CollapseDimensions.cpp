@@ -164,11 +164,6 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
     return false;
   }
 
-  // TODO(guray) Collapsing caused performance regression in a cpu
-  // benchmark, so we disable it.
-  if (genericOp.hasIndexSemantics())
-    return false;
-
   // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
   if (llvm::any_of(genericOp.getDpsInputOperands(),
                    [&](OpOperand *operand) -> bool {
