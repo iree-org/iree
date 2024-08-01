@@ -53,8 +53,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install cmake clang ninja-build
-          export CC=clang
-          export CXX=clang++
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: "Building tests"
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
