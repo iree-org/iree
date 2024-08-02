@@ -502,7 +502,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 FailureOr<IREE::Flow::DispatchRegionOp>
 moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
                                   IREE::Flow::DispatchRegionOp regionOp) {
-  // Values replaced by moving the `targets` into the dispatch region.
+  // Values replaced by moving the `target` into the dispatch region.
   SmallVector<Value> replacedValues;
 
   // List of dynamic dimensions for each new results added to the dispatch
@@ -537,7 +537,6 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   for (auto [index, result] : llvm::enumerate(target->getResults())) {
     replacedValues.push_back(result);
     yieldedResults.push_back(clonedTarget->getResult(index));
-    OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(target);
     SmallVector<Value> &dims = dispatchOpNewResultsDynamicDims.emplace_back();
     if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
