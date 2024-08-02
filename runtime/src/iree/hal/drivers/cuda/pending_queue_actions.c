@@ -381,7 +381,7 @@ typedef struct iree_hal_cuda_working_area_t {
   iree_allocator_t host_allocator;  // const
 
   const iree_hal_cuda_dynamic_symbols_t* symbols;
-  CUdevice device;
+  CUcontext context;
 } iree_hal_cuda_working_area_t;
 
 // This data structure is shared by the parent thread. It is responsible
@@ -412,11 +412,11 @@ typedef struct iree_hal_cuda_completion_area_t {
   iree_allocator_t host_allocator;
 
   const iree_hal_cuda_dynamic_symbols_t* symbols;
-  CUdevice device;
+  CUcontext context;
 } iree_hal_cuda_completion_area_t;
 
 static void iree_hal_cuda_working_area_initialize(
-    iree_allocator_t host_allocator, CUdevice device,
+    iree_allocator_t host_allocator, CUcontext context,
     const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_working_area_t* working_area) {
   iree_notification_initialize(&working_area->state_notification);
@@ -433,7 +433,7 @@ static void iree_hal_cuda_working_area_initialize(
   working_area->pending_work_items_count = 0;
   working_area->host_allocator = host_allocator;
   working_area->symbols = symbols;
-  working_area->device = device;
+  working_area->context = context;
 }
 
 static void iree_hal_cuda_working_area_deinitialize(
@@ -448,7 +448,7 @@ static void iree_hal_cuda_working_area_deinitialize(
 }
 
 static void iree_hal_cuda_completion_area_initialize(
-    iree_allocator_t host_allocator, CUdevice device,
+    iree_allocator_t host_allocator, CUcontext context,
     const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_completion_area_t* completion_area) {
   iree_notification_initialize(&completion_area->state_notification);
@@ -465,7 +465,7 @@ static void iree_hal_cuda_completion_area_initialize(
   completion_area->pending_completion_count = 0;
   completion_area->host_allocator = host_allocator;
   completion_area->symbols = symbols;
-  completion_area->device = device;
+  completion_area->context = context;
 }
 
 static void iree_hal_cuda_completion_area_deinitialize(
@@ -534,7 +534,8 @@ static const iree_hal_resource_vtable_t
 
 iree_status_t iree_hal_cuda_pending_queue_actions_create(
     const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    CUcontext context, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_cuda_pending_queue_actions_t** out_actions) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(block_pool);
@@ -556,11 +557,11 @@ iree_status_t iree_hal_cuda_pending_queue_actions_create(
 
   // Initialize the working area for the ready-list processing worker.
   iree_hal_cuda_working_area_t* working_area = &actions->working_area;
-  iree_hal_cuda_working_area_initialize(host_allocator, device, symbols,
+  iree_hal_cuda_working_area_initialize(host_allocator, context, symbols,
                                         working_area);
 
   iree_hal_cuda_completion_area_t* completion_area = &actions->completion_area;
-  iree_hal_cuda_completion_area_initialize(host_allocator, device, symbols,
+  iree_hal_cuda_completion_area_initialize(host_allocator, context, symbols,
                                            completion_area);
 
   // Create the ready-list processing worker itself.
@@ -1454,8 +1455,8 @@ static int iree_hal_cuda_completion_execute(
   iree_hal_cuda_completion_list_t* worklist = &completion_area->completion_list;
 
   iree_status_t status = IREE_CURESULT_TO_STATUS(
-      completion_area->symbols, cudaSetDevice(completion_area->device),
-      "cudaSetDevice");
+      completion_area->symbols, cuCtxSetCurrent(completion_area->context),
+      "cuCtxSetCurrent");
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_cuda_completion_wait_pending_completion_items(completion_area);
     iree_hal_cuda_post_error_to_completion_state(completion_area,
@@ -1544,8 +1545,8 @@ static int iree_hal_cuda_worker_execute(
   // devices (or streams from other devices). Force the correct device onto
   // this thread.
   iree_status_t status = IREE_CURESULT_TO_STATUS(
-      working_area->symbols, cudaSetDevice(working_area->device),
-      "cudaSetDevice");
+      working_area->symbols, cuCtxSetCurrent(working_area->context),
+      "cuCtxSetCurrent");
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_cuda_worker_wait_pending_work_items(working_area);
     iree_hal_cuda_post_error_to_worker_state(working_area,

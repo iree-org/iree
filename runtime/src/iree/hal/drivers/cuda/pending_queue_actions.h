@@ -39,7 +39,8 @@ typedef struct iree_hal_cuda_pending_queue_actions_t
 // Creates a pending actions queue.
 iree_status_t iree_hal_cuda_pending_queue_actions_create(
     const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    CUcontext context, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_cuda_pending_queue_actions_t** out_actions);
 
 // Destroys the pending |actions| queue.

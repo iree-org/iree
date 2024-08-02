@@ -8,7 +8,6 @@
 // errors loading the other symbols.
 IREE_CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
 IREE_CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
-IREE_CU_PFN_DECL(cudaSetDevice, int)
 IREE_CU_PFN_DECL(cuDriverGetVersion, int*)
 IREE_CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 IREE_CU_PFN_DECL(cuCtxDestroy, CUcontext)

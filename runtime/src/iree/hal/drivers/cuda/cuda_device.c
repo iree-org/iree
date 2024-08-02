@@ -153,7 +153,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->host_allocator = host_allocator;
 
   iree_status_t status = iree_hal_cuda_pending_queue_actions_create(
-      cuda_symbols, cu_device, &device->block_pool, host_allocator,
+      cuda_symbols, cu_device, context, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
