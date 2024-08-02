@@ -159,22 +159,25 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 
   IRRewriter rewriter(funcOp);
 
-  SmallVector<Operation *> tiledOpsWithLoweringConfig;
-  // Collect ops with tilingInterface that has the loweringconfig attached.
-  funcOp->walk([&](TilingInterface target) {
-    if (IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-            getLoweringConfig(target)) {
-      if (loweringConfig.hasTilingLevel(tilingLevel)) {
-        tiledOpsWithLoweringConfig.push_back(target);
-      }
-    }
-  });
-
-  FailureOr<Operation *> rootOp = getRootOperation(tiledOpsWithLoweringConfig);
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
 
   if (failed(rootOp)) {
+    funcOp.emitError() << "not able to find the root operation\n";
+    return signalPassFailure();
+  }
+
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+      getLoweringConfig(rootOp.value());
+  if (!loweringConfig) {
+    funcOp.emitError() << "not able to find the lowering config\n";
+    return signalPassFailure();
+  }
+
+  if (!loweringConfig.hasTilingLevel(tilingLevel)) {
     funcOp.emitError()
-        << "no operation found with the lowering_config attribute.\n";
+        << "not able to find the lowering config with the tiling level "
+        << tilingLevel.getValue() << "\n";
     return signalPassFailure();
   }
 
