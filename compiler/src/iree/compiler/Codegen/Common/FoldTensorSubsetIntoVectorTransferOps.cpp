@@ -120,6 +120,18 @@ public:
 };
 
 /// Returns true if `writeOp` fully overwrites its destination.
+///
+/// Example:
+///
+/// ```MLIR
+/// vector.transfer_write %vec, %dest[%c0, %c0] {in_bounds = [true, true]}
+///    : vector<4x5xf32>, tensor<4x5xf32>
+/// ```
+///
+/// This is an easy case `vector<4x5xf32>` fully-overwrites `tensor<4x5xf32>` as
+/// the vector is the same size as the tensor. This check also supports dynamic
+/// tensors, where it resolves the tensor sizes via value-bounds analysis, and
+/// then checks if the vector type fully overwrites the tensor.
 static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
   if (writeOp.hasOutOfBoundsDim())
     return false;
@@ -136,20 +148,24 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
     vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
   }
 
-  auto dest = writeOp.getSource();
-  auto destShape = writeOp.getShapedType().getShape();
-  auto destDimSize =
+  Value dest = writeOp.getSource();
+  ArrayRef<int64_t> destShape = writeOp.getShapedType().getShape();
+
+  // Attempts to resolve the size of a dim within the destination.
+  auto resolveDestinationDimSize =
       [&](unsigned dimIndex) -> FailureOr<iree_compiler::DimBoundSize> {
     auto size = destShape[dimIndex];
+    // Fixed-size dimensions are simply included in the shape.
     if (size != ShapedType::kDynamic)
       return iree_compiler::DimBoundSize{size};
+    // (Attempt to) resolve dynamic dimensions via value-bounds analysis.
     return iree_compiler::computeDimUpperBound(dest, dimIndex, vscaleRange);
   };
 
-  auto vecShape = vecType.getShape();
-  auto vecScalableFlags = vecType.getScalableDims();
+  ArrayRef<int64_t> vecShape = vecType.getShape();
+  ArrayRef<bool> vecScalableFlags = vecType.getScalableDims();
   for (unsigned d = 0, e = destShape.size(); d < e; ++d) {
-    auto dimSize = destDimSize(d);
+    auto dimSize = resolveDestinationDimSize(d);
     if (failed(dimSize))
       return false;
     if (dimSize->scalable && !vecScalableFlags[d])

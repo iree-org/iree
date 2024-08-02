@@ -76,8 +76,8 @@ func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
-// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x5xf32>, tensor<?x?xf32>
-
+// CHECK-NEXT:    %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x5xf32>, tensor<?x?xf32>
+// CHECK-NEXT:    return %[[WRITE]]
 // -----
 
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
@@ -88,7 +88,8 @@ func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
-// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x[4]xf32>, tensor<?x?xf32>
+// CHECK-NEXT:    %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x[4]xf32>, tensor<?x?xf32>
+// CHECK-NEXT:    return %[[WRITE]]
 func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
   attributes {hal.executable.target = #aarch64_sve}
 {
@@ -110,7 +111,8 @@ func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>,
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
-// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x8xf32>, tensor<?x?xf32>
+// CHECK-NEXT:    %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x8xf32>, tensor<?x?xf32>
+// CHECK-NEXT:    return %[[WRITE]]
 func.func @fold_insert_slice_into_transfer_write_dynamic(%v: vector<4x8xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index, %size: index) -> tensor<?x?xf32>
 {
   %c0 = arith.constant 0 : index
