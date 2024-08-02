@@ -10,7 +10,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -26,12 +26,12 @@ hal.executable private @matmul {
     builtin.module {
       func.func @matmul() {
         %c0 = arith.constant 0 : index
-        %M = hal.interface.constant.load[0] : index
-        %N = hal.interface.constant.load[1] : index
-        %K = hal.interface.constant.load[2] : index
-        %arg0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%M, %K}
-        %arg1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%K, %N}
-        %arg2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>{%M, %N}
+        %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %N = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %K = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<?x?xf32>{%M, %K}
+        %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<?x?xf32>{%K, %N}
+        %arg2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<?x?xf32>{%M, %N}
         %c4 = arith.constant 4 : index
         %c1 = arith.constant 1 : index
         %0 = memref.dim %arg0, %c1 : memref<?x?xf32>
@@ -97,9 +97,9 @@ hal.executable private @conv_1d {
       func.func @conv_1d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x6x1xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x8x1xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x1x1xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<3x6x1xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<3x8x1xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<3x1x1xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_id y
         %5 = gpu.block_id z
@@ -125,9 +125,9 @@ hal.executable private @conv_1d {
 }
 
 // CHECK-LABEL: func.func @conv_1d
-//       CHECK-DAG: %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//       CHECK-DAG: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//       CHECK-DAG: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//       CHECK-DAG: %[[RET:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
+//       CHECK-DAG: %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//       CHECK-DAG: %[[ARG1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //       CHECK-DAG: %[[ARG0SV1:.+]] = memref.subview %[[ARG0]]
 //       CHECK-DAG: %[[ARG1SV1:.+]] = memref.subview %[[ARG1]]
 //       CHECK-DAG: %[[RETSV1:.+]] = memref.subview %[[RET]]
@@ -173,18 +173,18 @@ hal.executable private @conv_2d {
     builtin.module {
       func.func @conv_2d() {
         %c0 = arith.constant 0 : index
-        %n = hal.interface.constant.load[0] : index
-        %oh = hal.interface.constant.load[1] : index
-        %ow = hal.interface.constant.load[2] : index
-        %oc = hal.interface.constant.load[3] : index
-        %ih = hal.interface.constant.load[4] : index
-        %iw = hal.interface.constant.load[5] : index
-        %ic = hal.interface.constant.load[6] : index
-        %fh = hal.interface.constant.load[7] : index
-        %fw = hal.interface.constant.load[8] : index
-        %arg0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
-        %arg1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
-        %arg2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}
+        %n = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %oh = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %ow = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %oc = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+        %ih = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : index
+        %iw = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : index
+        %ic = hal.interface.constant.load layout(#pipeline_layout) ordinal(6) : index
+        %fh = hal.interface.constant.load layout(#pipeline_layout) ordinal(7) : index
+        %fw = hal.interface.constant.load layout(#pipeline_layout) ordinal(8) : index
+        %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
+        %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
+        %arg2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}
         %c2 = arith.constant 2 : index
         %c3 = arith.constant 3 : index
         %c1 = arith.constant 1 : index
@@ -239,9 +239,9 @@ hal.executable private @conv_2d {
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //         CHECK: func.func @conv_2d
-//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
 //     CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //     CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //     CHECK-DAG:   %[[C4:.+]] = arith.constant 4
@@ -289,9 +289,9 @@ hal.executable private @conv_3d {
       func.func @conv_3d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x7x7x7x2xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x8x8x8x3xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<2x2x2x3x2xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<2x7x7x7x2xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<2x8x8x8x3xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<2x2x2x3x2xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_id y
         %5 = gpu.block_id z
@@ -359,9 +359,9 @@ module  {
       builtin.module {
         func.func @pooling_nhwc_max() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x16x16x6xf32>
-          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
-          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x14x13x6xf32>
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<2x16x16x6xf32>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<3x4xf32>
+          %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<2x14x13x6xf32>
           %3 = gpu.block_id x
           %4 = gpu.block_id y
           %5 = affine.apply #map0()[%4]
@@ -385,9 +385,9 @@ module  {
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //         CHECK: func.func @pooling_nhwc_max
-//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
 //         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]]
 //         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]]
 //     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
@@ -428,9 +428,9 @@ hal.executable @matvec {
         %c250 = arith.constant 250 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<250x1024xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1024xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<250xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<250x1024xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<1024xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<250xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %3 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]

@@ -1,5 +1,13 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-llvmcpu-vector-lowering-pipeline))" --split-input-file %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 func.func @matmul_391x384x384_f32() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -11,13 +19,13 @@ func.func @matmul_391x384x384_f32() {
   %cst_0 = arith.constant dense<0.000000e+00> : vector<8x32xf32>
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
   memref.assume_alignment %0, 64 : memref<391x384xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
   memref.assume_alignment %1, 64 : memref<384x384xf32>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
   memref.assume_alignment %2, 64 : memref<384xf32>
-  %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<391x384xf32>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
   memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -75,6 +83,14 @@ func.func @matmul_391x384x384_f32() {
 // Check that vector.loads whose elements are extracted and
 // consumed in a scalar fashion are scalarized.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 func.func @matmul_scalar_loads() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -86,13 +102,13 @@ func.func @matmul_scalar_loads() {
   %cst_0 = arith.constant dense<0.000000e+00> : vector<8x32xf32>
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
   memref.assume_alignment %0, 64 : memref<391x384xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
   memref.assume_alignment %1, 64 : memref<384x384xf32>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
   memref.assume_alignment %2, 64 : memref<384xf32>
-  %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<391x384xf32>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
   memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -130,11 +146,16 @@ func.func @matmul_scalar_loads() {
 
 // Make sure we don't transpose a mask but create a transposed mask instead.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @transpose_mask() {
   %a = arith.constant 4 : index
   %b = arith.constant 8 : index
   %c0 = arith.constant 0 : index
-  %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4x2xi1>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<4x2xi1>
   %mask = vector.create_mask %a, %b : vector<2x4xi1>
   %transpose_mask = vector.transpose %mask, [1, 0] : vector<2x4xi1> to vector<4x2xi1>
   vector.transfer_write %transpose_mask, %3[%c0, %c0] {in_bounds = [true, true]} : vector<4x2xi1>, memref<4x2xi1>
@@ -153,17 +174,24 @@ func.func @transpose_mask() {
 // Make sure that the gather patterns get rid of vector.gather over strided
 // memref.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 func.func @gather_strided_memref() {
   %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
   %cst_0 = arith.constant dense<true> : vector<4xi1>
   %c0_i32 = arith.constant 0 : i32
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
   memref.assume_alignment %0, 64 : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
   memref.assume_alignment %1, 64 : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
   memref.assume_alignment %2, 64 : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
   %subview = memref.subview %0[0, 0] [2592000, 1] [1, 1] : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>> to memref<2592000xf32, strided<[3]>, #hal.descriptor_type<storage_buffer>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index

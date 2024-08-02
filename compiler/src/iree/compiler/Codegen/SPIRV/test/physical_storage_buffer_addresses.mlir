@@ -21,9 +21,9 @@ hal.executable private @interface_binding {
     } {
       func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<4x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
 
         %3 = memref.load %0[%c0, %c0] : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
         %4 = memref.load %1[%c0] : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
