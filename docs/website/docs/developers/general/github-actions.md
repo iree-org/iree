@@ -17,14 +17,9 @@ automation (CI) and continuous delivery (CD) workflows:
 * Updating dependencies.
 
 Workflows are defined directly in the repository at
-[`.github/workflows/`](https://github.com/iree-org/iree/tree/main/.github/workflows),
-using a mix of official actions
-(e.g. [actions/checkout](https://github.com/actions/checkout)),
-community actions
-(e.g. [pre-commit/action](https://github.com/pre-commit/action)),
-and custom code. We use a mix of GitHub-hosted runners and self-hosted runners
-to get automated build and test coverage across a variety of platforms and
-hardware accelerators.
+[`.github/workflows/`](https://github.com/iree-org/iree/tree/main/.github/workflows).
+We use a mix of GitHub-hosted runners and self-hosted runners to get automated
+build and test coverage across a variety of platforms and hardware accelerators.
 
 ### Terminology primer
 
@@ -40,7 +35,37 @@ _(Read more on
 * _Events_ are specific activities in a repository that trigger a
   _workflow run_.
 
-<img src="https://docs.github.com/assets/cb-25535/mw-1440/images/help/actions/overview-actions-simple.webp">
+```mermaid
+graph
+  accTitle: Example workflow run diagram
+  accDescr {
+    An event runs two jobs - job 1 on runner 1 and job 2 on runner.
+    Job 1 runs four steps, each either an action or script.
+    Job 2 runs three other steps.
+  }
+
+  event("Event")
+
+  event --> runner_1
+  event --> runner_2
+
+  subgraph runner_1["Runner 1"]
+    job_1("Job 1
+    • Step 1: Run action
+    • Step 2: Run script
+    • Step 3: Run script
+    • Step 4: Run action
+    ")
+  end
+
+  subgraph runner_2["Runner 2"]
+    job_2("Job 2
+    • Step 1: Run action
+    • Step 2: Run script
+    • Step 3: Run script
+    ")
+  end
+```
 
 ## :material-list-status: Workflow descriptions and status
 
