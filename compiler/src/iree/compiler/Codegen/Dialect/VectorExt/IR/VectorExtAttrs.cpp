@@ -218,7 +218,7 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
              getShape(LayoutDimension::LANEY).value_or(0);
     break;
   default:
-    assert("Invalid dimension! Expected lane dimension.");
+    assert(false && "Invalid dimension! Expected lane dimension");
     break;
   }
   return offset;
