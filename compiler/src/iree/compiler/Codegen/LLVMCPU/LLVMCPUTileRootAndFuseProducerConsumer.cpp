@@ -42,7 +42,7 @@ static LogicalResult tileRootAndFuseProducerConsumerUsingSCF(
         root, "invalid pattern for op with no results");
   }
 
-  // 1.  Tile root op and Fuse Producers.
+  // 1. Tile root op and Fuse Producers.
   FailureOr<scf::SCFTileAndFuseResult> tiledResults =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, root, options);
 
@@ -147,7 +147,7 @@ struct LLVMCPUTileRootAndFuseProducerConsumer
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
-                    vector::VectorDialect>();
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
