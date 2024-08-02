@@ -98,10 +98,9 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
 
   iree_hal_cuda_device_params_t device_params;
   iree_hal_cuda_device_params_initialize(&device_params);
-  if (FLAG_cuda_use_streams) {
-    device_params.command_buffer_mode =
-        IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
-  }
+  device_params.command_buffer_mode =
+      FLAG_cuda_use_streams ? IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM
+                            : IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
   device_params.stream_tracing = FLAG_cuda_tracing;
   device_params.async_allocations = FLAG_cuda_async_allocations;
 

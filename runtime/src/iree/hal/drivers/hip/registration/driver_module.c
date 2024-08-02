@@ -152,10 +152,9 @@ static iree_status_t iree_hal_hip_driver_populate_options(
             "Option 'hip_use_streams' expected to be int. Got: '%.*s'",
             (int)value.size, value.data);
       }
-      if (ivalue) {
-        device_params->command_buffer_mode =
-            IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
-      }
+      device_params->command_buffer_mode =
+          ivalue ? IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM
+                 : IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
     } else if (iree_string_view_equal(key, key_hip_allow_inline_execution)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
         return iree_make_status(
