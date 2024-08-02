@@ -179,12 +179,29 @@ we most commonly use:
     * Where possible, jobs should allow this trigger so maintainers can test
       workflows without needing to send pull requests.
 
+!!! info - ""Presubmit" and "postsubmit""
+
+    We use the terminology "presubmit" and "postsubmit" to differentiate
+    between stages when checks run:
+
+    * "Presubmit" checks run on code that has not yet been
+      reviewed/approved/merged with either of the `pull_request` or
+      `workflow_dispatch` triggers.
+    * "Postsubmit" checks run on code that has been merged to a common branch
+      like `main` with either of the `push` or `schedule` triggers.
+
+    In an ideal world every check would run on presubmit, but some operating
+    system or hardware runners are in short supply and some workflows are slow
+    even with sufficient resources (e.g. benchmark suites). We try to strike a
+    balance between utility and economics.
+
 !!! example - "Example workflow triggers"
 
     * [`ci_linux_x64_clang_asan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_asan.yml)
-      runs on `pull_request` and `push` events despite building the compiler
-      and needing to use large build machines because it is generally useful
-      for all C/C++ compiler and runtime changes.
+      runs on presubmit (`pull_request` trigger) and postsubmit (`push`
+      trigger). Even though this workflow builds the compiler and needs to use
+      large build machines because, it is generally useful for all C/C++
+      compiler and runtime changes.
     * [`ci_linux_x64_clang_tsan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml)
       is similar to the ASan build but it runs on the `schedule` event because
       it is only situationally useful and we want to limit use of large build
@@ -219,8 +236,8 @@ workflows run based on paths modified. This mechanism is simple but somewhat
 limited in what it can express, so we have a custom mechanism for marking
 certain jobs as conditionally enabled:
 
-* All jobs run on `push` events, after pull requests are merged ('postsubmit').
-* Jobs may be marked as opt-in for `pull_request` events ('presubmit') by editing
+* Always run on `push` events, after pull requests are merged (postsubmit).
+* Jobs may be marked as opt-in for `pull_request` events (presubmit) by editing
   [`build_tools/github_actions/configure_ci.py`](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/configure_ci.py).
   That script runs as part of the
   [`setup.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/setup.yml)
