@@ -16,7 +16,7 @@
 // To prevent spilling pages we leave some room for the context structure.
 #define IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
-// iree_hal_hip_tracing_context_event_t contains a cuEvent that is used to
+// iree_hal_cuda_tracing_context_event_t contains a cuEvent that is used to
 // record timestamps for tracing GPU execution. In this struct, there are also
 // two linked lists that the current event may be added to during its lifetime.
 //
