@@ -32,7 +32,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
     FormDispatchRegionsPassOptions options;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
-      OpOperand &operand = encodingOp->getOpOperand(0);
+      OpOperand &operand = encodingOp.getSourceMutable();
       auto producerDispatch = operand.get().getDefiningOp<DispatchRegionOp>();
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
       if (!producerDispatch) {

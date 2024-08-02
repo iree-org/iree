@@ -256,7 +256,7 @@ def FormScalarDispatchesPass :
 
 def FuseEncodingOpsIntoDispatchRegionsPass :
     InterfacePass<"iree-flow-fuse-encoding-ops-into-dispatch-regions-pass", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses encoding ops into dispatch regions, or forms new dispatches around them.";
+  let summary = "Fuses set_encoding ops into producer dispatch regions, or forms new dispatches around them.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",

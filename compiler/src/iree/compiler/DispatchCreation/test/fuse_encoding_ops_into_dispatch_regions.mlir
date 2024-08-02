@@ -4,60 +4,35 @@
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
 module {
-  util.func public @quantized_matmul(%arg0: tensor<2x11008x128xf32>, %arg1: tensor<2x128x64xf32>) -> tensor<2x11008x64xf32> {
+  util.func public @parallel_fusion(%arg0: tensor<2x11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<2x11008x128xf32>
     %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
-      %5 = linalg.generic {
+      %3 = linalg.generic {
           indexing_maps = [#map, #map, #map],
           iterator_types = ["parallel", "parallel", "parallel"]}
           ins(%arg0, %arg0 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32>)
           outs(%0 : tensor<2x11008x128xf32>) {
       ^bb0(%in: f32, %in_0: f32, %out: f32):
-        %6 = arith.addf %in, %in_0 : f32
-        linalg.yield %6 : f32
+        %4 = arith.addf %in, %in_0 : f32
+        linalg.yield %4 : f32
       } -> tensor<2x11008x128xf32>
-      flow.return %5 : tensor<2x11008x128xf32>
+      flow.return %3 : tensor<2x11008x128xf32>
     }
-    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-    %3 = iree_encoding.set_encoding %arg1 : tensor<2x128x64xf32> -> tensor<2x128x64xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x128x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-    %4 = flow.dispatch.region -> (tensor<2x11008x64xf32>) {
-      %5 = tensor.empty() : tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>) -> tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-      %7 = linalg.generic {
-          indexing_maps = [#map1, #map2, #map3],
-          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
-          ins(%3, %2 : tensor<2x128x64xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x128x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>, tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>)
-          outs(%6 : tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>) {
-      ^bb0(%in: f32, %in_0: f32, %out: f32):
-        %9 = arith.mulf %in, %in_0 : f32
-        %10 = arith.addf %9, %out : f32
-        linalg.yield %10 : f32
-      } -> tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-      %8 = iree_encoding.unset_encoding %7 : tensor<2x11008x64xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x64xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>> -> tensor<2x11008x64xf32>
-      flow.return %8 : tensor<2x11008x64xf32>
-    }
-    util.return %4 : tensor<2x11008x64xf32>
+    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+    util.return %2 : tensor<2x11008x128xf32, #encoding>
   }
 }
 
-// CHECK-LABEL: @quantized_matmul
+// CHECK-LABEL: @parallel_fusion
 // CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #iree_encoding.encoding
 // CHECK:         %[[ADD:.+]] = linalg.generic
-// CHECK:         %[[SET_ENCODING0:.+]] = iree_encoding.set_encoding
-// CHECK:         flow.return %[[SET_ENCODING0]] :
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+// CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
-// CHECK:       %[[DISPATCH1:.+]] = flow.dispatch.region -> (tensor<2x128x64xf32, #iree_encoding.encoding
-// CHECK:         %[[SET_ENCODING1:.+]] = iree_encoding.set_encoding
-// CHECK:         flow.return %[[SET_ENCODING1]] :
-// CHECK:       }
-// CHECK:       %[[DISPATCH2:.+]] = flow.dispatch.region -> (tensor<2x11008x64xf32>) {
-// CHECK:         %[[MATMUL:.+]] = linalg.generic {{.*}} ins(%[[DISPATCH1]], %[[DISPATCH0]]
-// CHECK:         %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[MATMUL]]
-// CHECK:         flow.return %[[UNSET_ENCODING]] :
-// CHECK:       }
-// CHECK:       util.return %[[DISPATCH2]] : tensor<2x11008x64xf32>
+// CHECK:       util.return %[[DISPATCH0]] : tensor<2x11008x128xf32, #iree_encoding.encoding
 
 // -----
 
@@ -66,8 +41,9 @@ module {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
 module {
-  util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>> {
+  util.func public @reduction_fusion(%arg0: tensor<2x11008x128x16xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %0 = tensor.empty() : tensor<2x11008x128xf32>
     %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
       %5 = linalg.generic {
@@ -81,8 +57,8 @@ module {
       } -> tensor<2x11008x128xf32>
       flow.return %5 : tensor<2x11008x128xf32>
     }
-    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-    util.return %2 : tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
+    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+    util.return %2 : tensor<2x11008x128xf32, #encoding>
   }
 }
 
@@ -101,8 +77,9 @@ module {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
 module {
-  util.func public @transpose_no_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>> {
+  util.func public @transpose_no_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %0 = tensor.empty() : tensor<2x11008x128xf32>
     %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
       %5 = linalg.generic {
@@ -115,8 +92,8 @@ module {
       } -> tensor<2x11008x128xf32>
       flow.return %5 : tensor<2x11008x128xf32>
     }
-    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
-    util.return %2 : tensor<2x11008x128xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>>
+    %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+    util.return %2 : tensor<2x11008x128xf32, #encoding>
   }
 }
 
