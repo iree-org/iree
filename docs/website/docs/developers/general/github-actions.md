@@ -277,21 +277,21 @@ We group runners into categories:
     Want to run tests on your own hardware as part of IREE's upstream CI? Get
     in touch with us on one of our
     [communication channels](../../index.md#communication-channels) and we'd be
-    happy to help discuss the options available.
+    happy to discuss the options available.
 
 ## :material-book-open-outline: Maintenance tips
 
 * Certain workflow failures are posted in the `#github-ci` channel in IREE's
-  Discord server
+  Discord server.
 * GitHub supports
   [notifications for workflow runs](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/monitoring-workflows/notifications-for-workflow-runs)
-  but only for the user that last modified a workflow
+  but only for the user that last modified a workflow.
 * GitHub sometimes experiences incidents outside of our control. Monitor
   <https://www.githubstatus.com/> to see if issues are widespread.
 * Repository admins can monitor repository runners at
-  <https://github.com/iree-org/iree/settings/actions/runners>
+  <https://github.com/iree-org/iree/settings/actions/runners>.
 * Organization admins can monitor organization runners at
-  <https://github.com/organizations/iree-org/settings/actions/runners>
+  <https://github.com/organizations/iree-org/settings/actions/runners>.
 
 ### Self-hosted runner maintenance
 
@@ -303,13 +303,18 @@ stored at
 
 Official:
 
-* Guides for GitHub Actions: <https://docs.github.com/en/actions/guides>
-* Events that trigger workflows: <https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows>
-* About GitHub-hosted runners: <https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners>
-* About large runners: <https://docs.github.com/en/actions/using-github-hosted-runners/about-larger-runners/about-larger-runners>
-* GitHub Actions Runner application: <https://github.com/actions/runner>
-* GitHub Actions Runner Images with included software: <https://github.com/actions/runner-images>
+* Guides for GitHub Actions: <https://docs.github.com/en/actions/guides>.
+* Events that trigger workflows:
+  <https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows>.
+* About GitHub-hosted runners:
+  <https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners>.
+* About large runners:
+  <https://docs.github.com/en/actions/using-github-hosted-runners/about-larger-runners/about-larger-runners>.
+* GitHub Actions Runner application: <https://github.com/actions/runner>.
+* GitHub Actions Runner Images with included software:
+  <https://github.com/actions/runner-images>.
 
 Community:
 
-* A curated list of awesome things related to GitHub Actions: <https://github.com/sdras/awesome-actions>
+* A curated list of awesome things related to GitHub Actions:
+  <https://github.com/sdras/awesome-actions>.
