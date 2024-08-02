@@ -41,7 +41,11 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let results = (outs
     AnyShaped:$output
   );
-  let extraClassDeclaration = [{}];
+  let extraClassDeclaration = [{
+    bool hasTensorSemantics() {
+      return isa<RankedTensorType>(getOutput().getType());
+    }
+  }];
   let assemblyFormat = "$input `to` $layout attr-dict `:` type($input)";
   let hasVerifier = 1;
 }
