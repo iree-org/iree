@@ -77,6 +77,31 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   return TilingInfo{tilableOp, tileSizes, interchange};
 }
 
+/// Helper function to return the mapping attribute to use given the tile sizes
+static SmallVector<DeviceMappingAttrInterface>
+getMapping(MLIRContext *context, ArrayRef<OpFoldResult> tileSizes) {
+  SmallVector<DeviceMappingAttrInterface> mapping;
+  mapping.reserve(tileSizes.size());
+  for (auto tileSize : llvm::reverse(tileSizes)) {
+    if (isConstantIntValue(tileSize, 0)) {
+      continue;
+    }
+    uint64_t currSize = mapping.size();
+    switch (currSize) {
+    case 0:
+    case 1:
+    case 2:
+      mapping.push_back(IREE::Codegen::WorkgroupMappingAttr::get(
+          context, IREE::Codegen::symbolizeWorkgroupId(currSize).value()));
+      break;
+    default:
+      mapping.push_back(IREE::Codegen::WorkgroupMappingAttr::get(
+          context, IREE::Codegen::WorkgroupId::IdZ, currSize - 2));
+    }
+  }
+  return llvm::to_vector(llvm::reverse(mapping));
+}
+
 static SmallVector<int64_t> getStaticNumWorkgroups(RewriterBase &rewriter,
                                                    scf::ForallOp loop) {
   OpBuilder::InsertionGuard g(rewriter);
@@ -122,6 +147,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+
+  tilingOptions.setMapping(getMapping(context, tilingInfo->tileSizes));
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   tileAndFuseOptions.setTilingOptions(tilingOptions);

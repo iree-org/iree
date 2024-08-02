@@ -364,6 +364,25 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===----------------------------------------------------------------------===//
+// iree_codegen.workgroup_mapping
+//===----------------------------------------------------------------------===//
+
+WorkgroupMappingAttr WorkgroupMappingAttr::get(MLIRContext *context,
+                                               WorkgroupId id) {
+  return WorkgroupMappingAttr::get(context, id, /*delinearizedDim=*/0);
+}
+
+int64_t WorkgroupMappingAttr::getMappingId() const {
+  return static_cast<int64_t>(getId()) + getDelinearizedDim();
+}
+
+bool WorkgroupMappingAttr::isLinearMapping() const { return false; }
+
+int64_t WorkgroupMappingAttr::getRelativeIndex() const {
+  return getMappingId();
+}
+
+//===----------------------------------------------------------------------===//
 // Initialize attributes
 //===----------------------------------------------------------------------===//
 
