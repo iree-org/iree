@@ -82,8 +82,8 @@ rewriteStorageBufferSubspanOp(RewriterBase &rewriter,
       subspanOp.getLoc(), oldType.getNumElements()));
 
   auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp.getLoc(), newType, subspanOp.getSetAttr(),
-      subspanOp.getBindingAttr(), subspanOp.getDescriptorTypeAttr(),
+      subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
+      subspanOp.getSetAttr(), subspanOp.getBindingAttr(),
       subspanOp.getByteOffset(), dynamicDims, subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
 

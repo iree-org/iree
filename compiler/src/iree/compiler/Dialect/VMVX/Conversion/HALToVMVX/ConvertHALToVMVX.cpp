@@ -192,7 +192,7 @@ struct ConvertHALInterfaceConstantLoadOp
 
     // Index -> byte offset.
     auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
-        op.getLoc(), op.getIndex().getZExtValue());
+        op.getLoc(), op.getOrdinal().getZExtValue());
     auto elementSize =
         rewriter.createOrFold<IREE::Util::SizeOfOp>(op.getLoc(), resultType);
     auto byteOffset = rewriter.createOrFold<arith::MulIOp>(

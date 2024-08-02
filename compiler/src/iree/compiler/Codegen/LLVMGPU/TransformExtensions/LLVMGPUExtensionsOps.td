@@ -165,7 +165,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
       func.func @foo() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c1 : index
         scf.if %2 {
@@ -186,7 +186,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -266,7 +266,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -290,7 +290,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.

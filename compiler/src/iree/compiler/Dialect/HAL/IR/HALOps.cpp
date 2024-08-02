@@ -1769,20 +1769,33 @@ void ExecutableExportOrdinalOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.constant.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult InterfaceConstantLoadOp::verify() {
+  InterfaceConstantLoadOp op = *this;
+  auto layoutAttr = op.getLayout();
+  if (op.getOrdinal().getZExtValue() >= layoutAttr.getPushConstants()) {
+    return op.emitOpError("push constant ordinal out of bounds");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
 void InterfaceBindingSubspanOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
-    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
-    ValueRange dynamic_dims, IntegerAttr alignment,
+    OpBuilder &builder, OperationState &result, Type resultType,
+    IREE::HAL::PipelineLayoutAttr layout, APInt set, APInt binding,
+    Value byte_offset, ValueRange dynamic_dims, IntegerAttr alignment,
     std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
                                                          flags.value());
   }
-  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+  build(builder, result, resultType, layout, set, binding, byte_offset,
         dynamic_dims, alignment, descriptorAttr);
 }
 
@@ -1796,8 +1809,50 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
              << " associated dimension SSA values";
     }
   }
-
+  int64_t set = op.getSet().getSExtValue();
+  int64_t binding = op.getBinding().getSExtValue();
+  bool foundSet = false;
+  bool foundBinding = false;
+  for (auto setLayoutAttr : op.getLayout().getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == set) {
+      foundSet = true;
+      for (auto bindingAttr : setLayoutAttr.getBindings()) {
+        if (bindingAttr.getOrdinal() == binding) {
+          foundBinding = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!foundSet) {
+    return op.emitOpError("set ordinal ")
+           << set << " not present in pipeline layout";
+  } else if (!foundBinding) {
+    return op.emitOpError("binding ordinal ")
+           << binding << " not present in descriptor set layout";
+  }
   return success();
+}
+
+IREE::HAL::DescriptorSetBindingAttr
+InterfaceBindingSubspanOp::getDescriptorSetBindingAttr() {
+  int64_t set = getSet().getSExtValue();
+  int64_t binding = getBinding().getSExtValue();
+  for (auto setLayoutAttr : getLayout().getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == set) {
+      for (auto bindingAttr : setLayoutAttr.getBindings()) {
+        if (bindingAttr.getOrdinal() == binding) {
+          return bindingAttr;
+        }
+      }
+    }
+  }
+  return {};
+}
+
+IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
+  auto bindingAttr = getDescriptorSetBindingAttr();
+  return bindingAttr.getType();
 }
 
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {

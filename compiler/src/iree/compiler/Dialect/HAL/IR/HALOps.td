@@ -3065,7 +3065,8 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   }];
 
   let arguments = (ins
-    HAL_HostSizeAttr:$index,
+    HAL_PipelineLayoutAttr:$layout,
+    HAL_HostSizeAttr:$ordinal,
     OptionalAttr<IndexAttr>:$alignment,
     OptionalAttr<ArrayAttr>:$values
   );
@@ -3074,11 +3075,14 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   );
 
   let assemblyFormat = [{
-    `` `[` $index `]`
+    `layout` `(` $layout `)`
+    `ordinal` `(` $ordinal `)`
     (`alignment` `(` $alignment^ `)`)?
     (`values` `(` $values^ `)`)?
     attr-dict `:` type($result)
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
@@ -3097,9 +3101,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   }];
 
   let arguments = (ins
+    HAL_PipelineLayoutAttr:$layout,
     IndexAttr:$set,
     IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$descriptor_type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment,
@@ -3110,9 +3114,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   );
 
   let assemblyFormat = [{
+    `layout` `(` $layout `)`
     `set` `(` $set `)`
     `binding` `(` $binding `)`
-    `type` `(` custom<DescriptorType>($descriptor_type) `)`
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
     (`flags` `(` $descriptor_flags^ `)`)?
@@ -3122,9 +3126,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
+      "IREE::HAL::PipelineLayoutAttr":$layout,
       "APInt":$set,
       "APInt":$binding,
-      "IREE::HAL::DescriptorType":$descriptor_type,
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
       "IntegerAttr":$alignment,
@@ -3137,6 +3141,12 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
+
+    // Returns the descriptor set binding metadata for the given set/binding.
+    IREE::HAL::DescriptorSetBindingAttr getDescriptorSetBindingAttr();
+
+    // Returns the type of the descriptor this binding references.
+    IREE::HAL::DescriptorType getDescriptorType();
 
     // Returns the alignment of the base buffer pointer (before offset).
     llvm::MaybeAlign getBaseAlignment();

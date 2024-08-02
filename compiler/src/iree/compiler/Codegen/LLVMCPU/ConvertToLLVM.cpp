@@ -279,7 +279,7 @@ struct ConvertHALInterfaceConstantLoadOp
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp,
                   IREE::HAL::InterfaceConstantLoadOpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
-    int64_t index = loadOp.getIndex().getZExtValue();
+    int64_t index = loadOp.getOrdinal().getZExtValue();
     auto resultType =
         typeConverter->convertType(loadOp->getResult(0).getType());
     rewriter.replaceOp(

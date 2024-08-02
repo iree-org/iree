@@ -154,7 +154,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     // `hal.interface.binding.subspan` is
     //
     // ```mlir
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%offset)
+    //  hal.interface.binding.subspan layout(#pipeline_layout) set(0)
+    //  binding(1) offset(%offset)
     //      : memref<?x?xf32, strided<[?, 1], offset: 64]>>{%s0, %s1}
     // ```
     //
@@ -164,7 +165,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     //  #map = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
     //  %linearSize = affine.apply #map()[%offset, %s0, %s1]
     //  %c0 = arith.constant 0 : index
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%c0)
+    //  hal.interface.binding.subspan layout(#pipeline_layout) set(0)
+    //  binding(1) offset(%c0)
     //      : memref<?xf32>{%linearSize}
     // ```
     //
@@ -193,8 +195,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto linearInterfaceBinding =
         rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, newBufferType, binding.getSetAttr(), binding.getBindingAttr(),
-            binding.getDescriptorTypeAttr(), zero, dynamicLinearShape,
+            loc, newBufferType, binding.getLayoutAttr(), binding.getSetAttr(),
+            binding.getBindingAttr(), zero, dynamicLinearShape,
             binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
 
     SmallVector<Value> results;

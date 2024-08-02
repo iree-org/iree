@@ -283,8 +283,8 @@ struct FlattenBindingSubspan final
 
     auto newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), newOffset, dynamicShape,
+        subspanOp.getLoc(), newType, subspanOp.getLayout(), subspanOp.getSet(),
+        subspanOp.getBinding(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
     Value replacement = newOp;
