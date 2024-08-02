@@ -504,9 +504,6 @@ struct iree_hal_cuda_pending_queue_actions_t {
   bool exit_requested IREE_GUARDED_BY(action_mutex);
 };
 
-static const iree_hal_resource_vtable_t
-    iree_hal_cuda_pending_queue_actions_vtable;
-
 iree_status_t iree_hal_cuda_pending_queue_actions_create(
     const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
     CUcontext context, iree_arena_block_pool_t* block_pool,
