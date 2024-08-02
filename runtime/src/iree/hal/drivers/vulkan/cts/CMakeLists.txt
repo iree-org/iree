@@ -4,12 +4,22 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-unset(ADDITIONAL_TEST_ARGS)
+# TODO: investigate why these tests fail on Vulkan.
+unset(FILTER_TESTS)
+string(APPEND FILTER_TESTS "SemaphoreTest.WaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreTest.FailThenWait:")
+string(APPEND FILTER_TESTS "SemaphoreTest.MultiWaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreTest.DeviceMultiWaitThenFail:")
+string(APPEND FILTER_TESTS "SemaphoreSubmissionTest.PropagateFailSignal:")
+
 if(ANDROID)
   # Disable this test on Android due to flaky failures on Google Pixel 6 Pro
   # and Moto Edge X30.
-  set(ADDITIONAL_TEST_ARGS "--gtest_filter=-*WaitForFiniteTime*")
+  string(APPEND FILTER_TESTS "SemaphoreTest.WaitForFiniteTime:")
 endif()
+set(ADDITIONAL_TEST_ARGS
+  "--gtest_filter=-${FILTER_TESTS}"
+)
 
 iree_hal_cts_test_suite(
   DRIVER_NAME

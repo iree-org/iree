@@ -8,8 +8,8 @@
 
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/base/status.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
-#include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/timepoint_pool.h"
 #include "iree/hal/utils/semaphore_base.h"
 
@@ -187,6 +187,13 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
   // Notify timepoints - note that this must happen outside the lock.
   iree_hal_semaphore_notify(&semaphore->base, IREE_HAL_SEMAPHORE_FAILURE_VALUE,
                             status_code);
+
+  // Advance the pending queue actions if possible. This also must happen
+  // outside the lock to avoid nesting.
+  status = iree_hal_hip_pending_queue_actions_issue(
+      semaphore->pending_queue_actions);
+  iree_status_ignore(status);
+
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -316,6 +323,14 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     return iree_ok_status();
   }
 
+  iree_slim_mutex_lock(&semaphore->mutex);
+  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    iree_slim_mutex_unlock(&semaphore->mutex);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_ABORTED);
+  }
+  iree_slim_mutex_unlock(&semaphore->mutex);
+
   // Wait until the timepoint resolves.
   // If satisfied the timepoint is automatically cleaned up and we are done. If
   // the deadline is reached before satisfied then we have to clean it up.
@@ -326,6 +341,17 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint->base);
   }
   iree_hal_hip_timepoint_pool_release(semaphore->timepoint_pool, 1, &timepoint);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_slim_mutex_lock(&semaphore->mutex);
+  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    status = iree_make_status(IREE_STATUS_ABORTED);
+  }
+  iree_slim_mutex_unlock(&semaphore->mutex);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -405,6 +431,23 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
   }
   iree_wait_set_free(wait_set);
   iree_arena_deinitialize(&arena);
+
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    iree_hal_hip_semaphore_t* semaphore =
+        iree_hal_hip_semaphore_cast(semaphore_list.semaphores[i]);
+    iree_slim_mutex_lock(&semaphore->mutex);
+    if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+      iree_slim_mutex_unlock(&semaphore->mutex);
+      status = iree_make_status(IREE_STATUS_ABORTED);
+      break;
+    }
+    iree_slim_mutex_unlock(&semaphore->mutex);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
