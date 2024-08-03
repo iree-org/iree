@@ -85,6 +85,27 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
   op.erase();
 }
 
+// Adds set 3 with the emulated push descriptor binding, if needed.
+static IREE::HAL::PipelineLayoutAttr
+addSet3IfNeeded(IREE::HAL::PipelineLayoutAttr originalAttr) {
+  for (auto setLayoutAttr : originalAttr.getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == 3) {
+      return originalAttr;
+    }
+  }
+  SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs(
+      originalAttr.getSetLayouts());
+  SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
+  bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
+      originalAttr.getContext(), 0, IREE::HAL::DescriptorType::UniformBuffer,
+      std::nullopt));
+  setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
+      originalAttr.getContext(), 3, bindingAttrs, std::nullopt));
+  return IREE::HAL::PipelineLayoutAttr::get(originalAttr.getContext(),
+                                            originalAttr.getPushConstants(),
+                                            setLayoutAttrs);
+}
+
 class WGSLReplacePushConstantsPass
     : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -109,9 +130,9 @@ class WGSLReplacePushConstantsPass
     // individual push constants with `tensor.extract`.
 
     // Get the pipeline layout from the first constant load. It should be
-    // uniform across all constants.
+    // uniform across all constants. Add set 3 so we can use it.
     IREE::HAL::PipelineLayoutAttr layoutAttr =
-        constantLoadOps.front().getLayout();
+        addSet3IfNeeded(constantLoadOps.front().getLayout());
 
     // Inspect the alignment values. These are just hints, so if all are equal
     // then use the value, otherwise drop the alignment hint.
