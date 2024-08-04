@@ -111,6 +111,9 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, Attribute config);
 
+/// Adds an attribute (`root_op_info`) to `op` to mark it as the root op.
+void setRootOpInfo(Operation *op, Attribute info);
+
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info on the entry point op for the common case of specifying
 /// tile sizes to use for the operation, and pass pipeline to use for the
@@ -122,11 +125,17 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+    DictionaryAttr pipelineConfig = DictionaryAttr(),
+    std::optional<StringAttr> rootOpInfo = std::nullopt) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
   setLoweringConfig(op, config);
+  rootOpInfo = mlir::StringAttr::get(
+      context, "this-is-root-op"); // TODO: add more info for tuner
+  if (rootOpInfo.has_value()) {
+    setRootOpInfo(op, rootOpInfo.value());
+  }
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn.getContext(), passPipeline, SymbolRefAttr(), workgroupSize,
       subgroupSize, pipelineConfig);
