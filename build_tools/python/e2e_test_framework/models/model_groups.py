@@ -137,6 +137,9 @@ X86_64_BENCHMARK_CONFIG_LARGE = [
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES[32], threads=[30]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=jax_models.GEMMA_2B_IT_GREEDY_FP32_JAX_1024XI32_256I32, threads=[30]
+    ),
 ]
 
 # Microkernels.

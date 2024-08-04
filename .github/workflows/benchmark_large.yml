@@ -23,6 +23,7 @@ on:
         # Please keep this default value in sync with the jobs.build_e2e_test_artifacts.with.shard-count field below
         default: a2-highgpu-1g=1,c2-standard-60=2,default=1
         type: string
+  pull_request:
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
