@@ -1855,6 +1855,12 @@ IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
   return bindingAttr.getType();
 }
 
+int64_t InterfaceBindingSubspanOp::getFlatBindingIndex() {
+  int64_t set = getSet().getSExtValue();
+  int64_t binding = getBinding().getSExtValue();
+  return getLayout().getFlatBindingIndex(set, binding);
+}
+
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {
   if (auto baseAlignmentInt = getAlignment()) {
     return llvm::MaybeAlign(baseAlignmentInt.value().getZExtValue());

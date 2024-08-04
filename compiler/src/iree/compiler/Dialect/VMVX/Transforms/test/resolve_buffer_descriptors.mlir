@@ -77,7 +77,7 @@ func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index,
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
@@ -100,7 +100,7 @@ func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer,
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[INDEX_SIZE:.+]] = util.sizeof index
 // CHECK-DAG:   %[[OFFSET:.+]] = affine.apply #map()[%arg0, %[[INDEX_SIZE]]]
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
@@ -119,7 +119,7 @@ func.func @resolve_binding_subspan_dyn_dims(%arg0 : index, %arg1 : index) -> (!u
 }
 //     CHECK: func @resolve_binding_subspan_dyn_dims(
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %{{.+}}, %arg0, %arg1, %arg1, %[[C1]]
 
 // -----

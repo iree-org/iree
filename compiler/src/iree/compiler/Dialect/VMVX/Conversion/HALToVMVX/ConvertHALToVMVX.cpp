@@ -217,12 +217,6 @@ struct ConvertGetRawInterfaceBindingBufferOp
     assert(bindingsArg && isa<IREE::Util::ListType>(bindingsArg.getType()) &&
            "entry point not conforming to requirements");
 
-    // TODO(benvanik): compact the indices - the bindings we have on the ABI
-    // interface are dense.
-    if (op.getSet().getZExtValue() != 0) {
-      return op.emitOpError() << "sparse binding sets not yet implemented";
-    }
-
     IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
                            .getElementType();
@@ -230,7 +224,9 @@ struct ConvertGetRawInterfaceBindingBufferOp
         .replaceOpWithNewOp<IREE::Util::ListGetOp>(
             op, bindingType, bindingsArg,
             rewriter.createOrFold<arith::ConstantIndexOp>(
-                op.getLoc(), op.getBinding().getZExtValue()))
+                op.getLoc(), op.getLayout().getFlatBindingIndex(
+                                 op.getSet().getSExtValue(),
+                                 op.getBinding().getSExtValue())))
         .getResult();
     return success();
   }
@@ -250,22 +246,15 @@ struct ConvertHALInterfaceBindingSubspanOp
     assert(bindingsArg && isa<IREE::Util::ListType>(bindingsArg.getType()) &&
            "entry point not conforming to requirements");
 
-    // TODO(benvanik): compact the indices - the bindings we have on the ABI
-    // interface are dense.
-    if (op.getSet().getZExtValue() != 0) {
-      return op.emitOpError() << "sparse binding sets not yet implemented";
-    }
-
     IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
                            .getElementType();
-    auto sourceBuffer =
-        rewriter
-            .create<IREE::Util::ListGetOp>(
-                op.getLoc(), bindingType, bindingsArg,
-                rewriter.createOrFold<arith::ConstantIndexOp>(
-                    op.getLoc(), op.getBinding().getZExtValue()))
-            .getResult();
+    auto sourceBuffer = rewriter
+                            .create<IREE::Util::ListGetOp>(
+                                op.getLoc(), bindingType, bindingsArg,
+                                rewriter.createOrFold<arith::ConstantIndexOp>(
+                                    op.getLoc(), op.getFlatBindingIndex()))
+                            .getResult();
 
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
       // Offsetted binding: replace with a BufferSubspanOp.

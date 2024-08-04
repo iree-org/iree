@@ -647,7 +647,7 @@ def OpGroupBufferOps : OpDocGroup {
 
 let opDocGroup = OpGroupBufferOps in {
 
-def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
+def HAL_BufferAssertOp : HAL_Op<"buffer.assert"> {
   let summary = [{buffer compatibility assertion}];
   let description = [{
     Asserts that the buffer is compatible with the given allocator and usage.
@@ -2791,7 +2791,7 @@ def OpGroupInstrumentOps : OpDocGroup {
 
 let opDocGroup = OpGroupInstrumentOps in {
 
-def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup", []> {
+def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup"> {
   let summary = [{emits a dispatch workgroup instrumentation event}];
   let description = [{
     Emits an `iree_instrument_dispatch_workgroup_t` event into the
@@ -2825,7 +2825,7 @@ def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup", []> {
   }];
 }
 
-def HAL_InstrumentPrintOp : HAL_Op<"instrument.print", []> {
+def HAL_InstrumentPrintOp : HAL_Op<"instrument.print"> {
   let summary = [{emits a human-readable printf-style string event}];
   let description = [{
     Formats a string using a limited subset of printf format specifiers and the
@@ -2850,8 +2850,8 @@ def HAL_InstrumentPrintOp : HAL_Op<"instrument.print", []> {
 }
 
 def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
-    AllTypesMatch<["operand", "result"]>,
-  ]> {
+  AllTypesMatch<["operand", "result"]>,
+]> {
   let summary = [{emits a scalar value instrumentation event}];
   let description = [{
     Emits a workgroup-specific typed value with the given workgroup-relative
@@ -2878,8 +2878,8 @@ def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
 }
 
 def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
-    AllTypesMatch<["loadValue", "result"]>,
-  ]> {
+  AllTypesMatch<["loadValue", "result"]>,
+]> {
   let summary = [{emits a memory load instrumentation event}];
   let description = [{
     Emits a workgroup-specific memory load event indicating that a number of
@@ -2905,8 +2905,8 @@ def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
 }
 
 def HAL_InstrumentMemoryStoreOp : HAL_PureOp<"instrument.memory.store", [
-    AllTypesMatch<["storeValue", "result"]>,
-  ]> {
+  AllTypesMatch<["storeValue", "result"]>,
+]> {
   let summary = [{emits a memory store instrumentation event}];
   let description = [{
     Emits a workgroup-specific memory store event indicating that a number of
@@ -2945,8 +2945,8 @@ def OpGroupInterfaceOps : OpDocGroup {
 let opDocGroup = OpGroupInterfaceOps in {
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
     The global workgroup ID of the current tile in the range of
@@ -2978,8 +2978,8 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
 }
 
 def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
@@ -3012,8 +3012,8 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
 }
 
 def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
     The number of local invocations within the current workgroup along each
@@ -3086,9 +3086,9 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
-    AttrSizedOperandSegments,
-    Util_ShapeAwareOp,
-  ]> {
+  AttrSizedOperandSegments,
+  Util_ShapeAwareOp,
+]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
     Returns a subspan of an interface binding storage buffer in a generic type.
@@ -3148,6 +3148,11 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     // Returns the type of the descriptor this binding references.
     IREE::HAL::DescriptorType getDescriptorType();
 
+    // Returns the binding index in a flattened list of all sets and bindings.
+    // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
+    // a query for set 1 binding 0 would return 4.
+    int64_t getFlatBindingIndex();
+
     // Returns the alignment of the base buffer pointer (before offset).
     llvm::MaybeAlign getBaseAlignment();
 
@@ -3175,8 +3180,8 @@ def OpGroupPipelineLayoutOps : OpDocGroup {
 let opDocGroup = OpGroupPipelineLayoutOps in {
 
 def HAL_PipelineLayoutCreateOp : HAL_PureOp<"pipeline_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{creates an pipeline layout}];
   let description = [{
     Creates an pipeline layout from the given descriptor sets and push
