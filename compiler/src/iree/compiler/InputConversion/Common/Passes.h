@@ -49,6 +49,8 @@ createLinalgQuantizedConvToConvPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLinalgQuantizedMatmulToMatmulPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createTensorOpsToLinalgPass();
+
 
 // Type conversion.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass();

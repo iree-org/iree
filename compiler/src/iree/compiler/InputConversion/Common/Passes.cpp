@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -25,6 +26,7 @@ void buildCommonInputConversionPassPipeline(
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
+  passManager.addNestedPass<IREE::Util::FuncOp>(createTensorOpsToLinalgPass());
 
   // TODO: this pass should either live in InputConversion or be run in flow -
   // it's a mistake that it's here.

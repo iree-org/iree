@@ -48,6 +48,7 @@ iree_cc_library(
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
+    "TensorOpsToLinalg.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders
