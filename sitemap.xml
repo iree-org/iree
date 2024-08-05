@@ -186,6 +186,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/developers/general/github-actions/</loc>
+         <lastmod>2024-08-05</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/general/release-management/</loc>
          <lastmod>2024-08-05</lastmod>
          <changefreq>daily</changefreq>

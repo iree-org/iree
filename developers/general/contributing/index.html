@@ -2094,6 +2094,8 @@
       
         
       
+        
+      
     
     
       
@@ -2384,15 +2386,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#self-hosted-runners" class="md-nav__link">
-    <span class="md-ellipsis">
-      Self-hosted runners
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#ci-behavior-manipulation" class="md-nav__link">
     <span class="md-ellipsis">
       CI behavior manipulation
@@ -2457,6 +2450,29 @@
   
   <span class="md-ellipsis">
     Developer tips and tricks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm1.5 0a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm10.28-1.72-4.5 4.5a.75.75 0 0 1-1.06 0l-2-2a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l1.47 1.47 3.97-3.97a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"/></svg>
+  
+  <span class="md-ellipsis">
+    GitHub Actions
   </span>
   
 
@@ -4055,15 +4071,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#self-hosted-runners" class="md-nav__link">
-    <span class="md-ellipsis">
-      Self-hosted runners
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#ci-behavior-manipulation" class="md-nav__link">
     <span class="md-ellipsis">
       CI behavior manipulation
@@ -4419,19 +4426,8 @@ they <a href="https://github.com/iree-org/iree/branches/stale">appear to be stal
   other, so the project may configure these as optional</li>
 </ul>
 <h3 id="continuous-integration-ci"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg></span> Continuous integration (CI)<a class="headerlink" href="#continuous-integration-ci" title="Permanent link">link</a></h3>
-<p>IREE uses <a href="https://docs.github.com/en/actions">GitHub Actions</a> for CI. The
-primary CI is configured in the
-<a href="https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml">ci.yml workflow file</a>.</p>
-<h4 id="self-hosted-runners">Self-hosted runners<a class="headerlink" href="#self-hosted-runners" title="Permanent link">link</a></h4>
-<p>In addition to the default runners GitHub provides, IREE uses
-<a href="https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners">self-hosted runners</a>
-to run many of its workflow jobs. These enable access to additional compute and
-custom configurations such as accelerators.</p>
-<ul>
-<li>Configuration for GCP runners is stored at
-<a href="https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/"><code>build_tools/github_actions/runner/</code></a></li>
-<li>Configuration for other runners is done manually as needed</li>
-</ul>
+<p>IREE uses <a href="https://docs.github.com/en/actions">GitHub Actions</a> for CI. See
+our <a href="../github-actions/">GitHub Actions documentation</a> for full details.</p>
 <h4 id="ci-behavior-manipulation">CI behavior manipulation<a class="headerlink" href="#ci-behavior-manipulation" title="Permanent link">link</a></h4>
 <p>The setup step of the CI determines which CI jobs to run. This is controlled by
 the

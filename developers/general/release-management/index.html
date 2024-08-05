@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://iree.dev/developers/general/release-management/">
       
       
-        <link rel="prev" href="../developer-tips/">
+        <link rel="prev" href="../github-actions/">
       
       
         <link rel="next" href="../testing-guide/">
@@ -2094,6 +2094,8 @@
       
         
       
+        
+      
     
     
       
@@ -2203,6 +2205,29 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm1.5 0a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm10.28-1.72-4.5 4.5a.75.75 0 0 1-1.06 0l-2-2a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l1.47 1.47 3.97-3.97a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"/></svg>
+  
+  <span class="md-ellipsis">
+    GitHub Actions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2254,6 +2279,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#release-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Release status
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#picking-a-candidate-to-promote" class="md-nav__link">
@@ -3651,6 +3685,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#release-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Release status
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#picking-a-candidate-to-promote" class="md-nav__link">
     <span class="md-ellipsis">
       Picking a candidate to promote
@@ -3694,13 +3737,40 @@
 <h1 id="release-management">Release management<a class="headerlink" href="#release-management" title="Permanent link">link</a></h1>
 <p>IREE cuts automated releases via a workflow that is
 <a href="https://github.com/iree-org/iree/blob/main/.github/workflows/schedule_candidate_release.yml">triggered daily</a>.
-The only constraint placed on the commit that is released is that it has passed
-all CI checks. These are published on GitHub with the "pre-release" status. For
-debugging this process, see the
-<a href="../../debugging/releases/">Release debugging playbook</a>.</p>
+The only constraint placed on the commit that is released is that it has
+<a href="https://github.com/iree-org/iree/blob/main/build_tools/scripts/get_latest_green.sh">passed all required CI checks</a>.
+These are published on GitHub with the "pre-release" status. For debugging this
+process, see the <a href="../../debugging/releases/">Release debugging playbook</a>.</p>
 <p>We periodically promote one of these candidates to a "stable" release by
 removing the "pre-release" status. This makes it show up as a "latest" release
 on GitHub. We also push the Python packages for this release to PyPI.</p>
+<h2 id="release-status">Release status<a class="headerlink" href="#release-status" title="Permanent link">link</a></h2>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Release status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub release (stable)</td>
+<td><a href="https://github.com/iree-org/iree/releases/latest"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/iree-org/iree" /></a></td>
+</tr>
+<tr>
+<td>GitHub release (nightly)</td>
+<td><a href="https://github.com/iree-org/iree/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/iree-org/iree?include_prereleases" /></a></td>
+</tr>
+<tr>
+<td>Python iree-compiler</td>
+<td><a href="https://badge.fury.io/py/iree-compiler"><img alt="PyPI version" src="https://badge.fury.io/py/iree-compiler.svg" /></a></td>
+</tr>
+<tr>
+<td>Python iree-runtime</td>
+<td><a href="https://badge.fury.io/py/iree-runtime"><img alt="PyPI version" src="https://badge.fury.io/py/iree-runtime.svg" /></a></td>
+</tr>
+</tbody>
+</table>
 <h2 id="picking-a-candidate-to-promote">Picking a candidate to promote<a class="headerlink" href="#picking-a-candidate-to-promote" title="Permanent link">link</a></h2>
 <p>When selecting a candidate we use the following criteria:</p>
 <ol>
