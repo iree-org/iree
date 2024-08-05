@@ -187,6 +187,7 @@ nav:
           - "developers/general/contributing.md"
           - "developers/general/developer-overview.md"
           - "developers/general/developer-tips.md"
+          - "developers/general/github-actions.md"
           - "developers/general/release-management.md"
           - "developers/general/testing-guide.md"
       - "Building":
