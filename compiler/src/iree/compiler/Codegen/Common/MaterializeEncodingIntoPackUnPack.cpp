@@ -882,11 +882,24 @@ protected:
 } // namespace
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn) {
+  MLIRContext *context = patterns.getContext();
+  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
+                  MaterializeDPSOperation<linalg::GenericOp>,
+                  MaterializeOperation<tensor::EmptyOp>,
+                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
+                  UnsetEncodingOpToUnPackOpConversion>(
+      context, typeConverter, materializeEncodingValueFn);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+}
+
+void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
-
   typeConverter.addConversion(
       [&typeConverter](IREE::Flow::DispatchTensorType dispatchTensorType) {
         Type boundType = dispatchTensorType.getBoundType();
@@ -908,20 +921,10 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
 
-  // Add all patterns for converting from encoded type to the materialized
-  // type.
-  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
-                  UnsetEncodingOpToUnPackOpConversion>(
-      patterns.getContext(), typeConverter, materializeEncodingValueFn);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-
   patterns.insert<MaterializeFlowDispatchTensorLoadOp,
                   MaterializeFlowDispatchTensorStoreOp,
                   MaterializeInterfaceBindingEncoding>(
       context, typeConverter, materializeEncodingValueFn);
-}
+};
 
 } // namespace mlir::iree_compiler
