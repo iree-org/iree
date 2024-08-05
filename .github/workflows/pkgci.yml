@@ -8,14 +8,40 @@ name: PkgCI
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
-      # Experimental branches can also get packages and tests automatically.
-      - exppkg-*
       # Short term feature branches:
       - sdxl
+    paths:
+      - ".github/workflows/pkgci**"
+      - ".github/workflows/setup.yml"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
+  pull_request:
+    branches:
+      - main
+      # Short term feature branches:
+      - sdxl
+    paths:
+      - ".github/workflows/pkgci**"
+      - ".github/workflows/setup.yml"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
