@@ -115,15 +115,15 @@ hal.executable public @main {
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_T:.+]] = vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
+//       CHECK:     vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
 //       CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
 //       CHECK:     vector.transfer_write %[[RHS_RD]]
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[RHS_T:.+]] = vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
-//       CHECK:     %[[MM:.+]] = iree_gpu.multi_mma %[[LHS_T]], %[[RHS_T]]
-//       CHECK:     scf.yield %[[MM]]
+//       CHECK:     vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
+// CHECK-COUNT-4:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//       CHECK:     scf.yield
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:   vector.transfer_write %[[LOOP_T]], %[[B2]]
 
@@ -186,32 +186,31 @@ hal.executable private @main {
   }
 }
 
-// CHECK-LABEL: func @conv_igemm_im2col
-//   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
-//   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
-//   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
-//   CHECK-DAG:   memref.alloc() : memref<1x64x32xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<32x64xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x2x2x4x1xf32>)
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
-//       CHECK:     vector.transfer_write %[[LHS_RD]]
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
-//       CHECK:     %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<2x1x2x4xf16> to vector<1x2x1x2x4xf16>
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_T:.+]] = vector.transpose %[[LHS_MM1]], [0, 1, 3, 2, 4] : vector<1x2x1x2x4xf16> to vector<1x2x2x1x4xf16>
-//       CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
-//       CHECK:     vector.transfer_write %[[RHS_RD]]
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x2x1xf16>
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[RHS_T:.+]] = vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x2x1xf16> to vector<2x2x1x4xf16>
-//       CHECK:     %[[MM:.+]] = iree_gpu.multi_mma %[[LHS_T]], %[[RHS_T]]
-//       CHECK:     scf.yield %[[MM]]
-//       CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 3, 2, 4] : vector<1x2x2x4x1xf32> to vector<1x2x4x2x1xf32>
-//       CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<2x4x2x1xf32> from vector<1x2x4x2x1xf32>
-//       CHECK:   vector.transfer_write %[[EXTRACT]], %[[B2]]
+//   CHECK-LABEL: func @conv_igemm_im2col
+//     CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
+//     CHECK-DAG:   memref.alloc() : memref<1x64x32xf16, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   memref.alloc() : memref<32x64xf16, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
+//     CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//         CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x2x2x4x1xf32>)
+//         CHECK:     gpu.barrier
+//         CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
+//         CHECK:     vector.transfer_write %[[LHS_RD]]
+//         CHECK:     gpu.barrier
+//         CHECK:     %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
+//         CHECK:     %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<2x1x2x4xf16> to vector<1x2x1x2x4xf16>
+//         CHECK:     gpu.barrier
+//         CHECK:     vector.transpose %[[LHS_MM1]], [0, 1, 3, 2, 4] : vector<1x2x1x2x4xf16> to vector<1x2x2x1x4xf16>
+//         CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
+//         CHECK:     vector.transfer_write %[[RHS_RD]]
+//         CHECK:     gpu.barrier
+//         CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x2x1xf16>
+//         CHECK:     gpu.barrier
+//         CHECK:     vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x2x1xf16> to vector<2x2x1x4xf16>
+// CHECK-COUNT-4:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//         CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 3, 2, 4] : vector<1x2x2x4x1xf32> to vector<1x2x4x2x1xf32>
+//         CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<2x4x2x1xf32> from vector<1x2x4x2x1xf32>
+//         CHECK:   vector.transfer_write %[[EXTRACT]], %[[B2]]
