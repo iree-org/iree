@@ -23,10 +23,10 @@ namespace {
 /// Example:
 ///
 /// ```mlir
-///   %0 = tensor.pad %0 low[0, 1] high[0, 2] {
+///   %1 = tensor.pad %0 low[0, 1] high[0, 2] {
 ///       tensor.yield %val
 ///     } : tensor<1x2xf32> to tensor<2x5xf32>
-///   %res = tensor.pad %0 low[0, 2] high[3, 0] {
+///   %res = tensor.pad %1 low[0, 2] high[3, 0] {
 ///       tensor.yield %val
 ///     } : tensor<1x5xf32> to tensor<5x7xf32>
 /// ```
@@ -34,7 +34,7 @@ namespace {
 /// folds into:
 ///
 /// ```mlir
-///   %res = tensor.pad %-1 low[0, 3] high[3, 2] {
+///   %res = tensor.pad %0 low[0, 3] high[3, 2] {
 ///       tensor.yield %val
 ///     } : tensor<1x2xf32> to tensor<5x7xf32>
 /// ```
@@ -50,8 +50,10 @@ struct FoldConsecutiveConstantPadding : public OpRewritePattern<tensor::PadOp> {
       return failure();
     }
     auto producerPad = padOp.getSource().getDefiningOp<tensor::PadOp>();
-    if (!producerPad || producerPad.getNofold())
-      return failure();
+    if (!producerPad || producerPad.getNofold()) {
+      return rewriter.notifyMatchFailure(
+          padOp, "producer is not a foldable tensor.pad op");
+    }
 
     // Fail if the tensor::PadOps padding values do not match.
     Value consumerPadValue = padOp.getConstantPaddingValue();
