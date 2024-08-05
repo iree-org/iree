@@ -16,8 +16,8 @@ hal.executable @scalar_dispatch {
         %c0 = arith.constant 0 : index
         %c6364136223846793005_i64 = arith.constant 6364136223846793005 : i64
         %c1442695040888963407_i64 = arith.constant 1442695040888963407 : i64
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<i64>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<i64>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i64>> -> tensor<i64>
         %extracted = tensor.extract %2[] : tensor<i64>
         %3 = arith.muli %extracted, %c6364136223846793005_i64 : i64
@@ -32,8 +32,8 @@ hal.executable @scalar_dispatch {
 
 // CHECK-LABEL: func.func @scalar_dispatch()
 //  CHECK-SAME: translation_info = #iree_codegen.translation_info<LLVMGPUBaseLowering workgroup_size = [1, 1, 1]>
-//       CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//       CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//       CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //       CHECK:   memref.load %[[SPAN0]][] : memref<i64, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   arith.muli {{.+}} : i64
 //       CHECK:   arith.addi {{.+}} : i64

@@ -18,10 +18,10 @@ hal.executable @i4_dequant {
     builtin.module {
       func.func @i4_dequant() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072x128xi4>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<131072x128xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072x128xi4>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<131072xf32>>
+        %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<131072x128xf32>>
         %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [131072, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<131072x128xi4>> -> tensor<131072x128xi4>
         %5 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [131072], strides = [1] : !flow.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [131072], strides = [1] : !flow.dispatch.tensor<readonly:tensor<131072xf32>> -> tensor<131072xf32>

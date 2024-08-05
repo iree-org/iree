@@ -5,7 +5,8 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<4, storage_buffer>
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
   ]>,
   #hal.descriptor_set.layout<1, bindings = [
     #hal.descriptor_set.binding<2, storage_buffer>
@@ -17,9 +18,9 @@ hal.executable @abs_ex_dispatch_0 {
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) flags(ReadOnly) : memref<16xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<16xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) flags(ReadOnly) : memref<16xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -50,7 +51,7 @@ hal.executable @abs_ex_dispatch_0 {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<4, storage_buffer>
+    #hal.descriptor_set.binding<1, storage_buffer>
   ]>,
   #hal.descriptor_set.layout<1, bindings = [
     #hal.descriptor_set.binding<2, storage_buffer>
@@ -62,9 +63,9 @@ hal.executable @abs_ex_dispatch_0 {
     builtin.module {
       func.func @reduction_maximum() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) :
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) :
             memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x64xf32,
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x64x64xf32,
             strided<[4096, 64, 1], offset: ?>>
       %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
       %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32
@@ -114,8 +115,8 @@ hal.executable @masked_load_store {
         %c0 = arith.constant 0 : index
         %idx = gpu.thread_id x
         %pass_thru = arith.constant dense<0.000000e+00> : vector<1xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xf32, #gpu.address_space<global>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<64xf32, #gpu.address_space<global>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xf32, #gpu.address_space<global>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<64xf32, #gpu.address_space<global>>
         %mask = vector.create_mask %idx : vector<1xi1>
         %ld = vector.maskedload %0[%idx], %mask, %pass_thru : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32> into vector<1xf32>
         vector.maskedstore %1[%idx], %mask, %ld : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32>

@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXTypes.h"
 #include "mlir/IR/Attributes.h"

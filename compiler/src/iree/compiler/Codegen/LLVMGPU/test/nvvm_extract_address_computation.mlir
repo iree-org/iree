@@ -85,9 +85,9 @@ hal.executable private @matmul_dispatch_0 {
       func.func @matmul_dispatch_0_matmul_2560x2560x2560() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2560x2560xf16>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2560x2560xf16>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2560, 2560], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>> -> tensor<2560x2560xf16>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2560, 2560], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2560x2560xf16>> -> tensor<2560x2560xf16>
         %5 = tensor.empty() : tensor<2560x2560xf16>
