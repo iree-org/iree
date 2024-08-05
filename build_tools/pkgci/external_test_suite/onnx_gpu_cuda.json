@@ -10,7 +10,7 @@
   "skip_compile_tests": [
     "onnx/node/generated/test_dequantizelinear",
     "onnx/node/generated/test_group_normalization_example_expanded",
-    "onnx/node/generated/test_group_normalization_epsilon_expanded",
+    "onnx/node/generated/test_group_normalization_epsilon_expanded"
   ],
   "skip_run_tests": [
     "onnx/node/generated/test_gather_elements_negative_indices",
@@ -524,7 +524,6 @@
     "onnx/node/generated/test_constantofshape_int_zeros",
     "onnx/node/generated/test_dropout_default_mask_ratio",
     "onnx/node/generated/test_einsum_transpose",
-    "onnx/node/generated/test_elu_default",
     "onnx/node/generated/test_eyelike_with_dtype",
     "onnx/node/generated/test_gridsample_nearest",
     "onnx/node/generated/test_gridsample_nearest_align_corners_0_additional_1",
@@ -569,10 +568,6 @@
     "onnx/node/generated/test_reduce_sum_square_default_axes_keepdims_example_expanded",
     "onnx/node/generated/test_reduce_sum_square_default_axes_keepdims_random",
     "onnx/node/generated/test_reduce_sum_square_default_axes_keepdims_random_expanded",
-    "onnx/node/generated/test_sce_mean_no_weight_ii",
-    "onnx/node/generated/test_sce_mean_no_weight_ii_expanded",
-    "onnx/node/generated/test_sce_mean_no_weight_ii_log_prob",
-    "onnx/node/generated/test_sce_mean_no_weight_ii_log_prob_expanded",
     "onnx/node/generated/test_shape_end_1",
     "onnx/node/generated/test_shape_start_1",
     "onnx/node/generated/test_shape_start_1_end_2",
