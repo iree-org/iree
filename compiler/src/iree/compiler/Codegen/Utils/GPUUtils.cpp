@@ -959,7 +959,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
-static IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
+IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   if (clTestTarget.empty())
     return nullptr;
 

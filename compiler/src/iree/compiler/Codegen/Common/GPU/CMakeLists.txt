@@ -59,6 +59,7 @@ iree_cc_library(
     "GPUGeneralizeNamedOps.cpp"
     "GPUInferMemorySpace.cpp"
     "GPULowerToUKernels.cpp"
+    "GPUMaterializeEncoding.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPatterns.cpp"
@@ -129,6 +130,8 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -866,6 +867,51 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize * getUnrollM(), opaqueLayout.nSize * getUnrollN(),
+          opaqueLayout.kSize * getUnrollK()};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+DataTiledMMAAttr::getABCVectorTypes() const {
+  return MMAAttr::get(getContext(), getIntrinsic().getValue())
+      .getABCVectorTypes();
+}
+
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+  case MMAIntrinsic::MFMA_I32_32x32x16_I8:
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8: {
+    return 64;
+  }
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMA_I32_16x16x16_I8: {
+    return 32;
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return 0;
 }
 
 //===----------------------------------------------------------------------===//
