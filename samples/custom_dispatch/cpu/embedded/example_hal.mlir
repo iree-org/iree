@@ -48,7 +48,8 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   <0, bindings = [
       <0, storage_buffer, ReadOnly>,
-      <1, storage_buffer>
+      <1, storage_buffer, ReadOnly>,
+      <2, storage_buffer>
   ]>
 ]>
 
