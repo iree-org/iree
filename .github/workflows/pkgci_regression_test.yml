@@ -200,7 +200,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 1da89a12a8b00dc77506d702f61300803b6240b7
+          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
           path: SHARK-TestSuite
           submodules: false
           lfs: true
