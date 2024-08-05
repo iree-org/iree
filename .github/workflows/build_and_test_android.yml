@@ -109,12 +109,12 @@ jobs:
 
   test:
     # These physical devices are not scalable. Only run on postsubmit for now.
-    if: (! inputs.is-pr)
+    # if: (! inputs.is-pr)
     needs: cross_compile
     strategy:
       matrix:
         target:
-          - device-name: pixel-6-pro
+          - device-name: pixel-8-pro
             label-exclude: "^requires-gpu"
           - device-name: moto-edge-x30
             # Moto Edge X30 supports VK_KHR_16bit_storage for only storage
