@@ -91,7 +91,16 @@ MaterializeEncodingInfo
 getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
+/// Pouplates the set of patterns that lowers set_encoding, unset_encoding, and
+/// upstream dialect ops with encoding types to pack/unpack ops.
 void populateMaterializeEncodingIntoPackUnPackPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn);
+
+/// Pouplates the set of patterns that lowers IREE dialect (e.g., Flow, Hal,
+/// etc) ops with encoding types to pack/unpack ops.
+void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
