@@ -10817,9 +10817,9 @@ instrumentation events.</p>
 <h4 id="halinterfacebindingsubspan-halinterfacebindingsubspanop"><code>hal.interface.binding.subspan</code> (HAL::InterfaceBindingSubspanOp)<a class="headerlink" href="#halinterfacebindingsubspan-halinterfacebindingsubspanop" title="Permanent link">link</a></h4>
 <p><em>Returns an alias to a subspan of interface binding data</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.binding.subspan` `set` `(` $set `)`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.binding.subspan` `layout` `(` $layout `)`
+              `set` `(` $set `)`
               `binding` `(` $binding `)`
-              `type` `(` custom&lt;DescriptorType&gt;($descriptor_type) `)`
               (`alignment` `(` $alignment^ `)`)?
               (`offset` `(` $byte_offset^ `)`)?
               (`flags` `(` $descriptor_flags^ `)`)?
@@ -10837,9 +10837,9 @@ will be the minimum of the two.</p>
 <h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
 <tr><td><code>set</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>binding</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
-<tr><td><code>descriptor_type</code></td><td>::mlir::iree_compiler::IREE::HAL::DescriptorTypeAttr</td><td>valid DescriptorType</td></tr>
 <tr><td><code>alignment</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>descriptor_flags</code></td><td>::mlir::iree_compiler::IREE::HAL::DescriptorFlagsAttr</td><td>valid Descriptor flags</td></tr>
 </table>
@@ -10881,7 +10881,8 @@ will be the minimum of the two.</p>
 <h4 id="halinterfaceconstantload-halinterfaceconstantloadop"><code>hal.interface.constant.load</code> (HAL::InterfaceConstantLoadOp)<a class="headerlink" href="#halinterfaceconstantload-halinterfaceconstantloadop" title="Permanent link">link</a></h4>
 <p><em>Loads a constant value from the interface constant block</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.constant.load` `` `[` $index `]`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.interface.constant.load` `layout` `(` $layout `)`
+              `ordinal` `(` $ordinal `)`
               (`alignment` `(` $alignment^ `)`)?
               (`values` `(` $values^ `)`)?
               attr-dict `:` type($result)
@@ -10904,7 +10905,8 @@ and must be assumed to have any value.</p>
 <h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>index</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
+<tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>alignment</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>values</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 </table>
