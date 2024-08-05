@@ -544,10 +544,10 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-        subspanOp.getBinding(), subspanOp.getDescriptorType(),
-        subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+        subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp,
@@ -616,10 +616,10 @@ struct FoldExpandShapeIntoInterfaceTensorStore
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-          subspanOp.getBinding(), subspanOp.getDescriptorType(),
-          subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-          subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+          subspanOp.getDescriptorFlagsAttr());
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
@@ -752,10 +752,10 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-          subspanOp.getBinding(), subspanOp.getDescriptorType(),
-          subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-          subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+          subspanOp.getDescriptorFlagsAttr());
     }
 
     SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),

@@ -29,6 +29,10 @@
   compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [64, 64],
   max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
 
+#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+#pipeline_layout_1 = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
+#pipeline_layout_2 = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+
 module attributes {
   hal.device.targets = [
     #hal.device.target<"vulkan", [
@@ -40,8 +44,7 @@ module attributes {
 } {
   hal.executable private @example_module_dispatch_0 {
     hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
-      hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(
-                                   #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+      hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(#pipeline_layout_0) {
       ^bb0(%arg0: !hal.device):
         %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
@@ -49,8 +52,8 @@ module attributes {
       builtin.module {
         func.func @example_module_dispatch_0_generic_80_f32() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<80xf32>>
-          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<80xf32>>
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout_0) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<80xf32>>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout_0) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<80xf32>>
           %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [80], strides = [1] : !flow.dispatch.tensor<readonly:tensor<80xf32>> -> tensor<80xf32>
           %3 = tensor.empty() : tensor<80xf32>
           %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%2 : tensor<80xf32>) outs(%3 : tensor<80xf32>) {
@@ -66,8 +69,7 @@ module attributes {
   }
   hal.executable private @example_module_dispatch_1 {
     hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
-      hal.executable.export public @example_module_dispatch_1_matmul_16x16x5_f32 ordinal(0) layout(
-                                   #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+      hal.executable.export public @example_module_dispatch_1_matmul_16x16x5_f32 ordinal(0) layout(#pipeline_layout_1) {
       ^bb0(%arg0: !hal.device):
         %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
@@ -75,9 +77,9 @@ module attributes {
       builtin.module {
         func.func @example_module_dispatch_1_matmul_16x16x5_f32() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x5xf32>>
-          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5x16xf32>>
-          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<16x16xf32>>
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout_1) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x5xf32>>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout_1) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5x16xf32>>
+          %2 = hal.interface.binding.subspan layout(#pipeline_layout_1) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<16x16xf32>>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16, 5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x5xf32>> -> tensor<16x5xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [5, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5x16xf32>> -> tensor<5x16xf32>
           %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<16x16xf32>> -> tensor<16x16xf32>
@@ -90,8 +92,7 @@ module attributes {
   }
   hal.executable private @example_module_dispatch_2 {
     hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
-      hal.executable.export public @example_module_dispatch_2_generic_16x16_f32 ordinal(0) layout(
-                                   #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+      hal.executable.export public @example_module_dispatch_2_generic_16x16_f32 ordinal(0) layout(#pipeline_layout_2) {
       ^bb0(%arg0: !hal.device):
         %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
@@ -99,8 +100,8 @@ module attributes {
       builtin.module {
         func.func @example_module_dispatch_2_generic_16x16_f32() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x16xf32>>
-          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16xf32>>
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout_2) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x16xf32>>
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout_2) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16xf32>>
           %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x16xf32>> -> tensor<16x16xf32>
           %3 = tensor.empty() : tensor<16xf32>
           %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<16x16xf32>) outs(%3 : tensor<16xf32>) {

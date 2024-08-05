@@ -1,5 +1,12 @@
 // RUN: iree-opt --iree-convert-to-llvm --split-input-file %s | FileCheck %s --dump-input=always
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: llvm.func @binding_ptrs(
 func.func @binding_ptrs() {
   // CHECK-DAG: %[[C2:.+]] = llvm.mlir.constant(2
@@ -12,7 +19,7 @@ func.func @binding_ptrs() {
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
   %c72 = arith.constant 72 : index
   %c128 = arith.constant 128 : index
-  %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c72) : memref<?x2xf32, strided<[2, 1], offset: 18>>{%c128}
+  %memref = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) offset(%c72) : memref<?x2xf32, strided<[2, 1], offset: 18>>{%c128}
 
   // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][18]
   // CHECK: %[[OFFSET_D0:.+]] = llvm.mul %[[C5]], %[[C2]]
@@ -33,6 +40,13 @@ llvm.func @sink(%arg0: f32) {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: llvm.func @binding_ptrs_dynamic(
 func.func @binding_ptrs_dynamic() {
   // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1 :
@@ -46,7 +60,7 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
   // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
   // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
-  %offset = hal.interface.constant.load[0] : index
+  %offset = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
 
   // CHECK: %[[STATE0:.+]] = llvm.load %arg1
   // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE0]][9]
@@ -58,15 +72,15 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[DIM2_PTR:.+]] = llvm.getelementptr %[[CONSTANT_BASEPTR0]][3]
   // CHECK: %[[DIM2:.+]] = llvm.load %[[DIM2_PTR]]
   // CHECK: %[[DIM2_ZEXT:.+]] = llvm.zext %[[DIM2]]
-  %dim0 = hal.interface.constant.load[1]: index
-  %dim1 = hal.interface.constant.load[2] : index
-  %dim2 = hal.interface.constant.load[3] : index
+  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1): index
+  %dim1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+  %dim2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
 
   // CHECK: %[[STATE3:.+]] = llvm.load %arg1
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE3]][10]
   // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
-  %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%dim0, %dim1, %dim2}
+  %memref = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) offset(%offset) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%dim0, %dim1, %dim2}
 
   // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
   // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C32]]
@@ -94,6 +108,13 @@ llvm.func @sink(%arg0: f32) {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: llvm.func @binding_ptrs_sub_byte_dynamic(
 func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
@@ -103,14 +124,14 @@ func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
   // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
   // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
-  %offset = hal.interface.constant.load[0] : index
-  %dim0 = hal.interface.constant.load[1]: index
+  %offset = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1): index
 
   // CHECK: %[[STATE3:.+]] = llvm.load %arg1
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE3]][10]
   // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
-  %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<?xi4, strided<[1], offset: ?>>{%dim0}
+  %memref = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) offset(%offset) : memref<?xi4, strided<[1], offset: ?>>{%dim0}
 
   // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
   // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C4]]

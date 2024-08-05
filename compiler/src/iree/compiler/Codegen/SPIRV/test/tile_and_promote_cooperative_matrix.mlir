@@ -8,50 +8,56 @@
 
 // Single tile per workgroup means no subview ops for promotion.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1]>
-module {
-  func.func @matmul_f16_32x32x32() attributes {translation_info = #translation} {
-    %c32 = arith.constant 32 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf16>
-    memref.assume_alignment %0, 64 : memref<32x32xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf16>
-    memref.assume_alignment %1, 64 : memref<32x32xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf16>
-    memref.assume_alignment %2, 64 : memref<32x32xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf16>
-    memref.assume_alignment %3, 64 : memref<32x32xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %4 = affine.apply #map()[%workgroup_id_y]
-    %5 = affine.apply #map()[%workgroup_count_y]
-    scf.for %arg0 = %4 to %c32 step %5 {
-      %6 = affine.apply #map()[%workgroup_id_x]
-      %7 = affine.apply #map()[%workgroup_count_x]
-      scf.for %arg1 = %6 to %c32 step %7 {
-        linalg.fill ins(%cst : f16) outs(%3 : memref<32x32xf16>)
-        linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x32xf16>, memref<32x32xf16>) outs(%3 : memref<32x32xf16>)
-        linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : memref<32x32xf16>) outs(%3 : memref<32x32xf16>) {
-        ^bb0(%in: f16, %out: f16):
-          %8 = arith.divf %out, %in : f16
-          linalg.yield %8 : f16
-        }
+func.func @matmul_f16_32x32x32() attributes {translation_info = #translation} {
+  %c32 = arith.constant 32 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<32x32xf16>
+  memref.assume_alignment %0, 64 : memref<32x32xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x32xf16>
+  memref.assume_alignment %1, 64 : memref<32x32xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x32xf16>
+  memref.assume_alignment %2, 64 : memref<32x32xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<32x32xf16>
+  memref.assume_alignment %3, 64 : memref<32x32xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply #map()[%workgroup_id_y]
+  %5 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %4 to %c32 step %5 {
+    %6 = affine.apply #map()[%workgroup_id_x]
+    %7 = affine.apply #map()[%workgroup_count_x]
+    scf.for %arg1 = %6 to %c32 step %7 {
+      linalg.fill ins(%cst : f16) outs(%3 : memref<32x32xf16>)
+      linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x32xf16>, memref<32x32xf16>) outs(%3 : memref<32x32xf16>)
+      linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : memref<32x32xf16>) outs(%3 : memref<32x32xf16>) {
+      ^bb0(%in: f16, %out: f16):
+        %8 = arith.divf %out, %in : f16
+        linalg.yield %8 : f16
       }
     }
-    return
   }
+  return
 }
 
 // CHECK-LABEL: func.func @matmul_f16_32x32x32()
 
-//       CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//       CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//       CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 
 //   CHECK-NOT:   memref.alloc()
 //   CHECK-NOT:   memref.copy
@@ -63,6 +69,13 @@ module {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
@@ -70,51 +83,49 @@ module {
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
-module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
-    %c32 = arith.constant 32 : index
-    %c128 = arith.constant 128 : index
-    %c512 = arith.constant 512 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<128x32x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x512xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x128x512xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x128x512xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %workgroup_id_z = hal.interface.workgroup.id[2] : index
-    %workgroup_count_z = hal.interface.workgroup.count[2] : index
-    scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
-      %4 = affine.apply #map()[%workgroup_id_y]
-      %5 = affine.apply #map()[%workgroup_count_y]
-      scf.for %arg1 = %4 to %c128 step %5 {
-        %6 = affine.apply #map()[%workgroup_id_x]
-        %7 = affine.apply #map()[%workgroup_count_x]
-        scf.for %arg2 = %6 to %c512 step %7 {
-          %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-          %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
-          %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
-          linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
-          linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
-          ^bb0(%in: f16, %in_3: f16, %out: f16):
-            %8 = arith.mulf %in, %in_3 : f16
-            %9 = arith.addf %out, %8 : f16
-            linalg.yield %9 : f16
-          }
-          %subview_2 = memref.subview %3[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-          linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel", "parallel", "parallel"]} ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
-          ^bb0(%in: f16, %out: f16):
-            %8 = math.exp %in : f16
-            linalg.yield %8 : f16
-          }
+func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
+  %c32 = arith.constant 32 : index
+  %c128 = arith.constant 128 : index
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<128x32x64xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x64x512xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x128x512xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x128x512xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
+    %4 = affine.apply #map()[%workgroup_id_y]
+    %5 = affine.apply #map()[%workgroup_count_y]
+    scf.for %arg1 = %4 to %c128 step %5 {
+      %6 = affine.apply #map()[%workgroup_id_x]
+      %7 = affine.apply #map()[%workgroup_count_x]
+      scf.for %arg2 = %6 to %c512 step %7 {
+        %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+        %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
+        %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
+        linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
+        linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
+        ^bb0(%in: f16, %in_3: f16, %out: f16):
+          %8 = arith.mulf %in, %in_3 : f16
+          %9 = arith.addf %out, %8 : f16
+          linalg.yield %9 : f16
+        }
+        %subview_2 = memref.subview %3[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel", "parallel", "parallel"]} ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
+        ^bb0(%in: f16, %out: f16):
+          %8 = math.exp %in : f16
+          linalg.yield %8 : f16
         }
       }
     }
-    return
   }
+  return
 }
 
 // CHECK-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
@@ -172,6 +183,13 @@ module {
 
 // Cooperative matrix fusable elementwise ops do not need promote C.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
@@ -179,51 +197,49 @@ module {
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
-module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
-    %c32 = arith.constant 32 : index
-    %c128 = arith.constant 128 : index
-    %c512 = arith.constant 512 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<128x32x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x512xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x128x512xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x128x512xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %workgroup_id_z = hal.interface.workgroup.id[2] : index
-    %workgroup_count_z = hal.interface.workgroup.count[2] : index
-    scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
-      %4 = affine.apply #map()[%workgroup_id_y]
-      %5 = affine.apply #map()[%workgroup_count_y]
-      scf.for %arg1 = %4 to %c128 step %5 {
-        %6 = affine.apply #map()[%workgroup_id_x]
-        %7 = affine.apply #map()[%workgroup_count_x]
-        scf.for %arg2 = %6 to %c512 step %7 {
-          %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-          %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
-          %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
-          linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
-          linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
-          ^bb0(%in: f16, %in_3: f16, %out: f16):
-            %8 = arith.mulf %in, %in_3 : f16
-            %9 = arith.addf %out, %8 : f16
-            linalg.yield %9 : f16
-          }
-          %subview_2 = memref.subview %3[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-          linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel", "parallel", "parallel"]} ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
-          ^bb0(%in: f16, %out: f16):
-            %8 = arith.divf %out, %in : f16
-            linalg.yield %8 : f16
-          }
+func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
+  %c32 = arith.constant 32 : index
+  %c128 = arith.constant 128 : index
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<128x32x64xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x64x512xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x128x512xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x128x512xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
+    %4 = affine.apply #map()[%workgroup_id_y]
+    %5 = affine.apply #map()[%workgroup_count_y]
+    scf.for %arg1 = %4 to %c128 step %5 {
+      %6 = affine.apply #map()[%workgroup_id_x]
+      %7 = affine.apply #map()[%workgroup_count_x]
+      scf.for %arg2 = %6 to %c512 step %7 {
+        %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+        %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
+        %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
+        linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
+        linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
+        ^bb0(%in: f16, %in_3: f16, %out: f16):
+          %8 = arith.mulf %in, %in_3 : f16
+          %9 = arith.addf %out, %8 : f16
+          linalg.yield %9 : f16
+        }
+        %subview_2 = memref.subview %3[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel", "parallel", "parallel"]} ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
+        ^bb0(%in: f16, %out: f16):
+          %8 = arith.divf %out, %in : f16
+          linalg.yield %8 : f16
         }
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
@@ -251,50 +267,55 @@ module {
 
 // No need to promote C if there is no fused element wise ops.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 #map = affine_map<()[s0] -> (s0 * 32)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [64, 2, 1]>
-module {
-  func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
-    %c32 = arith.constant 32 : index
-    %c128 = arith.constant 128 : index
-    %c512 = arith.constant 512 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<128x32x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x512xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x128x512xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %workgroup_id_z = hal.interface.workgroup.id[2] : index
-    %workgroup_count_z = hal.interface.workgroup.count[2] : index
-    scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
-      %3 = affine.apply #map()[%workgroup_id_y]
-      %4 = affine.apply #map()[%workgroup_count_y]
-      scf.for %arg1 = %3 to %c128 step %4 {
-        %5 = affine.apply #map()[%workgroup_id_x]
-        %6 = affine.apply #map()[%workgroup_count_x]
-        scf.for %arg2 = %5 to %c512 step %6 {
-          %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-          %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
-          %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
-          linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
-          linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
-          ^bb0(%in: f16, %in_2: f16, %out: f16):
-            %7 = arith.mulf %in, %in_2 : f16
-            %8 = arith.addf %out, %7 : f16
-            linalg.yield %8 : f16
-          }
+func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info = #translation} {
+  %c32 = arith.constant 32 : index
+  %c128 = arith.constant 128 : index
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<128x32x64xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x64x512xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x128x512xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  scf.for %arg0 = %workgroup_id_z to %c32 step %workgroup_count_z {
+    %3 = affine.apply #map()[%workgroup_id_y]
+    %4 = affine.apply #map()[%workgroup_count_y]
+    scf.for %arg1 = %3 to %c128 step %4 {
+      %5 = affine.apply #map()[%workgroup_id_x]
+      %6 = affine.apply #map()[%workgroup_count_x]
+      scf.for %arg2 = %5 to %c512 step %6 {
+        %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+        %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
+        %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
+        linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
+        linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) attrs =  {lowering_config = #config} {
+        ^bb0(%in: f16, %in_2: f16, %out: f16):
+          %7 = arith.mulf %in, %in_2 : f16
+          %8 = arith.addf %out, %7 : f16
+          linalg.yield %8 : f16
         }
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
@@ -304,7 +325,7 @@ module {
 //      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-NOT: memref.alloc()
 
-//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
 //      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN2]]
 
 //      PROMOTEC: linalg.fill
@@ -331,44 +352,49 @@ module {
 
 // No need to promote again with allocations from bufferization.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
-module {
-  func.func @batch_matmul_f16_1x64x128x512() attributes {translation_info = #translation} {
-    %c4096 = arith.constant 4096 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x4096x512xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x512x4096xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<1x4096x4096xf32>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %3 = affine.apply #map()[%workgroup_id_y]
-    %4 = affine.apply #map()[%workgroup_count_y]
-    scf.for %arg0 = %3 to %c4096 step %4 {
-      %5 = affine.apply #map1()[%workgroup_id_x]
-      %6 = affine.apply #map1()[%workgroup_count_x]
-      scf.for %arg1 = %5 to %c4096 step %6 {
-        %subview = memref.subview %2[0, %arg0, %arg1] [1, 64, 128] [1, 1, 1] : memref<1x4096x4096xf32> to memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>
-        %subview_0 = memref.subview %0[0, %arg0, 0] [1, 64, 512] [1, 1, 1] : memref<1x4096x512xf16> to memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>
-        %subview_1 = memref.subview %1[0, 0, %arg1] [1, 512, 128] [1, 1, 1] : memref<1x512x4096xf16> to memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>
-        %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, #gpu.address_space<workgroup>>
-        linalg.fill ins(%cst : f16) outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
-        linalg.batch_matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>, memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>) outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
-        linalg.generic {indexing_maps = [#map2, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>) outs(%subview : memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>) {
-        ^bb0(%in: f16, %out: f32):
-          %7 = arith.extf %in : f16 to f32
-          linalg.yield %7 : f32
-        }
+func.func @batch_matmul_f16_1x64x128x512() attributes {translation_info = #translation} {
+  %c4096 = arith.constant 4096 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<1x4096x512xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<1x512x4096xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<1x4096x4096xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply #map()[%workgroup_id_y]
+  %4 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %3 to %c4096 step %4 {
+    %5 = affine.apply #map1()[%workgroup_id_x]
+    %6 = affine.apply #map1()[%workgroup_count_x]
+    scf.for %arg1 = %5 to %c4096 step %6 {
+      %subview = memref.subview %2[0, %arg0, %arg1] [1, 64, 128] [1, 1, 1] : memref<1x4096x4096xf32> to memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>
+      %subview_0 = memref.subview %0[0, %arg0, 0] [1, 64, 512] [1, 1, 1] : memref<1x4096x512xf16> to memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>
+      %subview_1 = memref.subview %1[0, 0, %arg1] [1, 512, 128] [1, 1, 1] : memref<1x512x4096xf16> to memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>
+      %alloc = memref.alloc() {alignment = 128 : i64} : memref<1x64x128xf16, #gpu.address_space<workgroup>>
+      linalg.fill ins(%cst : f16) outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
+      linalg.batch_matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<1x64x512xf16, strided<[2097152, 512, 1], offset: ?>>, memref<1x512x128xf16, strided<[2097152, 4096, 1], offset: ?>>) outs(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>)
+      linalg.generic {indexing_maps = [#map2, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%alloc : memref<1x64x128xf16, #gpu.address_space<workgroup>>) outs(%subview : memref<1x64x128xf32, strided<[16777216, 4096, 1], offset: ?>>) {
+      ^bb0(%in: f16, %out: f32):
+        %7 = arith.extf %in : f16 to f32
+        linalg.yield %7 : f32
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @batch_matmul_f16_1x64x128x512()
@@ -402,47 +428,54 @@ module {
 //      PROMOTEC: gpu.barrier
 
 // -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
-module {
-  func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
-    %c512 = arith.constant 512 : index
-    %c4096 = arith.constant 4096 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<512x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<64x4096xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<4096xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<512x4096xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %4 = affine.apply #map()[%workgroup_id_y]
-    %5 = affine.apply #map()[%workgroup_count_y]
-    scf.for %arg0 = %4 to %c512 step %5 {
-      %6 = affine.apply #map1()[%workgroup_id_x]
-      %7 = affine.apply #map1()[%workgroup_count_x]
-      scf.for %arg1 = %6 to %c4096 step %7 {
-        %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<512x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
-        %subview_0 = memref.subview %0[%arg0, 0] [64, 64] [1, 1] : memref<512x64xf16> to memref<64x64xf16, strided<[64, 1], offset: ?>>
-        %subview_1 = memref.subview %1[0, %arg1] [64, 128] [1, 1] : memref<64x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
-        linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
-        linalg.matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<64x64xf16, strided<[64, 1], offset: ?>>, memref<64x128xf16, strided<[4096, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
-        %subview_2 = memref.subview %2[%arg1] [128] [1] : memref<4096xf16> to memref<128xf16, strided<[1], offset: ?>>
-        linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_2 : memref<128xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>) {
-        ^bb0(%in: f16, %out: f16):
-          %8 = arith.addf %out, %in : f16
-          linalg.yield %8 : f16
-        }
+func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
+  %c512 = arith.constant 512 : index
+  %c4096 = arith.constant 4096 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<512x64xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<64x4096xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<4096xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<512x4096xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply #map()[%workgroup_id_y]
+  %5 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %4 to %c512 step %5 {
+    %6 = affine.apply #map1()[%workgroup_id_x]
+    %7 = affine.apply #map1()[%workgroup_count_x]
+    scf.for %arg1 = %6 to %c4096 step %7 {
+      %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<512x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
+      %subview_0 = memref.subview %0[%arg0, 0] [64, 64] [1, 1] : memref<512x64xf16> to memref<64x64xf16, strided<[64, 1], offset: ?>>
+      %subview_1 = memref.subview %1[0, %arg1] [64, 128] [1, 1] : memref<64x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
+      linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
+      linalg.matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<64x64xf16, strided<[64, 1], offset: ?>>, memref<64x128xf16, strided<[4096, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
+      %subview_2 = memref.subview %2[%arg1] [128] [1] : memref<4096xf16> to memref<128xf16, strided<[1], offset: ?>>
+      linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_2 : memref<128xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>) {
+      ^bb0(%in: f16, %out: f16):
+        %8 = arith.addf %out, %in : f16
+        linalg.yield %8 : f16
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
@@ -452,8 +485,8 @@ module {
 //  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-NOT: memref.alloc()
 
-//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
+//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3)
 //      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN3]]
 
 //      PROMOTEC: linalg.fill
@@ -487,47 +520,53 @@ module {
 
 // Transposed+broadcasted elementwise ops does not need promoting C matrix.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
-module {
-  func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
-    %c512 = arith.constant 512 : index
-    %c4096 = arith.constant 4096 : index
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<512x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<64x4096xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<512xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<512x4096xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %4 = affine.apply #map()[%workgroup_id_y]
-    %5 = affine.apply #map()[%workgroup_count_y]
-    scf.for %arg0 = %4 to %c512 step %5 {
-      %6 = affine.apply #map1()[%workgroup_id_x]
-      %7 = affine.apply #map1()[%workgroup_count_x]
-      scf.for %arg1 = %6 to %c4096 step %7 {
-        %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<512x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
-        %subview_0 = memref.subview %0[%arg0, 0] [64, 64] [1, 1] : memref<512x64xf16> to memref<64x64xf16, strided<[64, 1], offset: ?>>
-        %subview_1 = memref.subview %1[0, %arg1] [64, 128] [1, 1] : memref<64x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
-        linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
-        linalg.matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<64x64xf16, strided<[64, 1], offset: ?>>, memref<64x128xf16, strided<[4096, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
-        %subview_2 = memref.subview %2[%arg0] [64] [1] : memref<512xf16> to memref<64xf16, strided<[1], offset: ?>>
-        linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_2 : memref<64xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>) {
-        ^bb0(%in: f16, %out: f16):
-          %8 = arith.addf %out, %in : f16
-          linalg.yield %8 : f16
-        }
+func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation} {
+  %c512 = arith.constant 512 : index
+  %c4096 = arith.constant 4096 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<512x64xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<64x4096xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<512xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<512x4096xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply #map()[%workgroup_id_y]
+  %5 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %4 to %c512 step %5 {
+    %6 = affine.apply #map1()[%workgroup_id_x]
+    %7 = affine.apply #map1()[%workgroup_count_x]
+    scf.for %arg1 = %6 to %c4096 step %7 {
+      %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<512x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
+      %subview_0 = memref.subview %0[%arg0, 0] [64, 64] [1, 1] : memref<512x64xf16> to memref<64x64xf16, strided<[64, 1], offset: ?>>
+      %subview_1 = memref.subview %1[0, %arg1] [64, 128] [1, 1] : memref<64x4096xf16> to memref<64x128xf16, strided<[4096, 1], offset: ?>>
+      linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
+      linalg.matmul {lowering_config = #config} ins(%subview_0, %subview_1 : memref<64x64xf16, strided<[64, 1], offset: ?>>, memref<64x128xf16, strided<[4096, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>)
+      %subview_2 = memref.subview %2[%arg0] [64] [1] : memref<512xf16> to memref<64xf16, strided<[1], offset: ?>>
+      linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_2 : memref<64xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[4096, 1], offset: ?>>) {
+      ^bb0(%in: f16, %out: f16):
+        %8 = arith.addf %out, %in : f16
+        linalg.yield %8 : f16
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
@@ -537,8 +576,8 @@ module {
 //  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-NOT: memref.alloc()
 
-//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
+//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3)
 //      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN3]]
 
 //      PROMOTEC: linalg.fill
@@ -572,50 +611,55 @@ module {
 
 // Inlined large constant array needs promoting C matrix.
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1]>
-module {
-  func.func @matmul_f16_128x262144x2304() attributes {translation_info = #translation} {
-    %c128 = arith.constant 128 : index
-    %c262144 = arith.constant 262144 : index
-    %c96565312 = arith.constant 96565312 : index
-    %c806357120 = arith.constant 806357120 : index
-    %c134217728 = arith.constant 134217728 : index
-    %cst = arith.constant 0.000000e+00 : f16
-    %cst_0 = arith.constant dense<"0x69222B2E40A3002A45AC1AAB2E2E202DA21C212680264C2A102314A041A7D029CB28352E5BAAD3B02F299D9A142B8AA1D1285C28412B25AF9A24EE2BA22C242D53AD9E2948A9289FCF301D28012F08AD68A6DD20ECAC912465290B2E9420C5AA50A222A912AB9526B62ADA2039AD4D912C9FDD287B20B224D329BA2A4D2C41A76DAB7E30B027F62ED1A0F1273A2BAE9D0FA48029812992A65AA92A2C9C2EE9A744A4632C5FA8A9A4CF2D70A482A0F5A2DBA7B6304B9D22A52B1B9DA8E424722AB5ACD0248A2B8B29C82D782E402D1A99F0A60CA4DE2DD32815266F2A6B247FA6FE214E2853AA402390AB6925F1A339307F2664A23CACBE28BA2B3D286DB0BA2E"> : tensor<128xf16>
-    %0 = bufferization.to_memref %cst_0 : memref<128xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c96565312) : memref<128x2304xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c806357120) : memref<2304x262144xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c134217728) : memref<128x262144xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_count_x = hal.interface.workgroup.count[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_count_y = hal.interface.workgroup.count[1] : index
-    %4 = affine.apply #map()[%workgroup_id_y]
-    %5 = affine.apply #map()[%workgroup_count_y]
-    scf.for %arg0 = %4 to %c128 step %5 {
-      %6 = affine.apply #map1()[%workgroup_id_x]
-      %7 = affine.apply #map1()[%workgroup_count_x]
-      scf.for %arg1 = %6 to %c262144 step %7 {
-        %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<128x262144xf16> to memref<64x128xf16, strided<[262144, 1], offset: ?>>
-        %subview_1 = memref.subview %1[%arg0, 0] [64, 2304] [1, 1] : memref<128x2304xf16> to memref<64x2304xf16, strided<[2304, 1], offset: ?>>
-        %subview_2 = memref.subview %2[0, %arg1] [2304, 128] [1, 1] : memref<2304x262144xf16> to memref<2304x128xf16, strided<[262144, 1], offset: ?>>
-        linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
-        linalg.matmul {lowering_config = #config} ins(%subview_1, %subview_2 : memref<64x2304xf16, strided<[2304, 1], offset: ?>>, memref<2304x128xf16, strided<[262144, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
-        %subview_3 = memref.subview %0[%arg0] [64] [1] : memref<128xf16> to memref<64xf16, strided<[1], offset: ?>>
-        linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_3 : memref<64xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>) {
-        ^bb0(%in: f16, %out: f16):
-          %8 = arith.addf %out, %in : f16
-          linalg.yield %8 : f16
-        }
+func.func @matmul_f16_128x262144x2304() attributes {translation_info = #translation} {
+  %c128 = arith.constant 128 : index
+  %c262144 = arith.constant 262144 : index
+  %c96565312 = arith.constant 96565312 : index
+  %c806357120 = arith.constant 806357120 : index
+  %c134217728 = arith.constant 134217728 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_0 = arith.constant dense<"0x69222B2E40A3002A45AC1AAB2E2E202DA21C212680264C2A102314A041A7D029CB28352E5BAAD3B02F299D9A142B8AA1D1285C28412B25AF9A24EE2BA22C242D53AD9E2948A9289FCF301D28012F08AD68A6DD20ECAC912465290B2E9420C5AA50A222A912AB9526B62ADA2039AD4D912C9FDD287B20B224D329BA2A4D2C41A76DAB7E30B027F62ED1A0F1273A2BAE9D0FA48029812992A65AA92A2C9C2EE9A744A4632C5FA8A9A4CF2D70A482A0F5A2DBA7B6304B9D22A52B1B9DA8E424722AB5ACD0248A2B8B29C82D782E402D1A99F0A60CA4DE2DD32815266F2A6B247FA6FE214E2853AA402390AB6925F1A339307F2664A23CACBE28BA2B3D286DB0BA2E"> : tensor<128xf16>
+  %0 = bufferization.to_memref %cst_0 : memref<128xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c96565312) : memref<128x2304xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c806357120) : memref<2304x262144xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c134217728) : memref<128x262144xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply #map()[%workgroup_id_y]
+  %5 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %4 to %c128 step %5 {
+    %6 = affine.apply #map1()[%workgroup_id_x]
+    %7 = affine.apply #map1()[%workgroup_count_x]
+    scf.for %arg1 = %6 to %c262144 step %7 {
+      %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<128x262144xf16> to memref<64x128xf16, strided<[262144, 1], offset: ?>>
+      %subview_1 = memref.subview %1[%arg0, 0] [64, 2304] [1, 1] : memref<128x2304xf16> to memref<64x2304xf16, strided<[2304, 1], offset: ?>>
+      %subview_2 = memref.subview %2[0, %arg1] [2304, 128] [1, 1] : memref<2304x262144xf16> to memref<2304x128xf16, strided<[262144, 1], offset: ?>>
+      linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
+      linalg.matmul {lowering_config = #config} ins(%subview_1, %subview_2 : memref<64x2304xf16, strided<[2304, 1], offset: ?>>, memref<2304x128xf16, strided<[262144, 1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
+      %subview_3 = memref.subview %0[%arg0] [64] [1] : memref<128xf16> to memref<64xf16, strided<[1], offset: ?>>
+      linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel"]} ins(%subview_3 : memref<64xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>) {
+      ^bb0(%in: f16, %out: f16):
+        %8 = arith.addf %out, %in : f16
+        linalg.yield %8 : f16
       }
     }
-    return
   }
+  return
 }
 
 // PROMOTEC-LABEL: func.func @matmul_f16_128x262144x2304()

@@ -3,12 +3,19 @@
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
 #translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 module {
   func.func @restrict_num_workgroups() attributes {hal.executable.target = #executable_target_system_elf_arm_64_, translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1x1x4x4xf32>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1x4x4xf32>>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x4xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x1x4x4xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1x4x4xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x4xf32>>
     %input = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 1, 4, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1x4x4xf32>> -> tensor<1x1x4x4xf32>
     %filter = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [1, 4, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x4x4xf32>> -> tensor<1x4x4xf32>
     %5 = tensor.empty() : tensor<1x1x1x4xf32>

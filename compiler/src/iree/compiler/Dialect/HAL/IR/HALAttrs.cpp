@@ -86,6 +86,24 @@ uint32_t CollectiveAttr::getEncodedValue() const {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.pipeline.layout<*>
+//===----------------------------------------------------------------------===//
+
+int64_t PipelineLayoutAttr::getFlatBindingIndex(int64_t set,
+                                                int64_t binding) const {
+  int64_t flatIndex = 0;
+  for (auto setLayoutAttr : getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == set) {
+      flatIndex += binding;
+      break;
+    } else {
+      flatIndex += setLayoutAttr.getBindings().size();
+    }
+  }
+  return flatIndex;
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.executable.target<*>
 //===----------------------------------------------------------------------===//
 

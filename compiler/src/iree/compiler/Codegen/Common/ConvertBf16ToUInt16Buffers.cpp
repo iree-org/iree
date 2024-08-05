@@ -89,8 +89,8 @@ struct ConvertHalInterfaceBindingSubspan final
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-            op, newResultTy, adaptor.getSet(), adaptor.getBinding(),
-            adaptor.getDescriptorType(), adaptor.getByteOffset(),
+            op, newResultTy, adaptor.getLayout(), adaptor.getSet(),
+            adaptor.getBinding(), adaptor.getByteOffset(),
             adaptor.getDynamicDims(), adaptor.getAlignmentAttr(),
             adaptor.getDescriptorFlagsAttr());
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");

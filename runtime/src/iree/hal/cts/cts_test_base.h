@@ -9,6 +9,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include "iree/base/api.h"
 #include "iree/base/string_view.h"
@@ -275,6 +276,24 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     uint64_t value;
     IREE_EXPECT_OK(iree_hal_semaphore_query(semaphore, &value));
     EXPECT_EQ(expected_value, value);
+  }
+
+  // Check that a contains b.
+  // That is the codes of a and b are equal and the message of b is contained
+  // in the message of a.
+  void CheckStatusContains(iree_status_t a, iree_status_t b) {
+    EXPECT_EQ(iree_status_code(a), iree_status_code(b));
+    iree_allocator_t allocator = iree_allocator_system();
+    char* a_str = NULL;
+    iree_host_size_t a_str_length = 0;
+    EXPECT_TRUE(iree_status_to_string(a, &allocator, &a_str, &a_str_length));
+    char* b_str = NULL;
+    iree_host_size_t b_str_length = 0;
+    EXPECT_TRUE(iree_status_to_string(b, &allocator, &b_str, &b_str_length));
+    EXPECT_TRUE(std::string_view(a_str).find(std::string_view(b_str)) !=
+                std::string_view::npos);
+    iree_allocator_free(allocator, a_str);
+    iree_allocator_free(allocator, b_str);
   }
 };
 

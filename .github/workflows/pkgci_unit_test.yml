@@ -42,6 +42,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: Validate runtime wheel
         run: |
           source ${VENV_DIR}/bin/activate
