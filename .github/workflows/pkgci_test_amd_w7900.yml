@@ -30,11 +30,11 @@ jobs:
       IREE_HIP_DISABLE: 0
       IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
     steps:
-      - name: Checking out repository
+      - name: Check out repository
         uses: actions/checkout@v4.1.7
         with:
           submodules: false
-      - name: "Checking out runtime submodules"
+      - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@v5.1.0
         with:
@@ -49,9 +49,10 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: "Building tests"
+
+      - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
-      - name: "Running GPU tests"
+      - name: Run GPU tests
         env:
           CTEST_PARALLEL_LEVEL: 1
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
