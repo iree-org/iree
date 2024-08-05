@@ -128,10 +128,10 @@ public:
 ///    : vector<4x5xf32>, tensor<4x5xf32>
 /// ```
 ///
-/// This is an easy case `vector<4x5xf32>` fully-overwrites `tensor<4x5xf32>` as
-/// the vector is the same size as the tensor. This check also supports dynamic
-/// tensors, where it resolves the tensor sizes via value-bounds analysis, and
-/// then checks if the vector type fully overwrites the tensor.
+/// This is an easy case, `vector<4x5xf32>` fully-overwrites `tensor<4x5xf32>`
+/// as the vector is the same size as the tensor. This check also supports
+/// dynamic tensors, where it resolves the tensor sizes via value-bounds
+/// analysis, and then checks if the vector type fully overwrites the tensor.
 static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
   if (writeOp.hasOutOfBoundsDim())
     return false;
