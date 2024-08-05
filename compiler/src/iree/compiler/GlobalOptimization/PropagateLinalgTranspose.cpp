@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -59,9 +60,17 @@ static Value createTransposeInit(OpBuilder &builder, Value source,
   return empty;
 }
 
-// Constructs a transpose of the given tensor and permutation.
+// Constructs a transpose of the given tensor and permutation,
+// or produces a transposed version of the producing tensor.empty op.
 static Value createTranspose(OpBuilder &builder, Value source,
                              ArrayRef<int64_t> perm) {
+  if (auto empty = source.getDefiningOp<tensor::EmptyOp>()) {
+    Type elementType = empty.getType().getElementType();
+    SmallVector<OpFoldResult> mixedSizes = empty.getMixedSizes();
+    applyPermutationToVector(mixedSizes, perm);
+    return builder.create<tensor::EmptyOp>(empty.getLoc(), mixedSizes,
+                                           elementType);
+  }
   Value empty = createTransposeInit(builder, source, perm);
   return builder
       .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
@@ -736,22 +745,6 @@ public:
   }
 };
 
-// Folds `linalg.transpose(tensor.empty(), dest)` to `dest`.
-class FoldTransposeOfEmpty : public OpRewritePattern<linalg::TransposeOp> {
-public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
-                                PatternRewriter &rewriter) const override {
-    if (!transposeOp.getOperand(0).getDefiningOp<tensor::EmptyOp>()) {
-      return rewriter.notifyMatchFailure(
-          transposeOp, "transpose source is not tensor empty");
-    }
-    rewriter.replaceOp(transposeOp, transposeOp.getDpsInits()[0]);
-    return success();
-  }
-};
-
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -887,7 +880,6 @@ populateCommonCanonicalizationPatterns(MLIRContext *context,
   tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);
   tensor::populateFoldTensorEmptyPatterns(patterns,
                                           /*foldSingleUseOnly=*/false);
-  patterns.add<FoldTransposeOfEmpty>(context);
 }
 
 void PropagateLinalgTransposePass::runOnOperation() {
