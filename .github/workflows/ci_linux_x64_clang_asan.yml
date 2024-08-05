@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_asan.yml"
+      - ".github/workflows/setup.yml"
       - "CMakeLists.txt"
       - "build_tools/*"
       - "compiler/*"
@@ -26,6 +27,7 @@ on:
       - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_asan.yml"
+      - ".github/workflows/setup.yml"
       - "CMakeLists.txt"
       - "build_tools/*"
       - "compiler/*"

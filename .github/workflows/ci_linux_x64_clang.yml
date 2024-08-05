@@ -7,14 +7,36 @@
 name: CI - Linux x64 clang
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci_linux_x64_clang.yml"
+      - ".github/workflows/setup.yml"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
   pull_request:
     branches:
       - main
     paths:
       - ".github/workflows/ci_linux_x64_clang.yml"
-  schedule:
-    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
-    - cron: "15 9 * * 1-5"
+      - ".github/workflows/setup.yml"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +53,7 @@ jobs:
 
   linux_x64_clang:
     needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}

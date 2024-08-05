@@ -27,11 +27,43 @@ name: CI
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
 
 on:
-  workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/setup.yml"
+      - ".bazelrc"
+      - ".bazelversion"
+      - "WORKSPACE"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/setup.yml"
+      - ".bazelrc"
+      - ".bazelversion"
+      - "WORKSPACE"
+      - "CMakeLists.txt"
+      - "build_tools/*"
+      - "compiler/*"
+      - "llvm-external-projects/*"
+      - "runtime/*"
+      - "samples/*"
+      - "tests/*"
+      - "third_party/*"
+      - "tools/*"
+  workflow_dispatch:
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -55,16 +87,6 @@ jobs:
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
-  # TODO(scotttodd): drop this job in favor of ci_linux_x64_clang.yml once no jobs depend on it
-  build_all:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
-    uses: ./.github/workflows/build_all.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-      run-tests: true
 
   build_test_all_bazel:
     needs: setup
@@ -370,7 +392,6 @@ jobs:
       - setup
 
       # Basic
-      - build_all
       - build_test_all_bazel
 
       # Accelerators
