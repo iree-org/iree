@@ -51,26 +51,6 @@ class ShapesId(enum.Enum):
     LARGE = "large"
 
 
-# Enumerates ways to construct MLIR tensor types.
-@enum.unique
-class Dynamicity(enum.Enum):
-    STATIC = "static"  # Use fixed values everywhere. Example: tensor<4x6xf16>.
-
-
-# Enumerates ways to initialize input buffer contents.
-@enum.unique
-class InputGenerator(enum.Enum):
-    ZERO = "zero"  # Fill with zeros
-    RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
-
-
-# Enumerates ways to initialize kernel buffer contents.
-@enum.unique
-class KernelGenerator(enum.Enum):
-    ZERO = "zero"  # Fill with zeros
-    RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
-
-
 # batch: Batch dimension
 # m: M dimension of first and second matmul
 # n: N dimension of second matmul
