@@ -4621,7 +4621,7 @@ operand.</p>
 #contraction_trait = {
   indexing_maps = #contraction_accesses,
   iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F16_16x16x16_F32&gt;
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
 }
 %3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
   : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;
@@ -4660,7 +4660,7 @@ operand.</p>
 #contraction_trait = {
   indexing_maps = #contraction_accesses,
   iterator_types = [],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F16_16x16x16_F32&gt;
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
 }
 %3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
   : vector&lt;4xf16&gt;, vector&lt;4xf16&gt; into vector&lt;4xf32&gt;
@@ -4683,7 +4683,7 @@ subgroup semantics and must be resolved before distribution.</p>
 #contraction_trait = {
   indexing_maps = #contraction_accesses,
   iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F16_16x16x16_F32&gt;,
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
   rhs_permutation = [1, 0]
 }
 %7 = iree_gpu.multi_mma %4, %5, %6 #contraction_trait
@@ -5176,11 +5176,11 @@ enum name describes these fields as</p>
 </code></pre></div>
 <p>Enum cases:
 * MFMA_F32_16x16x4_F32 (<code>MFMA_F32_16x16x4_F32</code>)
-* MFMA_F16_16x16x16_F32 (<code>MFMA_F16_16x16x16_F32</code>)
-* MFMA_F16_32x32x8_F32 (<code>MFMA_F16_32x32x8_F32</code>)
-* MFMA_F8E4M3FNUZ_16x16x32_F32 (<code>MFMA_F8E4M3FNUZ_16x16x32_F32</code>)
-* MFMA_I8_16x16x32_I32 (<code>MFMA_I8_16x16x32_I32</code>)
-* MFMA_I8_32x32x16_I32 (<code>MFMA_I8_32x32x16_I32</code>)
+* MFMA_F32_16x16x16_F16 (<code>MFMA_F32_16x16x16_F16</code>)
+* MFMA_F32_32x32x8_F16 (<code>MFMA_F32_32x32x8_F16</code>)
+* MFMA_F32_16x16x32_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ</code>)
+* MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
+* MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
 * WMMA_F16_16x16x16_F32 (<code>WMMA_F16_16x16x16_F32</code>)
 * WMMA_F16_16x16x16_F16 (<code>WMMA_F16_16x16x16_F16</code>)</p>
 <h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
@@ -5605,29 +5605,29 @@ NVIDIA GPUs.</p>
 <td>MFMA_F32_16x16x4_F32</td>
 </tr>
 <tr>
-<td style="text-align: center;">MFMA_F16_16x16x16_F32</td>
+<td style="text-align: center;">MFMA_F32_16x16x16_F16</td>
 <td style="text-align: center;"><code>1</code></td>
-<td>MFMA_F16_16x16x16_F32</td>
+<td>MFMA_F32_16x16x16_F16</td>
 </tr>
 <tr>
-<td style="text-align: center;">MFMA_F16_32x32x8_F32</td>
+<td style="text-align: center;">MFMA_F32_32x32x8_F16</td>
 <td style="text-align: center;"><code>2</code></td>
-<td>MFMA_F16_32x32x8_F32</td>
+<td>MFMA_F32_32x32x8_F16</td>
 </tr>
 <tr>
-<td style="text-align: center;">MFMA_F8E4M3FNUZ_16x16x32_F32</td>
+<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ</td>
 <td style="text-align: center;"><code>3</code></td>
-<td>MFMA_F8E4M3FNUZ_16x16x32_F32</td>
+<td>MFMA_F32_16x16x32_F8E4M3FNUZ</td>
 </tr>
 <tr>
-<td style="text-align: center;">MFMA_I8_16x16x32_I32</td>
+<td style="text-align: center;">MFMA_I32_16x16x32_I8</td>
 <td style="text-align: center;"><code>4</code></td>
-<td>MFMA_I8_16x16x32_I32</td>
+<td>MFMA_I32_16x16x32_I8</td>
 </tr>
 <tr>
-<td style="text-align: center;">MFMA_I8_32x32x16_I32</td>
+<td style="text-align: center;">MFMA_I32_32x32x16_I8</td>
 <td style="text-align: center;"><code>5</code></td>
-<td>MFMA_I8_32x32x16_I32</td>
+<td>MFMA_I32_32x32x16_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">WMMA_F16_16x16x16_F32</td>
