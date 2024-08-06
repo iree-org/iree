@@ -7,17 +7,21 @@
 """Generator for e2e conv2d tests.
 """
 
+from typing import Optional
 import argparse
 import enum
 import dataclasses
 import typing
 import math
+import itertools
+import re
 
 
 # Data type of kernel entries. The string values must match MLIR data types.
 @enum.unique
 class KernelElemTypeId(enum.Enum):
     NONE = ""
+    I8 = "i8"
     F32 = "f32"
     F16 = "f16"
 
@@ -26,6 +30,16 @@ class KernelElemTypeId(enum.Enum):
 @enum.unique
 class InputElemTypeId(enum.Enum):
     NONE = ""
+    I8 = "i8"
+    F32 = "f32"
+    F16 = "f16"
+
+
+# Data type of input entries. The string values must match MLIR data types.
+@enum.unique
+class AccElemTypeId(enum.Enum):
+    NONE = ""
+    I32 = "i32"
     F32 = "f32"
     F16 = "f16"
 
@@ -37,6 +51,55 @@ class ShapesId(enum.Enum):
     SMALL = "small"
     MEDIUM = "medium"
     LARGE = "large"
+    GPU_LARGE = "gpu_large"
+
+
+# Describes a workgroup and tiling schedule to target a specific MMA intrinsic.
+@dataclasses.dataclass
+class MMASchedule:
+    intrinsic: str
+    m_count: int  # Number of subgroups per workgroup along M
+    n_count: int  # Number of subgroups per workgroup along N
+    m_tile_count: int
+    n_tile_count: int
+    k_tile_count: int
+
+    def __str__(self):
+        return (
+            "mma_schedule = #iree_gpu.mma_schedule<"
+            + f"intrinsic = #iree_gpu.mma_layout<{self.intrinsic}>, "
+            + f"subgroup_m_count = {self.m_count}, "
+            + f"subgroup_n_count = {self.n_count}>"
+        )
+
+
+# Enumerates of the collections of compilation info that we can generate tests
+# for. The values are the accepted values for the --compilation_info= flag.
+@enum.unique
+class CompilationInfoId(enum.Enum):
+    NONE = ""
+    LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
+    LLVMGPUVectorDistributeWMMA = "LLVMGPUVectorDistributeWMMA"
+    LLVMGPUVectorizeCDNA = "LLVMGPUVectorizeCDNA"
+    LLVMGPUVectorizeRDNA = "LLVMGPUVectorizeRDNA"
+
+
+# Describes how to construct compilation info for the testcase.
+@dataclasses.dataclass
+class CompilationInfo:
+    # Lowering Config
+    tile_sizes: typing.List[typing.List[int]]
+    # Translation Info
+    dispatch_lowering_pass_pipeline: str
+    software_pipeline_depth: int
+    mma_schedule: typing.Optional[MMASchedule]
+    # Compilation info
+    workgroup_size: typing.List[int]
+    subgroup_size: Optional[int] = None
+
+    # Prints the workgroup size
+    def workgroup_size_str(self):
+        return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
 
 
 # Enumerates ways to construct MLIR tensor types.
@@ -125,6 +188,8 @@ def get_test_shapes(shapes_id: ShapesId):
             TestShape(n=2, c=4, h=128, w=128, kh=3, kw=3, f=8, accumulate=True),
             TestShape(n=2, c=3, h=128, w=128, kh=3, kw=3, f=12, accumulate=True),
         ]
+    if shapes_id == ShapesId.GPU_LARGE:
+        return [TestShape(n=1, c=64, h=130, w=130, kh=3, kw=3, f=64, accumulate=True)]
 
     raise ValueError(shapes_id)
 
@@ -132,7 +197,7 @@ def get_test_shapes(shapes_id: ShapesId):
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.LARGE:
+    if shapes_id == ShapesId.LARGE or shapes_id == ShapesId.GPU_LARGE:
         return [
             Dynamicity.STATIC,
         ]
@@ -142,6 +207,156 @@ def get_dynamicities(shapes_id: ShapesId):
             Dynamicity.STATIC,
         ]
     raise ValueError(shapes_id)
+
+
+@dataclasses.dataclass
+class TileWorkgroupSizePair:
+    tile_size: typing.List[typing.List[int]]
+    workgroup_size: typing.List[int]
+
+
+def get_rocm_test_compilation_infos(
+    compilation_info_id: CompilationInfoId,
+    lhs_rhs_type: InputElemTypeId,
+    acc_type: AccElemTypeId,
+):
+    intrinsic = ""
+    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
+        intrinsic = "MFMA"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA:
+        intrinsic = "WMMA"
+    else:
+        raise ValueError("Unknown pipeline for rocm")
+
+    schedules = []
+    if intrinsic == "MFMA":
+        schedules = [
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+            MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
+            MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_I8_16x16x32_I32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I8_16x16x32_I32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I8_16x16x32_I32", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_I8_16x16x32_I32", 4, 2, 4, 2, 1),
+            MMASchedule("MFMA_I8_32x32x16_I32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I8_32x32x16_I32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I8_32x32x16_I32", 4, 1, 1, 2, 2),
+        ]
+    elif intrinsic == "WMMA":
+        schedules = [
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+        ]
+    else:
+        raise NotImplementedError("unhandled intrinsic case")
+
+    subgroup_size = 64 if intrinsic == "MFMA" else 32
+
+    infos = []
+    for schedule in schedules:
+        # Skip schedules with an intrinsic which element type does not
+        # match the requested one.
+
+        # Extract the input and acc type from intrinsic strings
+        extract_input_type = lambda s: re.search(r"(?:MFMA|WMMA)_([^_]+)_", s).group(1)
+        extract_output_type = lambda s: (
+            match := re.search(r"_(F\d+|I\d+)$", s)
+        ) and match.group(1)
+
+        if lhs_rhs_type.value.upper() != extract_input_type(
+            schedule.intrinsic
+        ) or acc_type.value.upper() != extract_output_type(schedule.intrinsic):
+            continue
+
+        if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 16
+        elif schedule.intrinsic == "MFMA_F16_32x32x8_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
+            wg_tile_k = schedule.k_tile_count * 8
+        elif schedule.intrinsic == "MFMA_I8_16x16x32_I32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 32
+        elif schedule.intrinsic == "MFMA_I8_32x32x16_I32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
+            wg_tile_k = schedule.k_tile_count * 16
+        elif schedule.intrinsic == "WMMA_F16_16x16x16_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 16
+        else:
+            raise NotImplementedError("unhandled intrinsic case")
+
+        workgroup_tile = [[1, 1, wg_tile_m, wg_tile_n, 1, 1, wg_tile_k]]
+        workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
+
+        infos.append(
+            CompilationInfo(
+                tile_sizes=workgroup_tile,
+                dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
+                workgroup_size=workgroup_size,
+                software_pipeline_depth=0,
+                mma_schedule=schedule,
+                subgroup_size=subgroup_size,
+            )
+        )
+    return infos
+
+
+# Returns the list of CompilationInfo's to use for the CompilationInfoId.
+def get_test_compilation_infos(
+    compilation_info_id: CompilationInfoId,
+    lhs_rhs_type: InputElemTypeId,
+    acc_type: AccElemTypeId,
+) -> typing.List[typing.Optional[CompilationInfo]]:
+    if compilation_info_id == CompilationInfoId.NONE:
+        return [None]
+
+    if compilation_info_id in [
+        CompilationInfoId.LLVMGPUVectorDistributeMFMA,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMA,
+    ]:
+        return get_rocm_test_compilation_infos(
+            compilation_info_id, lhs_rhs_type, acc_type
+        )
+
+    subgroup_size = -1
+    if compilation_info_id == CompilationInfoId.LLVMGPUVectorizeCDNA:
+        subgroup_size = 64
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorizeRDNA:
+        subgroup_size = 32
+
+    if subgroup_size == 64 or subgroup_size == 32:
+        workgroup_tile = [[1, 1, 8, 128, 1, 1, 4]]
+        workgroup_size = [64, 1, 1]
+        infos = []
+        infos.append(
+            CompilationInfo(
+                tile_sizes=workgroup_tile,
+                dispatch_lowering_pass_pipeline="LLVMGPUVectorize",
+                workgroup_size=workgroup_size,
+                software_pipeline_depth=0,
+                mma_schedule=None,
+                subgroup_size=subgroup_size,
+            )
+        )
+        return infos
+
+    raise ValueError("Unknown pipeline for rocm")
 
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
@@ -267,7 +482,7 @@ def get_tensor_shape(
     if kernel_layout == KernelLayout.FCHW:
         kernel_tensor_shape = [f, c, kh, kw]
     elif kernel_layout == KernelLayout.HWCF:
-        kernel_tensor_shape = [f, c, kh, kw]
+        kernel_tensor_shape = [kh, kw, c, f]
     else:
         raise ValueError(kernel_layout)
 
@@ -279,9 +494,10 @@ def get_tensor_shape(
 def generate_function_name(
     input_type: InputElemTypeId,
     kernel_type: KernelElemTypeId,
-    output_type: InputElemTypeId,
+    output_type: AccElemTypeId,
     shapes: TestInputTensorShapes,
     accumulate: bool,
+    compilation_info: typing.Optional[CompilationInfo] = None,
 ):
     input_t = input_type.value
     kernel_t = kernel_type.value
@@ -294,10 +510,20 @@ def generate_function_name(
     kw = int_or_DYN(shapes.kw)
     f = int_or_DYN(shapes.f)
 
+    info = ""
+    if compilation_info:
+        tile_sizes = list(itertools.chain(*compilation_info.tile_sizes))
+        tile_workgroup_key = (
+            "_".join([str(a) for a in tile_sizes])
+            + "_"
+            + "_".join([str(a) for a in compilation_info.workgroup_size])
+        )
+        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}_{tile_workgroup_key}"
+
     conv2d_kind = "conv2d_accumulate" if accumulate else "conv2d"
     return (
         f"{conv2d_kind}_{n}_{c}_{h}_{w}_times_"
-        + f"{kh}_{kw}_{f}_dtype_{input_t}_{kernel_t}_{acc_t}"
+        + f"{kh}_{kw}_{f}_dtype_{input_t}_{kernel_t}_{acc_t}{info}"
     )
 
 
@@ -318,18 +544,15 @@ def generate_function(
     input_layout: InputLayout,
     kernel_type: KernelElemTypeId,
     kernel_layout: KernelLayout,
-    acc_type: InputElemTypeId,
+    acc_type: AccElemTypeId,
     conv2d_attr: ConvAttrs,
     shape: TestShape,
     dynamicity: Dynamicity,
+    compilation_info: typing.Optional[CompilationInfo] = None,
 ):
     shapes = generate_shapes(shape, dynamicity)
     func_name = generate_function_name(
-        input_type,
-        kernel_type,
-        acc_type,
-        shapes,
-        shape.accumulate,
+        input_type, kernel_type, acc_type, shapes, shape.accumulate, compilation_info
     )
 
     input_shape, kernel_shape, output_shape = get_tensor_shape(
@@ -338,7 +561,7 @@ def generate_function(
     input_tensor_type = f"tensor<{input_shape[0]}x{input_shape[1]}x{input_shape[2]}x{input_shape[3]}x{input_type.value}>"
     kernel_tensor_type = f"tensor<{kernel_shape[0]}x{kernel_shape[1]}x{kernel_shape[2]}x{kernel_shape[3]}x{kernel_type.value}>"
 
-    acc_tensor_type = f"tensor<{output_shape[0]}x{output_shape[1]}x{output_shape[2]}x{output_shape[3]}x{input_type.value}>"
+    acc_tensor_type = f"tensor<{output_shape[0]}x{output_shape[1]}x{output_shape[2]}x{output_shape[3]}x{acc_type.value}>"
 
     op_name = None
     if input_layout == InputLayout.NCHW:
@@ -350,10 +573,47 @@ def generate_function(
         if kernel_layout == KernelLayout.HWCF:
             op_name = "linalg.conv_2d_nhwc_hwcf"
 
+    if op_name is None:
+        raise ValueError("Invalid combination of input_layout and kernel_layout")
+
     conv_attr = f"{{dilations = dense<{list(conv2d_attr.DILATION)}> : tensor<2xi64>, strides = dense<{list(conv2d_attr.STRIDE)}> : tensor<2xi64>}}"
 
     # Compilation info is optional; prints empty string by default.
     func_definition = ""
+    # compilation_info_attr = ""
+    if compilation_info:
+        requested_pipeline = compilation_info.dispatch_lowering_pass_pipeline
+        compiler_pipeline = requested_pipeline
+        if requested_pipeline == "SPIRVVectorizeMali":
+            compiler_pipeline = "SPIRVBaseVectorize"
+        elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
+            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
+        elif requested_pipeline == "SPIRVVectorizeNVIDIA":
+            # TODO: change to test SPIRVMatmulPromoteVectorize too
+            compiler_pipeline = "SPIRVBaseVectorize"
+
+        mma_schedule = ""
+        if compilation_info.mma_schedule is not None:
+            mma_schedule = ", {}".format(compilation_info.mma_schedule)
+        subgroup_size_str = ""
+        if compilation_info.subgroup_size is not None:
+            subgroup_size_str = f"subgroup_size = {compilation_info.subgroup_size}"
+
+        compilation_info_string = (
+            f"#compilation{generate_function.compilation_index} = "
+            "#iree_codegen.compilation_info<\n"
+            f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {compilation_info.tile_sizes}>,\n"
+            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()}\n"
+            f"  {subgroup_size_str},\n"
+            f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
+            f"  store_stage = 1{mma_schedule} }}>>\n"
+        )
+        # compilation_info_attr = (
+        #     f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
+        # )
+        func_definition = func_definition + compilation_info_string
+        conv_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}, dilations = dense<{list(conv2d_attr.DILATION)}> : tensor<2xi64>, strides = dense<{list(conv2d_attr.STRIDE)}> : tensor<2xi64>}}"
+        generate_function.compilation_index += 1
 
     signature = f"({input_tensor_type}, {kernel_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
     import_declaration = f"func.func private @module.{func_name}(%input: !hal.buffer_view, %kernel: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
@@ -363,13 +623,16 @@ def generate_function(
         f"  return %result: {acc_tensor_type}\n"
         f"}}\n"
     )
-
     return MLIRFunction(
         name=func_name,
         signature=signature,
         import_declaration=import_declaration,
         definition=func_definition,
     )
+
+
+# Counter for producing unique compilation info attrs
+generate_function.compilation_index = 0
 
 
 # Represents a call to a generated test function.
@@ -433,7 +696,7 @@ def generate_call(
     kernel_type: KernelElemTypeId,
     kernel_layout: KernelLayout,
     conv2d_attr: ConvAttrs,
-    acc_type: InputElemTypeId,
+    acc_type: AccElemTypeId,
     shape: TestShape,
 ):
     global call_id
@@ -443,7 +706,22 @@ def generate_call(
     func_name = f"{func_name}_{call_id}"
     call_id = call_id + 1
 
+    # layout of output tensor for checking correctness
+    layout = -1
     description = f"Conv2d shape (NxCxHxWxFxKHxKW): {shape.n}x{shape.c}x{shape.h}x{shape.w}x{shape.f}x{shape.kh}x{shape.kw}"
+    if input_layout == InputLayout.NCHW:
+        if kernel_layout == KernelLayout.FCHW or kernel_layout == KernelLayout.HWCF:
+            layout = 0  # for output tensor NxFxOHxOW
+        else:
+            raise ValueError(kernel_layout)
+    elif input_layout == InputLayout.NHWC:
+        if kernel_layout == KernelLayout.HWCF:
+            layout = 1  # for output tensor NxOHxOWxF
+        else:
+            raise ValueError(kernel_layout)
+    else:
+        raise ValueError(InputLayout)
+
     op = (
         f"func.func @{func_name}() attributes {{\n"
         f'  iree.reflection = {{description = "{description}"}}\n'
@@ -485,11 +763,12 @@ def generate_call(
         f"  %f = arith.constant {shape.f} : i64\n"
         f"  %kh = arith.constant {shape.kh} : i64\n"
         f"  %kw = arith.constant {shape.kw} : i64\n"
+        f"  %layout = arith.constant {layout} : i64\n"
         f"  %sh = arith.constant {conv2d_attr.STRIDE[0]} : i64\n"
         f"  %sw = arith.constant {conv2d_attr.STRIDE[1]} : i64\n"
         f"  %dh = arith.constant {conv2d_attr.DILATION[0]} : i64\n"
         f"  %dw = arith.constant {conv2d_attr.DILATION[1]} : i64\n"
-        f"  call @conv2d_test.check_conv2d_results(%device, %n, %c, %h, %w, %f, %kh, %kw, %sh, %sw, %dh, %dw, %input, %kernel, %acc, %result) : (!hal.device, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  call @conv2d_test.check_conv2d_results(%device, %n, %c, %h, %w, %f, %kh, %kw, %layout, %sh, %sw, %dh, %dw, %input, %kernel, %acc, %result) : (!hal.device, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
     op = op + "  return\n"
@@ -505,43 +784,48 @@ def generate(
     kernel_elem_type: KernelElemTypeId,
     kernel_layout: KernelLayout,
     conv2d_attr: ConvAttrs,
-    acc_type: InputElemTypeId,
+    acc_elem_type: AccElemTypeId,
     shapes_id: ShapesId,
+    compilation_info_id: CompilationInfoId,
 ):
     functions = {}
     calls = []
 
-    for shape in get_test_shapes(shapes_id):
-        for dynamicity in get_dynamicities(shapes_id):
-            function = generate_function(
-                input_elem_type,
-                input_layout,
-                kernel_elem_type,
-                kernel_layout,
-                acc_type,
-                conv2d_attr,
-                shape,
-                dynamicity,
-            )
-            # Different testcases may differ only by runtime parameters but
-            # share the same code. For example, dynamic-shapes testcases
-            # share the same code involing tensor<?x?xf32> even though the runtime
-            # value in the trace are different. That's why we append conditionally
-            # to calls, but unconditionally to function_definitions.
-            if function.name not in functions:
-                functions[function.name] = function
-            calls.append(
-                generate_call(
-                    function,
+    for compilation_info in get_test_compilation_infos(
+        compilation_info_id, input_elem_type, acc_elem_type
+    ):
+        for shape in get_test_shapes(shapes_id):
+            for dynamicity in get_dynamicities(shapes_id):
+                function = generate_function(
                     input_elem_type,
                     input_layout,
                     kernel_elem_type,
                     kernel_layout,
+                    acc_elem_type,
                     conv2d_attr,
-                    acc_type,
                     shape,
+                    dynamicity,
+                    compilation_info,
                 )
-            )
+                # Different testcases may differ only by runtime parameters but
+                # share the same code. For example, dynamic-shapes testcases
+                # share the same code involing tensor<?x?xf32> even though the runtime
+                # value in the trace are different. That's why we append conditionally
+                # to calls, but unconditionally to function_definitions.
+                if function.name not in functions:
+                    functions[function.name] = function
+                calls.append(
+                    generate_call(
+                        function,
+                        input_elem_type,
+                        input_layout,
+                        kernel_elem_type,
+                        kernel_layout,
+                        conv2d_attr,
+                        acc_elem_type,
+                        shape,
+                    )
+                )
 
     return (functions, calls)
 
@@ -563,7 +847,7 @@ def parse_arguments():
     parser.add_argument(
         "--input_type",
         type=str,
-        choices=["f32", "f16"],
+        choices=["i8", "f32", "f16"],
         help="Numeric type of input tensors",
         required=True,
     )
@@ -578,7 +862,7 @@ def parse_arguments():
     parser.add_argument(
         "--kernel_type",
         type=str,
-        choices=["f32", "f16"],
+        choices=["i8", "f32", "f16"],
         help="Numeric type of input tensors",
         required=True,
     )
@@ -593,7 +877,7 @@ def parse_arguments():
     parser.add_argument(
         "--acc_type",
         type=str,
-        choices=["f32", "f16"],
+        choices=["i32", "f32", "f16"],
         help="Numeric type of input tensors",
         default="",
         required=False,
@@ -617,6 +901,14 @@ def parse_arguments():
         type=str,
         default="1,1",
         help="The stride factor for the convolution operation. Comma-separated. As in 1,1",
+        required=False,
+    )
+    parser.add_argument(
+        "--compilation_info",
+        type=str,
+        choices=[i.value for i in CompilationInfoId],
+        help="Collection of compilation info setups to test",
+        default="",
         required=False,
     )
     parser.add_argument(
@@ -652,7 +944,7 @@ def write_calls_file(functions, calls, filename, requirements):
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
         "func.func private @conv2d_test.generate_random_tensor(%device: !hal.device, %dim0: i64, %dim1: i64, %dim2: i64, %dim3: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @conv2d_test.check_conv2d_results(%device: !hal.device, %n: i64, %c: i64, %h: i64, %w: i64, %f:i64, %kh:i64, %kw:i64, %sh:i64, %sw:i64, %dh:i64, %dw:i64, %input: !hal.buffer_view, %kernel: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
+        "func.func private @conv2d_test.check_conv2d_results(%device: !hal.device, %n: i64, %c: i64, %h: i64, %w: i64, %f:i64, %kh:i64, %kw:i64, %layout:i64, %sh:i64, %sw:i64, %dh:i64, %dw:i64, %input: !hal.buffer_view, %kernel: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
         "\n"
     )
 
@@ -676,9 +968,12 @@ def main(args):
     input_layout = InputLayout(args.input_layout)
     kernel_type = KernelElemTypeId(args.kernel_type)
     kernel_layout = KernelLayout(args.kernel_layout)
-    # TODO: The output type is same as the input type for now.
-    acc_type = input_type
+
+    acc_type = AccElemTypeId(args.acc_type)
+
     shapes_id = ShapesId(args.shapes)
+    compilation_info_id = CompilationInfoId(args.compilation_info)
+
     conv2d_attr = ConvAttrs(
         tuple(map(int, args.stride.split(","))),
         tuple(map(int, args.dilation.split(","))),
@@ -692,6 +987,7 @@ def main(args):
         conv2d_attr,
         acc_type,
         shapes_id,
+        compilation_info_id,
     )
 
     write_code_file(functions, args.output_conv2d_mlir)

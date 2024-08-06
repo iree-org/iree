@@ -323,3 +323,177 @@ iree_generated_e2e_runner_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+set(IREE_HIP_TEST_TARGET_CHIP gfx942)
+# To distinguish between CDNA(gfx9) and RDNA3(gfx11)
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_conv2d_rocm_f16_f16_f32_large_cdna3
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--input_layout=nhwc"
+    "--kernel_type=f16"
+    "--kernel_layout=hwcf"
+    "--acc_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_conv2d_rocm_f16_f16_f32_large_gpu_vectorize_cdna3
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--input_layout=nhwc"
+    "--kernel_type=f16"
+    "--kernel_layout=hwcf"
+    "--acc_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUVectorizeCDNA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_conv2d_rocm_nchw_f16_f16_f32_large_gpu_vectorize_cdna3
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--input_layout=nchw"
+    "--kernel_type=f16"
+    "--kernel_layout=fchw"
+    "--acc_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUVectorizeCDNA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_conv2d_rocm_i8_large_cdna3
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=i8"
+    "--input_layout=nhwc"
+    "--kernel_type=i8"
+    "--kernel_layout=hwcf"
+    "--acc_type=i32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_conv2d_rocm_f16_f16_f32_large_cdna3
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--input_layout=nhwc"
+    "--kernel_type=f16"
+    "--kernel_layout=hwcf"
+    "--acc_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUVectorDistributeWMMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-rdna3"
+)
+
+endif()

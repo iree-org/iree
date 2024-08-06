@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdexcept>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
@@ -21,7 +23,7 @@
 #include "tools/testing/e2e/test_utils.h"
 
 //===----------------------------------------------------------------------===//
-// Reference conv2d (NCHW-FCHW)
+// Reference conv2d (NCHW-FCHW) and (NHWC-HWCF)
 //===----------------------------------------------------------------------===//
 
 // Conversion from 4D indices in row major order to 1D index.
@@ -36,57 +38,219 @@ static int convert_to_1d_index(iree_hal_dim_t channels, iree_hal_dim_t height,
 static void reference_conv2d_f16_f16_f16_f16(
     iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
     iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
-    iree_hal_dim_t kw_size, iree_hal_dim_t sh_size, iree_hal_dim_t sw_size,
-    iree_hal_dim_t dh_size, iree_hal_dim_t dw_size, iree_hal_dim_t oh_size,
-    iree_hal_dim_t ow_size, const uint16_t* input_data,
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t oh_size, iree_hal_dim_t ow_size, const uint16_t* input_data,
     const uint16_t* kernel_data, const uint16_t* acc_data,
     uint16_t* result_data, iree_hal_dim_t n, iree_hal_dim_t oc,
     iree_hal_dim_t oh, iree_hal_dim_t ow) {
-  iree_hal_dim_t out_idx =
-      convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
+  if (layout == 0) {
+    // The layout of output tensor is NxfxOHxOW
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
 
-  float acc = acc_data ? iree_math_f16_to_f32(acc_data[out_idx]) : 0.f;
+    float acc = acc_data ? iree_math_f16_to_f32(acc_data[out_idx]) : 0.f;
 
-  for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+    for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+      for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+        for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size));
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
+
+          acc += iree_math_f16_to_f32(input_data[inp_idx]) *
+                 iree_math_f16_to_f32(kernel_data[krnl_idx]);
+        }
+      }
+      result_data[out_idx] = iree_math_f32_to_f16(acc);
+    }
+  } else if (layout == 1) {
+    // The layout of output tensor is NxOHxOWxf
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(oh_size, ow_size, f_size, n, oh, ow, oc);
+
+    float acc = acc_data ? iree_math_f16_to_f32(acc_data[out_idx]) : 0.f;
+
     for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
       for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
-        iree_hal_dim_t inp_idx = convert_to_1d_index(
-            c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
-            (ow * sw_size + kw * dw_size));
-        iree_hal_dim_t krnl_idx =
-            convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
+        for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              h_size, w_size, c_size, n, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size), ic);
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(kw_size, c_size, f_size, kh, kw, ic, oc);
 
-        acc += iree_math_f16_to_f32(input_data[inp_idx]) *
-               iree_math_f16_to_f32(kernel_data[krnl_idx]);
+          acc += iree_math_f16_to_f32(input_data[inp_idx]) *
+                 iree_math_f16_to_f32(kernel_data[krnl_idx]);
+        }
       }
     }
     result_data[out_idx] = iree_math_f32_to_f16(acc);
   }
 }
 
+// [f32 <= f16 * f16 + f32]
+static void reference_conv2d_f16_f16_f32_f32(
+    iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
+    iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t oh_size, iree_hal_dim_t ow_size, const uint16_t* input_data,
+    const uint16_t* kernel_data, const float* acc_data, float* result_data,
+    iree_hal_dim_t n, iree_hal_dim_t oc, iree_hal_dim_t oh, iree_hal_dim_t ow) {
+  if (layout == 0) {
+    // The layout of output tensor is NxfxOHxOW
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
+
+    float acc = acc_data ? acc_data[out_idx] : 0.f;
+
+    for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+      for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+        for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size));
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
+
+          acc += iree_math_f16_to_f32(input_data[inp_idx]) *
+                 iree_math_f16_to_f32(kernel_data[krnl_idx]);
+        }
+      }
+      result_data[out_idx] = acc;
+    }
+  } else if (layout == 1) {
+    // The layout of output tensor is NxOHxOWxf
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(oh_size, ow_size, f_size, n, oh, ow, oc);
+
+    float acc = acc_data ? acc_data[out_idx] : 0.f;
+
+    for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+      for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+        for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              h_size, w_size, c_size, n, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size), ic);
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(kw_size, c_size, f_size, kh, kw, ic, oc);
+
+          acc += iree_math_f16_to_f32(input_data[inp_idx]) *
+                 iree_math_f16_to_f32(kernel_data[krnl_idx]);
+        }
+      }
+    }
+    result_data[out_idx] = acc;
+  }
+}
+
+// [i32 <= i8 * i8 + i32]
+static void reference_conv2d_i8_i8_i32_i32(
+    iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
+    iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t oh_size, iree_hal_dim_t ow_size, const int8_t* input_data,
+    const int8_t* kernel_data, const int32_t* acc_data, int32_t* result_data,
+    iree_hal_dim_t n, iree_hal_dim_t oc, iree_hal_dim_t oh, iree_hal_dim_t ow) {
+  if (layout == 0) {
+    // The layout of output tensor is NxfxOHxOW
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
+
+    int32_t acc = acc_data ? acc_data[out_idx] : 0;
+
+    for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+      for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+        for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size));
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
+
+          int8_t lhs_value = input_data[inp_idx];
+          int8_t rhs_value = kernel_data[krnl_idx];
+          acc += (int32_t)lhs_value * (int32_t)rhs_value;
+        }
+      }
+      result_data[out_idx] = acc;
+    }
+  } else if (layout == 1) {
+    // The layout of output tensor is NxOHxOWxf
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(oh_size, ow_size, f_size, n, oh, ow, oc);
+
+    int32_t acc = acc_data ? acc_data[out_idx] : 0;
+
+    for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+      for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+        for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              h_size, w_size, c_size, n, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size), ic);
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(kw_size, c_size, f_size, kh, kw, ic, oc);
+
+          int8_t lhs_value = input_data[inp_idx];
+          int8_t rhs_value = kernel_data[krnl_idx];
+          acc += (int32_t)lhs_value * (int32_t)rhs_value;
+        }
+      }
+    }
+    result_data[out_idx] = acc;
+  }
+}
+
 static void reference_conv2d_f32_f32_f32_f32(
     iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
     iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
-    iree_hal_dim_t kw_size, iree_hal_dim_t sh_size, iree_hal_dim_t sw_size,
-    iree_hal_dim_t dh_size, iree_hal_dim_t dw_size, iree_hal_dim_t oh_size,
-    iree_hal_dim_t ow_size, const float* input_data, const float* kernel_data,
-    const float* acc_data, float* result_data, iree_hal_dim_t n,
-    iree_hal_dim_t oc, iree_hal_dim_t oh, iree_hal_dim_t ow) {
-  iree_hal_dim_t out_idx =
-      convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t oh_size, iree_hal_dim_t ow_size, const float* input_data,
+    const float* kernel_data, const float* acc_data, float* result_data,
+    iree_hal_dim_t n, iree_hal_dim_t oc, iree_hal_dim_t oh, iree_hal_dim_t ow) {
+  if (layout == 0) {
+    // The layout of output tensor is NxfxOHxOW
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(f_size, oh_size, ow_size, n, oc, oh, ow);
 
-  float acc = acc_data ? acc_data[out_idx] : 0;
+    float acc = acc_data ? acc_data[out_idx] : 0;
 
-  for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+    for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+      for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
+        for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size));
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
+
+          acc += input_data[inp_idx] * kernel_data[krnl_idx];
+        }
+      }
+      result_data[out_idx] = acc;
+    }
+  } else if (layout == 1) {
+    // The layout of output tensor is NxOHxOWxf
+    iree_hal_dim_t out_idx =
+        convert_to_1d_index(oh_size, ow_size, f_size, n, oh, ow, oc);
+
+    float acc = acc_data ? acc_data[out_idx] : 0;
+
     for (iree_hal_dim_t kh = 0; kh < kh_size; ++kh) {
       for (iree_hal_dim_t kw = 0; kw < kw_size; ++kw) {
-        iree_hal_dim_t inp_idx = convert_to_1d_index(
-            c_size, h_size, w_size, n, ic, (oh * sh_size + kh * dh_size),
-            (ow * sw_size + kw * dw_size));
-        iree_hal_dim_t krnl_idx =
-            convert_to_1d_index(c_size, kh_size, kw_size, oc, ic, kh, kw);
-
-        acc += input_data[inp_idx] * kernel_data[krnl_idx];
+        for (iree_hal_dim_t ic = 0; ic < c_size; ++ic) {
+          iree_hal_dim_t inp_idx = convert_to_1d_index(
+              h_size, w_size, c_size, n, (oh * sh_size + kh * dh_size),
+              (ow * sw_size + kw * dw_size), ic);
+          iree_hal_dim_t krnl_idx =
+              convert_to_1d_index(kw_size, c_size, f_size, kh, kw, ic, oc);
+          acc += input_data[inp_idx] * kernel_data[krnl_idx];
+        }
       }
     }
     result_data[out_idx] = acc;
@@ -97,28 +261,45 @@ static void reference_conv2d_f32_f32_f32_f32(
 static iree_status_t reference_conv2d_element(
     iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
     iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
-    iree_hal_dim_t kw_size, iree_hal_dim_t sh_size, iree_hal_dim_t sw_size,
-    iree_hal_dim_t dh_size, iree_hal_dim_t dw_size, iree_hal_dim_t oh_size,
-    iree_hal_dim_t ow_size, iree_hal_element_type_t input_type,
-    iree_hal_element_type_t kernel_type, iree_hal_element_type_t acc_type,
-    void* input_data, void* kernel_data, void* acc_data, void* result_data,
-    iree_hal_dim_t n, iree_hal_dim_t oc, iree_hal_dim_t oh, iree_hal_dim_t ow) {
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t oh_size, iree_hal_dim_t ow_size,
+    iree_hal_element_type_t input_type, iree_hal_element_type_t kernel_type,
+    iree_hal_element_type_t acc_type, void* input_data, void* kernel_data,
+    void* acc_data, void* result_data, iree_hal_dim_t n, iree_hal_dim_t oc,
+    iree_hal_dim_t oh, iree_hal_dim_t ow) {
   if (input_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       kernel_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_conv2d_f32_f32_f32_f32(
-        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, sh_size,
-        sw_size, dh_size, dw_size, oh_size, ow_size, (const float*)input_data,
-        (const float*)kernel_data, (const float*)acc_data, (float*)result_data,
-        n, oc, oh, ow);
+        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, layout,
+        sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
+        (const float*)input_data, (const float*)kernel_data,
+        (const float*)acc_data, (float*)result_data, n, oc, oh, ow);
   } else if (input_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              kernel_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     reference_conv2d_f16_f16_f16_f16(
-        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, sh_size,
-        sw_size, dh_size, dw_size, oh_size, ow_size,
+        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, layout,
+        sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
         (const uint16_t*)input_data, (const uint16_t*)kernel_data,
         (const uint16_t*)acc_data, (uint16_t*)result_data, n, oc, oh, ow);
+  } else if (input_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             kernel_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_conv2d_f16_f16_f32_f32(
+        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, layout,
+        sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
+        (const uint16_t*)input_data, (const uint16_t*)kernel_data,
+        (const float*)acc_data, (float*)result_data, n, oc, oh, ow);
+  } else if (input_type == IREE_HAL_ELEMENT_TYPE_INT_8 &&
+             kernel_type == IREE_HAL_ELEMENT_TYPE_INT_8 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_INT_32) {
+    reference_conv2d_i8_i8_i32_i32(
+        n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, layout,
+        sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
+        (const int8_t*)input_data, (const int8_t*)kernel_data,
+        (const int32_t*)acc_data, (int32_t*)result_data, n, oc, oh, ow);
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unhandled combination of element types in conv2d");
@@ -141,8 +322,8 @@ static iree_hal_dim_t out_shape_calc(iree_hal_dim_t i_shape,
 static iree_status_t reference_conv2d(
     iree_hal_dim_t n_size, iree_hal_dim_t c_size, iree_hal_dim_t h_size,
     iree_hal_dim_t w_size, iree_hal_dim_t f_size, iree_hal_dim_t kh_size,
-    iree_hal_dim_t kw_size, iree_hal_dim_t sh_size, iree_hal_dim_t sw_size,
-    iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
+    iree_hal_dim_t kw_size, iree_hal_dim_t layout, iree_hal_dim_t sh_size,
+    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
     iree_hal_element_type_t input_type, iree_hal_element_type_t kernel_type,
     iree_hal_element_type_t acc_type, iree_byte_span_t input_contents,
     iree_byte_span_t kernel_contents, iree_byte_span_t acc_contents,
@@ -156,20 +337,43 @@ static iree_status_t reference_conv2d(
   iree_hal_dim_t oh_size = out_shape_calc(h_size, kh_size, sh_size, dh_size);
   iree_hal_dim_t ow_size = out_shape_calc(w_size, kw_size, sw_size, dw_size);
 
-  for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-    for (iree_hal_dim_t oc = 0; oc < f_size; ++oc) {
-      for (iree_hal_dim_t oh = 0; oh < oh_size; ++oh) {
-        for (iree_hal_dim_t ow = 0; ow < ow_size; ++ow) {
-          IREE_RETURN_AND_END_ZONE_IF_ERROR(
-              z0, reference_conv2d_element(
-                      n_size, c_size, h_size, w_size, f_size, kh_size, kw_size,
-                      sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
-                      input_type, kernel_type, acc_type, input_contents.data,
-                      kernel_contents.data, acc_contents.data,
-                      result_contents.data, n, oc, oh, ow));
+  if (layout == 0) {
+    for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+      for (iree_hal_dim_t oc = 0; oc < f_size; ++oc) {
+        for (iree_hal_dim_t oh = 0; oh < oh_size; ++oh) {
+          for (iree_hal_dim_t ow = 0; ow < ow_size; ++ow) {
+            IREE_RETURN_AND_END_ZONE_IF_ERROR(
+                z0,
+                reference_conv2d_element(
+                    n_size, c_size, h_size, w_size, f_size, kh_size, kw_size,
+                    layout, sh_size, sw_size, dh_size, dw_size, oh_size,
+                    ow_size, input_type, kernel_type, acc_type,
+                    input_contents.data, kernel_contents.data,
+                    acc_contents.data, result_contents.data, n, oc, oh, ow));
+          }
         }
       }
     }
+  } else if (layout == 1) {
+    for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+      for (iree_hal_dim_t oh = 0; oh < oh_size; ++oh) {
+        for (iree_hal_dim_t ow = 0; ow < ow_size; ++ow) {
+          for (iree_hal_dim_t oc = 0; oc < f_size; ++oc) {
+            IREE_RETURN_AND_END_ZONE_IF_ERROR(
+                z0,
+                reference_conv2d_element(
+                    n_size, c_size, h_size, w_size, f_size, kh_size, kw_size,
+                    layout, sh_size, sw_size, dh_size, dw_size, oh_size,
+                    ow_size, input_type, kernel_type, acc_type,
+                    input_contents.data, kernel_contents.data,
+                    acc_contents.data, result_contents.data, n, oc, oh, ow));
+          }
+        }
+      }
+    }
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unhandled conv2d layout");
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -182,17 +386,18 @@ static iree_status_t reference_conv2d(
 
 typedef struct {
   iree_allocator_t host_allocator;
-  iree_hal_dim_t n;   // batch dim
-  iree_hal_dim_t c;   // input channels
-  iree_hal_dim_t h;   // input height
-  iree_hal_dim_t w;   // input width
-  iree_hal_dim_t f;   // output channels
-  iree_hal_dim_t kh;  // kernel height
-  iree_hal_dim_t kw;  // kernel width
-  iree_hal_dim_t sh;  // stride along height dim
-  iree_hal_dim_t sw;  // stride along width dim
-  iree_hal_dim_t dh;  // dilation along height dim
-  iree_hal_dim_t dw;  // dilation along width dim
+  iree_hal_dim_t n;       // batch dim
+  iree_hal_dim_t c;       // input channels
+  iree_hal_dim_t h;       // input height
+  iree_hal_dim_t w;       // input width
+  iree_hal_dim_t f;       // output channels
+  iree_hal_dim_t kh;      // kernel height
+  iree_hal_dim_t kw;      // kernel width
+  iree_hal_dim_t layout;  // conv layout, 0 : nchwxfchw (default); 1: nhwcxhwcf
+  iree_hal_dim_t sh;      // stride along height dim
+  iree_hal_dim_t sw;      // stride along width dim
+  iree_hal_dim_t dh;      // dilation along height dim
+  iree_hal_dim_t dw;      // dilation along width dim
   iree_hal_element_type_t input_type;
   iree_hal_element_type_t kernel_type;
   iree_hal_element_type_t acc_type;
@@ -209,11 +414,12 @@ static void conv2d_results_deinitialize(conv2d_results_t* results);
 static iree_status_t conv2d_results_initialize(
     iree_hal_device_t* device, iree_hal_dim_t n_size, iree_hal_dim_t c_size,
     iree_hal_dim_t h_size, iree_hal_dim_t w_size, iree_hal_dim_t f_size,
-    iree_hal_dim_t kh_size, iree_hal_dim_t kw_size, iree_hal_dim_t sh_size,
-    iree_hal_dim_t sw_size, iree_hal_dim_t dh_size, iree_hal_dim_t dw_size,
-    iree_hal_buffer_view_t* input, iree_hal_buffer_view_t* kernel,
-    iree_hal_buffer_view_t* acc, iree_hal_buffer_view_t* result,
-    iree_allocator_t host_allocator, conv2d_results_t* out_results) {
+    iree_hal_dim_t kh_size, iree_hal_dim_t kw_size, iree_hal_dim_t layout,
+    iree_hal_dim_t sh_size, iree_hal_dim_t sw_size, iree_hal_dim_t dh_size,
+    iree_hal_dim_t dw_size, iree_hal_buffer_view_t* input,
+    iree_hal_buffer_view_t* kernel, iree_hal_buffer_view_t* acc,
+    iree_hal_buffer_view_t* result, iree_allocator_t host_allocator,
+    conv2d_results_t* out_results) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_results, 0, sizeof(*out_results));
@@ -226,6 +432,7 @@ static iree_status_t conv2d_results_initialize(
   out_results->f = f_size;
   out_results->kh = kh_size;
   out_results->kw = kw_size;
+  out_results->layout = layout;
   out_results->sh = sh_size;
   out_results->sw = sw_size;
   out_results->dh = dh_size;
@@ -340,13 +547,13 @@ static iree_status_t check_conv2d_results_impl(FILE* file,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, reference_conv2d(results->n, results->c, results->h, results->w,
-                           results->f, results->kh, results->kw, results->sh,
-                           results->sw, results->dh, results->dw,
-                           results->input_type, results->acc_type,
-                           results->kernel_type, results->input_contents,
-                           results->kernel_contents, results->acc_contents,
-                           results->expected_contents, check_every));
+      z0,
+      reference_conv2d(
+          results->n, results->c, results->h, results->w, results->f,
+          results->kh, results->kw, results->layout, results->sh, results->sw,
+          results->dh, results->dw, results->input_type, results->kernel_type,
+          results->acc_type, results->input_contents, results->kernel_contents,
+          results->acc_contents, results->expected_contents, check_every));
 
   int count = 0;
 
@@ -466,7 +673,8 @@ class Conv2dTestModuleState final {
           int32_t max = 0;
           iree_test_utils_get_min_max_for_element_type(
               callback_state.element_type, &min, &max);
-          uint32_t range = (max - min + 1);
+          // divided by 4 to make numerical behavior more stable
+          uint32_t range = (max - min + 1) / 4;
           iree_host_size_t element_byte_count =
               iree_hal_element_dense_byte_count(callback_state.element_type);
           uint8_t* data_end = span.data + span.data_length;
@@ -487,8 +695,9 @@ class Conv2dTestModuleState final {
 
   Status CheckConv2dResults(
       const vm::ref<iree_hal_device_t> device, int64_t n, int64_t c, int64_t h,
-      int64_t w, int64_t f, int64_t kh, int64_t kw, int64_t sh, int64_t sw,
-      int64_t dh, int64_t dw, const vm::ref<iree_hal_buffer_view_t> input,
+      int64_t w, int64_t f, int64_t kh, int64_t kw, int64_t layout, int64_t sh,
+      int64_t sw, int64_t dh, int64_t dw,
+      const vm::ref<iree_hal_buffer_view_t> input,
       const vm::ref<iree_hal_buffer_view_t> kernel,
       const vm::ref<iree_hal_buffer_view_t> acc,
       const vm::ref<iree_hal_buffer_view_t> actual_result) {
@@ -496,9 +705,10 @@ class Conv2dTestModuleState final {
     IREE_RETURN_IF_ERROR(conv2d_results_initialize(
         device.get(), (iree_hal_dim_t)n, (iree_hal_dim_t)c, (iree_hal_dim_t)h,
         (iree_hal_dim_t)w, (iree_hal_dim_t)f, (iree_hal_dim_t)kh,
-        (iree_hal_dim_t)kw, (iree_hal_dim_t)sh, (iree_hal_dim_t)sw,
-        (iree_hal_dim_t)dh, (iree_hal_dim_t)dw, input.get(), kernel.get(),
-        acc.get(), actual_result.get(), host_allocator_, &results));
+        (iree_hal_dim_t)kw, (iree_hal_dim_t)layout, (iree_hal_dim_t)sh,
+        (iree_hal_dim_t)sw, (iree_hal_dim_t)dh, (iree_hal_dim_t)dw, input.get(),
+        kernel.get(), acc.get(), actual_result.get(), host_allocator_,
+        &results));
     iree_status_t status = check_conv2d_results(stderr, &results);
     conv2d_results_deinitialize(&results);
     return status;
