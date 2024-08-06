@@ -27,43 +27,11 @@ name: CI
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
 
 on:
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/setup.yml"
-      - ".bazelrc"
-      - ".bazelversion"
-      - "WORKSPACE"
-      - "CMakeLists.txt"
-      - "build_tools/**"
-      - "compiler/**"
-      - "llvm-external-projects/**"
-      - "runtime/**"
-      - "samples/**"
-      - "tests/**"
-      - "third_party/**"
-      - "tools/**"
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/setup.yml"
-      - ".bazelrc"
-      - ".bazelversion"
-      - "WORKSPACE"
-      - "CMakeLists.txt"
-      - "build_tools/**"
-      - "compiler/**"
-      - "llvm-external-projects/**"
-      - "runtime/**"
-      - "samples/**"
-      - "tests/**"
-      - "third_party/**"
-      - "tools/**"
-  workflow_dispatch:
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
