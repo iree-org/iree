@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "GPUGeneralizeNamedOps.cpp",
         "GPULowerToUKernels.cpp",
         "GPUMultiBuffering.cpp",
+        "GPUMaterializeEncoding.cpp",
         "GPUNestedLayoutDistributionPatterns.cpp",
         "GPUPatterns.cpp",
         "GPUPipelining.cpp",

@@ -57,6 +57,7 @@ iree_cc_library(
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPULowerToUKernels.cpp"
+    "GPUMaterializeEncoding.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPatterns.cpp"
