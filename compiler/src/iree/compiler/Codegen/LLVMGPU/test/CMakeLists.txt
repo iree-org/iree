@@ -36,7 +36,6 @@ iree_lit_test_suite(
     "gpu_pipeline_generalize_named_ops.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
-    "layout_analysis_and_distribution.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
     "llvmgpu_bufferize.mlir"

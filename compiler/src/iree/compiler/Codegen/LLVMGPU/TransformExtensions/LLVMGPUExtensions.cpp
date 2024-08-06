@@ -815,20 +815,6 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// LayoutAnalysisAndDistributionOp.
-//===---------------------------------------------------------------------===//
-DiagnosedSilenceableFailure
-transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  iree_compiler::doLayoutAnalysisAndDistribution(
-      rewriter, cast<mlir::FunctionOpInterface>(target));
-  results.push_back(target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-//===---------------------------------------------------------------------===//
 // ReorderTransposeOp
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
