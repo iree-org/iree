@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/exported_bits.h"
-#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -26,6 +25,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CPULOWERTOUKERNELSPASS
+#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 // Returns the CastOpInterface op of the body, if
 //   - the `genericOp` is element-wise with identity maps, and
@@ -54,32 +56,15 @@ getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
 
 namespace {
 class CPULowerToUKernelsPass
-    : public CPULowerToUKernelsBase<CPULowerToUKernelsPass> {
+    : public impl::CPULowerToUKernelsPassBase<CPULowerToUKernelsPass> {
 public:
-  CPULowerToUKernelsPass(bool skipIntermediateRoundings)
-      : skipIntermediateRoundings(skipIntermediateRoundings) {}
-
+  using impl::CPULowerToUKernelsPassBase<
+      CPULowerToUKernelsPass>::CPULowerToUKernelsPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override;
-
-  LogicalResult initializeOptions(
-      StringRef options,
-      function_ref<LogicalResult(const Twine &)> errorHandler) override {
-    if (failed(Pass::initializeOptions(options, errorHandler))) {
-      return failure();
-    }
-    // This option defaults to `true` both in Passes.td and in C++ code.
-    // If either side has `false`, that's a non-default choice, so we let that
-    // override a `true` on the other side.
-    skipIntermediateRoundings &= optionSkipIntermediateRoundings;
-    return success();
-  }
-
-private:
-  bool skipIntermediateRoundings;
 };
 } // namespace
 
@@ -639,10 +624,4 @@ void CPULowerToUKernelsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<OperationPass<>>
-createCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
-  return std::make_unique<CPULowerToUKernelsPass>(skipIntermediateRoundings);
-}
-
 } // namespace mlir::iree_compiler

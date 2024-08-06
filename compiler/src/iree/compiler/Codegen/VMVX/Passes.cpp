@@ -56,8 +56,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
 
   if (enableUKernels) {
     funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+    funcPassManager.addPass(createCPULowerToUKernelsPass(
+        CPULowerToUKernelsPassOptions{clSkipIntermediateRoundings}));
   }
 
   // Tensor-level micro-kernel optimizations.
