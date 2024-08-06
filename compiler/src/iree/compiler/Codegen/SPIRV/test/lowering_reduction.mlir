@@ -12,7 +12,8 @@
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -100,7 +101,8 @@ func.func @warp_reduction_dispatch() attributes {hal.executable.target = #execut
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -183,7 +185,8 @@ func.func @warp_reduction_dispatch() attributes {hal.executable.target = #execut
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 64],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -290,7 +293,8 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @dynamic_softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c32_i64 = arith.constant 32 : i64
