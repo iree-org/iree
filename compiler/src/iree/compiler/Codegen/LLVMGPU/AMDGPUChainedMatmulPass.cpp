@@ -69,6 +69,14 @@ struct AMDGPUPrepareForChainedMatmulPass final
     registry.insert<vector::VectorDialect>();
   }
 
+  VectorContractOpInfo getOpInfo(vector::ContractionOp contract) const {
+    auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+        contract.getIndexingMapsArray());
+    assert(succeeded(maybeOpInfo) &&
+           "contraction info for vector.contract should always be valid");
+    return maybeOpInfo.value();
+  }
+
   VectorValue swapDims(RewriterBase &rewriter, VectorValue val, int64_t dimA,
                        int64_t dimB) const {
     ArrayRef<int64_t> shape = val.getType().getShape();
@@ -109,7 +117,7 @@ struct AMDGPUPrepareForChainedMatmulPass final
   /// simply swap the operands without transposing them.
   void swapOperandsAndTranspose(RewriterBase &rewriter,
                                 vector::ContractionOp contractOp) const {
-    VectorContractOpInfo opInfo(contractOp);
+    VectorContractOpInfo opInfo = getOpInfo(contractOp);
     auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
     auto [accM, accN] = opInfo.getResultMNIndex();
@@ -177,7 +185,7 @@ struct AMDGPUPrepareForChainedMatmulPass final
   bool isOperandSwapInvariant(vector::ContractionOp contractOp) const {
     // Check if the innermost m, n, k dimensions are in the order:
     // lhs: (m, k), rhs: (n, k)
-    VectorContractOpInfo opInfo(contractOp);
+    VectorContractOpInfo opInfo = getOpInfo(contractOp);
     auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
     bool isLhsTransposed = lhsM > lhsK;

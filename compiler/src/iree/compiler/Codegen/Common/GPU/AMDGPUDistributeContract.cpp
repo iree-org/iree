@@ -28,6 +28,14 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    // Infer the contract kind so that we know know to correlate M/N/K dims.
+    auto maybeOpDetail = VectorContractOpInfo::inferFromIndexingMaps(
+        contractOp.getIndexingMapsArray());
+    if (failed(maybeOpDetail)) {
+      return rewriter.notifyMatchFailure(contractOp, "invalid contraction");
+    }
+    VectorContractOpInfo opDetail = maybeOpDetail.value();
+
     auto resultType = dyn_cast<VectorType>(contractOp.getResultType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
@@ -64,9 +72,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing iree.amdgpu.mma intrinsic attribute");
     }
-
-    // Infer the contract kind so that we know know to correlate M/N/K dims.
-    VectorContractOpInfo opDetail(contractOp);
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();
     LLVM_DEBUG({

@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -239,6 +240,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
+  funcPassManager.addPass(
+      IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;
@@ -819,8 +822,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // be safely dropped. This additionally allows vectorization of convolution to
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
+  funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
   if (!usePadToModelSharedMemcpy) {
-    funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
+    // Folding unit dims gets confused with padding.
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
@@ -829,12 +833,17 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   }
 
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  // Set anchors at tensor level for vector distribution later.
+  funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
 
   // Linalg -> Vector
   addGPUVectorizationPasses(funcPassManager);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createGPUCombineValueBarriersPass());
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);

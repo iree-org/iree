@@ -977,8 +977,14 @@ NestedLayoutAttr createNestedLayout(MLIRContext *context, int64_t rank,
 FailureOr<std::tuple<VectorExt::VectorLayoutInterface,
                      VectorExt::VectorLayoutInterface,
                      VectorExt::VectorLayoutInterface>>
-MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
-  VectorContractOpInfo opInfo(contractOp);
+MMAScheduleAttr::getContractionLayout(linalg::GenericOp contractOp) const {
+  auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+      contractOp.getIndexingMapsArray());
+  if (failed(maybeOpInfo)) {
+    return failure();
+  }
+  VectorContractOpInfo opInfo = maybeOpInfo.value();
+
   LLVM_DEBUG({
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
@@ -991,8 +997,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
   MLIRContext *context = getContext();
 
-  SmallVector<int64_t> bounds;
-  contractOp.getIterationBounds(bounds);
+  SmallVector<int64_t> bounds = contractOp.getStaticLoopRanges();
   int64_t batchCount = opInfo.getBatchCount();
   if (batchCount == 1 && bounds[0] != 1) {
     LLVM_DEBUG({ llvm::errs() << "non-unit batch dimension\n"; });
