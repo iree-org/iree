@@ -555,7 +555,6 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
         op, "op has both operands and users insided of its dispatch");
   }
   Operation *hoistedOp = rewriter.clone(*op);
-  rewriter.setInsertionPoint(dispatchRegionOp);
 
   // Step 2: Replace op uses inside and outside of the dispatch region with the
   //         hoisted results.
@@ -653,6 +652,13 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
   rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody().begin());
+  // Move the workgroup count region over.
+  if (!dispatchRegionOp.getWorkgroupCount().empty()) {
+    Region &newWorkgroupCountRegion = newDispatchRegionOp.getWorkgroupCount();
+    rewriter.inlineRegionBefore(dispatchRegionOp.getWorkgroupCount(),
+                                newWorkgroupCountRegion,
+                                newWorkgroupCountRegion.begin());
+  }
   // Need to make a new flow.return op, since the body was copied from the
   // old dispatch region.
   auto newDispatchReturnOp = cast<IREE::Flow::ReturnOp>(
