@@ -51,7 +51,8 @@ static void iree_hal_vulkan_destroy_event(VkDeviceHandle* logical_device,
 }
 
 iree_status_t iree_hal_vulkan_native_event_create(
-    VkDeviceHandle* logical_device, iree_hal_event_t** out_event) {
+    VkDeviceHandle* logical_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(out_event);
   *out_event = NULL;

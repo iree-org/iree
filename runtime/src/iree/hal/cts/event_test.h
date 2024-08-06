@@ -21,13 +21,15 @@ class EventTest : public CTSTestBase<> {};
 
 TEST_F(EventTest, Create) {
   iree_hal_event_t* event = NULL;
-  IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
+  IREE_ASSERT_OK(iree_hal_event_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                       IREE_HAL_EVENT_FLAG_NONE, &event));
   iree_hal_event_release(event);
 }
 
 TEST_F(EventTest, SignalAndReset) {
   iree_hal_event_t* event = NULL;
-  IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
+  IREE_ASSERT_OK(iree_hal_event_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                       IREE_HAL_EVENT_FLAG_NONE, &event));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -50,7 +52,8 @@ TEST_F(EventTest, SignalAndReset) {
 
 TEST_F(EventTest, SubmitWithChainedCommandBuffers) {
   iree_hal_event_t* event = NULL;
-  IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
+  IREE_ASSERT_OK(iree_hal_event_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                       IREE_HAL_EVENT_FLAG_NONE, &event));
 
   iree_hal_command_buffer_t* command_buffer_1 = NULL;
   iree_hal_command_buffer_t* command_buffer_2 = NULL;

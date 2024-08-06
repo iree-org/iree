@@ -231,8 +231,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
     // One signal semaphore from 0 -> 1.
     iree_hal_semaphore_t* signal_semaphore = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+        device_, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &signal_semaphore));
     uint64_t target_payload_value = 1ull;
     iree_hal_semaphore_list_t signal_semaphores = {
         /*count=*/1,
@@ -267,7 +267,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
   iree_hal_semaphore_t* CreateSemaphore() {
     iree_hal_semaphore_t* semaphore = NULL;
-    IREE_EXPECT_OK(iree_hal_semaphore_create(device_, 0, &semaphore));
+    IREE_EXPECT_OK(iree_hal_semaphore_create(
+        device_, 0, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
     return semaphore;
   }
 

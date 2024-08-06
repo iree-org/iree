@@ -93,7 +93,8 @@ TEST_F(FileTest, ReadEntireFile) {
   CreatePatternedDeviceBuffer(file_size, 0xCD, &buffer);
 
   iree_hal_semaphore_t* semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore));
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      device_, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
   iree_hal_fence_t* wait_fence = NULL;
   IREE_ASSERT_OK(iree_hal_fence_create_at(
       semaphore, 1ull, iree_allocator_system(), &wait_fence));
