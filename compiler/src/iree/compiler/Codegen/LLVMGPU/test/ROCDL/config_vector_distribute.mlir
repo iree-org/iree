@@ -10,7 +10,7 @@
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 64, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -51,7 +51,7 @@ func.func @expanded_matmul_transpose_b() {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 128, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -119,7 +119,7 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -152,7 +152,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 1, 32, 32, 1, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -236,7 +236,7 @@ func.func @wmma_matmul_1024x1024x1024() {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 16, 16]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 1
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -269,7 +269,7 @@ func.func @unaligned_mk_batch_matmul() {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 128, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

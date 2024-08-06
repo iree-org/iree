@@ -12,7 +12,7 @@ module {
       iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
       ins(%lhs_transpose, %arg1 : tensor<2x8x16x16xf16>, tensor<8x2x16x16xf16>)
       outs(%arg2 : tensor<2x2x16x16xf32>)
-    attrs =  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}>} {
+    attrs =  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>} {
     ^bb0(%in: f16, %in_2: f16, %out: f32):
       %4 = arith.extf %in : f16 to f32
       %5 = arith.extf %in_2 : f16 to f32
@@ -33,6 +33,6 @@ module {
 //       CHECK:     %[[LHS_T:.+]] = linalg.transpose ins({{.*}}: tensor<2x8x1x4xf16>)
 //       CHECK:     iree_gpu.multi_mma %[[LHS_T]]
 //  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+//  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:       : tensor<2x8x1x4xf16>, tensor<8x2x1x4xf16> into tensor<2x2x4x1xf32>
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
