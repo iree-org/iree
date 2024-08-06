@@ -68,6 +68,7 @@ iree_cc_library(
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
+    "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransferLowering.cpp"
