@@ -55,16 +55,6 @@ jobs:
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
-  # TODO(scotttodd): drop this job in favor of ci_linux_x64_clang.yml once no jobs depend on it
-  build_all:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
-    uses: ./.github/workflows/build_all.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-      run-tests: true
 
   build_test_all_bazel:
     needs: setup
@@ -370,7 +360,6 @@ jobs:
       - setup
 
       # Basic
-      - build_all
       - build_test_all_bazel
 
       # Accelerators
