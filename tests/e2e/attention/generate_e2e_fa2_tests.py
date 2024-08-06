@@ -71,6 +71,11 @@ class KernelGenerator(enum.Enum):
     RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
 
 
+# batch: Batch dimension
+# m: M dimension of first and second matmul
+# n: N dimension of second matmul
+# k1: K dimension of first matmul
+# k2: K dimension of second matmul
 @dataclasses.dataclass
 class TestShapeAndScale:
     batch: int
@@ -243,10 +248,10 @@ def generate_function(
         f"  %result0 = tensor.empty(): {result_tensor_type}\n"
         f"  %scale_f16 = arith.truncf %scale : f32 to f16 \n"
         f"  %result1 = {op_name} {{\n"
-        f"      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,\n"
-        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,\n"
-        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,\n"
-        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]\n}}"
+        f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
+        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
+        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
+        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
         f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
         f"      outs(%result0: {result_tensor_type}) -> {result_tensor_type}\n"
         f" return %result1: {result_tensor_type}\n"
