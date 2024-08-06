@@ -56,9 +56,9 @@ LogicalResult LayoutAttr::isValidLayout(ShapedType shapeTy,
                                         Location loc) const {
   ArrayRef<int64_t> shape = shapeTy.getShape();
   if (shape.size() != getRank()) {
-    return emitError(loc, "Rank of vector (" + std::to_string(shape.size()) +
-                              ") does not match rank of layout (" +
-                              std::to_string(getRank()) + ").");
+    return emitError(loc, "Rank of vector (")
+           << shape.size() << ") does not match rank of layout (" << getRank()
+           << ").";
   }
   for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = layout.getShapes();
@@ -72,12 +72,11 @@ LogicalResult LayoutAttr::isValidLayout(ShapedType shapeTy,
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);
-      return emitError(loc, "Vector shape: [" + shapeStr +
-                                "] does not match the layout (" + layoutStr +
-                                ") at dim " + std::to_string(idx) +
-                                ". Dimension expected by layout: " +
-                                std::to_string(expectedShape) +
-                                " actual: " + std::to_string(shape[idx]));
+      return emitError(loc, "Vector shape: [")
+             << shapeStr << "] does not match the layout (" << layoutStr
+             << ") at dim " << idx
+             << ". Dimension expected by layout: " << expectedShape
+             << " actual: " << shape[idx];
     }
   }
   return success();
@@ -325,9 +324,9 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
   int64_t rank = getRank();
   ArrayRef<int64_t> shape = shapeTy.getShape();
   if (shape.size() != rank) {
-    return emitError(loc, "Rank of vector (" + std::to_string(shape.size()) +
-                              ") does not match rank of layout (" +
-                              std::to_string(rank) + ").");
+    return emitError(loc, "Rank of vector (")
+           << shape.size() << ") does not match rank of layout (" << rank
+           << ").";
   }
   // Multiply all shapes in the layout.
   for (int i = 0, e = rank; i < e; ++i) {
@@ -342,12 +341,11 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
       printStripped(layoutOs);
-      return emitError(loc, "Vector shape: [" + shapeStr +
-                                "] does not match the layout (" + layoutStr +
-                                ") at dim " + std::to_string(i) +
-                                ". Dimension expected by layout: " +
-                                std::to_string(expectedShape) +
-                                " actual: " + std::to_string(shape[i]));
+      return emitError(loc, "Vector shape: [")
+             << shapeStr << "] does not match the layout ("
+             << layoutStr + ") at dim " << i
+             << ". Dimension expected by layout: " << expectedShape
+             << " actual: " << shape[i];
     }
   }
   return success();

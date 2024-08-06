@@ -69,18 +69,17 @@ struct VectorizeToLayoutOpPattern final
 namespace {
 struct VectorizeIREEVectorExtOpsPass final
     : impl::VectorizeIREEVectorExtOpsPassBase<VectorizeIREEVectorExtOpsPass> {
-  void runOnOperation() override;
+  void runOnOperation() override {
+
+    MLIRContext *ctx = &getContext();
+    RewritePatternSet patterns(ctx);
+    patterns.add<VectorizeToLayoutOpPattern>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 };
 } // namespace
-
-void VectorizeIREEVectorExtOpsPass::runOnOperation() {
-  MLIRContext *ctx = &getContext();
-  RewritePatternSet patterns(ctx);
-  patterns.add<VectorizeToLayoutOpPattern>(ctx);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-    return signalPassFailure();
-  }
-}
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
