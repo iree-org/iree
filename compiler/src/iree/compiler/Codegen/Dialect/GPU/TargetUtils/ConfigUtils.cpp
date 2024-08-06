@@ -80,8 +80,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     IREE::GPU::MMAIntrinsic type = mma.getIntrinsic().getValue();
     // TODO: Drop this once all intrinsics are supported.
-    if (type != IREE::GPU::MMAIntrinsic::MFMA_F16_16x16x16_F32 &&
-        type != IREE::GPU::MMAIntrinsic::MFMA_I8_16x16x32_I32) {
+    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16 &&
+        type != IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8) {
       continue;
     }
     supportedMmas.push_back(mma);

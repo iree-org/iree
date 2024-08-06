@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(func.func(iree-gpu-pack-to-intrinsics, canonicalize, cse))' --split-input-file | FileCheck %s
 
-#config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>}>
+#config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}>
 module {
   func.func @matmul_32x32x8(%a: tensor<64x64xf16>, %b: tensor<64x64xf16>, %c: tensor<64x64xf32>) -> tensor<64x64xf32> {
     %mm = linalg.matmul {lowering_config = #config} ins(%a, %b : tensor<64x64xf16>, tensor<64x64xf16>) outs(%c : tensor<64x64xf32>) -> tensor<64x64xf32>
@@ -18,7 +18,7 @@ module {
 //       CHECK:   %[[PACKED_MM:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[A_PACK]], %[[B_PACK]] : tensor<2x8x32x8xf16>, tensor<8x2x32x8xf16>)
 //  CHECK-SAME:     outs(%[[C_PACK]] : tensor<2x2x32x32xf32>)
-//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>}>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}>
 
 // -----
 
@@ -32,7 +32,7 @@ module {
       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
     } ins(%a, %b : tensor<?x?x?xf16>, tensor<?x?x?x?xf16>)
     outs(%c : tensor<?x?x?xf32>) attrs =  {
-      lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}>
+      lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>
     } {
     ^bb0(%in: f16, %in_2: f16, %out: f32):
       %4 = arith.extf %in : f16 to f32
@@ -54,4 +54,4 @@ module {
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
 //  CHECK-SAME:     ins({{.*}} : tensor<?x?x?x16x16xf16>, tensor<?x?x?x?x16x16xf16>)
 //  CHECK-SAME:     outs({{.*}} : tensor<?x?x?x16x16xf32>)
-//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>

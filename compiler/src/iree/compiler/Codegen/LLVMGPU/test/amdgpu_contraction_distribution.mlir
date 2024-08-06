@@ -4,7 +4,7 @@
 // layoutC means and how these layouts are assigned based on the instruction
 // type.
 
-#layout = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+#layout = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -58,7 +58,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+#layout = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -107,7 +107,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
+#layout = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -163,7 +163,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
+#layout = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 
 #map1 = affine_map<(d0, d1, d2) -> (d2, d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>

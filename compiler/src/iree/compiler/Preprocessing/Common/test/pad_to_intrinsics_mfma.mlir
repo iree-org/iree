@@ -67,7 +67,7 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 #target = #iree_gpu.target<arch = "gfx942", features = "",
   wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_32x32x8_F32>],
+  mma = [<MFMA_F32_32x32x8_F16>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
   max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>

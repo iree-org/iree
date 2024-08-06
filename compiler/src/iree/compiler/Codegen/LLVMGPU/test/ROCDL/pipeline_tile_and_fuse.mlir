@@ -72,7 +72,7 @@ hal.executable public @main {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 2], subgroup = [2, 2], mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 2], subgroup = [2, 2], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @matmul_transpose_b_mfma ordinal(0) layout(#pipeline_layout) {
@@ -136,7 +136,7 @@ hal.executable public @main {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_gpu.lowering_config<{workgroup = [1, 64, 64, 0], reduction = [0, 0, 0, 2], subgroup = [1, 2, 2], mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}>
+#config = #iree_gpu.lowering_config<{workgroup = [1, 64, 64, 0], reduction = [0, 0, 0, 2], subgroup = [1, 2, 2], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}>
 hal.executable private @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @conv_igemm_im2col ordinal(0) layout(#pipeline_layout) {

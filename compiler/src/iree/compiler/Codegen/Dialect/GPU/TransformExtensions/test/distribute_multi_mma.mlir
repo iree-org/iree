@@ -9,7 +9,7 @@ func.func @distribute_multi_mma_F16_16x16x16_F32(%lhs: tensor<2x2x16x16xf16>, %r
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
   return %0 : tensor<2x2x16x16xf32>
 }
@@ -61,7 +61,7 @@ func.func @distribute_multi_mma_I8_16x16x32_I32(%lhs: tensor<2x2x16x32xi8>, %rhs
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_I8_16x16x32_I32>,
+    kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
     rhs_permutation = array<i64: 1, 0>
   } : tensor<2x2x16x32xi8>, tensor<2x2x16x32xi8> into tensor<2x2x16x16xi32>
   return %0 : tensor<2x2x16x16xi32>

@@ -29,7 +29,7 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 //       CHECK:   linalg.fill ins
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     reduction = [0 : index, 0 : index, 0 : index, 0 : index, 8 : index]
 //  CHECK-SAME:     subgroup = [0 : index, 0 : index, 4 : index, 1 : index, 0 : index]
 //  CHECK-SAME:     workgroup = [1 : index, 1 : index, 64 : index, 64 : index, 0 : index]
@@ -52,7 +52,7 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 //       CHECK:   linalg.fill ins
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     reduction = [0 : index, 0 : index, 4 : index]
 //  CHECK-SAME:     subgroup = [2 : index, 4 : index, 0 : index]
 //  CHECK-SAME:     workgroup = [64 : index, 128 : index, 0 : index]
