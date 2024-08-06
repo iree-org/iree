@@ -155,7 +155,6 @@ func.func @negative_fold_insert_slice_into_transfer_write_scalable(%v: vector<4x
 // CHECK: %[[WRITE:.*]] = vector.transfer_write
 // CHECK: tensor.insert_slice %[[WRITE]]
 
-
 // -----
 
 func.func @negative_fold_insert_slice_into_transfer_write_dynamic(%v: vector<4x7xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index, %size: index) -> tensor<?x?xf32>

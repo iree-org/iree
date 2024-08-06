@@ -123,7 +123,7 @@ public:
 ///
 /// Example:
 ///
-/// ```MLIR
+/// ```
 /// vector.transfer_write %vec, %dest[%c0, %c0] {in_bounds = [true, true]}
 ///    : vector<4x5xf32>, tensor<4x5xf32>
 /// ```
