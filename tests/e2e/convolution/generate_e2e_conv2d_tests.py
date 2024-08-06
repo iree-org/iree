@@ -584,13 +584,6 @@ def generate_function(
     if compilation_info:
         requested_pipeline = compilation_info.dispatch_lowering_pass_pipeline
         compiler_pipeline = requested_pipeline
-        if requested_pipeline == "SPIRVVectorizeMali":
-            compiler_pipeline = "SPIRVBaseVectorize"
-        elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
-            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
-        elif requested_pipeline == "SPIRVVectorizeNVIDIA":
-            # TODO: change to test SPIRVMatmulPromoteVectorize too
-            compiler_pipeline = "SPIRVBaseVectorize"
 
         mma_schedule = ""
         if compilation_info.mma_schedule is not None:
@@ -608,9 +601,7 @@ def generate_function(
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
             f"  store_stage = 1{mma_schedule} }}>>\n"
         )
-        # compilation_info_attr = (
-        #     f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
-        # )
+
         func_definition = func_definition + compilation_info_string
         conv_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}, dilations = dense<{list(conv2d_attr.DILATION)}> : tensor<2xi64>, strides = dense<{list(conv2d_attr.STRIDE)}> : tensor<2xi64>}}"
         generate_function.compilation_index += 1

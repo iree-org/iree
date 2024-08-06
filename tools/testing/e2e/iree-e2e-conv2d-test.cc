@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <stdexcept>
-
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
