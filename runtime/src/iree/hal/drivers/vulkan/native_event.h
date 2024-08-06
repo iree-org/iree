@@ -18,6 +18,7 @@ extern "C" {
 // Creates a native Vulkan VkEvent object.
 iree_status_t iree_hal_vulkan_native_event_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_event_flags_t flags,
     iree_hal_event_t** out_event);
 
 // Returns Vulkan event handle.

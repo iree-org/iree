@@ -14,8 +14,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-iree_status_t iree_hal_webgpu_nop_event_create(iree_allocator_t host_allocator,
-                                               iree_hal_event_t** out_event);
+iree_status_t iree_hal_webgpu_nop_event_create(
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_event_flags_t flags,
+    iree_allocator_t host_allocator, iree_hal_event_t** out_event);
 
 #ifdef __cplusplus
 }  // extern "C"

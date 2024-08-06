@@ -573,7 +573,8 @@ static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
 }
 
 static iree_status_t iree_hal_cuda_device_create_event(
-    iree_hal_device_t* base_device, iree_hal_event_t** out_event) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "event not yet implmeneted");
 }
@@ -615,7 +616,7 @@ static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_event_semaphore_create(
       initial_value, device->cuda_symbols, device->timepoint_pool,

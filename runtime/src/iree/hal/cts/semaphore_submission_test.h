@@ -77,7 +77,8 @@ TEST_F(SemaphoreSubmissionTest, SubmitWithWait) {
       wait_payload_values,
   };
   iree_hal_semaphore_t* signal_semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 100, &signal_semaphore));
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      device_, 100, IREE_HAL_SEMAPHORE_FLAG_NONE, &signal_semaphore));
   uint64_t signal_payload_values[] = {101};
   iree_hal_semaphore_list_t signal_semaphores = {
       1,

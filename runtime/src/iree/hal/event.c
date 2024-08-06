@@ -17,14 +17,16 @@
 
 IREE_HAL_API_RETAIN_RELEASE(event);
 
-IREE_API_EXPORT iree_status_t
-iree_hal_event_create(iree_hal_device_t* device, iree_hal_event_t** out_event) {
+IREE_API_EXPORT iree_status_t iree_hal_event_create(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_event);
   *out_event = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(
-      device, iree_hal_device, create_event)(device, out_event);
+  iree_status_t status =
+      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_event)(
+          device, queue_affinity, flags, out_event);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

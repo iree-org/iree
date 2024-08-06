@@ -12,6 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -21,22 +22,6 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 // Types and Enums
 //===----------------------------------------------------------------------===//
-
-// A bitmap indicating logical device queue affinity.
-// Used to direct submissions to specific device queues or locate memory nearby
-// where it will be used. The meaning of the bits in the bitmap is
-// implementation-specific: a bit may represent a logical queue in an underlying
-// API such as a VkQueue or a physical queue such as a discrete virtual device.
-//
-// Bitwise operations can be performed on affinities; for example AND'ing two
-// affinities will produce the intersection and OR'ing will produce the union.
-// This enables just-in-time selection as a command buffer could be made
-// available to some set of queues when recorded and then AND'ed with an actual
-// set of queues to execute on during submission.
-typedef uint64_t iree_hal_queue_affinity_t;
-
-// Specifies that any queue may be selected.
-#define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
 
 // TBD: placeholder for reserving unique pools.
 // The intent is that semantically meaningful pools can be defined like
