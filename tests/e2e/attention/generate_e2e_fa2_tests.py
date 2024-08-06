@@ -136,12 +136,6 @@ def get_tensor_shapes(
     n = shapes_scale.n
     scale = shapes_scale.scale
 
-    query_tensor_shape, key_tensor_shape, value_tensor_shape, result_tensor_shape = (
-        [],
-        [],
-        [],
-        [],
-    )
 
     query_tensor_shape = [batch, m, k1]
     key_tensor_shape = [batch, k2, k1]
