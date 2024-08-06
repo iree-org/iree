@@ -164,6 +164,11 @@ def GPUApplyTilingLevelPass :
   ];
 }
 
+def GPUMaterializeDeviceEncodingPass :
+    InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
 def GPUTensorTileToSerialLoopsPass :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";

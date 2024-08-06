@@ -20,6 +20,9 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
   unsigned srcRank = 0;
+  // Metadata for a generalized expand_shape + transpose
+  SmallVector<int64_t> innerTileShapes;
+  SmallVector<int64_t> permutation;
 };
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(

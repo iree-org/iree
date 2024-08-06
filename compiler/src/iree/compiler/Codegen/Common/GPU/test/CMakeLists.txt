@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "gpu_distribute_shared_memory.mlir"
     "gpu_generalize_named_ops.mlir"
     "gpu_lower_to_ukernels.mlir"
+    "gpu_materialize_encoding.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
     "gpu_pipeline.mlir"
