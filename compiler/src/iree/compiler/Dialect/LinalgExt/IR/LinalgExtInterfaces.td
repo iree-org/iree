@@ -73,7 +73,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
         operand or result does not have an indexing map representation.
       }],
       /*retTy=*/"SmallVector<AffineMap>",
-      /*methodName=*/"getIndexingMaps",
+      /*methodName=*/"getIndexingMapsArray",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
