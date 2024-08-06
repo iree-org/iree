@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include <numeric>
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 
 using namespace mlir;
@@ -19,7 +18,7 @@ using VectorValue = TypedValue<VectorType>;
 
 // Validate that the layout has the same shape as the input.
 LogicalResult ToLayoutOp::verify() {
-  return getLayout().isValidLayout(getInput());
+  return getLayout().isValidLayout(getInput().getType(), getLoc());
 }
 
 // to_simd -> to_simt
