@@ -59,32 +59,37 @@ jobs:
       - name: "Testing Samples"
         run: ./build_tools/testing/test_samples.sh
 
-  # TODO(scotttodd): Convert web test scripts to use installed compiler packages and local runtime
-  #                  builds, rather than local compiler builds. The host tools are too slow to build
-  #                  on standard sized runners (and for casual users).
-
-  # web:
-  #   runs-on: ubuntu-20.04
-  #   # TODO: remove dependence on magic matching build dir names
-  #   env:
-  #     HOST_BUILD_DIR: build-host-install
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@v4.1.7
-  #       with:
-  #         submodules: true
-  #     - name: "Building host tools"
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh  \
-  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-  #           gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-  #           ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
-  #     - name: "Testing Experimental Web Samples"
-  #       env:
-  #         IREE_EMPSCRIPTEN_BUILD_DIR: build-emscripten
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh  \
-  #           --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
-  #           --env "IREE_EMPSCRIPTEN_BUILD_DIR=${IREE_EMPSCRIPTEN_BUILD_DIR}" \
-  #           gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214 \
-  #           ./experimental/web/build_and_test_samples.sh
+  web:
+    runs-on: ubuntu-20.04
+    container: gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214
+    env:
+      VENV_DIR: ${{ github.workspace }}/.venv
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Check out repository"
+        uses: actions/checkout@v4.1.7
+      - name: "Mark git safe.directory"
+        run: git config --global --add safe.directory '*'
+      - name: "Check out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@v5.1.0
+        with:
+          python-version: "3.11"
+      - name: "Setup Python venv"
+        run: |
+          python3 -m venv ${VENV_DIR}
+          source ${VENV_DIR}/bin/activate
+          python3 -m pip install \
+            --find-links https://iree.dev/pip-release-links.html \
+            --upgrade \
+            iree-compiler \
+            iree-runtime
+      - name: "Test experimental web samples"
+        env:
+          HOST_TOOLS_BINARY_DIR: ${{ env.VENV_DIR }}/bin
+          IREE_EMPSCRIPTEN_BUILD_DIR: build-emscripten
+        run: |
+          source ${VENV_DIR}/bin/activate
+          ./experimental/web/build_and_test_samples.sh ${HOST_TOOLS_BINARY_DIR}
