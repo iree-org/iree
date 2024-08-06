@@ -650,7 +650,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
 // does this automatically).
 static void updateConsumersFromProducers(
     ArrayRef<Operation *> slice,
-    llvm::MapVector<linalg::GenericOp, CollapseInfo> &opMap) {
+    llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
 
   // Slice is topologically sorted to ensure that `op`'s producers have been
   // updated before we visit it.
@@ -703,7 +703,7 @@ static void updateConsumersFromProducers(
 // does this automatically).
 static void updateProducersFromConsumers(
     ArrayRef<Operation *> slice,
-    llvm::MapVector<linalg::GenericOp, CollapseInfo> &opMap) {
+    llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
 
   // Iterate over `slice` in reverse so that we visit each `op` 's consumer
   // before visiting `op`.
@@ -775,7 +775,7 @@ static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies
-  llvm::MapVector<linalg::GenericOp, CollapseInfo> opMap;
+  llvm::DenseMap<linalg::GenericOp, CollapseInfo> opMap;
   for (auto *op : slice) {
     auto genericOp = cast<linalg::GenericOp>(op);
     opMap[genericOp] = CollapseInfo(getCollapsibleLoops(genericOp));
