@@ -413,8 +413,8 @@ builtin.module attributes { transform.with_named_sequence } {
 builtin.module attributes { transform.with_named_sequence } {
   func.func @invalid_rank_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
     %c = arith.addf %a, %b : vector<16x16xf16>
-    // expected-error @above {{Rank of vector (2) does not match rank of layout (3)}}
     %cl = iree_vector_ext.to_layout %c to #layout : vector<16x16xf16>
+    // expected-error @above {{Rank of vector (2) does not match rank of layout (3)}}
     func.return %cl : vector<16x16xf16>
   }
 
@@ -442,8 +442,8 @@ builtin.module attributes { transform.with_named_sequence } {
 builtin.module attributes { transform.with_named_sequence } {
   func.func @invalid_size_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
     %c = arith.addf %a, %b : vector<16x16xf16>
-    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [1, 1], threads_per_outer = [8, 2], elements_per_thread = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
     %cl = iree_vector_ext.to_layout %c to #layout2 : vector<16x16xf16>
+    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [1, 1], threads_per_outer = [8, 2], elements_per_thread = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
     func.return %cl : vector<16x16xf16>
   }
 

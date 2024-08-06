@@ -714,7 +714,11 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     Value laneId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MMAIntrinsic::MFMA_I8_16x16x32_I32:
+    break;
+  default:
     return failure();
   }
 

@@ -23,7 +23,9 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -58,9 +60,17 @@ static Value createTransposeInit(OpBuilder &builder, Value source,
   return empty;
 }
 
-// Constructs a transpose of the given tensor and permutation.
+// Constructs a transpose of the given tensor and permutation,
+// or produces a transposed version of the producing tensor.empty op.
 static Value createTranspose(OpBuilder &builder, Value source,
                              ArrayRef<int64_t> perm) {
+  if (auto empty = source.getDefiningOp<tensor::EmptyOp>()) {
+    Type elementType = empty.getType().getElementType();
+    SmallVector<OpFoldResult> mixedSizes = empty.getMixedSizes();
+    applyPermutationToVector(mixedSizes, perm);
+    return builder.create<tensor::EmptyOp>(empty.getLoc(), mixedSizes,
+                                           elementType);
+  }
   Value empty = createTransposeInit(builder, source, perm);
   return builder
       .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
@@ -861,6 +871,17 @@ static void populateNamedOpSinkingPatterns(MLIRContext *context,
                                                  SmallVector<int64_t>{0, 2, 1});
 }
 
+static void
+populateCommonCanonicalizationPatterns(MLIRContext *context,
+                                       RewritePatternSet &patterns) {
+  linalg::FillOp::getCanonicalizationPatterns(patterns, context);
+  tensor::EmptyOp::getCanonicalizationPatterns(patterns, context);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);
+  tensor::populateFoldTensorEmptyPatterns(patterns,
+                                          /*foldSingleUseOnly=*/false);
+}
+
 void PropagateLinalgTransposePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
@@ -895,6 +916,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
     if (failed(
@@ -952,6 +974,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     bubblingPatterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
         context, /*benefit=*/2);
     bubblingPatterns.insert<ComposeTransposes>(context);
+    populateCommonCanonicalizationPatterns(context, bubblingPatterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(bubblingPatterns)))) {
       return signalPassFailure();
@@ -1003,6 +1026,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
         context, enableAggressivePropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
     if (failed(

@@ -43,6 +43,21 @@ util.func public @specialize_non_involution_transpose_op(%arg0 : tensor<1x2x3xf3
 
 // -----
 
+util.func public @fold_transpose_of_fill() -> tensor<32x128xf32> {
+  %cst = arith.constant 1.0 : f32
+  %empty = tensor.empty(): tensor<128x32xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<128x32xf32>) -> tensor<128x32xf32>
+  %empty_t = tensor.empty(): tensor<32x128xf32>
+  %transposed = linalg.transpose ins(%fill : tensor<128x32xf32>)
+      outs(%empty_t : tensor<32x128xf32>) permutation = [1, 0]
+  util.return %transposed : tensor<32x128xf32>
+}
+// CHECK-LABEL: util.func public @fold_transpose_of_fill
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   util.return %[[FILL]]
+
+// -----
+
 util.func public @propagate_through_extract_slice(%arg0 : tensor<1x256x128xf32>) -> tensor<1x128x32xf32> {
   %empty = tensor.empty(): tensor<1x128x256xf32>
   %transposed = linalg.transpose ins(%arg0 : tensor<1x256x128xf32>)
@@ -465,6 +480,8 @@ util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
 //   APROP-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d0)>
 //   APROP-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 //       APROP: util.func public @bubble_through_matmul
+//       APROP:   %[[EMPTY:.+]] = tensor.empty() : tensor<16x16xf32>
 //       APROP:   %[[MATMUL:.+]] = linalg.generic
-//       APROP:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+//  APROP-SAME:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+//  APROP-SAME:     outs(%[[EMPTY]] : tensor<16x16xf32>)
 //       APROP:   util.return %[[MATMUL]]
