@@ -112,7 +112,7 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 void setLoweringConfig(Operation *op, Attribute config);
 
 /// Convenience function that sets the lowering configuration on the operation
-/// and translation info on for a generic lowering config, lowering pipeline,
+/// and translation info for a generic lowering config, lowering pipeline,
 /// and optional workgroup/subgroup size.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     mlir::FunctionOpInterface entryPointFn, Operation *op,
