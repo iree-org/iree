@@ -279,7 +279,7 @@ struct ConvertHALInterfaceConstantLoadOp
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp,
                   IREE::HAL::InterfaceConstantLoadOpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
-    int64_t index = loadOp.getIndex().getZExtValue();
+    int64_t index = loadOp.getOrdinal().getZExtValue();
     auto resultType =
         typeConverter->convertType(loadOp->getResult(0).getType());
     rewriter.replaceOp(
@@ -307,7 +307,7 @@ struct ConvertHALInterfaceBindingSubspanOp
           "failed to convert interface.binding.subspan result to memref type");
     }
     auto memRefDesc = abi.loadBinding(
-        subspanOp, operands.getBindingAttr().getInt(), operands.getByteOffset(),
+        subspanOp, subspanOp.getFlatBindingIndex(), operands.getByteOffset(),
         memRefType, operands.getDynamicDims(), rewriter);
     rewriter.replaceOp(subspanOp, {memRefDesc});
     return success();
@@ -921,7 +921,8 @@ public:
   }
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
+    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect,
+                    affine::AffineDialect>();
   }
 
   void runOnOperation() override;

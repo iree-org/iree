@@ -102,8 +102,10 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         elementOffsetInt.value(), strides);
   }
-  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr,
-                                           subspanOp.getDescriptorTypeAttr());
+  auto memRefType =
+      getMemrefTypeForTensor(shapedType, layoutAttr,
+                             rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
+                                 subspanOp.getDescriptorType()));
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
@@ -136,10 +138,10 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
   rewriter.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
   Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.getSet(),
-      subspanOp.getBinding(), subspanOp.getDescriptorType(),
-      subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+      subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
+      subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+      subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+      subspanOp.getDescriptorFlagsAttr());
   rewriter.create<memref::AssumeAlignmentOp>(
       subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;

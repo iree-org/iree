@@ -1474,10 +1474,6 @@ class TransformVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TransformVectorLayoutOptions(Operation *root, bool fullConversion)
       : VectorLayoutOptions(root, fullConversion) {}
-
-  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    return success();
-  }
 };
 
 DiagnosedSilenceableFailure

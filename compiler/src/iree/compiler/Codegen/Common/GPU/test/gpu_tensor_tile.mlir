@@ -1,5 +1,12 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tensor-tile, cse))" %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 256]]>
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -7,9 +14,9 @@
 module {
   func.func @add_tensor() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %3 = affine.apply #map()[%workgroup_id_x]
@@ -28,9 +35,9 @@ module {
 
 //         CHECK: #[[$MAP:.*]] = affine_map<(d0) -> (d0 * 4)>
 //   CHECK-LABEL: func.func @add_tensor
-//     CHECK-DAG:   %[[A:.*]] = hal.interface.binding.subspan set(0) binding(0)
-//     CHECK-DAG:   %[[B:.*]] = hal.interface.binding.subspan set(0) binding(1)
-//     CHECK-DAG:   %[[C:.*]] = hal.interface.binding.subspan set(0) binding(2)
+//     CHECK-DAG:   %[[A:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//     CHECK-DAG:   %[[B:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//     CHECK-DAG:   %[[C:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
 //     CHECK-DAG:   %[[LA:.*]] = flow.dispatch.tensor.load %[[A]]
 //     CHECK-DAG:   %[[LB:.*]] = flow.dispatch.tensor.load %[[B]]
 //     CHECK-DAG:   %[[LC:.*]] = flow.dispatch.tensor.load %[[C]]
@@ -51,6 +58,12 @@ module {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 4]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -60,8 +73,8 @@ module {
   func.func @reduction() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %2 = affine.apply #map()[%workgroup_id_x]
     %3 = flow.dispatch.tensor.load %1, offsets = [%2], sizes = [64], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<128xf32>> -> tensor<64xf32>
@@ -103,6 +116,12 @@ module {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -112,8 +131,8 @@ module {
   func.func @reduction_broadcast() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %2 = affine.apply #map()[%workgroup_id_x]

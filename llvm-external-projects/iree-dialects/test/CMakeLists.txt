@@ -27,5 +27,3 @@ add_lit_testsuite(check-iree-dialects "Running the iree-dialects regression test
 set_target_properties(check-iree-dialects PROPERTIES FOLDER "Tests")
 
 add_lit_testsuites(IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${IREE_DIALECTS_TEST_DEPENDS})
-
-add_subdirectory(lib)

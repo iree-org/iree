@@ -1,9 +1,15 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-type-propagation))" %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 func.func @generic_op_i4() {
-  %d = hal.interface.constant.load[0] : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<?xi4>>{%d}
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<?xi4>>{%d}
+  %d = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<?xi4>>{%d}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<?xi4>>{%d}
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes=[%d], strides=[1] : !flow.dispatch.tensor<readonly:tensor<?xi4>>{%d} -> tensor<?xi4>
   %4 = tensor.empty(%d) : tensor<?xi4>
   %5 = linalg.generic {
@@ -19,8 +25,8 @@ func.func @generic_op_i4() {
 }
 
 // CHECK-LABEL: func.func @generic_op_i4()
-//   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]{{.+}} -> tensor<?xi4>
 //   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?xi4>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic

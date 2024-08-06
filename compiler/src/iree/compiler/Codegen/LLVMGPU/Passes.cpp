@@ -72,6 +72,11 @@ static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
+static llvm::cl::opt<bool>
+    clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
+                      llvm::cl::desc("Enable implicit gemm for convolutions."),
+                      llvm::cl::init(false));
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
   StringRef reorderStr = "<not set>";
@@ -241,6 +246,7 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;
@@ -362,6 +368,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
 
   // Vectorize copies that came out of vectorization.
   funcPassManager.addPass(createVectorizeMemrefCopyPass());
+
+  // Step 7. Unroll operations to native intrinsic widths.
+  funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Step 8. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
@@ -789,6 +800,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
 
   // Vector SIMD -> Vector SIMT
+  funcPassManager.addPass(createLLVMGPUConfigureVectorLayouts());
   funcPassManager.addPass(createLLVMGPUVectorDistribute());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -1042,6 +1054,8 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPredicatedPass(
+        clLLVMGPUUseIgemm, IREE::LinalgExt::createConvertConv2DToIm2ColOpPass);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);

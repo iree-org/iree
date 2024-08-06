@@ -7,7 +7,6 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Async/IR/Async.h"
@@ -40,13 +39,6 @@
 using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
 
-namespace mlir {
-namespace test_ext {
-/// Test passes, do not deserve an include.
-void registerVectorExtTestPasses();
-} // namespace test_ext
-} // namespace mlir
-
 int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
@@ -56,7 +48,6 @@ int main(int argc, char **argv) {
       // clang-format off
       // Local dialects
       mlir::iree_compiler::IREE::Input::IREEInputDialect,
-      mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,
@@ -80,8 +71,6 @@ int main(int argc, char **argv) {
   registerSCFPasses();
   // Local dialect passes.
   mlir::linalg::transform::registerDropSchedulePass();
-  // Local test passes.
-  mlir::test_ext::registerVectorExtTestPasses();
 
   // External models.
   mlir::func::registerInlinerExtension(registry);

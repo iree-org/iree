@@ -2,9 +2,17 @@
 // RUN:   --pass-pipeline='builtin.module(func.func(iree-spirv-tile-to-cooperative-ops, iree-codegen-generic-vectorization, iree-spirv-vectorize-to-cooperative-ops, iree-codegen-optimize-tensor-insert-extract-slices, canonicalize, cse))' \
 // RUN:   %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size = [32, 1, 1]>
-builtin.module  {
 func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
@@ -15,11 +23,11 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   %2 = gpu.thread_id  z
   %alloc = memref.alloc() : memref<32x32xf16, 3>
   %alloc_0 = memref.alloc() : memref<32x32xf16, 3>
-  %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<256x1024xf16>
-  %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1024x128xf16>
-  %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
-  %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
-  %7 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf16>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<256x1024xf16>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<1024x128xf16>
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<256x128xf16>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<256x128xf16>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(4) alignment(64) offset(%c0) : memref<256x128xf16>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
@@ -69,7 +77,6 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
     linalg.yield %11 : f16
   }
   return
-}
 }
 
 //       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>
@@ -127,77 +134,83 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32], [1, 16, 16], [0, 0, 0, 32], [1, 16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
-builtin.module  {
-  func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
-    %cst = arith.constant 0.000000e+00 : f16
-    %c0 = arith.constant 0 : index
-    %c32 = arith.constant 32 : index
-    %c512 = arith.constant 512 : index
-    %c1 = arith.constant 1 : index
-    %0 = gpu.thread_id  x
-    %1 = gpu.thread_id  y
-    %2 = gpu.thread_id  z
-    %alloc = memref.alloc() : memref<1x32x32xf16, 3>
-    %alloc_0 = memref.alloc() : memref<1x32x32xf16, 3>
-    %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x512xf16>
-    memref.assume_alignment %3, 64 : memref<16x128x512xf16>
-    %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<16x512x256xf16>
-    memref.assume_alignment %4, 64 : memref<16x512x256xf16>
-    %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x256xf16>
-    memref.assume_alignment %5, 64 : memref<16x128x256xf16>
-    %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<16x128x256xf16>
-    memref.assume_alignment %6, 64 : memref<16x128x256xf16>
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_id_z = hal.interface.workgroup.id[2] : index
-    %7 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
-    %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
-    %subview = memref.subview %6[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
-    %subview_1 = memref.subview %3[%workgroup_id_z, %7, 0] [1, 32, 512] [1, 1, 1] : memref<16x128x512xf16> to memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>>
-    %subview_2 = memref.subview %4[%workgroup_id_z, 0, %8] [1, 512, 32] [1, 1, 1] : memref<16x512x256xf16> to memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>>
-    linalg.fill {__internal_linalg_transform__ = "workgroup_memory"}
-      ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
-    scf.for %arg0 = %c0 to %c512 step %c32 {
-      %subview_4 = memref.subview %subview_1[0, 0, %arg0] [1, 32, 32] [1, 1, 1] : memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
-      %subview_5 = memref.subview %subview_2[0, %arg0, 0] [1, 32, 32] [1, 1, 1] : memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>> to memref<1x32x32xf16, strided<[131072, 256, 1], offset: ?>>
-      gpu.barrier
-      %subview_6 = memref.subview %alloc[%c0, %c0, %c0] [1, 32, 32] [1, 1, 1] : memref<1x32x32xf16, 3> to memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
-      %10 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
-      %11 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
-      %12 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
-      %subview_7 = memref.subview %subview_4[0, %9, %10] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x1x8xf16, strided<[65536, 512, 1], offset: ?>>
-      %subview_8 = memref.subview %subview_6[0, %11, %12] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3> to memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      %13 = vector.transfer_read %subview_7[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<1x1x8xf16, strided<[65536, 512, 1], offset: ?>>, vector<1x1x8xf16>
-      vector.transfer_write %13, %subview_8[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x1x8xf16>, memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      %subview_9 = memref.subview %alloc_0[%c0, %c0, %c0] [1, 32, 32] [1, 1, 1] : memref<1x32x32xf16, 3> to memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      %14 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
-      %15 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
-      %16 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
-      %17 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
-      %subview_10 = memref.subview %subview_5[0, %14, %15] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[131072, 256, 1], offset: ?>> to memref<1x1x8xf16, strided<[131072, 256, 1], offset: ?>>
-      %subview_11 = memref.subview %subview_9[0, %16, %17] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3> to memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      %18 = vector.transfer_read %subview_10[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<1x1x8xf16, strided<[131072, 256, 1], offset: ?>>, vector<1x1x8xf16>
-      vector.transfer_write %18, %subview_11[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x1x8xf16>, memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
-      gpu.barrier
-      linalg.batch_matmul {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config}
-        ins(%alloc, %alloc_0 : memref<1x32x32xf16, 3>, memref<1x32x32xf16, 3>) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
-    }
-    %subview_3 = memref.subview %5[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
-    linalg.generic {
-        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-        iterator_types = ["parallel", "parallel", "parallel"]}
-    ins(%subview_3 : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
-    outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
-    attrs = {__internal_linalg_transform__ = "workgroup_memory"} {
-    ^bb0(%in: f16, %out: f16):
-      %9 = arith.divf %out, %in : f16
-      linalg.yield %9 : f16
-    }
-    return
+func.func @matmul_256x1024x128_div_add() attributes {translation_info = #translation} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %c512 = arith.constant 512 : index
+  %c1 = arith.constant 1 : index
+  %0 = gpu.thread_id  x
+  %1 = gpu.thread_id  y
+  %2 = gpu.thread_id  z
+  %alloc = memref.alloc() : memref<1x32x32xf16, 3>
+  %alloc_0 = memref.alloc() : memref<1x32x32xf16, 3>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<16x128x512xf16>
+  memref.assume_alignment %3, 64 : memref<16x128x512xf16>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<16x512x256xf16>
+  memref.assume_alignment %4, 64 : memref<16x512x256xf16>
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x128x256xf16>
+  memref.assume_alignment %5, 64 : memref<16x128x256xf16>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<16x128x256xf16>
+  memref.assume_alignment %6, 64 : memref<16x128x256xf16>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %7 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
+  %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
+  %subview = memref.subview %6[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
+  %subview_1 = memref.subview %3[%workgroup_id_z, %7, 0] [1, 32, 512] [1, 1, 1] : memref<16x128x512xf16> to memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>>
+  %subview_2 = memref.subview %4[%workgroup_id_z, 0, %8] [1, 512, 32] [1, 1, 1] : memref<16x512x256xf16> to memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>>
+  linalg.fill {__internal_linalg_transform__ = "workgroup_memory"}
+    ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
+  scf.for %arg0 = %c0 to %c512 step %c32 {
+    %subview_4 = memref.subview %subview_1[0, 0, %arg0] [1, 32, 32] [1, 1, 1] : memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
+    %subview_5 = memref.subview %subview_2[0, %arg0, 0] [1, 32, 32] [1, 1, 1] : memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>> to memref<1x32x32xf16, strided<[131072, 256, 1], offset: ?>>
+    gpu.barrier
+    %subview_6 = memref.subview %alloc[%c0, %c0, %c0] [1, 32, 32] [1, 1, 1] : memref<1x32x32xf16, 3> to memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
+    %11 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
+    %12 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
+    %subview_7 = memref.subview %subview_4[0, %9, %10] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x1x8xf16, strided<[65536, 512, 1], offset: ?>>
+    %subview_8 = memref.subview %subview_6[0, %11, %12] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3> to memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    %13 = vector.transfer_read %subview_7[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<1x1x8xf16, strided<[65536, 512, 1], offset: ?>>, vector<1x1x8xf16>
+    vector.transfer_write %13, %subview_8[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x1x8xf16>, memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    %subview_9 = memref.subview %alloc_0[%c0, %c0, %c0] [1, 32, 32] [1, 1, 1] : memref<1x32x32xf16, 3> to memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    %14 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
+    %15 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
+    %16 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
+    %17 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
+    %subview_10 = memref.subview %subview_5[0, %14, %15] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[131072, 256, 1], offset: ?>> to memref<1x1x8xf16, strided<[131072, 256, 1], offset: ?>>
+    %subview_11 = memref.subview %subview_9[0, %16, %17] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3> to memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    %18 = vector.transfer_read %subview_10[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<1x1x8xf16, strided<[131072, 256, 1], offset: ?>>, vector<1x1x8xf16>
+    vector.transfer_write %18, %subview_11[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x1x8xf16>, memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
+    gpu.barrier
+    linalg.batch_matmul {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config}
+      ins(%alloc, %alloc_0 : memref<1x32x32xf16, 3>, memref<1x32x32xf16, 3>) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
   }
+  %subview_3 = memref.subview %5[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
+  linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+  ins(%subview_3 : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
+  outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
+  attrs = {__internal_linalg_transform__ = "workgroup_memory"} {
+  ^bb0(%in: f16, %out: f16):
+    %9 = arith.divf %out, %in : f16
+    linalg.yield %9 : f16
+  }
+  return
 }
 
 //       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>
@@ -259,9 +272,15 @@ builtin.module  {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize workgroup_size=[32, 1, 1]>
-builtin.module  {
 func.func @matmul_256x1024x128_mixed_signedness_int8() {
   %cst = arith.constant 0 : i32
   %cst_i8 = arith.constant 0 : i8
@@ -273,9 +292,9 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
   %2 = gpu.thread_id  z
   %alloc = memref.alloc() : memref<32x32xi8, 3>
   %alloc_0 = memref.alloc() : memref<32x32xi8, 3>
-  %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<256x1024xi8>
-  %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1024x128xi8>
-  %7 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xi32>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<256x1024xi8>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<1024x128xi8>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(4) alignment(64) offset(%c0) : memref<256x128xi32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
@@ -322,7 +341,6 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
     }
   }
   return
-}
 }
 
 //       CHECK: #[[$MAP_Y:.+]] = affine_map<()[s0] -> (s0 * 16)>

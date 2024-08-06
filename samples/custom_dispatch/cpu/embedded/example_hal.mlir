@@ -45,6 +45,14 @@
   #x86_64_target
 ]> : !hal.device
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
+  <0, bindings = [
+      <0, storage_buffer, ReadOnly>,
+      <1, storage_buffer, ReadOnly>,
+      <2, storage_buffer>
+  ]>
+]>
+
 module @example attributes {hal.device.targets = [#cpu_target]} {
 
   // Executable containing exported shims and calls to external functions.
@@ -81,26 +89,19 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
       // The ordinal must be assigned by the user and unique for the executable.
       // The layout defines the required bindings and push constants and can be
       // thought of as the function signature.
-      hal.executable.export public @simple_mul ordinal(0)
-          layout(#hal.pipeline.layout<push_constants = 1, sets = [
-            <0, bindings = [
-                <0, storage_buffer, ReadOnly>,
-                <1, storage_buffer, ReadOnly>,
-                <2, storage_buffer>
-            ]>
-          ]>) attributes {
-            // Bindings are automatically inferred when possible as part of the
-            // ABI but can be overridden if the user wants to use features such
-            // as sparse bindings or multiple descriptor sets. To do so the
-            // `hal.interface.bindings` attribute can be added to a dispatch op
-            // as follows mapping tensor operands/results to the pipeline layout
-            // sets/bindings:
-            hal.interface.bindings = [
-              #hal.interface.binding<0, 0>,
-              #hal.interface.binding<0, 1>,
-              #hal.interface.binding<0, 2>
-            ]
-          } {
+      hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) attributes {
+        // Bindings are automatically inferred when possible as part of the
+        // ABI but can be overridden if the user wants to use features such
+        // as sparse bindings or multiple descriptor sets. To do so the
+        // `hal.interface.bindings` attribute can be added to a dispatch op
+        // as follows mapping tensor operands/results to the pipeline layout
+        // sets/bindings:
+        hal.interface.bindings = [
+          #hal.interface.binding<0, 0>,
+          #hal.interface.binding<0, 1>,
+          #hal.interface.binding<0, 2>
+        ]
+      } {
       ^bb0(%device: !hal.device, %workload: index):
         // This host function is used to compute the XYZ workgroup count
         // dispatched at runtime. It can query the %device for capabilities
@@ -113,13 +114,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
       }
 
       // Similar to the above but in-place by using a read/write binding.
-      hal.executable.export public @simple_mul_inplace ordinal(1)
-          layout(#hal.pipeline.layout<push_constants = 1, sets = [
-            <0, bindings = [
-                <0, storage_buffer, ReadOnly>,
-                <1, storage_buffer>
-            ]>
-          ]>) {
+      hal.executable.export public @simple_mul_inplace ordinal(1) layout(#pipeline_layout) {
       ^bb0(%device: !hal.device, %workload: index):
         %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
         %c1 = arith.constant 1 : index
@@ -173,7 +168,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %c0 = arith.constant 0 : index
 
           // Push constants representing primitive operands can be loaded here.
-          %dim_i32 = hal.interface.constant.load[0] : i32
+          %dim_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
           %dim = arith.index_castui %dim_i32 : i32 to index
 
           // This function is invoked once per workgroup so determine where this
@@ -184,9 +179,9 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Bindings are accessed by reference.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           // Call the externally defined C function with an (almost) plain C
           // calling convention (see above for details about the mess memrefs
@@ -211,15 +206,15 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         func.func @simple_mul_inplace() {
           %c0 = arith.constant 0 : index
 
-          %dim_i32 = hal.interface.constant.load[0] : i32
+          %dim_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
           %dim = arith.index_castui %dim_i32 : i32 to index
 
           %workgroup_id_x = hal.interface.workgroup.id[0] : index
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
           // Same as above but note that we're treating %binding1 as read/write.
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           func.call @simple_mul_inplace_workgroup(%binding0, %binding1, %dim, %tid) : (memref<?xf32>, memref<?xf32>, index, index) -> ()
 

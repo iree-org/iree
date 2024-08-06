@@ -377,6 +377,140 @@ TEST_F(SemaphoreTest, SimultaneousMultiWaitAll) {
   iree_hal_semaphore_release(semaphore2);
 }
 
+// Wait on a semaphore that is then failed.
+TEST_F(SemaphoreTest, FailThenWait) {
+  iree_hal_semaphore_t* semaphore = this->CreateSemaphore();
+
+  iree_status_t status =
+      iree_make_status(IREE_STATUS_CANCELLED, "FailThenWait test.");
+  iree_hal_semaphore_fail(semaphore, iree_status_clone(status));
+
+  iree_status_t wait_status = iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE));
+  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  uint64_t value = 1234;
+  iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
+  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  CheckStatusContains(query_status, status);
+
+  iree_hal_semaphore_release(semaphore);
+  iree_status_ignore(status);
+  iree_status_ignore(wait_status);
+  iree_status_ignore(query_status);
+}
+
+// Wait on a semaphore that is then failed.
+TEST_F(SemaphoreTest, WaitThenFail) {
+  iree_hal_semaphore_t* semaphore = this->CreateSemaphore();
+
+  // It is possible that the order becomes fail than wait.
+  // We assume that it is less likely since starting the thread takes time.
+  iree_status_t status =
+      iree_make_status(IREE_STATUS_CANCELLED, "WaitThenFail test.");
+  std::thread signal_thread(
+      [&]() { iree_hal_semaphore_fail(semaphore, iree_status_clone(status)); });
+
+  iree_status_t wait_status = iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE));
+  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  uint64_t value = 1234;
+  iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
+  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  CheckStatusContains(query_status, status);
+
+  signal_thread.join();
+  iree_hal_semaphore_release(semaphore);
+  iree_status_ignore(status);
+  iree_status_ignore(wait_status);
+  iree_status_ignore(query_status);
+}
+
+// Wait 2 semaphores then fail one of them.
+TEST_F(SemaphoreTest, MultiWaitThenFail) {
+  iree_hal_semaphore_t* semaphore1 = this->CreateSemaphore();
+  iree_hal_semaphore_t* semaphore2 = this->CreateSemaphore();
+
+  // It is possible that the order becomes fail than wait.
+  // We assume that it is less likely since starting the thread takes time.
+  iree_status_t status =
+      iree_make_status(IREE_STATUS_CANCELLED, "MultiWaitThenFail test.");
+  std::thread signal_thread([&]() {
+    iree_hal_semaphore_fail(semaphore1, iree_status_clone(status));
+  });
+
+  iree_hal_semaphore_t* semaphore_array[] = {semaphore1, semaphore2};
+  uint64_t payload_array[] = {1, 1};
+  iree_hal_semaphore_list_t semaphore_list = {
+      IREE_ARRAYSIZE(semaphore_array),
+      semaphore_array,
+      payload_array,
+  };
+  iree_status_t wait_status = iree_hal_semaphore_list_wait(
+      semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE));
+  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  uint64_t value = 1234;
+  iree_status_t semaphore1_query_status =
+      iree_hal_semaphore_query(semaphore1, &value);
+  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  CheckStatusContains(semaphore1_query_status, status);
+
+  // semaphore2 must not have changed.
+  uint64_t semaphore2_value = 1234;
+  IREE_ASSERT_OK(iree_hal_semaphore_query(semaphore2, &semaphore2_value));
+  EXPECT_EQ(semaphore2_value, 0);
+
+  signal_thread.join();
+  iree_hal_semaphore_release(semaphore1);
+  iree_hal_semaphore_release(semaphore2);
+  iree_status_ignore(status);
+  iree_status_ignore(wait_status);
+  iree_status_ignore(semaphore1_query_status);
+}
+
+// Wait 2 semaphores using iree_hal_device_wait_semaphores then fail
+// one of them.
+TEST_F(SemaphoreTest, DeviceMultiWaitThenFail) {
+  iree_hal_semaphore_t* semaphore1 = this->CreateSemaphore();
+  iree_hal_semaphore_t* semaphore2 = this->CreateSemaphore();
+
+  // It is possible that the order becomes fail than wait.
+  // We assume that it is less likely since starting the thread takes time.
+  iree_status_t status =
+      iree_make_status(IREE_STATUS_CANCELLED, "DeviceMultiWaitThenFail test.");
+  std::thread signal_thread([&]() {
+    iree_hal_semaphore_fail(semaphore1, iree_status_clone(status));
+  });
+
+  iree_hal_semaphore_t* semaphore_array[] = {semaphore1, semaphore2};
+  uint64_t payload_array[] = {1, 1};
+  iree_hal_semaphore_list_t semaphore_list = {
+      IREE_ARRAYSIZE(semaphore_array),
+      semaphore_array,
+      payload_array,
+  };
+  iree_status_t wait_status = iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ANY, semaphore_list,
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE));
+  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  uint64_t value = 1234;
+  iree_status_t semaphore1_query_status =
+      iree_hal_semaphore_query(semaphore1, &value);
+  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  CheckStatusContains(semaphore1_query_status, status);
+
+  // semaphore2 must not have changed.
+  uint64_t semaphore2_value = 1234;
+  IREE_ASSERT_OK(iree_hal_semaphore_query(semaphore2, &semaphore2_value));
+  EXPECT_EQ(semaphore2_value, 0);
+
+  signal_thread.join();
+  iree_hal_semaphore_release(semaphore1);
+  iree_hal_semaphore_release(semaphore2);
+  iree_status_ignore(status);
+  iree_status_ignore(wait_status);
+  iree_status_ignore(semaphore1_query_status);
+}
+
 }  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_SEMAPHORE_TEST_H_

@@ -1,9 +1,9 @@
-// RUN: iree-opt --split-input-file --iree-flow-transformation-pipeline --iree-flow-export-benchmark-funcs --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-export-benchmark-funcs-pass --verify-diagnostics %s | FileCheck %s
 
 // Basic usage from the `--iree-native-bindings-support` flag.
 
 // CHECK-LABEL: func private @simpleMul
-util.func public @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export} {
+util.func public @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view {
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<4xf32>
   %1 = hal.tensor.import %arg1 : !hal.buffer_view -> tensor<4xf32>
   %2 = arith.mulf %0, %1 : tensor<4xf32>
@@ -41,8 +41,8 @@ util.func public @while(%start: i32, %bound: i32) -> i32 {
 //     CHECK: util.global private @[[GLOBAL_ARG1:.+]] {{{.+}}} = 0 : i32
 
 //     CHECK: util.func public @while_benchmark()
-// CHECK-DAG:   %[[ARG0:.+]] = util.global.load immutable @[[GLOBAL_ARG0]] : i32
-// CHECK-DAG:   %[[ARG1:.+]] = util.global.load immutable @[[GLOBAL_ARG1]] : i32
+// CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : i32
+// CHECK-DAG:   %[[ARG1:.+]] = util.global.load @[[GLOBAL_ARG1]] : i32
 //     CHECK:   %[[RET0:.+]] = util.call @while(%[[ARG0]], %[[ARG1]])
 //     CHECK:   util.optimization_barrier %[[RET0]] : i32
 //     CHECK:   util.return

@@ -6,14 +6,23 @@ icon: octicons/package-16
 
 IREE cuts automated releases via a workflow that is
 [triggered daily](https://github.com/iree-org/iree/blob/main/.github/workflows/schedule_candidate_release.yml).
-The only constraint placed on the commit that is released is that it has passed
-all CI checks. These are published on GitHub with the "pre-release" status. For
-debugging this process, see the
-[Release debugging playbook](../debugging/releases.md).
+The only constraint placed on the commit that is released is that it has
+[passed all required CI checks](https://github.com/iree-org/iree/blob/main/build_tools/scripts/get_latest_green.sh).
+These are published on GitHub with the "pre-release" status. For debugging this
+process, see the [Release debugging playbook](../debugging/releases.md).
 
 We periodically promote one of these candidates to a "stable" release by
 removing the "pre-release" status. This makes it show up as a "latest" release
 on GitHub. We also push the Python packages for this release to PyPI.
+
+## Release status
+
+| Package | Release status |
+| -- | -- |
+GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree)](https://github.com/iree-org/iree/releases/latest)
+GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree?include_prereleases)](https://github.com/iree-org/iree/releases)
+Python iree-compiler | [![PyPI version](https://badge.fury.io/py/iree-compiler.svg)](https://badge.fury.io/py/iree-compiler)
+Python iree-runtime | [![PyPI version](https://badge.fury.io/py/iree-runtime.svg)](https://badge.fury.io/py/iree-runtime)
 
 ## Picking a candidate to promote
 

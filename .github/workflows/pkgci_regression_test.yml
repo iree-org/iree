@@ -62,7 +62,6 @@ jobs:
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
       LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
@@ -90,7 +89,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 1da89a12a8b00dc77506d702f61300803b6240b7
+          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -139,17 +138,21 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             models-config-file: models_gpu_rocm_gfx942.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -162,8 +165,7 @@ jobs:
           # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
@@ -198,7 +200,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 1da89a12a8b00dc77506d702f61300803b6240b7
+          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -243,21 +245,23 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
@@ -285,6 +289,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -e experimental/regression_suite
 
       # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests

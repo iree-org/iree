@@ -268,7 +268,7 @@ public:
     uint64_t numConstants = 0;
     funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
       numConstants =
-          std::max(constantOp.getIndex().getZExtValue() + 1, numConstants);
+          std::max(constantOp.getOrdinal().getZExtValue() + 1, numConstants);
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
@@ -474,7 +474,7 @@ public:
     auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping.size() + ireeConstantOp.getIndex().getZExtValue());
+        argMapping.size() + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.

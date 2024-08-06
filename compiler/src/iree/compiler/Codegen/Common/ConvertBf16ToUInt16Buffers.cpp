@@ -89,8 +89,8 @@ struct ConvertHalInterfaceBindingSubspan final
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-            op, newResultTy, adaptor.getSet(), adaptor.getBinding(),
-            adaptor.getDescriptorType(), adaptor.getByteOffset(),
+            op, newResultTy, adaptor.getLayout(), adaptor.getSet(),
+            adaptor.getBinding(), adaptor.getByteOffset(),
             adaptor.getDynamicDims(), adaptor.getAlignmentAttr(),
             adaptor.getDescriptorFlagsAttr());
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
@@ -288,19 +288,19 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::BroadcastOp, vector::ShuffleOp, vector::ExtractElementOp,
           vector::ExtractOp, vector::InsertElementOp, vector::InsertOp,
           vector::ScalableInsertOp, vector::ScalableExtractOp,
-          vector::InsertStridedSliceOp, vector::ReshapeOp,
-          vector::ExtractStridedSliceOp, vector::TransferReadOp,
-          vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
-          vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
-          vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
-          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
-          vector::MaskOp, vector::TransposeOp, vector::FlatTransposeOp,
-          vector::SplatOp, vector::YieldOp>([&typeConverter](Operation *op) {
-        bool legal = typeConverter.isLegal(op);
-        LLVM_DEBUG(if (!legal) llvm::dbgs()
-                   << "Bf16Emulation: illegal op: " << *op << "\n");
-        return legal;
-      });
+          vector::InsertStridedSliceOp, vector::ExtractStridedSliceOp,
+          vector::TransferReadOp, vector::TransferWriteOp, vector::LoadOp,
+          vector::StoreOp, vector::MaskedLoadOp, vector::MaskedStoreOp,
+          vector::GatherOp, vector::ScatterOp, vector::ExpandLoadOp,
+          vector::CompressStoreOp, vector::ShapeCastOp, vector::ConstantMaskOp,
+          vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
+          vector::FlatTransposeOp, vector::SplatOp, vector::YieldOp>(
+          [&typeConverter](Operation *op) {
+            bool legal = typeConverter.isLegal(op);
+            LLVM_DEBUG(if (!legal) llvm::dbgs()
+                       << "Bf16Emulation: illegal op: " << *op << "\n");
+            return legal;
+          });
 
       RewritePatternSet patterns(ctx);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);

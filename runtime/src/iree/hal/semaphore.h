@@ -164,6 +164,7 @@ iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list);
 
 // Signals each semaphore in |semaphore_list| to indicate failure with
 // |signal_status|.
+// Takes ownership of |signal_status|.
 IREE_API_EXPORT void iree_hal_semaphore_list_fail(
     iree_hal_semaphore_list_t semaphore_list, iree_status_t signal_status);
 

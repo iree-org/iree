@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 #define IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 
 namespace mlir {
@@ -97,10 +97,6 @@ using VectorLayoutInterface = IREE::VectorExt::VectorLayoutInterface;
 class VectorLayoutAnalysis {
 public:
   VectorLayoutAnalysis(Operation *root) : root(root) {}
-
-  /// Fix the layout for a specific value. Returns failure if the layout set is
-  /// invalid for the value.
-  LogicalResult setAnchor(Value val, VectorLayoutInterface layout);
 
   /// Run the analysis. The analysis expects that the user has set some anchor
   /// points and is trying to infer the layout of other values.

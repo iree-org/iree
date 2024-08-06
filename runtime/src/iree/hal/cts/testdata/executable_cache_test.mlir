@@ -22,8 +22,8 @@ hal.executable.source public @executable {
     func.func @abs() {
       %c0 = arith.constant 0 : index
 
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:f32>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<writeonly:f32>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:f32>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) offset(%c0) : !flow.dispatch.tensor<writeonly:f32>
 
       %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
       %3 = tensor.empty() : tensor<f32>

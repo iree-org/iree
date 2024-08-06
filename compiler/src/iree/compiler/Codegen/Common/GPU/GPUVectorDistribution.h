@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_VECTOR_DISTRIBUTION_H_
 #define IREE_COMPILER_CODEGEN_COMMON_GPU_VECTOR_DISTRIBUTION_H_
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -105,9 +105,6 @@ public:
   }
 
   virtual ~VectorLayoutOptions() = default;
-
-  /// Set the anchor ops in the analysis rooted on the root operation.
-  virtual LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
 
   bool verifyConversion() const { return fullConversion; }
 

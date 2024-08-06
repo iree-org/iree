@@ -513,6 +513,20 @@ def OutlineDispatchRegionsPass :
   ];
 }
 
+def SetEncodingPass :
+    InterfacePass<"iree-flow-set-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
+           "provides padding size hints that will be attached to encodings.">,
+  ];
+}
+
 def TopLevelSCFToCFGPass :
     InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
   let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";

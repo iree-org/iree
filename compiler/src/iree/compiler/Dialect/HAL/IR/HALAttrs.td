@@ -448,6 +448,12 @@ def HAL_PipelineLayoutAttr :
     `sets` `=` `[` $setLayouts `]`
     `>`
   }];
+  let extraClassDeclaration = [{
+    // Returns the binding index in a flattened list of all sets and bindings.
+    // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
+    // a query for set 1 binding 0 would return 4.
+    int64_t getFlatBindingIndex(int64_t set, int64_t binding) const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//

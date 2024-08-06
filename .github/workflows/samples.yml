@@ -49,9 +49,9 @@ jobs:
       - name: "Installing build dependencies"
         run: |
           sudo apt update
-          sudo apt install cmake clang ninja-build
-          export CC=clang
-          export CXX=clang++
+          sudo apt install -y cmake clang ninja-build libstdc++-12-dev
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
       - name: "Setting up Python"
         uses: actions/setup-python@v5.1.0
         with:

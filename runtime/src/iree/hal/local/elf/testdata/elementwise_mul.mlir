@@ -47,9 +47,9 @@ hal.executable.source public @ex {
   // exported.
   builtin.module {
     func.func @elementwise_mul() {
-      %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %dst = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
+      %lhs = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %rhs = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %dst = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index

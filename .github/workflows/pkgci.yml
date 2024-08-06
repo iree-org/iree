@@ -78,3 +78,10 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_cpu')
     uses: ./.github/workflows/pkgci_test_tensorflow_cpu.yml
+
+  test_android:
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_android')
+    uses: ./.github/workflows/pkgci_test_android.yml
+    with:
+      write-caches: ${{ needs.setup.outputs.write-caches }}

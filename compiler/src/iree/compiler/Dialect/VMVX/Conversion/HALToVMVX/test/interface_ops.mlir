@@ -1,5 +1,12 @@
 // RUN: iree-opt --split-input-file --iree-vmvx-conversion --canonicalize %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK: util.global private @__constant_5xi32 : !util.buffer
 // CHECK: util.initializer {
 // CHECK:   %[[CST:.*]] = util.buffer.constant : !util.buffer = dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
@@ -26,9 +33,9 @@ func.func @entry() {
   %c1 = arith.constant 1 : index
   %0 = memref.get_global @__constant_5xi32 : memref<5xi32>
   //      CHECK: %[[BINDING0:.+]] = util.list.get %[[BINDINGS]][%c0] : !util.list<!util.buffer>
-  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<5xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<5xf32>
   //      CHECK: %[[BINDING1:.+]] = util.list.get %[[BINDINGS]][%c1] : !util.list<!util.buffer>
-  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xi32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<5xi32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index

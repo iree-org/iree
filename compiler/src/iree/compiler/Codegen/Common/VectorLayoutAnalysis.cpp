@@ -100,7 +100,9 @@ private:
   /// should only be used when you know there will be no layout conflicts.
   /// Otherwise, the resolve-like functions should be used.
   void setInnerLayout(const VectorLayoutInterface &layout) {
-    assert(layout && layout.isValidLayout(getValue()).succeeded());
+    assert(layout &&
+           layout.isValidLayout(getValue().getType(), getValue().getLoc())
+               .succeeded());
     vectorLayout = layout;
   }
 
@@ -1022,17 +1024,6 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
 /// ==========================================================================
 ///        VectorLayoutAnalysis
 /// ==========================================================================
-
-LogicalResult VectorLayoutAnalysis::setAnchor(Value val,
-                                              VectorLayoutInterface layout) {
-  auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
-  assert(typedVal && "expected value to be a vector type");
-  if (layout.isValidLayout(typedVal).failed()) {
-    return failure();
-  }
-  anchors[typedVal] = cast<VectorLayoutInterface>(layout);
-  return success();
-}
 
 LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring

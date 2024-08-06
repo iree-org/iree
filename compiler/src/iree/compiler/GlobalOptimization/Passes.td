@@ -148,15 +148,6 @@ def RemoveZeroExtentTensors :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createRemoveZeroExtentTensorsPass()";
 }
 
-def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
-  let summary = "Introduces tensor encoding for compute operations.";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
-  let options = [
-    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
-           "provides padding size hints that will be attached to encodings.">,
-  ];
-}
-
 def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
   let summary = "Simplifies tensor pack and unpack ops.";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSimplifyPackUnpackPass()";

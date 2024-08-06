@@ -1,8 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-codegen-emulate-narrow-type %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @memref_i4_to_i8() -> i4 {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<3x15xi4>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<3x15xi4>
   %1 = memref.load %0[%c0, %c0] : memref<3x15xi4>
   return %1 : i4
 }
@@ -11,9 +16,14 @@ func.func @memref_i4_to_i8() -> i4 {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @memref_i4_to_i8_dynamic(%arg0 : index, %arg1 : index, %arg2 : index) -> i4 {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%arg0) flags(ReadOnly) : memref<?x?xi4, strided<[?, 1], offset: ?>>{%arg1, %arg2}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%arg0) flags(ReadOnly) : memref<?x?xi4, strided<[?, 1], offset: ?>>{%arg1, %arg2}
   %1 = memref.load %0[%c0, %c0] : memref<?x?xi4, strided<[?, 1], offset: ?>>
   return %1 : i4
 }

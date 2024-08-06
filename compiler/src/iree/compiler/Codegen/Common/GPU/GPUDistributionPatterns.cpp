@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <numeric>
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -795,8 +795,8 @@ struct DistributeLayoutConflictResolutions final
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+    auto vector = cast<VectorValue>(resolutionOp.getInput());
+    auto result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout)
       return failure();
@@ -848,8 +848,8 @@ struct DistributeLayoutConflictToSharedMemory final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     auto loc = resolutionOp.getLoc();
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+    auto vector = cast<VectorValue>(resolutionOp.getInput());
+    auto result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
@@ -1019,10 +1019,12 @@ struct DistributeTrivialLayoutConversions final
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    auto input = cast<VectorValue>(toLayoutOp.getInput());
+    auto output = cast<VectorValue>(toLayoutOp.getOutput());
     VectorLayoutInterface currentLayout =
-        dyn_cast<LayoutAttr>(signature[toLayoutOp.getInput()]);
+        dyn_cast<LayoutAttr>(signature[input]);
     VectorLayoutInterface targetLayout =
-        dyn_cast<LayoutAttr>(signature[toLayoutOp.getResult()]);
+        dyn_cast<LayoutAttr>(signature[output]);
 
     if (currentLayout != targetLayout) {
       return rewriter.notifyMatchFailure(toLayoutOp,

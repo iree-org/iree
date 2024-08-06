@@ -1,0 +1,91 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Workflow for Android cross-compilation and test jobs.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: PkgCI Test Android
+
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+      write-caches:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+      write-caches:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cross_compile:
+    runs-on: ubuntu-20.04
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      VENV_DIR: ${{ github.workspace }}/.venv
+      IREE_TARGET_BUILD_DIR: build-android-arm_64
+    steps:
+      # General setup.
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@v5.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}
+          save: ${{ inputs.write-caches == 1 }}
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y ninja-build
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25b
+      - name: Build for Android
+        env:
+          IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ inputs.write-caches }}
+          BUILD_PRESET: test
+        run: build_tools/cmake/build_android.sh
+
+  # TODO: run tests on physical devices or emulators
+  #   * Emulators can run on the same host that ran the build
+  #   * Physical devices could either
+  #     A) be connected to a self-hosted build machine that runs the compiler,
+  #        connects over ADB, and run tests
+  #     B) be connected to a self-hosted run machine that downloads already
+  #        compiled artifacts from a build machine and just connects over ADB
+  #        to run tests

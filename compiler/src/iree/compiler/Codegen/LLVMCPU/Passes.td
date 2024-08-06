@@ -142,6 +142,17 @@ def LLVMCPUTileAndFuse :
   ];
 }
 
+def LLVMCPUTileRootAndFuseProducerConsumer :
+    InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile root op and fuse with producer and consumer TilingInterface ops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTileRootAndFuseProducerConsumer()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
 def LLVMCPUVerifyVectorSizeLegality :
     InterfacePass<"iree-llvmcpu-verify-vector-size-legality", "mlir::FunctionOpInterface"> {
   let summary =

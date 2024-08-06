@@ -24,6 +24,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::SPIRV

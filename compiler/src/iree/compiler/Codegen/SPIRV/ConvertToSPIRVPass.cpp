@@ -288,7 +288,7 @@ struct HALInterfaceLoadConstantConverter final
     auto layoutAttr = exportOps.front().getLayout();
 
     uint64_t elementCount = layoutAttr.getPushConstants();
-    unsigned index = loadOp.getIndex().getZExtValue();
+    unsigned index = loadOp.getOrdinal().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly. This is expected to be

@@ -127,19 +127,22 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
   switch (index) {
   case MATMUL_LHS:
   case MATMUL_RHS:
-  case MATMUL_RESULT:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index])
-        .getAffineMap();
+  case MATMUL_RESULT: {
+    auto indexingMap =
+        llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index]).getAffineMap();
+    if (auto bcastMap = getBcastMap()) {
+      indexingMap = bcastMap.getAffineMap().compose(indexingMap);
+    }
+    return indexingMap;
+  }
   default:
     return AffineMap();
   }
 }
 
-unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
-  AffineMap map = getMapForOperandIndex();
-  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
-  assert(idx.has_value());
-  return idx.value();
+std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+  return getMapForOperandIndex().getResultPosition(
+      getAffineDimExpr(dimPos, getContext()));
 }
 
 ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {

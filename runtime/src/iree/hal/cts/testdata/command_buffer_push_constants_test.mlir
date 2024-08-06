@@ -14,12 +14,12 @@ hal.executable.source public @executable {
   }
   builtin.module {
     func.func @write_push_constants() {
-      %input_0 = hal.interface.constant.load[0] : i32
-      %input_1 = hal.interface.constant.load[1] : i32
-      %input_2 = hal.interface.constant.load[2] : i32
-      %input_3 = hal.interface.constant.load[3] : i32
+      %input_0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+      %input_1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+      %input_2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+      %input_3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
 
-      %out = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4xi32>
+      %out = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<4xi32>
 
       %c0 = arith.constant 0 : index
       %c1 = arith.constant 1 : index

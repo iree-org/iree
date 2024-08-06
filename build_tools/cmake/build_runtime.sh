@@ -21,7 +21,7 @@ CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 IREE_BUILD_PYTHON_BINDINGS="${IREE_BUILD_PYTHON_BINDINGS:-ON}"
 
 source build_tools/cmake/setup_build.sh
-# Note: not using ccache since the runtime build should be fast already.
+source build_tools/cmake/setup_ccache.sh
 
 declare -a args
 args=(
@@ -31,8 +31,8 @@ args=(
   "-DIREE_BUILD_COMPILER=OFF"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
 
-  "-DIREE_RUNTIME_OPTIMIZATION_PROFILE=lto"
-  "-DIREE_FORCE_LTO_COMPAT_BINUTILS_ON_LINUX=ON"
+  # Use `lld` for faster linking.
+  "-DIREE_ENABLE_LLD=ON"
 
   "-DIREE_BUILD_PYTHON_BINDINGS=${IREE_BUILD_PYTHON_BINDINGS}"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
@@ -81,3 +81,7 @@ case "${BUILD_PRESET}" in
     exit 1
     ;;
 esac
+
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
