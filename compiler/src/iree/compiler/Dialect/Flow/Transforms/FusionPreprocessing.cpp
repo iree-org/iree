@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -223,6 +224,7 @@ struct FusionPreprocessingPass
     // operand shapes.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     memref::populateResolveShapedTypeResultDimsPatterns(patterns);
+    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
