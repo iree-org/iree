@@ -60,6 +60,12 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
+def LLVMGPUConfigureTensorLayouts :
+    InterfacePass<"iree-llvmgpu-configure-tensor-layouts", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to set layouts on tensors for later vector distribution";
+  let constructor = "mlir::iree_compiler::createLLVMGPUConfigureTensorLayouts()";
+}
+
 def LLVMGPUConfigureVectorLayouts :
     InterfacePass<"iree-llvmgpu-configure-vector-layouts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to set layouts for vector distribution";

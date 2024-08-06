@@ -25,6 +25,13 @@ struct DistributeContractions final
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+        contractOp.getIndexingMapsArray());
+    if (failed(maybeOpInfo)) {
+      return rewriter.notifyMatchFailure(contractOp, "invalid contraction");
+    }
+    VectorContractOpInfo opInfo = maybeOpInfo.value();
+
     VectorValue result = dyn_cast<VectorValue>(contractOp.getResult());
     if (!result) {
       return rewriter.notifyMatchFailure(contractOp,
@@ -67,7 +74,6 @@ struct DistributeContractions final
     Value vector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    VectorContractOpInfo opInfo(contractOp);
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
 
     std::optional<int64_t> kBatch = layouts[LHS].getBatchDim(lhsK);

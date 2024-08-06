@@ -152,6 +152,10 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPromoteMatmulToFitMMAPass(
     LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims);
 
+// Pass to set layouts on tensors for later vector distribution.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createLLVMGPUConfigureTensorLayouts();
+
 // Pass to set layouts for vector distribution.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createLLVMGPUConfigureVectorLayouts();
