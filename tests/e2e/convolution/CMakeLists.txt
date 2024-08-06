@@ -324,7 +324,6 @@ iree_generated_e2e_runner_test(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-set(IREE_HIP_TEST_TARGET_CHIP gfx942)
 # To distinguish between CDNA(gfx9) and RDNA3(gfx11)
 if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
 
