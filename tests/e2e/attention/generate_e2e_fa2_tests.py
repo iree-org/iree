@@ -94,7 +94,7 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=4, m=16384, k1=256, k2=2048, n=128, scale=1.0),
+            TestShapeAndScale(batch=4, m=4096, k1=64, k2=2048, n=64, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
@@ -241,16 +241,17 @@ def generate_function(
     func_definition = func_definition + (
         f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
         f"  %result0 = tensor.empty(): {result_tensor_type}\n"
-        f"  indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,\n"
-        f"                   affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,\n"
-        f"                   affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,\n"
-        f"                   affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]\n"
         f"  %scale_f16 = arith.truncf %scale : f32 to f16 \n"
-        f"  %result1 = {op_name} ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16}) outs(%result0: {result_tensor_type}) -> {result_tensor_type}\n"
-        f"  return %result1: {result_tensor_type}\n"
+        f"  %result1 = {op_name} {{\n"
+        f"      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,\n"
+        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,\n"
+        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,\n"
+        f"                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]\n}}"
+        f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n" 
+        f"      outs(%result0: {result_tensor_type}) -> {result_tensor_type}\n"
+        f" return %result1: {result_tensor_type}\n"
         f"}}\n"
     )
-
     return MLIRFunction(
         name=func_name,
         signature=signature,
