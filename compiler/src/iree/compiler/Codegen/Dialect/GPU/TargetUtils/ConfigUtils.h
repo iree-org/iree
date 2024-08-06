@@ -7,11 +7,18 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-SmallVector<int64_t> deriveThreadTileSizes(Operation *op);
+/// Helper for setting up a matmul config based on the specified target.
+/// TODO: Currently this only succeeds if the target supports an mma
+/// kind. Add support for a fallback direct lowering path.
+LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
+                                      mlir::FunctionOpInterface entryPoint,
+                                      Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 
