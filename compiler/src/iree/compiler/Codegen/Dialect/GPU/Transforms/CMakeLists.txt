@@ -45,6 +45,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "ConcretizeMmaShapes.cpp"
     "DistributeMmaToLanes.cpp"
     "FuseAndHoistParallelLoops.cpp"
     "LowerIREEGPUOps.cpp"

@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -749,6 +750,75 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
   offsets.append(canonicalOffsets);
   sizes.append(canonicalSizes);
 
+  return success();
+}
+
+LogicalResult MMAAttr::materializeOperandConcreteShape(
+    OpBuilder &builder, IREE::GPU::MMAFragment fragment, Value operand,
+    std::optional<ArrayRef<int64_t>> permutation,
+    SmallVector<ReassociationIndices> &reassociations,
+    RankedTensorType &resultType) const {
+  OpaqueMmaLayout opaqueLayout =
+      getOpaqueMFMALayout(operand.getContext(), getIntrinsic().getValue());
+  ConcreteMmaLayout layout =
+      getConcreteMFMALayout(operand.getContext(), getIntrinsic().getValue());
+  SmallVector<ArrayRef<int64_t>> concreteSizes;
+  SmallVector<int64_t, 2> opaqueSizes;
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs: {
+    concreteSizes.push_back(layout.aMLayout.getShapes());
+    concreteSizes.push_back(layout.aKLayout.getShapes());
+    opaqueSizes.push_back(opaqueLayout.mSize);
+    opaqueSizes.push_back(opaqueLayout.kSize);
+    break;
+  }
+  case IREE::GPU::MMAFragment::Rhs: {
+    concreteSizes.push_back(layout.bKLayout.getShapes());
+    concreteSizes.push_back(layout.bNLayout.getShapes());
+    opaqueSizes.push_back(opaqueLayout.kSize);
+    opaqueSizes.push_back(opaqueLayout.nSize);
+    break;
+  }
+  case IREE::GPU::MMAFragment::Acc: {
+    concreteSizes.push_back(layout.cMLayout.getShapes());
+    concreteSizes.push_back(layout.cNLayout.getShapes());
+    opaqueSizes.push_back(opaqueLayout.mSize);
+    opaqueSizes.push_back(opaqueLayout.nSize);
+    break;
+  }
+  }
+  if (permutation.has_value()) {
+    applyPermutationToVector(concreteSizes, permutation.value());
+    applyPermutationToVector(opaqueSizes, permutation.value());
+  }
+
+  // Inner tile must have sizes matching the opaque layout.
+  auto operandType = llvm::cast<RankedTensorType>(operand.getType());
+  ArrayRef<int64_t> operandShape = operandType.getShape();
+  SmallVector<int64_t, 2> innerShape(operandShape.end() - 2,
+                                     operandShape.end());
+  if (!llvm::equal(opaqueSizes, innerShape)) {
+    return failure();
+  }
+
+  // Expand the shape of the inner tile to reflect the MMA thread layout.
+  SmallVector<int64_t, 4> resultShape(operandShape.begin(),
+                                      operandShape.end() - 2);
+  SmallVector<ReassociationIndices> reInds =
+      llvm::map_to_vector(llvm::seq<int64_t>(resultShape.size()),
+                          [](int64_t idx) -> ReassociationIndices {
+                            return ReassociationIndices({idx});
+                          });
+  int idx = reInds.size();
+  for (ArrayRef<int64_t> sizes : concreteSizes) {
+    resultShape.append(SmallVector<int64_t>(sizes));
+    reInds.push_back(
+        llvm::to_vector(llvm::seq<int64_t>(idx, idx + sizes.size())));
+    idx += sizes.size();
+  }
+
+  reassociations = reInds;
+  resultType = operandType.clone(resultShape);
   return success();
 }
 

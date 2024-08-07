@@ -20,6 +20,16 @@ def DistributeMmaToLanesPass :
   ];
 }
 
+def ConcretizeMmaShapesPass :
+    InterfacePass<"iree-gpu-concretize-mma-shapes", "mlir::FunctionOpInterface"> {
+  let summary = "Expands the inner dimensions of iree_gpu.multi_mma ops to match the thread layout";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect",
+  ];
+}
+
 def FuseAndHoistParallelLoopsPass :
     InterfacePass<"iree-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
   let summary = "Greedily fuses and hoists parallel loops.";
