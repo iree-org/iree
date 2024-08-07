@@ -165,7 +165,7 @@ const WgpDetails *getCDNA1WgpDetails() {
 
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
-      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F32_16x16x16_F16,
       MMAIntrinsic::WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails rdna3Wgp = {
@@ -355,7 +355,7 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 
 const WgpDetails *getAmpereWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F32_16x16x16_F16,
       MMAIntrinsic::WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails ampereWgp = {
@@ -368,7 +368,7 @@ const WgpDetails *getAmpereWgpDetails() {
 
 const WgpDetails *getTuringWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F32_16x16x16_F16,
       MMAIntrinsic::WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails turingWgp = {
@@ -381,7 +381,7 @@ const WgpDetails *getTuringWgpDetails() {
 
 const WgpDetails *getVoltaWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
-      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F32_16x16x16_F16,
       MMAIntrinsic::WMMA_F16_16x16x16_F16,
   };
   // clang-format off

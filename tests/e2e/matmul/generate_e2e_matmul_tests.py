@@ -292,13 +292,13 @@ def get_rocm_test_compilation_infos(
         ]
     elif intrinsic == "WMMA":
         schedules = [
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
         ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
@@ -338,7 +338,7 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_F16_16x16x16_F32":
+        elif schedule.intrinsic == "WMMA_F32_16x16x16_F16":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
