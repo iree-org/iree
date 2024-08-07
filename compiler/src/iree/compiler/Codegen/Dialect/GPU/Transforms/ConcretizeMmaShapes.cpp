@@ -26,92 +26,112 @@ struct ConcretizeMmaShapesPass final
 };
 } // namespace
 
-struct ConcretizeMmaInputShapes final
-    : OpRewritePattern<IREE::GPU::MultiMmaOp> {
+struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+
+  ConcretizeMmaOperandShape(MLIRContext *context, MMAFragment fragment)
+      : OpRewritePattern<MultiMmaOp>(context), fragment(fragment) {}
+
+  LogicalResult matchAndRewrite(MultiMmaOp mmaOp,
                                 PatternRewriter &rewriter) const override {
-    IREE::GPU::MmaInterfaceAttr kind = mmaOp.getKind();
-    SmallVector<ReassociationIndices> lhsReassociations, rhsReassociations;
-    RankedTensorType lhsConcreteType, rhsConcreteType;
-    if (failed(kind.materializeOperandConcreteShape(
-            rewriter, IREE::GPU::MMAFragment::Lhs, mmaOp.getLhs(),
-            mmaOp.getLhsPermutation(), lhsReassociations, lhsConcreteType))) {
+    if (!mmaOp.hasTensorSemantics()) {
       return failure();
     }
-    if (failed(kind.materializeOperandConcreteShape(
-            rewriter, IREE::GPU::MMAFragment::Rhs, mmaOp.getRhs(),
-            mmaOp.getRhsPermutation(), rhsReassociations, rhsConcreteType))) {
+
+    // Get the right operand and permutation for the `fragment`.
+    Value operand;
+    std::optional<ArrayRef<int64_t>> permutation;
+    switch (fragment) {
+    case MMAFragment::Lhs:
+      operand = mmaOp.getLhs();
+      permutation = mmaOp.getLhsPermutation();
+      break;
+    case MMAFragment::Rhs:
+      operand = mmaOp.getRhs();
+      permutation = mmaOp.getRhsPermutation();
+      break;
+    case MMAFragment::Acc:
+      operand = mmaOp.getAcc();
+      permutation = mmaOp.getAccPermutation();
+      break;
+    }
+
+    // Get the reassociation indices and result type of the expand_shape op.
+    MmaInterfaceAttr kind = mmaOp.getKind();
+    SmallVector<ReassociationIndices> reassociations;
+    RankedTensorType concreteType;
+    if (failed(kind.materializeOperandConcreteShape(rewriter, fragment, operand,
+                                                    permutation, reassociations,
+                                                    concreteType))) {
       return failure();
     }
+
+    // Create the expand_shape.
     Location loc = mmaOp->getLoc();
-    Value concreteLhs =
-        rewriter
-            .create<tensor::ExpandShapeOp>(loc, lhsConcreteType, mmaOp.getLhs(),
-                                           lhsReassociations)
-            .getResult();
-    Value concreteRhs =
-        rewriter
-            .create<tensor::ExpandShapeOp>(loc, rhsConcreteType, mmaOp.getRhs(),
-                                           rhsReassociations)
-            .getResult();
+    Value concreteOperand = rewriter
+                                .create<tensor::ExpandShapeOp>(
+                                    loc, concreteType, operand, reassociations)
+                                .getResult();
 
-    std::optional<DenseI64ArrayAttr> lhsPerm, rhsPerm, accPerm;
-    if (mmaOp.getLhsPermutation().has_value())
-      lhsPerm = mmaOp.getLhsPermutationAttr();
-    if (mmaOp.getRhsPermutation().has_value())
-      rhsPerm = mmaOp.getRhsPermutationAttr();
-    if (mmaOp.getAccPermutation().has_value())
-      accPerm = mmaOp.getAccPermutationAttr();
+    // Expand the permutation for the new inner dimensions of the expanded
+    // multi_mma operand.
+    auto expandPerm =
+        [&](std::optional<ArrayRef<int64_t>> perm, MMAFragment frag,
+            int64_t outerRank) -> std::optional<DenseI64ArrayAttr> {
+      if (!perm.has_value()) {
+        return std::nullopt;
+      }
+      if (frag != fragment) {
+        return rewriter.getDenseI64ArrayAttr(perm.value());
+      }
+      SmallVector<ReassociationIndices> innerReInds(
+          reassociations.begin() + outerRank, reassociations.end());
+      for (auto &reInd : innerReInds) {
+        for (auto &idx : reInd) {
+          idx -= outerRank;
+        }
+      }
+      SmallVector<int64_t> expandedPerm;
+      for (auto reInd : applyPermutation(innerReInds, perm.value())) {
+        expandedPerm.append(reInd);
+      }
+      return rewriter.getDenseI64ArrayAttr(expandedPerm);
+    };
+    std::optional<DenseI64ArrayAttr> lhsPerm = expandPerm(
+        mmaOp.getLhsPermutation(), MMAFragment::Lhs, mmaOp.getLhsOuterRank());
+    std::optional<DenseI64ArrayAttr> rhsPerm = expandPerm(
+        mmaOp.getRhsPermutation(), MMAFragment::Rhs, mmaOp.getRhsOuterRank());
+    std::optional<DenseI64ArrayAttr> accPerm = expandPerm(
+        mmaOp.getAccPermutation(), MMAFragment::Acc, mmaOp.getAccOuterRank());
 
-    rewriter.replaceOpWithNewOp<IREE::GPU::MultiMmaOp>(
-        mmaOp, concreteLhs, concreteRhs, mmaOp.getAcc(),
+    // Create the new multi_mma op with the concrete type.
+    auto concreteMmaOp = rewriter.create<MultiMmaOp>(
+        loc,
+        /*lhs=*/fragment == MMAFragment::Lhs ? concreteOperand : mmaOp.getLhs(),
+        /*rhs=*/fragment == MMAFragment::Rhs ? concreteOperand : mmaOp.getRhs(),
+        /*acc=*/fragment == MMAFragment::Acc ? concreteOperand : mmaOp.getAcc(),
         mmaOp.getIndexingMaps(), mmaOp.getIteratorTypes(), mmaOp.getKind(),
         lhsPerm, rhsPerm, accPerm);
 
-    return success();
-  }
-};
-
-struct ConcretizeMmaResultShape final
-    : OpRewritePattern<IREE::GPU::MultiMmaOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
-                                PatternRewriter &rewriter) const override {
-    IREE::GPU::MmaInterfaceAttr kind = mmaOp.getKind();
-    SmallVector<ReassociationIndices> accReassociations;
-    RankedTensorType accConcreteType;
-    if (failed(kind.materializeOperandConcreteShape(
-            rewriter, IREE::GPU::MMAFragment::Acc, mmaOp.getAcc(),
-            mmaOp.getAccPermutation(), accReassociations, accConcreteType))) {
-      return failure();
+    if (auto config = getLoweringConfig(mmaOp)) {
+      setLoweringConfig(concreteMmaOp, config);
     }
-    Location loc = mmaOp->getLoc();
-    Value concreteAcc =
-        rewriter
-            .create<tensor::ExpandShapeOp>(loc, accConcreteType, mmaOp.getAcc(),
-                                           accReassociations)
-            .getResult();
 
-    std::optional<DenseI64ArrayAttr> lhsPerm, rhsPerm, accPerm;
-    if (mmaOp.getLhsPermutation().has_value())
-      lhsPerm = mmaOp.getLhsPermutationAttr();
-    if (mmaOp.getRhsPermutation().has_value())
-      rhsPerm = mmaOp.getRhsPermutationAttr();
-    if (mmaOp.getAccPermutation().has_value())
-      accPerm = mmaOp.getAccPermutationAttr();
+    if (fragment != MMAFragment::Acc) {
+      rewriter.replaceOp(mmaOp, concreteMmaOp);
+      return success();
+    }
 
-    auto concreteMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
-        loc, mmaOp.getLhs(), mmaOp.getRhs(), concreteAcc,
-        mmaOp.getIndexingMaps(), mmaOp.getIteratorTypes(), mmaOp.getKind(),
-        lhsPerm, rhsPerm, accPerm);
-
+    // For the Acc operand, the result needs to be collapsed back to the
+    // original type so that types match with consumers.
     rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
-        mmaOp, mmaOp.getAccType(), concreteMmaOp.getResult(),
-        accReassociations);
+        mmaOp, mmaOp.getAccType(), concreteMmaOp.getResult(), reassociations);
 
     return success();
   }
+
+private:
+  MMAFragment fragment;
 };
 
 void ConcretizeMmaShapesPass::runOnOperation() {
@@ -120,10 +140,11 @@ void ConcretizeMmaShapesPass::runOnOperation() {
 
   RewritePatternSet patterns(context);
   if (concretizeInputs) {
-    patterns.insert<ConcretizeMmaInputShapes>(context);
+    patterns.insert<ConcretizeMmaOperandShape>(context, MMAFragment::Lhs);
+    patterns.insert<ConcretizeMmaOperandShape>(context, MMAFragment::Rhs);
   }
   if (concretizeResult) {
-    patterns.insert<ConcretizeMmaResultShape>(context);
+    patterns.insert<ConcretizeMmaOperandShape>(context, MMAFragment::Acc);
   }
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

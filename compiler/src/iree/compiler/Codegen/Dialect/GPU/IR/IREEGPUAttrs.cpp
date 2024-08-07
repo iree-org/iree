@@ -788,6 +788,9 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   }
   }
   if (permutation.has_value()) {
+    if (permutation.value().size() != opaqueSizes.size()) {
+      return failure();
+    }
     applyPermutationToVector(concreteSizes, permutation.value());
     applyPermutationToVector(opaqueSizes, permutation.value());
   }
@@ -795,7 +798,7 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   // Inner tile must have sizes matching the opaque layout.
   auto operandType = llvm::cast<RankedTensorType>(operand.getType());
   ArrayRef<int64_t> operandShape = operandType.getShape();
-  SmallVector<int64_t, 2> innerShape(operandShape.end() - 2,
+  SmallVector<int64_t, 2> innerShape(operandShape.end() - opaqueSizes.size(),
                                      operandShape.end());
   if (!llvm::equal(opaqueSizes, innerShape)) {
     return failure();
