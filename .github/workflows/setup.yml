@@ -33,10 +33,6 @@ on:
         description: |
           Whether to write to caches.
         value: ${{ jobs.setup.outputs.write-caches }}
-      benchmark-presets:
-        description: |
-          A comma-separated string of benchmarks to run.
-        value: ${{ jobs.setup.outputs.benchmark-presets }}
 
 permissions:
   contents: read
@@ -54,7 +50,6 @@ jobs:
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
-      benchmark-presets: ${{ steps.configure.outputs.benchmark-presets }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
@@ -107,10 +102,7 @@ jobs:
 
       - name: "Show enabled options"
         env:
-          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets || 'None' }}
           ENABLED_JOBS: ${{ join(fromJson(steps.configure.outputs.enabled-jobs)) || 'None' }}
         run: |
           echo ":green_circle: Enabled jobs: \`${ENABLED_JOBS}\`" \
               >> "${GITHUB_STEP_SUMMARY}"
-          echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
-            >> "${GITHUB_STEP_SUMMARY}"

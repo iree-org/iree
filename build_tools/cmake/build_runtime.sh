@@ -16,7 +16,6 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
-BUILD_PRESET="${BUILD_PRESET:-test}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 IREE_BUILD_PYTHON_BINDINGS="${IREE_BUILD_PYTHON_BINDINGS:-ON}"
 
@@ -28,8 +27,10 @@ args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
 
-  "-DIREE_BUILD_COMPILER=OFF"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DIREE_BUILD_COMPILER=OFF"
+  "-DIREE_ENABLE_ASSERTIONS=ON"
+  "-DIREE_BUILD_SAMPLES=ON"
 
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
@@ -38,49 +39,9 @@ args=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 )
-
-case "${BUILD_PRESET}" in
-  test)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=ON
-      -DIREE_BUILD_SAMPLES=ON
-    )
-    ;;
-  benchmark)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_SAMPLES=OFF
-      -DIREE_BUILD_TESTS=OFF
-    )
-    ;;
-  benchmark-with-tracing)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_SAMPLES=OFF
-      -DIREE_BUILD_TESTS=OFF
-      -DIREE_ENABLE_RUNTIME_TRACING=ON
-    )
-    ;;
-  *)
-    echo "Unknown build preset: ${BUILD_PRESET}"
-    exit 1
-    ;;
-esac
-
 "${CMAKE_BIN}" "${args[@]}"
 
-case "${BUILD_PRESET}" in
-  test)
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
-    ;;
-  benchmark|benchmark-with-tracing)
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-benchmark-module -- -k 0
-    ;;
-  *)
-    echo "Unknown build preset: ${BUILD_PRESET}"
-    exit 1
-    ;;
-esac
+"${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats

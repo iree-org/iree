@@ -205,7 +205,6 @@ nav:
           - "developers/debugging/sanitizers.md"
       - "Performance":
           - "developers/performance/benchmarking.md"
-          - "developers/performance/benchmark-suites.md"
           - "developers/performance/profiling.md"
           - "developers/performance/profiling-cpu-events.md"
           - "developers/performance/profiling-gpu-vulkan.md"

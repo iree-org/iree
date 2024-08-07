@@ -84,9 +84,6 @@ wget -nc https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallSta
 # Import programs into MLIR                                                   #
 ###############################################################################
 
-# Note: you can also download imported programs from CI runs:
-# https://iree.dev/developers/performance/benchmark-suites/#fetching-benchmark-artifacts-from-ci
-
 IREE_IMPORT_TFLITE_PATH=iree-import-tflite
 
 # import_program helper

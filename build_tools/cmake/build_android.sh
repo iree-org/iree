@@ -10,9 +10,7 @@
 #
 # The required IREE_HOST_BIN_DIR environment variable indicates the location
 # of the precompiled IREE binaries. Also requires that ANDROID_NDK variables be
-# set. The BUILD_PRESET environment variable indicates how the project should be
-# configured: "test", "benchmark", "benchmark-with-tracing", or
-# "benchmark-suite-test". Defaults to "test".
+# set.
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
 # uses the environment variable IREE_TARGET_BUILD_DIR, defaulting to
@@ -30,8 +28,6 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-android}}"
 ANDROID_ABI="${IREE_ANDROID_ABI:-arm64-v8a}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
-E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
-BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -45,43 +41,12 @@ declare -a args=(
   -DANDROID_ABI="${ANDROID_ABI}"
   -DANDROID_PLATFORM=android-29
   -DIREE_HOST_BIN_DIR="${IREE_HOST_BIN_DIR}"
+  -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_TESTS=ON
   -DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF
   -DIREE_BUILD_SAMPLES=OFF
 )
-
-case "${BUILD_PRESET}" in
-  test)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=ON
-    )
-    ;;
-  benchmark)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_TESTS=OFF
-    )
-    ;;
-  benchmark-with-tracing)
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=OFF
-      -DIREE_BUILD_TESTS=OFF
-      -DIREE_ENABLE_RUNTIME_TRACING=ON
-    )
-    ;;
-  benchmark-suite-test)
-    E2E_TEST_ARTIFACTS_DIR="$(realpath ${E2E_TEST_ARTIFACTS_DIR})"
-    args+=(
-      -DIREE_ENABLE_ASSERTIONS=ON
-      -DIREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR}"
-    )
-    ;;
-  *)
-    echo "Unknown build preset: ${BUILD_PRESET}"
-    exit 1
-    ;;
-esac
 
 # Configure towards 64-bit Android 10, then build.
 "${CMAKE_BIN}" "${args[@]}"

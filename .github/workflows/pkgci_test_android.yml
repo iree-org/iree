@@ -78,7 +78,6 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: 0
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: ${{ inputs.write-caches }}
-          BUILD_PRESET: test
         run: build_tools/cmake/build_android.sh
 
   # TODO: run tests on physical devices or emulators
