@@ -19,8 +19,19 @@
 
 namespace mlir::iree_compiler {
 
+//------------------------------------------------------------------------------
+// Wrappers that not use tablegen options.
+//------------------------------------------------------------------------------
+
+std::unique_ptr<OperationPass<>>
+createCPULowerToUKernelsPass(bool skipIntermediateRoundings);
+
 /// Adds CPU bufferization passes to the pipeline.
 void addCPUBufferizePasses(OpPassManager &funcPassManager);
+
+//----------------------------------------------------------------------------//
+// Register Common CPU Passes
+//----------------------------------------------------------------------------//
 
 #define GEN_PASS_DECL
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc" // IWYU pragma: keep

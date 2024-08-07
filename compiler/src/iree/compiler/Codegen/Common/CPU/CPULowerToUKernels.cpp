@@ -60,6 +60,9 @@ class CPULowerToUKernelsPass
 public:
   using impl::CPULowerToUKernelsPassBase<
       CPULowerToUKernelsPass>::CPULowerToUKernelsPassBase;
+  explicit CPULowerToUKernelsPass(bool skipIntermediateRoundings) {
+    this->skipIntermediateRoundings = skipIntermediateRoundings;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
@@ -624,4 +627,10 @@ void CPULowerToUKernelsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
+
+std::unique_ptr<OperationPass<>>
+createCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
+  return std::make_unique<CPULowerToUKernelsPass>(skipIntermediateRoundings);
+}
+
 } // namespace mlir::iree_compiler
