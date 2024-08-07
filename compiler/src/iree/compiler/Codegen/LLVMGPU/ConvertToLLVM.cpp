@@ -533,8 +533,10 @@ void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
 }
 
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
-  patterns.insert<HALInterfaceWorkgroupOpsConverter<
+  patterns.add<HALInterfaceWorkgroupOpsConverter<
                       IREE::HAL::InterfaceWorkgroupIDOp, gpu::BlockIdOp>,
+                  HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupSizeOp, gpu::BlockDimOp>,
                   HALInterfaceWorkgroupOpsConverter<
                       IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
       patterns.getContext());
