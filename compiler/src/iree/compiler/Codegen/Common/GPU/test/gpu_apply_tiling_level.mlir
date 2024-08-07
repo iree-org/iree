@@ -360,7 +360,7 @@ module {
     %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
       indexing_maps = #contraction_accesses,
       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       lowering_config = #config
     } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
     return %0 : tensor<?x?x4xf32>

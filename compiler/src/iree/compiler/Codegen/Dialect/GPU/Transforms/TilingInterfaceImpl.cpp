@@ -22,13 +22,6 @@ SmallVector<utils::IteratorType> MultiMmaOp::getLoopIteratorTypes() {
   return getIteratorTypesArray();
 }
 
-static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
-  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i)
-    if (targetExpr == map.getResult(i))
-      return i;
-  return -1;
-}
-
 SmallVector<Range> MultiMmaOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
@@ -41,17 +34,20 @@ SmallVector<Range> MultiMmaOp::getIterationDomain(OpBuilder &builder) {
     auto iteratorType = llvm::cast<IteratorTypeAttr>(it.value()).getValue();
     if (iteratorType == utils::IteratorType::reduction) {
       // Get reduction dim size from lhs shape (same size in rhsShape).
-      int64_t lhsDimIndex = getResultIndex(indexingMaps[0], targetExpr);
-      assert(lhsDimIndex >= 0);
+      std::optional<int64_t> lhsDimIndex =
+          indexingMaps[0].getResultPosition(targetExpr);
+      assert(lhsDimIndex && "invalid lhs map");
       OpFoldResult ub =
-          tensor::getMixedSize(builder, loc, getLhs(), lhsDimIndex);
+          tensor::getMixedSize(builder, loc, getLhs(), *lhsDimIndex);
       ranges.emplace_back(Range{zero, ub, one});
       continue;
     }
     // Get parallel dimension size from result shape.
-    int64_t resDimIndex = getResultIndex(indexingMaps[2], targetExpr);
-    assert(resDimIndex >= 0);
-    OpFoldResult ub = tensor::getMixedSize(builder, loc, getAcc(), resDimIndex);
+    std::optional<int64_t> resDimIndex =
+        indexingMaps[2].getResultPosition(targetExpr);
+    assert(resDimIndex && "invalid result map");
+    OpFoldResult ub =
+        tensor::getMixedSize(builder, loc, getAcc(), *resDimIndex);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
