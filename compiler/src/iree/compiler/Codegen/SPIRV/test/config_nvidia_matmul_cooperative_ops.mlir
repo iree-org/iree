@@ -192,6 +192,6 @@ func.func @matmul_256x1024x8() {
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1] subgroup_size = 32, {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 //       CHECK: func.func @matmul_256x1024x8
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

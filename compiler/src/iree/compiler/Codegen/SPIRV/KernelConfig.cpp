@@ -327,8 +327,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   tileSizes.push_back(windowTileSizes);
 
   auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      funcOp, linalgOp, tileSizes, pipeline, workgroupSize, subgroupSize);
 }
 
 } // namespace detail
@@ -755,7 +755,7 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
     return setOpConfigAndEntryPointFnTranslation(
         op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt,
+        subgroupSize,
         getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
                                       storeStage));
   }
@@ -773,7 +773,7 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
                       reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-      CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
+      CodeGenPipeline::SPIRVBaseVectorize, workgroupSize, subgroupSize);
 }
 
 } // namespace detail
@@ -1028,7 +1028,7 @@ static LogicalResult setFftOpConfig(IREE::GPU::TargetAttr target,
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize);
+      workgroupSize, subgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1143,7 +1143,8 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-            CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+            CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize,
+            subgroupSize))) {
       return failure();
     }
 
@@ -1245,7 +1246,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
   if (failed(setOpConfigAndEntryPointFnTranslation(
           op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
-          CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+          CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize, subgroupSize))) {
     return failure();
   }
 
@@ -1349,8 +1350,8 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
     tileSizes.push_back(workgroupTileSizes);
     tileSizes.push_back(threadTileSizes);
 
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes,
-                                                 pipeline, workgroupSize);
+    return setOpConfigAndEntryPointFnTranslation(
+        funcOp, op, tileSizes, pipeline, workgroupSize, subgroupSize);
   }
 
   // Common case for all linalg ops.
@@ -1522,7 +1523,7 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
   }
 
   return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, pipeline,
-                                               workgroupSize);
+                                               workgroupSize, subgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
