@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @FoldTimepointExport
 util.func private @FoldTimepointExport(%arg0: !hal.semaphore, %arg1: index) -> (!hal.semaphore, index) {
