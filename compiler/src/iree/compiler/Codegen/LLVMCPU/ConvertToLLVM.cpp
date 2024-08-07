@@ -43,12 +43,14 @@
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
 #include "mlir/Dialect/ArmSVE/Transforms/Transforms.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -922,6 +924,13 @@ public:
   using impl::ConvertToLLVMPassBase<ConvertToLLVMPass>::ConvertToLLVMPassBase;
   explicit ConvertToLLVMPass(bool reassociateFpReductions) {
     this->reassociateFpReductions = reassociateFpReductions;
+  }
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect,
+                    memref::MemRefDialect, linalg::LinalgDialect,
+                    tosa::TosaDialect, cf::ControlFlowDialect, scf::SCFDialect,
+                    vector::VectorDialect, arm_neon::ArmNeonDialect,
+                    arm_sve::ArmSVEDialect, LLVM::LLVMDialect>();
   }
   void runOnOperation() override;
 };
