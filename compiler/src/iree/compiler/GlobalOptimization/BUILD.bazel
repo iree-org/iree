@@ -45,6 +45,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "GlobalOptimization",
     srcs = [
+        "BubbleUpExtractThroughDequantize.cpp",
         "CleanupNumericNarrowing.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",
         "DataLayoutPropagation.cpp",

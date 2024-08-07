@@ -109,6 +109,7 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(createExpandTensorShapesPass());
 
   FunctionLikeNest(mainPassManager)
+      .addPass(createBubbleUpExtractThroughDequantizePass)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.

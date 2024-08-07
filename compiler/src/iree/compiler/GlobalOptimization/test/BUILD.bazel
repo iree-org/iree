@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "fuse_dequantization_matmul.mlir",
             "fuse_horizontal_contractions.mlir",
             "fuse_silu_horizontal_matmul.mlir",
+            "bubble_up_extract_slice_through_dequantize.mlir",
             "generalize_named_ops.mlir",
             "global_loop_invariant_code_motion.mlir",
             "hoist_into_globals.mlir",
