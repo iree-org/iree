@@ -78,9 +78,9 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
 }
 
 /// Helper function to return the mapping attribute to use given the tile sizes
-static SmallVector<DeviceMappingAttrInterface>
-getMapping(MLIRContext *context, ArrayRef<OpFoldResult> tileSizes) {
-  SmallVector<DeviceMappingAttrInterface> mapping;
+static SmallVector<Attribute> getMapping(MLIRContext *context,
+                                         ArrayRef<OpFoldResult> tileSizes) {
+  SmallVector<Attribute> mapping;
   mapping.reserve(tileSizes.size());
   for (auto tileSize : llvm::reverse(tileSizes)) {
     if (isConstantIntValue(tileSize, 0)) {
