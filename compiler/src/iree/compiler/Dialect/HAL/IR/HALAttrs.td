@@ -423,6 +423,9 @@ def HAL_DescriptorSetLayoutAttr :
     (`,` `flags` `=` $flags^)?
     `>`
   }];
+  let extraClassDeclaration = [{
+    DescriptorSetBindingAttr getBinding(int64_t ordinal) const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -449,6 +452,8 @@ def HAL_PipelineLayoutAttr :
     `>`
   }];
   let extraClassDeclaration = [{
+    DescriptorSetLayoutAttr getSetLayout(int64_t ordinal) const;
+
     // Returns the binding index in a flattened list of all sets and bindings.
     // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
     // a query for set 1 binding 0 would return 4.

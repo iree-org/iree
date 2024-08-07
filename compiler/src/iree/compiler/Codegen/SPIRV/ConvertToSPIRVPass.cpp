@@ -502,10 +502,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   if (moduleOp.getBody()->empty())
     return;
 
-  bool useIndirectBindings = false;
-  if (UnitAttr indirectBindingsAttr = getIndirectBindingsAttr(moduleOp)) {
-    useIndirectBindings = true;
-  };
+  bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = getEntryPoint(funcOp);
@@ -529,16 +526,6 @@ void ConvertToSPIRVPass::runOnOperation() {
     std::optional<int> subgroupSize32;
     if (subgroupSize && subgroupSize->isNonNegative()) {
       subgroupSize32 = subgroupSize->getZExtValue();
-    }
-
-    for (IREE::HAL::DescriptorSetLayoutAttr setLayout :
-         exportOp->getLayout().getSetLayouts()) {
-      bool isIndirect =
-          setLayout.getFlags() == IREE::HAL::DescriptorSetLayoutFlags::Indirect;
-      if (isIndirect != useIndirectBindings) {
-        exportOp->emitOpError("is incompatible with the target configuration");
-        return signalPassFailure();
-      }
     }
 
     funcOp->setAttr(

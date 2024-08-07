@@ -99,10 +99,7 @@ struct SPIRVMapMemRefStorageClassPass final
     MLIRContext *context = &getContext();
     Operation *op = getOperation();
 
-    bool useIndirectBindings = false;
-    if (UnitAttr indirectBindingsAttr = getIndirectBindingsAttr(op)) {
-      useIndirectBindings = true;
-    };
+    bool useIndirectBindings = usesIndirectBindingsAttr(op);
 
     spirv::MemorySpaceToStorageClassMap memorySpaceMap;
 
