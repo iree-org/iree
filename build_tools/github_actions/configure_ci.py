@@ -138,6 +138,8 @@ NVGPU_PATHS = [
     "runtime/src/iree/hal/drivers/cuda/*",
     # Common code likely enough to affect code paths unique to NVIDIA GPUs:
     "compiler/src/iree/compiler/GlobalOptimization/*",
+    # Tests.
+    "tests/e2e/*",
 ]
 
 AMDGPU_PATHS = [
@@ -146,6 +148,8 @@ AMDGPU_PATHS = [
     "runtime/src/iree/hal/drivers/hip/*",
     # Common code likely enough to affect code paths unique to AMDGPU:
     "compiler/src/iree/compiler/GlobalOptimization/*",
+    # Tests.
+    "tests/e2e/*",
 ]
 
 # Jobs to run in presumbit if files under the corresponding path see changes.
