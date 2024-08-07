@@ -290,6 +290,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "uint32_t":$max_thread_count_per_workgroup,
     // The maximal number of shared memory bytes we can allocate per workgroup.
     "uint32_t":$max_workgroup_memory_bytes,
+    // Tthe maximum number of workgroups per X/Y/Z dimension in a dispatch.
+    "DenseI32ArrayAttr":$max_workgroup_counts,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the

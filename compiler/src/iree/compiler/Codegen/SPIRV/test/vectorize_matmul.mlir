@@ -271,7 +271,8 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 } {
   %c0 = arith.constant 0 : i32
   %i0 = arith.constant 0 : index
@@ -330,7 +331,8 @@ func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 } {
   %c0 = arith.constant 0 : i32
   %i0 = arith.constant 0 : index

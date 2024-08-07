@@ -949,7 +949,9 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createLoopInvariantCodeMotionPass)
-      .addPass(createLowerAffinePass);
+      .addPass(createLowerAffinePass)
+      .addPass(arith::createIntRangeOptimizationsPass)
+      .addPass(arith::createArithUnsignedWhenEquivalentPass);
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
@@ -984,7 +986,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
-      .addPass(createLLVMGPUVectorLoweringPass);
+      .addPass(createLLVMGPUVectorLoweringPass)
+      // Expose workitem and workgroup counts to range inference later.
+      .addPass(createGPUPropagateDispatchSizeBoundsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1017,6 +1021,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass)
+      // Re-run index optimizations to take care of this ronud of indexing
+      // even though now we can't reason about loop bounds
+      .addPass(arith::createIntRangeOptimizationsPass)
+      .addPass(arith::createArithUnsignedWhenEquivalentPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 

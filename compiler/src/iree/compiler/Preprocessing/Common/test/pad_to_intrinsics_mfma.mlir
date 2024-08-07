@@ -69,7 +69,8 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F32_32x32x8_F16>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+  max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main2(

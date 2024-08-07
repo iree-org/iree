@@ -18,6 +18,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
@@ -2944,9 +2945,28 @@ def OpGroupInterfaceOps : OpDocGroup {
 
 let opDocGroup = OpGroupInterfaceOps in {
 
-def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
+class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
+  : HAL_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+      DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>])> {
+  let arguments = (ins
+    IndexAttr:$dimension,
+    OptionalAttr<IndexAttr>:$upper_bound);
+  let results = (outs HAL_Dim:$result);
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim), ::mlir::IntegerAttr{});
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    `[` $dimension `]` (`upper_bound` $upper_bound^)? attr-dict `:` type($result)
+  }];
+}
+
+def HAL_InterfaceWorkgroupIDOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.id"> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
     The global workgroup ID of the current tile in the range of
@@ -2961,25 +2981,9 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
     %z = hal.interface.workgroup.id[2] : index
     ```
   }];
-
-  let arguments = (ins IndexAttr:$dimension);
-  let results = (outs HAL_Dim:$result);
-
-  let builders = [
-    OpBuilder<(ins "unsigned":$dim),
-    [{
-      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
-    }]>,
-  ];
-
-  let assemblyFormat = [{
-    `[` $dimension `]` attr-dict `:` type($result)
-  }];
 }
 
-def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
+def HAL_InterfaceWorkgroupCountOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.count"> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
@@ -2996,24 +3000,9 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
     ```
   }];
 
-  let arguments = (ins IndexAttr:$dimension);
-  let results = (outs HAL_Dim:$result);
-
-  let builders = [
-    OpBuilder<(ins "unsigned":$dim),
-    [{
-      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
-    }]>,
-  ];
-
-  let assemblyFormat = [{
-    `[` $dimension `]` attr-dict `:` type($result)
-  }];
 }
 
-def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
+def HAL_InterfaceWorkgroupSizeOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.size"> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
     The number of local invocations within the current workgroup along each
@@ -3028,20 +3017,6 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
     %y = hal.interface.workgroup.size[1] : index
     %z = hal.interface.workgroup.size[2] : index
     ```
-  }];
-
-  let arguments = (ins IndexAttr:$dimension);
-  let results = (outs HAL_Dim:$result);
-
-  let builders = [
-    OpBuilder<(ins "unsigned":$dim),
-    [{
-      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
-    }]>,
-  ];
-
-  let assemblyFormat = [{
-    `[` $dimension `]` attr-dict `:` type($result)
   }];
 }
 
