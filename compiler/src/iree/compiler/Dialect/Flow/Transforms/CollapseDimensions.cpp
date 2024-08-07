@@ -650,13 +650,14 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
 // does this automatically).
 static void updateConsumersFromProducers(
     ArrayRef<Operation *> slice,
-    llvm::MapVector<linalg::GenericOp, CollapseInfo> &opMap) {
+    llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
 
   // Slice is topologically sorted to ensure that `op`'s producers have been
   // updated before we visit it.
   for (auto op : slice) {
     auto genericOp = cast<linalg::GenericOp>(op);
-    CollapseInfo &consumerInfo = opMap[genericOp];
+    assert(opMap.contains(genericOp));
+    CollapseInfo &consumerInfo = opMap.find(genericOp)->second;
 
     for (auto operand : genericOp.getDpsInputOperands()) {
       auto definingOp = operand->get().getDefiningOp();
@@ -680,12 +681,12 @@ static void updateConsumersFromProducers(
 
       // If the producer is not a generic or there is no mapping, the tensor is
       // not collapsable. So, all dimensions of the producer are uncollapsable.
-      if (!producerOp || failed(mapping)) {
+      if (!producerOp || !opMap.contains(producerOp) || failed(mapping)) {
         consumerInfo.updateCollapseViaSubtract(producerUncollapsable);
         continue;
       }
 
-      CollapseInfo &producerInfo = opMap[producerOp];
+      CollapseInfo &producerInfo = opMap.find(producerOp)->second;
       FailureOr<CollapseInfo::CollapsableLoopsSet> producerCollapsable =
           producerInfo.getTransformedCollapsableLoops(mapping.value());
       if (!failed(producerCollapsable)) {
@@ -702,25 +703,27 @@ static void updateConsumersFromProducers(
 // does this automatically).
 static void updateProducersFromConsumers(
     ArrayRef<Operation *> slice,
-    llvm::MapVector<linalg::GenericOp, CollapseInfo> &opMap) {
+    llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
 
   // Iterate over `slice` in reverse so that we visit each `op` 's consumer
   // before visiting `op`.
   for (auto op : llvm::reverse(slice)) {
     auto genericConsumer = cast<linalg::GenericOp>(op);
-    const CollapseInfo &consumerInfo = opMap[genericConsumer];
+    assert(opMap.contains(genericConsumer));
+    const CollapseInfo &consumerInfo = opMap.find(genericConsumer)->second;
+
     for (auto operand : genericConsumer.getDpsInputOperands()) {
       auto definingOp = operand->get().getDefiningOp();
-      if (!definingOp || isNonNullAndOutsideDispatch(definingOp)) {
+      if (!definingOp) {
         continue;
       }
       auto genericProducer = dyn_cast<linalg::GenericOp>(definingOp);
-      if (!genericProducer) {
+      if (!genericProducer || !opMap.contains(genericProducer)) {
         continue;
       }
 
       // Get a mapping from the consumer's iteration space to the producer's.
-      CollapseInfo &producerInfo = opMap[genericProducer];
+      CollapseInfo &producerInfo = opMap.find(genericProducer)->second;
       FailureOr<AffineMap> consumerToProducerMap =
           getConsumerLoopToProducerLoopsMap(*operand);
       if (failed(consumerToProducerMap)) {
@@ -772,7 +775,7 @@ static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies
-  llvm::MapVector<linalg::GenericOp, CollapseInfo> opMap;
+  llvm::DenseMap<linalg::GenericOp, CollapseInfo> opMap;
   for (auto *op : slice) {
     auto genericOp = cast<linalg::GenericOp>(op);
     opMap[genericOp] = CollapseInfo(getCollapsibleLoops(genericOp));
