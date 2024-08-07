@@ -188,27 +188,9 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
 
-/// Utility method to get the optional padding value to use with pack operation
-/// if source is defined using a `tensor.pad` operation. Note `source` is
-/// passed by reference. It is updated to use the source of the pad operation.
-static std::optional<Value> getPaddingValue(Value &source) {
-  auto padOp = source.getDefiningOp<tensor::PadOp>();
-  if (!padOp || padOp.getNofold() || !padOp.hasZeroLowPad()) {
-    return std::nullopt;
-  }
-
-  Value constantPaddingValue = padOp.getConstantPaddingValue();
-  if (!constantPaddingValue) {
-    return std::nullopt;
-  }
-
-  source = padOp.getSource();
-  return constantPaddingValue;
-}
-
-/// Utility method to convert from `set_encoding` op to `pack` operation.
-/// For now this takes a `paddingValue` as input. The source is also taken
-/// as input so that these could be used with `OpConversionPatterns`.
+/// Utility method to convert from `set_encoding` op to `pack` operation with
+/// zero padding values. The source is also taken as input so that these could
+/// be used with `OpConversionPatterns`.
 static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, MaterializeEncodingFn materializeEncodingFn,
@@ -235,13 +217,8 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  std::optional<Value> paddingValue;
-  if (encoding.getRoundDimsToArray().empty()) {
-    paddingValue = getPaddingValue(source);
-  } else {
-    paddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(resultType.getElementType()));
-  }
+  Value paddingValue = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(resultType.getElementType()));
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(

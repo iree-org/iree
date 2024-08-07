@@ -17,48 +17,6 @@ func.func @pack_unpack_gemm_lhs(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func.func @pad_gemm(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>, %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
-  %pad_value = arith.constant 0.0 : f32
-  %pad_lhs = tensor.pad %arg0 low[0, 0] high[4, 2] {
-    ^bb0(%b0: index, %b1 : index):
-      tensor.yield %pad_value : f32
-    } : tensor<100x250xf32> to tensor<104x252xf32>
-  %lhs = iree_encoding.set_encoding %pad_lhs : tensor<104x252xf32> -> tensor<104x252xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %pad_rhs = tensor.pad %arg1 low[0, 0] high[2, 4] {
-    ^bb0(%b0: index, %b1 : index):
-      tensor.yield %pad_value : f32
-    } : tensor<250x500xf32> to tensor<252x504xf32>
-  %rhs = iree_encoding.set_encoding %pad_rhs : tensor<252x504xf32> -> tensor<252x504xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %pad_output = tensor.pad %arg2 low[0, 0] high[4, 4] {
-    ^bb0(%b0: index, %b1 : index):
-      tensor.yield %pad_value : f32
-    } : tensor<100x500xf32> to tensor<104x504xf32>
-  %output = iree_encoding.set_encoding %pad_output : tensor<104x504xf32> -> tensor<104x504xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %gemm_packed = linalg.matmul ins(%lhs, %rhs : tensor<104x252xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>, tensor<252x504xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%output : tensor<104x504xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<104x504xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %gemm = iree_encoding.unset_encoding %gemm_packed : tensor<104x504xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<104x504xf32>
-  %result = tensor.extract_slice %gemm[0, 0] [100, 500] [1, 1] : tensor<104x504xf32> to tensor<100x500xf32>
-  return %result : tensor<100x500xf32>
-}
-//      CHECK: func @pad_gemm(
-// CHECK-SAME:     %[[ARG0:.+]]: tensor<100x250xf32>
-// CHECK-SAME:     %[[ARG1:.+]]: tensor<250x500xf32>
-// CHECK-SAME:     %[[ARG2:.+]]: tensor<100x500xf32>
-//      CHECK:   %[[CST:.+]] = arith.constant 0.0
-//  CHECK-DAG:   %[[LHS:.+]] = tensor.pad %[[ARG0]]
-//  CHECK-DAG:   %[[RHS:.+]] = tensor.pad %[[ARG1]]
-//  CHECK-DAG:   %[[DEST:.+]] = tensor.pad %[[ARG2]]
-//      CHECK:   %[[GEMM:.+]] = linalg.matmul
-// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
-// CHECK-SAME:       outs(%[[DEST]] :
-//      CHECK:   %[[RES:.+]] = tensor.extract_slice %[[GEMM]]
-//      CHECK:   return %[[RES]]
-
-// -----
-
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @gemm_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %1 = iree_encoding.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
@@ -103,8 +61,8 @@ func.func @gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -
 // CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[LHS]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[RHS]], %[[C1]]
 //  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xf32>
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:       outs(%[[EMPTY]] :
