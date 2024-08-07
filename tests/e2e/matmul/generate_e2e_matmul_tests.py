@@ -311,7 +311,7 @@ def get_rocm_test_compilation_infos(
         # match the requested one.
         # Extracts the input type from strings. The naming convention is
         # [output_type]_MxNxK_[input_type].
-        input_type = schedule.intrinsic.split('_')[-1]
+        input_type = schedule.intrinsic.split("_")[-1]
         if lhs_rhs_type.value.upper() != input_type:
             continue
 
