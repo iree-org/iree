@@ -28,6 +28,14 @@ def ConcretizeMmaShapesPass :
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
     "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect",
   ];
+  let options = [
+    Option<"concretizeInputs", "concretize-inputs",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the lhs and rhs operands of the multi_mma ops.">,
+    Option<"concretizeResult", "concretize-result",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the acc operand of the multi_mma ops.">,
+  ];
 }
 
 def FuseAndHoistParallelLoopsPass :
