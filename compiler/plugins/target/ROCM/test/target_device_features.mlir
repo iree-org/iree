@@ -15,7 +15,7 @@
 // GFX940-SAME:         mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
 
 // GFX1100: target = #iree_gpu.target<arch = "gfx1100",
-// GFX1100-SAME:        mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>]
+// GFX1100-SAME:        mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>]
 // GFX1100-SAME:        subgroup_size_choices = [32, 64]
 
 // GFX941: target = #iree_gpu.target<arch = "gfx941",

@@ -480,7 +480,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //       RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
-//  RDNA3-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+//  RDNA3-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
 //  RDNA3-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 //  RDNA3-SAME:   prefetch_shared_memory
 
