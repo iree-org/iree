@@ -760,6 +760,12 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
     RankedTensorType &resultType) const {
   OpaqueMmaLayout opaqueLayout =
       getOpaqueMFMALayout(operand.getContext(), getIntrinsic().getValue());
+  // TODO(Max191): The `getConcreteMFMALayout` function creates some
+  //   `PerDimLayoutAttr` that are not used by this function. This means that
+  //   any pass that uses `materializeOperandConcreteShape` needs to be
+  //   dependent on the VectorExt dialect. Ideally, the `getConcreteMFMALayout`
+  //   function should be refactored so we can reuse the shape information of
+  //   the layout without needing to create any `PerDimLayoutAttr`.
   ConcreteMmaLayout layout =
       getConcreteMFMALayout(operand.getContext(), getIntrinsic().getValue());
   SmallVector<ArrayRef<int64_t>> concreteSizes;
