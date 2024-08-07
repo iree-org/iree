@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @FoldTimepointExport
 util.func private @FoldTimepointExport(%arg0: !hal.semaphore, %arg1: index) -> (!hal.semaphore, index) {
@@ -184,6 +184,46 @@ util.func private @SinkAwaitToFirstConsumer(
 // CHECK: ^bb4(
 ^bb4(%arg6: !stream.resource<external>):
   util.return %arg6 : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @SinkAwaitToFirstConsumerRegion
+util.func private @SinkAwaitToFirstConsumerRegion(
+  %arg0: i1, %arg1: i1, %arg2: i1,
+  %arg3: !stream.resource<constant>,
+  %arg4: !stream.resource<staging>,
+  %arg5: !stream.resource<external>,
+  %arg6: !stream.timepoint
+) -> (!stream.resource<external>, !stream.resource<external>) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-NOT stream.timepoint.await
+  %0:2 = stream.timepoint.await %arg6 => %arg3, %arg4 : !stream.resource<constant>{%c100}, !stream.resource<staging>{%c200}
+  cf.cond_br %arg0, ^bb1, ^bb2(%arg5, %arg5 : !stream.resource<external>,  !stream.resource<external>)
+  // CHECK: ^bb1
+  ^bb1:
+  // CHECK: stream.timepoint.await
+  // CHECK: "fake.region"
+  %3 = "fake.region"() ({
+    // CHECK: "fake.region"
+    %4 = "fake.region"() ({
+      // CHECK: stream.async.transfer
+      %5 = stream.async.transfer %0#0 : !stream.resource<constant>{%c100} -> !stream.resource<external>{%c100}
+      // CHECK: "fake.yield"
+      "fake.yield"(%5) : (!stream.resource<external>) -> ()
+    }) : () -> (!stream.resource<external>)
+    // CHECK: "fake.yield"
+    "fake.yield"(%4) : (!stream.resource<external>) -> ()
+  }) : () -> (!stream.resource<external>)
+  // CHECK: stream.async.transfer
+  %2 = stream.async.transfer %0#1 : !stream.resource<staging>{%c200} -> !stream.resource<external>{%c200}
+  // CHECK: cf.br
+  cf.br ^bb2(%2, %3 : !stream.resource<external>, !stream.resource<external>)
+  // CHECK: ^bb2
+^bb2(%arg7: !stream.resource<external>, %arg8: !stream.resource<external>):
+  // CHECK:util.return
+  util.return %arg7, %arg8 : !stream.resource<external>,  !stream.resource<external>
 }
 
 // -----
