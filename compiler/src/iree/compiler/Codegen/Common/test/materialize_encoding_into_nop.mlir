@@ -61,8 +61,8 @@ func.func @gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -
 // CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[LHS]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[RHS]], %[[C1]]
 //  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xf32>
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:       outs(%[[EMPTY]] :
