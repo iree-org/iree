@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -14,11 +13,17 @@
 #define DEBUG_TYPE "iree-llvmcpu-drop-vector-unit-dims"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUDROPVECTORUNITDIMSPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 class LLVMCPUDropVectorUnitDimsPass
-    : public LLVMCPUDropVectorUnitDimsBase<LLVMCPUDropVectorUnitDimsPass> {
+    : public impl::LLVMCPUDropVectorUnitDimsPassBase<
+          LLVMCPUDropVectorUnitDimsPass> {
 public:
-  using LLVMCPUDropVectorUnitDimsBase::LLVMCPUDropVectorUnitDimsBase;
+  using impl::LLVMCPUDropVectorUnitDimsPassBase<
+      LLVMCPUDropVectorUnitDimsPass>::LLVMCPUDropVectorUnitDimsPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, vector::VectorDialect>();
@@ -46,10 +51,4 @@ void LLVMCPUDropVectorUnitDimsPass::runOnOperation() {
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUDropVectorUnitDimsPass() {
-  return std::make_unique<LLVMCPUDropVectorUnitDimsPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -27,6 +26,9 @@
 #define DEBUG_TYPE "iree-llvmcpu-tile-root-and-fuse-producers-consumers"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUTILEROOTANDFUSEPRODUCERCONSUMERPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -139,10 +141,13 @@ static LogicalResult tileRootAndFuseProducerConsumer(IRRewriter &rewriter,
 /// producers recursively. The `tilingLevel` must be specified. It picks the
 /// `tilingLevel`-th list as tiling sizes from lowering_config.
 struct LLVMCPUTileRootAndFuseProducerConsumer
-    : LLVMCPUTileRootAndFuseProducerConsumerBase<
+    : impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
           LLVMCPUTileRootAndFuseProducerConsumer> {
-  LLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel = -1) {
-    this->tilingLevel.setValue(tilingLevel);
+  using impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
+      LLVMCPUTileRootAndFuseProducerConsumer>::
+      LLVMCPUTileRootAndFuseProducerConsumerPassBase;
+  explicit LLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel) {
+    this->tilingLevel = tilingLevel;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,

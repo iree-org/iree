@@ -299,7 +299,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
-      options.splitVectorTransfersTo, options.enableArmI8mm));
+      LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
+                                              options.enableArmI8mm}));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
@@ -307,7 +308,8 @@ void buildLLVMCPUVectorLoweringPipeline(
 
   funcPassManager.addPass(createLLVMCPUVectorTransferLoweringPass());
   funcPassManager.addPass(createLLVMCPUVectorTransposeLoweringPass(
-      options.lowerVectorTransposeToAVX2));
+      LLVMCPUVectorTransposeLoweringPassOptions{
+          options.lowerVectorTransposeToAVX2}));
 
   // Potentially removes shape_cast and broadcast on unit dims before shape_cast
   // lowering.
@@ -531,7 +533,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   // Vector lowering of Mmt4d.
   funcPassManager.addPass(createLLVMCPUMmt4dVectorLoweringPass(
-      clEnableVectorContractCustomKernels));
+      LLVMCPUMmt4dVectorLoweringPassOptions{
+          clEnableVectorContractCustomKernels}));
 
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
@@ -702,7 +705,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(
-            clFailOnOutOfBoundsStackAllocation);
+            LLVMCPUCheckIRBeforeLLVMConversionPassOptions{
+                clFailOnOutOfBoundsStackAllocation});
       })
       // SCF -> CF
       .addPass(createConvertSCFToCFPass)

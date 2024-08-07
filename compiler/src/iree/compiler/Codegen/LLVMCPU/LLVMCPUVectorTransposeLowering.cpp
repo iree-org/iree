@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -15,6 +14,10 @@
 #define DEBUG_TYPE "iree-llvmcpu-vector-transpose-lowering"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUVECTORTRANSPOSELOWERINGPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 
 static bool has16x16Transpose(mlir::FunctionOpInterface funcOp) {
@@ -36,14 +39,12 @@ static bool has16x16Transpose(mlir::FunctionOpInterface funcOp) {
 }
 
 class LLVMCPUVectorTransposeLoweringPass
-    : public LLVMCPUVectorTransposeLoweringBase<
+    : public impl::LLVMCPUVectorTransposeLoweringPassBase<
           LLVMCPUVectorTransposeLoweringPass> {
 public:
-  using LLVMCPUVectorTransposeLoweringBase::LLVMCPUVectorTransposeLoweringBase;
-  LLVMCPUVectorTransposeLoweringPass(bool lowerVectorTransposeToAVX2) {
-    this->lowerVectorTransposeToAVX2 = lowerVectorTransposeToAVX2;
-  }
-
+  using impl::LLVMCPUVectorTransposeLoweringPassBase<
+      LLVMCPUVectorTransposeLoweringPass>::
+      LLVMCPUVectorTransposeLoweringPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -84,11 +85,4 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorTransposeLoweringPass(bool lowerVectorTransposeToAVX2) {
-  return std::make_unique<LLVMCPUVectorTransposeLoweringPass>(
-      lowerVectorTransposeToAVX2);
-}
-
 } // namespace mlir::iree_compiler

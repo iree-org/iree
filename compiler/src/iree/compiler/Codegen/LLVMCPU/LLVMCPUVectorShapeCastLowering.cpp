@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -14,12 +13,18 @@
 #define DEBUG_TYPE "iree-llvmcpu-vector-shape-cast-lowering"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUVECTORSHAPECASTLOWERINGPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 class LLVMCPUVectorShapeCastLoweringPass
-    : public LLVMCPUVectorShapeCastLoweringBase<
+    : public impl::LLVMCPUVectorShapeCastLoweringPassBase<
           LLVMCPUVectorShapeCastLoweringPass> {
 public:
-  using LLVMCPUVectorShapeCastLoweringBase::LLVMCPUVectorShapeCastLoweringBase;
+  using impl::LLVMCPUVectorShapeCastLoweringPassBase<
+      LLVMCPUVectorShapeCastLoweringPass>::
+      LLVMCPUVectorShapeCastLoweringPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -36,10 +41,4 @@ void LLVMCPUVectorShapeCastLoweringPass::runOnOperation() {
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorShapeCastLoweringPass() {
-  return std::make_unique<LLVMCPUVectorShapeCastLoweringPass>();
-}
-
 } // namespace mlir::iree_compiler

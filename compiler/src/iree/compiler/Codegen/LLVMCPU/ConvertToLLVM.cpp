@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -65,6 +64,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTTOLLVMPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -914,31 +916,14 @@ public:
   }
 };
 
-class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
+class ConvertToLLVMPass
+    : public impl::ConvertToLLVMPassBase<ConvertToLLVMPass> {
 public:
-  ConvertToLLVMPass(bool reassociateFpReductions) {
-    targetReassociateFpReductions.setValue(reassociateFpReductions);
+  using impl::ConvertToLLVMPassBase<ConvertToLLVMPass>::ConvertToLLVMPassBase;
+  explicit ConvertToLLVMPass(bool reassociateFpReductions) {
+    this->reassociateFpReductions = reassociateFpReductions;
   }
-  ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect,
-                    affine::AffineDialect>();
-  }
-
   void runOnOperation() override;
-
-private:
-  Option<std::string> targetTriple{
-      *this, "target-triple", llvm::cl::desc("Code generation target triple."),
-      llvm::cl::init("")};
-  Option<std::string> targetDataLayout{
-      *this, "target-data-layout",
-      llvm::cl::desc("Code generation target data layout."),
-      llvm::cl::init("")};
-  Option<bool> targetReassociateFpReductions{
-      *this, "target-reassociate-fp-reductions",
-      llvm::cl::desc("Code generation target reassociate FP reductions."),
-      llvm::cl::init("false")};
 };
 
 } // namespace
@@ -952,15 +937,14 @@ static std::string getStringAttrFromTargetAttr(ModuleOp module,
 
 void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
-  std::string dataLayoutStr = targetDataLayout.getValue();
+  std::string dataLayoutStr = targetDataLayout;
   if (targetDataLayout.empty()) {
     dataLayoutStr = getStringAttrFromTargetAttr(module, "data_layout");
   }
-  std::string targetTripleStr = targetTriple.getValue();
+  std::string targetTripleStr = targetTriple;
   if (targetTripleStr.empty()) {
     targetTripleStr = getStringAttrFromTargetAttr(module, "target_triple");
   }
-
   // Add required attributes to the module so that the lowering knows how to
   // handle structs and data layouts.
   module->setAttr(LLVM::LLVMDialect::getTargetTripleAttrName(),
@@ -1056,8 +1040,8 @@ void ConvertToLLVMPass::runOnOperation() {
   // unroll them to 1-D before converting to the LLVM dialect.
   vector::populateVectorBitCastLoweringPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
-  populateVectorToLLVMConversionPatterns(
-      typeConverter, patterns, targetReassociateFpReductions.getValue());
+  populateVectorToLLVMConversionPatterns(typeConverter, patterns,
+                                         reassociateFpReductions);
 
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {

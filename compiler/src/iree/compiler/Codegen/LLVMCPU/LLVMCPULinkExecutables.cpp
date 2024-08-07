@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
@@ -13,10 +12,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMCPULINKEXECUTABLESPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 
 struct LLVMCPULinkExecutablesPass
-    : public LLVMCPULinkExecutablesBase<LLVMCPULinkExecutablesPass> {
+    : public impl::LLVMCPULinkExecutablesPassBase<LLVMCPULinkExecutablesPass> {
   LLVMCPULinkExecutablesPass() = default;
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -69,12 +71,5 @@ struct LLVMCPULinkExecutablesPass
     }
   }
 };
-
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createLLVMCPULinkExecutablesPass() {
-  return std::make_unique<LLVMCPULinkExecutablesPass>();
-}
-
 } // namespace mlir::iree_compiler
