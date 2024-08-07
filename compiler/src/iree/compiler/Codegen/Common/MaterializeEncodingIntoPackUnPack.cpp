@@ -456,8 +456,8 @@ lowerGenericOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
     packedIndexingMaps.push_back(packedInputMap);
   }
   // Create the new packed identity map for the output.
-  packedIndexingMaps.push_back(AffineMap::getMultiDimIdentityMap(
-      convertedResultType.getRank(), rewriter.getContext()));
+  packedIndexingMaps.push_back(
+      rewriter.getMultiDimIdentityMap(convertedResultType.getRank()));
   auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
       genericOp.getLoc(), convertedResultType, convertedInputOperands,
       convertedOutputOperands, packedIndexingMaps, iteratorTypes,
