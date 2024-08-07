@@ -44,7 +44,7 @@ int index_3d(int i, int j, int k, int dim2, int dim3) {
   return i * dim2 * dim3 + j * dim3 + k;
 }
 
-static void reference_attention_f16_f16_f16_f16(
+static void reference_attention_f32_f32_f32_f32(
     iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2, iree_hal_dim_t N,
     iree_hal_dim_t B, const float* query_data, const float* key_data,
     const float* value_data, float* result_data, iree_hal_dim_t b) {
@@ -101,10 +101,10 @@ static iree_status_t reference_attention_element(
     iree_hal_element_type_t value_elem_type,
     iree_hal_element_type_t result_elem_type, void* query_data, void* key_data,
     void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b) {
-  if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
-      key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
-      value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
-    reference_attention_f16_f16_f16_f16(
+  if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
+      key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
+      value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_attention_f32_f32_f32_f32(
         M, K1, K2, N, B, (const float*)query_data, (const float*)key_data,
         (const float*)value_data, (float*)result_data, b);
 
