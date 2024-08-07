@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# End-to-end fa2 tests.
+# End-to-end attention tests.
 
 load("//build_tools/bazel:iree_e2e_generated_runner_test.bzl", "iree_generated_e2e_runner_test")
 
@@ -14,8 +14,8 @@ package(
 )
 
 py_binary(
-    name = "generate_e2e_fa2_tests",
-    srcs = ["generate_e2e_fa2_tests.py"],
+    name = "generate_e2e_attention_tests",
+    srcs = ["generate_e2e_attention_tests.py"],
 )
 
 ###########################################################################
@@ -26,8 +26,8 @@ py_binary(
 
 # Default CPU backend.
 [iree_generated_e2e_runner_test(
-    name = "e2e_fa2_cpu_%s_%s_%s_%s" % (dtype, dtype, dtype, size),
-    generator = ":generate_e2e_fa2_tests",
+    name = "e2e_attention_cpu_%s_%s_%s_%s" % (dtype, dtype, dtype, size),
+    generator = ":generate_e2e_attention_tests",
     generator_args = [
         "--query_type=%s" % dtype,
         "--key_type=%s" % dtype,
@@ -42,8 +42,8 @@ py_binary(
         ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["default"],
-    test_runner = "//tools/testing/e2e:iree-e2e-fa2-test",
-    test_type = "fa2",
+    test_runner = "//tools/testing/e2e:iree-e2e-attention-test",
+    test_type = "attention",
 ) for dtype in [
     "f16",
 ] for size in [

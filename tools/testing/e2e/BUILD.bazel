@@ -70,8 +70,8 @@ iree_runtime_cc_binary(
 )
 
 iree_runtime_cc_binary(
-    name = "iree-e2e-fa2-test",
-    srcs = ["iree-e2e-fa2-test.cc"],
+    name = "iree-e2e-attention-test",
+    srcs = ["iree-e2e-attention-test.cc"],
     deps = [
         ":e2e_test_util",
         "//runtime/src/iree/base",

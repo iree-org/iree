@@ -4,7 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Generator for e2e fa2 tests.
+"""Generator for e2e attention tests.
 """
 
 import argparse
@@ -125,7 +125,7 @@ def generate_shapes_and_scale(shape: TestShapeAndScale):
     return shapes_scale
 
 
-# Helper to return input, kernel and output shapes based on the layout and FA2Params.
+# Helper to return input, kernel and output shapes based on the layout and the Attention Params.
 def get_tensor_shapes(
     shapes_scale: TestShapeAndScale,
 ):
@@ -163,9 +163,9 @@ def generate_function_name(
     k2 = shapes_scale.k2
     n = shapes_scale.n
 
-    fa2 = "fa2"
+    attention = "attention"
     return (
-        f"{fa2}_{batch}_{m}_{k1}_{k2}_{n}"
+        f"{attention}_{batch}_{m}_{k1}_{k2}_{n}"
         + f"_dtype_{query_t}_{key_t}_{value_t}_{result_t}"
     )
 
@@ -180,8 +180,8 @@ class MLIRFunction:
 
 
 # Generates a test function in the generated MLIR code.
-# The generated function will take the same arguments as linalg.fa2 variants
-# and will just call linalg.fa2 variants with them, returning its result.
+# The generated function will take the same arguments as iree_linalg_ext.attention variants
+# and will just call iree_linalg_ext.attention variants with them, returning its result.
 def generate_function(
     query_type: QueryElemTypeId,
     key_type: KeyElemTypeId,
@@ -284,7 +284,7 @@ def generate_random_3d_tensor(
         f"  %{name}_dim2 = arith.constant {tensor_shape[2]} : i64\n"
         f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
         f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
-        f"  %{name} = call @fa2_test.generate_random_tensor(%device, %{name}_dim0, %{name}_dim1, %{name}_dim2, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i64, i32, i32) -> !hal.buffer_view\n"
+        f"  %{name} = call @attention_test.generate_random_tensor(%device, %{name}_dim0, %{name}_dim1, %{name}_dim2, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i64, i32, i32) -> !hal.buffer_view\n"
     )
 
 
@@ -303,7 +303,7 @@ def generate_call(
     func_name = f"{func_name}_{call_id}"
     call_id = call_id + 1
 
-    description = f"FA2 shape (BATCHxMxK1xK2xN): {shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}x{shapes_scale.k2}x{shapes_scale.k1}x{shapes_scale.n}"
+    description = f"Attention shape (BATCHxMxK1xK2xN): {shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}x{shapes_scale.k2}x{shapes_scale.k1}x{shapes_scale.n}"
     op = (
         f"func.func @{func_name}() attributes {{\n"
         f'  iree.reflection = {{description = "{description}"}}\n'
@@ -333,7 +333,7 @@ def generate_call(
         f"  %k1 = arith.constant {shapes_scale.k1} : i64\n"
         f"  %k2 = arith.constant {shapes_scale.k2} : i64\n"
         f"  %n = arith.constant {shapes_scale.n} : i64\n"
-        f"  call @fa2_test.check_fa2_results(%device, %batch, %m, %k1, %k2, %n, %query, %key, %value, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %query, %key, %value, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
     op = op + "  return\n"
@@ -375,11 +375,11 @@ def generate(
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Generator of e2e fa2 tests")
+    parser = argparse.ArgumentParser(description="Generator of e2e Attention tests")
     parser.add_argument(
-        "--output_fa2_mlir",
+        "--output_attention_mlir",
         type=str,
-        help="Path of output .mlir file containing the generated fa2 functions",
+        help="Path of output .mlir file containing the generated Attention functions",
         required=True,
     )
     parser.add_argument(
@@ -448,8 +448,8 @@ def write_calls_file(functions, calls, filename, requirements):
 
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
-        "func.func private @fa2_test.generate_random_tensor(%device: !hal.device, %dim0: i64, %dim1: i64, %dim2: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @fa2_test.check_fa2_results(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %result: !hal.buffer_view)\n"
+        "func.func private @attention_test.generate_random_tensor(%device: !hal.device, %dim0: i64, %dim1: i64, %dim2: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
+        "func.func private @attention_test.check_attention_results(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %result: !hal.buffer_view)\n"
         "\n"
     )
 
@@ -481,7 +481,7 @@ def main(args):
         shapes_id,
     )
 
-    write_code_file(functions, args.output_fa2_mlir)
+    write_code_file(functions, args.output_attention_mlir)
     write_calls_file(
         functions,
         calls,
