@@ -432,9 +432,9 @@ struct AttentionTestModule final
 
 }  // namespace iree
 
-static iree_status_t attention_test_module_create(iree_vm_instance_t* instance,
-                                            iree_allocator_t host_allocator,
-                                            iree_vm_module_t** out_module) {
+static iree_status_t attention_test_module_create(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<iree::AttentionTestModule>(
