@@ -6,10 +6,9 @@
 
 #include "./hal.h"
 
+#include <nanobind/nanobind.h>
 #include <nanobind/stl/vector.h>
 
-#include <algorithm>
-#include <iterator>
 #include <optional>
 
 #include "./local_dlpack.h"
@@ -20,7 +19,6 @@
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "nanobind/nanobind.h"
 
 namespace iree {
 namespace python {
@@ -1092,11 +1090,10 @@ VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
   } else {
     // Set device related arguments in the case of multiple devices.
     devices_vector.reserve(devices->size());
-    std::transform(devices->begin(), devices->end(),
-                   std::back_inserter(devices_vector), [](nanobind::handle h) {
-                     HalDevice* d = py::cast<HalDevice*>(h);
-                     return d->raw_ptr();
-                   });
+    for (auto devicesIt = devices->begin(); devicesIt != devices->end();
+         ++devicesIt) {
+      devices_vector.push_back(py::cast<HalDevice*>(*devicesIt)->raw_ptr());
+    }
     devices_ptr = devices_vector.data();
     device_count = devices_vector.size();
   }
