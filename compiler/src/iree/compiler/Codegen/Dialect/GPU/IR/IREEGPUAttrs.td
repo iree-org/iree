@@ -131,6 +131,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getSubgroupSize",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
+    "materializeOperandConcreteShape",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
