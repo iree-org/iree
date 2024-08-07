@@ -561,7 +561,6 @@ include(iree_native_test)
 include(iree_cc_binary_benchmark)
 include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
-include(iree_fetch_artifact)
 include(iree_plugin_register)
 
 # Default any sub-tree which doesn't provide its own package namespacing
