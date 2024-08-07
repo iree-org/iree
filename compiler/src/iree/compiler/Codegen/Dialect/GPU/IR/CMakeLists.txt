@@ -37,6 +37,7 @@ iree_cc_library(
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
     "IREEGPUOps.cpp"
+    "TilingInterfaceImpl.cpp"
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
@@ -55,6 +56,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTilingInterface
     MLIRVectorDialect
     MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
