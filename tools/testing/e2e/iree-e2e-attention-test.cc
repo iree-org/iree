@@ -417,7 +417,7 @@ static const vm::NativeFunction<AttentionTestModuleState>
             "generate_random_tensor",
             &AttentionTestModuleState::GenerateRandom3dTensor),
         vm::MakeNativeFunction(
-            "check_fa2_results",
+            "check_attention_results",
             &AttentionTestModuleState::CheckAttentionResults),
 };
 
@@ -432,13 +432,13 @@ struct AttentionTestModule final
 
 }  // namespace iree
 
-static iree_status_t fa2_test_module_create(iree_vm_instance_t* instance,
+static iree_status_t attention_test_module_create(iree_vm_instance_t* instance,
                                             iree_allocator_t host_allocator,
                                             iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<iree::AttentionTestModule>(
-      "fa2_test", /*version=*/0, instance, host_allocator,
+      "attention_test", /*version=*/0, instance, host_allocator,
       iree::span<
           const iree::vm::NativeFunction<iree::AttentionTestModuleState>>(
           iree::kAttentionTestModuleFunctions));
@@ -457,7 +457,7 @@ int main(int argc, char** argv) {
   }
 
   iree_status_t status = iree_test_utils_load_and_run_e2e_tests(
-      iree_allocator_system(), fa2_test_module_create);
+      iree_allocator_system(), attention_test_module_create);
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);

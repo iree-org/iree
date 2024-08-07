@@ -79,9 +79,9 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
-    iree-e2e-fa2-test
+    iree-e2e-attention-test
   SRCS
-    "iree-e2e-fa2-test.cc"
+    "iree-e2e-attention-test.cc"
   DEPS
     ::e2e_test_util
     iree::base

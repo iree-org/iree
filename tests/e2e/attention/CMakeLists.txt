@@ -12,18 +12,18 @@ iree_add_all_subdirs()
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_fa2_cpu_f16_f16_f16_small
+    e2e_attention_cpu_f16_f16_f16_small
   TEST_TYPE
-    fa2
+    attention
   GENERATOR
-    "generate_e2e_fa2_tests.py"
+    "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
     "--query_type=f16"
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=small"
   TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-fa2-test
+    iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
     "llvm-cpu"
   DRIVERS
@@ -37,18 +37,18 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_fa2_cpu_f16_f16_f16_medium
+    e2e_attention_cpu_f16_f16_f16_medium
   TEST_TYPE
-    fa2
+    attention
   GENERATOR
-    "generate_e2e_fa2_tests.py"
+    "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
     "--query_type=f16"
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=medium"
   TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-fa2-test
+    iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
     "llvm-cpu"
   DRIVERS
@@ -62,18 +62,18 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_fa2_cpu_f16_f16_f16_large
+    e2e_attention_cpu_f16_f16_f16_large
   TEST_TYPE
-    fa2
+    attention
   GENERATOR
-    "generate_e2e_fa2_tests.py"
+    "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
     "--query_type=f16"
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=large"
   TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-fa2-test
+    iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
     "llvm-cpu"
   DRIVERS
