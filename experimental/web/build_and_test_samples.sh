@@ -7,17 +7,13 @@
 
 # Builds and tests IREE samples for CI.
 #
-# Accepts no arguments. Configuration must be done via environment variables.
 # The build directory for the emscripten build is taken from the environment
 # variable IREE_EMPSCRIPTEN_BUILD_DIR, defaulting to "build-emscripten".
 # Designed for CI, but can be run manually.
-#
-# NOTE: This is different from most of our CI build scripts because we make use
-# of build_sample.sh scripts that are designed to be runnable by humans with
-# minimal configuration.
 
 set -xeuo pipefail
 
+HOST_TOOLS_BINARY_DIR="$1"
 export IREE_EMPSCRIPTEN_BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
 
 # These samples require that all HAL drivers be disabled to avoid linking
@@ -27,11 +23,12 @@ export IREE_EMPSCRIPTEN_BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripte
 test -f "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt" \
   && rm "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt"
 
-experimental/web/sample_static/build_sample.sh
-experimental/web/sample_dynamic/build_sample.sh
+experimental/web/sample_static/build_sample.sh ${HOST_TOOLS_BINARY_DIR}
+experimental/web/sample_dynamic/build_sample.sh ${HOST_TOOLS_BINARY_DIR}
 
-# Clear the cache again before building the webgpu sample.
-test -f "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt" \
-  && rm "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt"
+# TODO(scotttodd): re-enable once release packages include webgpu-spirv compiler target
 
-experimental/web/sample_webgpu/build_sample.sh
+# # Clear the cache again before building the webgpu sample.
+# test -f "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt" \
+#   && rm "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt"
+# experimental/web/sample_webgpu/build_sample.sh ${HOST_TOOLS_BINARY_DIR}
