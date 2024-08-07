@@ -309,10 +309,10 @@ def get_rocm_test_compilation_infos(
     for schedule in schedules:
         # Skip schedules with an intrinsic which element type does not
         # match the requested one.
-        # Extracts the input type from strings containing either 'MFMA' or 'WMMA'
-        # followed by an underscore.
-        extract_input_type = lambda s: re.search(r"(?:MFMA|WMMA)_([^_]+)_", s).group(1)
-        if lhs_rhs_type.value.upper() != extract_input_type(schedule.intrinsic):
+        # Extracts the input type from strings. The naming convention is
+        # [output_type]_MxNxK_[input_type].
+        input_type = schedule.intrinsic.split("_")[-1]
+        if lhs_rhs_type.value.upper() != input_type:
             continue
 
         if schedule.intrinsic == "MFMA_F32_16x16x4_F32":
