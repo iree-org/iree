@@ -64,6 +64,24 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def FuseHorizontalContractionsPass:
+    InterfacePass<"iree-flow-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+  let options = [
+    Option<"fusionLimit", "fusion-limit", "int",
+            /*default=*/"3", "Maximum number of contractions fused into one">
+  ];
+  let statistics = [
+    Statistic<"numFusionGroups", "num-fusion-groups", "Number of fusion groups found">,
+    Statistic<"numSize2FusionGroups", "num-size-2-groups", "Number of fusion groups of size 2">,
+    Statistic<"numSize3FusionGroups", "num-size-3-groups", "Number of fusion groups of size 3">
+  ];
+}
+
 def FuseMultiUseElementwiseProducerPass :
     InterfacePass<"iree-flow-fuse-multi-use-elementwise-producer",
                    "mlir::FunctionOpInterface"> {
