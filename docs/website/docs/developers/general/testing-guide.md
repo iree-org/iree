@@ -224,13 +224,6 @@ to running CTest (from the build directory):
 cmake --build . --target iree-test-deps
 ```
 
-To run e2e model tests in
-[generated_e2e_model_tests.cmake](https://github.com/iree-org/iree/blob/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
-because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
-set when configuring CMake. Also see
-[IREE Benchmark Suite Prerequisites](../performance/benchmark-suites.md#prerequisites)
-for required packages.
-
 ### Running a Test
 
 For the test

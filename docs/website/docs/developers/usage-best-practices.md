@@ -53,16 +53,6 @@ TODO: which compiler targets to use (try both CUDA and Vulkan?)
 
 TODO: use the most specific LLVM target triple you can?
 
-### Tuning compilation heuristics
-
-IREE runs its own suite of benchmarks continuously using the definitions at
-<https://github.com/iree-org/iree/tree/main/benchmarks>. The flags set for these
-benchmarks represent the latest manually tuned values for workloads we track
-closely and referencing them may help with your own search for peak performance.
-You can use these flags in your own explorations, but note that as compiler
-performance matures, the existing flags will gradually be replaced with
-attributes for autotuning or command line options for experimental features.
-
 ## Practices for runtime use
 
 TODO: sample code, profile numbers

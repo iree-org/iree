@@ -317,8 +317,6 @@ ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-skip-llvm-integrate-benchmark: free form reason
-benchmark-extra: extra,benchmarks,to,run
 runner-env: [testing|prod]
 ```
 
@@ -355,25 +353,6 @@ runner-env: [testing|prod]
     In all these cases, the setup does not make any effort to ensure that job
     dependencies are satisfied. Thus, if you request skipping the `build_all`
     job, all the jobs that depend on it will fail, not be skipped.
-
-??? info - "Using `benchmark-extra`, `skip-llvm-integrate-benchmark`"
-
-    ``` text
-    benchmark-extra: extra,benchmarks,to,run
-    skip-llvm-integrate-benchmark: free form reason
-    ```
-
-    Benchmarks don't run by default on PRs, and must be specifically requested.
-
-    The `benchmark-extra` option allows specifying additional benchmark presets
-    to run as part of benchmarking. It accepts a comma-separated list of
-    benchmark presets. This combines with labels added to the PR (which are a
-    more limited set of options). See the
-    [benchmark suites documentation](../performance/benchmark-suites.md).
-
-    Benchmarks *do* run by default on PRs detected to be an integration of LLVM
-    into IREE, but this behavior can be disabled with
-    `skip-llvm-integrate-benchmark`.
 
 ??? info - "Using `runner-env`"
 

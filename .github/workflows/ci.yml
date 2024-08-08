@@ -168,7 +168,6 @@ jobs:
             runs-on: macos-14
     env:
       BUILD_DIR: build-runtime
-      BUILD_PRESET: test
       IREE_READ_REMOTE_CCACHE: 0
       IREE_WRITE_REMOTE_CCACHE: 0
       IREE_READ_LOCAL_CCACHE: 1
@@ -331,7 +330,6 @@ jobs:
   #           --env "IREE_TARGET_ARCH=${ARCH}" \
   #           --env "IREE_TARGET_ABI=${ABI}" \
   #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "BUILD_PRESET=test" \
   #           --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
   #           "${DOCKER_IMAGE}" \
   #           "${BUILD_SCRIPT}"
@@ -342,7 +340,6 @@ jobs:
   #           --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
   #           --env "IREE_TARGET_ARCH=${ARCH}" \
   #           --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
-  #           --env "BUILD_PRESET=test" \
   #           "${DOCKER_IMAGE}" \
   #           "${TEST_SCRIPT}"
 

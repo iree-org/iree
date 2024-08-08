@@ -96,5 +96,3 @@ iree_static_linker_test(
     "--iree-vm-target-index-bits=32"
   EMITC
 )
-
-include(generated_e2e_model_tests.cmake)

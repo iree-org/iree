@@ -5,64 +5,63 @@
 exclude: "third_party/"
 
 repos:
-
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: check-merge-conflict
+      - id: check-merge-conflict
 
-    -   id: check-yaml
+      - id: check-yaml
         # * Extensions can't be included in the mkdocs schema, so skip checking
         #   https://github.com/squidfunk/mkdocs-material/issues/6378
         # * clang-format files use `---` to split for multiple languages,
         #   resulting in errors like `expected a single document in the stream`
         exclude: "mkdocs.yml|.clang-format"
 
-    -   id: end-of-file-fixer
+      - id: end-of-file-fixer
         exclude_types: ["image", "jupyter"]
 
-    -   id: trailing-whitespace
+      - id: trailing-whitespace
         exclude_types: ["image", "jupyter"]
 
--   repo: https://github.com/psf/black
+  - repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
-    -   id: black
+      - id: black
         name: Run Black to format Python files
 
--   repo: https://github.com/pre-commit/mirrors-clang-format
+  - repo: https://github.com/pre-commit/mirrors-clang-format
     # Loosely track the most recent versions in
     #   * Runner images: https://github.com/actions/runner-images/
     #   * Editor extensions: https://github.com/microsoft/vscode-cpptools
     rev: v18.1.3
     hooks:
-    -   id: clang-format
+      - id: clang-format
         name: Run clang-format on C/C++/etc. files
         exclude_types: ["jupyter"]
 
--   repo: https://github.com/igorshubovych/markdownlint-cli
+  - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.41.0
     hooks:
-    -   id: markdownlint
+      - id: markdownlint
         name: Run markdownlint on .md files
         args: ["--config", "docs/.markdownlint.yml"]
         files: "docs/website/.*.md"
         exclude: "mlir-dialects/!(index).md"
 
--   repo: https://github.com/Lucas-C/pre-commit-hooks
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.5
     hooks:
-    -   id: forbid-tabs
+      - id: forbid-tabs
         exclude: ".gitmodules|Makefile"
 
--   repo: https://github.com/jlebar/pre-commit-hooks.git
+  - repo: https://github.com/jlebar/pre-commit-hooks.git
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
     hooks:
-      -   id: do-not-submit
+      - id: do-not-submit
 
--   repo: local
+  - repo: local
     hooks:
-    -   id: buildifier
+      - id: buildifier
         name: Run buildifier
         entry: buildifier
         language: golang
@@ -72,7 +71,10 @@ repos:
         # of improving it or at least explaining it as hundreds of developers
         # search for basic support: https://github.com/golang/go/issues/35732.
         # Docs are technically at https://go.dev/ref/mod#go-install ¯\_(ツ)_/¯
-        additional_dependencies: ["github.com/bazelbuild/buildtools/buildifier@1429e15ae755a6762d0edf9198062dc6ed04408d"]
+        additional_dependencies:
+          [
+            "github.com/bazelbuild/buildtools/buildifier@1429e15ae755a6762d0edf9198062dc6ed04408d",
+          ]
         files: '^(.*/)?(BUILD\.bazel|BUILD|WORKSPACE|WORKSPACE\.bazel|WORKSPACE\.bzlmod|MODULE\.bazel)$|\.BUILD$|\.bzl$'
         # Pin the language version so other system version are _not_ used.
         # Older go versions used different syntax for "go install" (which is
@@ -81,7 +83,7 @@ repos:
         # probably changed again in a future version, whatever.
         language_version: "1.16"
 
-    -   id: bazel_to_cmake
+      - id: bazel_to_cmake
         name: Run bazel_to_cmake.py
         language: python
         # Note: this passes file names to the tool. The tool can also be run
@@ -90,35 +92,19 @@ repos:
         # Keep the top level directories here in sync with .bazel_to_cmake.cfg.py.
         files: '^(compiler|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel|CMakeLists.txt)$'
 
-    -   id: check_path_lengths
+      - id: check_path_lengths
         name: Check for excessively long path lengths
         language: fail
         entry: Path lengths relative to the root should be < 75 characters (run ./build_tools/scripts/check_path_lengths.py for detailed output)
         # The regex includes/excludes here should roughly match the behavior of
         # the check_path_lengths.py script.
         files: '^compiler/.{66,}/\w+\.'
-        exclude: 'test/'
+        exclude: "test/"
 
-    -   id: build_file_names
+      - id: build_file_names
         name: Check Bazel file names
         entry: Files should be named BUILD.bazel instead of BUILD
         language: fail
         files: "BUILD$"
 
     # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)
-
-    -   id: generate_cmake_e2e_test_artifacts_suite
-        name: Run generate_cmake_e2e_test_artifacts_suite.py
-        language: python
-        entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
-        args: ["--output_dir", "./tests/e2e/test_artifacts"]
-        files: '^(build_tools/python|build_tools/testing|tests/e2e/test_artifacts)/.*'
-        pass_filenames: false
-
-    -   id: generate_cmake_e2e_model_tests
-        name: Run generate_cmake_e2e_model_tests.py
-        language: python
-        entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
-        args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
-        files: '^(build_tools/python|build_tools/testing|tests/e2e/stablehlo_models)/.*'
-        pass_filenames: false
