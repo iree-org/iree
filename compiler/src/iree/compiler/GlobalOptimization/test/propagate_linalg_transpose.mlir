@@ -485,3 +485,183 @@ util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
 //  APROP-SAME:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 //  APROP-SAME:     outs(%[[EMPTY]] : tensor<16x16xf32>)
 //       APROP:   util.return %[[MATMUL]]
+
+// -----
+
+util.func public @propagate_transpose_down_through_broadcast_elementwise(%arg0: tensor<3x4x2xf32>, %arg1: tensor<3x4xf32>) -> tensor<2x3x4xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %transposed = linalg.transpose ins(%arg0 : tensor<3x4x2xf32>)
+      outs(%empty : tensor<2x3x4xf32>) permutation = [2, 0, 1]
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%transposed, %arg1 : tensor<2x3x4xf32>, tensor<3x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %in1: f32, %out: f32):
+                    %add = arith.addf %in, %in1 : f32
+                    linalg.yield %add : f32
+                  } -> tensor<2x3x4xf32>
+  util.return %0 : tensor<2x3x4xf32>
+}
+
+//   SINK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//   SINK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// SINK-LABEL: util.func public @propagate_transpose_down_through_broadcast_elementwise
+//  SINK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<3x4x2xf32>
+//  SINK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<3x4xf32>
+//       SINK:   %[[ELEM:.+]] = linalg.generic
+//  SINK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP]]]
+//  SINK-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<3x4x2xf32>, tensor<3x4xf32>
+//       SINK:     arith.addf
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ELEM]] : tensor<3x4x2xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<2x3x4xf32>)
+//  SINK-SAME:                    permutation = [2, 0, 1]
+//       SINK:   util.return %[[TRANSPOSE]] : tensor<2x3x4xf32>
+
+// -----
+
+util.func public @propagate_transpose_down_through_multi_operand_elementwise(%arg0: tensor<3x4x2xf32>, %arg1: tensor<3x4xf32>) -> tensor<2x3x4xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %t1 = linalg.transpose ins(%arg0 : tensor<3x4x2xf32>)
+      outs(%empty : tensor<2x3x4xf32>) permutation = [2, 0, 1]
+  %empty2 = tensor.empty(): tensor<4x3xf32>
+  %t2 = linalg.transpose ins(%arg1 : tensor<3x4xf32>)
+      outs(%empty2 : tensor<4x3xf32>) permutation = [1, 0]
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d2, d1)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%t2, %t1 : tensor<4x3xf32>, tensor<2x3x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %in1: f32, %out: f32):
+                    %add = arith.addf %in, %in1 : f32
+                    linalg.yield %add : f32
+                  } -> tensor<2x3x4xf32>
+  util.return %0 : tensor<2x3x4xf32>
+}
+
+// Verify that it first selects the correct transpose to propagate and then
+// fuses the transpose on the broadcasted operand.
+
+//   SINK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//   SINK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// SINK-LABEL: util.func public @propagate_transpose_down_through_multi_operand_elementwise
+//  SINK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<3x4x2xf32>
+//  SINK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<3x4xf32>
+//       SINK:   %[[ELEM:.+]] = linalg.generic
+//  SINK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP1]]]
+//  SINK-SAME:     ins(%[[ARG1]], %[[ARG0]] : tensor<3x4xf32>, tensor<3x4x2xf32>
+//       SINK:     arith.addf
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ELEM]] : tensor<3x4x2xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<2x3x4xf32>)
+//  SINK-SAME:                    permutation = [2, 0, 1]
+//       SINK:   util.return %[[TRANSPOSE]] : tensor<2x3x4xf32>
+
+// -----
+
+util.func public @sink_transpose_down_to_broadcast_elementwise(%arg0: tensor<3x4x2xf32>, %arg1: tensor<2x4xf32>) -> tensor<2x3x4xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %transposed = linalg.transpose ins(%arg0 : tensor<3x4x2xf32>)
+      outs(%empty : tensor<2x3x4xf32>) permutation = [2, 0, 1]
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%transposed, %arg1 : tensor<2x3x4xf32>, tensor<2x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %in1: f32, %out: f32):
+                    %add = arith.addf %in, %in1 : f32
+                    linalg.yield %add : f32
+                  } -> tensor<2x3x4xf32>
+  util.return %0 : tensor<2x3x4xf32>
+}
+
+// Verify that the transpose is fused rather than propagated because the
+// broadcast operand would be affected by the transpose.
+
+//   SINK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
+//   SINK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+//   SINK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// SINK-LABEL: util.func public @sink_transpose_down_to_broadcast_elementwise
+//  SINK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<3x4x2xf32>
+//  SINK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<2x4xf32>
+//       SINK:   %[[ELEM:.+]] = linalg.generic
+//  SINK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
+//  SINK-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<3x4x2xf32>, tensor<2x4xf32>
+//       SINK:     arith.addf
+//       SINK:   util.return %[[ELEM]] : tensor<2x3x4xf32>
+
+// -----
+
+util.func public @propagate_transpose_up_through_broadcast_elementwise(%arg0: tensor<2x3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4x2xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%arg0, %arg1 : tensor<2x3x4xf32>, tensor<3x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %in1: f32, %out: f32):
+                    %add = arith.addf %in, %in1 : f32
+                    linalg.yield %add : f32
+                  } -> tensor<2x3x4xf32>
+  %empty1 = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%0 : tensor<2x3x4xf32>)
+      outs(%empty1 : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  util.return %transposed : tensor<3x4x2xf32>
+}
+
+//   BUBBLE-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//   BUBBLE-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// BUBBLE-LABEL: util.func public @propagate_transpose_up_through_broadcast_elementwise
+//  BUBBLE-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<2x3x4xf32>
+//  BUBBLE-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<3x4xf32>
+//       BUBBLE:   %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<2x3x4xf32>
+//  BUBBLE-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  BUBBLE-SAME:                    permutation = [1, 2, 0]
+//       BUBBLE:   %[[ELEM:.+]] = linalg.generic
+//  BUBBLE-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP]]]
+//  BUBBLE-SAME:     ins(%[[TRANSPOSE]], %[[ARG1]] : tensor<3x4x2xf32>, tensor<3x4xf32>
+//       BUBBLE:     arith.addf
+//       BUBBLE:   util.return %[[ELEM]] : tensor<3x4x2xf32>
+
+// -----
+
+util.func public @bubble_transpose_to_broadcast_elementwise(%arg0: tensor<2x3x4xf32>, %arg1: tensor<2x4xf32>) -> tensor<3x4x2xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%arg0, %arg1 : tensor<2x3x4xf32>, tensor<2x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %in1: f32, %out: f32):
+                    %add = arith.addf %in, %in1 : f32
+                    linalg.yield %add : f32
+                  } -> tensor<2x3x4xf32>
+  %empty1 = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%0 : tensor<2x3x4xf32>)
+      outs(%empty1 : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  util.return %transposed : tensor<3x4x2xf32>
+}
+
+// Verify that the transpose is fused rather than propagated because the
+// broadcast operand would be affected by the transpose.
+
+//   BUBBLE-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+//   BUBBLE-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+//   BUBBLE-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// BUBBLE-LABEL: util.func public @bubble_transpose_to_broadcast_elementwise
+//  BUBBLE-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<2x3x4xf32>
+//  BUBBLE-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<2x4xf32>
+//       BUBBLE:   %[[ELEM:.+]] = linalg.generic
+//  BUBBLE-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
+//  BUBBLE-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<2x3x4xf32>, tensor<2x4xf32>
+//       BUBBLE:     arith.addf
+//       BUBBLE:   util.return %[[ELEM]] : tensor<3x4x2xf32>
