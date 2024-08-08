@@ -119,6 +119,10 @@ void structDefinition(OpBuilder builder, Location location,
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand);
 
+Value structMemberAddress(OpBuilder builder, Location location,
+                          emitc::PointerType type, StringRef memberName,
+                          Value operand);
+
 void structMemberAssign(OpBuilder builder, Location location,
                         StringRef memberName, Value operand, Value data);
 
@@ -127,6 +131,10 @@ void structMemberAssign(OpBuilder builder, Location location,
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand);
+
+Value structPtrMemberAddress(OpBuilder builder, Location location,
+                             emitc::PointerType type, StringRef memberName,
+                             Value operand);
 
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data);
