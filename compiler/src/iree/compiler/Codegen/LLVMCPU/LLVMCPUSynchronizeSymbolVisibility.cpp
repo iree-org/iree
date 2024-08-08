@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUSYNCHRONIZESYMBOLVISIBILITYPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -29,10 +31,8 @@ static void setVisibilityFromLinkage(SymbolOpInterface op,
 }
 
 struct LLVMCPUSynchronizeSymbolVisibilityPass
-    : public LLVMCPUSynchronizeSymbolVisibilityBase<
+    : public impl::LLVMCPUSynchronizeSymbolVisibilityPassBase<
           LLVMCPUSynchronizeSymbolVisibilityPass> {
-  LLVMCPUSynchronizeSymbolVisibilityPass() = default;
-
   void runOnOperation() override {
     auto moduleOp = getOperation();
     for (auto &op : moduleOp.getOps()) {
@@ -44,12 +44,5 @@ struct LLVMCPUSynchronizeSymbolVisibilityPass
     }
   }
 };
-
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUSynchronizeSymbolVisibilityPass() {
-  return std::make_unique<LLVMCPUSynchronizeSymbolVisibilityPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
@@ -26,14 +25,18 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMCPUTILEPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 
 /// This pass tiles all the TilingInterface operations. The `tilingLevel` must
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
 /// lowering_config.
-struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
-  LLVMCPUTilePass(int64_t tilingLevel = -1) {
-    this->tilingLevel.setValue(tilingLevel);
+struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
+  using impl::LLVMCPUTilePassBase<LLVMCPUTilePass>::LLVMCPUTilePassBase;
+  explicit LLVMCPUTilePass(int64_t tilingLevel) {
+    this->tilingLevel = tilingLevel;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
