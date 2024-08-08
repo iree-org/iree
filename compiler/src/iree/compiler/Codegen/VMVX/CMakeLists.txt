@@ -46,11 +46,11 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "KernelDispatch.cpp"
-    "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
     "VMVXLowerExecutableTargetPass.cpp"
+    "VMVXLowerLinalgMicrokernels.cpp"
     "VMVXSelectLoweringStrategy.cpp"
   DEPS
     ::PassHeaders
