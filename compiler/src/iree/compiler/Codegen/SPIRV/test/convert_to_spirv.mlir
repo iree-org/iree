@@ -247,6 +247,44 @@ hal.executable private @interface_wg_id {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
+hal.executable private @interface_wg_size {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
+    hal.executable.export @interface_wg_size layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
+      func.func @interface_wg_size() {
+        %c0 = arith.constant 0.0 : f32
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<64x64xf32, #spirv.storage_class<StorageBuffer>>
+        memref.store %c0, %subspan[%workgroup_size_x, %workgroup_size_y] : memref<64x64xf32, #spirv.storage_class<StorageBuffer>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: spirv.module
+//   CHECK-DAG:   spirv.GlobalVariable @[[WGSIZE:.+]] built_in("WorkgroupSize")
+//   CHECK-DAG:   spirv.GlobalVariable @[[BIND:.+]] bind(0, 0)
+//       CHECK:     %[[CST0:.+]] = spirv.Constant 0.000000e+00 : f32
+//       CHECK:     %[[ADDR1:.+]] = spirv.mlir.addressof @[[WGSIZE]]
+//       CHECK:     %[[VAL1:.+]] = spirv.Load "Input" %[[ADDR1:.+]]
+//       CHECK:     %[[WGSIZEX:.+]] = spirv.CompositeExtract %[[VAL1]][0 : i32]
+//       CHECK:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGSIZE]]
+//       CHECK:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2:.+]]
+//       CHECK:     %[[WGSIZEY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @interface_wg_count layout(#pipeline_layout) attributes {
