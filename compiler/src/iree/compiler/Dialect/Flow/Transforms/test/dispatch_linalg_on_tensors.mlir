@@ -1874,11 +1874,12 @@ util.func public @batchnorm_training(%arg0: tensor<12xf32>, %arg1: tensor<12x12x
 
 // -----
 
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
-    -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
+    -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
-  util.return %0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  util.return %0 : tensor<?x?xf32, #encoding>
 }
 //      CHECK: util.func public @set_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
@@ -1907,10 +1908,11 @@ util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
-util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>)
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
+util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>)
     -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
   util.return %0 : tensor<?x?xf32>
 }
 //      CHECK: util.func public @unset_encoding_op
@@ -1941,8 +1943,9 @@ util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_encoding.encod
 // -----
 
 #map = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
-    -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
+    -> tensor<?x?xf32, #encoding> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
@@ -1955,8 +1958,8 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
       tensor.yield %cst : f32
     } : tensor<?x?xf32> to tensor<?x?xf32>
   %encoding = iree_encoding.set_encoding %pad
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
-  util.return %encoding : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  util.return %encoding : tensor<?x?xf32, #encoding>
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 16) * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
@@ -1997,11 +2000,12 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @unset_encoding_and_slice(
-    %arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %arg0: tensor<?x?xf32, #encoding>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
   %1 = tensor.extract_slice %0[0, 0] [%arg1, %arg2] [1, 1]
       : tensor<?x?xf32> to tensor<?x?xf32>
   util.return %1 : tensor<?x?xf32>
@@ -2039,10 +2043,11 @@ util.func public @unset_encoding_and_slice(
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @root_on_unset_encoding(
-    %arg0: tensor<784x96xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %arg0: tensor<784x96xf32, #encoding>,
     %arg1: tensor<96xf32>) -> tensor<784x96xf32> {
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<784x96xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<784x96xf32>
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<784x96xf32, #encoding> -> tensor<784x96xf32>
   %1 = tensor.empty() : tensor<784x96xf32>
   %cst = arith.constant 0.000000e+00 : f32
   %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<784x96xf32>) -> tensor<784x96xf32>
@@ -2084,14 +2089,15 @@ util.func public @root_on_unset_encoding(
 
 // -----
 
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @gemm_encoded(
-    %arg0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %arg0 : tensor<?x?xf32, #encoding>,
     %arg1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>,
     %arg2 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>)
     -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>> {
   %0 = linalg.matmul
       ins(%arg0, %arg1
-          : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+          : tensor<?x?xf32, #encoding>,
             tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>)
       outs(%arg2 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>)
       -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>
@@ -2115,21 +2121,22 @@ util.func public @gemm_encoded(
 
 // -----
 
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @gemm_fill_encoded(
-    %arg0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+    %arg0 : tensor<?x?xf32, #encoding>,
     %arg1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>)
     -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #encoding>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>
   %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>)
       -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>
   %0 = linalg.matmul
       ins(%arg0, %arg1
-          : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
+          : tensor<?x?xf32, #encoding>,
             tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>>)
       outs(%fill : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>)
       -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>>

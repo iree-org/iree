@@ -79,14 +79,15 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 
 // ----
 
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
-    %arg5: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>>>) {
+    %arg5: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = flow.dispatch.workload.ordinal %arg3, 2 : index
   %1 = flow.dispatch.workload.ordinal %arg4, 3 : index
-  %2 = flow.dispatch.tie_shape %arg5 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>>>{%0, %1}
+  %2 = flow.dispatch.tie_shape %arg5 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   %3 = flow.dispatch.workload.ordinal %arg1, 0 : index
   %4 = flow.dispatch.workload.ordinal %arg2, 1 : index
   %5 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>> -> tensor<512x1024xf32>
@@ -94,8 +95,8 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
   ^bb0(%arg6: index, %arg7: index):
     tensor.yield %cst : f32
   } : tensor<512x1024xf32> to tensor<?x?xf32>
-  %11 = iree_encoding.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>>
-  flow.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>>>{%0, %1}
+  %11 = iree_encoding.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  flow.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   util.return
 }
 
