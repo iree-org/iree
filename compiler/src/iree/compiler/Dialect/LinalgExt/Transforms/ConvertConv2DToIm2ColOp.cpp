@@ -322,6 +322,12 @@ struct ConvertConv2DToIm2ColOpPass
     // The im2col transformation collapses some of the dimensions of the
     // convolution operands. Try to push the reshape ops towards the boundaries
     // of the function and fold with interface tensor ops.
+    //
+    // TODO(Max191): Allow for the im2col op to have multiple M dimensions, and
+    //   generate a multi-M dim contraction instead of collapsing and
+    //   propagating reshapes. It should ultimately become a pass option to
+    //   decide whether to collapse the contraction dimensions into a single
+    //   M/N/K dimension.
     {
       RewritePatternSet bubbleCollapseShapePatterns(context);
       linalg::ControlFusionFn bubbleUpExpansionControlFn =
