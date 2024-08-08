@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -13,6 +12,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_REMOVEZEROEXTENTTENSORSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 /// Check if a `t` is a `tensor` with zero extents.
 static std::optional<RankedTensorType> isZeroExtent(Type t) {
@@ -77,7 +79,7 @@ struct FoldZeroExtentInserts : public OpRewritePattern<tensor::InsertSliceOp> {
 namespace {
 
 struct RemoveZeroExtentTensorsPass
-    : RemoveZeroExtentTensorsBase<RemoveZeroExtentTensorsPass> {
+    : impl::RemoveZeroExtentTensorsPassBase<RemoveZeroExtentTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect>();
   }
@@ -99,11 +101,6 @@ void RemoveZeroExtentTensorsPass::runOnOperation() {
     funcOp->emitOpError("failed to run canonicalizations (proxy for DCE)");
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createRemoveZeroExtentTensorsPass() {
-  return std::make_unique<RemoveZeroExtentTensorsPass>();
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

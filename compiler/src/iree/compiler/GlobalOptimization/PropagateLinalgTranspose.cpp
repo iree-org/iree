@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,6 +32,9 @@
 #define DEBUG_TYPE "iree-global-opt-propagate-linalg-transpose"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_PROPAGATELINALGTRANSPOSEPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Transpose permutation helpers
@@ -801,29 +803,18 @@ private:
 
 namespace {
 struct PropagateLinalgTransposePass
-    : public PropagateLinalgTransposeBase<PropagateLinalgTransposePass> {
+    : public impl::PropagateLinalgTransposePassBase<
+          PropagateLinalgTransposePass> {
+  using impl::PropagateLinalgTransposePassBase<
+      PropagateLinalgTransposePass>::PropagateLinalgTransposePassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
-  PropagateLinalgTransposePass(bool enableAggressivePropagation) {
+  explicit PropagateLinalgTransposePass(bool enableAggressivePropagation) {
     this->enableAggressivePropagation = enableAggressivePropagation;
   }
-  PropagateLinalgTransposePass(const PropagateLinalgTransposePass &pass)
-      : PropagateLinalgTransposePass(pass.enableAggressivePropagation) {}
 
   void runOnOperation() override;
-
-private:
-  Option<bool> testSinkingOnly{
-      *this, "test-sinking-only",
-      llvm::cl::desc("Flag used for lit-testing sinking patterns only. "
-                     "Not for general usage"),
-      llvm::cl::init(false)};
-  Option<bool> testBubblingOnly{
-      *this, "test-bubbling-only",
-      llvm::cl::desc("Flag used for lit-testing bubbling patterns only. "
-                     "Not for general usage"),
-      llvm::cl::init(false)};
 };
 } // namespace
 
