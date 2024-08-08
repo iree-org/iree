@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
@@ -306,11 +308,53 @@ struct ConvertConv2DToIm2ColOpPass
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    RewritePatternSet patterns(&getContext());
-    patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+
+    // Rewrite convolutions into a im2col and GEMM.
+    {
+      RewritePatternSet patterns(&getContext());
+      patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(context);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // The im2col transformation collapses some of the dimensions of the
+    // convolution operands. Try to push the reshape ops towards the boundaries
+    // of the function and fold with interface tensor ops.
+    {
+      RewritePatternSet bubbleCollapseShapePatterns(context);
+      linalg::ControlFusionFn bubbleUpExpansionControlFn =
+          [](OpOperand *fusedOperand) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
+
+            // Block only if one of the operations has a lowering configuration
+            // which means it likely expects tiling specific to its original
+            // shape.
+            if (getLoweringConfig(producer) || getLoweringConfig(consumer)) {
+              return false;
+            }
+            return true;
+          };
+      linalg::populateFoldReshapeOpsByCollapsingPatterns(
+          bubbleCollapseShapePatterns, bubbleUpExpansionControlFn);
+      // Add patterns to do some additional cleanup (on top of canonicalizations
+      // that can be done later) of reshape ops.
+      tensor::populateFoldTensorEmptyPatterns(bubbleCollapseShapePatterns);
+      linalg::FillOp::getCanonicalizationPatterns(bubbleCollapseShapePatterns,
+                                                  context);
+      tensor::CollapseShapeOp::getCanonicalizationPatterns(
+          bubbleCollapseShapePatterns, context);
+      tensor::EmptyOp::getCanonicalizationPatterns(bubbleCollapseShapePatterns,
+                                                   context);
+      tensor::ExpandShapeOp::getCanonicalizationPatterns(
+          bubbleCollapseShapePatterns, context);
+      populateReshapeToInterfaceTensorPatterns(bubbleCollapseShapePatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              getOperation(), std::move(bubbleCollapseShapePatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
