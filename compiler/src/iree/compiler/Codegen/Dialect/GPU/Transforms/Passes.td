@@ -11,12 +11,11 @@ include "mlir/Pass/PassBase.td"
 
 def DistributeMmaToLanesPass :
     InterfacePass<"iree-gpu-distribute-mma-to-lanes", "mlir::FunctionOpInterface"> {
-  let summary = "Converts and distributes linalg ops with mma kinds to lanes";
+  let summary = "Distributes iree_gpu.multi_mma ops to lanes";
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",
     "::mlir::scf::SCFDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
   ];
 }
 
@@ -58,7 +57,7 @@ def LowerIREEGPUOpsPass :
 
 def PackToIntrinsicsPass :
     InterfacePass<"iree-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations to specified intrinsic shapes";
+  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
