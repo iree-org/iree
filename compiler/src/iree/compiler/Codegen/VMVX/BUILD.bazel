@@ -28,7 +28,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
     ],
@@ -49,11 +48,11 @@ iree_compiler_cc_library(
     name = "VMVX",
     srcs = [
         "KernelDispatch.cpp",
-        "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
         "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
         "VMVXLowerExecutableTargetPass.cpp",
+        "VMVXLowerLinalgMicrokernels.cpp",
         "VMVXSelectLoweringStrategy.cpp",
     ],
     hdrs = [
