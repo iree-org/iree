@@ -43,7 +43,6 @@
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
 #include "mlir/Dialect/ArmSVE/Transforms/Transforms.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -928,9 +927,9 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect,
                     memref::MemRefDialect, linalg::LinalgDialect,
-                    tosa::TosaDialect, cf::ControlFlowDialect, scf::SCFDialect,
-                    vector::VectorDialect, arm_neon::ArmNeonDialect,
-                    arm_sve::ArmSVEDialect, LLVM::LLVMDialect>();
+                    tosa::TosaDialect, scf::SCFDialect, vector::VectorDialect,
+                    arm_neon::ArmNeonDialect, arm_sve::ArmSVEDialect,
+                    LLVM::LLVMDialect>();
   }
   void runOnOperation() override;
 };
