@@ -830,6 +830,45 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
     iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping);
 
+// Prepares for mapping the buffer to be accessed as a host pointer into
+// |out_buffer_mapping|. The byte offset and byte length may be adjusted for
+// device alignment. The output data pointer will be properly aligned to the
+// start of the data. Fails if the memory could not be mapped (invalid access
+// type, invalid range, or unsupported memory type).
+//
+// Requires that the buffer has the IREE_HAL_BUFFER_USAGE_MAPPING bit set.
+// If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
+// invalidate the byte range they want to access to update the visibility of the
+// mapped memory.
+//
+// This is the first part of a paired operation with
+// iree_hal_buffer_commit_map_range. This allows callers to prepare for mapping
+// (performing all of the validation) without actually resolving the host
+// pointer yet. Once prepared the mapping must be unmapped with
+// iree_hal_buffer_unmap_range even if it is never committed.
+//
+// Callers are allowed to prepare mappings prior to the |buffer| having
+// allocated storage. Committing the mapping requires that storage has been
+// bound for the duration the mapping will be live.
+//
+// Example usage:
+//  iree_hal_buffer_prepare_map_range(..., &mapping);
+//  if (maybe) iree_hal_buffer_commit_map_range(..., &mapping);
+//  iree_hal_buffer_unmap_range(&mapping);
+IREE_API_EXPORT iree_status_t iree_hal_buffer_prepare_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
+    iree_hal_buffer_mapping_t* out_buffer_mapping);
+
+// Commits a mapping operation from iree_hal_buffer_prepare_map_range.
+// May fail for internal reasons but not any of those previously validated
+// during preparation.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_commit_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_hal_buffer_mapping_t* buffer_mapping);
+
 // Unmaps the buffer as was previously mapped to |buffer_mapping|.
 //
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
