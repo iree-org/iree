@@ -6,6 +6,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/assets/images/</loc>
+         <lastmod>2024-08-08</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/building-from-source/</loc>
          <lastmod>2024-08-08</lastmod>
          <changefreq>daily</changefreq>
