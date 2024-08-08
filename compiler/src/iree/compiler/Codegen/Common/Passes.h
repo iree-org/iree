@@ -284,6 +284,10 @@ createTileAndDistributeToWorkgroupsPass(
     linalg::DistributionMethod distributionMethod =
         linalg::DistributionMethod::Cyclic);
 
+/// Pass to tile and distribute to workgroups.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createTileAndDistributeToWorkgroupsUsingForallOpPass();
+
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
 std::unique_ptr<Pass>

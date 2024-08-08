@@ -611,7 +611,7 @@ struct SwapExtractSliceWithTensorEmpty
 } // namespace
 
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
+    RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
                   SwapExtractSliceWithTensorEmpty>(context);
