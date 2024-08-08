@@ -239,7 +239,7 @@ IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32b_2d, rIIIrIIIrIIIII, {
 static iree_status_t iree_vm_shim_ukernel_x32b_2d_v(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
-    iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
+    iree_vm_native_function_target_t target_fn, void* IREE_RESTRICT module,
     void* IREE_RESTRICT module_state) {
   // TODO: Figure out how to identify this with the actual target fn.
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -308,7 +308,7 @@ IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32u_2d, rIIIrIIIII, {
 static iree_status_t iree_vm_shim_ukernel_x32u_2d_v(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
-    iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
+    iree_vm_native_function_target_t target_fn, void* IREE_RESTRICT module,
     void* IREE_RESTRICT module_state) {
   // TODO: Figure out how to identify this with the actual target fn.
   IREE_TRACE_ZONE_BEGIN(z0);

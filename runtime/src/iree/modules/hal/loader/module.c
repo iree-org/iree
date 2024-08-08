@@ -289,7 +289,7 @@ static iree_status_t iree_hal_loader_module_executable_dispatch(
 static iree_status_t iree_vm_shim_dispatch_v(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
-    iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
+    iree_vm_native_function_target_t target_fn, void* IREE_RESTRICT module,
     void* IREE_RESTRICT module_state) {
   // TODO(benvanik): support multiple variadic segments in one call.
   // For now we inline what it would do in a very painful way.
