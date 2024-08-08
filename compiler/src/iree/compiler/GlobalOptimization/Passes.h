@@ -40,14 +40,13 @@ void buildGlobalOptimizationPassPipeline(
 // Wrappers that not use tablegen options.
 //------------------------------------------------------------------------------
 
-std::unique_ptr<Pass>
-createDecomposeConcatPass(bool enableConcatTransposition);
+std::unique_ptr<Pass> createDecomposeConcatPass(bool enableConcatTransposition);
 
 // Used by the demoteContractionInputsToBF16 pass to determine which op inputs
 // to demote.
 enum class DemotionOption { All, Conv, Matmul, None };
-std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass(
-    DemotionOption option);
+std::unique_ptr<Pass>
+createDemoteContractionInputsToBF16Pass(DemotionOption option);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation);
