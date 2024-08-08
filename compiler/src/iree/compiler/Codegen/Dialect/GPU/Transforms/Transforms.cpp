@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -442,10 +443,16 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     accPerm = accInnerPerm;
   }
 
+  IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+      getLoweringConfig(linalgOp);
+
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::GPU::MultiMmaOp>(
       linalgOp, inputs[0], inputs[1], inputs[2],
       ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
       mmaKind, lhsPerm, rhsPerm, accPerm);
+  if (maybeLoweringConfig) {
+    setLoweringConfig(newMmaOp, maybeLoweringConfig);
+  }
   return newMmaOp;
 }
 
