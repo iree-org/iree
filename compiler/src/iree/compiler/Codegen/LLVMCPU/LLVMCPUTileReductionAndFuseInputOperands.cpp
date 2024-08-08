@@ -45,133 +45,126 @@ struct LLVMCPUTileReductionAndFuseInputOperands
   void runOnOperation() override;
 };
 
-/// This collects the set of operations to tile + fuse starting from the given
-/// root |op| and walking up to its producers. Stops at operations given by
-/// |exclude| which are expected to receive their own independent tiling for the
-/// given level.
-static llvm::SmallDenseSet<Operation *>
-collectTiledAndFusedOps(Operation *op,
-                        llvm::SmallDenseSet<TilingInterface> exclude) {
+/// Starting from `op` walk all operands backwards to find all
+/// potentially fusable operations, i.e. operations that implement
+/// the `TilingInterface`.
+static void collectTiledAndFusedOps(Operation *rootOp,
+                                    llvm::SmallDenseSet<Operation *> &result) {
   SmallVector<Operation *> worklist;
-  llvm::SmallDenseSet<Operation *> producers;
-  worklist.push_back(op);
-  producers.insert(op);
+  worklist.push_back(rootOp);
+  result.insert(rootOp);
   while (!worklist.empty()) {
     Operation *current = worklist.pop_back_val();
     for (OpOperand &operand : current->getOpOperands()) {
-      auto producer = operand.get().getDefiningOp<TilingInterface>();
-      if (!producer || producers.contains(producer) ||
-          exclude.contains(producer))
+      Operation *producer = operand.get().getDefiningOp();
+      if (!producer || !isa<TilingInterface>(producer) ||
+          result.count(producer))
         continue;
       worklist.push_back(producer);
-      producers.insert(producer);
+      result.insert(producer);
     }
   }
-  return producers;
 }
 
 /// Apply a tile and fuse transformation to all payload ops and store both the
 /// tiled operation as well as the created tile loops.
 static LogicalResult
 applyTileAndFuseToEachRoot(RewriterBase &rewriter,
-                           llvm::SmallDenseSet<TilingInterface> &payloadOps,
+                           TilingInterface tilingInterfaceOp,
                            int64_t tilingLevel) {
-  for (TilingInterface tilingInterfaceOp : payloadOps) {
-    mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
 
-    llvm::SmallDenseSet<Operation *> tiledAndFusedOps =
-        collectTiledAndFusedOps(tilingInterfaceOp, payloadOps);
-    llvm::DenseSet<Operation *> yieldReplacementsFor;
-    for (auto op : tiledAndFusedOps) {
-      if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-            return dominanceInfo.properlyDominates(tilingInterfaceOp, user);
-          })) {
-        yieldReplacementsFor.insert(op);
-      }
-    }
+  mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
+  llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
+  collectTiledAndFusedOps(tilingInterfaceOp, tiledAndFusedOps);
 
-    rewriter.setInsertionPoint(tilingInterfaceOp);
-    SmallVector<OpFoldResult> tileSizes =
-        getLoweringConfig(tilingInterfaceOp)
-            .getTilingLevelSizes(rewriter, tilingLevel, tilingInterfaceOp);
-
-    // Pad the tile sizes with zero.
-    auto zero = rewriter.getIndexAttr(0);
-    int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
-    if (tileSizes.size() > numLoops) {
-      return failure();
-    }
-    while (tileSizes.size() < numLoops) {
-      tileSizes.push_back(zero);
-    }
-
-    scf::SCFTilingOptions tilingOptions;
-    tilingOptions.setTileSizes(tileSizes);
-
-    scf::SCFTileAndFuseOptions tileAndFuseOptions;
-    tileAndFuseOptions.setTilingOptions(tilingOptions);
-
-    scf::SCFTileAndFuseOptions::ControlFnTy controlFn =
-        [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
-            bool isDestinationOperand) {
-          Operation *owner = originalProducer.getOwner();
-          bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
-          bool shouldFuse = false;
-          if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
-            shouldFuse = !payloadOps.contains(tilingOwner);
-          }
-          // Do not fuse destination operands.
-          shouldFuse &= !isDestinationOperand;
-          return std::make_tuple(shouldFuse, yieldProducerReplacement);
-        };
-    tileAndFuseOptions.setFusionControlFn(controlFn);
-
-    FailureOr<scf::SCFTileAndFuseResult> tiledResults =
-        scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
-                                                  tileAndFuseOptions);
-    if (failed(tiledResults)) {
-      return failure();
-    }
-
-    // Perform the replacement of tiled and fused values.
-    SmallVector<Operation *> opsToReplace{tilingInterfaceOp};
-    llvm::append_range(opsToReplace, tiledResults->fusedProducers);
-    for (Operation *toReplace : opsToReplace) {
-      for (OpResult res : toReplace->getResults())
-        if (auto replacement = tiledResults->replacements.lookup(res)) {
-          Operation *replacementOp = replacement.getDefiningOp();
-          rewriter.replaceUsesWithIf(res, replacement, [&](OpOperand &use) {
-            Operation *user = use.getOwner();
-            return dominanceInfo.properlyDominates(replacementOp, user);
-          });
-        }
-
-      if (toReplace->use_empty()) {
-        rewriter.eraseOp(toReplace);
-      }
+  llvm::DenseSet<Operation *> yieldReplacementsFor;
+  for (auto op : tiledAndFusedOps) {
+    if (llvm::any_of(op->getUsers(), [&](Operation *user) {
+          return dominanceInfo.properlyDominates(tilingInterfaceOp, user);
+        })) {
+      yieldReplacementsFor.insert(op);
     }
   }
+
+  SmallVector<OpFoldResult> tileSizes =
+      getLoweringConfig(tilingInterfaceOp)
+          .getTilingLevelSizes(rewriter, tilingLevel, tilingInterfaceOp);
+
+  // Pad the tile sizes with zero.
+  auto zero = rewriter.getIndexAttr(0);
+  int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
+  if (tileSizes.size() > numLoops) {
+    return failure();
+  }
+  while (tileSizes.size() < numLoops) {
+    tileSizes.push_back(zero);
+  }
+
+  scf::SCFTilingOptions tilingOptions;
+  tilingOptions.setTileSizes(tileSizes);
+
+  scf::SCFTileAndFuseOptions tileAndFuseOptions;
+  tileAndFuseOptions.setTilingOptions(tilingOptions);
+
+  scf::SCFTileAndFuseOptions::ControlFnTy controlFn =
+      [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
+          bool isDestinationOperand) {
+        Operation *owner = originalProducer.getOwner();
+        bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
+        // Do not fuse destination operands.
+        bool shouldFuse = !isDestinationOperand;
+        return std::make_tuple(shouldFuse, yieldProducerReplacement);
+      };
+  tileAndFuseOptions.setFusionControlFn(controlFn);
+
+  FailureOr<scf::SCFTileAndFuseResult> tiledResults =
+      scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
+                                                tileAndFuseOptions);
+  if (failed(tiledResults)) {
+    return failure();
+  }
+
+  // Perform the replacement of tiled and fused values.
+  SmallVector<Operation *> opsToReplace{tilingInterfaceOp};
+  llvm::append_range(opsToReplace, tiledResults->fusedProducers);
+  for (Operation *toReplace : opsToReplace) {
+    for (OpResult res : toReplace->getResults())
+      if (auto replacement = tiledResults->replacements.lookup(res)) {
+        Operation *replacementOp = replacement.getDefiningOp();
+        rewriter.replaceUsesWithIf(res, replacement, [&](OpOperand &use) {
+          Operation *user = use.getOwner();
+          return dominanceInfo.properlyDominates(replacementOp, user);
+        });
+      }
+
+    if (toReplace->use_empty()) {
+      rewriter.eraseOp(toReplace);
+    }
+  }
+
   return success();
 }
 
-// Collects Reduction operations with lowering config at the given tiling level.
-static llvm::SmallDenseSet<TilingInterface>
-getReductionOpsWithLoweringConfig(Operation *funcOp, int64_t tilingLevel) {
-  llvm::SmallDenseSet<TilingInterface> targets;
-  funcOp->walk([&](TilingInterface target) {
-    if (!llvm::any_of(target.getLoopIteratorTypes(), [](auto iter) {
+// Returns the first reduction operation with lowering config at the given
+// tiling level.
+static std::optional<TilingInterface>
+getReductionOpWithLoweringConfig(Operation *funcOp, int64_t tilingLevel) {
+  TilingInterface target = nullptr;
+  funcOp->walk([&](TilingInterface op) {
+    if (!llvm::any_of(op.getLoopIteratorTypes(), [](auto iter) {
           return iter == utils::IteratorType::reduction;
         })) {
       WalkResult::advance();
     }
     if (IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-            getLoweringConfig(target)) {
+            getLoweringConfig(op)) {
       if (loweringConfig.hasTilingLevel(tilingLevel)) {
-        targets.insert(target);
+        target = op;
+        WalkResult::interrupt();
       }
     }
   });
-  return targets;
+  return target;
 }
 
 void LLVMCPUTileReductionAndFuseInputOperands::runOnOperation() {
@@ -182,12 +175,15 @@ void LLVMCPUTileReductionAndFuseInputOperands::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  auto targetOps = getReductionOpsWithLoweringConfig(funcOp, tilingLevel);
+  auto targetOp = getReductionOpWithLoweringConfig(funcOp, tilingLevel);
 
-  IRRewriter rewriter(funcOp);
-  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel))) {
-    funcOp.emitError() << "tiling of level " << tilingLevel << " failed\n";
-    return signalPassFailure();
+  if (*targetOp) {
+    IRRewriter rewriter(funcOp);
+    if (failed(applyTileAndFuseToEachRoot(rewriter, targetOp.value(),
+                                          tilingLevel))) {
+      funcOp.emitError() << "tiling of level " << tilingLevel << " failed\n";
+      return signalPassFailure();
+    }
   }
 
   RewritePatternSet patterns =
