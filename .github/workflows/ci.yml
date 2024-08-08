@@ -168,11 +168,6 @@ jobs:
             runs-on: macos-14
     env:
       BUILD_DIR: build-runtime
-      BUILD_PRESET: test
-      IREE_READ_REMOTE_CCACHE: 0
-      IREE_WRITE_REMOTE_CCACHE: 0
-      IREE_READ_LOCAL_CCACHE: 1
-      IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5.1.0
@@ -195,18 +190,29 @@ jobs:
 
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
-
+      - name: Install Python requirements
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
-
-      - name: Install Python requirements
-        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: Build runtime
-        run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-      - name: Test runtime
+      - name: CMake - configure
+        run: |
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DIREE_BUILD_COMPILER=OFF \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_BUILD_SAMPLES=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON
+      - name: CMake - build
+        run: cmake --build ${BUILD_DIR} -- -k 0
+      - name: CTest
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   small_runtime:
