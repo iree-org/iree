@@ -33,7 +33,7 @@ struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 
-  char name[16];
+  char name[32];
   pthread_t handle;
 
   iree_thread_entry_t entry;

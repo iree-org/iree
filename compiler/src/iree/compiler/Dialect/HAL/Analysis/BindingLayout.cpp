@@ -62,8 +62,7 @@ assumeExportLayout(IREE::HAL::PipelineLayoutAttr layoutAttr) {
       DescriptorSetLayoutBinding setBinding;
       setBinding.ordinal = bindingAttr.getOrdinal();
       setBinding.type = bindingAttr.getType();
-      setBinding.flags =
-          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None);
+      setBinding.flags = bindingAttr.getFlags();
       setLayout.bindings[setBinding.ordinal] = setBinding;
       pipelineLayout.resourceMap.emplace_back(setLayout.ordinal,
                                               setBinding.ordinal);
@@ -123,7 +122,6 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
 
   // Check the usage of each binding at each dispatch site.
   struct DescriptorInfo {
-    bool isIndirect = false;
     DescriptorFlags flags = DescriptorFlags::None;
   };
   SmallVector<DescriptorInfo> descriptorInfos(bindingCount);
@@ -142,12 +140,18 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
       // Opt into indirect descriptors when dynamic values are used from
       // execution regions that may be executed more than once.
       if (!isRegionExecutedOnce) {
-        auto resource = dispatchOp.getResources()[i];
+        Value resource = dispatchOp.getResources()[i];
+        if (auto blockArg = dyn_cast<BlockArgument>(resource)) {
+          if (blockArg.getOwner()->getParentOp() == parentOp) {
+            resource = parentOp.getResourceOperands()[blockArg.getArgNumber()];
+          }
+        }
         switch (categorizeValue(resource)) {
         default:
         case ValueOrigin::Unknown:
         case ValueOrigin::MutableGlobal:
-          descriptorInfo.isIndirect |= true;
+          descriptorInfo.flags =
+              descriptorInfo.flags | IREE::HAL::DescriptorFlags::Indirect;
           break;
         case ValueOrigin::LocalConstant:
         case ValueOrigin::ImmutableGlobal:
@@ -173,74 +177,27 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
   pipelineLayout.pushConstantCount = operandCount;
   pipelineLayout.resourceMap.resize(bindingCount);
 
-  // Today we use one or two sets based on the composition of bindings we have:
-  // we try to put everything in a directly referenced set 0 and spill over any
-  // indirectly referenced values into the second set.
-  //
-  // HACK: the Vulkan HAL implementation currently cannot handle multiple
-  // descriptor sets. Ouch. To preserve existing behavior we only use a single
-  // set and mark the whole thing as indirect if any bindings are indirect.
-  const bool forceSingleSet = true;
-  if (forceSingleSet) {
-    DescriptorSetLayout setLayout;
-    setLayout.ordinal = 0;
-    setLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::None;
-    setLayout.bindings.reserve(bindingCount);
-    for (unsigned i = 0; i < bindingCount; ++i) {
-      const auto &descriptorInfo = descriptorInfos[i];
-      if (descriptorInfo.isIndirect) {
-        setLayout.flags =
-            setLayout.flags | IREE::HAL::DescriptorSetLayoutFlags::Indirect;
-      }
-      DescriptorSetLayoutBinding setBinding;
-      setBinding.ordinal = setLayout.bindings.size();
-      setBinding.type = IREE::HAL::DescriptorType::StorageBuffer;
-      setBinding.flags = descriptorInfo.flags;
-      setLayout.bindings.push_back(setBinding);
-      pipelineLayout.resourceMap[i] =
-          std::make_pair(setLayout.ordinal, setBinding.ordinal);
+  // TODO(#18154): simplify binding setup.
+  DescriptorSetLayout setLayout;
+  setLayout.ordinal = 0;
+  setLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::None;
+  setLayout.bindings.reserve(bindingCount);
+  for (unsigned i = 0; i < bindingCount; ++i) {
+    const auto &descriptorInfo = descriptorInfos[i];
+    if (allEnumBitsSet(descriptorInfo.flags,
+                       IREE::HAL::DescriptorFlags::Indirect)) {
+      setLayout.flags =
+          setLayout.flags | IREE::HAL::DescriptorSetLayoutFlags::Indirect;
     }
-    pipelineLayout.setLayouts.push_back(setLayout);
-  } else {
-    DescriptorSetLayout directSetLayout;
-    directSetLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::None;
-    directSetLayout.bindings.reserve(bindingCount);
-    DescriptorSetLayout indirectSetLayout;
-    indirectSetLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::Indirect;
-    indirectSetLayout.bindings.reserve(bindingCount);
-
-    // Ordinals relative to the owning set.
-    SmallVector<unsigned> bindingSetOrdinals(bindingCount);
-    for (unsigned i = 0; i < bindingCount; ++i) {
-      const auto &descriptorInfo = descriptorInfos[i];
-      auto &setLayout =
-          descriptorInfo.isIndirect ? indirectSetLayout : directSetLayout;
-      DescriptorSetLayoutBinding setBinding;
-      setBinding.ordinal = setLayout.bindings.size();
-      setBinding.type = IREE::HAL::DescriptorType::StorageBuffer;
-      setBinding.flags = descriptorInfo.flags;
-      setLayout.bindings.push_back(setBinding);
-      bindingSetOrdinals[i] = setBinding.ordinal;
-    }
-    unsigned nextSetOrdinal = 0;
-    if (!directSetLayout.bindings.empty()) {
-      directSetLayout.ordinal = nextSetOrdinal++;
-      pipelineLayout.setLayouts.push_back(directSetLayout);
-    }
-    if (!indirectSetLayout.bindings.empty()) {
-      indirectSetLayout.ordinal = nextSetOrdinal++;
-      pipelineLayout.setLayouts.push_back(indirectSetLayout);
-    }
-
-    // Map each resource to its set/binding ordinals.
-    for (unsigned i = 0; i < bindingCount; ++i) {
-      const auto &descriptorInfo = descriptorInfos[i];
-      auto &setLayout =
-          descriptorInfo.isIndirect ? indirectSetLayout : directSetLayout;
-      pipelineLayout.resourceMap[i] =
-          std::make_pair(setLayout.ordinal, bindingSetOrdinals[i]);
-    }
+    DescriptorSetLayoutBinding setBinding;
+    setBinding.ordinal = setLayout.bindings.size();
+    setBinding.type = IREE::HAL::DescriptorType::StorageBuffer;
+    setBinding.flags = descriptorInfo.flags;
+    setLayout.bindings.push_back(setBinding);
+    pipelineLayout.resourceMap[i] =
+        std::make_pair(setLayout.ordinal, setBinding.ordinal);
   }
+  pipelineLayout.setLayouts.push_back(setLayout);
 
   LLVM_DEBUG({
     auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();

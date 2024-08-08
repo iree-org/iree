@@ -20,8 +20,12 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_hip_kernel_info_t {
+  // TODO(#18189): remove when using simplified bindings.
   iree_hal_pipeline_layout_t* layout;
   hipFunction_t function;
+  uint32_t constant_count;
+  uint32_t binding_count;
+  // TODO(#18189): add bitfield indicating indirect bindings.
   uint32_t block_size[3];
   uint32_t shared_memory_size;
 

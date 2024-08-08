@@ -275,11 +275,11 @@ BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
         // consumer region. This would require emitting ops that track that
         // information (probably via util.range.min/max). For now we bind the
         // entire buffer range and let the individual commands subrange them.
-        IREE::HAL::BindingTableValue bindingTableValue;
-        bindingTableValue.buffer = bufferValue;
-        bindingTableValue.byteOffset = indexSet.get(0);
-        bindingTableValue.byteLength = bufferSize;
-        indirectBuffers.push_back(bindingTableValue);
+        IREE::HAL::BindingValue bindingValue;
+        bindingValue.buffer = bufferValue;
+        bindingValue.byteOffset = indexSet.get(0);
+        bindingValue.byteLength = bufferSize;
+        indirectBuffers.push_back(bindingValue);
       }
       break;
     }
@@ -300,26 +300,26 @@ std::optional<Value> BindingTable::lookupResourceSlot(Value resourceValue) {
   return std::nullopt;
 }
 
-IREE::HAL::BindingTableValue CommandBufferConversionMapping::resolveBinding(
+IREE::HAL::BindingValue CommandBufferConversionMapping::resolveBinding(
     Location loc, Value resourceValue, Value bufferValue, Value useOffset,
     Value useLength, OpBuilder &builder) {
-  IREE::HAL::BindingTableValue bindingTableValue;
+  IREE::HAL::BindingValue bindingValue;
 
   // Try to resolve the resource to a slot. If not found then it's a direct
   // reference and we use the buffer provided.
   auto slot = bindingTable.lookupResourceSlot(resourceValue);
   if (slot.has_value()) {
-    bindingTableValue.buffer = slot.value();
+    bindingValue.buffer = slot.value();
   } else {
-    bindingTableValue.buffer = bufferValue;
+    bindingValue.buffer = bufferValue;
   }
 
   // TODO(benvanik): adjust range by the binding table base index. Today all
   // binding table entries are the full buffers starting at zero.
-  bindingTableValue.byteOffset = useOffset;
-  bindingTableValue.byteLength = useLength;
+  bindingValue.byteOffset = useOffset;
+  bindingValue.byteLength = useLength;
 
-  return bindingTableValue;
+  return bindingValue;
 }
 
 void StreamConversionMapping::mapCommandBuffer(

@@ -30,6 +30,13 @@ static llvm::cl::opt<bool> clIndirectCommandBuffers{
     llvm::cl::init(false),
 };
 
+// TODO(#18154): switch default to true and then remove.
+static llvm::cl::opt<bool> clExperimentalDispatch2{
+    "iree-hal-experimental-dispatch2",
+    llvm::cl::desc("Whether to emit iree_hal_command_buffer_dispatch2 ops."),
+    llvm::cl::init(false),
+};
+
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -623,8 +630,8 @@ struct CmdCollectiveOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
 
-    IREE::HAL::BindingTableValue sendBinding;
-    IREE::HAL::BindingTableValue recvBinding;
+    IREE::HAL::BindingValue sendBinding;
+    IREE::HAL::BindingValue recvBinding;
     switch (adaptor.getOp().getKind()) {
     default:
       assert(adaptor.getResources().size() == 2 && "should have verified");
@@ -663,6 +670,7 @@ struct CmdCollectiveOpPattern
   }
 };
 
+// TODO(#18154): switch to dispatch2.
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -842,6 +850,145 @@ struct CmdDispatchOpPattern
             bindings);
       }
     }
+  }
+};
+
+struct CmdDispatch2OpPattern
+    : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = dispatchOp.getLoc();
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(dispatchOp);
+
+    // TODO(multi-device): reusable command buffers done at the stream level may
+    // make this difficult. For now we assume each stream region being lowered
+    // has a singular affinity that may itself reference multiple devices in the
+    // future but currently uniquely identifies a device.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(dispatchOp);
+
+    // Get the device handle we're executing against in this execution region.
+    // Note that this is a dynamic value: we have to treat the device as unknown
+    // here.
+    Value device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
+        loc, rewriter.getType<IREE::HAL::DeviceType>(),
+        commandBufferMapping.getHandle());
+
+    // Prepare for variant switch table by gathering the conditions selecting
+    // each variant.
+    SmallVector<int64_t> caseIndices;
+    SmallVector<std::pair<SymbolRefAttr, IREE::HAL::ExecutableExportOp>>
+        caseExportOps;
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+      // NOTE: slow lookup!
+      auto exportOp =
+          SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+              dispatchOp, entryPointAttr);
+      assert(exportOp && "dispatch target export not found");
+      caseIndices.push_back(caseIndices.size());
+      caseExportOps.push_back(std::make_pair(entryPointAttr, exportOp));
+    });
+
+    // If there is only one variant we can emit that directly without a
+    // conditional check. The same result should occur later on but it saves
+    // a lot of IR during generation if we know we can avoid it.
+    if (caseExportOps.size() == 1) {
+      auto [entryPointAttr, exportOp] = caseExportOps.front();
+      rewriter.replaceOp(dispatchOp,
+                         emitDispatchOp(loc, affinityAttr, device,
+                                        commandBufferMapping, exportOp,
+                                        entryPointAttr, dispatchOp, adaptor,
+                                        rewriter));
+    } else {
+      // Select the variant index.
+      Value selectedIndex = buildIfElseTree(
+          loc, caseExportOps.size(),
+          [&](Location loc, size_t i, OpBuilder &builder) {
+            auto exportOp = caseExportOps[i].second;
+            auto variantOp =
+                exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+            return variantOp.buildCondition(device, rewriter);
+          },
+          rewriter);
+
+      // Allow each variant to define how it is dispatched.
+      auto switchOp = rewriter.create<scf::IndexSwitchOp>(
+          loc, TypeRange{}, selectedIndex, caseIndices, caseIndices.size());
+      for (size_t i = 0; i < caseExportOps.size(); ++i) {
+        auto [entryPointAttr, exportOp] = caseExportOps[i];
+        auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+        auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
+        emitDispatchOp(loc, affinityAttr, device, commandBufferMapping,
+                       exportOp, entryPointAttr, dispatchOp, adaptor,
+                       caseBuilder);
+        caseBuilder.create<scf::YieldOp>(loc);
+      }
+
+      // Fallback for no available variant. Today we just no-op as executable
+      // loading should have already failed.
+      auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+      auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+      defaultBuilder.create<scf::YieldOp>(loc);
+
+      rewriter.replaceOp(dispatchOp, switchOp);
+    }
+
+    return success();
+  }
+
+  Operation *emitDispatchOp(
+      Location loc, IREE::Stream::AffinityAttr affinityAttr, Value device,
+      CommandBufferConversionMapping &commandBufferMapping,
+      IREE::HAL::ExecutableExportOp exportOp, SymbolRefAttr entryPointAttr,
+      IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
+      OpBuilder &builder) const {
+    auto workgroupCount = exportOp.calculateWorkgroupCount(
+        loc, device, adaptor.getWorkload(), builder);
+
+    Value executable = builder.create<IREE::HAL::ExecutableLookupOp>(
+        loc, builder.getType<IREE::HAL::ExecutableType>(), device,
+        entryPointAttr.getRootReference().getValue());
+    Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+        loc, builder.getIndexType(), entryPointAttr);
+
+    // TODO(#18154): simplify bindings by removing descriptor sets.
+    auto layoutAttr = exportOp.getLayout();
+    auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
+        exportOp, dispatchOp.getResources().size());
+    SmallVector<IREE::HAL::BindingValue> bindings;
+    for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
+      auto descriptorFlags = layoutAttr.getSetLayout(bindingAttr.getSet())
+                                 .getBinding(i)
+                                 .getFlags();
+      IREE::HAL::BindingValue binding;
+      if (bitEnumContainsAll(descriptorFlags,
+                             IREE::HAL::DescriptorFlags::Indirect)) {
+        // Indirect binding resolved through the cached command buffer binding
+        // table. The buffer recorded in the descriptor is a slot ordinal into
+        // the binding table. Note that the range may be adjusted based on the
+        // range bound to the slot in the table.
+        auto resolvedBinding = commandBufferMapping.resolveBinding(
+            loc, dispatchOp.getResources()[i], adaptor.getResources()[i],
+            adaptor.getResourceOffsets()[i], adaptor.getResourceLengths()[i],
+            builder);
+        binding.buffer = resolvedBinding.buffer;
+        binding.byteOffset = resolvedBinding.byteOffset;
+        binding.byteLength = resolvedBinding.byteLength;
+      } else {
+        // Direct binding referencing the buffer and range provided on the op.
+        binding.buffer = adaptor.getResources()[i];
+        binding.byteOffset = adaptor.getResourceOffsets()[i];
+        binding.byteLength = adaptor.getResourceLengths()[i];
+      }
+      bindings.push_back(binding);
+    }
+
+    auto flags = IREE::HAL::DispatchFlags::None;
+
+    return builder.create<IREE::HAL::CommandBufferDispatch2Op>(
+        loc, commandBufferMapping.getHandle(), executable, ordinal,
+        workgroupCount, adaptor.getUniformOperands(), bindings, flags);
   }
 };
 
@@ -1408,9 +1555,15 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
               CmdFillOpPattern, CmdCopyOpPattern, CmdCollectiveOpPattern,
-              CmdDispatchOpPattern, CmdFuncOpPattern, CmdCallOpPattern,
-              CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
+              CmdFuncOpPattern, CmdCallOpPattern, CmdExecuteOpPattern,
+              CmdSerialOpPattern, CmdConcurrentOpPattern>(
           mapping, typeConverter, context);
+  // TODO(#18154): drop existing pattern.
+  if (clExperimentalDispatch2) {
+    patterns.insert<CmdDispatch2OpPattern>(mapping, typeConverter, context);
+  } else {
+    patterns.insert<CmdDispatchOpPattern>(mapping, typeConverter, context);
+  }
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,

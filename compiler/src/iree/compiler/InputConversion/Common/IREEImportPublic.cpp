@@ -78,17 +78,16 @@ convertDescriptorType(IREE::Input::DescriptorType src) {
   }
 }
 
-static std::optional<IREE::HAL::DescriptorFlags>
+static IREE::HAL::DescriptorFlags
 convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
   if (!src.has_value())
-    return std::nullopt;
+    return IREE::HAL::DescriptorFlags::None;
   switch (*src) {
+  default:
   case IREE::Input::DescriptorFlags::None:
     return IREE::HAL::DescriptorFlags::None;
   case IREE::Input::DescriptorFlags::ReadOnly:
     return IREE::HAL::DescriptorFlags::ReadOnly;
-  default:
-    return std::nullopt;
   }
 }
 

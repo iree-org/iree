@@ -43,9 +43,15 @@ typedef enum iree_hal_descriptor_type_e {
 // A bitmask of flags controlling the behavior of a descriptor.
 enum iree_hal_descriptor_flag_bits_t {
   IREE_HAL_DESCRIPTOR_FLAG_NONE = 0u,
+
   // Indicates that the binding is treated as immutable within all dispatches
   // using it.
   IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY = 1u << 0,
+
+  // Indicates the descriptor is 'bindless' and passed via implementation-
+  // specific parameter buffers stored in memory instead of API-level calls.
+  // Ignored by implementations that don't have a concept of indirect bindings.
+  IREE_HAL_DESCRIPTOR_FLAG_INDIRECT = 1u << 1,
 };
 typedef uint32_t iree_hal_descriptor_flags_t;
 

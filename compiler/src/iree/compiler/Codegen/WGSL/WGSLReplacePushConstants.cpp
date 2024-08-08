@@ -98,7 +98,7 @@ addSet3IfNeeded(IREE::HAL::PipelineLayoutAttr originalAttr) {
   SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
   bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
       originalAttr.getContext(), 0, IREE::HAL::DescriptorType::UniformBuffer,
-      std::nullopt));
+      IREE::HAL::DescriptorFlags::None));
   setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
       originalAttr.getContext(), 3, bindingAttrs, std::nullopt));
   return IREE::HAL::PipelineLayoutAttr::get(originalAttr.getContext(),

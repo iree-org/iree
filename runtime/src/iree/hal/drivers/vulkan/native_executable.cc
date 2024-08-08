@@ -26,6 +26,7 @@ using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_entry_point_t {
   VkPipeline pipeline;
+  iree_hal_pipeline_layout_t* layout;
   iree_string_view_t name;
 
   // Optional debug information.
@@ -107,6 +108,11 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
       iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
   for (iree_host_size_t entry_ordinal = 0; entry_ordinal < pipeline_count;
        ++entry_ordinal) {
+    iree_hal_pipeline_layout_t* pipeline_layout =
+        executable_params->pipeline_layouts[entry_ordinal];
+    iree_hal_pipeline_layout_retain(pipeline_layout);
+    out_entry_points[entry_ordinal].layout = pipeline_layout;
+
     VkComputePipelineCreateInfo* create_info = &create_infos[entry_ordinal];
     create_info->sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     create_info->pNext = NULL;
@@ -121,8 +127,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     } else {
       create_info->flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     }
-    create_info->layout = iree_hal_vulkan_native_pipeline_layout_handle(
-        executable_params->pipeline_layouts[entry_ordinal]);
+    create_info->layout =
+        iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
     create_info->basePipelineHandle = VK_NULL_HANDLE;
     create_info->basePipelineIndex = 0;
 
@@ -472,6 +478,7 @@ static void iree_hal_vulkan_native_executable_destroy(
   for (iree_host_size_t i = 0; i < executable->entry_point_count; ++i) {
     iree_hal_vulkan_destroy_pipeline(executable->logical_device,
                                      executable->entry_points[i].pipeline);
+    iree_hal_pipeline_layout_release(executable->entry_points[i].layout);
   }
   iree_allocator_free(host_allocator, executable);
 
@@ -528,7 +535,8 @@ void iree_hal_vulkan_native_executable_entry_point_source_location(
 
 iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
     iree_hal_executable_t* base_executable, iree_host_size_t entry_ordinal,
-    VkPipeline* out_pipeline_handle) {
+    VkPipeline* out_pipeline_handle,
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
   iree_hal_vulkan_native_executable_t* executable =
       iree_hal_vulkan_native_executable_cast(base_executable);
   if (entry_ordinal >= executable->entry_point_count) {
@@ -537,6 +545,9 @@ iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
                             entry_ordinal);
   }
   *out_pipeline_handle = executable->entry_points[entry_ordinal].pipeline;
+  if (out_pipeline_layout) {
+    *out_pipeline_layout = executable->entry_points[entry_ordinal].layout;
+  }
   return iree_ok_status();
 }
 
