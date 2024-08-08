@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -23,18 +22,18 @@
 
 #define DEBUG_TYPE "iree-vmvx-lower-executable-target"
 
-using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
-
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_VMVXLOWEREXECUTABLETARGETPASS
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
 
 namespace {
 
 /// Lowers an hal.executable.variant operation to scalar/native-vector code.
 class VMVXLowerExecutableTargetPass
-    : public VMVXLowerExecutableTargetBase<VMVXLowerExecutableTargetPass> {
+    : public impl::VMVXLowerExecutableTargetPassBase<
+          VMVXLowerExecutableTargetPass> {
 public:
-  VMVXLowerExecutableTargetPass() = default;
-  VMVXLowerExecutableTargetPass(const VMVXLowerExecutableTargetPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<IREE::HAL::HALDialect,
@@ -89,10 +88,4 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createVMVXLowerExecutableTargetPass() {
-  return std::make_unique<VMVXLowerExecutableTargetPass>();
-}
-
 } // namespace mlir::iree_compiler

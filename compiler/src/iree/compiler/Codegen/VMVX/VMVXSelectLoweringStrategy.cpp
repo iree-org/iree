@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -25,13 +24,15 @@ using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_VMVXSELECTLOWERINGSTRATEGYPASS
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
+
 namespace {
 /// Selects the lowering strategy for a hal.executable.variant operation.
 class VMVXSelectLoweringStrategyPass
-    : public VMVXSelectLoweringStrategyBase<VMVXSelectLoweringStrategyPass> {
+    : public impl::VMVXSelectLoweringStrategyPassBase<
+          VMVXSelectLoweringStrategyPass> {
 public:
-  VMVXSelectLoweringStrategyPass() = default;
-  VMVXSelectLoweringStrategyPass(const VMVXSelectLoweringStrategyPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
     // unnecessary dialect registrations.
@@ -61,10 +62,4 @@ void VMVXSelectLoweringStrategyPass::runOnOperation() {
     }
   }
 }
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createVMVXSelectLoweringStrategyPass() {
-  return std::make_unique<VMVXSelectLoweringStrategyPass>();
-}
-
 } // namespace mlir::iree_compiler

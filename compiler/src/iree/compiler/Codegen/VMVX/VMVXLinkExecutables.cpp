@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
@@ -14,11 +13,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_VMVXLINKEXECUTABLESPASS
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
+
 namespace {
 
 struct VMVXLinkExecutablesPass
-    : public VMVXLinkExecutablesBase<VMVXLinkExecutablesPass> {
-  VMVXLinkExecutablesPass() = default;
+    : public impl::VMVXLinkExecutablesPassBase<VMVXLinkExecutablesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -79,9 +80,4 @@ struct VMVXLinkExecutablesPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass() {
-  return std::make_unique<VMVXLinkExecutablesPass>();
-}
-
 } // namespace mlir::iree_compiler
