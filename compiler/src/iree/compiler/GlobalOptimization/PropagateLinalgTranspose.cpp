@@ -642,12 +642,10 @@ private:
   bool allowGeneralizing = false;
 };
 
-static bool isOperandMapAffectedByTransposeMap(
+static bool isIndexingMapAffectedByTransposeMap(
     AffineMap indexingMap, ArrayRef<int64_t> iterationSpacePermutation) {
   int64_t prevIdx = -1;
   for (auto result : indexingMap.getResults()) {
-    assert(isa<AffineDimExpr>(result) &&
-           "expected projected permutation indexing map");
     int64_t idx =
         iterationSpacePermutation[cast<AffineDimExpr>(result).getPosition()];
     // Verify that the relative ordering of indices in the map remain the same.
@@ -661,12 +659,22 @@ static bool isOperandMapAffectedByTransposeMap(
   return false;
 }
 
+// Finds a single DPS input operand of the given |genericOp| that is affected by
+// the |iterationSpacePermutation|. In other words, the permutation changes the
+// relative ordering of any of the dimensions of that input operand.
+//
+// For example, with permutation [1, 0, 2], affine map (d0, d1, d2) -> (d0, d1)
+// is affected by the permutation because the first two dimensions are iterated
+// in a different order while (d0, d1, d2) -> (d0, d2) is unaffected.
+//
+// If no such operand is found or there is more than one such operation, nullptr
+// is returned.
 static OpOperand *
 getSingleTransposedInputOperand(linalg::GenericOp genericOp,
                                 ArrayRef<int64_t> iterationSpacePermutation) {
   OpOperand *operand = nullptr;
   for (auto input : genericOp.getDpsInputOperands()) {
-    if (!isOperandMapAffectedByTransposeMap(
+    if (!isIndexingMapAffectedByTransposeMap(
             genericOp.getMatchingIndexingMap(input),
             iterationSpacePermutation)) {
       continue;
@@ -679,6 +687,11 @@ getSingleTransposedInputOperand(linalg::GenericOp genericOp,
   return operand;
 }
 
+// Returns a new list of indexing maps that composes the iteration space
+// permutation map |transposeMap| with all indexing maps of |genericOp| except
+// for the |transposedInputIdx|'th operand. The unchanged operand is expected
+// to have an explicit `linalg.transpose` op constructed for it so its map does
+// not need to be updated.
 static SmallVector<AffineMap>
 getTransposedIndexingMaps(linalg::GenericOp genericOp,
                           int64_t transposedInputIdx, AffineMap transposeMap) {
