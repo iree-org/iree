@@ -148,10 +148,10 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
 
-  build_test_runtime:
+  runtime:
     needs: setup
-    name: "build_test_runtime :: ${{ matrix.name }}"
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime')
+    name: "runtime :: ${{ matrix.name }}"
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime')
     runs-on: ${{ matrix.runs-on }}
     defaults:
       run:
@@ -215,55 +215,86 @@ jobs:
       - name: CTest
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
-  small_runtime:
+  runtime_small:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'small_runtime')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_small')
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
     steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building size-optimized runtime"
+      - uses: actions/checkout@v4.1.7
+      - name: Install requirements
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_runtime_small.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
+          sudo apt update
+          sudo apt install -y ninja-build
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+      - name: Checkout runtime submodules
+        run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}
+          save: ${{ needs.setup.outputs.write-caches == 1 }}
+      - name: CMake - configure
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DIREE_BUILD_COMPILER=OFF \
+            -DIREE_RUNTIME_OPTIMIZATION_PROFILE=size \
+            -DIREE_ENABLE_LLD=ON
+      - name: CMake - build
+        run: cmake --build ${BUILD_DIR} -- -k 0
+      - name: CTest
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
-  tracing:
+  runtime_tracing:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'tracing')
+    name: "runtime_tracing :: ${{ matrix.provider }} provider"
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_tracing')
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: tracy
+          - provider: console
     env:
       BUILD_DIR: build-tracing
+      TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building IREE runtime with tracing - Tracy"
+      - uses: actions/checkout@v4.1.7
+      - name: Install requirements
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "TRACING_PROVIDER=tracy" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_runtime_tracing.sh \
-            "${BUILD_DIR}"
-      - name: "Building IREE runtime with tracing - console"
+          sudo apt update
+          sudo apt install -y ninja-build
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+      - name: Checkout runtime submodules
+        run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ matrix.provider }}
+          save: ${{ needs.setup.outputs.write-caches == 1 }}
+      - name: CMake - configure
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "TRACING_PROVIDER=console" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_runtime_tracing.sh \
-            "${BUILD_DIR}"
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DIREE_BUILD_COMPILER=OFF \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_RUNTIME_TRACING=ON \
+            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER}
+      - name: CMake - build
+        run: cmake --build ${BUILD_DIR} -- -k 0
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -365,16 +396,16 @@ jobs:
     needs:
       - setup
 
-      # Basic
+      # Toolchains
       - build_test_all_bazel
 
       # Accelerators
       # - test_nvidia_a100
 
-      # Configurations
-      - build_test_runtime
-      - small_runtime
-      - tracing
+      # Runtime build variants
+      - runtime
+      - runtime_small
+      - runtime_tracing
 
       # Crosscompilation
       # - cross_compile_and_test
