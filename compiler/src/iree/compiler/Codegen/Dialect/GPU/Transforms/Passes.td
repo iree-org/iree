@@ -16,6 +16,7 @@ def DistributeMmaToLanesPass :
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",
     "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect",
   ];
 }
 
