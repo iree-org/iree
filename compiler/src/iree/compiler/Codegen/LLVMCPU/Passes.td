@@ -213,6 +213,11 @@ def LLVMCPUVirtualVectorLoweringPass :
 def LLVMCPUVectorTransferLoweringPass :
     InterfacePass<"iree-llvmcpu-vector-transfer-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";
+  let options = [
+    Option<"enableScalableLowerings", "enable-scalable-lowerings", "bool",
+      /*default=*/"false",
+      "Enables scalable vector specific transfer lowerings">,
+  ];
 }
 
 def LLVMCPUVectorTransposeLoweringPass :
