@@ -15,6 +15,14 @@ guides, and instructions on building from source.
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8738/badge)](https://www.bestpractices.dev/projects/8738)
 
+#### Set Up IREE
+
+```bash
+git clone https://github.com/openxla/iree
+cmake -G Ninja -B ../iree-build/ .
+cmake --build ../iree-build/
+```
+
 #### Project Status
 
 IREE is still in its early phase. We have settled down on the overarching
