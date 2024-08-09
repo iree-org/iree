@@ -131,7 +131,7 @@ def LLVMCPUTilePass :
   ];
 }
 
-def LLVMCPUTileAndFuse :
+def LLVMCPUTileAndFusePass :
     InterfacePass<"iree-llvmcpu-tile-and-fuse", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile and fuse TilingInterface operations.";
   let options = [
@@ -140,13 +140,20 @@ def LLVMCPUTileAndFuse :
   ];
 }
 
-def LLVMCPUTileRootAndFuseProducerConsumerPass :
-    InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to tile root op and fuse with producer and consumer TilingInterface ops.";
-  let options = [
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
-  ];
+def LLVMCPUTileRootAndFuseProducerConsumerPass
+    : InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile root op and fuse with producer and consumer "
+                "TilingInterface ops.";
+  let options =
+      [Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+              "Use default tiling level used to retrieve the configuration "
+              "from lowering_config">,
+       Option<"onlyFuseProducerInputOperands",
+              "only-fuse-producer-input-operands", "bool",
+              /*default=*/"false",
+              "Specifies if we only want to fuse producer's input operands. "
+              "This is helpful to tile&fuse in case of reduction dimensions.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :
