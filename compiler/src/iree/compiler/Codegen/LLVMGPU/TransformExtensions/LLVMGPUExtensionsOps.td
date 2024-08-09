@@ -527,47 +527,6 @@ def CreateAsyncGroupsOp :
   }];
 }
 
-def LayoutAnalysisAndDistributionOp :
-  Op<Transform_Dialect, "iree.layout_analysis_and_distribution",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Targets the whole func op and does the following:
-
-    1. First, computes the layouts of the of any vector.contract ops
-       that could lower to mma.syncs. Then, propagates these layouts to
-       neighboring ops.
-
-    2. Next, it lowers each of these ops based on their layout.
-
-    The layout is represented as an 8D vector with the following shape:
-    batch0, batch1, laneidz, laneidy, laneidx, vecidz, vecidy, vecidx
-
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
-
-  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::FunctionOpInterface target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-
-}
-
 def ReorderTransposeOp :
   Op<Transform_Dialect, "iree.reorder_transpose",
     [FunctionalStyleTransformOpTrait,
