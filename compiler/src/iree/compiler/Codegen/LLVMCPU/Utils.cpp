@@ -93,4 +93,14 @@ bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp) {
   return true;
 }
 
+bool mayHaveUndefinedBehavior(Operation *op) {
+  if (isa<mlir::arith::RemSIOp, mlir::arith::RemUIOp, mlir::arith::DivSIOp,
+          mlir::arith::DivUIOp, mlir::arith::CeilDivSIOp,
+          mlir::arith::CeilDivUIOp, mlir::arith::FloorDivSIOp,
+          mlir::arith::DivFOp, mlir::arith::RemFOp>(op)) {
+    return true;
+  }
+  return false;
+}
+
 } // namespace mlir::iree_compiler
