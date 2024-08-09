@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
@@ -38,6 +36,8 @@ static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
 }
 
 namespace {
+
+using ControlFnTy = std::optional<std::function<bool(Operation *)>>;
 
 // Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
 // and linalg.matmul.
@@ -77,8 +77,16 @@ class ConvertConv2DNhwcHwcf final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  ConvertConv2DNhwcHwcf(MLIRContext *context, ControlFnTy controlFn)
+      : OpRewritePattern<linalg::Conv2DNhwcHwcfOp>(context),
+        controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(convOp)) {
+      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
+    }
+
     auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
     auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
@@ -183,6 +191,9 @@ public:
 
     return success();
   }
+
+private:
+  ControlFnTy controlFn;
 };
 
 // For nchw, because the channels are to the left of the image shape dimensions,
@@ -194,8 +205,16 @@ class ConvertConv2DNchwFchw final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  ConvertConv2DNchwFchw(MLIRContext *context, ControlFnTy controlFn)
+      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context),
+        controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(convOp)) {
+      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
+    }
+
     auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
     auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
@@ -298,74 +317,33 @@ public:
 
     return success();
   }
+
+private:
+  ControlFnTy controlFn;
 };
 
 struct ConvertConv2DToIm2ColOpPass
     : ConvertConv2DToIm2ColOpBase<ConvertConv2DToIm2ColOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<tensor::TensorDialect, IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
   void runOnOperation() override {
-    MLIRContext *context = &getContext();
-
-    // Rewrite convolutions into a im2col and GEMM.
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(context);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    // The im2col transformation collapses some of the dimensions of the
-    // convolution operands. Try to push the reshape ops towards the boundaries
-    // of the function and fold with interface tensor ops.
-    //
-    // TODO(Max191): Allow for the im2col op to have multiple M dimensions, and
-    //   generate a multi-M dim contraction instead of collapsing and
-    //   propagating reshapes. It should ultimately become a pass option to
-    //   decide whether to collapse the contraction dimensions into a single
-    //   M/N/K dimension.
-    {
-      RewritePatternSet bubbleCollapseShapePatterns(context);
-      linalg::ControlFusionFn bubbleUpExpansionControlFn =
-          [](OpOperand *fusedOperand) {
-            Operation *producer = fusedOperand->get().getDefiningOp();
-            Operation *consumer = fusedOperand->getOwner();
-
-            // Block only if one of the operations has a lowering configuration
-            // which means it likely expects tiling specific to its original
-            // shape.
-            if (getLoweringConfig(producer) || getLoweringConfig(consumer)) {
-              return false;
-            }
-            return true;
-          };
-      linalg::populateFoldReshapeOpsByCollapsingPatterns(
-          bubbleCollapseShapePatterns, bubbleUpExpansionControlFn);
-      // Add patterns to do some additional cleanup (on top of canonicalizations
-      // that can be done later) of reshape ops.
-      tensor::populateFoldTensorEmptyPatterns(bubbleCollapseShapePatterns);
-      linalg::FillOp::getCanonicalizationPatterns(bubbleCollapseShapePatterns,
-                                                  context);
-      tensor::CollapseShapeOp::getCanonicalizationPatterns(
-          bubbleCollapseShapePatterns, context);
-      tensor::EmptyOp::getCanonicalizationPatterns(bubbleCollapseShapePatterns,
-                                                   context);
-      tensor::ExpandShapeOp::getCanonicalizationPatterns(
-          bubbleCollapseShapePatterns, context);
-      populateReshapeToInterfaceTensorPatterns(bubbleCollapseShapePatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              getOperation(), std::move(bubbleCollapseShapePatterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(&getContext());
+    populateConv2DToIm2colOpPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };
 
 } // namespace
+
+void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
+                                      ControlFnTy controlFn) {
+  patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(
+      patterns.getContext(), std::move(controlFn));
+}
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertConv2DToIm2ColOpPass() {
