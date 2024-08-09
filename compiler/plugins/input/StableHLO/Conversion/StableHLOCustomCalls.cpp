@@ -221,6 +221,22 @@ struct HouseholderReflectorRewriter final
   }
 };
 
+struct ShapeAssertionDrop final
+    : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
+  using OpRewritePattern<mlir::stablehlo::CustomCallOp>::OpRewritePattern;
+  using OpAdaptor = mlir::stablehlo::CustomCallOp::Adaptor;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
+                                PatternRewriter &rewriter) const final {
+    if (op.getCallTargetName() != "shape_assertion") {
+      return rewriter.notifyMatchFailure(
+          op, "not shape_assertion");
+    }
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass Definition.
 //===----------------------------------------------------------------------===//
@@ -237,7 +253,7 @@ struct LegalizeStableHLOCustomCalls final
     MLIRContext *ctx = f.getContext();
 
     RewritePatternSet patterns(ctx);
-    patterns.add<HouseholderReflectorRewriter>(ctx);
+    patterns.add<HouseholderReflectorRewriter, ShapeAssertionDrop>(ctx);
     if (failed(applyPatternsAndFoldGreedily(f, std::move(patterns)))) {
       signalPassFailure();
     }
