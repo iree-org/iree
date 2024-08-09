@@ -18,7 +18,8 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
-//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]] : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
+//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
+//  CHECK-SAME:     vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>
 //       CHECK:   return %[[TRUNC]] : vector<96x64xf16>
 
@@ -60,7 +61,7 @@ func.func @mfma_matmul_96x64x16_mm_cannot_downcast(%lhs: vector<96x16xf16>, %rhs
 // CHECK-LABEL: func.func @mfma_matmul_96x64x16_mm_cannot_downcast
 //   CHECK-NOT:   arith.extf
 //       CHECK:   vector.contract
-//  CHECK-SAME:     %{{.+}}, %{{.+}}, %{{.+}} : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf64>
+//  CHECK-SAME:   vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf64>
 //   CHECK-NOT:   arith.truncf
 
 // -----
@@ -83,7 +84,8 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
-//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]] : vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf32>
+//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
+//  CHECK-SAME:     vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<48x32xf32> to vector<48x32xf16>
 //       CHECK:   return %[[TRUNC]] : vector<48x32xf16>
 
@@ -111,6 +113,7 @@ func.func @transform_dialect_mfma_matmul_96x64x16(%lhs: vector<96x16xf16>, %rhs:
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
-//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]] : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
+//  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
+//  CHECK-SAME:     vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>
 //       CHECK:   return %[[TRUNC]] : vector<96x64xf16>
