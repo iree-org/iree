@@ -57,7 +57,8 @@ typedef struct iree_hal_hip_tracing_context_event_list_t {
 iree_status_t iree_hal_hip_tracing_context_allocate(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, hipStream_t stream,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    int32_t stream_tracing_verbosity, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_hip_tracing_context_t** out_context);
 
 // Frees a tracing context and all associated HIP resources.
@@ -87,21 +88,21 @@ void iree_hal_hip_tracing_free(
 void iree_hal_hip_stream_tracing_zone_begin_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
-    const iree_tracing_location_t* src_loc);
+    int32_t verbosity, const iree_tracing_location_t* src_loc);
 
 // Begins an external zone using the given source information.
 // The provided strings will be copied into the tracy buffer.
 void iree_hal_hip_stream_tracing_zone_begin_external_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
-    const char* file_name, size_t file_name_length, uint32_t line,
-    const char* function_name, size_t function_name_length, const char* name,
-    size_t name_length);
+    int32_t verbosity, const char* file_name, size_t file_name_length,
+    uint32_t line, const char* function_name, size_t function_name_length,
+    const char* name, size_t name_length);
 
 void iree_hal_hip_graph_tracing_zone_begin_external_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list,
-    hipGraphNode_t* out_node, hipGraph_t graph,
+    hipGraphNode_t* out_node, hipGraph_t graph, int32_t verbosity,
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
@@ -109,61 +110,66 @@ void iree_hal_hip_graph_tracing_zone_begin_external_impl(
 
 void iree_hal_hip_stream_tracing_zone_end_impl(
     iree_hal_hip_tracing_context_t* context,
-    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream);
+    iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
+    int32_t verbosity);
 void iree_hal_hip_graph_tracing_zone_end_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list,
-    hipGraphNode_t* out_node, hipGraph_t graph,
+    hipGraphNode_t* out_node, hipGraph_t graph, int32_t verbosity,
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count);
 
 // Begins a new zone with the parent function name.
-#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN(context, event_list, stream)     \
+#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN(context, event_list, stream,     \
+                                         verbosity)                       \
   static const iree_tracing_location_t TracyConcat(                       \
       __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
                                             (uint32_t)__LINE__, 0};       \
   iree_hal_hip_stream_tracing_zone_begin_impl(                            \
-      context, event_list, stream,                                        \
+      context, event_list, stream, verbosity,                             \
       &TracyConcat(__tracy_source_location, __LINE__));
 
 // Begins an externally defined zone with a dynamic source location.
 // The |file_name|, |function_name|, and optional |name| strings will be copied
 // into the trace buffer and do not need to persist.
-#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                    \
-    context, event_list, stream, file_name, file_name_length, line,   \
-    function_name, function_name_length, name, name_length)           \
-  iree_hal_hip_stream_tracing_zone_begin_external_impl(               \
-      context, event_list, stream, file_name, file_name_length, line, \
-      function_name, function_name_length, name, name_length)
+#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                             \
+    context, event_list, stream, verbosity, file_name, file_name_length, line, \
+    function_name, function_name_length, name, name_length)                    \
+  iree_hal_hip_stream_tracing_zone_begin_external_impl(                        \
+      context, event_list, stream, verbosity, file_name, file_name_length,     \
+      line, function_name, function_name_length, name, name_length)
+
 #define IREE_HIP_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(                             \
-    context, event_list, out_node, graph, dependency_nodes,                   \
+    context, event_list, out_node, graph, verbosity, dependency_nodes,        \
     dependency_nodes_count, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)                                  \
   iree_hal_hip_graph_tracing_zone_begin_external_impl(                        \
-      context, event_list, out_node, graph, dependency_nodes,                 \
+      context, event_list, out_node, graph, verbosity, dependency_nodes,      \
       dependency_nodes_count, file_name, file_name_length, line,              \
       function_name, function_name_length, name, name_length)
 
-#define IREE_HIP_STREAM_TRACE_ZONE_END(context, event_list, stream) \
-  iree_hal_hip_stream_tracing_zone_end_impl(context, event_list, stream)
-#define IREE_HIP_GRAPH_TRACE_ZONE_END(context, event_list, out_node, graph, \
-                                      dependency_nodes,                     \
-                                      dependency_nodes_count)               \
-  iree_hal_hip_graph_tracing_zone_end_impl(context, event_list, out_node,   \
-                                           graph, dependency_nodes,         \
+#define IREE_HIP_STREAM_TRACE_ZONE_END(context, event_list, stream, verbosity) \
+  iree_hal_hip_stream_tracing_zone_end_impl(context, event_list, stream,       \
+                                            verbosity)
+
+#define IREE_HIP_GRAPH_TRACE_ZONE_END(context, event_list, out_node, graph,    \
+                                      verbosity, dependency_nodes,             \
+                                      dependency_nodes_count)                  \
+  iree_hal_hip_graph_tracing_zone_end_impl(context, event_list, out_node,      \
+                                           graph, verbosity, dependency_nodes, \
                                            dependency_nodes_count)
 #else
 
-#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN(context, event_list, stream)
-#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                  \
-    context, event_list, stream, file_name, file_name_length, line, \
+#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN(context, event_list, stream, verbosity)
+#define IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                             \
+    context, event_list, stream, verbosity, file_name, file_name_length, line, \
     function_name, function_name_length, name, name_length)
 #define IREE_HIP_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(                             \
-    context, event_list, out_node, graph, dependency_nodes,                   \
+    context, event_list, out_node, graph, verbosity, dependency_nodes,        \
     dependency_nodes_count, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
 #define IREE_HIP_STREAM_TRACE_ZONE_END(context, evnet_list, stream)
 #define IREE_HIP_GRAPH_TRACE_ZONE_END(context, event_list, out_node, graph, \
-                                      dependency_nodes,                     \
+                                      verbosity, dependency_nodes,          \
                                       dependency_nodes_count)
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 

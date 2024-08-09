@@ -275,7 +275,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
   out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
-  out_params->stream_tracing = false;
+  out_params->stream_tracing = 0;
   out_params->async_allocations = true;
   out_params->allow_inline_execution = false;
 }
@@ -346,7 +346,8 @@ static iree_status_t iree_hal_hip_device_create_internal(
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
     status = iree_hal_hip_tracing_context_allocate(
         device->hip_symbols, device->identifier, dispatch_stream,
-        &device->block_pool, host_allocator, &device->tracing_context);
+        device->params.stream_tracing, &device->block_pool, host_allocator,
+        &device->tracing_context);
   }
 
   // Memory pool support is conditional.

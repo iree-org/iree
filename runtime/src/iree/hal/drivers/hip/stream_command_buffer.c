@@ -183,7 +183,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_begin(
 
   IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream,
+      command_buffer->hip_stream, 1,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_stream_command_buffer",
       strlen("iree_hal_hip_stream_command_buffer"),
       /*name=*/NULL, 0);
@@ -214,7 +214,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
 
   IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 command_buffer->hip_stream, 1);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -230,7 +230,7 @@ static void iree_hal_hip_stream_command_buffer_begin_debug_group(
 
   IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, location ? location->file.data : NULL,
+      command_buffer->hip_stream, 1, location ? location->file.data : NULL,
       location ? location->file.size : 0, location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
 }
@@ -243,7 +243,7 @@ static void iree_hal_hip_stream_command_buffer_end_debug_group(
 
   IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 command_buffer->hip_stream, 1);
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
@@ -542,7 +542,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
 
   IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, kernel_info.source_filename.data,
+      command_buffer->hip_stream, 2, kernel_info.source_filename.data,
       kernel_info.source_filename.size, kernel_info.source_line,
       kernel_info.function_name.data, kernel_info.function_name.size,
       /*name=*/NULL, 0);
@@ -617,7 +617,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
 
   IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 command_buffer->hip_stream, 2);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
