@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "scatter_dynamic.mlir"
     "select.mlir"
+    "shape_assertion.mlir"
     "sine.mlir"
     "slice.mlir"
     "sort.mlir"
