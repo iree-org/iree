@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -20,10 +19,13 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_GENERALIZELINALGNAMEDOPSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 namespace {
 struct GeneralizeLinalgNamedOpsPass
-    : public GeneralizeLinalgNamedOpsBase<GeneralizeLinalgNamedOpsPass> {
-
+    : public impl::GeneralizeLinalgNamedOpsPassBase<
+          GeneralizeLinalgNamedOpsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -57,11 +59,6 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass() {
-  return std::make_unique<GeneralizeLinalgNamedOpsPass>();
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

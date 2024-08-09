@@ -32,8 +32,9 @@ util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : ten
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
-    %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
+    %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #encoding> {
   %0 = tensor.empty() : tensor<384x512xf32>
   %1 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map1],
                        iterator_types = ["parallel", "parallel"]}
@@ -44,8 +45,8 @@ util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x51
     %4 = arith.addf %3, %in_1 : f32
     linalg.yield %4 : f32
   } -> tensor<384x512xf32>
-  %2 = iree_encoding.set_encoding %1 : tensor<384x512xf32> -> tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
-  util.return %2 : tensor<384x512xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  %2 = iree_encoding.set_encoding %1 : tensor<384x512xf32> -> tensor<384x512xf32, #encoding>
+  util.return %2 : tensor<384x512xf32, #encoding>
 }
 // CHECK-LABEL: util.func public @elem_set_encoding
 // CHECK:         flow.dispatch.workgroups

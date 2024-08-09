@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -31,6 +30,9 @@ using namespace mlir;
 using transform_ext::StructuredOpMatcher;
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_RAISESPECIALOPSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -998,7 +1000,8 @@ public:
 // Pass Implementation
 //===----------------------------------------------------------------------===//
 
-struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
+struct RaiseSpecialOpsPass
+    : public impl::RaiseSpecialOpsPassBase<RaiseSpecialOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }
@@ -1054,9 +1057,4 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createRaiseSpecialOps() {
-  return std::make_unique<RaiseSpecialOpsPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

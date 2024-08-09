@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -101,10 +100,13 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_GLOBALLOOPINVARIANTCODEMOTIONPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 namespace {
 
 struct GlobalLoopInvariantCodeMotionPass
-    : public GlobalLoopInvariantCodeMotionBase<
+    : public impl::GlobalLoopInvariantCodeMotionPassBase<
           GlobalLoopInvariantCodeMotionPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -129,9 +131,4 @@ struct GlobalLoopInvariantCodeMotionPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGlobalLoopInvariantCodeMotionPass() {
-  return std::make_unique<GlobalLoopInvariantCodeMotionPass>();
-}
 } // namespace mlir::iree_compiler::GlobalOptimization

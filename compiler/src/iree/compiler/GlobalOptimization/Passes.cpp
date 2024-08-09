@@ -101,7 +101,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
-  mainPassManager.addPass(createEraseUnusedLinalgOperands());
+  mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
@@ -116,7 +116,7 @@ void buildGlobalOptimizationPassPipeline(
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
-      .addPass(createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOpsPass)
       // We decompose and transpose concatenations immediately before folding
       // unit extent dims because this allows decoupling unit dims in the
       // concatenation from the transposes that are introduced.
@@ -138,10 +138,8 @@ void buildGlobalOptimizationPassPipeline(
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);
       })
-      .addPass([&]() {
-        return createFuseDequantizationMatmulPass(
-            clEnableQuantizedMatmulReassociation);
-      })
+      .addPredicatedPass(clEnableQuantizedMatmulReassociation,
+                         createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Propagate transposes immediately before set encoding/data tiling
@@ -226,7 +224,7 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       // After running const-eval to a fixed point and folding unit extent dims,
       // try any new raising opportunities.
-      .addPass(createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOpsPass)
       // Strip std.assert & co after we perform optimizations; prior to this we
       // may use the assertions to derive information during analysis.
       .addPredicatedPass(transformOptions.options.stripAssertions,

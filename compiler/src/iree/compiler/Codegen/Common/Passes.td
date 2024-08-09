@@ -83,11 +83,9 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
     sub expression references values that are defined in the same loop scope.
     The sub expression are then stitched back together following the loop
     nest order.
-
     The goal of this pass is to break down `affine.apply` expressions such
     that the resulting sub expressions can be hoisted out in their respective
     loop.
-
     E.g., Let's say we have
     ```mlir
     %res = affine.apply
@@ -112,16 +110,20 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
     ```
     Now the sequence of instructions leading to and including
     `%inv1x32_plus_inv2` can be hoisted out of the loop.
-
     This pass requires `scf.for` structures to still be around otherwise
     the break down will be meaningless.
-
     Note: The decomposition performed by this pass will be undone by
     canonicalization. Make sure to lower the resulting ops before that.
   }];
   let dependentDialects = [
       "mlir::affine::AffineDialect"
   ];
+}
+
+def ConvolutionToIGEMMPass :
+    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Transforms convolution operations into an implicit GEMM format.";
 }
 
 def DecomposeConvolutionToLowerDimOpsPass :

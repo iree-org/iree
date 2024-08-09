@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -26,6 +25,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_DETACHELEMENTWISEFROMNAMEDOPSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -185,7 +187,7 @@ struct DetachSplatConstantOutsOperands
 };
 
 struct DetachElementwiseFromNamedOpsPass
-    : public DetachElementwiseFromNamedOpsBase<
+    : public impl::DetachElementwiseFromNamedOpsPassBase<
           DetachElementwiseFromNamedOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, linalg::LinalgDialect,
@@ -206,9 +208,4 @@ struct DetachElementwiseFromNamedOpsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass() {
-  return std::make_unique<DetachElementwiseFromNamedOpsPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

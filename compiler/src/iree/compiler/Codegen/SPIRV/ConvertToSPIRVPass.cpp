@@ -302,10 +302,10 @@ struct HALInterfaceLoadConstantConverter final
   }
 };
 
-/// A pattern to convert hal.interface.workgroup.id/count into corresponding
-/// SPIR-V Builtin ops.
+/// A pattern to convert hal.interface.workgroup.id/count/size into
+/// corresponding SPIR-V Builtin ops.
 template <typename InterfaceOpTy, spirv::BuiltIn builtin>
-struct HALInterfaceWorkgroupIdAndCountConverter final
+struct HALInterfaceWorkgroupOpsConverter final
     : OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
@@ -656,10 +656,12 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Add IREE HAL interface op conversions.
   patterns.add<
       HALInterfaceLoadConstantConverter,
-      HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
-      HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupIDOp,
+                                        spirv::BuiltIn::WorkgroupId>,
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupSizeOp,
+                                        spirv::BuiltIn::WorkgroupSize>,
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupCountOp,
+                                        spirv::BuiltIn::NumWorkgroups>>(
       typeConverter, context);
 
   // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops

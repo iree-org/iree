@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -13,6 +12,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_CONVERT1X1FILTERCONV2DTOMATMULPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -157,7 +159,7 @@ public:
 };
 
 struct Convert1X1FilterConv2DToMatmulPass
-    : public Convert1X1FilterConv2DToMatmulBase<
+    : public impl::Convert1X1FilterConv2DToMatmulPassBase<
           Convert1X1FilterConv2DToMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
@@ -176,9 +178,4 @@ struct Convert1X1FilterConv2DToMatmulPass
   }
 };
 } // namespace
-
-std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass() {
-  return std::make_unique<Convert1X1FilterConv2DToMatmulPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

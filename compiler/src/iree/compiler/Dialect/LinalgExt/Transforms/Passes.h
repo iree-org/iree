@@ -49,6 +49,12 @@ createDecomposeWinogradTransformPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertConv2DToIm2ColOpPass();
 
+// Patterns to convert linalg convolution ops into a gemm with an im2col
+// op and reshapes on the inputs.
+void populateConv2DToIm2colOpPatterns(
+    RewritePatternSet &patterns,
+    std::optional<std::function<bool(Operation *)>> controlFn = std::nullopt);
+
 // Creates a pass to convert linalg convolution ops into a sequence of
 // linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
 // tranformation.
