@@ -85,13 +85,6 @@ def get_test_shapes(shapes_id: ShapesId):
     raise ValueError(shapes_id)
 
 
-# Intentionally fixed seed! We want full reproducibility here, both across runs
-# and across machines.
-# Intentionally not shared with pseudorandom_generator_seed to limit the ways
-# in which shuffling testcases changes which random values are generated.
-local_pseudorandom_state = 1
-
-
 # Determines the shape of input and kernel tensors.
 @dataclasses.dataclass
 class TestInputTensorShapes:
