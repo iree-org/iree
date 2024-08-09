@@ -29,7 +29,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return failure();
   }
 
