@@ -124,11 +124,9 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   ];
 }
 
-def DecomposeConvolutionToLowerDimOps :
+def DecomposeConvolutionToLowerDimOpsPass :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
-  let constructor =
-  "mlir::iree_compiler::createDecomposeConvolutionToLowerDimOpsPass()";
 }
 
 def DecomposeLinalgGenericPass :

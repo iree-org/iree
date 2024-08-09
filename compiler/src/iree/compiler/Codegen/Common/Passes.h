@@ -88,9 +88,6 @@ createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims,
     linalg::DistributionMethod distributionMethod);
 
-// Decomposes high-D convolution ops into low-D ones.
-std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();
-
 // TODO(hanchung): Move it where it is defined (i.e., Codegen/LLVMGPU).
 // Extract address computations (including the ones with GPU instructions) into
 // their own separate instructions.
