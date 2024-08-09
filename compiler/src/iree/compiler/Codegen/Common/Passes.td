@@ -494,11 +494,9 @@ def TileAndDistributeToWorkgroupsPass :
   ];
 }
 
-def TransformDialectInterpreter :
+def TransformDialectInterpreterPass :
     Pass<"iree-transform-dialect-interpreter"> {
   let summary = "Pass to apply transform dialect operations.";
-  let constructor =
-    "mlir::iree_compiler::createTransformDialectInterpreterPass()";
   let description = [{
     This pass runs the transform dialect interpreter and applies the named
     sequence transformation specified by the provided name (defaults to
@@ -506,7 +504,7 @@ def TransformDialectInterpreter :
   }];
   let options = [
     Option<"entryPoint", "entry-point", "std::string",
-           /*default=*/[{"transform::TransformDialect::kTransformEntryPointSymbolName.str()"}],
+           /*default=*/"::mlir::transform::TransformDialect::kTransformEntryPointSymbolName.str()",
            "Entry point of the pass pipeline.">,
     Option<"libraryFileName", "library-file-name", "std::string",
            /*default=*/[{""}],

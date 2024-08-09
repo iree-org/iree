@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -79,14 +80,13 @@ createIREEComprehensiveBufferizePass(
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
 std::unique_ptr<Pass>
-createTransformDialectInterpreterPass(StringRef transformSequenceName = "");
+createTransformDialectInterpreterPass(StringRef transformSequenceName);
 
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims,
     linalg::DistributionMethod distributionMethod);
-
 
 // Decomposes high-D convolution ops into low-D ones.
 std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();

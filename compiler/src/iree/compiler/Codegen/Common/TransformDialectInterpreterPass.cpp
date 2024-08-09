@@ -13,6 +13,11 @@
 
 using namespace mlir;
 
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TRANSFORMDIALECTINTERPRETERPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 /// Pass declaration.
@@ -20,11 +25,14 @@ namespace {
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreterPass
-    : public iree_compiler::TransformDialectInterpreterBase<
+    : public impl::TransformDialectInterpreterPassBase<
           TransformDialectInterpreterPass> {
 public:
-  TransformDialectInterpreterPass(StringRef libraryFileName = StringRef(),
-                                  StringRef entryPoint = StringRef()) {
+  using impl::TransformDialectInterpreterPassBase<
+      TransformDialectInterpreterPass>::TransformDialectInterpreterPassBase;
+
+  TransformDialectInterpreterPass(StringRef libraryFileName,
+                                  StringRef entryPoint) {
     this->libraryFileName = libraryFileName.str();
     this->entryPoint = entryPoint.str();
   }
@@ -68,6 +76,7 @@ public:
   }
 };
 } // namespace
+} // namespace mlir::iree_compiler
 
 namespace mlir::iree_compiler {
 
