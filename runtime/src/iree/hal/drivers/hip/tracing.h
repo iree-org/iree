@@ -177,7 +177,7 @@ void iree_hal_hip_graph_tracing_zone_end_impl(
     context, event_list, out_node, graph, verbosity, dependency_nodes,        \
     dependency_nodes_count, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
-#define IREE_HIP_STREAM_TRACE_ZONE_END(context, evnet_list, stream)
+#define IREE_HIP_STREAM_TRACE_ZONE_END(context, evnet_list, stream, verbosity)
 #define IREE_HIP_GRAPH_TRACE_ZONE_END(context, event_list, out_node, graph, \
                                       verbosity, dependency_nodes,          \
                                       dependency_nodes_count)

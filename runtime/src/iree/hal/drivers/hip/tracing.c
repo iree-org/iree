@@ -502,6 +502,7 @@ void iree_hal_hip_graph_tracing_zone_end_impl(
 iree_status_t iree_hal_hip_tracing_context_allocate(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, hipStream_t stream,
+    iree_hal_hip_tracing_verbosity_t stream_tracing_verbosity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_hip_tracing_context_t** out_context) {
   *out_context = NULL;
