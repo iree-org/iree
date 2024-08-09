@@ -344,6 +344,14 @@ static iree_status_t iree_hal_hip_device_create_internal(
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
+    if (device->params.stream_tracing >= IREE_HAL_HIP_TRACING_VERBOSITY_MAX ||
+        device->params.stream_tracing < IREE_HAL_HIP_TRACING_VERBOSITY_OFF) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "invalid stream_tracing argument: expected to be between %d and %d",
+          IREE_HAL_HIP_TRACING_VERBOSITY_OFF,
+          IREE_HAL_HIP_TRACING_VERBOSITY_MAX);
+    }
     status = iree_hal_hip_tracing_context_allocate(
         device->hip_symbols, device->identifier, dispatch_stream,
         device->params.stream_tracing, &device->block_pool, host_allocator,

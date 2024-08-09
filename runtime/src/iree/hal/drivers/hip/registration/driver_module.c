@@ -185,12 +185,6 @@ static iree_status_t iree_hal_hip_driver_populate_options(
             "Option 'hip_tracing' expected to be int. Got: '%.*s'",
             (int)value.size, value.data);
       }
-      if (!(ivalue >= 0 && ivalue <= 3)) {
-        return iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_tracing' expected to be 0, 1, 2. Got: '%.*s'",
-            (int)value.size, value.data);
-      }
       device_params->stream_tracing = ivalue;
     } else if (iree_string_view_equal(key, key_hip_default_index)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {

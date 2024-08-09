@@ -83,10 +83,10 @@ iree_hal_hip_graph_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 static void iree_hip_graph_command_buffer_trace_zone_begin_external(
-    iree_hal_hip_graph_command_buffer_t* command_buffer, int32_t verbosity,
-    const char* file_name, size_t file_name_length, uint32_t line,
-    const char* function_name, size_t function_name_length, const char* name,
-    size_t name_length) {
+    iree_hal_hip_graph_command_buffer_t* command_buffer,
+    iree_hal_hip_tracing_verbosity_t verbosity, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length) {
   // Make sure there are no new nodes after the last barrier.
   // Work should start after the event.
   if (IREE_UNLIKELY(command_buffer->graph_node_count != 0)) {
@@ -111,7 +111,8 @@ static void iree_hip_graph_command_buffer_trace_zone_begin_external(
 }
 
 static void iree_hip_graph_command_buffer_trace_zone_end(
-    iree_hal_hip_graph_command_buffer_t* command_buffer, int32_t verbosity) {
+    iree_hal_hip_graph_command_buffer_t* command_buffer,
+    iree_hal_hip_tracing_verbosity_t verbosity) {
   // Make sure there are no new nodes after the last barrier.
   // Prior work should end before the tracing event is recorded.
   if (IREE_UNLIKELY(command_buffer->graph_node_count != 0)) {
@@ -344,7 +345,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin(
       "hipGraphCreate");
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, 1,
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_graph_command_buffer",
       strlen("iree_hal_hip_graph_command_buffer"),
       /*name=*/NULL, 0);
@@ -361,7 +362,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_end(
   IREE_RETURN_IF_ERROR(
       iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 1);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE);
 
   // Reset state used during recording.
   command_buffer->hip_barrier_node = NULL;
@@ -396,8 +398,9 @@ static void iree_hal_hip_graph_command_buffer_begin_debug_group(
 
   (void)command_buffer;
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, 1, location ? location->file.data : NULL,
-      location ? location->file.size : 0, location ? location->line : 0,
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE,
+      location ? location->file.data : NULL, location ? location->file.size : 0,
+      location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
 }
 
@@ -406,7 +409,8 @@ static void iree_hal_hip_graph_command_buffer_end_debug_group(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 1);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t
@@ -519,7 +523,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -557,7 +562,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
           dependency_count, &params),
       "hipGraphAddMemsetNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -573,7 +579,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
                             "cannot use graph-based command buffer");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -625,7 +632,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -641,7 +649,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
                             "cannot use graph-based command buffer");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -687,7 +696,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -791,9 +801,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
               executable, entry_point, &kernel_info));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, 2, kernel_info.source_filename.data,
-      kernel_info.source_filename.size, kernel_info.source_line,
-      kernel_info.function_name.data, kernel_info.function_name.size,
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size,
       /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -878,7 +889,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
           dependency_count, &params),
       "hipGraphAddKernelNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer, 2);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

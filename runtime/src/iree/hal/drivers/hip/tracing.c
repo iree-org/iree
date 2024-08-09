@@ -121,8 +121,8 @@ static iree_status_t iree_hal_hip_tracing_context_initial_calibration(
 iree_status_t iree_hal_hip_tracing_context_allocate(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, hipStream_t stream,
-    int32_t stream_tracing_verbosity, iree_arena_block_pool_t* block_pool,
-    iree_allocator_t host_allocator,
+    iree_hal_hip_tracing_verbosity_t stream_tracing_verbosity,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_hip_tracing_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(symbols);
@@ -429,7 +429,8 @@ static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
 void iree_hal_hip_stream_tracing_zone_begin_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
-    int32_t verbosity, const iree_tracing_location_t* src_loc) {
+    iree_hal_hip_tracing_verbosity_t verbosity,
+    const iree_tracing_location_t* src_loc) {
   if (!context) return;
   if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
@@ -440,9 +441,9 @@ void iree_hal_hip_stream_tracing_zone_begin_impl(
 void iree_hal_hip_stream_tracing_zone_begin_external_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
-    int32_t verbosity, const char* file_name, size_t file_name_length,
-    uint32_t line, const char* function_name, size_t function_name_length,
-    const char* name, size_t name_length) {
+    iree_hal_hip_tracing_verbosity_t verbosity, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length) {
   if (!context) return;
   if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
@@ -455,7 +456,8 @@ void iree_hal_hip_stream_tracing_zone_begin_external_impl(
 void iree_hal_hip_graph_tracing_zone_begin_external_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list,
-    hipGraphNode_t* out_node, hipGraph_t graph, int32_t verbosity,
+    hipGraphNode_t* out_node, hipGraph_t graph,
+    iree_hal_hip_tracing_verbosity_t verbosity,
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
@@ -473,7 +475,7 @@ void iree_hal_hip_graph_tracing_zone_begin_external_impl(
 void iree_hal_hip_stream_tracing_zone_end_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
-    int32_t verbosity) {
+    iree_hal_hip_tracing_verbosity_t verbosity) {
   if (!context) return;
   if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
@@ -484,7 +486,8 @@ void iree_hal_hip_stream_tracing_zone_end_impl(
 void iree_hal_hip_graph_tracing_zone_end_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list,
-    hipGraphNode_t* out_node, hipGraph_t graph, int32_t verbosity,
+    hipGraphNode_t* out_node, hipGraph_t graph,
+    iree_hal_hip_tracing_verbosity_t verbosity,
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count) {
   if (!context) return;
   if (verbosity > context->verbosity) return;
