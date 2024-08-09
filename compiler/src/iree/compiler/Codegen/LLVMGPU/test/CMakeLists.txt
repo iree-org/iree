@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
     "config_winograd.mlir"
+    "configure_tensor_layout.mlir"
     "configure_vector_layout.mlir"
     "conv_pipeline_test_cuda.mlir"
     "conv_pipeline_test_rocm.mlir"

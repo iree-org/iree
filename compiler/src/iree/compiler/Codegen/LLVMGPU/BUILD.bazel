@@ -95,6 +95,7 @@ iree_compiler_cc_library(
         "KernelConfig.cpp",
         "LLVMGPUCastAddressSpaceFunction.cpp",
         "LLVMGPUCastTypeToFitMMA.cpp",
+        "LLVMGPUConfigureTensorLayouts.cpp",
         "LLVMGPUConfigureVectorLayouts.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",

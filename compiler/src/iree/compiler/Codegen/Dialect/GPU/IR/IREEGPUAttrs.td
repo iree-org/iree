@@ -253,7 +253,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
     ::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface>>
-      getContractionLayout(::mlir::vector::ContractionOp contractOp) const;
+      getContractionLayout(::mlir::linalg::GenericOp contractOp) const;
   }];
 }
 

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/Support/Debug.h"
@@ -104,46 +105,41 @@ struct GPUVectorAllocPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    SmallVector<vector::ContractionOp> opsToPromote;
-    funcOp.walk([&](vector::ContractionOp op) {
-      // Today we only do promotion for certain contractions.
-      if (contractOpFilter(op))
+    SmallVector<IREE::VectorExt::ToLayoutOp> opsToPromote;
+    funcOp.walk([&](IREE::VectorExt::ToLayoutOp op) {
+      if (op->hasAttr("shared_memory_conversion")) {
         opsToPromote.push_back(op);
+      }
     });
-    for (vector::ContractionOp contractOp : opsToPromote) {
-      OpBuilder builder(contractOp);
+
+    for (IREE::VectorExt::ToLayoutOp op : opsToPromote) {
+      OpBuilder builder(op);
 
       // HACK: Until proper barrier placement is handled later we have to
       // synchronize explicitly in this pass.
 
       // Synchronize before the write to shared memory to avoid stepping over
       // reads in the previous iteration of a loop.
-      builder.create<gpu::BarrierOp>(contractOp->getLoc());
+      builder.create<gpu::BarrierOp>(op->getLoc());
 
       // Promote both of the input operands, excluding the accumulator.
-      OpOperand &lhs = contractOp.getLhsMutable();
-      FailureOr<Value> lhsRet =
-          allocateTensorForVector(builder, contractOp->getLoc(), lhs.get());
-      if (failed(lhsRet)) {
-        return signalPassFailure();
-      }
-
-      OpOperand &rhs = contractOp.getRhsMutable();
-      FailureOr<Value> rhsRet =
-          allocateTensorForVector(builder, contractOp->getLoc(), rhs.get());
-      if (failed(rhsRet)) {
+      OpOperand &operand = op.getInputMutable();
+      FailureOr<Value> ret =
+          allocateTensorForVector(builder, op->getLoc(), operand.get());
+      if (failed(ret)) {
         return signalPassFailure();
       }
 
       // Synchronize after the write to shared memory before we read from it.
-      builder.create<gpu::BarrierOp>(contractOp->getLoc());
+      builder.create<gpu::BarrierOp>(op->getLoc());
 
-      Value lhsVec =
-          readVectorFromTensor(builder, contractOp.getLhsType(), *lhsRet);
-      Value rhsVec =
-          readVectorFromTensor(builder, contractOp.getRhsType(), *rhsRet);
-      lhs.set(lhsVec);
-      rhs.set(rhsVec);
+      VectorType inputTy = cast<VectorType>(op.getType());
+      Value read = readVectorFromTensor(builder, inputTy, *ret);
+      operand.set(read);
+
+      // Remove the shared_memory_conversion attribute from the to_layout
+      // operation.
+      op->removeAttr("shared_memory_conversion");
     }
   }
 };
