@@ -140,7 +140,7 @@ set(CMAKE_CXX_FLAGS ${MY_FLAGS} ${CMAKE_CXX_FLAGS})
 Examples of how to setup the CMakeLists.txt and .cmake file:
 
 * [IREE RISC-V toolchain cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
-* [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
+* [IREE Bare-Metal Arm Sample](https://github.com/iree-org/iree-bare-metal-arm)
 * [IREE Bare-Metal RV32 Sample](https://github.com/AmbiML/iree-rv32-springbok)
 
 ## Bare-metal execution example
