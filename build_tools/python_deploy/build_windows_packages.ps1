@@ -72,6 +72,7 @@ function build_iree_runtime() {
 
 function build_iree_compiler() {
   param($python_version)
+  $env:IREE_TARGET_BACKEND_CUDA = "ON"
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/compiler/
 }
 

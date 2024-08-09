@@ -31,7 +31,7 @@ If `nvidia-smi` does not exist, you will need to
 Python packages are regularly published to
 [PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
 [Python Bindings](../../reference/bindings/python.md) page for more details.
-The core `iree-compiler` package includes the CUDA compiler:
+The core `iree-compiler` package includes the CUDA compiler (excluding MacOS packages):
 
 === "Stable releases"
 
