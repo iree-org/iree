@@ -44,6 +44,10 @@ void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
                                                  /*maxTransferRank=*/1);
   auto vectorTransferToSCFOptions =
       VectorTransferToSCFOptions().enableFullUnroll();
+  if (enableScalableLowerings) {
+    vectorTransferToSCFOptions.enableLowerScalable();
+  }
+
   populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
