@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -22,15 +21,15 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_OPTIMIZETENSORINSERTEXTRACTSLICESPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 class OptimizeTensorInsertExtractSlicesPass
-    : public OptimizeTensorInsertExtractSlicesBase<
+    : public impl::OptimizeTensorInsertExtractSlicesPassBase<
           OptimizeTensorInsertExtractSlicesPass> {
 public:
-  using OptimizeTensorInsertExtractSlicesBase::
-      OptimizeTensorInsertExtractSlicesBase;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
@@ -233,10 +232,4 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createOptimizeTensorInsertExtractSlicesPass() {
-  return std::make_unique<OptimizeTensorInsertExtractSlicesPass>();
-}
-
 } // namespace mlir::iree_compiler

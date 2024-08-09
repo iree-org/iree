@@ -4,9 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
-
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -18,7 +15,12 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
+
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_IREEEXPANDSTRIDEDMETADATAPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 /// Helper struct to return the offset, sizes and strides
@@ -243,7 +245,11 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
 };
 
 struct IREEExpandStridedMetadataPass
-    : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
+    : public impl::IREEExpandStridedMetadataPassBase<
+          IREEExpandStridedMetadataPass> {
+  using impl::IREEExpandStridedMetadataPassBase<
+      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
                     IREE::Codegen::IREECodegenDialect, memref::MemRefDialect>();
@@ -289,9 +295,4 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
     }
   }
 }
-
-std::unique_ptr<Pass> createIREEExpandStridedMetadataPass() {
-  return std::make_unique<IREEExpandStridedMetadataPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -181,7 +181,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Math dialect elementry functions -> polynomial form.
       .addPass(createPolynomialApproximationPass)
 
-      .addPass(createPadDynamicAlloc);
+      .addPass(createPadDynamicAllocPass);
 
   // Check to make sure we are not exceeding shared memory usage limit.
   auto getSharedMemoryLimit = [](mlir::FunctionOpInterface fn) {

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -13,10 +12,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_VECTORIZEMEMREFCOPYPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 struct VectorizeMemrefCopyPass
-    : public VectorizeMemrefCopyPassBase<VectorizeMemrefCopyPass> {
+    : public impl::VectorizeMemrefCopyPassBase<VectorizeMemrefCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, vector::VectorDialect>();
   }
@@ -31,9 +33,4 @@ struct VectorizeMemrefCopyPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createVectorizeMemrefCopyPass() {
-  return std::make_unique<VectorizeMemrefCopyPass>();
-}
-
 } // namespace mlir::iree_compiler

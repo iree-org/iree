@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -14,12 +13,17 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_ERASEDEADALLOCANDSTORESPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 class EraseDeadAllocAndStoresPass
-    : public EraseDeadAllocAndStoresBase<EraseDeadAllocAndStoresPass> {
+    : public impl::EraseDeadAllocAndStoresPassBase<
+          EraseDeadAllocAndStoresPass> {
 public:
-  using EraseDeadAllocAndStoresBase::EraseDeadAllocAndStoresBase;
+  using impl::EraseDeadAllocAndStoresPassBase<
+      EraseDeadAllocAndStoresPass>::EraseDeadAllocAndStoresPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
@@ -34,10 +38,4 @@ void EraseDeadAllocAndStoresPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createEraseDeadAllocAndStoresPass() {
-  return std::make_unique<EraseDeadAllocAndStoresPass>();
-}
-
 } // namespace mlir::iree_compiler

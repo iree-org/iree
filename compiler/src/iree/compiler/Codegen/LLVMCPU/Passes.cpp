@@ -401,7 +401,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
   }
 
   {
-    funcPassManager.addPass(createVectorizePadPass());
+    funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     if (pipelineOpt.decomposePackUnPackOps) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());
       funcPassManager.addPass(createCanonicalizerPass());
@@ -465,7 +465,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   }
 
   {
-    funcPassManager.addPass(createVectorizePadPass());
+    funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
@@ -481,7 +481,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
   }
 
   // Eliminate redundant transfer_read/write to avoid stack allocations.
-  funcPassManager.addPass(createOptimizeVectorTransferPass(/*flatten=*/true));
+  funcPassManager.addPass(createOptimizeVectorTransferPass(
+      OptimizeVectorTransferPassOptions{/*flatten=*/true}));
 
   addCPUBufferizePasses(funcPassManager);
 

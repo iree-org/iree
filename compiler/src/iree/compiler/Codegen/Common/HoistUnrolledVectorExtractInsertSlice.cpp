@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
@@ -21,6 +20,9 @@
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_HOISTUNROLLEDVECTOREXTRACTINSERTSLICEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Returns all the users of `srcTensor` if they are artifacts from vector
 /// unrolling. It is true only if
@@ -200,12 +202,9 @@ static scf::ForOp hoistUnrolledVectorExtractInsert(RewriterBase &rewriter,
 
 namespace {
 class HoistUnrolledVectorExtractInsertSlicePass
-    : public HoistUnrolledVectorExtractInsertSliceBase<
+    : public impl::HoistUnrolledVectorExtractInsertSlicePassBase<
           HoistUnrolledVectorExtractInsertSlicePass> {
 public:
-  using HoistUnrolledVectorExtractInsertSliceBase::
-      HoistUnrolledVectorExtractInsertSliceBase;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
@@ -231,10 +230,4 @@ void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
   }
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createHoistUnrolledVectorExtractInsertSlicePass() {
-  return std::make_unique<HoistUnrolledVectorExtractInsertSlicePass>();
-}
-
 } // namespace mlir::iree_compiler

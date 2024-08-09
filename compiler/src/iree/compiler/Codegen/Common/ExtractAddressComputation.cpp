@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/ExtractAddressComputation.h"
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -14,11 +13,12 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "extract-address-computation"
-
-using namespace mlir;
+#define DEBUG_TYPE "iree-codegen-extract-address-computation"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_EXTRACTADDRESSCOMPUTATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Helper functions for the `load base[off0...]`
@@ -97,7 +97,8 @@ void populateExtractAddressComputationPatterns(RewritePatternSet &patterns) {
 namespace {
 
 struct ExtractAddressComputationPass
-    : public ExtractAddressComputationBase<ExtractAddressComputationPass> {
+    : public impl::ExtractAddressComputationPassBase<
+          ExtractAddressComputationPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -109,9 +110,5 @@ void ExtractAddressComputationPass::runOnOperation() {
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<Pass> createExtractAddressComputationPass() {
-  return std::make_unique<ExtractAddressComputationPass>();
 }
 } // namespace mlir::iree_compiler

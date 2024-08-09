@@ -13,7 +13,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -24,6 +23,10 @@
 #define DEBUG_TYPE "iree-codegen-erase-hal-descriptor-type"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_ERASEHALDESCRIPTORTYPEFROMMEMREFPASS
+#define GEN_PASS_DEF_CONVERTHALDESCRIPTORTYPETOGPUADDRESSSPACEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -37,7 +40,7 @@ static bool isLegalType(Type type) {
 }
 
 struct EraseHALDescriptorTypeFromMemRefPass final
-    : public EraseHALDescriptorTypeFromMemRefBase<
+    : public impl::EraseHALDescriptorTypeFromMemRefPassBase<
           EraseHALDescriptorTypeFromMemRefPass> {
   void runOnOperation() override {
     AttrTypeReplacer replacer;
@@ -65,7 +68,7 @@ struct EraseHALDescriptorTypeFromMemRefPass final
 };
 
 struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
-    : public ConvertHALDescriptorTypeToGPUAddressSpaceBase<
+    : public impl::ConvertHALDescriptorTypeToGPUAddressSpacePassBase<
           ConvertHALDescriptorTypeToGPUAddressSpacePass> {
   void runOnOperation() override {
     AttrTypeReplacer replacer;
@@ -96,13 +99,4 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createEraseHALDescriptorTypeFromMemRefPass() {
-  return std::make_unique<EraseHALDescriptorTypeFromMemRefPass>();
-}
-
-std::unique_ptr<Pass> createConvertHALDescriptorTypeToGPUAddressSpacePass() {
-  return std::make_unique<ConvertHALDescriptorTypeToGPUAddressSpacePass>();
-}
-
 } // namespace mlir::iree_compiler

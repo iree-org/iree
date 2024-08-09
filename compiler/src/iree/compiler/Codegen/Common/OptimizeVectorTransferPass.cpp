@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -24,6 +23,9 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_OPTIMIZEVECTORTRANSFERPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -60,8 +62,10 @@ static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
 }
 
 struct OptimizeVectorTransferPass
-    : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
-  OptimizeVectorTransferPass(bool flatten) : flatten(flatten) {}
+    : public impl::OptimizeVectorTransferPassBase<OptimizeVectorTransferPass> {
+  using impl::OptimizeVectorTransferPassBase<
+      OptimizeVectorTransferPass>::OptimizeVectorTransferPassBase;
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     LDBG("before optimize vector transfer\n" << funcOp);
@@ -119,29 +123,7 @@ struct OptimizeVectorTransferPass
     memref::eraseDeadAllocAndStores(rewriter, funcOp);
     LDBG("after erasing unused allocs and stores\n" << funcOp);
   }
-
-  LogicalResult initializeOptions(
-      StringRef options,
-      function_ref<LogicalResult(const Twine &)> errorHandler) override {
-    if (failed(Pass::initializeOptions(options, errorHandler))) {
-      return failure();
-    }
-    // `flatten` may have been set to `true` in the constructor already.
-    // The |= is so we preserve that rather than overwrite it with the default
-    // value `false` of `optionFlatten`.
-    flatten |= optionFlatten;
-    return success();
-  }
-
-private:
-  bool flatten;
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createOptimizeVectorTransferPass(bool flatten) {
-  return std::make_unique<OptimizeVectorTransferPass>(flatten);
-}
-
 } // namespace mlir::iree_compiler

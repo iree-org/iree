@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -21,6 +20,9 @@
 #define DEBUG_TYPE "iree-codegen-remove-trivial-loops"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_REMOVESINGLEITERATIONLOOPPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Converts a symbolic GPU processor dimension to its numeric one.
 static unsigned dimToIndex(gpu::Dimension dim) {
@@ -111,7 +113,8 @@ static LogicalResult removeOneTripTiledLoops(mlir::FunctionOpInterface funcOp,
 namespace {
 
 class RemoveSingleIterationLoopPass final
-    : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
+    : public impl::RemoveSingleIterationLoopPassBase<
+          RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
 
@@ -129,10 +132,4 @@ class RemoveSingleIterationLoopPass final
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createRemoveSingleIterationLoopPass() {
-  return std::make_unique<RemoveSingleIterationLoopPass>();
-}
-
 } // namespace mlir::iree_compiler

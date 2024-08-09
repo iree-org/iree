@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -16,6 +15,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_FOROPCANONICALIZATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -288,7 +290,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 };
 
 struct ForOpCanonicalizationPass
-    : public ForOpCanonicalizationBase<ForOpCanonicalizationPass> {
+    : public impl::ForOpCanonicalizationPassBase<ForOpCanonicalizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
@@ -312,10 +314,4 @@ struct ForOpCanonicalizationPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createForOpCanonicalizationPass() {
-  return std::make_unique<ForOpCanonicalizationPass>();
-}
-
 } // namespace mlir::iree_compiler

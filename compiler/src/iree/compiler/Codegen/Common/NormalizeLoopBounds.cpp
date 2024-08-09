@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -17,6 +16,9 @@
 #define DEBUG_TYPE "iree-codegen-normalize-loop-bounds"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_NORMALIZELOOPBOUNDSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 static OpFoldResult emitNormalizedUpperBound(RewriterBase &rewriter,
                                              Location loc, OpFoldResult lb,
@@ -166,9 +168,10 @@ static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 
 namespace {
 struct NormalizeLoopBoundsPass
-    : public NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
-  NormalizeLoopBoundsPass(bool nFor, bool nForall)
-      : normalizeFor(nFor), normalizeForall(nForall) {}
+    : public impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
+  using impl::NormalizeLoopBoundsPassBase<
+      NormalizeLoopBoundsPass>::NormalizeLoopBoundsPassBase;
+
   void runOnOperation() override {
     Operation *op = getOperation();
     IRRewriter rewriter(op);
@@ -183,17 +186,6 @@ struct NormalizeLoopBoundsPass
       });
     }
   }
-
-private:
-  bool normalizeFor;
-  bool normalizeForall;
 };
 } // namespace
-
-std::unique_ptr<Pass> createNormalizeLoopBoundsPass(bool normalizeFor,
-                                                    bool normalizeForall) {
-  return std::make_unique<NormalizeLoopBoundsPass>(normalizeFor,
-                                                   normalizeForall);
-}
-
 } // namespace mlir::iree_compiler

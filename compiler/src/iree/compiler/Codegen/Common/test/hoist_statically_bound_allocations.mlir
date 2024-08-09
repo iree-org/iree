@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations{vscale-min=1 vscale-max=16}))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations{vscale-max=0}))" %s | FileCheck %s --check-prefix=CHECK-UNBOUNDED-VSCALE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-statically-bound-allocations{vscale-min=1 vscale-max=16}))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-statically-bound-allocations{vscale-max=0}))" %s | FileCheck %s --check-prefix=CHECK-UNBOUNDED-VSCALE
 
 // Note: Scalable allocations are not hoisted if vscale is unbounded.
 

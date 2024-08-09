@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_DECOMPOSECONVOLUTIONTOLOWERDIMOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -121,7 +123,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
 }
 
 class DecomposeConvolutionToLowerDimOpsPass
-    : public DecomposeConvolutionToLowerDimOpsBase<
+    : public impl::DecomposeConvolutionToLowerDimOpsPassBase<
           DecomposeConvolutionToLowerDimOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, linalg::LinalgDialect>();
@@ -169,9 +171,4 @@ class DecomposeConvolutionToLowerDimOpsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass() {
-  return std::make_unique<DecomposeConvolutionToLowerDimOpsPass>();
-}
-
 } // namespace mlir::iree_compiler

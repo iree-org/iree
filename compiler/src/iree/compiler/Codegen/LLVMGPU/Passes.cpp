@@ -341,7 +341,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
 
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
-      /*normalizeFor=*/false, /*normalizeForall=*/true));
+      NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,
+                                     /*normalizeForall=*/true}));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
@@ -973,7 +974,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
       // Pad allocations with dynamic dimension after linalg lowering but before
       // lowering SCF and affine ops.
-      .addPass(createPadDynamicAlloc)
+      .addPass(createPadDynamicAllocPass)
 
       .addPass(createLowerAffinePass)
       .addPass(createCanonicalizerPass)
