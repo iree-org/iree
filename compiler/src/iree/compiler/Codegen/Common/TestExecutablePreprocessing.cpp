@@ -16,8 +16,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct TestExecutablePreprocessingPass
-    : public impl::TestExecutablePreprocessingPassBase<
+struct TestExecutablePreprocessingPass final
+    : impl::TestExecutablePreprocessingPassBase<
           TestExecutablePreprocessingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();

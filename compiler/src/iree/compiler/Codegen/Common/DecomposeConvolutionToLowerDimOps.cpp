@@ -122,7 +122,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
       loweringConfigAttr.value().getNativeVectorSize());
 }
 
-class DecomposeConvolutionToLowerDimOpsPass
+class DecomposeConvolutionToLowerDimOpsPass final
     : public impl::DecomposeConvolutionToLowerDimOpsPassBase<
           DecomposeConvolutionToLowerDimOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {

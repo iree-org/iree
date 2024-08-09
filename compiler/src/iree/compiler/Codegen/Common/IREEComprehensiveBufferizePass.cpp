@@ -72,7 +72,7 @@ static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
 }
 
 namespace {
-class EliminateEmptyTensorsPass
+class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -83,7 +83,7 @@ public:
 };
 
 /// Pass to convert from tensor based ops to memref based ops.
-class IREEComprehensiveBufferizePass
+class IREEComprehensiveBufferizePass final
     : public impl::IREEComprehensiveBufferizePassBase<
           IREEComprehensiveBufferizePass> {
 public:

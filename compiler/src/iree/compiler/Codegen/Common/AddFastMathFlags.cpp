@@ -30,8 +30,8 @@ namespace {
 /// Add the corresponding fast-math flags to operations given a floating-point
 /// optimization mode.
 // TODO: For now we only allow default flags, such as arithmetic reassociation.
-struct AddFastMathFlagsPass
-    : public impl::AddFastMathFlagsPassBase<AddFastMathFlagsPass> {
+struct AddFastMathFlagsPass final
+    : impl::AddFastMathFlagsPassBase<AddFastMathFlagsPass> {
 public:
   using impl::AddFastMathFlagsPassBase<
       AddFastMathFlagsPass>::AddFastMathFlagsPassBase;

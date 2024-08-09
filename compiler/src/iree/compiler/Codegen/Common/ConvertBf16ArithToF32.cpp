@@ -237,8 +237,8 @@ struct PromoteBF16ToF32Converter
   }
 };
 
-struct ConvertBf16ArithToF32Pass
-    : public impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
+struct ConvertBf16ArithToF32Pass final
+    : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
   using impl::ConvertBf16ArithToF32PassBase<
       ConvertBf16ArithToF32Pass>::ConvertBf16ArithToF32PassBase;
   void runOnOperation() override {

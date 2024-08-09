@@ -289,8 +289,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
   }
 };
 
-struct ForOpCanonicalizationPass
-    : public impl::ForOpCanonicalizationPassBase<ForOpCanonicalizationPass> {
+struct ForOpCanonicalizationPass final
+    : impl::ForOpCanonicalizationPassBase<ForOpCanonicalizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }

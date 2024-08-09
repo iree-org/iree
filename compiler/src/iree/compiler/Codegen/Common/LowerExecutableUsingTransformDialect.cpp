@@ -13,7 +13,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-class LowerExecutableUsingTransformDialectPass
+class LowerExecutableUsingTransformDialectPass final
     : public impl::LowerExecutableUsingTransformDialectPassBase<
           LowerExecutableUsingTransformDialectPass> {
 public:

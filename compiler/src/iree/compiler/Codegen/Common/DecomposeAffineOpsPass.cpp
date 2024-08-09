@@ -15,8 +15,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct DecomposeAffineOpsPass
-    : public impl::DecomposeAffineOpsPassBase<DecomposeAffineOpsPass> {
+struct DecomposeAffineOpsPass final
+    : impl::DecomposeAffineOpsPassBase<DecomposeAffineOpsPass> {
   void runOnOperation() override;
 };
 

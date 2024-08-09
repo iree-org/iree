@@ -262,8 +262,8 @@ static LogicalResult lowerWorkgroupCount(
 
 namespace {
 
-struct TileAndDistributeToWorkgroupsPass
-    : public impl::TileAndDistributeToWorkgroupsPassBase<
+struct TileAndDistributeToWorkgroupsPass final
+    : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
   using impl::TileAndDistributeToWorkgroupsPassBase<
       TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;

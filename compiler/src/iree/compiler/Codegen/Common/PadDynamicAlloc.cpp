@@ -78,8 +78,8 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
 
 namespace {
 
-struct PadDynamicAllocPass
-    : public impl::PadDynamicAllocPassBase<PadDynamicAllocPass> {
+struct PadDynamicAllocPass final
+    : impl::PadDynamicAllocPassBase<PadDynamicAllocPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();

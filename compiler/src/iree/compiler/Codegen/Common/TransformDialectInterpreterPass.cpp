@@ -23,7 +23,7 @@ namespace {
 /// Interpreter pass that applies transform dialect ops for codegen.
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
-class TransformDialectInterpreterPass
+class TransformDialectInterpreterPass final
     : public impl::TransformDialectInterpreterPassBase<
           TransformDialectInterpreterPass> {
 public:

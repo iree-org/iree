@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class DecomposeLinalgGenericPass
+class DecomposeLinalgGenericPass final
     : public impl::DecomposeLinalgGenericPassBase<DecomposeLinalgGenericPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, linalg::LinalgDialect>();

@@ -99,8 +99,8 @@ static void populateIreeNarrowTypeEmulationPatterns(
 // Pass Definition
 //===----------------------------------------------------------------------===//
 
-struct EmulateNarrowTypePass
-    : public impl::EmulateNarrowTypePassBase<EmulateNarrowTypePass> {
+struct EmulateNarrowTypePass final
+    : impl::EmulateNarrowTypePassBase<EmulateNarrowTypePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, func::FuncDialect,
                     memref::MemRefDialect, vector::VectorDialect,

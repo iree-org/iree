@@ -23,9 +23,8 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
-struct MaterializeEncodingIntoNopPass
-    : public impl::MaterializeEncodingIntoNopPassBase<
-          MaterializeEncodingIntoNopPass> {
+struct MaterializeEncodingIntoNopPass final
+    : impl::MaterializeEncodingIntoNopPassBase<MaterializeEncodingIntoNopPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }

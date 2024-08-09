@@ -96,9 +96,8 @@ void populateExtractAddressComputationPatterns(RewritePatternSet &patterns) {
 //===----------------------------------------------------------------------===//
 namespace {
 
-struct ExtractAddressComputationPass
-    : public impl::ExtractAddressComputationPassBase<
-          ExtractAddressComputationPass> {
+struct ExtractAddressComputationPass final
+    : impl::ExtractAddressComputationPassBase<ExtractAddressComputationPass> {
   void runOnOperation() override;
 };
 } // namespace

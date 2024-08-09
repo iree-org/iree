@@ -570,8 +570,8 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
   }
 };
 
-struct TypePropagationPass
-    : public impl::TypePropagationPassBase<TypePropagationPass> {
+struct TypePropagationPass final
+    : impl::TypePropagationPassBase<TypePropagationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
   }

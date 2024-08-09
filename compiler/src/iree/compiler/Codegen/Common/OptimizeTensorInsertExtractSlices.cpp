@@ -26,7 +26,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class OptimizeTensorInsertExtractSlicesPass
+class OptimizeTensorInsertExtractSlicesPass final
     : public impl::OptimizeTensorInsertExtractSlicesPassBase<
           OptimizeTensorInsertExtractSlicesPass> {
 public:

@@ -312,7 +312,7 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
-class GenericVectorizationPass
+class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
   using impl::GenericVectorizationPassBase<

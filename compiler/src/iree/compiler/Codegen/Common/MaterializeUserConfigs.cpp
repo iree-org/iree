@@ -69,8 +69,8 @@ runTransformConfigurationStrategy(Operation *payloadRoot,
   return StrategyRunResult::Success;
 }
 
-struct MaterializeUserConfigsPass
-    : public impl::MaterializeUserConfigsPassBase<MaterializeUserConfigsPass> {
+struct MaterializeUserConfigsPass final
+    : impl::MaterializeUserConfigsPassBase<MaterializeUserConfigsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registerTransformDialectTranslationDependentDialects(registry);
   }

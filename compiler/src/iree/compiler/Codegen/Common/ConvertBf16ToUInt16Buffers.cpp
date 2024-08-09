@@ -252,8 +252,7 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
 //===----------------------------------------------------------------------===//
 
 struct ConvertBf16ToUInt16BuffersPass final
-    : public impl::ConvertBf16ToUInt16BuffersPassBase<
-          ConvertBf16ToUInt16BuffersPass> {
+    : impl::ConvertBf16ToUInt16BuffersPassBase<ConvertBf16ToUInt16BuffersPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }

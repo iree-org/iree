@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class EraseDeadAllocAndStoresPass
+class EraseDeadAllocAndStoresPass final
     : public impl::EraseDeadAllocAndStoresPassBase<
           EraseDeadAllocAndStoresPass> {
 public:

@@ -31,8 +31,8 @@ namespace mlir::iree_compiler {
 namespace {
 
 /// Runs canonicalization patterns on interface load/store ops.
-struct CleanupBufferAllocViewPass
-    : public impl::CleanupBufferAllocViewPassBase<CleanupBufferAllocViewPass> {
+struct CleanupBufferAllocViewPass final
+    : impl::CleanupBufferAllocViewPassBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateReshapeToInterfaceTensorPatterns(patterns);

@@ -26,7 +26,7 @@ static llvm::cl::opt<bool> clNativeMathPrecision(
 namespace {
 
 /// math dialect elementry functions -> polynomial form.
-class PolynomialApproximationPass
+class PolynomialApproximationPass final
     : public impl::PolynomialApproximationPassBase<
           PolynomialApproximationPass> {
   void runOnOperation() override {

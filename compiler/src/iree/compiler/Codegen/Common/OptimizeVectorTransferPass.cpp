@@ -61,8 +61,8 @@ static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
       [&](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
 }
 
-struct OptimizeVectorTransferPass
-    : public impl::OptimizeVectorTransferPassBase<OptimizeVectorTransferPass> {
+struct OptimizeVectorTransferPass final
+    : impl::OptimizeVectorTransferPassBase<OptimizeVectorTransferPass> {
   using impl::OptimizeVectorTransferPassBase<
       OptimizeVectorTransferPass>::OptimizeVectorTransferPassBase;
 

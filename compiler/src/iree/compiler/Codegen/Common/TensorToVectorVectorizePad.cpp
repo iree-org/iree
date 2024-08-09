@@ -231,9 +231,8 @@ struct VectorizePadWithConditions final
   }
 };
 
-struct TensorToVectorVectorizePadPass
-    : public impl::TensorToVectorVectorizePadPassBase<
-          TensorToVectorVectorizePadPass> {
+struct TensorToVectorVectorizePadPass final
+    : impl::TensorToVectorVectorizePadPassBase<TensorToVectorVectorizePadPass> {
   using impl::TensorToVectorVectorizePadPassBase<
       TensorToVectorVectorizePadPass>::TensorToVectorVectorizePadPassBase;
 

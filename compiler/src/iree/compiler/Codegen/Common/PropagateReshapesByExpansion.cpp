@@ -17,8 +17,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct PropagateReshapesByExpansionPass
-    : public impl::PropagateReshapesByExpansionPassBase<
+struct PropagateReshapesByExpansionPass final
+    : impl::PropagateReshapesByExpansionPassBase<
           PropagateReshapesByExpansionPass> {
   void runOnOperation() override;
 };

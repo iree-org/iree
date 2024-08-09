@@ -156,7 +156,7 @@ private:
 };
 
 struct FoldAffineMinInDistributedLoopsPass final
-    : public impl::FoldAffineMinInDistributedLoopsPassBase<
+    : impl::FoldAffineMinInDistributedLoopsPassBase<
           FoldAffineMinInDistributedLoopsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());

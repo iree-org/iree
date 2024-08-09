@@ -36,8 +36,8 @@ namespace {
 
 /// Pass to bufferize early copy-only dispatches. This allows backends
 /// to use the `linalg.generic` operation generated for lowering the dispatch.
-struct BufferizeCopyOnlyDispatchesPass
-    : public impl::BufferizeCopyOnlyDispatchesPassBase<
+struct BufferizeCopyOnlyDispatchesPass final
+    : impl::BufferizeCopyOnlyDispatchesPassBase<
           BufferizeCopyOnlyDispatchesPass> {
   using impl::BufferizeCopyOnlyDispatchesPassBase<
       BufferizeCopyOnlyDispatchesPass>::BufferizeCopyOnlyDispatchesPassBase;

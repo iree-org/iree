@@ -51,7 +51,7 @@ namespace {
 /// In theory this could live upstream, but given that there is disagreement
 /// about the validity of `tensor_to_memref` usage/canonicalizations, keeping
 /// this pattern here.
-class FoldTensorExtractOpPass
+class FoldTensorExtractOpPass final
     : public impl::FoldTensorExtractOpPassBase<FoldTensorExtractOpPass> {
   void runOnOperation() override;
 };

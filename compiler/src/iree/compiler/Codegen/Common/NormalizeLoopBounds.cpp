@@ -167,8 +167,8 @@ static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 }
 
 namespace {
-struct NormalizeLoopBoundsPass
-    : public impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
+struct NormalizeLoopBoundsPass final
+    : impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
   using impl::NormalizeLoopBoundsPassBase<
       NormalizeLoopBoundsPass>::NormalizeLoopBoundsPassBase;
 

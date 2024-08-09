@@ -201,7 +201,7 @@ static scf::ForOp hoistUnrolledVectorExtractInsert(RewriterBase &rewriter,
 }
 
 namespace {
-class HoistUnrolledVectorExtractInsertSlicePass
+class HoistUnrolledVectorExtractInsertSlicePass final
     : public impl::HoistUnrolledVectorExtractInsertSlicePassBase<
           HoistUnrolledVectorExtractInsertSlicePass> {
 public:

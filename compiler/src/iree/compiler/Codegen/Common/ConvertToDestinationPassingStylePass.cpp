@@ -51,7 +51,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-class ConvertToDestinationPassingStylePass
+class ConvertToDestinationPassingStylePass final
     : public impl::ConvertToDestinationPassingStylePassBase<
           ConvertToDestinationPassingStylePass> {
 public:

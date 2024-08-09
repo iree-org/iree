@@ -32,8 +32,8 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
   }
 };
 
-struct MemrefCopyToLinalgPass
-    : public impl::MemrefCopyToLinalgPassBase<MemrefCopyToLinalgPass> {
+struct MemrefCopyToLinalgPass final
+    : impl::MemrefCopyToLinalgPassBase<MemrefCopyToLinalgPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }

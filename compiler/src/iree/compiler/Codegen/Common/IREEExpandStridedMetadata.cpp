@@ -244,9 +244,8 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
   }
 };
 
-struct IREEExpandStridedMetadataPass
-    : public impl::IREEExpandStridedMetadataPassBase<
-          IREEExpandStridedMetadataPass> {
+struct IREEExpandStridedMetadataPass final
+    : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
   using impl::IREEExpandStridedMetadataPassBase<
       IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
 

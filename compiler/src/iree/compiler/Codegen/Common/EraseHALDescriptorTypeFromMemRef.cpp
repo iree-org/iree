@@ -40,7 +40,7 @@ static bool isLegalType(Type type) {
 }
 
 struct EraseHALDescriptorTypeFromMemRefPass final
-    : public impl::EraseHALDescriptorTypeFromMemRefPassBase<
+    : impl::EraseHALDescriptorTypeFromMemRefPassBase<
           EraseHALDescriptorTypeFromMemRefPass> {
   void runOnOperation() override {
     AttrTypeReplacer replacer;
@@ -68,7 +68,7 @@ struct EraseHALDescriptorTypeFromMemRefPass final
 };
 
 struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
-    : public impl::ConvertHALDescriptorTypeToGPUAddressSpacePassBase<
+    : impl::ConvertHALDescriptorTypeToGPUAddressSpacePassBase<
           ConvertHALDescriptorTypeToGPUAddressSpacePass> {
   void runOnOperation() override {
     AttrTypeReplacer replacer;

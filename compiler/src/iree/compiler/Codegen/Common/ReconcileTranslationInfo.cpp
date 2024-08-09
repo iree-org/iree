@@ -24,7 +24,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-class ReconcileTranslationInfoPass
+class ReconcileTranslationInfoPass final
     : public impl::ReconcileTranslationInfoPassBase<
           ReconcileTranslationInfoPass> {
 public:

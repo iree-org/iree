@@ -63,9 +63,8 @@ struct RematerializeParallelOpsPattern
   }
 };
 
-struct RematerializeParallelOpsPass
-    : public impl::RematerializeParallelOpsPassBase<
-          RematerializeParallelOpsPass> {
+struct RematerializeParallelOpsPass final
+    : impl::RematerializeParallelOpsPassBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());

@@ -20,9 +20,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct SplitFullPartialTransferPass
-    : public impl::SplitFullPartialTransferPassBase<
-          SplitFullPartialTransferPass> {
+struct SplitFullPartialTransferPass final
+    : impl::SplitFullPartialTransferPassBase<SplitFullPartialTransferPass> {
   using impl::SplitFullPartialTransferPassBase<
       SplitFullPartialTransferPass>::SplitFullPartialTransferPassBase;
 

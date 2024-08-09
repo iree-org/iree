@@ -47,8 +47,8 @@ struct TestPartitionableLoopsInterfacePattern
   }
 };
 
-struct TestPartitionableLoopsInterfacePass
-    : public impl::TestPartitionableLoopsInterfacePassBase<
+struct TestPartitionableLoopsInterfacePass final
+    : impl::TestPartitionableLoopsInterfacePassBase<
           TestPartitionableLoopsInterfacePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();

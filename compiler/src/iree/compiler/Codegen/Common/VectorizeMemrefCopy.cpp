@@ -17,8 +17,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct VectorizeMemrefCopyPass
-    : public impl::VectorizeMemrefCopyPassBase<VectorizeMemrefCopyPass> {
+struct VectorizeMemrefCopyPass final
+    : impl::VectorizeMemrefCopyPassBase<VectorizeMemrefCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, vector::VectorDialect>();
   }

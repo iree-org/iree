@@ -64,8 +64,8 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-struct DecomposePackUnPackOpsPass
-    : public impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
+struct DecomposePackUnPackOpsPass final
+    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
   using impl::DecomposePackUnPackOpsPassBase<
       DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
   explicit DecomposePackUnPackOpsPass(bool tileOuterToOne) {

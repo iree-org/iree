@@ -64,8 +64,8 @@ struct BubbleUpAcrossCastOp
   }
 };
 
-struct BubbleUpOrdinalOpsPass
-    : public impl::BubbleUpOrdinalOpsPassBase<BubbleUpOrdinalOpsPass> {
+struct BubbleUpOrdinalOpsPass final
+    : impl::BubbleUpOrdinalOpsPassBase<BubbleUpOrdinalOpsPass> {
   void runOnOperation() override;
 };
 } // namespace
