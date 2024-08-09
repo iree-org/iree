@@ -68,3 +68,22 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/vm:cc",
     ],
 )
+
+iree_runtime_cc_binary(
+    name = "iree-e2e-attention-test",
+    srcs = ["iree-e2e-attention-test.cc"],
+    deps = [
+        ":e2e_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:path",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/tooling:context_util",
+        "//runtime/src/iree/tooling:device_util",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
+    ],
+)
