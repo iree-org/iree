@@ -50,7 +50,7 @@ static int shapedTypeStaticSize(
 }
 
 /// Returns success if the total shared memory allocation size is less than the
-/// limit set by limit.
+/// limit.
 static LogicalResult checkGPUAllocationSize(
     mlir::FunctionOpInterface funcOp, unsigned limit,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
@@ -93,15 +93,13 @@ class GPUCheckResourceUsagePass final
     : public impl::GPUCheckResourceUsagePassBase<GPUCheckResourceUsagePass> {
 public:
   explicit GPUCheckResourceUsagePass(
-      std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit,
       std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth)
-      : getSharedMemoryLimit(getSharedMemoryLimit),
-        getIndexBitwidth(getIndexBitwidth) {}
+      : getIndexBitwidth(getIndexBitwidth) {}
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    unsigned limit =
-        getSharedMemoryLimit ? getSharedMemoryLimit(funcOp) : 64 * 1024;
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    unsigned limit = target.getWgp().getMaxWorkgroupMemoryBytes();
     if (failed(checkGPUAllocationSize(funcOp, limit,
                                       getIndexBitwidth
                                           ? getIndexBitwidth
@@ -111,7 +109,6 @@ public:
   }
 
 private:
-  std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit;
   std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth;
 };
 
@@ -119,10 +116,8 @@ private:
 
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createGPUCheckResourceUsagePass(
-    std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
-  return std::make_unique<GPUCheckResourceUsagePass>(getSharedMemoryLimit,
-                                                     getIndexBitwidth);
+  return std::make_unique<GPUCheckResourceUsagePass>(getIndexBitwidth);
 }
 
 } // namespace mlir::iree_compiler
