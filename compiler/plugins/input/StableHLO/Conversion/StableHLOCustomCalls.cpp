@@ -229,8 +229,7 @@ struct ShapeAssertionDrop final
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const final {
     if (op.getCallTargetName() != "shape_assertion") {
-      return rewriter.notifyMatchFailure(
-          op, "not shape_assertion");
+      return rewriter.notifyMatchFailure(op, "not shape_assertion");
     }
     rewriter.eraseOp(op);
     return success();
