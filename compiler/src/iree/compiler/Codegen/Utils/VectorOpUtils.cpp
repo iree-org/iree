@@ -52,6 +52,10 @@ VectorContractOpInfo::inferFromIndexingMaps(ArrayRef<AffineMap> maps) {
   opInfo.lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
   opInfo.rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
 
+  opInfo.lhsUnitDims = maps[0].getBroadcastDims();
+  opInfo.rhsUnitDims = maps[1].getBroadcastDims();
+  opInfo.accUnitDims = maps[2].getBroadcastDims();
+
   opInfo.contractionDims = contractionDims;
 
   return opInfo;

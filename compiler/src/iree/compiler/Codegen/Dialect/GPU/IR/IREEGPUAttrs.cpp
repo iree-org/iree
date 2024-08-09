@@ -974,14 +974,8 @@ NestedLayoutAttr createNestedLayout(MLIRContext *context, int64_t rank,
 FailureOr<std::tuple<VectorExt::VectorLayoutInterface,
                      VectorExt::VectorLayoutInterface,
                      VectorExt::VectorLayoutInterface>>
-MMAScheduleAttr::getContractionLayout(linalg::LinalgOp contractOp) const {
-  auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
-      contractOp.getIndexingMapsArray());
-  if (failed(maybeOpInfo)) {
-    return failure();
-  }
-  VectorContractOpInfo opInfo = maybeOpInfo.value();
-
+MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
+                                      linalg::LinalgOp contractOp) const {
   LLVM_DEBUG({
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";

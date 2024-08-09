@@ -820,6 +820,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  // Set anchors at tensor level for vector distribution later.
+  funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
+
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
   // be safely dropped. This additionally allows vectorization of convolution to
@@ -829,14 +832,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   if (!usePadToModelSharedMemcpy) {
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
+    funcPassManager.addPass(
+        IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
 
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-  // Set anchors at tensor level for vector distribution later.
-  funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
 
   // Linalg -> Vector
   addGPUVectorizationPasses(funcPassManager);
