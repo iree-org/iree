@@ -349,10 +349,8 @@ void reorderTranspose(RewriterBase &rewriter,
   }
 }
 
-/// Insert barriers and wait operations if there are allocs of a different alias
-/// group before the given alloc.
-static void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
-                       ArrayRef<Operation *> aliasGroup) {
+void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
+                ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies) {
   Block *entryBlock = &(*funcOp.getBlocks().begin());
   bool needBarrier = false;
   if (alloc->getBlock() != entryBlock) {
@@ -375,7 +373,6 @@ static void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
     return;
   OpBuilder builder(alloc);
   // TODO: make it a option if needed.
-  bool hasAsyncCopies = true;
   if (hasAsyncCopies) {
     Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
         funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
