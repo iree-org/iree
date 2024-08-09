@@ -46,7 +46,7 @@ func.func @i4_dequant_matvec_f32() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec_f32()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -101,7 +101,7 @@ func.func @i4_dequant_matvec_f32() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 4, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [128, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [128, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec_f32()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -184,7 +184,7 @@ func.func @i4_dequant_matvec_f32() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec_f32()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -240,7 +240,7 @@ func.func @i4_dequant_matvec_f16() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec_f16()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -324,7 +324,7 @@ func.func @i4_dequant_matvec() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -400,7 +400,7 @@ func.func @i4_dequant_matvec() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 4, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @i4_dequant_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -443,7 +443,7 @@ func.func @dynamic_batch_matvec() {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 64]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @dynamic_batch_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.batch_matmul

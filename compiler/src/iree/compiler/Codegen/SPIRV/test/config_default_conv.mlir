@@ -37,7 +37,7 @@ func.func @nhwc_conv_pointwise_112x112x32() {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 32], [1, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [8, 2, 2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [8, 2, 2] subgroup_size = 32>
 //      CHECK: func.func @nhwc_conv_pointwise_112x112x32()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -66,7 +66,7 @@ func.func @nchw_conv_2x1280x8x8() {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 16, 8, 8], [1, 8, 1, 4], [0, 0, 0, 0, 4, 1, 1], [0, 0, 1, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [2, 8, 2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [2, 8, 2]  subgroup_size = 32>
 //      CHECK: func.func @nchw_conv_2x1280x8x8()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.conv_2d_nchw_fchw

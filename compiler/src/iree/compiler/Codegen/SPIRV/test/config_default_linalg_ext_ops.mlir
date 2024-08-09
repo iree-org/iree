@@ -55,7 +55,7 @@ func.func @static_3d_sort() {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 64], [1, 0, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1] subgroup_size = 64>
 //      CHECK: func.func @static_3d_sort()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.sort
@@ -85,7 +85,7 @@ func.func @static_1d_fft_stage2() {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @static_1d_fft_stage2()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   iree_linalg_ext.fft
@@ -116,7 +116,7 @@ func.func @static_3d_fft_stage3() {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @static_3d_fft_stage3()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   iree_linalg_ext.fft
