@@ -5,14 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LOWEREXECUTABLEUSINGTRANSFORMDIALECTPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 class LowerExecutableUsingTransformDialectPass
-    : public LowerExecutableUsingTransformDialectBase<
+    : public impl::LowerExecutableUsingTransformDialectPassBase<
           LowerExecutableUsingTransformDialectPass> {
 public:
   void runOnOperation() override;
@@ -62,10 +64,4 @@ void LowerExecutableUsingTransformDialectPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createLowerExecutableUsingTransformDialectPass() {
-  return std::make_unique<LowerExecutableUsingTransformDialectPass>();
-}
-
 } // namespace mlir::iree_compiler

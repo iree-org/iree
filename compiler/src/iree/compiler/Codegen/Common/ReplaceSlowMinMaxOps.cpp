@@ -4,15 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_REPLACESLOWMINMAXOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -57,16 +58,16 @@ struct ReplaceSlowWithFastReductionMinMaxOpPattern final
 };
 
 struct ReplaceSlowMinMaxOpsPass
-    : public ReplaceSlowMinMaxOpsBase<ReplaceSlowMinMaxOpsPass> {
+    : public impl::ReplaceSlowMinMaxOpsPassBase<ReplaceSlowMinMaxOpsPass> {
 public:
-  using ReplaceSlowMinMaxOpsBase::ReplaceSlowMinMaxOpsBase;
+  using impl::ReplaceSlowMinMaxOpsPassBase<
+      ReplaceSlowMinMaxOpsPass>::ReplaceSlowMinMaxOpsPassBase;
   void runOnOperation() override;
 };
 
 } // namespace
 
-void mlir::iree_compiler::populateReplaceSlowMinMaxOpsPatterns(
-    RewritePatternSet &patterns) {
+void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns) {
   patterns.add<
       ReplaceSlowWithFastMinMaxOpPattern<arith::MinimumFOp, arith::MinNumFOp>,
       ReplaceSlowWithFastMinMaxOpPattern<arith::MaximumFOp, arith::MaxNumFOp>,
@@ -84,7 +85,4 @@ void ReplaceSlowMinMaxOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-mlir::iree_compiler::createReplaceSlowMinMaxOpsPass() {
-  return std::make_unique<ReplaceSlowMinMaxOpsPass>();
-}
+} // namespace mlir::iree_compiler

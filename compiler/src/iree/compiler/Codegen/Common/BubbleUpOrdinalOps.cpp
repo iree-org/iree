@@ -11,13 +11,15 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_BUBBLEUPORDINALOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -63,7 +65,7 @@ struct BubbleUpAcrossCastOp
 };
 
 struct BubbleUpOrdinalOpsPass
-    : public BubbleUpOrdinalOpsBase<BubbleUpOrdinalOpsPass> {
+    : public impl::BubbleUpOrdinalOpsPassBase<BubbleUpOrdinalOpsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -77,9 +79,4 @@ void BubbleUpOrdinalOpsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<Pass> createBubbleUpOrdinalOpsPass() {
-  return std::make_unique<BubbleUpOrdinalOpsPass>();
-}
-
 } // namespace mlir::iree_compiler

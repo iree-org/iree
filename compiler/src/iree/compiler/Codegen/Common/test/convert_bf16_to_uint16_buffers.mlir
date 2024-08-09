@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --iree-convert-bf16-to-uint16-buffers %s | FileCheck %s
+// RUN:   --iree-codegen-convert-bf16-to-uint16-buffers %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

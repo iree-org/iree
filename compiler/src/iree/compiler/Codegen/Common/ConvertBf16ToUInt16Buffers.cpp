@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -24,6 +23,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -34,9 +34,12 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-spirv-emulate-bf16"
+#define DEBUG_TYPE "iree-codegen-convert-bf16-to-uint16-buffers"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTBF16TOUINT16BUFFERSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -249,7 +252,8 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
 //===----------------------------------------------------------------------===//
 
 struct ConvertBf16ToUInt16BuffersPass final
-    : public ConvertBf16ToUInt16BuffersBase<ConvertBf16ToUInt16BuffersPass> {
+    : public impl::ConvertBf16ToUInt16BuffersPassBase<
+          ConvertBf16ToUInt16BuffersPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -312,13 +316,4 @@ struct ConvertBf16ToUInt16BuffersPass final
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-// Public interface
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<OperationPass<>> createConvertBf16ToUInt16BuffersPass() {
-  return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
-}
-
 } // namespace mlir::iree_compiler

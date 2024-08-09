@@ -4,16 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_DECOMPOSEAFFINEOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 struct DecomposeAffineOpsPass
-    : public DecomposeAffineOpsBase<DecomposeAffineOpsPass> {
+    : public impl::DecomposeAffineOpsPassBase<DecomposeAffineOpsPass> {
   void runOnOperation() override;
 };
 
@@ -26,9 +29,5 @@ void DecomposeAffineOpsPass::runOnOperation() {
     reorderOperandsByHoistability(rewriter, op);
     (void)decompose(rewriter, op);
   });
-}
-
-std::unique_ptr<Pass> createDecomposeAffineOpsPass() {
-  return std::make_unique<DecomposeAffineOpsPass>();
 }
 } // namespace mlir::iree_compiler

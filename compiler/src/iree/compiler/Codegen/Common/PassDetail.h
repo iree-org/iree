@@ -7,9 +7,11 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_PASS_DETAIL_H_
 #define IREE_COMPILER_CODEGEN_COMMON_PASS_DETAIL_H_
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <iterator>
-#include "iree/compiler/Codegen/Common/PassDetail.h"
+
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -34,6 +34,9 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
         "This is specified as <file-path>@<sequence-name>. If not specified,"
         "this will default to `__kernel_config`."),
     llvm::cl::init(""));
+
+#define GEN_PASS_DEF_MATERIALIZEUSERCONFIGSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -67,7 +70,7 @@ runTransformConfigurationStrategy(Operation *payloadRoot,
 }
 
 struct MaterializeUserConfigsPass
-    : public MaterializeUserConfigsBase<MaterializeUserConfigsPass> {
+    : public impl::MaterializeUserConfigsPassBase<MaterializeUserConfigsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -204,9 +207,4 @@ private:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeUserConfigsPass() {
-  return std::make_unique<MaterializeUserConfigsPass>();
-}
-
 } // namespace mlir::iree_compiler

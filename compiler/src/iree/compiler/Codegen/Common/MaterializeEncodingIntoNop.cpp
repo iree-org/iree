@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -18,11 +17,15 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_MATERIALIZEENCODINGINTONOPPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 using namespace IREE::Encoding;
 
 namespace {
 struct MaterializeEncodingIntoNopPass
-    : public MaterializeEncodingIntoNopBase<MaterializeEncodingIntoNopPass> {
+    : public impl::MaterializeEncodingIntoNopPassBase<
+          MaterializeEncodingIntoNopPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
@@ -69,11 +72,6 @@ struct MaterializeEncodingIntoNopPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createMaterializeEncodingIntoNopPass() {
-  return std::make_unique<MaterializeEncodingIntoNopPass>();
-}
 
 void addEncodingToNopPasses(FunctionLikeNest &passManager) {
   passManager.addPass(createMaterializeEncodingIntoNopPass)

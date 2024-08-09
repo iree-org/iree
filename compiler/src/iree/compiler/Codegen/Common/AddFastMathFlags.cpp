@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Matchers.h"
@@ -13,8 +12,10 @@
 
 #define DEBUG_TYPE "iree-codegen-add-fast-math-flags"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_ADDFASTMATHFLAGSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Add `contract` FMF to operations that support it.
 static void addContractFMF(Operation *op) {
@@ -30,9 +31,10 @@ namespace {
 /// optimization mode.
 // TODO: For now we only allow default flags, such as arithmetic reassociation.
 struct AddFastMathFlagsPass
-    : public AddFastMathFlagsBase<AddFastMathFlagsPass> {
+    : public impl::AddFastMathFlagsPassBase<AddFastMathFlagsPass> {
 public:
-  using AddFastMathFlagsBase::AddFastMathFlagsBase;
+  using impl::AddFastMathFlagsPassBase<
+      AddFastMathFlagsPass>::AddFastMathFlagsPassBase;
 
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) { addContractFMF(op); });
@@ -40,8 +42,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>>
-mlir::iree_compiler::createAddFastMathFlagsPass() {
-  return std::make_unique<AddFastMathFlagsPass>();
-}
+} // namespace mlir::iree_compiler
