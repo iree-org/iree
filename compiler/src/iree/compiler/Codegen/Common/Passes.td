@@ -485,7 +485,7 @@ def TileAndDistributeToWorkgroupsPass :
             clEnumValN(linalg::DistributionMethod::CyclicNumProcsGeNumIters,
                        "1", "Use CyclicNumProcGeNumIter strategy"),
             clEnumValN(linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-                       "2", "Use CyclicNumProcGeNumIter strategy"),
+                       "2", "Use CyclicNumProcEqNumIter strategy"),
             clEnumValN(linalg::DistributionMethod::None,
                        "3", "Use None strategy")
         )}]>,
