@@ -93,6 +93,37 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                    ArrayRef<Operation *> targets,
                                    Flow::DispatchRegionOp regionOp);
 
+/// Move a `target` op that is following the given dispatch region op into the
+/// dispatch region.
+///
+/// Results of the `target` are appended to the yielded results of the dispatch
+/// region, and uses of each result are replaced with the corresponding newly
+/// yielded result. Operands of the `target` that are produced by the dispatch
+/// region are replaced in the cloned op with the corresponding result yielded
+/// inside of the dispatch region.
+///
+/// Example:
+///
+/// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+///   %0 = "another_op"(%input) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   flow.return %0 : tensor<?xf32>
+/// }
+/// %1 = "some_op"(%r) : () -> (tensor<?xf32>)
+/// %2 = "some_op_use"(%1) : (tensor<?xf32>) -> (tensor<?xf32>)
+///
+/// Becomes:
+///
+/// %r:2 = flow.dispatch.region -> (tensor<?xf32>{%d0}, tensor<?xf32>{%d1}) {
+///   %0 = "another_op"(%input) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   %1 = "some_op"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   flow.return %0, %1 : tensor<?xf32>, tensor<?xf32>
+/// }
+/// %2 = "some_op_use"(%r#1) : (tensor<?xf32>) -> (tensor<?xf32>)
+///
+FailureOr<IREE::Flow::DispatchRegionOp>
+moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                  IREE::Flow::DispatchRegionOp regionOp);
+
 /// Wrap the given op in a new dispatch region op.
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
                                                          Operation *op);
@@ -103,6 +134,18 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// Note: This function returns `false` for ops that should be tiled and fused
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
+
+/// Hoists an operation out of a dispatch region, as long as it does not have
+/// producers inside of the dispatch region, or all of its uses are part of
+/// the dispatch region op return. If these criteria are not met, then return
+/// failure.
+///
+/// If all producers are defined outside of the dispatch region, then the op
+/// will be hoisted above the dispatch region op. Otherwise, the op will be
+/// hoisted below the dispatch region op, and the operands of the hoisted op
+/// will be added to the yielded values of the dispatch region op.
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op);
 
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
