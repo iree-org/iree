@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 namespace mlir::iree_compiler {
 
@@ -27,6 +28,14 @@ StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx);
 /// is infered from the config dictt. attribute that's part of to the
 /// translation info corresponding to this funciton.
 bool isLoopPeelingEnabled(FunctionOpInterface funcOp);
+
+/// Creates a string attribute containing the name of the attribute that is
+/// used to enable SCF lowerig for Topk operations.
+void setEnableTopkSCFLowerAttrName(IREE::LinalgExt::TopkOp topkOp);
+
+/// Checks whether SCF lowering has been enabled for the Topk operation. This
+/// is calculated based on compilation flag and Topk input shape.
+bool isTopkSCFLowerEnabled(IREE::LinalgExt::TopkOp topkOp);
 
 } // namespace mlir::iree_compiler
 
