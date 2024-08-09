@@ -23,6 +23,7 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -664,9 +665,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
        llvm::zip_equal(subgroupLayout.outer, subgroupLayout.thread,
                        subgroupLayout.element)) {
     if (outer != 1) {
-      // TODO: Support this case. Might need a reshape since this makes the
-      // slice non-contigious.
-      return failure();
+      rankReducedShape.push_back(outer);
     }
     rankReducedShape.push_back(thread * element);
   }
@@ -690,6 +689,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
                        subgroupLayout.element)) {
     if (dimSize == 1) {
       vtids.push_back(zero);
+      continue;
     }
 
     // ((tid floordiv stride) mod size) * element.
@@ -702,7 +702,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   }
 
   int64_t idx = 0;
-  for (int64_t element : subgroupLayout.element) {
+  for (auto [element, outer] :
+       llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer)) {
+    if (outer != 1) {
+      canonicalSizes.push_back(builder.getIndexAttr(outer));
+      canonicalOffsets.push_back(zero);
+    }
     canonicalSizes.push_back(builder.getIndexAttr(element));
     canonicalOffsets.push_back(vtids[idx++]);
   }
@@ -716,13 +721,6 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     Value laneId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
-    break;
-  default:
-    return failure();
-  }
 
   MMAAttr::SingleSubgroupLayout subgroupLayout;
   switch (fragment) {
@@ -758,47 +756,33 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
     std::optional<ArrayRef<int64_t>> permutation,
     SmallVector<ReassociationIndices> &reassociations,
     RankedTensorType &resultType) const {
-  OpaqueMmaLayout opaqueLayout =
-      getOpaqueMFMALayout(operand.getContext(), getIntrinsic().getValue());
-  // TODO(Max191): The `getConcreteMFMALayout` function creates some
-  //   `PerDimLayoutAttr` that are not used by this function. This means that
-  //   any pass that uses `materializeOperandConcreteShape` needs to be
-  //   dependent on the VectorExt dialect. Ideally, the `getConcreteMFMALayout`
-  //   function should be refactored so we can reuse the shape information of
-  //   the layout without needing to create any `PerDimLayoutAttr`.
-  ConcreteMmaLayout layout =
-      getConcreteMFMALayout(operand.getContext(), getIntrinsic().getValue());
-  SmallVector<ArrayRef<int64_t>> concreteSizes;
+
+  SmallVector<int64_t, 2> outerSizes;
   SmallVector<int64_t, 2> opaqueSizes;
+  auto [m, n, k] = getMNKShape();
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs: {
-    concreteSizes.push_back(layout.aMLayout.getShapes());
-    concreteSizes.push_back(layout.aKLayout.getShapes());
-    opaqueSizes.push_back(opaqueLayout.mSize);
-    opaqueSizes.push_back(opaqueLayout.kSize);
+    outerSizes = getASingleSubgroupLayout().outer;
+    opaqueSizes.append({m, k});
     break;
   }
   case IREE::GPU::MMAFragment::Rhs: {
-    concreteSizes.push_back(layout.bKLayout.getShapes());
-    concreteSizes.push_back(layout.bNLayout.getShapes());
-    opaqueSizes.push_back(opaqueLayout.kSize);
-    opaqueSizes.push_back(opaqueLayout.nSize);
+    outerSizes = getBSingleSubgroupLayout().outer;
+    opaqueSizes.append({k, n});
     break;
   }
   case IREE::GPU::MMAFragment::Acc: {
-    concreteSizes.push_back(layout.cMLayout.getShapes());
-    concreteSizes.push_back(layout.cNLayout.getShapes());
-    opaqueSizes.push_back(opaqueLayout.mSize);
-    opaqueSizes.push_back(opaqueLayout.nSize);
+    outerSizes = getCSingleSubgroupLayout().outer;
+    opaqueSizes.append({m, n});
     break;
   }
   }
   if (permutation.has_value()) {
-    if (permutation.value().size() != opaqueSizes.size()) {
+    if (permutation.value().size() != outerSizes.size()) {
       return failure();
     }
-    applyPermutationToVector(concreteSizes, permutation.value());
     applyPermutationToVector(opaqueSizes, permutation.value());
+    applyPermutationToVector(outerSizes, permutation.value());
   }
 
   // Inner tile must have sizes matching the opaque layout.
@@ -819,11 +803,23 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
                             return ReassociationIndices({idx});
                           });
   int idx = reInds.size();
-  for (ArrayRef<int64_t> sizes : concreteSizes) {
-    resultShape.append(SmallVector<int64_t>(sizes));
-    reInds.push_back(
-        llvm::to_vector(llvm::seq<int64_t>(idx, idx + sizes.size())));
-    idx += sizes.size();
+  for (auto [outer, native] : llvm::zip_equal(outerSizes, opaqueSizes)) {
+    // Skip expansion if the outer dim is unit as the SingleSubgroupLayout gives
+    // a guarantee that the |element| counts are contiguous within the layout,
+    // and a unit outer implies a single offset and size for that dimension.
+    if (outer == 1) {
+      resultShape.push_back(native);
+      reInds.push_back(ReassociationIndices({idx++}));
+      continue;
+    }
+
+    // Reshape to [outer, native / outer] == [outer, thread * element]. This
+    // corresponds to |outer| repetitions of the thread/element sublayout.
+    resultShape.push_back(outer);
+    assert(native % outer == 0 && "invalid mma layout");
+    resultShape.push_back(native / outer);
+    reInds.push_back(ReassociationIndices{idx, idx + 1});
+    idx += 2;
   }
 
   reassociations = reInds;
