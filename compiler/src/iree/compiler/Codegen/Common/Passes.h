@@ -86,6 +86,10 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen = false);
 
+/// Converts convolution operations to a GEMM with an im2col op on the image.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createConvolutionToIGEMMPass();
+
 // Decompose affine.apply operations into sub affine.apply that can be
 // hoisted in different loops.
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();

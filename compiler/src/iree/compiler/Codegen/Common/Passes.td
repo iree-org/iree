@@ -70,6 +70,13 @@ def ConvertToDestinationPassingStyle :
   ];
 }
 
+def ConvolutionToIGEMM :
+    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Transforms convolution operations into an implicit GEMM format.";
+  let constructor = "mlir::iree_compiler::createConvolutionToIGEMMPass()";
+}
+
 def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
   let description = [{
