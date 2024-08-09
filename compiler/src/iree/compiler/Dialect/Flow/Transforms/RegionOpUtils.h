@@ -104,6 +104,18 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
+/// Hoists an operation out of a dispatch region, as long as it does not have
+/// producers inside of the dispatch region, or all of its uses are part of
+/// the dispatch region op return. If these criteria are not met, then return
+/// failure.
+///
+/// If all producers are defined outside of the dispatch region, then the op
+/// will be hoisted above the dispatch region op. Otherwise, the op will be
+/// hoisted below the dispatch region op, and the operands of the hoisted op
+/// will be added to the yielded values of the dispatch region op.
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op);
+
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
 
