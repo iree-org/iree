@@ -706,8 +706,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO: Currently, we are forcing number of subgroups to be 1. This can be
   // fixed by teaching vector distribution chained matmul.
-  GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/1,
-                                        /*bestMNTileCountPerSubgroup=*/8,
+  GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+                                        /*bestMNTileCountPerSubgroup=*/4,
                                         /*bestKTileCountPerSubgroup=*/4};
 
   LDBG("Attention Vector Distribution Config");
