@@ -87,8 +87,6 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 // get the index size.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createGPUCheckResourceUsagePass(
-    std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit =
-        nullptr,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth =
         nullptr);
 

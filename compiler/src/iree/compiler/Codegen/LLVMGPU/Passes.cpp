@@ -992,13 +992,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // Run checks on shared memory usage.
   funcPassManager
       .addPass([&]() {
-        auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
-          IREE::GPU::TargetAttr target = getGPUTargetAttr(entryPoint);
-          return target.getWgp().getMaxWorkgroupMemoryBytes();
-        };
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
-        return createGPUCheckResourceUsagePass(getSharedMemoryLimit,
-                                               getIndexBitwidth);
+        return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
       // SCF -> CF
       .addPass(createConvertSCFToCFPass)
