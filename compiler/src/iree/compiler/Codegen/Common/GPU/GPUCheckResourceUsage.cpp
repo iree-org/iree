@@ -99,7 +99,8 @@ public:
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    unsigned limit = target.getWgp().getMaxWorkgroupMemoryBytes();
+    unsigned limit =
+        target ? target.getWgp().getMaxWorkgroupMemoryBytes() : 64 * 1024;
     if (failed(checkGPUAllocationSize(funcOp, limit,
                                       getIndexBitwidth
                                           ? getIndexBitwidth
