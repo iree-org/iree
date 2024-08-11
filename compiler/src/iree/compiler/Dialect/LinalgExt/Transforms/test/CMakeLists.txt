@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "decompose_online_attention.mlir"
     "decompose_winograd.mlir"
     "distribution.mlir"
+    "pad_attention.mlir"
     "pad_contraction_to_block_size.mlir"
     "split_reduction.mlir"
     "tile_attention.mlir"
