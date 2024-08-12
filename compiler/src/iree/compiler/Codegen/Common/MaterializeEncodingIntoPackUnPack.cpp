@@ -187,10 +187,12 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
 
-/// Utility method to convert from `set_encoding` op to `pack` operation with
-/// zero padding values. The source is also taken as input so that these could
-/// be used with `OpConversionPatterns`.
-static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. It is not
+/// moved because it needs some cleanup for this file. E.g., `getPaddingValue`
+/// is no longer needed. Ideally we should move CPU specific patterns (e.g.,
+/// lowerContractionOpWithEncoding, etc) to the CPUMaterializeEncoding file;
+/// move general patterns to EncodingUtils, and retire this file.
+FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -231,10 +233,9 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
 }
 
-/// Utility method to convert from `set_encoding` op to `pack` operation.
-/// The source is taken as input so that these could be used with
-/// `OpConversionPatterns`.
-static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. See the reason
+/// in the implementation comment of lowerSetEncodingToPackOp method.
+FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {

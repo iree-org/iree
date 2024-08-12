@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -90,6 +91,22 @@ struct TileMxNxK {
 MaterializeEncodingInfo
 getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
+
+/// Utility method to convert from `set_encoding` op to `pack` operation.
+/// For now this takes a `paddingValue` as input. The source is also taken
+/// as input so that these could be used with `OpConversionPatterns`.
+FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
+    Value source, MaterializeEncodingFn materializeEncodingFn,
+    MaterializeEncodingValueFn materializeEncodingValueFn);
+
+/// Utility method to convert from `unset_encoding` op to `unpack` operation.
+/// The source is taken as input so that these could be used with
+/// `OpConversionPatterns`.
+FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
+    Value packedValue, MaterializeEncodingFn materializeEncodingFn,
+    MaterializeEncodingValueFn materializeEncodingValueFn);
 
 /// Pouplates the set of patterns that lowers set_encoding, unset_encoding, and
 /// upstream dialect ops with encoding types to pack/unpack ops.
