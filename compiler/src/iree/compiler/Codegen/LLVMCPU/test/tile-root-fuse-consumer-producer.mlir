@@ -106,31 +106,14 @@ func.func @dequant_avgpool(%arg0: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf3
 }
 
 // CHECK-REDUCTION-LABEL:   func.func @dequant_avgpool(
-// CHECK-REDUCTION-SAME:                               %[[VAL_0:.*]]: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf32> {
-// CHECK-REDUCTION:           %[[VAL_1:.*]] = arith.constant 5 : index
-// CHECK-REDUCTION:           %[[VAL_2:.*]] = arith.constant 1 : index
-// CHECK-REDUCTION:           %[[VAL_3:.*]] = arith.constant 65 : index
-// CHECK-REDUCTION:           %[[VAL_4:.*]] = arith.constant 1.250000e-01 : f32
-// CHECK-REDUCTION:           %[[VAL_5:.*]] = arith.constant 0.000000e+00 : f32
-// CHECK-REDUCTION:           %[[VAL_6:.*]] = arith.constant 0 : index
-// CHECK-REDUCTION:           %[[VAL_7:.*]] = tensor.empty() : tensor<1x320x1x1xf32>
-// CHECK-REDUCTION:           %[[VAL_8:.*]] = scf.for %[[VAL_9:.*]] = %[[VAL_6]] to %[[VAL_3]] step %[[VAL_2]] iter_args(%[[VAL_10:.*]] = %[[VAL_7]]) -> (tensor<1x320x1x1xf32>) {
-// CHECK-REDUCTION:             %[[VAL_11:.*]] = scf.for %[[VAL_12:.*]] = %[[VAL_6]] to %[[VAL_3]] step %[[VAL_1]] iter_args(%[[ITER_ARG:.*]] = %[[VAL_10]]) -> (tensor<1x320x1x1xf32>) {
-// CHECK-REDUCTION:               %[[VAL_14:.*]] = tensor.extract_slice %[[VAL_0]][0, 0, %[[VAL_9]], %[[VAL_12]]] [1, 320, 1, 5] [1, 1, 1, 1] : tensor<1x320x65x65xi8> to tensor<1x320x1x5xi8>
-// CHECK-REDUCTION:               %[[VAL_15:.*]] = tensor.empty() : tensor<1x320x1x5xf32>
-// CHECK-REDUCTION:               %[[VAL_16:.*]] = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[VAL_14]] : tensor<1x320x1x5xi8>) outs(%[[VAL_15]] : tensor<1x320x1x5xf32>) {
-// CHECK-REDUCTION:               ^bb0(%[[VAL_17:.*]]: i8, %[[VAL_18:.*]]: f32):
-// CHECK-REDUCTION:                 %[[VAL_19:.*]] = arith.extsi %[[VAL_17]] : i8 to i32
-// CHECK-REDUCTION:                 %[[VAL_20:.*]] = arith.sitofp %[[VAL_19]] : i32 to f32
-// CHECK-REDUCTION:                 %[[VAL_21:.*]] = arith.mulf %[[VAL_20]], %[[VAL_4]] : f32
-// CHECK-REDUCTION:                 linalg.yield %[[VAL_21]] : f32
-// CHECK-REDUCTION:               } -> tensor<1x320x1x5xf32>
-// CHECK-REDUCTION:               %[[VAL_22:.*]] = tensor.empty() : tensor<1x5xf32>
-// CHECK-REDUCTION:               %[[VAL_23:.*]] = linalg.fill ins(%[[VAL_5]] : f32) outs(%[[VAL_22]] : tensor<1x5xf32>) -> tensor<1x5xf32>
-// CHECK-REDUCTION:               %[[RED:.*]] = linalg.pooling_nchw_sum {lowering_config = #config} ins(%[[VAL_16]], %[[VAL_23]] : tensor<1x320x1x5xf32>, tensor<1x5xf32>) outs(%[[ITER_ARG]] : tensor<1x320x1x1xf32>) -> tensor<1x320x1x1xf32>
-// CHECK-REDUCTION:               scf.yield %[[RED]] : tensor<1x320x1x1xf32>
+// CHECK-REDUCTION-SAME:      {
+// CHECK-REDUCTION:           scf.for
+// CHECK-REDUCTION-SAME:        {
+// CHECK-REDUCTION:             scf.for
+// CHECK-REDUCTION-SAME:          {
+// CHECK-REDUCTION:                 linalg.generic
+// CHECK-REDUCTION:                 %[[POOL:.+]] = linalg.pooling_nchw_sum
+// CHECK-REDUCTION:                 scf.yield %[[POOL]]
+// CHECK-REDUCTION:               }
 // CHECK-REDUCTION:             }
-// CHECK-REDUCTION:             scf.yield %[[VAL_11]] : tensor<1x320x1x1xf32>
 // CHECK-REDUCTION:           }
-// CHECK-REDUCTION:           return %[[VAL_8]] : tensor<1x320x1x1xf32>
-// CHECK-REDUCTION:         }

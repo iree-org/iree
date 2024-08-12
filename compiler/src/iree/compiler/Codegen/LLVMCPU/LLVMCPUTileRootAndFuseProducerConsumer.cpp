@@ -81,11 +81,12 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
   auto zero = rewriter.getIndexAttr(0);
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   if (tileSizes.size() > numLoops) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "tile sizes size " << tileSizes.size()
+               << " exceeds the number of loops " << numLoops << "\n");
     return failure();
   }
-  while (tileSizes.size() < numLoops) {
-    tileSizes.push_back(zero);
-  }
+  tileSizes.resize(numLoops, zero);
 
   scf::SCFTilingOptions tilingOptions;
   tilingOptions.setTileSizes(tileSizes);
@@ -98,7 +99,8 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
           bool isDestinationOperand) {
         Operation *owner = originalProducer.getOwner();
         bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
-        // Do not fuse destination operands.
+        // Do not fuse destination operands if onlyFuseProducerInputOperands is
+        // true.
         bool shouldFuse =
             !(onlyFuseProducerInputOperands && isDestinationOperand);
         return std::make_tuple(shouldFuse, yieldProducerReplacement);
@@ -133,7 +135,7 @@ tileRootAndFuseProducers(IRRewriter &rewriter, TilingInterface rootOp,
   return tiledResults->tiledAndFusedOps.front();
 }
 
-static LogicalResult fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
 
   //  Typically, the consumers of the tiled operation are slices of the
   //  results of the tiled operation. These are expressed in IR using
@@ -180,7 +182,6 @@ static LogicalResult fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
     addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
                        candidates);
   }
-  return success();
 }
 
 /// Implementation of tile root and fuse producers and consumers greedily.
@@ -198,7 +199,7 @@ static LogicalResult tileRootAndFuse(IRRewriter &rewriter,
     return failure();
 
   if (!onlyFuseProducerInputOperands)
-    return fuseConsumers(rewriter, tiledOp.value());
+    fuseConsumers(rewriter, tiledOp.value());
 
   return success();
 }
