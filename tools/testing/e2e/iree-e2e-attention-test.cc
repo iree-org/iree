@@ -99,8 +99,7 @@ static iree_status_t reference_attention_element(
     iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2, iree_hal_dim_t N,
     iree_hal_dim_t B, iree_hal_element_type_t query_elem_type,
     iree_hal_element_type_t key_elem_type,
-    iree_hal_element_type_t value_elem_type,
-    void* query_data, void* key_data,
+    iree_hal_element_type_t value_elem_type, void* query_data, void* key_data,
     void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b) {
   query_elem_type =
       IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
@@ -130,8 +129,7 @@ static iree_status_t reference_attention(
     iree_hal_dim_t B, iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2,
     iree_hal_dim_t N, iree_hal_element_type_t query_elem_type,
     iree_hal_element_type_t key_elem_type,
-    iree_hal_element_type_t value_elem_type,
-    iree_byte_span_t query_contents,
+    iree_hal_element_type_t value_elem_type, iree_byte_span_t query_contents,
     iree_byte_span_t key_contents, iree_byte_span_t value_contents,
     iree_byte_span_t actual_contents, iree_byte_span_t result_contents,
     int compute_every) {
@@ -147,11 +145,11 @@ static iree_status_t reference_attention(
     if (++count < compute_every) continue;
     count = 0;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, reference_attention_element(
-                M, K1, K2, N, B, query_elem_type, key_elem_type,
-                value_elem_type, query_contents.data,
-                key_contents.data, value_contents.data, actual_contents.data,
-                result_contents.data, b));
+        z0,
+        reference_attention_element(
+            M, K1, K2, N, B, query_elem_type, key_elem_type, value_elem_type,
+            query_contents.data, key_contents.data, value_contents.data,
+            actual_contents.data, result_contents.data, b));
   }
 
   IREE_TRACE_ZONE_END(z0);
