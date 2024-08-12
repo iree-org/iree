@@ -384,7 +384,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
 
-   Accepts an N-D tensor input consisting of values and an optioanl N-D tensor
+   Accepts an N-D tensor input consisting of values and an optional N-D tensor
    for indices of those values (i32 type). If input indices aren't provided, the
    index mapping is inferred based on the k dim.  Both input values/indices
    tensors and output values/indicies tensors must have the same shape. Top-K is
@@ -495,6 +495,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyShaped:$key,
                        AnyShaped:$value,
                        AnyFloat:$scale,
+                       Optional<AnyShaped>:$mask,
                        Variadic<AnyShaped>:$outputs,
                        AffineMapArrayAttr:$indexing_maps
   );
@@ -505,10 +506,25 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    $query `:` type($query)
+    $key `:` type($key)
+    $value `:` type($value)
+    $scale `:` type($scale)
+    (`mask` `(` $mask^ `:` type($mask) `)`)?
+    `into` $outputs `:` type($outputs)
     (`->` type($results)^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins "TypeRange":$results,
+    "Value":$query,
+    "Value":$key,
+    "Value":$value,
+    "Value":$scale,
+    "ValueRange":$outputs,
+    "ArrayAttr":$indexing_maps,
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+  ];
 
   let extraClassDeclaration = [{
     // Method to implement for specifying output range for

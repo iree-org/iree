@@ -1200,6 +1200,11 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
+void AttentionOp::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ::mlir::TypeRange results, ::mlir::Value query, ::mlir::Value key, ::mlir::Value value, ::mlir::Value scale, ::mlir::ValueRange outputs, ::mlir::ArrayAttr indexing_maps, std::optional<::mlir::Value> mask) {
+  build(odsBuilder, odsState, results, query, key, value, scale, mask ? *mask : Value(), outputs, indexing_maps);
+}
+
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
