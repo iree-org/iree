@@ -238,4 +238,20 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_library(
+  NAME
+    deferred_work_queue
+  HDRS
+    "deferred_work_queue.h"
+  SRCS
+    "deferred_work_queue.c"
+  DEPS
+    ::deferred_command_buffer
+    ::resource_set
+    iree::base
+    iree::base::internal::synchronization
+    iree::hal
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

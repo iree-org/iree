@@ -201,3 +201,16 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "deferred_work_queue",
+    srcs = ["deferred_work_queue.c"],
+    hdrs = ["deferred_work_queue.h"],
+    deps = [
+        ":deferred_command_buffer",
+        ":resource_set",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+    ],
+)
