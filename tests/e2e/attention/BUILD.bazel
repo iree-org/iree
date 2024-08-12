@@ -45,7 +45,7 @@ py_binary(
     test_runner = "//tools/testing/e2e:iree-e2e-attention-test",
     test_type = "attention",
 ) for dtype in [
-    "f32",
+    "f16",
 ] for size in [
     "small",
     "medium",

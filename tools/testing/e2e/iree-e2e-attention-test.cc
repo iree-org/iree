@@ -101,6 +101,15 @@ static iree_status_t reference_attention_element(
     iree_hal_element_type_t value_elem_type,
     iree_hal_element_type_t result_elem_type, void* query_data, void* key_data,
     void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b) {
+  query_elem_type =
+      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
+  key_elem_type =
+      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
+  value_elem_type =
+      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
+  result_elem_type =
+      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
+
   if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {

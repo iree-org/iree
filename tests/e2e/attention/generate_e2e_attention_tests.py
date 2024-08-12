@@ -18,28 +18,28 @@ import math
 @enum.unique
 class QueryElemTypeId(enum.Enum):
     NONE = ""
-    F32 = "f32"
+    F16 = "f16"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class KeyElemTypeId(enum.Enum):
     NONE = ""
-    F32 = "f32"
+    F16 = "f16"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class ValueElemTypeId(enum.Enum):
     NONE = ""
-    F32 = "f32"
+    F16 = "f16"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class ResultElemTypeId(enum.Enum):
     NONE = ""
-    F32 = "f32"
+    F16 = "f16"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -384,21 +384,21 @@ def parse_arguments():
     parser.add_argument(
         "--query_type",
         type=str,
-        choices=["f32"],
+        choices=["f16"],
         help="Numeric type of query tensors ",
         required=True,
     )
     parser.add_argument(
         "--key_type",
         type=str,
-        choices=["f32"],
+        choices=["f16"],
         help="Numeric type of key tensors ",
         required=True,
     )
     parser.add_argument(
         "--value_type",
         type=str,
-        choices=["f32"],
+        choices=["f16"],
         help="Numeric type of value tensors ",
         required=True,
     )
