@@ -92,6 +92,7 @@ static void reference_attention_f32_f32_f32_f32(
       result_data[o_idx] = sum;
     }
   }
+  free_tensor(Attention);
 }
 
 static iree_status_t reference_attention_element(
