@@ -88,11 +88,6 @@ createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims,
     linalg::DistributionMethod distributionMethod);
 
-// TODO(hanchung): Move it where it is defined (i.e., Codegen/LLVMGPU).
-// Extract address computations (including the ones with GPU instructions) into
-// their own separate instructions.
-std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
-
 //----------------------------------------------------------------------------//
 // CodeGen Common Patterns
 //----------------------------------------------------------------------------//

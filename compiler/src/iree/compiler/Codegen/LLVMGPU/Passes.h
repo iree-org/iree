@@ -130,6 +130,10 @@ createLLVMGPUCastTypeToFitMMAPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUDistribute();
 
+// Extract address computations (including the ones with GPU instructions) into
+// their own separate instructions.
+std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
+
 /// Create pass selecting the lowering strategy for LLVMGPU.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUSelectLoweringStrategyPass();
