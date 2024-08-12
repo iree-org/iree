@@ -240,3 +240,14 @@ func.func @vector_barrier(%input: vector<8xf16>) -> vector<8xf16> {
 // CHECK-LABEL: func @vector_barrier
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<8xf16>
 //       CHECK:   iree_gpu.value_barrier %[[INPUT]] : vector<8xf16>
+
+// -----
+
+func.func @vector_barrier(%input: vector<8xf16>) -> (vector<8xf16>, vector<8xf16>) {
+  %out:2 = iree_gpu.value_barrier %input, %input : vector<8xf16>, vector<8xf16>
+  return %out#0, %out#1 : vector<8xf16>, vector<8xf16>
+}
+
+// CHECK-LABEL: func @vector_barrier
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<8xf16>
+//       CHECK:   iree_gpu.value_barrier %[[INPUT]], %[[INPUT]] : vector<8xf16>, vector<8xf16>
