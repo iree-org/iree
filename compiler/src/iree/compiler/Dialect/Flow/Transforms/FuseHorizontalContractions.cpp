@@ -36,21 +36,12 @@ namespace mlir::iree_compiler::IREE::Flow {
 #define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
-#define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
-#include "iree/compiler/GlobalOptimization/Passes.h.inc"
-
 namespace {
 
 struct FuseHorizontalContractionsPass
     : public impl::FuseHorizontalContractionsPassBase<
           FuseHorizontalContractionsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect>();
-  }
-  FuseHorizontalContractionsPass() {}
-  FuseHorizontalContractionsPass(const FuseHorizontalContractionsPass &pass)
-      : FuseHorizontalContractionsPass() {}
-
+  using Base::Base;
   void runOnOperation() override;
 };
 
