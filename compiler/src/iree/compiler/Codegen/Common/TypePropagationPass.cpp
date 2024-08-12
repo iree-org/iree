@@ -24,7 +24,6 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -39,6 +38,9 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TYPEPROPAGATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Insert instructions to convert from one element type to another.
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
@@ -568,8 +570,8 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
   }
 };
 
-struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
-  TypePropagationPass() = default;
+struct TypePropagationPass final
+    : impl::TypePropagationPassBase<TypePropagationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
   }
@@ -627,10 +629,4 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTypePropagationPass() {
-  return std::make_unique<TypePropagationPass>();
-}
-
 } // namespace mlir::iree_compiler

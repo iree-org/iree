@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -23,6 +22,9 @@
 #define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GENERICVECTORIZATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -310,20 +312,11 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
-class GenericVectorizationPass
-    : public GenericVectorizationBase<GenericVectorizationPass> {
+class GenericVectorizationPass final
+    : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
-  using GenericVectorizationBase::GenericVectorizationBase;
-  GenericVectorizationPass(const GenericVectorizationPassOptions &options) {
-    this->enableVectorMasking.setValue(options.enableVectorMasking);
-    this->useConfiguredVectorSizes.setValue(options.useConfiguredVectorSizes);
-    this->vectorizePadding.setValue(options.vectorizePadding);
-    this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
-    this->enableCleanup.setValue(options.enableCleanup);
-    this->generateContract.setValue(options.generateContract);
-    this->foldCastIntoContract.setValue(options.foldCastIntoContract);
-    this->maxVectorSize.setValue(options.maxVectorSize);
-  }
+  using impl::GenericVectorizationPassBase<
+      GenericVectorizationPass>::GenericVectorizationPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
@@ -438,14 +431,4 @@ void GenericVectorizationPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGenericVectorizationPass() {
-  return std::make_unique<GenericVectorizationPass>();
-}
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGenericVectorizationPass(const GenericVectorizationPassOptions &options) {
-  return std::make_unique<GenericVectorizationPass>(options);
-}
-
 } // namespace mlir::iree_compiler

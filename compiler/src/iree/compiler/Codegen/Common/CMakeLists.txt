@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -124,9 +123,10 @@ iree_cc_library(
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
-    "RemoveTrivialLoops.cpp"
+    "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
     "SplitFullPartialTransferPass.cpp"
+    "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
@@ -135,7 +135,6 @@ iree_cc_library(
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
-    "VectorizePad.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

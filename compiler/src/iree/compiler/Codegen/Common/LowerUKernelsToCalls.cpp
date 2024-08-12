@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "llvm/ADT/MapVector.h"
@@ -14,9 +13,12 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LOWERUKERNELOPSTOCALLSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 struct LowerUKernelOpsToCallsPass
-    : LowerUKernelOpsToCallsBase<LowerUKernelOpsToCallsPass> {
+    : impl::LowerUKernelOpsToCallsPassBase<LowerUKernelOpsToCallsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, func::FuncDialect>();
   }
@@ -53,9 +55,4 @@ void LowerUKernelOpsToCallsPass::runOnOperation() {
     rewriter.replaceOp(r.first, r.second->getResults());
   }
 }
-
-std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass() {
-  return std::make_unique<LowerUKernelOpsToCallsPass>();
-}
-
 } // namespace mlir::iree_compiler

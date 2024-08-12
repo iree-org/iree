@@ -33,7 +33,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -61,6 +60,9 @@
 #define DEBUG_TYPE "iree-flatten-memref-subspan"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_FLATTENMEMREFSUBSPANPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -740,11 +742,8 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
 // Pass
 //===----------------------------------------------------------------------===//
 
-struct FlattenMemRefSubspanPass
-    : public FlattenMemRefSubspanBase<FlattenMemRefSubspanPass> {
-  FlattenMemRefSubspanPass() {}
-  FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
-
+struct FlattenMemRefSubspanPass final
+    : impl::FlattenMemRefSubspanPassBase<FlattenMemRefSubspanPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, memref::MemRefDialect>();
   }
@@ -903,9 +902,4 @@ struct FlattenMemRefSubspanPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass() {
-  return std::make_unique<FlattenMemRefSubspanPass>();
-}
-
 } // namespace mlir::iree_compiler

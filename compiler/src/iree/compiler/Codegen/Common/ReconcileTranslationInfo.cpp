@@ -14,16 +14,19 @@
 // up. In case of inconsistencies, this pass will throw an error.
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_RECONCILETRANSLATIONINFOPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
-class ReconcileTranslationInfoPass
-    : public ReconcileTranslationInfoBase<ReconcileTranslationInfoPass> {
+class ReconcileTranslationInfoPass final
+    : public impl::ReconcileTranslationInfoPassBase<
+          ReconcileTranslationInfoPass> {
 public:
   void runOnOperation() override;
 };
@@ -144,11 +147,6 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     }
     eraseLoweringConfig(op);
   });
-}
-
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createReconcileTranslationInfoPass() {
-  return std::make_unique<ReconcileTranslationInfoPass>();
 }
 
 } // namespace mlir::iree_compiler

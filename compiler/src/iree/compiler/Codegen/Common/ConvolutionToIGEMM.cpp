@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -18,12 +17,15 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_CONVOLUTIONTOIGEMMPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
 
-class ConvolutionToIGEMMPass
-    : public ConvolutionToIGEMMBase<ConvolutionToIGEMMPass> {
+class ConvolutionToIGEMMPass final
+    : public impl::ConvolutionToIGEMMPassBase<ConvolutionToIGEMMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
@@ -95,10 +97,4 @@ class ConvolutionToIGEMMPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvolutionToIGEMMPass() {
-  return std::make_unique<ConvolutionToIGEMMPass>();
-}
-
 } // namespace mlir::iree_compiler

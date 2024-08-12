@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -14,6 +13,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_DECOMPOSESOFTMAXPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 /// Given an N-dimensional tensor x, this op converts
@@ -96,9 +98,11 @@ static LogicalResult convertSoftmaxToGenerics(mlir::FunctionOpInterface funcOp,
   return success();
 }
 
-struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
-  DecomposeSoftmaxPass() = default;
-  DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
+struct DecomposeSoftmaxPass
+    : impl::DecomposeSoftmaxPassBase<DecomposeSoftmaxPass> {
+  using impl::DecomposeSoftmaxPassBase<
+      DecomposeSoftmaxPass>::DecomposeSoftmaxPassBase;
+  explicit DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();

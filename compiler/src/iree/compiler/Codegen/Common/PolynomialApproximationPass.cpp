@@ -3,7 +3,7 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#include "iree/compiler/Codegen/Common/PassDetail.h"
+
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
@@ -20,11 +20,15 @@ static llvm::cl::opt<bool> clNativeMathPrecision(
         "Skip polynomial lowering for math op natively available on GPU"),
     llvm::cl::init(false));
 
+#define GEN_PASS_DEF_POLYNOMIALAPPROXIMATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 /// math dialect elementry functions -> polynomial form.
-class PolynomialApproximationPass
-    : public PolynomialApproximationPassBase<PolynomialApproximationPass> {
+class PolynomialApproximationPass final
+    : public impl::PolynomialApproximationPassBase<
+          PolynomialApproximationPass> {
   void runOnOperation() override {
     RewritePatternSet mathPatterns(&getContext());
     populateExpandTanPattern(mathPatterns);
@@ -51,9 +55,4 @@ class PolynomialApproximationPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<>> createPolynomialApproximationPass() {
-  return std::make_unique<PolynomialApproximationPass>();
-}
-
 } // namespace mlir::iree_compiler

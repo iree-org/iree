@@ -181,7 +181,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Math dialect elementry functions -> polynomial form.
       .addPass(createPolynomialApproximationPass)
 
-      .addPass(createPadDynamicAlloc);
+      .addPass(createPadDynamicAllocPass);
 
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };

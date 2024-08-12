@@ -28,7 +28,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
     ],
@@ -133,9 +132,10 @@ iree_compiler_cc_library(
         "PropagateReshapesByExpansion.cpp",
         "ReconcileTranslationInfo.cpp",
         "RematerializeParallelOps.cpp",
-        "RemoveTrivialLoops.cpp",
+        "RemoveSingleIterationLoop.cpp",
         "ReplaceSlowMinMaxOps.cpp",
         "SplitFullPartialTransferPass.cpp",
+        "TensorToVectorVectorizePad.cpp",
         "TestExecutablePreprocessing.cpp",
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
@@ -144,7 +144,6 @@ iree_compiler_cc_library(
         "TypePropagationPass.cpp",
         "UserConfig.cpp",
         "VectorizeMemrefCopy.cpp",
-        "VectorizePad.cpp",
     ],
     hdrs = [
         "BufferizationAnalysis.h",

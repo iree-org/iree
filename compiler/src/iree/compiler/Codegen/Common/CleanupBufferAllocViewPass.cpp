@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -26,11 +25,14 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_CLEANUPBUFFERALLOCVIEWPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 /// Runs canonicalization patterns on interface load/store ops.
-struct CleanupBufferAllocViewPass
-    : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
+struct CleanupBufferAllocViewPass final
+    : impl::CleanupBufferAllocViewPassBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateReshapeToInterfaceTensorPatterns(patterns);
@@ -43,10 +45,4 @@ struct CleanupBufferAllocViewPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCleanupBufferAllocViewPass() {
-  return std::make_unique<CleanupBufferAllocViewPass>();
-}
-
 } // namespace mlir::iree_compiler

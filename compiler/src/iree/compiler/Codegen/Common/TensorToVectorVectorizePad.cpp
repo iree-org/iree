@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,6 +24,9 @@
 // Once it lands, this pattern can be replaced.
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TENSORTOVECTORVECTORIZEPADPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Gets the given `attrOrValue` as an index value by creating constant ops
 /// for attributes.
@@ -229,8 +231,11 @@ struct VectorizePadWithConditions final
   }
 };
 
-struct TensorToVectorVectorizePadPass
-    : public TensorToVectorVectorizePadBase<TensorToVectorVectorizePadPass> {
+struct TensorToVectorVectorizePadPass final
+    : impl::TensorToVectorVectorizePadPassBase<TensorToVectorVectorizePadPass> {
+  using impl::TensorToVectorVectorizePadPassBase<
+      TensorToVectorVectorizePadPass>::TensorToVectorVectorizePadPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -254,10 +259,4 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit) {
   patterns.add<VectorizePadWithConditions>(patterns.getContext(), baseBenefit);
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createVectorizePadPass() {
-  return std::make_unique<TensorToVectorVectorizePadPass>();
-}
-
 } // namespace mlir::iree_compiler

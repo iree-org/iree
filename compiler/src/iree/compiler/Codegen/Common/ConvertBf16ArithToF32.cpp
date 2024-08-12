@@ -14,7 +14,6 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -38,6 +37,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTBF16ARITHTOF32PASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -235,9 +237,10 @@ struct PromoteBF16ToF32Converter
   }
 };
 
-struct ConvertBf16ArithToF32Pass
-    : public ConvertBf16ArithToF32Base<ConvertBf16ArithToF32Pass> {
-  using ConvertBf16ArithToF32Base::ConvertBf16ArithToF32Base;
+struct ConvertBf16ArithToF32Pass final
+    : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
+  using impl::ConvertBf16ArithToF32PassBase<
+      ConvertBf16ArithToF32Pass>::ConvertBf16ArithToF32PassBase;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -312,9 +315,4 @@ struct ConvertBf16ArithToF32Pass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<>> createConvertBf16ArithToF32Pass() {
-  return std::make_unique<ConvertBf16ArithToF32Pass>();
-}
-
 } // namespace mlir::iree_compiler

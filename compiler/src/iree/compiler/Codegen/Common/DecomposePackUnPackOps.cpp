@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,6 +24,9 @@
 #define DEBUG_TYPE "iree-codegen-decompose-pack-unpack-ops"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_DECOMPOSEPACKUNPACKOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -62,9 +64,11 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-struct DecomposePackUnPackOpsPass
-    : public DecomposePackUnPackOpsBase<DecomposePackUnPackOpsPass> {
-  DecomposePackUnPackOpsPass(bool tileOuterToOne) {
+struct DecomposePackUnPackOpsPass final
+    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
+  using impl::DecomposePackUnPackOpsPassBase<
+      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
+  explicit DecomposePackUnPackOpsPass(bool tileOuterToOne) {
     this->tileOuterToOne = tileOuterToOne;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
