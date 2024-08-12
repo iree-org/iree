@@ -1,0 +1,27 @@
+Help on package iree.compiler in iree:
+
+NNAAMMEE
+    iree.compiler - IREE compiler Python bindings.
+
+PPAACCKKAAGGEE  CCOONNTTEENNTTSS
+    _mlir_libs (package)
+    _package_test
+    api (package)
+    ir
+    passmanager
+    rewrite
+    tf
+    tflite
+    tools (package)
+
+SSUUBBMMOODDUULLEESS
+    binaries
+    core
+    debugging
+
+DDAATTAA
+    DDEEFFAAUULLTT__TTEESSTTIINNGG__BBAACCKKEENNDDSS = ['llvm-cpu']
+
+FFIILLEE
+    /home/rbhowmik/iree-build/compiler/bindings/python/iree/compiler/__init__.py
+
