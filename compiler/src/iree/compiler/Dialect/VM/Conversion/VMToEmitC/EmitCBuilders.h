@@ -45,42 +45,6 @@ enum PreprocessorDirective {
   PRAGMA
 };
 
-enum UnaryOperator {
-  // arithmetic
-  PLUS = 0,
-  MINUS,
-  BITWISE_NOT,
-  // logical
-  LOGICAL_NOT,
-};
-
-enum BinaryOperator {
-  // arithmetic
-  ADDITION = 0,
-  SUBTRACTION,
-  PRODUCT,
-  DIVISION,
-  REMAINDER,
-  BITWISE_AND,
-  BITWISE_OR,
-  BITWISE_XOR,
-  BITWISE_LEFT_SHIFT,
-  BITWISE_RIGHT_SHIFT,
-  // logical
-  LOGICAL_AND,
-  LOGICAL_OR,
-  // comparison
-  EQUAL_TO,
-  NOT_EQUAL_TO,
-  LESS_THAN,
-  GREATER_THAN,
-  LESS_THAN_OR_EQUAL,
-  GREATER_THAN_OR_EQUAL,
-};
-
-Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
-                    Value operand, Type resultType);
-
 Value allocateVariable(OpBuilder builder, Location location, Type type,
                        Attribute initializer);
 
