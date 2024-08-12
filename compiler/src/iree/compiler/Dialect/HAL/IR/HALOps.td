@@ -1469,6 +1469,7 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
   }];
 }
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_CommandBufferPushConstantsOp : HAL_Op<"command_buffer.push_constants"> {
   let summary = [{command buffer push constants operation}];
   let description = [{
@@ -1496,6 +1497,7 @@ def HAL_CommandBufferPushConstantsOp : HAL_Op<"command_buffer.push_constants"> {
   }];
 }
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_CommandBufferPushDescriptorSetOp : HAL_Op<"command_buffer.push_descriptor_set", [
   SameVariadicOperandSize,
 ]> {
@@ -1541,6 +1543,7 @@ def HAL_CommandBufferPushDescriptorSetOp : HAL_Op<"command_buffer.push_descripto
   let hasCanonicalizer = 1;
 }
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let summary = [{command buffer dispatch recording operation}];
   let description = [{
@@ -1571,6 +1574,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   }];
 }
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
   let summary = [{command buffer indirect dispatch recording operation}];
   let description = [{
@@ -1596,6 +1600,139 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
+}
+
+def HAL_CommandBufferDispatch2Op : HAL_Op<"command_buffer.dispatch2", [
+  AttrSizedOperandSegments,
+]> {
+  let summary = [{command buffer dispatch recording operation}];
+  let description = [{
+    Dispatches an execution request.
+    The request may execute overlapped with any other transfer operation or
+    dispatch made within the same barrier-defined sequence.
+
+    The provided constant data and binding list will be recorded into the
+    command buffer and need not remain live beyond the call. Push constants are
+    always 4-byte values and treated as opaque, meaning that they may be
+    bit-casted floats, bit-packed booleans, etc. The provided buffers may either
+    be HAL buffers or indirect references into the command buffer binding table.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,
+    HAL_Ordinal:$entry_point,
+    HAL_Dim:$workgroup_x,
+    HAL_Dim:$workgroup_y,
+    HAL_Dim:$workgroup_z,
+    Variadic<I32>:$constants,
+    Variadic<AnyTypeOf<[Index, HAL_BufferType]>>:$binding_buffers,
+    Variadic<HAL_DeviceSize>:$binding_offsets,
+    Variadic<HAL_DeviceSize>:$binding_lengths,
+    HAL_DispatchFlagsAttr:$flags
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $executable `:` type($executable) `)`
+    `` `[` $entry_point `]`
+    `workgroups` `(` `[`
+        $workgroup_x `,`
+        $workgroup_y `,`
+        $workgroup_z
+    `]` `)`
+    (`constants` `(` `[` $constants^ `]` `)`)?
+    `bindings` `(` `[`
+    custom<Bindings>($binding_buffers,
+                     type($binding_buffers),
+                     $binding_offsets,
+                     $binding_lengths)
+    `]` `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Value":$commandBuffer,
+      "Value":$executable,
+      "Value":$entryPoint,
+      "ValueRange":$workgroups,
+      "ValueRange":$constants,
+      "ArrayRef<BindingValue>":$bindings,
+      "IREE::HAL::DispatchFlags":$flags
+    )>,
+  ];
+
+  let hasVerifier = 1;
+}
+
+def HAL_CommandBufferDispatch2IndirectOp : HAL_Op<"command_buffer.dispatch2.indirect", [
+  AttrSizedOperandSegments,
+]> {
+  let summary = [{command buffer indirect dispatch recording operation}];
+  let description = [{
+    Dispatches an execution request with a deferred workgroup count.
+    This is the same as iree_hal_command_buffer_dispatch but the workgroup count
+    is read from the given |workgroups_ref| buffer at the specified offset as
+    3 uint32_t XYZ values immediately before performing the dispatch. This
+    allows prior dispatches within the command sequence to populate the
+    workgroup count or the workgroup count to change across submissions of the
+    same reusable command buffer.
+
+    The provided constant data and binding list will be recorded into the
+    command buffer and need not remain live beyond the call. Push constants are
+    always 4-byte values and treated as opaque, meaning that they may be
+    bit-casted floats, bit-packed booleans, etc. The provided buffers may either
+    be HAL buffers or indirect references into the command buffer binding table.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,
+    HAL_Ordinal:$entry_point,
+    AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
+    HAL_DeviceSize:$workgroups_offset,
+    Variadic<I32>:$constants,
+    Variadic<AnyTypeOf<[Index, HAL_BufferType]>>:$binding_buffers,
+    Variadic<HAL_DeviceSize>:$binding_offsets,
+    Variadic<HAL_DeviceSize>:$binding_lengths,
+    HAL_DispatchFlagsAttr:$flags
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $executable `:` type($executable) `)`
+    `` `[` $entry_point `]`
+    `workgroups` `(` $workgroups_buffer `:` type($workgroups_buffer) `)`
+    `` `[` $workgroups_offset `]`
+    (`constants` `(` `[` $constants^ `]` `)`)?
+    `bindings` `(` `[`
+    custom<Bindings>($binding_buffers,
+                     type($binding_buffers),
+                     $binding_offsets,
+                     $binding_lengths)
+    `]` `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Value":$commandBuffer,
+      "Value":$executable,
+      "Value":$entryPoint,
+      "Value":$workgroupsBuffer,
+      "Value":$workgroupsOffset,
+      "ValueRange":$constants,
+      "ArrayRef<BindingValue>":$bindings,
+      "IREE::HAL::DispatchFlags":$flags
+    )>,
+  ];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupCommandBufferOps
@@ -2060,7 +2197,7 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
       "Value":$waitFence,
       "Value":$signalFence,
       "Value":$commandBuffer,
-      "ArrayRef<BindingTableValue>":$bindings
+      "ArrayRef<IREE::HAL::BindingValue>":$bindings
     )>,
   ];
 
@@ -2663,6 +2800,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   ];
 }
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   AttrSizedOperandSegments,
@@ -2696,6 +2834,42 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
     `device` `(` $device `:` type($device) `)`
     `target` `(` $executable_target `)`
     `layouts` `(` `[` $layouts `]` `)`
+    (`constants` `(` `[` $constants^ `]` `)`)?
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_ExecutableCreate2Op : HAL_PureOp<"executable.create2", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{creates an executable}];
+  let description = [{
+    Creates a target-dependent executable cached on the provided device. Entry
+    points contained within the executable can be dispatched using the resulting
+    executable handle.
+
+    Depending on the driver creation may take a non-trivial amount of time
+    (such as when JITing/etc). As the cache is internally synchronized callers
+    can issue preparation requests from multiple threads - even for the same
+    executables - and calls will block until preparation completes.
+
+    Optional constants provide for specialization of the executable based on
+    runtime-derived parameters.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    SymbolRefAttr:$executable_target,
+    Variadic<I32>:$constants
+  );
+  let results = (outs
+    HAL_Executable:$result
+  );
+
+  let assemblyFormat = [{
+    `device` `(` $device `:` type($device) `)`
+    `target` `(` $executable_target `)`
     (`constants` `(` `[` $constants^ `]` `)`)?
     `:` type($result)
     attr-dict-with-keyword

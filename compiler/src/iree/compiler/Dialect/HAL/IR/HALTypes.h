@@ -185,7 +185,10 @@ struct DescriptorSetBindingValue {
   Value byteLength;
 };
 
-struct BindingTableValue {
+// A tuple containing runtime values for a binding.
+// The buffer specified may be either a !hal.buffer or an index of a binding
+// table slot to source the buffer from.
+struct BindingValue {
   Value buffer;
   Value byteOffset;
   Value byteLength;

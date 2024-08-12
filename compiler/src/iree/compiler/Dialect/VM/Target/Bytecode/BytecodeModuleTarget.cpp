@@ -202,12 +202,23 @@ static iree_vm_AttrDef_vec_ref_t makeAttrDefs(DictionaryAttr attrs,
   SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
   for (auto attr : attrs) {
     auto key = attr.getName().strref();
-    auto value = llvm::dyn_cast<StringAttr>(attr.getValue());
-    if (!value || key.empty())
+    if (key.empty()) {
       continue;
+    }
+    std::string value;
+    if (auto stringAttr = dyn_cast<StringAttr>(attr.getValue())) {
+      value = stringAttr.getValue().str();
+    } else if (auto integerAttr = dyn_cast<IntegerAttr>(attr.getValue())) {
+      SmallVector<char> str;
+      integerAttr.getValue().toStringSigned(str);
+      value.append(str.data(), str.size());
+    } else {
+      assert(false && "expected string or integer reflection attr");
+      continue;
+    }
     // NOTE: if we actually want to keep these we should dedupe them (as the
     // keys and likely several of the values are shared across all functions).
-    auto valueRef = fbb.createString(value.getValue());
+    auto valueRef = fbb.createString(value);
     auto keyRef = fbb.createString(key);
     attrRefs.push_back(iree_vm_AttrDef_create(fbb, keyRef, valueRef));
   }

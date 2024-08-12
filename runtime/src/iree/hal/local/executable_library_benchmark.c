@@ -186,7 +186,7 @@ static iree_status_t iree_hal_executable_library_run(
       local_executable->dispatch_attrs
           ? local_executable->dispatch_attrs[FLAG_entry_point]
                     .local_memory_pages *
-                IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+                IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
           : 0;
   if (local_memory_size > 0) {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(

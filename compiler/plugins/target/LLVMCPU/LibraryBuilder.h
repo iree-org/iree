@@ -74,16 +74,22 @@ public:
     UNDEFINED = 4u,
   };
 
-  // IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+  // IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
   static const int64_t kWorkgroupLocalMemoryPageSize = 4096;
 
   // iree_hal_executable_dispatch_attrs_v0_t
   struct DispatchAttrs {
     // Required workgroup local memory size, in bytes.
     int64_t localMemorySize = 0;
+    // Total number of 32-bit constants used by the dispatch.
+    uint8_t constantCount = 0;
+    // Total number of bindings used by the dispatch.
+    uint8_t bindingCount = 0;
 
     // True if all values are default and the attributes may be omitted.
-    constexpr bool isDefault() const { return localMemorySize == 0; }
+    constexpr bool isDefault() const {
+      return localMemorySize == 0 && constantCount == 0 && bindingCount == 0;
+    }
   };
 
   // iree_hal_executable_source_location_v0_t

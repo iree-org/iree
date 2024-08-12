@@ -43,6 +43,45 @@ util.func public @executableCreate(
 
 // -----
 
+hal.executable @exe {
+  hal.executable.binary @binary1 attributes {
+    data = dense<[0, 1, 2, 3]> : vector<4xi8>,
+    format = "format1"
+  }
+  hal.executable.binary @binary2 attributes {
+    data = dense<[4, 5, 6, 7]> : vector<4xi8>,
+    format = "format2"
+  }
+}
+
+// CHECK-LABEL: @executableCreate2
+util.func public @executableCreate2(
+  // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
+  %device: !hal.device
+) -> (!hal.executable, !hal.executable) {
+
+  // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format1_
+  // CHECK-DAG: %[[BINARY1:.+]] = vm.rodata.inline "exe_binary1" {alignment = 16 : i64} : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
+  // CHECK-DAG: %[[NULL1:.+]] = vm.const.ref.zero : !vm.buffer
+  // CHECK: %[[EXE1:.+]] = vm.call @hal.executable.create2(
+  // CHECK-SAME: %[[DEV]], %[[FORMAT1]], %[[BINARY1]], %[[NULL1]]
+  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer) -> !vm.ref<!hal.executable>
+  %0 = hal.executable.create2 device(%device : !hal.device) target(@exe::@binary1) : !hal.executable
+
+  // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format2_
+  // CHECK-DAG: %[[BINARY2:.+]] = vm.rodata.inline "exe_binary2" {alignment = 16 : i64} : !vm.buffer = dense<[4, 5, 6, 7]> : vector<4xi8>
+  // CHECK-DAG: %[[NULL2:.+]] = vm.const.ref.zero : !vm.buffer
+  // CHECK: %[[EXE2:.+]] = vm.call @hal.executable.create2(
+  // CHECK-SAME: %[[DEV]], %[[FORMAT2]], %[[BINARY2]], %[[NULL2]]
+  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer) -> !vm.ref<!hal.executable>
+  %1 = hal.executable.create2 device(%device : !hal.device) target(@exe::@binary2) : !hal.executable
+
+  // CHECK: vm.return %[[EXE1]], %[[EXE2]]
+  util.return %0, %1 : !hal.executable, !hal.executable
+}
+
+// -----
+
 hal.executable @exe1 {
   hal.executable.binary @binary1 attributes {
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,

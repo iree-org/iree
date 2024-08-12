@@ -749,7 +749,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
   VkPipeline pipeline_handle = VK_NULL_HANDLE;
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_native_executable_pipeline_for_entry_point(
-          executable, entry_point, &pipeline_handle));
+          executable, entry_point, &pipeline_handle, NULL));
   command_buffer->syms->vkCmdBindPipeline(
       command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_handle);
 
@@ -787,9 +787,123 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   VkPipeline pipeline_handle = VK_NULL_HANDLE;
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_native_executable_pipeline_for_entry_point(
-          executable, entry_point, &pipeline_handle));
+          executable, entry_point, &pipeline_handle, NULL));
   command_buffer->syms->vkCmdBindPipeline(
       command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_handle);
+
+  VkBuffer workgroups_device_buffer =
+      iree_hal_vulkan_buffer_handle(workgroups_ref.buffer);
+  iree_device_size_t workgroups_offset =
+      iree_hal_buffer_byte_offset(workgroups_ref.buffer) +
+      workgroups_ref.offset;
+  command_buffer->syms->vkCmdDispatchIndirect(
+      command_buffer->handle, workgroups_device_buffer, workgroups_offset);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch2_bind(
+    iree_hal_vulkan_direct_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
+  // Get the compiled and linked pipeline for the specified entry point.
+  VkPipeline pipeline_handle = VK_NULL_HANDLE;
+  iree_hal_pipeline_layout_t* pipeline_layout = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_native_executable_pipeline_for_entry_point(
+          executable, entry_point, &pipeline_handle, &pipeline_layout));
+
+  // Update push constants.
+  if (!iree_const_byte_span_is_empty(constants)) {
+    VkPipelineLayout pipeline_layout_handle =
+        iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
+    command_buffer->syms->vkCmdPushConstants(
+        command_buffer->handle, pipeline_layout_handle,
+        VK_SHADER_STAGE_COMPUTE_BIT, (uint32_t)0,
+        (uint32_t)constants.data_length, constants.data);
+  }
+
+  // Retain bound buffers until the command buffer is reset.
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, bindings.count, bindings.values,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
+
+  // Either allocate, update, and bind a descriptor set or use push descriptor
+  // sets to use the command buffer pool when supported.
+  IREE_RETURN_IF_ERROR(command_buffer->descriptor_set_arena.BindDescriptorSet(
+      command_buffer->handle, pipeline_layout, 0, bindings.count,
+      bindings.values));
+
+  command_buffer->syms->vkCmdBindPipeline(
+      command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_handle);
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch2(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  IREE_TRACE({
+    iree_hal_vulkan_source_location_t source_location;
+    iree_hal_vulkan_native_executable_entry_point_source_location(
+        executable, entry_point, &source_location);
+    IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+        command_buffer->tracing_context, command_buffer->handle,
+        source_location.file_name.data, source_location.file_name.size,
+        source_location.line, source_location.func_name.data,
+        source_location.func_name.size, /*name=*/NULL, 0);
+  });
+
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &executable));
+
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_direct_command_buffer_dispatch2_bind(
+      command_buffer, executable, entry_point, constants, bindings, flags));
+
+  command_buffer->syms->vkCmdDispatch(command_buffer->handle,
+                                      workgroup_count[0], workgroup_count[1],
+                                      workgroup_count[2]);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch2_indirect(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  IREE_TRACE({
+    iree_hal_vulkan_source_location_t source_location;
+    iree_hal_vulkan_native_executable_entry_point_source_location(
+        executable, entry_point, &source_location);
+    IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
+        command_buffer->tracing_context, command_buffer->handle,
+        source_location.file_name.data, source_location.file_name.size,
+        source_location.line, source_location.func_name.data,
+        source_location.func_name.size, /*name=*/NULL, 0);
+  });
+
+  const void* resources[2] = {executable, workgroups_ref.buffer};
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, IREE_ARRAYSIZE(resources), resources));
+
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_direct_command_buffer_dispatch2_bind(
+      command_buffer, executable, entry_point, constants, bindings, flags));
 
   VkBuffer workgroups_device_buffer =
       iree_hal_vulkan_buffer_handle(workgroups_ref.buffer);
@@ -836,5 +950,8 @@ const iree_hal_command_buffer_vtable_t
         /*.dispatch=*/iree_hal_vulkan_direct_command_buffer_dispatch,
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,
+        /*.dispatch2=*/iree_hal_vulkan_direct_command_buffer_dispatch2,
+        /*.dispatch2_indirect=*/
+        iree_hal_vulkan_direct_command_buffer_dispatch2_indirect,
 };
 }  // namespace

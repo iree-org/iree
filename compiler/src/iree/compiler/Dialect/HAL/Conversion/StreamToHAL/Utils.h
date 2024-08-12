@@ -84,7 +84,7 @@ public:
   size_t size() const { return indirectBuffers.size(); }
 
   // Builds a binding table (buffer, offset, length) based on the analysis.
-  ArrayRef<IREE::HAL::BindingTableValue> getValues() { return indirectBuffers; }
+  ArrayRef<IREE::HAL::BindingValue> getValues() { return indirectBuffers; }
 
   // Returns the binding table slot for the given resource, if it's used
   // indirectly.
@@ -94,7 +94,7 @@ private:
   // True if any ops are nested that may prevent binding table usage.
   bool hasUnsupportedOps = false;
   // Buffer binding table with <buffer, offset, length>.
-  SmallVector<IREE::HAL::BindingTableValue> indirectBuffers;
+  SmallVector<IREE::HAL::BindingValue> indirectBuffers;
   // A mapping of resources to binding table slot ordinals.
   DenseMap<Value, Value> indirectSlots;
 };
@@ -111,10 +111,9 @@ public:
   // The returned range may differ from the provided used range in cases where
   // an indirect binding table reference may have already factored in the
   // offset.
-  IREE::HAL::BindingTableValue resolveBinding(Location loc, Value resourceValue,
-                                              Value bufferValue,
-                                              Value useOffset, Value useLength,
-                                              OpBuilder &builder);
+  IREE::HAL::BindingValue resolveBinding(Location loc, Value resourceValue,
+                                         Value bufferValue, Value useOffset,
+                                         Value useLength, OpBuilder &builder);
 
 private:
   Value handle;

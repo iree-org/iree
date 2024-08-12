@@ -43,7 +43,8 @@ void iree_hal_vulkan_native_executable_entry_point_source_location(
 // Returns the cached VkPipeline for the given executable |entry_ordinal|.
 iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
     iree_hal_executable_t* executable, iree_host_size_t entry_ordinal,
-    VkPipeline* out_pipeline_handle);
+    VkPipeline* out_pipeline_handle,
+    iree_hal_pipeline_layout_t** out_pipeline_layout);
 
 #ifdef __cplusplus
 }  // extern "C"

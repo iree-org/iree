@@ -160,6 +160,19 @@ util.func public @executable_create(
 
 // -----
 
+// CHECK-LABEL: @executable_create2
+// CHECK-SAME: %[[DEVICE:.+]]: !hal.device
+util.func public @executable_create2(%device: !hal.device) {
+  //      CHECK: = hal.executable.create
+  // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+  // CHECK-SAME:     target(@exe::@binary1) : !hal.executable
+  %0 = hal.executable.create2 device(%device : !hal.device)
+                              target(@exe::@binary1) : !hal.executable
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @pipeline_layout_create
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.descriptor_set_layout,
