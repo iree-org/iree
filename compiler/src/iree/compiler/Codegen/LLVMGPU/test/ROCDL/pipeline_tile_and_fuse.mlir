@@ -45,8 +45,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
 //   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
-//   CHECK-DAG:   memref.alloc() : memref<64x4xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x4xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1280 step %c4 {{.*}} -> (vector<8x4xf32>)
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2xf16>
@@ -106,8 +106,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
 //   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
@@ -190,8 +190,8 @@ hal.executable private @main {
 //     CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
 //     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
-//     CHECK-DAG:   memref.alloc() : memref<1x64x32xf16, #gpu.address_space<workgroup>>
-//     CHECK-DAG:   memref.alloc() : memref<32x64xf16, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   memref.alloc() : memref<1x64x36xf16, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   memref.alloc() : memref<32x68xf16, #gpu.address_space<workgroup>>
 //     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //     CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -262,8 +262,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
 //   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
 //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2x8xf16>
@@ -331,8 +331,8 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func @matmul_transpose_b_mfma_16x16x4
-//   CHECK-DAG:   memref.alloc() : memref<64x8xf32, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x8xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c320 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 // CHECK-COUNT-8:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
 //       CHECK:     scf.yield
@@ -385,8 +385,8 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func @matmul_transpose_b_mfma_16x16x32_f8
-//   CHECK-DAG:   memref.alloc() : memref<64x64xf8E4M3FNUZ, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x64xf8E4M3FNUZ, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c40 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 // CHECK-COUNT-8:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32
 //       CHECK:     scf.yield
@@ -439,8 +439,8 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func @matmul_transpose_b_mfma_32x32x16_i8
-//   CHECK-DAG:   memref.alloc() : memref<64x32xi8, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x32xi8, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x4x1xi32>)
 // CHECK-COUNT-8:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32
 //       CHECK:     scf.yield
@@ -493,8 +493,8 @@ hal.executable public @main {
 }
 
 // CHECK-LABEL: func @matmul_transpose_b_wmma_f16_16x16x16_f16
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf16>)
 // CHECK-COUNT-8:   amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf16>
 //       CHECK:     scf.yield
