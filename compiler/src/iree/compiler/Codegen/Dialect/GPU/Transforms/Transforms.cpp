@@ -463,7 +463,6 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
                                             IREE::GPU::MultiMmaOp mmaOp) {
   if (!mmaOp.hasTensorSemantics() || mmaOp.hasThreadSemantics()) {
-    llvm::errs() << "semantics\n";
     return rewriter.notifyMatchFailure(
         mmaOp, "mmaOp must have vector and subgroup for distribution.");
   }
@@ -510,8 +509,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Lhs, laneId, lhsPermutation,
           lhsOffsets, lhsSizes, lhsStrides))) {
-    llvm::errs() << "lhs\n";
-    return rewriter.notifyMatchFailure(mmaOp, "failed to populate lhs offsets");
+    return mmaOp->emitOpError("failed to populate lhs offsets");
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
   // vector shape.
@@ -531,8 +529,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Rhs, laneId, rhsPermutation,
           rhsOffsets, rhsSizes, rhsStrides))) {
-    llvm::errs() << "rhs\n";
-    return rewriter.notifyMatchFailure(mmaOp, "failed to populate rhs offsets");
+    return mmaOp->emitOpError("failed to populate rhs offsets");
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
   // vector shape.
@@ -552,8 +549,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Acc, laneId, accPermutation,
           accOffsets, accSizes, accStrides))) {
-    llvm::errs() << "acc\n";
-    return rewriter.notifyMatchFailure(mmaOp, "failed to populate acc offsets");
+    return mmaOp->emitOpError("failed to populate acc offsets");
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
   // inner vector shape.
