@@ -392,7 +392,7 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   uint8_t constant_count;
   // Total number of bindings used by the dispatch.
   uint8_t binding_count;
-  // TODO(#18189): add ~8 uint64_t fields for binding bits (readonly/indirect).
+  // TODO(#18154): add ~8 uint64_t fields for binding bits (readonly/indirect).
 } iree_hal_executable_dispatch_attrs_v0_t;
 static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
