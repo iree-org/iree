@@ -224,7 +224,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
       }
       if (!iree_status_is_ok(status)) break;
 
-      // TODO(#18189): embed all of this on a single flatbuffer table
+      // TODO(#18154): embed all of this on a single flatbuffer table
       // per-export.
       //
       // Package required parameters for kernel launches for each entry point.

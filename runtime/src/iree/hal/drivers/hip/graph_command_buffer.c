@@ -60,7 +60,7 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
 
-  // TODO(#18189): drop state used by legacy bindings mechanism.
+  // TODO(#18154): drop state used by legacy bindings mechanism.
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
   struct {
     hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
