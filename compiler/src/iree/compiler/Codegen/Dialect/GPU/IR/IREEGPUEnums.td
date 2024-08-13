@@ -98,7 +98,7 @@ class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> 
   let genSpecializedAttr = 0;
 }
 
-// Format: <kind>_<input-type>_<M>x<N>x<K>_<output-type>
+// Format: <kind>_<output-type>_<M>x<N>x<K>_<input-type>
 def MFMA_F32_16x16x4_F32 : I32EnumAttrCase<"MFMA_F32_16x16x4_F32", 0>;
 def MFMA_F32_16x16x16_F16 : I32EnumAttrCase<"MFMA_F32_16x16x16_F16", 1>;
 def MFMA_F32_32x32x8_F16  : I32EnumAttrCase<"MFMA_F32_32x32x8_F16", 2>;
