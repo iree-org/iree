@@ -73,7 +73,6 @@ iree_lit_test_suite(
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
-    "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck
     iree-opt

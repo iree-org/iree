@@ -73,7 +73,6 @@ iree_cc_library(
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
     "WorkgroupReordering.cpp"
-    "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
