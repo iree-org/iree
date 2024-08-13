@@ -238,8 +238,8 @@ func.func @concretize_WMMA_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tenso
 // CHECK-INPUTS:        %[[MMA:.+]] = iree_gpu.multi_mma
 // CHECK-INPUTS:        return %[[MMA]]
 
-// CHECK-RESULT:        %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0, 1], [2]] output_shape [8, 2, 16]
+// CHECK-RESULT:        %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0, 1], [2]] output_shape [16, 1, 16]
 // CHECK-RESULT:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[EXPANDED_ACC]]
-// CHECK-RESULT-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<8x2x16xf16>
+// CHECK-RESULT-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x1x16xf16>
 // CHECK-RESULT:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0, 1], [2]]
 // CHECK-RESULT:        return %[[COLLAPSED]]
