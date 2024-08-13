@@ -208,11 +208,11 @@ def generate_function(
     func_definition = ""
 
     signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
-    import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: f32) -> !hal.buffer_view"
+    import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
     func_definition = func_definition + (
         f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
         f"  %result0 = tensor.empty(): {result_tensor_type}\n"
-        f"  %scale_f16 = arith.truncf %scale : f32 to f16 \n"
+        f"  %scale_f16 = arith.truncf %scale : {F32} to {F16} \n"
         f"  %result1 = {op_name} {{\n"
         f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"

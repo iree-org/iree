@@ -279,8 +279,8 @@ static void attention_results_deinitialize(attention_results_t* results) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-// Helper for check_matmul_results: the actual interesting part once we've
-// obtained and validated the {m,k,n}_size values. On error, detailed logging is
+// Helper for check_attention_results: the actual interesting part once we've
+// obtained and validated the {b,m,k1,k2,n}_size values. On error, detailed logging is
 // written to |file| if it is not NULL.
 static iree_status_t check_attention_results_impl(
     FILE* file, const attention_results_t* results, int check_every) {
