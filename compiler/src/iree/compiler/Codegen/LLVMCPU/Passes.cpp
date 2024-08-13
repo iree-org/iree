@@ -451,8 +451,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
+      tilingConfig.getVectorReductionLevel()));
   funcPassManager.addPass(
       createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
