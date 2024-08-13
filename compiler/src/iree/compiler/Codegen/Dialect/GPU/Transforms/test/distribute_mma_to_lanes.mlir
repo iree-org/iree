@@ -239,7 +239,7 @@ func.func @distribute_WMMA_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tenso
 }
 
 // CHECK-DAG: #[[$XMAP:.+]] = affine_map<(d0) -> (d0 mod 16)>
-// CHECK-DAG: #[[$YMAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 2)>
+// CHECK-DAG: #[[$YMAP:.+]] = affine_map<() -> ()>
 
 // CHECK-LABEL: func @distribute_WMMA_F16_16x16x16_F16
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
@@ -248,10 +248,9 @@ func.func @distribute_WMMA_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tenso
 //   CHECK-DAG:     %[[IDX:.+]] = affine.apply #[[$XMAP]](%[[LANEID]])
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[IDX]], 0] [1, 16]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, %[[IDX]]] [16, 1]
-//   CHECK-DAG:     %[[IDY:.+]] = affine.apply #[[$YMAP]](%[[LANEID]])
-//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, %[[IDY]], %[[IDX]]] [8, 1, 1]
+//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, 0, %[[IDX]]] [16, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]]
 //  CHECK-SAME:       kind = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F16>
-//  CHECK-SAME:       : tensor<1x16xf16>, tensor<16x1xf16> into tensor<8x1x1xf16>
-//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][0, %[[IDY]], %[[IDX]]] [8, 1, 1]
+//  CHECK-SAME:       : tensor<1x16xf16>, tensor<16x1xf16> into tensor<16x1x1xf16>
+//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][0, 0, %[[IDX]]] [16, 1, 1]
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
