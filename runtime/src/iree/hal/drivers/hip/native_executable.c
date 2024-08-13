@@ -18,8 +18,8 @@
 #include "iree/base/internal/flatcc/parsing.h"
 #include "iree/schemas/executable_debug_info_reader.h"
 #include "iree/schemas/executable_debug_info_verifier.h"
-#include "iree/schemas/rocm_executable_def_reader.h"
-#include "iree/schemas/rocm_executable_def_verifier.h"
+#include "iree/schemas/hip_executable_def_reader.h"
+#include "iree/schemas/hip_executable_def_verifier.h"
 
 typedef struct iree_hal_hip_native_executable_t {
   // Abstract resource used for injecting reference counting and vtable;
@@ -64,7 +64,7 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
   // the flatbuffer meet our expectations.
-  int verify_ret = iree_hal_rocm_ExecutableDef_verify_as_root(
+  int verify_ret = iree_hal_hip_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -72,11 +72,11 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
                             flatcc_verify_error_string(verify_ret));
   }
 
-  iree_hal_rocm_ExecutableDef_table_t executable_def =
-      iree_hal_rocm_ExecutableDef_as_root(flatbuffer_data.data);
+  iree_hal_hip_ExecutableDef_table_t executable_def =
+      iree_hal_hip_ExecutableDef_as_root(flatbuffer_data.data);
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
+      iree_hal_hip_ExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
   if (entry_point_count == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -90,9 +90,9 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
     }
   }
 
-  iree_hal_rocm_BlockSize_vec_t block_sizes_vec =
-      iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
-  size_t block_size_count = iree_hal_rocm_BlockSize_vec_len(block_sizes_vec);
+  iree_hal_hip_BlockSize_vec_t block_sizes_vec =
+      iree_hal_hip_ExecutableDef_block_sizes_get(executable_def);
+  size_t block_size_count = iree_hal_hip_BlockSize_vec_len(block_sizes_vec);
   if (entry_point_count != block_size_count) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -101,7 +101,7 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
   }
 
   flatbuffers_uint32_vec_t shared_memory_sizes_vec =
-      iree_hal_rocm_ExecutableDef_shared_memory_sizes_get(executable_def);
+      iree_hal_hip_ExecutableDef_shared_memory_sizes_get(executable_def);
   size_t shared_memory_sizes_count =
       flatbuffers_string_vec_len(shared_memory_sizes_vec);
   if (entry_point_count != shared_memory_sizes_count) {
@@ -112,7 +112,7 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
   }
 
   flatbuffers_string_t hsaco_image =
-      iree_hal_rocm_ExecutableDef_hsaco_image_get(executable_def);
+      iree_hal_hip_ExecutableDef_hsaco_image_get(executable_def);
   if (flatbuffers_string_len(hsaco_image) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no HSACO image present");
@@ -137,18 +137,18 @@ iree_status_t iree_hal_hip_native_executable_create(
       z0, iree_hal_hip_native_executable_flatbuffer_verify(
               executable_params->executable_data));
 
-  iree_hal_rocm_ExecutableDef_table_t executable_def =
-      iree_hal_rocm_ExecutableDef_as_root(
+  iree_hal_hip_ExecutableDef_table_t executable_def =
+      iree_hal_hip_ExecutableDef_as_root(
           executable_params->executable_data.data);
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
-  iree_hal_rocm_BlockSize_vec_t block_sizes_vec =
-      iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
+      iree_hal_hip_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_hip_BlockSize_vec_t block_sizes_vec =
+      iree_hal_hip_ExecutableDef_block_sizes_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes_vec =
-      iree_hal_rocm_ExecutableDef_shared_memory_sizes_get(executable_def);
+      iree_hal_hip_ExecutableDef_shared_memory_sizes_get(executable_def);
   flatbuffers_string_t hsaco_image =
-      iree_hal_rocm_ExecutableDef_hsaco_image_get(executable_def);
+      iree_hal_hip_ExecutableDef_hsaco_image_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
@@ -213,7 +213,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 
     // Publish any embedded source files to the tracing infrastructure.
     iree_hal_debug_publish_source_files(
-        iree_hal_rocm_ExecutableDef_source_files_get(executable_def));
+        iree_hal_hip_ExecutableDef_source_files_get(executable_def));
 
     for (iree_host_size_t i = 0; i < entry_point_count; i++) {
       // Lookup the function in the module; this should always succeed but we
@@ -287,10 +287,10 @@ iree_status_t iree_hal_hip_native_executable_create(
       });
 
       IREE_TRACE({
-        if (iree_hal_rocm_ExecutableDef_source_locations_is_present(
+        if (iree_hal_hip_ExecutableDef_source_locations_is_present(
                 executable_def)) {
           iree_hal_debug_FileLineLocDef_vec_t source_locs_vec =
-              iree_hal_rocm_ExecutableDef_source_locations_get(executable_def);
+              iree_hal_hip_ExecutableDef_source_locations_get(executable_def);
           iree_hal_debug_FileLineLocDef_table_t source_loc =
               iree_hal_debug_FileLineLocDef_vec_at(source_locs_vec, i);
           flatbuffers_string_t filename =
