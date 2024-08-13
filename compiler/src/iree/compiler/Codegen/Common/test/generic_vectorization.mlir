@@ -445,3 +445,62 @@ func.func @dynamic_fill_with_scalable_tiling_infer_remainder_vector_size(%arg0: 
 // CHECK-MASK:   scf.for
 // CHECK-MASK:     scf.for
 // CHECK-MASK:       vector.transfer_write %[[CST]], {{.*}} {in_bounds = [true, true, true, true]} : vector<1x1x4x[4]xf32>, tensor<1x1x4x?xf32>
+
+// -----
+
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0], [1, 4, [4], 0], [0, 0, 0, 3], [0, 0, 0, 0]]>
+#map = affine_map<()[s0] -> (-(96 mod s0) + 96)>
+#map1 = affine_map<(d0) -> (d0 * 2)>
+
+func.func @depthwise_conv_fold_away_masking(%arg0: tensor<1x68x120x96xf32>, %arg1: tensor<1x137x241x96xf32>, %arg2: tensor<3x3x96xf32>) -> tensor<1x68x120x96xf32>
+  attributes {hal.executable.target = #aarch64_sve}
+{
+  %c3 = arith.constant 3 : index
+  %c96 = arith.constant 96 : index
+  %c120 = arith.constant 120 : index
+  %c68 = arith.constant 68 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %vscale = vector.vscale
+  %c4_vscale = arith.muli %vscale, %c4 : index
+  %0 = scf.for %arg3 = %c0 to %c68 step %c1 iter_args(%arg4 = %arg0) -> (tensor<1x68x120x96xf32>) {
+    %1 = scf.for %arg5 = %c0 to %c120 step %c4 iter_args(%arg6 = %arg4) -> (tensor<1x68x120x96xf32>) {
+      %2 = affine.apply #map()[%c4_vscale]
+      %3 = scf.for %arg7 = %c0 to %2 step %c4_vscale iter_args(%arg8 = %arg6) -> (tensor<1x68x120x96xf32>) {
+        %4 = affine.apply #map1(%arg3)
+        %5 = affine.apply #map1(%arg5)
+        %extracted_slice = tensor.extract_slice %arg1[0, %4, %5, %arg7] [1, 3, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x137x241x96xf32> to tensor<1x3x9x?xf32>
+        %extracted_slice_0 = tensor.extract_slice %arg2[0, 0, %arg7] [3, 3, %c4_vscale] [1, 1, 1] : tensor<3x3x96xf32> to tensor<3x3x?xf32>
+        %extracted_slice_1 = tensor.extract_slice %arg8[0, %arg3, %arg5, %arg7] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x68x120x96xf32> to tensor<1x1x4x?xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%extracted_slice_1 : tensor<1x1x4x?xf32>) -> tensor<1x1x4x?xf32>
+        %7 = scf.for %arg9 = %c0 to %c3 step %c1 iter_args(%arg10 = %6) -> (tensor<1x1x4x?xf32>) {
+          %extracted_slice_2 = tensor.extract_slice %extracted_slice[0, %arg9, 0, 0] [1, 1, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x3x9x?xf32> to tensor<1x1x9x?xf32>
+          %extracted_slice_3 = tensor.extract_slice %extracted_slice_0[%arg9, 0, 0] [1, 3, %c4_vscale] [1, 1, 1] : tensor<3x3x?xf32> to tensor<1x3x?xf32>
+          %extracted_slice_4 = tensor.extract_slice %arg10[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> to tensor<1x1x4x?xf32>
+          %extracted_slice_5 = tensor.extract_slice %extracted_slice_2[0, 0, 0, 0] [1, 1, 9, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x9x?xf32> to tensor<1x9x?xf32>
+          %extracted_slice_6 = tensor.extract_slice %extracted_slice_3[0, 0, 0] [1, 3, %c4_vscale] [1, 1, 1] : tensor<1x3x?xf32> to tensor<3x?xf32>
+          %extracted_slice_7 = tensor.extract_slice %extracted_slice_4[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> to tensor<1x4x?xf32>
+          %8 = linalg.depthwise_conv_1d_nwc_wc {dilations = dense<1> : vector<1xi64>, lowering_config = #config, strides = dense<2> : vector<1xi64>} ins(%extracted_slice_5, %extracted_slice_6 : tensor<1x9x?xf32>, tensor<3x?xf32>) outs(%extracted_slice_7 : tensor<1x4x?xf32>) -> tensor<1x4x?xf32>
+          %inserted_slice_8 = tensor.insert_slice %8 into %extracted_slice_4[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x4x?xf32> into tensor<1x1x4x?xf32>
+          %inserted_slice_9 = tensor.insert_slice %inserted_slice_8 into %arg10[0, 0, 0, 0] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x1x4x?xf32>
+          scf.yield %inserted_slice_9 : tensor<1x1x4x?xf32>
+        }
+        %inserted_slice = tensor.insert_slice %7 into %arg8[0, %arg3, %arg5, %arg7] [1, 1, 4, %c4_vscale] [1, 1, 1, 1] : tensor<1x1x4x?xf32> into tensor<1x68x120x96xf32>
+        scf.yield %inserted_slice : tensor<1x68x120x96xf32>
+      }
+      scf.yield %3 : tensor<1x68x120x96xf32>
+    }
+    scf.yield %1 : tensor<1x68x120x96xf32>
+  }
+  return %0 : tensor<1x68x120x96xf32>
+}
+
+/// This checks that the masks (introduced by the vectorizer) are eliminated by
+/// the end of the iree-codegen-generic-vectorization pass.
+
+// CHECK-MASK-LABEL: func.func @depthwise_conv_fold_away_masking
+// CHECK-MASK-NOT: vector.create_mask
+// CHECK-MASK-NOT: vector.constant_mask
