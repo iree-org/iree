@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include "iree/schemas/executable_debug_info.fbs";
+
 namespace iree.hal.wgsl;
 
 // 'WGSL Executable'.
@@ -28,6 +30,9 @@ table ExecutableDef {
   // A mapping of executable entry point ordinals to the shader module in which
   // they reside.
   entry_points:[uint];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;

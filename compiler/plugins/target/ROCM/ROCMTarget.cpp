@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -607,26 +608,11 @@ public:
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Attach embedded source file contents.
-    SmallVector<iree_hal_rocm_SourceFileDef_ref_t> sourceFileRefs;
-    if (auto sourcesAttr = variantOp.getSourcesAttr()) {
-      for (auto sourceAttr : llvm::reverse(sourcesAttr.getValue())) {
-        if (auto resourceAttr = dyn_cast_if_present<DenseResourceElementsAttr>(
-                sourceAttr.getValue())) {
-          auto filenameRef = builder.createString(sourceAttr.getName());
-          auto contentRef = builder.streamUint8Vec([&](llvm::raw_ostream &os) {
-            auto blobData = resourceAttr.getRawHandle().getBlob()->getData();
-            os.write(blobData.data(), blobData.size());
-            return true;
-          });
-          sourceFileRefs.push_back(iree_hal_rocm_SourceFileDef_create(
-              builder, filenameRef, contentRef));
-        }
-      }
-      std::reverse(sourceFileRefs.begin(), sourceFileRefs.end());
-    }
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
 
     SmallVector<StringRef> entryPointNames;
-    SmallVector<iree_hal_rocm_FileLineLocDef_ref_t> sourceLocationRefs;
+    SmallVector<iree_hal_debug_FileLineLocDef_ref_t> sourceLocationRefs;
     entryPointNames.resize(exportOps.size());
     for (auto exportOp : exportOps) {
       auto ordinalAttr = exportOp.getOrdinalAttr();
@@ -644,27 +630,28 @@ public:
           // be kept as-is.
           sourceLocationRefs.resize(exportOps.size());
           auto filenameRef = builder.createString(loc->getFilename());
-          sourceLocationRefs[ordinal] = iree_hal_rocm_FileLineLocDef_create(
+          sourceLocationRefs[ordinal] = iree_hal_debug_FileLineLocDef_create(
               builder, filenameRef, loc->getLine());
         }
       }
     }
 
     // Optional compilation stage source files.
-    SmallVector<iree_hal_rocm_StageLocationsDef_ref_t> stageLocationsRefs;
+    SmallVector<iree_hal_debug_StageLocationsDef_ref_t> stageLocationsRefs;
     if (serOptions.debugLevel >= 3) {
       for (auto exportOp : exportOps) {
-        SmallVector<iree_hal_rocm_StageLocationDef_ref_t> stageLocationRefs;
+        SmallVector<iree_hal_debug_StageLocationDef_ref_t> stageLocationRefs;
         if (auto locsAttr = exportOp.getSourceLocsAttr()) {
           for (auto locAttr : locsAttr.getValue()) {
             if (auto loc =
                     findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
               auto stageNameRef = builder.createString(locAttr.getName());
               auto filenameRef = builder.createString(loc->getFilename());
-              stageLocationRefs.push_back(iree_hal_rocm_StageLocationDef_create(
-                  builder, stageNameRef,
-                  iree_hal_rocm_FileLineLocDef_create(builder, filenameRef,
-                                                      loc->getLine())));
+              stageLocationRefs.push_back(
+                  iree_hal_debug_StageLocationDef_create(
+                      builder, stageNameRef,
+                      iree_hal_debug_FileLineLocDef_create(builder, filenameRef,
+                                                           loc->getLine())));
             }
           }
         }
@@ -673,7 +660,7 @@ public:
           // be kept as-is.
           stageLocationsRefs.resize(exportOps.size());
           int64_t ordinal = exportOp.getOrdinalAttr().getInt();
-          stageLocationsRefs[ordinal] = iree_hal_rocm_StageLocationsDef_create(
+          stageLocationsRefs[ordinal] = iree_hal_debug_StageLocationsDef_create(
               builder, builder.createOffsetVecDestructive(stageLocationRefs));
         }
       }
@@ -710,10 +697,7 @@ public:
       iree_hal_rocm_ExecutableDef_stage_locations_add(builder,
                                                       stageLocationsRef);
     }
-    if (!sourceFileRefs.empty()) {
-      auto sourceFilesRef = builder.createOffsetVecDestructive(sourceFileRefs);
-      iree_hal_rocm_ExecutableDef_source_files_add(builder, sourceFilesRef);
-    }
+    iree_hal_rocm_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_rocm_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

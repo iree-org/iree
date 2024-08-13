@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include "iree/schemas/executable_debug_info.fbs";
+
 namespace iree.hal.spirv;
 
 // 'SPIR-V Executable'.
@@ -13,29 +15,6 @@ file_extension "spve";
 table ShaderModuleDef {
   // SPIR-V code blob.
   code:[uint32];
-}
-
-// Source code location denoted by a file name and line within that file.
-table FileLineLocDef {
-  filename:string;
-  line:int32;
-}
-
-// Source location keyed by a string compilation stage name.
-table StageLocationDef {
-  stage:string;
-  location:FileLineLocDef;
-}
-
-// Table of stage locations sorted in ascending order by stage name.
-table StageLocationsDef {
-  locations:[StageLocationDef];
-}
-
-// An embedded source file referenced by locations in the file.
-table SourceFileDef {
-  path:string;
-  content:[uint8];
 }
 
 // A SPIR-V shader module and runtime pipeline layout description.
@@ -63,14 +42,14 @@ table ExecutableDef {
   // A map of entry point ordinals to source locations.
   // This information is optional and may be used by debuggers and profilers to
   // associate executable entry points with the source that generated them.
-  source_locations:[FileLineLocDef];
+  source_locations:[iree.hal.debug.FileLineLocDef];
 
   // Table of source locations per entry point keyed by a string compilation
   // stage name. Sorted ascending by name.
-  stage_locations:[StageLocationsDef];
+  stage_locations:[iree.hal.debug.StageLocationsDef];
 
   // Embedded source files sorted ascending by path.
-  source_files:[SourceFileDef];
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;
