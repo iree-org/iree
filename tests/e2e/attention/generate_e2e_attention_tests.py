@@ -71,15 +71,15 @@ class TestShapeAndScale:
 def get_test_shapes(shapes_id: ShapesId):
     if shapes_id == ShapesId.SMALL:
         return [
-            TestShapeAndScale(batch=1, m=128, k1=64, k2=512, n=32, scale=1.0),
+            TestShapeAndScale(batch=2, m=1024, k1=64, k2=512, n=32, scale=1.0),
         ]
     if shapes_id == ShapesId.MEDIUM:
         return [
-            TestShapeAndScale(batch=2, m=512, k1=128, k2=512, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=2048, k1=128, k2=512, n=64, scale=1.0),
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=2, m=512, k1=64, k2=1024, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=4096, k1=64, k2=1024, n=128, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
@@ -321,12 +321,21 @@ def generate_call(
     )
 
     op = op + (
-        f"  %batch = arith.constant {shapes_scale.batch} : i64\n"
-        f"  %m = arith.constant {shapes_scale.m} : i64\n"
-        f"  %k1 = arith.constant {shapes_scale.k1} : i64\n"
-        f"  %k2 = arith.constant {shapes_scale.k2} : i64\n"
-        f"  %n = arith.constant {shapes_scale.n} : i64\n"
-        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %query, %key, %value, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  %batch = arith.constant {shapes_scale.batch} : i64 \n"
+        f"  %m = arith.constant {shapes_scale.m} : i64 \n"
+        f"  %k1 = arith.constant {shapes_scale.k1} : i64 \n"
+        f"  %k2 = arith.constant {shapes_scale.k2} : i64 \n"
+        f"  %n = arith.constant {shapes_scale.n} : i64 \n"
+        f"  %query1 = hal.tensor.import %query : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> \n"
+        f"  %key1 = hal.tensor.import %key : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> \n"
+        f"  %value1 = hal.tensor.import %value : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> \n"
+        f"  %queryExt = arith.extf %query1 : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> \n"
+        f"  %keyExt = arith.extf %key1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> \n"
+        f"  %valueExt = arith.extf %value1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> \n"
+        f"  %queryExt1 = hal.tensor.export %queryExt : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
+        f"  %keyExt1 = hal.tensor.export %keyExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
+        f"  %valueExt1 = hal.tensor.export %valueExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> -> !hal.buffer_view \n"
+        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %queryExt1, %keyExt1, %valueExt1, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
     op = op + "  return\n"

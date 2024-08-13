@@ -37,7 +37,9 @@ float* allocate_tensor(int dim1, int dim2, int dim3) {
 }
 
 // Function to free allocated tensors
-void free_tensor(float* tensor) { free(tensor); }
+void free_tensor(float* tensor) {
+  if (tensor != nullptr) free(tensor);
+}
 
 // Function to calculate 1D index for a 3D array
 int index_3d(int i, int j, int k, int dim2, int dim3) {
@@ -57,6 +59,7 @@ static void reference_attention_f32_f32_f32_f32(
       for (int k1 = 0; k1 < K1; ++k1) {
         int q_idx = index_3d(b, m, k1, M, K1);
         int k_idx = index_3d(b, k2, k1, K2, K1);
+
         sum += query_data[q_idx] * key_data[k_idx];
       }
       int att_idx = index_3d(b, m, k2, M, K2);
@@ -101,13 +104,6 @@ static iree_status_t reference_attention_element(
     iree_hal_element_type_t key_elem_type,
     iree_hal_element_type_t value_elem_type, void* query_data, void* key_data,
     void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b) {
-  query_elem_type =
-      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
-  key_elem_type =
-      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
-  value_elem_type =
-      IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 32);
-
   if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
