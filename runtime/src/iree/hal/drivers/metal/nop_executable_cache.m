@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/metal/kernel_library.h"
+#include "iree/hal/drivers/metal/executable.h"
 
 typedef struct iree_hal_metal_nop_executable_cache_t {
   // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
@@ -75,8 +75,8 @@ static iree_status_t iree_hal_metal_nop_executable_cache_prepare_executable(
     const iree_hal_executable_params_t* executable_params, iree_hal_executable_t** out_executable) {
   iree_hal_metal_nop_executable_cache_t* executable_cache =
       iree_hal_metal_nop_executable_cache_cast(base_executable_cache);
-  return iree_hal_metal_kernel_library_create(executable_cache->device, executable_params,
-                                              executable_cache->host_allocator, out_executable);
+  return iree_hal_metal_executable_create(executable_cache->device, executable_params,
+                                          executable_cache->host_allocator, out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t iree_hal_metal_nop_executable_cache_vtable = {

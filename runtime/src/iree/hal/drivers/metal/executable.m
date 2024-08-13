@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/metal/kernel_library.h"
+#include "iree/hal/drivers/metal/executable.h"
 
 #include <stddef.h>
 
@@ -15,7 +15,7 @@
 #include "iree/schemas/metal_executable_def_reader.h"
 #include "iree/schemas/metal_executable_def_verifier.h"
 
-typedef struct iree_hal_metal_kernel_library_t {
+typedef struct iree_hal_metal_executable_t {
   // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
   iree_hal_resource_t resource;
 
@@ -23,20 +23,20 @@ typedef struct iree_hal_metal_kernel_library_t {
 
   iree_host_size_t entry_point_count;
   iree_hal_metal_kernel_params_t entry_points[];
-} iree_hal_metal_kernel_library_t;
+} iree_hal_metal_executable_t;
 
-static const iree_hal_executable_vtable_t iree_hal_metal_kernel_library_vtable;
+static const iree_hal_executable_vtable_t iree_hal_metal_executable_vtable;
 
-static iree_hal_metal_kernel_library_t* iree_hal_metal_kernel_library_cast(
+static iree_hal_metal_executable_t* iree_hal_metal_executable_cast(
     iree_hal_executable_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_kernel_library_vtable);
-  return (iree_hal_metal_kernel_library_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_executable_vtable);
+  return (iree_hal_metal_executable_t*)base_value;
 }
 
-static const iree_hal_metal_kernel_library_t* iree_hal_metal_kernel_library_const_cast(
+static const iree_hal_metal_executable_t* iree_hal_metal_executable_const_cast(
     const iree_hal_executable_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_kernel_library_vtable);
-  return (const iree_hal_metal_kernel_library_t*)base_value;
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_executable_vtable);
+  return (const iree_hal_metal_executable_t*)base_value;
 }
 
 // Verifies the structure of the flatbuffer so that we can avoid doing so during runtime.
@@ -44,7 +44,7 @@ static const iree_hal_metal_kernel_library_t* iree_hal_metal_kernel_library_cons
 // There are still some conditions we must be aware of (such as omitted names on functions with
 // internal linkage), however we shouldn't need to bounds check anything within the flatbuffer
 // after this succeeds.
-static iree_status_t iree_hal_metal_kernel_library_flatbuffer_verify(
+static iree_status_t iree_hal_metal_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data) {
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -192,7 +192,7 @@ static iree_status_t iree_hal_metal_load_mtllib(iree_const_byte_span_t source_da
 
 // Creates MTL compute pipeline objects for the given |entry_point| in |library| and writes to
 // |out_function| and |out_pso|. The caller should release |out_function| and |out_pso| after done.
-static iree_status_t iree_hal_metal_create_pipline_object(
+static iree_status_t iree_hal_metal_create_pipeline_object(
     id<MTLLibrary> library, iree_string_view_t entry_point, const char* source_code,
     id<MTLDevice> device, id<MTLFunction>* out_function, id<MTLComputePipelineState>* out_pso) {
   @autoreleasepool {
@@ -226,11 +226,11 @@ iree_status_t iree_hal_metal_compile_msl_and_create_pipeline_object(
     id<MTLComputePipelineState>* out_pso) {
   IREE_RETURN_IF_ERROR(
       iree_hal_metal_compile_msl(source_code, entry_point, device, compile_options, out_library));
-  return iree_hal_metal_create_pipline_object(*out_library, entry_point, source_code.data, device,
-                                              out_function, out_pso);
+  return iree_hal_metal_create_pipeline_object(*out_library, entry_point, source_code.data, device,
+                                               out_function, out_pso);
 }
 
-iree_status_t iree_hal_metal_kernel_library_create(
+iree_status_t iree_hal_metal_executable_create(
     id<MTLDevice> device, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
@@ -238,10 +238,10 @@ iree_status_t iree_hal_metal_kernel_library_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_metal_kernel_library_t* executable = NULL;
+  iree_hal_metal_executable_t* executable = NULL;
 
   IREE_RETURN_IF_ERROR(
-      iree_hal_metal_kernel_library_flatbuffer_verify(executable_params->executable_data));
+      iree_hal_metal_executable_flatbuffer_verify(executable_params->executable_data));
 
   iree_hal_metal_ExecutableDef_table_t executable_def =
       iree_hal_metal_ExecutableDef_as_root(executable_params->executable_data.data);
@@ -276,7 +276,7 @@ iree_status_t iree_hal_metal_kernel_library_create(
                  (char*)((char*)executable + sizeof(*executable) +
                          entry_point_count * sizeof(executable->entry_points[0])));
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_metal_kernel_library_vtable, &executable->resource);
+    iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
     executable->host_allocator = host_allocator;
     executable->entry_point_count = entry_point_count;
 
@@ -313,8 +313,8 @@ iree_status_t iree_hal_metal_kernel_library_create(
       }
       if (!iree_status_is_ok(status)) break;
 
-      status = iree_hal_metal_create_pipline_object(library, entry_point_view, source_code, device,
-                                                    &function, &pso);
+      status = iree_hal_metal_create_pipeline_object(library, entry_point_view, source_code, device,
+                                                     &function, &pso);
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
@@ -350,8 +350,8 @@ iree_status_t iree_hal_metal_kernel_library_create(
   return status;
 }
 
-static void iree_hal_metal_kernel_library_destroy(iree_hal_executable_t* base_executable) {
-  iree_hal_metal_kernel_library_t* executable = iree_hal_metal_kernel_library_cast(base_executable);
+static void iree_hal_metal_executable_destroy(iree_hal_executable_t* base_executable) {
+  iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < executable->entry_point_count; ++i) {
@@ -366,11 +366,11 @@ static void iree_hal_metal_kernel_library_destroy(iree_hal_executable_t* base_ex
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_metal_kernel_library_entry_point_kernel_params(
+iree_status_t iree_hal_metal_executable_entry_point_kernel_params(
     const iree_hal_executable_t* base_executable, int32_t entry_point,
     iree_hal_metal_kernel_params_t* out_params) {
-  const iree_hal_metal_kernel_library_t* executable =
-      iree_hal_metal_kernel_library_const_cast(base_executable);
+  const iree_hal_metal_executable_t* executable =
+      iree_hal_metal_executable_const_cast(base_executable);
   if (entry_point >= executable->entry_point_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %d",
                             entry_point);
@@ -379,6 +379,6 @@ iree_status_t iree_hal_metal_kernel_library_entry_point_kernel_params(
   return iree_ok_status();
 }
 
-static const iree_hal_executable_vtable_t iree_hal_metal_kernel_library_vtable = {
-    .destroy = iree_hal_metal_kernel_library_destroy,
+static const iree_hal_executable_vtable_t iree_hal_metal_executable_vtable = {
+    .destroy = iree_hal_metal_executable_destroy,
 };
