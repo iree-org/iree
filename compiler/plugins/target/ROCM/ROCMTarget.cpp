@@ -651,16 +651,16 @@ public:
                                               targetHSACO.size());
 
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-    iree_hal_rocm_BlockSizeDef_vec_start(builder);
+    iree_hal_rocm_BlockSize_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
     for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
-      iree_hal_rocm_BlockSizeDef_vec_push_create(
+      iree_hal_rocm_BlockSize_vec_push_create(
           builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
     auto workgroupLocalMemoriesRef =
         builder.createInt32Vec(workgroupLocalMemories);
-    auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
+    auto blockSizesRef = iree_hal_rocm_BlockSize_vec_end(builder);
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
     iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(

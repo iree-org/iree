@@ -665,12 +665,12 @@ public:
     std::string gpuImage = produceGpuImage(options, targetArch, ptxImage);
     auto gpuImageRef =
         flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
-    iree_hal_cuda_BlockSizeDef_vec_start(builder);
+    iree_hal_cuda_BlockSize_vec_start(builder);
     for (const auto &workgroupSize : workgroupSizes) {
-      iree_hal_cuda_BlockSizeDef_vec_push_create(
+      iree_hal_cuda_BlockSize_vec_push_create(
           builder, workgroupSize[0], workgroupSize[1], workgroupSize[2]);
     }
-    auto blockSizesRef = iree_hal_cuda_BlockSizeDef_vec_end(builder);
+    auto blockSizesRef = iree_hal_cuda_BlockSize_vec_end(builder);
     auto workgroupLocalMemoriesRef =
         builder.createInt32Vec(workgroupLocalMemories);
     auto entryPointsRef = builder.createStringVec(entryPointNames);
