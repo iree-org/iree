@@ -27,6 +27,9 @@ table StageLocationsDef {
 // Debug information for an exported function.
 // Empty/omitted if the compilation debug level is 0.
 table ExportDef {
+  // Original export name from the producer tool.
+  name:string;
+
   // Source location in the canonical form to be presented in most tooling.
   // Generally included with compilation debug level >= 1.
   location:FileLineLocDef;

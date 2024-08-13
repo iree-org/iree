@@ -54,6 +54,52 @@ iree_status_t iree_hal_debug_verify_export_def(
   return iree_ok_status();
 }
 
+iree_host_size_t iree_hal_debug_calculate_export_info_size(
+    iree_hal_debug_ExportDef_table_t export_def) {
+  if (!export_def) return 0;
+
+  iree_host_size_t total_size = sizeof(iree_hal_debug_export_info_t);
+  total_size +=
+      flatbuffers_string_len(iree_hal_debug_ExportDef_name_get(export_def));
+
+  iree_hal_debug_FileLineLocDef_table_t location_def =
+      iree_hal_debug_ExportDef_location_get(export_def);
+  if (location_def) {
+    total_size += flatbuffers_string_len(
+        iree_hal_debug_FileLineLocDef_filename_get(location_def));
+  }
+
+  return total_size;
+}
+
+void iree_hal_debug_copy_export_info(
+    iree_hal_debug_ExportDef_table_t export_def,
+    iree_hal_debug_export_info_t* out_info) {
+  memset(out_info, 0, sizeof(*out_info));
+  if (!export_def) return;
+
+  char* ptr = (char*)out_info + sizeof(*out_info);
+
+  flatbuffers_string_t name = iree_hal_debug_ExportDef_name_get(export_def);
+  if (name) {
+    size_t name_length = flatbuffers_string_len(name);
+    memcpy(ptr, name, name_length);
+    out_info->name = iree_make_string_view(ptr, name_length);
+    ptr += name_length;
+  }
+
+  iree_hal_debug_FileLineLocDef_table_t location_def =
+      iree_hal_debug_ExportDef_location_get(export_def);
+  if (location_def) {
+    flatbuffers_string_t filename =
+        iree_hal_debug_FileLineLocDef_filename_get(location_def);
+    size_t filename_length = flatbuffers_string_len(filename);
+    memcpy(ptr, filename, filename_length);
+    out_info->source_filename = iree_make_string_view(ptr, filename_length);
+    ptr += filename_length;
+  }
+}
+
 void iree_hal_debug_publish_source_files(
     iree_hal_debug_SourceFileDef_vec_t source_files_vec) {
   if (!source_files_vec) return;
