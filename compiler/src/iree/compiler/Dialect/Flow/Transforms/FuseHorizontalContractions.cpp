@@ -149,7 +149,8 @@ getTruncateOp(Operation *op,
     if (!checkOperationEquivalence(genericOp, seedTruncateOp.value())) {
       return std::nullopt;
     }
-    if (!isHorizontalToGroup(genericOp, groupedOperations, dominanceInfo, seedTruncateOp.value())) {
+    if (!isHorizontalToGroup(genericOp, groupedOperations, dominanceInfo,
+                             seedTruncateOp.value())) {
       return std::nullopt;
     }
   }
@@ -192,7 +193,8 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
 
   SetVector<Operation *> allOps;
   SmallVector<linalg::LinalgOp> contractionOps = {seedOp};
-  std::optional<linalg::GenericOp> seedTruncOp = getTruncateOp(seedOp, allOps, dominanceInfo);
+  std::optional<linalg::GenericOp> seedTruncOp =
+      getTruncateOp(seedOp, allOps, dominanceInfo);
   std::optional<SmallVector<linalg::GenericOp>> truncateOps;
   if (seedTruncOp) {
     truncateOps = {seedTruncOp.value()};
