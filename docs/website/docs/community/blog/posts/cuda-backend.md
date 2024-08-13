@@ -82,7 +82,7 @@ table CUDAExecutableDef {
   entry_points:[string];
 
   // Block sizes for each entry point.
-  block_sizes:[CUDABlockSizeDef];
+  block_sizes:[CUDABlockSize];
 
   // PTX string of the module.
   ptx_image:string;

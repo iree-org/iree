@@ -11,7 +11,7 @@ file_identifier "ROCM";
 file_extension "rocm";
 
 // A struct for the kernel block size along each dimensions.
-struct BlockSizeDef {
+struct BlockSize {
   x:uint32;
   y:uint32;
   z:uint32;
@@ -48,7 +48,7 @@ table ExecutableDef {
 
   // Block sizes for each entry point.
   // This list has the same size as the entry_points list.
-  block_sizes:[BlockSizeDef];
+  block_sizes:[BlockSize];
 
   // Size of dynamic shared memory.
   // This list has the same size as the entry_points list.
