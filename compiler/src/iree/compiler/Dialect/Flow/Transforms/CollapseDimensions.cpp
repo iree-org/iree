@@ -282,10 +282,12 @@ public:
 
   // Update `collapsableLoops` by taking the set intersection with
   // `otherCollapsable` and update the reassociation indicies accordingly.
+  // Returns true if the operation modified the number of collapsable loops.
   bool updateCollapseViaIntersect(const CollapsableLoopsSet &otherCollapsable);
 
   // Update `collapsableLoops` by subtracting `uncollapsable` and update the
   // reassociation indicies accordingly.
+  // Returns true if the operation modified the number of collapsable loops.
   bool updateCollapseViaSubtract(const CollapsableLoopsSet &uncollapsable);
 
   // Get `collapsableLoops` after applying the transformation provided by `map`.
@@ -650,6 +652,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
 // For each consumer, use it's producers to constrain which dimensions it will
 // collapse. `slice` is expected to be topologically sorted (getBackwardSlice
 // does this automatically).
+// Returns true if the operation modified any op's `CollapseInfo`.
 static bool updateConsumersFromProducers(
     ArrayRef<Operation *> slice,
     llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
@@ -708,6 +711,7 @@ static bool updateConsumersFromProducers(
 // For each producer, use it's consumers to constrain which dimensions it will
 // collapse. `slice` is expected to be topologically sorted (getBackwardSlice
 // does this automatically).
+// Returns true if the operation modified any op's `CollapseInfo`.
 static bool updateProducersFromConsumers(
     ArrayRef<Operation *> slice,
     llvm::DenseMap<linalg::GenericOp, CollapseInfo> &opMap) {
@@ -806,7 +810,14 @@ static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
 
   bool didUpdateProducers = true;
   bool didUpdateConsumers = true;
+  int iterationCount = 0;
   while (didUpdateProducers || didUpdateConsumers) {
+    // Cap the max number of iterations at 10. If it hasn't converged by then,
+    // don't collapse any ops in this dispatch.
+    iterationCount++;
+    if (iterationCount > 10) {
+      return false;
+    }
     // Step 4. For each producer, reduce the number of collapsed dimensions
     // based on the dimensions that it's consumers can collapse.
     didUpdateProducers =
