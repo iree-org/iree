@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -522,9 +523,13 @@ public:
     FlatbufferBuilder builder;
     iree_hal_cuda_ExecutableDef_start_as_root(builder);
 
+    // Attach embedded source file contents.
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
+
     SmallVector<std::string> entryPointNames;
     std::string ptxImage;
-    SmallVector<iree_hal_cuda_FileLineLocDef_ref_t> sourceLocationRefs;
+    SmallVector<iree_hal_debug_FileLineLocDef_ref_t> sourceLocationRefs;
     if (variantOp.isExternal()) {
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()
@@ -595,7 +600,7 @@ public:
         if (serOptions.debugLevel >= 1) {
           if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
             auto filenameRef = builder.createString(loc->getFilename());
-            sourceLocationRefs.push_back(iree_hal_cuda_FileLineLocDef_create(
+            sourceLocationRefs.push_back(iree_hal_debug_FileLineLocDef_create(
                 builder, filenameRef, loc->getLine()));
           }
         }
@@ -691,6 +696,7 @@ public:
       iree_hal_cuda_ExecutableDef_source_locations_add(builder,
                                                        sourceLocationsRef);
     }
+    iree_hal_cuda_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_cuda_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

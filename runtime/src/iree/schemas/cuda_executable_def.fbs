@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include "iree/schemas/executable_debug_info.fbs";
+
 namespace iree.hal.cuda;
 
 // 'CUDA Executable'.
@@ -15,12 +17,6 @@ struct BlockSize {
   x:uint32;
   y:uint32;
   z:uint32;
-}
-
-// Source code location denoted by a file name and line within that file.
-table FileLineLocDef {
-  filename:string;
-  line:int32;
 }
 
 table ExecutableDef {
@@ -39,12 +35,13 @@ table ExecutableDef {
   // PTX string of the module.
   ptx_image:string;
 
-  // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
-
   // A map of entry point ordinals to source locations.
   // This information is optional and may be used by debuggers and profilers to
   // associate executable entry points with the source that generated them.
-  source_locations:[FileLineLocDef];
+  source_locations:[iree.hal.debug.FileLineLocDef];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;

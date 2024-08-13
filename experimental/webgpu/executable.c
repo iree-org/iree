@@ -10,9 +10,12 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
+#include "iree/hal/utils/executable_debug_info.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
+#include "iree/schemas/executable_debug_info_reader.h"
+#include "iree/schemas/executable_debug_info_verifier.h"
 #include "iree/schemas/wgsl_executable_def_reader.h"
 #include "iree/schemas/wgsl_executable_def_verifier.h"
 
@@ -267,6 +270,10 @@ iree_status_t iree_hal_webgpu_executable_create(
                                  &executable->resource);
     executable->host_allocator = host_allocator;
     executable->entry_point_count = executable_params->pipeline_layout_count;
+
+    // Publish any embedded source files to the tracing infrastructure.
+    iree_hal_debug_publish_source_files(
+        iree_hal_rocm_ExecutableDef_source_files_get(executable_def));
 
     // Create one pipeline per entry point.
     flatbuffers_uint32_vec_t entry_points_vec =

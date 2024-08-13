@@ -42,9 +42,11 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::metal::builtin
     iree::hal::utils::deferred_command_buffer
+    iree::hal::utils::executable_debug_info
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
+    iree::schemas::executable_debug_info_c_fbs
     iree::schemas::metal_executable_def_c_fbs
     "-framework Foundation"
     "-framework Metal"

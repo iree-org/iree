@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
@@ -212,6 +213,10 @@ public:
     FlatbufferBuilder builder;
     iree_hal_metal_ExecutableDef_start_as_root(builder);
 
+    // Attach embedded source file contents.
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
+
     auto entryPointNamesRef = builder.createStringVec(mslEntryPointNames);
     iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
 
@@ -242,6 +247,8 @@ public:
           flatbuffers_string_vec_create(builder, refs.data(), refs.size());
       iree_hal_metal_ExecutableDef_shader_libraries_add(builder, libsRef);
     }
+
+    iree_hal_metal_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
     iree_hal_metal_ExecutableDef_end_as_root(builder);
 

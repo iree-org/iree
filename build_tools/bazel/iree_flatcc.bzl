@@ -10,12 +10,14 @@ def iree_flatbuffer_c_library(
         name,
         srcs,
         flatcc_args = ["--common", "--reader"],
+        includes = [],
         testonly = False,
         **kwargs):
     flatcc = "@com_github_dvidelabs_flatcc//:flatcc"
 
     flags = [
         "-o$(RULEDIR)",
+        "-I runtime/src",
     ] + flatcc_args
 
     out_stem = "%s" % (srcs[0].replace(".fbs", ""))
@@ -34,10 +36,10 @@ def iree_flatbuffer_c_library(
 
     native.genrule(
         name = name + "_gen",
-        srcs = srcs,
+        srcs = srcs + includes,
         outs = outs,
         tools = [flatcc],
-        cmd = "$(location %s) %s $(SRCS)" % (flatcc, " ".join(flags)),
+        cmd = "$(location %s) %s %s" % (flatcc, " ".join(flags), " ".join(["$(location {})".format(src) for src in srcs])),
         testonly = testonly,
     )
     native.cc_library(

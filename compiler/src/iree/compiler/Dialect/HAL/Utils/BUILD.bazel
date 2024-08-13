@@ -13,6 +13,22 @@ package(
 )
 
 iree_compiler_cc_library(
+    name = "ExecutableDebugInfoUtils",
+    srcs = [
+        "ExecutableDebugInfoUtils.cpp",
+    ],
+    hdrs = [
+        "ExecutableDebugInfoUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "LLVMLinkerUtils",
     srcs = [
         "LLVMLinkerUtils.cpp",
