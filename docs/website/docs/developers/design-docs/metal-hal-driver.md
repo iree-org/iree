@@ -195,7 +195,7 @@ IREE [`iree_hal_buffer_t`][hal-buffer] maps Metal `MTLBuffer`. See
 IREE [`iree_hal_executable_t`][hal-executable] represents a GPU program archive with
 a driver-defined format. It maps naturally to Metal [`MTLLibrary`][mtl-library].
 An entry point in a `MTLLibrary` is a [`MTLFunction`][mtl-function]. We define
-[`iree_hal_metal_kernel_params_t`][metal-kernel-library] to wrap around a
+[`iree_hal_metal_executable_t`][metal-executable] to wrap around a
 `MTLLibrary`, its `MTLFunction`s, and also `MTLComputePipelineState` objects
 constructed from `MTLFunction`s.
 
@@ -328,7 +328,7 @@ with the current active `MTLComputeCommandEncoder`:
 [hal-semaphore]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/semaphore.h
 [metal-device]: https://github.com/iree-org/iree/tree/main/experimental/metal/metal_device.h
 [metal-driver]: https://github.com/iree-org/iree/tree/main/experimental/metal/metal_driver.h
-[metal-kernel-library]: https://github.com/iree-org/iree/tree/main/experimental/metal/kernel_library.h
+[metal-executable]: https://github.com/iree-org/iree/tree/main/experimental/metal/executable.h
 [metal-shared-event]: https://github.com/iree-org/iree/tree/main/experimental/metal/shared_event.h
 [metal-spirv-target]: https://github.com/iree-org/iree/tree/main/compiler/plugins/target/MetalSPIRV
 [metal-builtin-kernels]: https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/drivers/metal/builtin/
