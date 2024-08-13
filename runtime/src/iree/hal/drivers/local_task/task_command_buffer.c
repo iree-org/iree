@@ -78,7 +78,7 @@ typedef struct iree_hal_task_command_buffer_t {
     // All execution tasks emitted that must execute after |open_barrier|.
     iree_task_list_t open_tasks;
 
-    // TODO(#18189): remove legacy binding state.
+    // TODO(#18154): remove legacy binding state.
     // A flattened list of all available descriptor set bindings.
     // As descriptor sets are pushed/bound the bindings will be updated to
     // represent the fully-translated binding data pointer.
@@ -90,7 +90,7 @@ typedef struct iree_hal_task_command_buffer_t {
         binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
                         IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
 
-    // TODO(#18189): remove legacy push constant state.
+    // TODO(#18154): remove legacy push constant state.
     // All available push constants updated each time push_constants is called.
     // Reset only with the command buffer and otherwise will maintain its values
     // during recording to allow for partial push_constants updates.

@@ -132,7 +132,7 @@ public:
 
       // Specify the constant and binding information used to validate
       // dispatches.
-      // TODO(#18189): pack per-binding information bitfields.
+      // TODO(#18154): pack per-binding information bitfields.
       if (auto layoutAttr = exportOp.getLayout()) {
         int64_t constantCount = layoutAttr.getPushConstants();
         if (constantCount > 0) {
