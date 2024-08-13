@@ -77,7 +77,6 @@ iree_lit_test_suite(
             "vector_lowering.mlir",
             "vector_to_gpu.mlir",
             "winograd_pipeline_test.mlir",
-            "workgroup_specialization_pipeline_test.mlir",
         ],
         include = ["*.mlir"],
         # tensor_dialect_*_spec is a an MLIR file that specifies a

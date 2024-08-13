@@ -75,7 +75,6 @@ iree_compiler_cc_library(
         "Passes.cpp",
         "VectorReductionToGPU.cpp",
         "WorkgroupReordering.cpp",
-        "WorkgroupSpecializationPass.cpp",
     ],
     hdrs = [
         "GPUPatterns.h",
