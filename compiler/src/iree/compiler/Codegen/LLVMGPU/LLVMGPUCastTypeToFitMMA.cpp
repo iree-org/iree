@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -20,6 +19,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUCASTTYPETOFITMMAPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
@@ -72,9 +74,8 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
   }
 };
 
-struct LLVMGPUCastTypeToFitMMAPass
-    : public LLVMGPUCastTypeToFitMMABase<LLVMGPUCastTypeToFitMMAPass> {
-public:
+struct LLVMGPUCastTypeToFitMMAPass final
+    : impl::LLVMGPUCastTypeToFitMMAPassBase<LLVMGPUCastTypeToFitMMAPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
     registry.insert<arith::ArithDialect>();
@@ -114,9 +115,4 @@ public:
   }
 };
 } // namespace
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMGPUCastTypeToFitMMAPass() {
-  return std::make_unique<LLVMGPUCastTypeToFitMMAPass>();
-}
-
 } // namespace mlir::iree_compiler

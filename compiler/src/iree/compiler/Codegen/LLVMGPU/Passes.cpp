@@ -497,7 +497,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
 
   // Distribute linalg onto warps within the workgroup.
   funcPassManager.addPass(
-      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+      createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/true));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1) {
     funcPassManager.addPass(createGPUMultiBufferingPass(
@@ -518,7 +518,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Linalg -> vector
-  funcPassManager.addPass(createLLVMGPUTensorCoreVectorizationPass());
+  funcPassManager.addPass(
+      createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::WMMA));
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
@@ -537,7 +538,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createLLVMGPUVectorToGPU());
+  funcPassManager.addPass(
+      createLLVMGPUVectorToGPUPass(GPUTensorCoreType::WMMA));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -551,7 +553,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
       llvm::to_underlying(PipeliningSchedulingStrategy::loadGlobalStage0);
   funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
   // Optimize shared memory usage.
-  funcPassManager.addPass(createLLVMGPUPackSharedMemoryAlloc());
+  funcPassManager.addPass(createLLVMGPUPackSharedMemoryAllocPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -565,7 +567,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
 
   // Distribute linalg onto warps within the workgroup.
   funcPassManager.addPass(
-      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+      createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/true));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1) {
     funcPassManager.addPass(createGPUMultiBufferingPass(
@@ -604,7 +606,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
-      createLLVMGPUVectorToGPU(GPUTensorCoreType::MMA_SYNC));
+      createLLVMGPUVectorToGPUPass(GPUTensorCoreType::MMA_SYNC));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -618,7 +620,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
       llvm::to_underlying(PipeliningSchedulingStrategy::nvidiaTensorCore);
   funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
   // Optimize shared memory usage.
-  funcPassManager.addPass(createLLVMGPUPackSharedMemoryAlloc());
+  funcPassManager.addPass(createLLVMGPUPackSharedMemoryAllocPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -801,8 +803,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
 
   // Vector SIMD -> Vector SIMT
-  funcPassManager.addPass(createLLVMGPUConfigureVectorLayouts());
-  funcPassManager.addPass(createLLVMGPUVectorDistribute());
+  funcPassManager.addPass(createLLVMGPUConfigureVectorLayoutsPass());
+  funcPassManager.addPass(createLLVMGPUVectorDistributePass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -889,7 +891,8 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
   tileAndBufferize(funcPassManager);
 
   // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(createLLVMGPUTileAndDistribute());
+  funcPassManager.addPass(
+      createLLVMGPUTileAndDistributePass(/*distributeToWarp=*/false));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -1019,7 +1022,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // Strip out the debug info for the kernel.
   modulePassManager.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic.
-  modulePassManager.addPass(createLLVMGPUCastAddressSpaceFunction());
+  modulePassManager.addPass(createLLVMGPUCastAddressSpaceFunctionPass());
 
   if (forROCDL) {
     // convert to ROCDL.

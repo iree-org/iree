@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/SetVector.h"
@@ -26,6 +25,9 @@
 #define DEBUG_TYPE "iree-llvmgpu-configure-vector-layouts"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUCONFIGUREVECTORLAYOUTSPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
@@ -279,10 +281,9 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
   return success();
 }
 
-struct LLVMGPUConfigureVectorLayoutsPass
-    : public LLVMGPUConfigureVectorLayoutsBase<
+struct LLVMGPUConfigureVectorLayoutsPass final
+    : impl::LLVMGPUConfigureVectorLayoutsPassBase<
           LLVMGPUConfigureVectorLayoutsPass> {
-public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<vector::VectorDialect>();
@@ -360,10 +361,4 @@ public:
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUConfigureVectorLayouts() {
-  return std::make_unique<LLVMGPUConfigureVectorLayoutsPass>();
-}
-
 } // namespace mlir::iree_compiler

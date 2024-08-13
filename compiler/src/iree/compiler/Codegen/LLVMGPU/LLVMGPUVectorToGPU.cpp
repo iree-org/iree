@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -20,6 +19,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUVECTORTOGPUPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 static void swizzleSharedMemory(mlir::FunctionOpInterface funcOp) {
   SmallVector<memref::AllocOp> shmAllocOps;
@@ -38,10 +40,13 @@ static void swizzleSharedMemory(mlir::FunctionOpInterface funcOp) {
 }
 
 namespace {
-struct LLVMGPUVectorToGPUPass
-    : public LLVMGPUVectorToGPUBase<LLVMGPUVectorToGPUPass> {
+struct LLVMGPUVectorToGPUPass final
+    : impl::LLVMGPUVectorToGPUPassBase<LLVMGPUVectorToGPUPass> {
+  using impl::LLVMGPUVectorToGPUPassBase<
+      LLVMGPUVectorToGPUPass>::LLVMGPUVectorToGPUPassBase;
   LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, affine::AffineDialect,
                     memref::MemRefDialect>();
@@ -103,7 +108,7 @@ private:
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUVectorToGPU(GPUTensorCoreType tensorCoreType) {
+createLLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType) {
   return std::make_unique<LLVMGPUVectorToGPUPass>(tensorCoreType);
 }
 
