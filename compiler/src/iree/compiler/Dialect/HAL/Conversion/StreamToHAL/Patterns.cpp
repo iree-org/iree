@@ -34,7 +34,7 @@ static llvm::cl::opt<bool> clIndirectCommandBuffers{
 static llvm::cl::opt<bool> clExperimentalDispatch2{
     "iree-hal-experimental-dispatch2",
     llvm::cl::desc("Whether to emit iree_hal_command_buffer_dispatch2 ops."),
-    llvm::cl::init(false),
+    llvm::cl::init(true),
 };
 
 struct ContextResolveOpPattern

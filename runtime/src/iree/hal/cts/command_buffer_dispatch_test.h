@@ -25,27 +25,6 @@ class CommandBufferDispatchTest
         device_, iree_make_cstring_view("default"),
         iree_loop_inline(&loop_status_), &executable_cache_));
 
-    iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] =
-        {
-            {
-                0,
-                IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                IREE_HAL_DESCRIPTOR_FLAG_NONE,
-            },
-            {
-                1,
-                IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                IREE_HAL_DESCRIPTOR_FLAG_NONE,
-            },
-        };
-    IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-        device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
-        IREE_ARRAYSIZE(descriptor_set_layout_bindings),
-        descriptor_set_layout_bindings, &descriptor_set_layout_));
-    IREE_ASSERT_OK(iree_hal_pipeline_layout_create(
-        device_, /*push_constants=*/0, /*set_layout_count=*/1,
-        &descriptor_set_layout_, &pipeline_layout_));
-
     iree_hal_executable_params_t executable_params;
     iree_hal_executable_params_initialize(&executable_params);
     executable_params.caching_mode =
@@ -54,8 +33,6 @@ class CommandBufferDispatchTest
         iree_make_cstring_view(get_test_executable_format());
     executable_params.executable_data = get_test_executable_data(
         iree_make_cstring_view("command_buffer_dispatch_test.bin"));
-    executable_params.pipeline_layout_count = 1;
-    executable_params.pipeline_layouts = &pipeline_layout_;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
         executable_cache_, &executable_params, &executable_));
@@ -63,16 +40,12 @@ class CommandBufferDispatchTest
 
   void CleanupExecutable() {
     iree_hal_executable_release(executable_);
-    iree_hal_pipeline_layout_release(pipeline_layout_);
-    iree_hal_descriptor_set_layout_release(descriptor_set_layout_);
     iree_hal_executable_cache_release(executable_cache_);
     IREE_ASSERT_OK(loop_status_);
   }
 
   iree_status_t loop_status_ = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache_ = NULL;
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout_ = NULL;
-  iree_hal_pipeline_layout_t* pipeline_layout_ = NULL;
   iree_hal_executable_t* executable_ = NULL;
 };
 
@@ -90,20 +63,20 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
   iree_hal_buffer_t* output_buffer = NULL;
   CreateFilledDeviceBuffer<float>(4 * sizeof(float), -9.0f, &output_buffer);
 
-  iree_hal_buffer_ref_t descriptor_set_bindings[2];
-  iree_hal_buffer_binding_t bindings[2];
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_binding_t binding_table_values[2];
   iree_hal_buffer_binding_table_t binding_table =
       iree_hal_buffer_binding_table_empty();
   switch (GetParam()) {
     case RecordingType::kDirect:
-      descriptor_set_bindings[0] = {
+      binding_refs[0] = {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/input_buffer,
           /*offset=*/1 * sizeof(float),
           /*length=*/2 * sizeof(float),
       };
-      descriptor_set_bindings[1] = {
+      binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/0,
           /*buffer=*/output_buffer,
@@ -112,26 +85,26 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
       };
       break;
     case RecordingType::kIndirect:
-      binding_table.count = IREE_ARRAYSIZE(descriptor_set_bindings);
-      binding_table.bindings = bindings;
-      bindings[0] = {
+      binding_table.count = IREE_ARRAYSIZE(binding_refs);
+      binding_table.bindings = binding_table_values;
+      binding_table_values[0] = {
           /*buffer=*/input_buffer,
           /*offset=*/1 * sizeof(float),
           /*length=*/2 * sizeof(float),
       };
-      descriptor_set_bindings[0] = {
+      binding_refs[0] = {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/NULL,
           /*offset=*/0,
           /*length=*/2 * sizeof(float),
       };
-      bindings[1] = {
+      binding_table_values[1] = {
           /*buffer=*/output_buffer,
           /*offset=*/1 * sizeof(float),
           /*length=*/2 * sizeof(float),
       };
-      descriptor_set_bindings[1] = {
+      binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/1,
           /*buffer=*/NULL,
@@ -140,6 +113,10 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
       };
       break;
   }
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -148,14 +125,11 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
       binding_table.count, &command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
 
-  IREE_ASSERT_OK(iree_hal_command_buffer_push_descriptor_set(
-      command_buffer, pipeline_layout_, /*set=*/0,
-      IREE_ARRAYSIZE(descriptor_set_bindings), descriptor_set_bindings));
+  uint32_t workgroup_count[3] = {1, 1, 1};
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch2(
+      command_buffer, executable_, /*entry_point=*/0, workgroup_count,
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
 
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
-      /*workgroup_x=*/1, /*workgroup_y=*/1, /*workgroup_z=*/1,
-      IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
       command_buffer,
       /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |
