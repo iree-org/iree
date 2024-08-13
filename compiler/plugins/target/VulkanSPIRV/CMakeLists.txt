@@ -37,8 +37,10 @@ iree_cc_library(
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Utils::ExecutableDebugInfoUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
+    iree::schemas::executable_debug_info_c_fbs
     iree::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )

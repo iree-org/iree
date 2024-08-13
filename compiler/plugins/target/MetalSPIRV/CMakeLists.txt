@@ -41,8 +41,10 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Utils::ExecutableDebugInfoUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
+    iree::schemas::executable_debug_info_c_fbs
     iree::schemas::metal_executable_def_c_fbs
   PUBLIC
 )
