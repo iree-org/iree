@@ -30,7 +30,7 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 // CHECK-SAME:   AMD,
 // CHECK-SAME:   #spirv.resource_limits<max_compute_shared_memory_size = 65536,
 // CHECK-SAME:     max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024 : i32, 1024 : i32, 1024 : i32],
-// CHECK-SAME:     subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64,
+// CHECK-SAME:     min_subgroup_size = 32, max_subgroup_size = 64,
 // CHECK-SAME:     cooperative_matrix_properties_khr = [
 // CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>,
 // CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>

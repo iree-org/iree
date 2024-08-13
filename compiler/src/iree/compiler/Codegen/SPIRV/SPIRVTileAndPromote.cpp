@@ -199,8 +199,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  std::optional<int> subgroupSize =
-      getGPUSubgroupSize(funcOp, /*pickLargest=*/true);
+  std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
   if (!subgroupSize) {
     funcOp.emitError("failed to query subgroup size");
     return signalPassFailure();

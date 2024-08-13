@@ -372,17 +372,14 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
       return *llvm::max_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
     // Returns the preferred subgroup size. If the target supports multiple
-    // subgroup sizes, pickLargest controls whether to return the largest one.
+    // subgroup sizes, pick the smallest one.
     //
     // AMD RDNA GPUs supports multiple subgroup sizes and the preferred one
     // differ given the API--HIP prefers 32 while Vulkan prefers 64.
-    // TODO: We should be able to force Vulkan side to use 32 consistently
-    // too with subgroup size control; it might have perf implications though.
-    int getPreferredSubgroupSize(bool pickLargest=false) const {
-      if (pickLargest) {
-        return getMaxSubgroupSize();
-      }
-      return getMinSubgroupSize();
+    // We force Vulkan side to use 32 to be consistent with the HIP backend;
+    // might have implications on perf.
+    int getPreferredSubgroupSize() const {
+      return *llvm::min_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
 
     // Hardware feature related APIs

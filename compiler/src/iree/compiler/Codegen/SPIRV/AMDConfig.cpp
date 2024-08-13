@@ -37,7 +37,7 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
           AMDCoopMatrixSoftwarePipelineStoreStage)))
     return success();
 
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
   std::array<int64_t, 3> threadMNK;
   auto inputType =
@@ -67,7 +67,7 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setAMDCodeGenConfig(IREE::GPU::TargetAttr target,
                                   Operation *rootOp) {
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
