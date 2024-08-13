@@ -145,9 +145,7 @@ iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {
   return iree_ok_status();
 }
 
-}  // namespace
-
-extern "C" int main(int argc, char** argv) {
+int RealMain(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
 
   // Pass through flags to gtest (allowing --help to fall through).
@@ -180,4 +178,7 @@ extern "C" int main(int argc, char** argv) {
   return exit_code;
 }
 
+}  // namespace
 }  // namespace iree
+
+int main(int argc, char** argv) { return iree::RealMain(argc, argv); }

@@ -8,7 +8,7 @@
 #include "iree/base/internal/flags.h"
 #include "iree/testing/gtest.h"
 
-extern "C" int main(int argc, char** argv) {
+int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
 
   // Pass through flags to gtest (allowing --help to fall through).
