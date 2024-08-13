@@ -13,7 +13,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/metal/builtin_executables.h"
-#include "iree/hal/drivers/metal/kernel_library.h"
+#include "iree/hal/drivers/metal/executable.h"
 #include "iree/hal/drivers/metal/metal_buffer.h"
 #include "iree/hal/drivers/metal/metal_device.h"
 #include "iree/hal/drivers/metal/pipeline_layout.h"
@@ -962,7 +962,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &executable));
 
   iree_hal_metal_kernel_params_t kernel_params;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_executable_entry_point_kernel_params(
                                             executable, entry_point, &kernel_params));
 
   // Allocate the command segment and keep track of all necessary API data.
@@ -1144,7 +1144,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch2(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &executable));
 
   iree_hal_metal_kernel_params_t kernel_params;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_executable_entry_point_kernel_params(
                                             executable, entry_point, &kernel_params));
 
   // Allocate the command segment and keep track of all necessary API data.

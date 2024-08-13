@@ -83,16 +83,13 @@ iree_status_t iree_hal_metal_builtin_executable_create(
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
+      // Thread group size for builtin executables are determined at runtime dispatch time.
+      // We don't need the layout information for builtins either.
       iree_hal_metal_kernel_params_t* params = &executable->entry_points[i];
+      memset(params, 0, sizeof(*params));
       params->library = library;
       params->function = function;
       params->pso = pso;
-      // Thread group size for builtin executables are determined at runtime dispatch time.
-      params->threadgroup_size[0] = 0;
-      params->threadgroup_size[1] = 0;
-      params->threadgroup_size[2] = 0;
-      // We don't need the layout parameter for builtin executables too.
-      params->layout = NULL;
 
       // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({ params->function_name = IREE_SV(entry_point); });
