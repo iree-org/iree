@@ -88,9 +88,9 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
     }
   }
 
-  iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
+  iree_hal_rocm_BlockSize_vec_t block_sizes_vec =
       iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
-  size_t block_size_count = iree_hal_rocm_BlockSizeDef_vec_len(block_sizes_vec);
+  size_t block_size_count = iree_hal_rocm_BlockSize_vec_len(block_sizes_vec);
   if (entry_point_count != block_size_count) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -141,7 +141,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 
   flatbuffers_string_vec_t entry_points_vec =
       iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
-  iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
+  iree_hal_rocm_BlockSize_vec_t block_sizes_vec =
       iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes_vec =
       iree_hal_rocm_ExecutableDef_shared_memory_sizes_get(executable_def);

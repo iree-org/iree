@@ -84,9 +84,9 @@ static iree_status_t iree_hal_cuda_native_executable_flatbuffer_verify(
     }
   }
 
-  iree_hal_cuda_BlockSizeDef_vec_t block_sizes_vec =
+  iree_hal_cuda_BlockSize_vec_t block_sizes_vec =
       iree_hal_cuda_ExecutableDef_block_sizes_get(executable_def);
-  size_t block_size_count = iree_hal_cuda_BlockSizeDef_vec_len(block_sizes_vec);
+  size_t block_size_count = iree_hal_cuda_BlockSize_vec_len(block_sizes_vec);
   if (block_size_count == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no block sizes present");
@@ -134,7 +134,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
       iree_hal_cuda_ExecutableDef_shared_memory_size_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
       iree_hal_cuda_ExecutableDef_entry_points_get(executable_def);
-  iree_hal_cuda_BlockSizeDef_vec_t block_sizes_vec =
+  iree_hal_cuda_BlockSize_vec_t block_sizes_vec =
       iree_hal_cuda_ExecutableDef_block_sizes_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
