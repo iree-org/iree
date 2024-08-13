@@ -202,9 +202,9 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::MultiDimReductionOp op) {
   // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
   VectorType srcVectorType = op.getSourceVectorType();
   auto nativeSize = llvm::to_vector(srcVectorType.getShape());
-  auto dims = op.getReductionDims().getAsValueRange<IntegerAttr>();
-  for (const auto &dimAttr : dims) {
-    nativeSize[dimAttr.getZExtValue()] = 1;
+  ArrayRef<int64_t> dims = op.getReductionDims();
+  for (const int64_t dim : dims) {
+    nativeSize[dim] = 1;
   }
   return nativeSize;
 }
