@@ -766,8 +766,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
 // owning this queue. It must not be unregistered until all requests that use
 // it have completed.
 //
-// Fails if the queue does not support dispatch operations (as indicated by
-// can_dispatch).
+// Fails if the queue does not support dispatch operations or
+// IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -799,8 +799,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
 // The provided constant data and binding list will be recorded into the command
 // buffer and need not remain live beyond the call.
 //
-// Fails if the queue does not support dispatch operations (as indicated by
-// can_dispatch).
+// Fails if the queue does not support dispatch operations or
+// IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
