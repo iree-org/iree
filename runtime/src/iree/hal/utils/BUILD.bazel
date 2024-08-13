@@ -26,16 +26,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "debug_allocator",
-    srcs = ["debug_allocator.c"],
-    hdrs = ["debug_allocator.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "collective_batch",
     srcs = ["collective_batch.c"],
     hdrs = ["collective_batch.h"],
@@ -59,6 +49,16 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "debug_allocator",
+    srcs = ["debug_allocator.c"],
+    hdrs = ["debug_allocator.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "deferred_command_buffer",
     srcs = ["deferred_command_buffer.c"],
     hdrs = ["deferred_command_buffer.h"],
@@ -67,6 +67,17 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "executable_debug_info",
+    srcs = ["executable_debug_info.c"],
+    hdrs = ["executable_debug_info.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
     ],
 )
 
