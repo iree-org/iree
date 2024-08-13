@@ -16,6 +16,7 @@ def DistributeMmaToLanesPass :
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",
     "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect",
   ];
 }
 
@@ -25,7 +26,6 @@ def ConcretizeMmaShapesPass :
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect",
   ];
   let options = [
     Option<"concretizeInputs", "concretize-inputs",
