@@ -6,11 +6,11 @@
 
 include "iree/schemas/executable_debug_info.fbs";
 
-namespace iree.hal.rocm;
+namespace iree.hal.hip;
 
-// 'ROCM Executable'.
-file_identifier "ROCM";
-file_extension "rocm";
+// 'HIP Executable'.
+file_identifier "HIPE";
+file_extension "hipe";
 
 // A struct for the kernel block size along each dimensions.
 struct BlockSize {

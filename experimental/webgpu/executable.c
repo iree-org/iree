@@ -273,7 +273,7 @@ iree_status_t iree_hal_webgpu_executable_create(
 
     // Publish any embedded source files to the tracing infrastructure.
     iree_hal_debug_publish_source_files(
-        iree_hal_rocm_ExecutableDef_source_files_get(executable_def));
+        iree_hal_hip_ExecutableDef_source_files_get(executable_def));
 
     // Create one pipeline per entry point.
     flatbuffers_uint32_vec_t entry_points_vec =
