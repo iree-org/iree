@@ -16,9 +16,12 @@
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
+#include "iree/hal/utils/executable_debug_info.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
+#include "iree/schemas/executable_debug_info_reader.h"
+#include "iree/schemas/executable_debug_info_verifier.h"
 #include "iree/schemas/spirv_executable_def_reader.h"
 #include "iree/schemas/spirv_executable_def_verifier.h"
 
@@ -30,8 +33,8 @@ typedef struct iree_hal_vulkan_entry_point_t {
   iree_string_view_t name;
 
   // Optional debug information.
-  IREE_TRACE(iree_hal_spirv_FileLineLocDef_table_t source_location;)
-  IREE_TRACE(iree_hal_spirv_StageLocationDef_vec_t stage_locations;)
+  IREE_TRACE(iree_hal_debug_FileLineLocDef_table_t source_location;)
+  IREE_TRACE(iree_hal_debug_StageLocationDef_vec_t stage_locations;)
 } iree_hal_vulkan_entry_point_t;
 
 static iree_status_t iree_hal_vulkan_create_shader_module(
@@ -414,44 +417,32 @@ iree_status_t iree_hal_vulkan_native_executable_create(
     }
   }
 
+  // Publish any embedded source files to the tracing infrastructure.
+  if (iree_status_is_ok(status)) {
+    iree_hal_debug_publish_source_files(
+        iree_hal_spirv_ExecutableDef_source_files_get(executable_def));
+  }
+
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   if (iree_status_is_ok(status)) {
     if (iree_hal_spirv_ExecutableDef_source_locations_is_present(
             executable_def)) {
-      iree_hal_spirv_FileLineLocDef_vec_t source_locations_vec =
+      iree_hal_debug_FileLineLocDef_vec_t source_locations_vec =
           iree_hal_spirv_ExecutableDef_source_locations_get(executable_def);
       for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
         executable->entry_points[i].source_location =
-            iree_hal_spirv_FileLineLocDef_vec_at(source_locations_vec, i);
+            iree_hal_debug_FileLineLocDef_vec_at(source_locations_vec, i);
       }
     }
     if (iree_hal_spirv_ExecutableDef_stage_locations_is_present(
             executable_def)) {
-      iree_hal_spirv_StageLocationsDef_vec_t stage_locations_vec =
+      iree_hal_debug_StageLocationsDef_vec_t stage_locations_vec =
           iree_hal_spirv_ExecutableDef_stage_locations_get(executable_def);
       for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
-        iree_hal_spirv_StageLocationsDef_table_t stage_locations =
-            iree_hal_spirv_StageLocationsDef_vec_at(stage_locations_vec, i);
+        iree_hal_debug_StageLocationsDef_table_t stage_locations =
+            iree_hal_debug_StageLocationsDef_vec_at(stage_locations_vec, i);
         executable->entry_points[i].stage_locations =
-            iree_hal_spirv_StageLocationsDef_locations_get(stage_locations);
-      }
-    }
-
-    // Publish any embedded source files to the tracing infrastructure.
-    if (iree_hal_spirv_ExecutableDef_source_files_is_present(executable_def)) {
-      iree_hal_spirv_SourceFileDef_vec_t source_files_vec =
-          iree_hal_spirv_ExecutableDef_source_files_get(executable_def);
-      for (iree_host_size_t i = 0;
-           i < iree_hal_spirv_SourceFileDef_vec_len(source_files_vec); ++i) {
-        iree_hal_spirv_SourceFileDef_table_t source_file =
-            iree_hal_spirv_SourceFileDef_vec_at(source_files_vec, i);
-        flatbuffers_string_t path =
-            iree_hal_spirv_SourceFileDef_path_get(source_file);
-        flatbuffers_uint8_vec_t content =
-            iree_hal_spirv_SourceFileDef_content_get(source_file);
-        IREE_TRACE_PUBLISH_SOURCE_FILE(path, flatbuffers_string_len(path),
-                                       content,
-                                       flatbuffers_uint8_vec_len(content));
+            iree_hal_debug_StageLocationsDef_locations_get(stage_locations);
       }
     }
   }
@@ -500,29 +491,29 @@ void iree_hal_vulkan_native_executable_entry_point_source_location(
   out_source_location->func_name = entry_point->name;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  iree_hal_spirv_FileLineLocDef_table_t source_location =
+  iree_hal_debug_FileLineLocDef_table_t source_location =
       entry_point->source_location;
   if (entry_point->stage_locations) {
-    for (size_t i = 0; i < iree_hal_spirv_StageLocationDef_vec_len(
+    for (size_t i = 0; i < iree_hal_debug_StageLocationDef_vec_len(
                                entry_point->stage_locations);
          ++i) {
-      iree_hal_spirv_StageLocationDef_table_t stage_location =
-          iree_hal_spirv_StageLocationDef_vec_at(entry_point->stage_locations,
+      iree_hal_debug_StageLocationDef_table_t stage_location =
+          iree_hal_debug_StageLocationDef_vec_at(entry_point->stage_locations,
                                                  i);
       // TODO(benvanik): a way to select what location is chosen. For now we
       // just pick the first one.
       source_location =
-          iree_hal_spirv_StageLocationDef_location_get(stage_location);
+          iree_hal_debug_StageLocationDef_location_get(stage_location);
       break;
     }
   }
   if (source_location) {
     flatbuffers_string_t filename =
-        iree_hal_spirv_FileLineLocDef_filename_get(source_location);
+        iree_hal_debug_FileLineLocDef_filename_get(source_location);
     out_source_location->file_name =
         iree_make_string_view(filename, flatbuffers_string_len(filename));
     out_source_location->line =
-        iree_hal_spirv_FileLineLocDef_line_get(source_location);
+        iree_hal_debug_FileLineLocDef_line_get(source_location);
   } else {
     out_source_location->file_name = out_source_location->func_name;
     out_source_location->line = 0;

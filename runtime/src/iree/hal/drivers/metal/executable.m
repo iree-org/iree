@@ -9,9 +9,12 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/utils/executable_debug_info.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
+#include "iree/schemas/executable_debug_info_reader.h"
+#include "iree/schemas/executable_debug_info_verifier.h"
 #include "iree/schemas/metal_executable_def_reader.h"
 #include "iree/schemas/metal_executable_def_verifier.h"
 
@@ -279,6 +282,12 @@ iree_status_t iree_hal_metal_executable_create(
     iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
     executable->host_allocator = host_allocator;
     executable->entry_point_count = entry_point_count;
+
+    // Publish any embedded source files to the tracing infrastructure.
+    if (iree_status_is_ok(status)) {
+      iree_hal_debug_publish_source_files(
+          iree_hal_metal_ExecutableDef_source_files_get(executable_def));
+    }
 
     size_t shader_library_count = flatbuffers_string_vec_len(shader_libraries_vec);
     size_t shader_source_count = flatbuffers_string_vec_len(shader_sources_vec);

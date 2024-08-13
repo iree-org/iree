@@ -662,16 +662,18 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
-    def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
+    def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None, includes=None):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         srcs_block = self._convert_srcs_block(srcs)
         flatcc_args_block = self._convert_string_list_block("FLATCC_ARGS", flatcc_args)
+        includes_block = self._convert_srcs_block(includes, block_name="INCLUDES")
 
         self._converter.body += (
             f"flatbuffer_c_library(\n"
             f"{name_block}"
             f"{srcs_block}"
             f"{flatcc_args_block}"
+            f"{includes_block}"
             f"  PUBLIC\n)\n\n"
         )
 
