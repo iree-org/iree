@@ -52,10 +52,10 @@ typedef struct iree_hal_stream_tracing_context_event_list_t {
 } iree_hal_stream_tracing_context_event_list_t;
 
 typedef enum iree_hal_stream_tracing_verbosity_e {
-  IREE_HAL_TRACING_VERBOSITY_OFF = 0,
-  IREE_HAL_TRACING_VERBOSITY_COARSE,
-  IREE_HAL_TRACING_VERBOSITY_FINE,
-  IREE_HAL_TRACING_VERBOSITY_MAX
+  IREE_HAL_STREAM_TRACING_VERBOSITY_OFF = 0,
+  IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE,
+  IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,
+  IREE_HAL_STREAM_TRACING_VERBOSITY_MAX
 } iree_hal_stream_tracing_verbosity_t;
 
 typedef struct iree_hal_stream_tracing_device_interface_vtable_t

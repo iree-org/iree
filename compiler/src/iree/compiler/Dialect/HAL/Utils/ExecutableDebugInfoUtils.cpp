@@ -57,6 +57,11 @@ createExportDefs(int debugLevel,
     assert(ordinalAttr && "ordinals must be assigned");
     int64_t ordinal = ordinalAttr.getInt();
 
+    flatbuffers_ref_t nameRef = 0;
+    if (debugLevel >= 1) {
+      nameRef = fbb.createString(exportOp.getName());
+    }
+
     flatbuffers_ref_t locationRef = 0;
     if (debugLevel >= 1) {
       if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
@@ -87,10 +92,11 @@ createExportDefs(int debugLevel,
       }
     }
 
-    if (locationRef || stageLocationsRef) {
-      exportDefs[ordinal] =
-          iree_hal_debug_ExportDef_create(fbb, locationRef, stageLocationsRef);
-    }
+    iree_hal_debug_ExportDef_start(fbb);
+    iree_hal_debug_ExportDef_name_add(fbb, nameRef);
+    iree_hal_debug_ExportDef_location_add(fbb, locationRef);
+    iree_hal_debug_ExportDef_stage_locations_add(fbb, stageLocationsRef);
+    exportDefs[ordinal] = iree_hal_debug_ExportDef_end(fbb);
   }
 
   return exportDefs;

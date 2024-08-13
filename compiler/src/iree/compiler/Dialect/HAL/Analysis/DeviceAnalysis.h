@@ -51,6 +51,15 @@ public:
   std::optional<SmallVector<IREE::Util::GlobalOpInterface>>
   lookupDeviceGlobals(Value deviceValue);
 
+  // Returns a set of possible targets of the given `!hal.device` global, if
+  // analyzed.
+  std::optional<DeviceSet>
+  lookupDeviceTargets(IREE::Util::GlobalOpInterface deviceGlobalOp);
+
+  // Returns a set of possible targets of the given `!hal.device` global, if
+  // analyzed.
+  std::optional<DeviceSet> lookupDeviceTargets(SymbolRefAttr deviceGlobalAttr);
+
   // Returns a set of possible targets of the given `!hal.device` value, if
   // analyzed.
   std::optional<DeviceSet> lookupDeviceTargets(Value deviceValue);
