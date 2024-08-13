@@ -633,8 +633,13 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
       stack, call.function, cconv_arguments, call.arguments, cconv_results,
       &current_frame, &regs));
 
-  return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
-                                   call.results);
+  iree_status_t status = iree_vm_bytecode_dispatch(stack, module, current_frame,
+                                                   regs, call.results);
+  if (!iree_status_is_ok(status) && !iree_status_is_deferred(status)) {
+    // Balance the external_enter on failure.
+    IREE_IGNORE_ERROR(iree_vm_stack_function_leave(stack));
+  }
+  return status;
 }
 
 iree_status_t iree_vm_bytecode_dispatch_resume(

@@ -23,6 +23,27 @@ extern "C" {
 iree_status_t iree_hal_debug_verify_export_def(
     iree_hal_debug_ExportDef_table_t export_def);
 
+// Basic debug information referencing allocated host memory.
+typedef struct iree_hal_debug_export_info_t {
+  iree_string_view_t name;
+  iree_string_view_t source_filename;
+  uint32_t source_line;
+} iree_hal_debug_export_info_t;
+
+// Returns the size in bytes required to store a copy of the export debug info.
+// Callers should allocate this amount of memory to populate with
+// iree_hal_debug_copy_export_info.
+iree_host_size_t iree_hal_debug_calculate_export_info_size(
+    iree_hal_debug_ExportDef_table_t export_def);
+
+// Clones the given export flatbuffer data into a heap structure allocated with
+// at least the size as calculated by iree_hal_debug_calculate_export_info_size.
+// The storage is valid until freed by the caller and decoupled from the
+// Flatbuffer storage.
+void iree_hal_debug_copy_export_info(
+    iree_hal_debug_ExportDef_table_t export_def,
+    iree_hal_debug_export_info_t* out_info);
+
 // Publishes the given source files to any attached debug/trace providers.
 // This must be called prior to emitting any debug/trace events that reference
 // the files that are contained within.

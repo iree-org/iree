@@ -32,6 +32,8 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 
 // A bitfield specifying the mode of operation for a command buffer.
 enum iree_hal_command_buffer_mode_bits_t {
+  IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT = 0u,
+
   // Command buffer will be submitted once and never used again.
   // This may enable in-place patching of command buffers that reduce overhead
   // when it's known that command buffers will not be reused.

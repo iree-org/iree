@@ -40,8 +40,6 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "pipeline_layout.c"
-    "pipeline_layout.h"
     "rccl_channel.c"
     "rccl_channel.h"
     "stream_command_buffer.c"

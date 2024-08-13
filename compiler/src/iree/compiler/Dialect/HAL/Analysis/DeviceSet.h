@@ -20,6 +20,7 @@ class DeviceSet {
 public:
   DeviceSet() = default;
   explicit DeviceSet(ArrayAttr targetsAttr);
+  explicit DeviceSet(ArrayRef<IREE::HAL::DeviceTargetAttr> targetAttrs);
   explicit DeviceSet(const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs);
   ~DeviceSet();
 

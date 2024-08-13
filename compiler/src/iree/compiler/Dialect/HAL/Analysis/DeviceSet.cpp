@@ -19,6 +19,12 @@ DeviceSet::DeviceSet(ArrayAttr targetsAttr) {
   }
 }
 
+DeviceSet::DeviceSet(ArrayRef<IREE::HAL::DeviceTargetAttr> targetAttrs) {
+  for (auto targetAttr : targetAttrs) {
+    this->targetAttrs.insert(targetAttr);
+  }
+}
+
 DeviceSet::DeviceSet(const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs)
     : targetAttrs(targetAttrs) {}
 
