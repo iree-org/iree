@@ -24,7 +24,7 @@
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
-#include "iree/schemas/rocm_executable_def_builder.h"
+#include "iree/schemas/hip_executable_def_builder.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -605,7 +605,7 @@ public:
     }
 
     iree_compiler::FlatbufferBuilder builder;
-    iree_hal_rocm_ExecutableDef_start_as_root(builder);
+    iree_hal_hip_ExecutableDef_start_as_root(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(
@@ -670,35 +670,35 @@ public:
                                               targetHSACO.size());
 
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-    iree_hal_rocm_BlockSize_vec_start(builder);
+    iree_hal_hip_BlockSize_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
     for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
-      iree_hal_rocm_BlockSize_vec_push_create(
+      iree_hal_hip_BlockSize_vec_push_create(
           builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
     auto workgroupLocalMemoriesRef =
         builder.createInt32Vec(workgroupLocalMemories);
-    auto blockSizesRef = iree_hal_rocm_BlockSize_vec_end(builder);
-    iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
+    auto blockSizesRef = iree_hal_hip_BlockSize_vec_end(builder);
+    iree_hal_hip_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_hip_ExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_hal_hip_ExecutableDef_shared_memory_sizes_add(
         builder, workgroupLocalMemoriesRef);
-    iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
+    iree_hal_hip_ExecutableDef_hsaco_image_add(builder, hsacoRef);
     if (!sourceLocationRefs.empty()) {
       auto sourceLocationsRef =
           builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_rocm_ExecutableDef_source_locations_add(builder,
-                                                       sourceLocationsRef);
+      iree_hal_hip_ExecutableDef_source_locations_add(builder,
+                                                      sourceLocationsRef);
     }
     if (!stageLocationsRefs.empty()) {
       auto stageLocationsRef =
           builder.createOffsetVecDestructive(stageLocationsRefs);
-      iree_hal_rocm_ExecutableDef_stage_locations_add(builder,
-                                                      stageLocationsRef);
+      iree_hal_hip_ExecutableDef_stage_locations_add(builder,
+                                                     stageLocationsRef);
     }
-    iree_hal_rocm_ExecutableDef_source_files_add(builder, sourceFilesRef);
-    iree_hal_rocm_ExecutableDef_end_as_root(builder);
+    iree_hal_hip_ExecutableDef_source_files_add(builder, sourceFilesRef);
+    iree_hal_hip_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
