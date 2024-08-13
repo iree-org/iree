@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -230,7 +231,7 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     return OpaqueMmaLayout{32, 32, 16, i8, i8, i32};
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     return OpaqueMmaLayout{16, 16, 16, f16, f16, f32};
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
@@ -352,8 +353,7 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
     // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [1, 16]>
     // #layout_a = #iree_vector_ext.layout<#outer, #inner>
@@ -367,6 +367,24 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     auto bNLayout = outer;
     auto cMLayout =
         PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {8, 2, 1});
+    auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
+    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
+                             bNLayout,     cMLayout, cNLayout};
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
+    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [1, 16]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
+    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
+
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {1, 16});
+    auto aMLayout = outer;
+    auto aKLayout = inner;
+    auto bKLayout = inner;
+    auto bNLayout = outer;
+    auto cMLayout =
+        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {16, 1, 1});
     auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
@@ -462,11 +480,16 @@ MMAAttr::getABCVectorTypes() const {
     auto cType = VectorType::get({16}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     auto aType = VectorType::get({16}, getAType());
     auto bType = VectorType::get({16}, getBType());
     auto cType = VectorType::get({8}, getCType());
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    auto aType = VectorType::get({16}, getAType());
+    auto bType = VectorType::get({16}, getBType());
+    auto cType = VectorType::get({16}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
   }
@@ -491,7 +514,7 @@ int64_t MMAAttr::getBlockSize() const {
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     return 1;
   }
   }
@@ -509,7 +532,7 @@ int64_t MMAAttr::getSubgroupSize() const {
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     return 64;
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
     return 32;
   }
@@ -541,7 +564,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*strides=*/{1, 32},
             /*element=*/{1, 8}};
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 16},
             /*element=*/{1, 16}};
@@ -573,7 +596,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
             /*element=*/{8, 1}};
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*strides=*/{16, 1},
             /*element=*/{16, 1}};
@@ -596,9 +619,12 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
     return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
             /*element=*/{4, 1}};
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*strides=*/{16, 1},
+            /*element=*/{1, 1}};
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*strides=*/{16, 1},
             /*element=*/{1, 1}};
   }
   }
@@ -643,7 +669,7 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
                                 rhs, acc)
         .getResult();
   }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
     return builder.create<amdgpu::WMMAOp>(loc, resultType, lhs, rhs, acc)
         .getResult();
@@ -663,9 +689,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
        llvm::zip_equal(subgroupLayout.outer, subgroupLayout.thread,
                        subgroupLayout.element)) {
     if (outer != 1) {
-      // TODO: Support this case. Might need a reshape since this makes the
-      // slice non-contigious.
-      return failure();
+      rankReducedShape.push_back(outer);
     }
     rankReducedShape.push_back(thread * element);
   }
@@ -689,6 +713,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
                        subgroupLayout.element)) {
     if (dimSize == 1) {
       vtids.push_back(zero);
+      continue;
     }
 
     // ((tid floordiv stride) mod size) * element.
@@ -701,7 +726,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   }
 
   int64_t idx = 0;
-  for (int64_t element : subgroupLayout.element) {
+  for (auto [element, outer] :
+       llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer)) {
+    if (outer != 1) {
+      canonicalSizes.push_back(builder.getIndexAttr(outer));
+      canonicalOffsets.push_back(zero);
+    }
     canonicalSizes.push_back(builder.getIndexAttr(element));
     canonicalOffsets.push_back(vtids[idx++]);
   }
@@ -715,13 +745,6 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     Value laneId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
-    break;
-  default:
-    return failure();
-  }
 
   MMAAttr::SingleSubgroupLayout subgroupLayout;
   switch (fragment) {
@@ -749,6 +772,82 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
   offsets.append(canonicalOffsets);
   sizes.append(canonicalSizes);
 
+  return success();
+}
+
+LogicalResult MMAAttr::materializeOperandConcreteShape(
+    OpBuilder &builder, IREE::GPU::MMAFragment fragment, Value operand,
+    std::optional<ArrayRef<int64_t>> permutation,
+    SmallVector<ReassociationIndices> &reassociations,
+    RankedTensorType &resultType) const {
+
+  SmallVector<int64_t, 2> outerSizes;
+  SmallVector<int64_t, 2> opaqueSizes;
+  auto [m, n, k] = getMNKShape();
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs: {
+    outerSizes = getASingleSubgroupLayout().outer;
+    opaqueSizes.append({m, k});
+    break;
+  }
+  case IREE::GPU::MMAFragment::Rhs: {
+    outerSizes = getBSingleSubgroupLayout().outer;
+    opaqueSizes.append({k, n});
+    break;
+  }
+  case IREE::GPU::MMAFragment::Acc: {
+    outerSizes = getCSingleSubgroupLayout().outer;
+    opaqueSizes.append({m, n});
+    break;
+  }
+  }
+  if (permutation.has_value()) {
+    if (permutation.value().size() != outerSizes.size()) {
+      return failure();
+    }
+    applyPermutationToVector(opaqueSizes, permutation.value());
+    applyPermutationToVector(outerSizes, permutation.value());
+  }
+
+  // Inner tile must have sizes matching the opaque layout.
+  auto operandType = llvm::cast<RankedTensorType>(operand.getType());
+  ArrayRef<int64_t> operandShape = operandType.getShape();
+  SmallVector<int64_t, 2> innerShape(operandShape.end() - opaqueSizes.size(),
+                                     operandShape.end());
+  if (!llvm::equal(opaqueSizes, innerShape)) {
+    return failure();
+  }
+
+  // Expand the shape of the inner tile to reflect the MMA thread layout.
+  SmallVector<int64_t, 4> resultShape(operandShape.begin(),
+                                      operandShape.end() - 2);
+  SmallVector<ReassociationIndices> reInds =
+      llvm::map_to_vector(llvm::seq<int64_t>(resultShape.size()),
+                          [](int64_t idx) -> ReassociationIndices {
+                            return ReassociationIndices({idx});
+                          });
+  int idx = reInds.size();
+  for (auto [outer, native] : llvm::zip_equal(outerSizes, opaqueSizes)) {
+    // Skip expansion if the outer dim is unit as the SingleSubgroupLayout gives
+    // a guarantee that the |element| counts are contiguous within the layout,
+    // and a unit outer implies a single offset and size for that dimension.
+    if (outer == 1) {
+      resultShape.push_back(native);
+      reInds.push_back(ReassociationIndices({idx++}));
+      continue;
+    }
+
+    // Reshape to [outer, native / outer] == [outer, thread * element]. This
+    // corresponds to |outer| repetitions of the thread/element sublayout.
+    resultShape.push_back(outer);
+    assert(native % outer == 0 && "invalid mma layout");
+    resultShape.push_back(native / outer);
+    reInds.push_back(ReassociationIndices{idx, idx + 1});
+    idx += 2;
+  }
+
+  reassociations = reInds;
+  resultType = operandType.clone(resultShape);
   return success();
 }
 

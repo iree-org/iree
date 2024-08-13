@@ -4,20 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_DATALAYOUTPROPAGATIONPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
 struct DataLayoutPropagationPass
-    : public DataLayoutPropagationBase<DataLayoutPropagationPass> {
+    : public impl::DataLayoutPropagationPassBase<DataLayoutPropagationPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
@@ -43,9 +43,4 @@ struct DataLayoutPropagationPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDataLayoutPropagationPass() {
-  return std::make_unique<DataLayoutPropagationPass>();
-}
 } // namespace mlir::iree_compiler::GlobalOptimization

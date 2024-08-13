@@ -558,7 +558,7 @@ func.func @contract_to_wmma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x1
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to #layout_c : vector<16x16xf32>

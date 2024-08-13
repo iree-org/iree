@@ -45,12 +45,6 @@ static llvm::cl::opt<bool> clEnableEarlyMaterialization(
         "false eventually. This does not work for heterogeneous computing."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
-    "iree-global-opt-enable-fuse-horizontal-contractions",
-    llvm::cl::desc(
-        "Enables horizontal fusion of contractions with one common operand"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
     llvm::cl::desc("Demotes inputs (LHS, RHS) of contraction ops to BF16. "
@@ -101,7 +95,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
-  mainPassManager.addPass(createEraseUnusedLinalgOperands());
+  mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
@@ -116,7 +110,7 @@ void buildGlobalOptimizationPassPipeline(
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
-      .addPass(createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOpsPass)
       // We decompose and transpose concatenations immediately before folding
       // unit extent dims because this allows decoupling unit dims in the
       // concatenation from the transposes that are introduced.
@@ -138,10 +132,8 @@ void buildGlobalOptimizationPassPipeline(
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);
       })
-      .addPass([&]() {
-        return createFuseDequantizationMatmulPass(
-            clEnableQuantizedMatmulReassociation);
-      })
+      .addPredicatedPass(clEnableQuantizedMatmulReassociation,
+                         createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Propagate transposes immediately before set encoding/data tiling
@@ -158,13 +150,6 @@ void buildGlobalOptimizationPassPipeline(
           })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
-
-  if (clEnableFuseHorizontalContractions) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(createFuseHorizontalContractionsPass)
-        .addPass(IREE::Flow::createCanonicalizerPass)
-        .addPass(mlir::createCSEPass);
-  }
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
@@ -226,7 +211,7 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       // After running const-eval to a fixed point and folding unit extent dims,
       // try any new raising opportunities.
-      .addPass(createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOpsPass)
       // Strip std.assert & co after we perform optimizations; prior to this we
       // may use the assertions to derive information during analysis.
       .addPredicatedPass(transformOptions.options.stripAssertions,

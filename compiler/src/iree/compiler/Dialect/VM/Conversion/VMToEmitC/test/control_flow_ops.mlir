@@ -67,9 +67,10 @@ vm.module @my_module {
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
 
     // Lookup import from module struct.
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
+    // CHECK-NEXT: %[[IMPORTS_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = "emitc.member_of_ptr"(%arg2) <{member = "imports"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: emitc.assign %[[IMPORTS]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORTS_VAR]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS_VAR]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
@@ -93,9 +94,10 @@ vm.module @my_module {
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
 
     // Lookup import from module struct.
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
+    // CHECK-NEXT: %[[IMPORTS_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = "emitc.member_of_ptr"(%arg2) <{member = "imports"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: emitc.assign %[[IMPORTS]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORTS_VAR]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS_VAR]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
@@ -150,9 +152,10 @@ vm.module @my_module {
   vm.func @call_variadic(%arg0 : i32, %arg1 : i32) -> i32 {
 
     // Lookup import from module struct.
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
+    // CHECK-NEXT: %[[IMPORTS_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = "emitc.member_of_ptr"(%arg2) <{member = "imports"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: emitc.assign %[[IMPORTS]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORTS_VAR]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS_VAR]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
@@ -183,9 +186,10 @@ vm.module @my_module {
   vm.func @call_variadic() -> i32 {
 
     // Lookup import from module struct.
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
+    // CHECK-NEXT: %[[IMPORTS_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = "emitc.member_of_ptr"(%arg2) <{member = "imports"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: emitc.assign %[[IMPORTS]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORTS_VAR]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS_VAR]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
@@ -346,12 +350,14 @@ vm.module @my_module {
     // CHECK-NEXT: ^[[FAIL]]:
     // CHECK-NEXT: %[[MSG:.+]] = emitc.call_opaque "iree_make_cstring_view"() {args = [#emitc.opaque<"\22message\22">]}
     // CHECK-SAME:     : () -> !emitc.opaque<"iree_string_view_t">
-    // CHECK-NEXT: %[[MSGSIZE:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[MSG]]) {args = [0 : index, #emitc.opaque<"size">]}
-    // CHECK-SAME:     : (!emitc.opaque<"iree_string_view_t">) -> !emitc.opaque<"iree_host_size_t">
-    // CHECK-NEXT: %[[MSGSIZEINT:.+]] = emitc.cast %[[MSGSIZE]] : !emitc.opaque<"iree_host_size_t"> to !emitc.opaque<"int">
-    // CHECK-NEXT: %[[MSGDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[MSG]]) {args = [0 : index, #emitc.opaque<"data">]}
-    // CHECK-SAME:     : (!emitc.opaque<"iree_string_view_t">) -> !emitc.ptr<!emitc.opaque<"const char">>
-    // CHECK-NEXT: %[[FAILSTATUS:.+]] = emitc.call_opaque "iree_status_allocate_f"(%[[MSGSIZEINT]], %[[MSGDATA]])
+    // CHECK-NEXT: %[[MSGSIZE_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[MSGSIZE:.+]] = "emitc.member"(%[[MSG]]) <{member = "size"}> : (!emitc.opaque<"iree_string_view_t">) -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: emitc.assign %[[MSGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[MSGSIZE_VAR]] : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[MSGSIZEINT:.+]] = emitc.cast %[[MSGSIZE_VAR]] : !emitc.opaque<"iree_host_size_t"> to !emitc.opaque<"int">
+    // CHECK-NEXT: %[[MSGDATA_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"const char">>
+    // CHECK-NEXT: %[[MSGDATA:.+]] = "emitc.member"(%[[MSG]]) <{member = "data"}> : (!emitc.opaque<"iree_string_view_t">) -> !emitc.ptr<!emitc.opaque<"const char">>
+    // CHECK-NEXT: emitc.assign %[[MSGDATA]] : !emitc.ptr<!emitc.opaque<"const char">> to %[[MSGDATA_VAR]] : !emitc.ptr<!emitc.opaque<"const char">>
+    // CHECK-NEXT: %[[FAILSTATUS:.+]] = emitc.call_opaque "iree_status_allocate_f"(%[[MSGSIZEINT]], %[[MSGDATA_VAR]])
     // CHECK-SAME:     {args = [#emitc.opaque<"IREE_STATUS_FAILED_PRECONDITION">, #emitc.opaque<"\22<vm>\22">, 0 : i32, #emitc.opaque<"\22%.*s\22">, 0 : index, 1 : index]}
     // CHECK-SAME:     : (!emitc.opaque<"int">, !emitc.ptr<!emitc.opaque<"const char">>) -> !emitc.opaque<"iree_status_t">
     // CHECK-NEXT: return %[[FAILSTATUS]] : !emitc.opaque<"iree_status_t">
@@ -376,39 +382,45 @@ vm.module @my_module {
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSTRUCTFN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "function"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSTRUCTFN]] : !emitc.opaque<"iree_vm_function_t"> to %[[ARGSTRUCTFN_MEMBER]] : !emitc.opaque<"iree_vm_function_t">
 
   // Allocate space for the arguments.
-  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.apply "&"(%[[ARGBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
   // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[ARGSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSDATA:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGBYTESPANDATA]] : !emitc.ptr<ui8> to %[[ARGSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
-  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.apply "&"(%[[RESBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
   // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[RESSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[RESULTSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[RESSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESSDATA:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESBYTESPANDATA]] : !emitc.ptr<ui8> to %[[RESSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Check that we don't pack anything into the argument struct.
-  // CHECK-NOT: emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-NOT: %[[ARGSPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%{{.+}}) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-NOT: "emitc.member"(%[[RESBYTESPAN]]) <{member = "arguments"}>
+  // CHECK-NOT: "emitc.member"(%{{.+}}) <{member = "data"}>
 
   // Create the call to the imported function.
-  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
-  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
-  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index]}
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[MODULE_MEMBER:.+]] = "emitc.member_of_ptr"(%arg1) <{member = "module"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: emitc.assign %[[MODULE_MEMBER]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">> to %[[IMPORTMOD]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[BEGIN_CALL:.+]] = "emitc.member_of_ptr"(%[[IMPORTMOD]]) <{member = "begin_call"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_CALL_INDIRECT"(%[[BEGIN_CALL]], %[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
 
   // Check that we don't unpack anything from the result struct.
-  // CHECK-NOT: emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-NOT: emitc.call_opaque "EMITC_STRUCT_MEMBER"(%{{.+}}) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-NOT: "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}>
+  // CHECK-NOT: "emitc.member"(%{{.+}}) <{member = "data"}>
 
   // Return ok status.
   //      CHECK: %[[OK:.+]] = emitc.call_opaque "iree_ok_status"()
@@ -454,34 +466,39 @@ vm.module @my_module {
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSTRUCTFN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "function"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSTRUCTFN]] : !emitc.opaque<"iree_vm_function_t"> to %[[ARGSTRUCTFN_MEMBER]] : !emitc.opaque<"iree_vm_function_t">
 
   // Allocate space for the arguments.
-  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]])
-  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.apply "&"(%[[ARGBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[ARGSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSDATA:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGBYTESPANDATA]] : !emitc.ptr<ui8> to %[[ARGSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
-  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]])
-  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.apply "&"(%[[RESBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[RESSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[RESULTSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[RESSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESSDATA:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESBYTESPANDATA]] : !emitc.ptr<ui8> to %[[RESSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the arguments into the struct.
   // Here we also create pointers for non-pointer types.
-  // CHECK-NEXT: %[[ARGS:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[ARGSPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGS:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGS_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[ARGS_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[ARGS]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGSPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGSPTR_MEMBER:.+]] = "emitc.member"(%[[ARGS]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGSPTR_MEMBER]] : !emitc.ptr<ui8> to %[[ARGSPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[ARGHOSTSIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A1PTR:.+]] = emitc.apply "&"(%arg2) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[ARGSPTR]], %[[A1PTR]], %[[ARGHOSTSIZE]])
@@ -505,16 +522,19 @@ vm.module @my_module {
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[A3ADDR]], %[[A4PTR]], %[[A3SIZE:.+]])
 
   // Create the call to the imported function.
-  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
-  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
-  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index]}
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[MODULE_MEMBER:.+]] = "emitc.member_of_ptr"(%arg1) <{member = "module"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: emitc.assign %[[MODULE_MEMBER]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">> to %[[IMPORTMOD]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[BEGIN_CALL:.+]] = "emitc.member_of_ptr"(%[[IMPORTMOD]]) <{member = "begin_call"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_CALL_INDIRECT"(%[[BEGIN_CALL]], %[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
 
   // Unpack the function results.
-  //      CHECK: %[[RES:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[RESPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[RES]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  //      CHECK: %[[RES:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RES_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[RES_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[RES]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESPTR_MEMBER:.+]] = "emitc.member"(%[[RES]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESPTR_MEMBER]] : !emitc.ptr<ui8> to %[[RESPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[RESHOSTSIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%arg6, %[[RESPTR]], %[[RESHOSTSIZE]])
 
@@ -556,34 +576,39 @@ vm.module @my_module {
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSTRUCTFN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "function"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSTRUCTFN]] : !emitc.opaque<"iree_vm_function_t"> to %[[ARGSTRUCTFN_MEMBER]] : !emitc.opaque<"iree_vm_function_t">
 
   // Allocate space for the arguments.
-  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]])
-  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.apply "&"(%[[ARGBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[ARGSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSDATA:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGBYTESPANDATA]] : !emitc.ptr<ui8> to %[[ARGSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
-  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]])
-  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.apply "&"(%[[RESBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[RESSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[RESULTSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[RESSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESSDATA:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESBYTESPANDATA]] : !emitc.ptr<ui8> to %[[RESSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the arguments into the struct.
   // Here we also create pointers for non-pointer types.
-  // CHECK-NEXT: %[[ARGS:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[ARGSPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGS:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGS_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[ARGS_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[ARGS]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGSPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGSPTR_MEMBER:.+]] = "emitc.member"(%[[ARGS]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGSPTR_MEMBER]] : !emitc.ptr<ui8> to %[[ARGSPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[ARGHOSTSIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A1PTR:.+]] = emitc.apply "&"(%arg2) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[ARGSPTR]], %[[A1PTR]], %[[ARGHOSTSIZE]])
@@ -595,16 +620,19 @@ vm.module @my_module {
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[A1ADDR]], %[[A2PTR]], %[[A1SIZE]])
 
   // Create the call to the imported function.
-  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
-  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
-  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index]}
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[MODULE_MEMBER:.+]] = "emitc.member_of_ptr"(%arg1) <{member = "module"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: emitc.assign %[[MODULE_MEMBER]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">> to %[[IMPORTMOD]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[BEGIN_CALL:.+]] = "emitc.member_of_ptr"(%[[IMPORTMOD]]) <{member = "begin_call"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_CALL_INDIRECT"(%[[BEGIN_CALL]], %[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
 
   // Unpack the function results.
-  //      CHECK: %[[RES:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[RESPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[RES]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  //      CHECK: %[[RES:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RES_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[RES_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[RES]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESPTR_MEMBER:.+]] = "emitc.member"(%[[RES]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESPTR_MEMBER]] : !emitc.ptr<ui8> to %[[RESPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[RESHOSTSIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%arg4, %[[RESPTR]], %[[RESHOSTSIZE]])
 
@@ -643,45 +671,55 @@ vm.module @my_module {
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSTRUCTFN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "function"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSTRUCTFN]] : !emitc.opaque<"iree_vm_function_t"> to %[[ARGSTRUCTFN_MEMBER]] : !emitc.opaque<"iree_vm_function_t">
 
   // Allocate space for the arguments.
-  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.apply "&"(%[[ARGBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
   // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[ARGSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[ARGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[ARGSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSDATA:.+]] = "emitc.member_of_ptr"(%[[ARGBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGBYTESPANDATA]] : !emitc.ptr<ui8> to %[[ARGSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
-  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.apply "&"(%[[RESBYTESPAN_MEMBER]]) : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
   // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
-  // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: %[[RESSDATALENGTH:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data_length"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.assign %[[RESULTSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[RESSDATALENGTH]] : !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESSDATA:.+]] = "emitc.member_of_ptr"(%[[RESBYTESPAN]]) <{member = "data"}> : (!emitc.ptr<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESBYTESPANDATA]] : !emitc.ptr<ui8> to %[[RESSDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the argument into the struct.
-  // CHECK-NEXT: %[[ARGS:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[ARGSPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGS:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGS_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[ARGS_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[ARGS]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGSPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGSPTR_MEMBER:.+]] = "emitc.member"(%[[ARGS]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGSPTR_MEMBER]] : !emitc.ptr<ui8> to %[[ARGSPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[ARG:.+]] = emitc.cast %[[ARGSPTR]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
   // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_assign"(%arg2, %[[ARG]])
 
   // Create the call to the imported function.
-  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
-  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
-  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index]}
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[MODULE_MEMBER:.+]] = "emitc.member_of_ptr"(%arg1) <{member = "module"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: emitc.assign %[[MODULE_MEMBER]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">> to %[[IMPORTMOD]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[BEGIN_CALL:.+]] = "emitc.member_of_ptr"(%[[IMPORTMOD]]) <{member = "begin_call"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %{{.+}} = emitc.call_opaque "EMITC_CALL_INDIRECT"(%[[BEGIN_CALL]], %[[IMPORTMOD]], %arg0, %[[ARGSTRUCT]])
 
   // Unpack the function results.
-  //      CHECK: %[[RES:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
-  // CHECK-NEXT: %[[RESPTR:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%[[RES]]) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  //      CHECK: %[[RES:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RES_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: emitc.assign %[[RES_MEMBER]] : !emitc.opaque<"iree_byte_span_t"> to %[[RES]] : !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESPTR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESPTR_MEMBER:.+]] = "emitc.member"(%[[RES]]) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESPTR_MEMBER]] : !emitc.ptr<ui8> to %[[RESPTR]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[RESREFPTR:.+]] = emitc.cast %[[RESPTR]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
   // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_move"(%[[RESREFPTR]], %arg3)
 
@@ -714,20 +752,23 @@ vm.module @my_module {
   // CHECK-NEXT: %[[MODSTATECASTED:.+]] = emitc.cast %arg5 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"struct my_module_state_t">>
 
   // Cast argument and result structs.
-  // CHECK-NEXT: %[[ARGDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGDATA:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGDATA_MEMBER:.+]] = "emitc.member"(%arg2) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[ARGDATA_MEMBER]] : !emitc.ptr<ui8> to %[[ARGDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[ARGS:.+]] = emitc.cast %[[ARGDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>
-  // CHECK-NEXT: %[[RESULTDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg3) {args = [0 : index, #emitc.opaque<"data">]}
-  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESULTDATA:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESULTDATA_MEMBER:.+]] = "emitc.member"(%arg3) <{member = "data"}> : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.assign %[[RESULTDATA_MEMBER]] : !emitc.ptr<ui8> to %[[RESULTDATA]] : !emitc.ptr<ui8>
   // CHECK-NEXT: %[[RESULTS:.+]] = emitc.cast %[[RESULTDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>
 
   // Unpack the argument from the struct.
-  // CHECK-NEXT: %[[MARG:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"arg0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>) -> i32
+  // CHECK-NEXT: %[[MARG:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
+  // CHECK-NEXT: %[[MARG_MEMBER:.+]] = "emitc.member_of_ptr"(%[[ARGS]]) <{member = "arg0"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>) -> i32
+  // CHECK-NEXT: emitc.assign %[[MARG_MEMBER]] : i32 to %[[MARG]] : i32
 
   // Unpack the result pointer from the struct.
-  // CHECK-NEXT: %[[MRES:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ADDRESS"(%[[RESULTS]]) {args = [0 : index, #emitc.opaque<"res0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>) -> !emitc.ptr<i32>
+  // CHECK-NEXT: %[[MRES_MEMBER:.+]] = "emitc.member_of_ptr"(%[[RESULTS]]) <{member = "res0"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>) -> i32
+  // CHECK-NEXT: %[[MRES:.+]] = emitc.apply "&"(%[[MRES_MEMBER]]) : (i32) -> !emitc.ptr<i32>
 
   // Call the internal function.
   // CHECK-NEXT: %{{.+}} = emitc.call @my_module_fn(%arg0, %[[MODULECASTED]], %[[MODSTATECASTED]], %[[MARG]], %[[MRES]])
@@ -778,9 +819,13 @@ vm.module @my_module {
   vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
   // CHECK-LABEL: emitc.func private @my_module_call_fn
   vm.func @call_fn() -> i32 {
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]} : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
-    // CHECK-NEXT: %[[MODULE:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%[[IMPORT]]) {args = [0 : index, #emitc.opaque<"module">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+    // CHECK-NEXT: %[[IMPORTS_VAR:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = "emitc.member_of_ptr"(%arg2) <{member = "imports"}> : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: emitc.assign %[[IMPORTS]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORTS_VAR]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS_VAR]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[MODULE:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+    // CHECK-NEXT: %[[MODULE_MEMBER:.+]] = "emitc.member_of_ptr"(%[[IMPORT]]) <{member = "module"}> : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+    // CHECK-NEXT: emitc.assign %[[MODULE_MEMBER]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">> to %[[MODULE]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
     // CHECK-NEXT: %[[CONDITION0:.+]] = emitc.logical_not %[[MODULE]] : !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
     // CHECK-NEXT: %[[CONDITION1:.+]] = emitc.logical_not %[[CONDITION0]] : i1
     // CHECK-NEXT: %[[RESULT:.+]] = emitc.cast %[[CONDITION1]] : i1 to i32

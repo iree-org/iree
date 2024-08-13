@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -30,6 +29,10 @@
 #define DEBUG_TYPE "cpu-materialize-encoding"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
+#define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
+#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 // Enumerate tile sizes to choose from when no specific architecture is
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
@@ -529,9 +532,8 @@ getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
 }
 
 struct CPUMaterializeHostEncodingPass
-    : public CPUMaterializeHostEncodingBase<CPUMaterializeHostEncodingPass> {
-  CPUMaterializeHostEncodingPass() = default;
-
+    : public impl::CPUMaterializeHostEncodingPassBase<
+          CPUMaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
                     IREE::Codegen::IREECodegenDialect>();
@@ -585,19 +587,13 @@ struct CPUMaterializeHostEncodingPass
   }
 };
 
-std::unique_ptr<Pass> createCPUMaterializeHostEncodingPass() {
-  return std::make_unique<CPUMaterializeHostEncodingPass>();
-}
-
 // NOTE: this runs on host modules and executables and has two paths to handle
 // that. It should _not_ be running on both - target-specific codegen passes
 // are not allowed on host programs and it's a big violation of layering that
 // this exists.
 struct CPUMaterializeDeviceEncodingPass
-    : public CPUMaterializeDeviceEncodingBase<
+    : public impl::CPUMaterializeDeviceEncodingPassBase<
           CPUMaterializeDeviceEncodingPass> {
-  CPUMaterializeDeviceEncodingPass() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
                     IREE::Codegen::IREECodegenDialect>();
@@ -611,9 +607,5 @@ struct CPUMaterializeDeviceEncodingPass
     }
   }
 };
-
-std::unique_ptr<Pass> createCPUMaterializeDeviceEncodingPass() {
-  return std::make_unique<CPUMaterializeDeviceEncodingPass>();
-}
 
 } // namespace mlir::iree_compiler

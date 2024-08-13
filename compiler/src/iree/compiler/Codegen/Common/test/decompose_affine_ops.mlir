@@ -1,4 +1,4 @@
-// RUN: iree-opt -decompose-affine-ops %s | FileCheck %s
+// RUN: iree-opt -iree-codegen-decompose-affine-ops %s | FileCheck %s
 
 // Check that we have one affine.apply per loop dependence:
 // IV0 with STRIDE0, IV1 with STRID1, etc.

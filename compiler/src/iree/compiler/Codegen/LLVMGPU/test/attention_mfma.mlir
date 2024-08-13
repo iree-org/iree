@@ -1,5 +1,5 @@
-// RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter)' \
-// RUN:   --iree-gpu-test-target=gfx908 --iree-codegen-transform-dialect-library=%p/attention_mfma_transform_spec.mlir | \
+// RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter{library-file-name=%p/attention_mfma_transform_spec.mlir})' \
+// RUN:   --iree-gpu-test-target=gfx908 | \
 // RUN: FileCheck --check-prefix=CHECK %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

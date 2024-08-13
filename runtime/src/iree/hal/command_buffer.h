@@ -91,6 +91,7 @@ typedef uint32_t iree_hal_command_category_t;
 //
 // Roughly maps to VkDescriptorSetBinding.
 typedef struct iree_hal_buffer_ref_t {
+  // TODO(#18154): change ordinal to `reserved` after binding simplification.
   // The binding number of this entry and corresponds to a resource of the
   // same binding number in the executable interface. Only used by certain
   // calls.
@@ -124,6 +125,12 @@ static inline iree_hal_buffer_ref_t iree_hal_make_indirect_buffer_ref(
     iree_device_size_t length) {
   return (iree_hal_buffer_ref_t){0, buffer_slot, NULL, offset, length};
 }
+
+// A list of buffer references.
+typedef struct iree_hal_buffer_ref_list_t {
+  iree_host_size_t count;
+  const iree_hal_buffer_ref_t* values;
+} iree_hal_buffer_ref_list_t;
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
@@ -714,6 +721,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
     iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
+//
 // Pushes an inline set of constants that can be accessed by subsequent
 // dispatches using a compatible pipeline layout.
 //
@@ -725,6 +734,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
+//
 // Pushes descriptor set bindings and associates them with |set|.
 // This uses an internal ringbuffer inside of the command buffer to avoid the
 // need for creating and binding descriptor sets and managing their lifetime.
@@ -745,6 +756,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
+//
 // Dispatches an execution request.
 // The request may execute overlapped with any other transfer operation or
 // dispatch made within the same barrier-defined sequence.
@@ -761,6 +774,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
     iree_hal_dispatch_flags_t flags);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
+//
 // Dispatches an execution request with deferred workgroup counts.
 // This is the same as iree_hal_command_buffer_dispatch but the workgroup counts
 // are read from the given |workgroups_buffer| at offset |workgroups_offset| as
@@ -774,6 +789,40 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags);
+
+// Dispatches an execution request.
+// The request may execute overlapped with any other transfer operation or
+// dispatch made within the same barrier-defined sequence. The executable
+// specified must be registered for use with the device driver owning this
+// queue.
+//
+// The provided constant data and binding list will be recorded into the command
+// buffer and need not remain live beyond the call.
+//
+// Fails if the queue does not support dispatch operations (as indicated by
+// can_dispatch).
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
+// Dispatches an execution request with a deferred workgroup count.
+// This is the same as iree_hal_command_buffer_dispatch but the workgroup count
+// is read from the given |workgroups_ref| buffer at the specified offset as
+// 3 uint32_t XYZ values immediately before performing the dispatch. This allows
+// prior dispatches within the command sequence to populate the workgroup
+// count or the workgroup count to change across submissions of the same
+// reusable command buffer.
+//
+// The buffer must have been allocated with
+// IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS and be of
+// IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2_indirect(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
 //===----------------------------------------------------------------------===//
 // Validation support
@@ -937,6 +986,18 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
       iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags);
+
+  iree_status_t(IREE_API_PTR* dispatch2)(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_executable_t* executable, int32_t entry_point,
+      const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+      iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
+  iree_status_t(IREE_API_PTR* dispatch2_indirect)(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_executable_t* executable, int32_t entry_point,
+      iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+      iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);
 

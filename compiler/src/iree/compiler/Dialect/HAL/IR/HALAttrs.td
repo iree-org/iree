@@ -168,10 +168,12 @@ def HAL_DescriptorTypeAttr :
 
 def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;
+def HAL_DescriptorFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0002>;
 def HAL_DescriptorFlagsAttr :
     I32BitEnumAttr<"DescriptorFlags", "valid Descriptor flags", [
       HAL_DescriptorFlags_None,
       HAL_DescriptorFlags_ReadOnly,
+      HAL_DescriptorFlags_Indirect,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -387,7 +389,7 @@ def HAL_DescriptorSetBindingAttr :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
     AttrParameter<"DescriptorType", "">:$type,
-    OptionalParameter<"std::optional<DescriptorFlags>">:$flags
+    OptionalParameter<"DescriptorFlags", "DescriptorFlags::None">:$flags
   );
   let assemblyFormat = [{
     `<` $ordinal `,` $type (`,` $flags^)? `>`
@@ -423,6 +425,9 @@ def HAL_DescriptorSetLayoutAttr :
     (`,` `flags` `=` $flags^)?
     `>`
   }];
+  let extraClassDeclaration = [{
+    DescriptorSetBindingAttr getBinding(int64_t ordinal) const;
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -449,6 +454,8 @@ def HAL_PipelineLayoutAttr :
     `>`
   }];
   let extraClassDeclaration = [{
+    DescriptorSetLayoutAttr getSetLayout(int64_t ordinal) const;
+
     // Returns the binding index in a flattened list of all sets and bindings.
     // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
     // a query for set 1 binding 0 would return 4.

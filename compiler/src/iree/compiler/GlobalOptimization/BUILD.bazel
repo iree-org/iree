@@ -30,7 +30,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
     ],
@@ -54,7 +53,6 @@ iree_compiler_cc_library(
         "EraseUnusedLinalgOperands.cpp",
         "ExpandTensorShapes.cpp",
         "FuseDequantizationMatmul.cpp",
-        "FuseHorizontalContractions.cpp",
         "FuseSiluHorizontalMatmul.cpp",
         "GeneralizeLinalgNamedOps.cpp",
         "GlobalLoopInvariantCodeMotion.cpp",

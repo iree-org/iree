@@ -116,7 +116,9 @@ public:
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Add reflection information used at runtime specific to the HAL interface.
-    SymbolTable symbolTable(variantOp.getInnerModule());
+    auto vmModule =
+        *variantOp.getInnerModule().getOps<IREE::VM::ModuleOp>().begin();
+    SymbolTable symbolTable(vmModule);
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getName());
 
@@ -126,6 +128,24 @@ public:
       auto localMemorySizeAttr = exportOp.getWorkgroupLocalMemoryAttr();
       if (localMemorySizeAttr) {
         funcOp.setReflectionAttr("local_memory", localMemorySizeAttr);
+      }
+
+      // Specify the constant and binding information used to validate
+      // dispatches.
+      // TODO(#18189): pack per-binding information bitfields.
+      if (auto layoutAttr = exportOp.getLayout()) {
+        int64_t constantCount = layoutAttr.getPushConstants();
+        if (constantCount > 0) {
+          funcOp.setReflectionAttr("constant_count",
+                                   executableBuilder.getI8IntegerAttr(
+                                       static_cast<uint8_t>(constantCount)));
+        }
+        size_t bindingCount = layoutAttr.getSetLayout(0).getBindings().size();
+        if (bindingCount > 0) {
+          funcOp.setReflectionAttr("binding_count",
+                                   executableBuilder.getI8IntegerAttr(
+                                       static_cast<uint8_t>(bindingCount)));
+        }
       }
     }
 

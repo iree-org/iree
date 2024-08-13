@@ -176,8 +176,6 @@ def build_compile_command_line(
       List of strings of command line.
     """
     iree_compile = find_tool("iree-compile")
-    if not options.target_backends:
-        raise ValueError("Expected a non-empty list for 'target_backends'")
 
     cl = [
         iree_compile,
@@ -185,8 +183,9 @@ def build_compile_command_line(
         f"--iree-input-type={options.input_type!s}",
         f"--iree-vm-bytecode-module-output-format={options.output_format!s}",
     ]
-    for target_backend in options.target_backends:
-        cl.append(f"--iree-hal-target-backends={target_backend}")
+    if options.target_backends is not None:
+        for target_backend in options.target_backends:
+            cl.append(f"--iree-hal-target-backends={target_backend}")
 
     # Output file.
     if options.output_file:

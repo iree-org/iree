@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -23,6 +22,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_VMVXLOWERLINALGMICROKERNELSPASS
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
 
 namespace {
 
@@ -918,7 +920,11 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
 } // namespace
 
 class VMVXLowerLinalgMicrokernelsPass
-    : public VMVXLowerLinalgMicrokernelsBase<VMVXLowerLinalgMicrokernelsPass> {
+    : public impl::VMVXLowerLinalgMicrokernelsPassBase<
+          VMVXLowerLinalgMicrokernelsPass> {
+  using impl::VMVXLowerLinalgMicrokernelsPassBase<
+      VMVXLowerLinalgMicrokernelsPass>::VMVXLowerLinalgMicrokernelsPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::VMVX::VMVXDialect,
                     memref::MemRefDialect>();
@@ -948,9 +954,4 @@ class VMVXLowerLinalgMicrokernelsPass
     }
   }
 };
-
-std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass() {
-  return std::make_unique<VMVXLowerLinalgMicrokernelsPass>();
-}
-
 } // namespace mlir::iree_compiler

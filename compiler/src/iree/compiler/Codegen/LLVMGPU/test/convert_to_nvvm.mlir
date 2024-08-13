@@ -426,3 +426,33 @@ hal.executable @masked_load_store {
 //       CHECK:   %[[MASK_BIT:.+]] = llvm.icmp "sgt" {{.*}} : vector<1xi64>
 //       CHECK:   llvm.intr.masked.load %{{.*}}, %[[MASK_BIT]]
 //       CHECK:   llvm.intr.masked.store %{{.*}}, %[[MASK_BIT]]
+
+// -----
+// Test workgroup size lowering
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @interface_wg_size {
+  hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export @interface_wg_size layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module attributes {} {
+      func.func @interface_wg_size() {
+        %c0 = arith.constant 0.0 : f32
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<64x64xf32>
+        memref.store %c0, %subspan[%workgroup_size_x, %workgroup_size_y] : memref<64x64xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.func @interface_wg_size
+//       CHECK:   %[[WGDIMX:.+]] = nvvm.read.ptx.sreg.ntid.x
+//       CHECK:   %[[WGDIMY:.+]] = nvvm.read.ptx.sreg.ntid.y

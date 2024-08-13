@@ -203,7 +203,7 @@ func.func @conv_nchwc() {
 // WMMA:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // WMMA-SAME: mma_schedule = #iree_gpu.mma_schedule
-// WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
+// WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
 // WMMA-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

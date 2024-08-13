@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -29,6 +28,9 @@ using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMCPULOWEREXECUTABLETARGETPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 /// Lowers an hal.executable.variant operation to scalar/native-vector
 /// code. Invokes different compilation pipeline to
@@ -36,7 +38,7 @@ namespace {
 /// - then convert to LLVM dialect.
 /// In due course this could be used to generate code for all backends.
 class LLVMCPULowerExecutableTargetPass
-    : public LLVMCPULowerExecutableTargetBase<
+    : public impl::LLVMCPULowerExecutableTargetPassBase<
           LLVMCPULowerExecutableTargetPass> {
 public:
   LLVMCPULowerExecutableTargetPass() = default;
@@ -167,10 +169,4 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMCPULowerExecutableTargetPass() {
-  return std::make_unique<LLVMCPULowerExecutableTargetPass>();
-}
-
 } // namespace mlir::iree_compiler

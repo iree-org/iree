@@ -211,74 +211,50 @@ void structDefinition(OpBuilder builder, Location location,
 
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/"EMITC_STRUCT_MEMBER",
-          /*operands=*/ArrayRef<Value>{operand},
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, memberName)}))
-      .getResult(0);
+  Value var = allocateVariable(builder, location, type);
+  Value member =
+      builder.create<emitc::MemberOp>(location, type, memberName, operand);
+  builder.create<emitc::AssignOp>(location, var, member);
+  return var;
+}
+
+Value structMemberAddress(OpBuilder builder, Location location,
+                          emitc::PointerType type, StringRef memberName,
+                          Value operand) {
+  Value member = builder.create<emitc::MemberOp>(location, type.getPointee(),
+                                                 memberName, operand);
+  return addressOf(builder, location, member);
 }
 
 void structMemberAssign(OpBuilder builder, Location location,
                         StringRef memberName, Value operand, Value data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/"EMITC_STRUCT_MEMBER_ASSIGN",
-      /*operands=*/ArrayRef<Value>{operand, data},
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           builder.getIndexAttr(1)}));
-}
-
-void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName, Value operand, StringRef data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/"EMITC_STRUCT_MEMBER_ASSIGN",
-      /*operands=*/ArrayRef<Value>{operand},
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           emitc::OpaqueAttr::get(ctx, data)}));
+  Value member = builder.create<emitc::MemberOp>(location, data.getType(),
+                                                 memberName, operand);
+  builder.create<emitc::AssignOp>(location, member, data);
 }
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/"EMITC_STRUCT_PTR_MEMBER",
-          /*operands=*/ArrayRef<Value>{operand},
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, memberName)}))
-      .getResult(0);
+  Value var = allocateVariable(builder, location, type);
+  Value member =
+      builder.create<emitc::MemberOfPtrOp>(location, type, memberName, operand);
+  builder.create<emitc::AssignOp>(location, var, member);
+  return var;
+}
+
+Value structPtrMemberAddress(OpBuilder builder, Location location,
+                             emitc::PointerType type, StringRef memberName,
+                             Value operand) {
+  Value member = builder.create<emitc::MemberOfPtrOp>(
+      location, type.getPointee(), memberName, operand);
+  return addressOf(builder, location, member);
 }
 
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/"EMITC_STRUCT_PTR_MEMBER_ASSIGN",
-      /*operands=*/ArrayRef<Value>{operand, data},
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           builder.getIndexAttr(1)}));
+  Value member = builder.create<emitc::MemberOfPtrOp>(location, data.getType(),
+                                                      memberName, operand);
+  builder.create<emitc::AssignOp>(location, member, data);
 }
 
 Value ireeMakeCstringView(OpBuilder builder, Location location,

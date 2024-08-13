@@ -1095,10 +1095,15 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // Set function pointers
     for (std::string funcName :
          {"destroy", "alloc_state", "free_state", "resolve_import"}) {
+      // The type doesn't matter, the result gets inlined into it's uses anyway.
+      Type type = emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
+
+      Value funcPtr = builder.create<emitc::LiteralOp>(
+          loc, type, moduleName + "_" + funcName);
       emitc_builders::structMemberAssign(builder, loc,
                                          /*memberName=*/funcName,
                                          /*operand=*/vmModule,
-                                         /*value=*/moduleName + "_" + funcName);
+                                         /*value=*/funcPtr);
     }
 
     std::string descriptorPtr = "&" + moduleName + "_descriptor_";
@@ -1910,23 +1915,17 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       auto value = argumentStruct.value.value();
 
       if (llvm::isa<IREE::VM::RefType>(input.value())) {
-        Type ptrType = emitc::PointerType::get(
+        auto ptrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
         std::string memberName = "arg" + std::to_string(input.index());
-        auto memberPtr = rewriter.create<emitc::CallOpaqueOp>(
-            /*location=*/loc,
-            /*type=*/ptrType,
-            /*callee=*/"EMITC_STRUCT_PTR_MEMBER_ADDRESS",
-            /*operands=*/ArrayRef<Value>{value},
-            /*args=*/
-            ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                 emitc::OpaqueAttr::get(ctx, memberName)}));
+        auto memberPtr = emitc_builders::structPtrMemberAddress(
+            rewriter, loc, ptrType, memberName, value);
         rewriter.create<emitc::CallOpaqueOp>(
             /*location=*/memberPtr.getLoc(),
             /*type=*/TypeRange{},
             /*callee=*/"iree_vm_ref_retain_inplace",
-            /*operands=*/ArrayRef<Value>{memberPtr.getResult(0)});
-        argumentStruct.callArguments.push_back(memberPtr.getResult(0));
+            /*operands=*/ArrayRef<Value>{memberPtr});
+        argumentStruct.callArguments.push_back(memberPtr);
       } else {
         Type memberType = input.value();
         std::string memberName = "arg" + std::to_string(input.index());
@@ -1945,7 +1944,6 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
   LogicalResult unpackResults(ConversionPatternRewriter &rewriter,
                               IREE::VM::ExportOp &exportOp,
                               GeneratedStruct &resultStruct) const {
-    auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
     // The struct is empty, nothing to do.
@@ -1966,18 +1964,12 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       assert(resultStruct.value.has_value());
       auto value = resultStruct.value.value();
 
-      Type ptrType = typeConverter->convertTypeAsPointer(result.value());
+      auto ptrType = typeConverter->convertTypeAsPointer(result.value());
 
       std::string memberName = "res" + std::to_string(result.index());
-      auto memberPtr = rewriter.create<emitc::CallOpaqueOp>(
-          /*location=*/loc,
-          /*type=*/ptrType,
-          /*callee=*/"EMITC_STRUCT_PTR_MEMBER_ADDRESS",
-          /*operands=*/ArrayRef<Value>{value},
-          /*args=*/
-          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, memberName)}));
-      resultStruct.callArguments.push_back(memberPtr.getResult(0));
+      Value memberPtr = emitc_builders::structPtrMemberAddress(
+          rewriter, loc, ptrType, memberName, value);
+      resultStruct.callArguments.push_back(memberPtr);
     }
 
     return success();
@@ -2272,19 +2264,11 @@ private:
     auto ctx = builder.getContext();
 
     // byteSpan = call.<memberName>;
-    auto byteSpan =
-        builder
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/
-                emitc::PointerType::get(
-                    emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
-                /*callee=*/"EMITC_STRUCT_MEMBER_ADDRESS",
-                /*operands=*/ArrayRef<Value>{call},
-                /*args=*/
-                ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                                     emitc::OpaqueAttr::get(ctx, memberName)}))
-            .getResult(0);
+    auto byteSpan = emitc_builders::structMemberAddress(
+        builder, loc,
+        emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
+        memberName, call);
 
     // void *byteSpan_data_void = iree_alloca(size);
     auto byteSpanDataVoid =
@@ -2480,20 +2464,19 @@ private:
         /*memberName=*/"module",
         /*operand=*/import);
 
+    // The type doesn't matter, the result gets inlined into it's uses anyway.
+    emitc::PointerType type =
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
+
+    Value beginCall = builder.create<emitc::MemberOfPtrOp>(
+        loc, type, "begin_call", importModule);
+
     returnIfError(
         /*rewriter=*/builder,
         /*location=*/loc,
-        /*callee=*/"EMITC_STRUCT_PTR_MEMBER_CALL",
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {
-                           builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, "begin_call"),
-                           builder.getIndexAttr(0),
-                           builder.getIndexAttr(1),
-                           builder.getIndexAttr(2),
-                       }),
-        /*operands=*/ArrayRef<Value>{importModule, stack, call},
+        /*callee=*/"EMITC_CALL_INDIRECT",
+        /*args=*/{},
+        /*operands=*/ArrayRef<Value>{beginCall, importModule, stack, call},
         typeConverter.analysis);
 
     return success();

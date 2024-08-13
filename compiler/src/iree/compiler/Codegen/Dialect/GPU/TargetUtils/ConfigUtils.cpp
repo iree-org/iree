@@ -29,7 +29,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return failure();
   }
 
@@ -39,23 +39,20 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
   SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
-      mlir::linalg::inferContractionDims(linalgOp);
-  if (failed(contractionDims)) {
-    return failure();
-  }
+  mlir::linalg::ContractionDimensions contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp).value();
 
-  if (contractionDims->k.empty() || contractionDims->m.empty() ||
-      contractionDims->n.empty()) {
+  if (contractionDims.k.empty() || contractionDims.m.empty() ||
+      contractionDims.n.empty()) {
     return failure();
   }
 
   // For now we are not being smart and trying to reshape dimensions to allow
   // for better usage of intrinsics, and instead are tiling all dimensions
   // except the inner most m, n, and k dimensions to 1.
-  int64_t mDim = contractionDims->m.back();
-  int64_t nDim = contractionDims->n.back();
-  int64_t kDim = contractionDims->k.back();
+  int64_t mDim = contractionDims.m.back();
+  int64_t nDim = contractionDims.n.back();
+  int64_t kDim = contractionDims.k.back();
 
   // Dynamic dims are expected to be taken care of earlier in the pipeline.
   if (ShapedType::isDynamic(bounds[mDim]) ||
@@ -76,16 +73,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   SmallVector<GPUMatmulShapeType> intrinsics;
-  SmallVector<IREE::GPU::MmaInterfaceAttr> supportedMmas;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    IREE::GPU::MMAIntrinsic type = mma.getIntrinsic().getValue();
-    // TODO: Drop this once all intrinsics are supported.
-    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16 &&
-        type != IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8) {
-      continue;
-    }
-    supportedMmas.push_back(mma);
-
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     if (mma.getSubgroupSize() != targetSubgroupSize)
@@ -159,19 +147,19 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> subgroupTileSizes(linalgOp.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
-  for (int64_t batch : contractionDims->batch) {
+  for (int64_t batch : contractionDims.batch) {
     workgroupTileSizes[batch] = 1;
   }
 
   // Tile all m, n, and k dimensions to 1 except the innermost. Unit dims
   // from this tiling are folded before vectorization.
-  for (int64_t m : llvm::drop_end(contractionDims->m)) {
+  for (int64_t m : llvm::drop_end(contractionDims.m)) {
     workgroupTileSizes[m] = 1;
   }
-  for (int64_t n : llvm::drop_end(contractionDims->n)) {
+  for (int64_t n : llvm::drop_end(contractionDims.n)) {
     workgroupTileSizes[n] = 1;
   }
-  for (int64_t k : llvm::drop_end(contractionDims->k)) {
+  for (int64_t k : llvm::drop_end(contractionDims.k)) {
     reductionTileSizes[k] = 1;
   }
 
@@ -188,7 +176,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   // Similarly the reduction tile size is just the post-packing tile count.
   reductionTileSizes[kDim] = schedule->kTileCount;
 
-  IREE::GPU::MmaInterfaceAttr mmaKind = supportedMmas[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind =
+      target.getWgp().getMma()[schedule->index];
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.

@@ -10,6 +10,9 @@
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>
 } {
@@ -18,28 +21,28 @@ func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
   %N = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %K = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>,
-                   tensor<?x?xi8, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>)
-      outs(%5 : tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>)
-      -> tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
   return
 }
 
@@ -90,21 +93,24 @@ func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
 func.func @fill_matmul(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index) attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x2xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x3xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>>{%arg4, %arg5}
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>> -> tensor<1x2xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>> -> tensor<2x3xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>
-  %7 = tensor.empty() : tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>
-  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>) -> tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>
-  %9 = linalg.matmul ins(%3, %4 : tensor<1x2xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>, tensor<2x3xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>) outs(%8 : tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>) -> tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>
-  flow.dispatch.tensor.store %9, %2, offsets = [0, 0], sizes = [1, 3], strides = [1, 1] : tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>> -> !flow.dispatch.tensor<writeonly:tensor<1x3xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x2xf32, #encoding_lhs>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x3xf32, #encoding_rhs>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x3xf32, #encoding_result>>{%arg4, %arg5}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2xf32, #encoding_lhs>> -> tensor<1x2xf32, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32, #encoding_rhs>> -> tensor<2x3xf32, #encoding_rhs>
+  %7 = tensor.empty() : tensor<1x3xf32, #encoding_result>
+  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x3xf32, #encoding_result>) -> tensor<1x3xf32, #encoding_result>
+  %9 = linalg.matmul ins(%3, %4 : tensor<1x2xf32, #encoding_lhs>, tensor<2x3xf32, #encoding_rhs>) outs(%8 : tensor<1x3xf32, #encoding_result>) -> tensor<1x3xf32, #encoding_result>
+  flow.dispatch.tensor.store %9, %2, offsets = [0, 0], sizes = [1, 3], strides = [1, 1] : tensor<1x3xf32, #encoding_result> -> !flow.dispatch.tensor<writeonly:tensor<1x3xf32, #encoding_result>>
   return
 }
 //      CHECK: func.func @fill_matmul
@@ -140,6 +146,7 @@ func.func @fill_matmul(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 func.func @set_encoding_dynamic() attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
@@ -149,13 +156,13 @@ func.func @set_encoding_dynamic() attributes {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%d0, %d1}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%d0, %d1}
+      : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding_lhs>>{%d0, %d1}
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%d0, %d1} -> tensor<?x?xf32>
-  %3 = iree_encoding.set_encoding %2 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+  %3 = iree_encoding.set_encoding %2 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
   flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
-      -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%d0, %d1}
+      : tensor<?x?xf32, #encoding_lhs>
+      -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding_lhs>>{%d0, %d1}
   return
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -189,6 +196,7 @@ func.func @set_encoding_dynamic() attributes {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 func.func @unset_encoding_dynamic() attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
@@ -197,14 +205,14 @@ func.func @unset_encoding_dynamic() attributes {
   %d0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %d1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%d0, %d1}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%d0, %d1}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%d0, %d1}
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%d0, %d1}
-      -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%d0, %d1}
+      -> tensor<?x?xf32, #encoding_lhs>
   %3 = iree_encoding.unset_encoding %2
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding_lhs> -> tensor<?x?xf32>
   %4 = tensor.extract_slice %3[0, 0] [%d0, %d1] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
       : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%d0, %d1}
@@ -240,6 +248,9 @@ func.func @unset_encoding_dynamic() attributes {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 func.func @matmul_lowering_f32f32f32_generic() attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
@@ -248,28 +259,28 @@ func.func @matmul_lowering_f32f32f32_generic() attributes {
   %N = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %K = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%M, %K}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>{%K, %N}
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xf32, #encoding_lhs>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xf32, #encoding_rhs>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xf32, #encoding_result>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>,
-                   tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>)
-      outs(%5 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>)
-      -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
+      ins(%3, %4 : tensor<?x?xf32, #encoding_lhs>,
+                   tensor<?x?xf32, #encoding_rhs>)
+      outs(%5 : tensor<?x?xf32, #encoding_result>)
+      -> tensor<?x?xf32, #encoding_result>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>>>{%M, %N}
+      : tensor<?x?xf32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>

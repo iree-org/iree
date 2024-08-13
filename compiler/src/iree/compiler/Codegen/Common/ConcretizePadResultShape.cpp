@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
@@ -23,6 +22,9 @@
 #define DEBUG_TYPE "iree-codegen-concretize-pad-result-shape"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONCRETIZEPADRESULTSHAPEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Gets the given `attrOrValue` as an index value by creating constant ops
 /// for attributes.
@@ -126,12 +128,9 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 };
 
 class ConcretizePadResultShapePass final
-    : public ConcretizePadResultShapeBase<ConcretizePadResultShapePass> {
+    : public impl::ConcretizePadResultShapePassBase<
+          ConcretizePadResultShapePass> {
 public:
-  ConcretizePadResultShapePass() = default;
-  ConcretizePadResultShapePass(const ConcretizePadResultShapePass &pass) =
-      default;
-
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
@@ -154,11 +153,6 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConcretizePadResultShapePass() {
-  return std::make_unique<ConcretizePadResultShapePass>();
-}
 
 void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
                                               ArrayRef<int64_t> numWorkgroups) {

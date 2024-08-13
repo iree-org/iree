@@ -268,17 +268,11 @@ makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
     SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
       bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
-          builder.getContext(), binding.ordinal, binding.type,
-          binding.flags != IREE::HAL::DescriptorFlags::None
-              ? binding.flags
-              : std::optional<IREE::HAL::DescriptorFlags>{}));
-    }
-    std::optional<IREE::HAL::DescriptorSetLayoutFlags> flags;
-    if (targetAttr.hasConfigurationAttr("hal.bindings.indirect")) {
-      flags = IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+          builder.getContext(), binding.ordinal, binding.type, binding.flags));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
-        builder.getContext(), setLayout.ordinal, bindingAttrs, flags));
+        builder.getContext(), setLayout.ordinal, bindingAttrs,
+        setLayout.flags));
   }
   return IREE::HAL::PipelineLayoutAttr::get(
       builder.getContext(), pipelineLayout.pushConstantCount, setLayoutAttrs);
@@ -354,8 +348,10 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
       continue; // unhandled arg type (primitive/etc)
     }
     auto setBinding = resourceMap[resourceIdx++];
-    auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
-    auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
+    auto setLayoutAttr = layoutAttr.getSetLayout(setBinding.first);
+    assert(setLayoutAttr && "layout must be consistent");
+    auto bindingAttr = setLayoutAttr.getBinding(setBinding.second);
+    assert(bindingAttr && "layout must be consistent");
     convertBindingUsage(sourceFuncOp, arg, layoutAttr, setLayoutAttr,
                         bindingAttr);
   }

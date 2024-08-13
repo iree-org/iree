@@ -181,20 +181,13 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Math dialect elementry functions -> polynomial form.
       .addPass(createPolynomialApproximationPass)
 
-      .addPass(createPadDynamicAlloc);
+      .addPass(createPadDynamicAllocPass);
 
-  // Check to make sure we are not exceeding shared memory usage limit.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface fn) {
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(fn);
-    return target.getWgp().getMaxWorkgroupMemoryBytes();
-  };
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
   funcPassManager
-      .addPass([&]() {
-        return createGPUCheckResourceUsagePass(getSharedMemoryLimit,
-                                               getIndexBitwidth);
-      })
+      .addPass(
+          [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
       // Fold load/store from/to subview ops into the original memref when
       // possible. In SPIR-V we don't use memref descriptor so it's not possible

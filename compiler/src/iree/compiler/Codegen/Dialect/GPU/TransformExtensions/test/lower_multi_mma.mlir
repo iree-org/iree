@@ -77,7 +77,7 @@ func.func @lower_multi_mma_wmma_16x16x16(%lhs: vector<16xf16>, %rhs: vector<16xf
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
   } : vector<16xf16>, vector<16xf16> into vector<8xf32>
   return %0 : vector<8xf32>
 }

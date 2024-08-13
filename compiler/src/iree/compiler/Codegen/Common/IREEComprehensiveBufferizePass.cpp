@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -45,9 +44,36 @@ using mlir::bufferization::OneShotBufferizationOptions;
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_ELIMINATEEMPTYTENSORSPASS
+#define GEN_PASS_DEF_IREECOMPREHENSIVEBUFFERIZEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
+// Default allocation functions.
+static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
+                                            MemRefType allocationType,
+                                            ValueRange dynamicSizes,
+                                            unsigned int alignment) {
+  MemRefType type = allocationType;
+  if (auto storage = type.getMemorySpace()) {
+    // We cannot allocate to generate a resultant MemRef type with descriptor
+    // type memory space; that's runtime allocations. So erase and fallback to
+    // the default 0 memory space. It is fine given this is just the default
+    // allocator; backends are expected to control by themselves.
+    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
+      type = MemRefType::get(type.getShape(), type.getElementType(),
+                             type.getLayout());
+  }
+  return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
+}
+static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
+                                     Value from, Value to) {
+  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
+  return success(static_cast<bool>(copyOp));
+}
+
 namespace {
-class EliminateEmptyTensorsPass
-    : public EliminateEmptyTensorsBase<EliminateEmptyTensorsPass> {
+class EliminateEmptyTensorsPass final
+    : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
@@ -57,13 +83,15 @@ public:
 };
 
 /// Pass to convert from tensor based ops to memref based ops.
-class IREEComprehensiveBufferizePass
-    : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
+class IREEComprehensiveBufferizePass final
+    : public impl::IREEComprehensiveBufferizePassBase<
+          IREEComprehensiveBufferizePass> {
 public:
+  using impl::IREEComprehensiveBufferizePassBase<
+      IREEComprehensiveBufferizePass>::IREEComprehensiveBufferizePassBase;
   explicit IREEComprehensiveBufferizePass(
-      std::optional<BufferizationOptions::AllocationFn> allocationFn =
-          std::nullopt,
-      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
+      BufferizationOptions::AllocationFn allocationFn,
+      BufferizationOptions::MemCpyFn memCpyFn)
       : allocationFn(allocationFn), memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -88,33 +116,10 @@ public:
   void runOnOperation() override;
 
 private:
-  const std::optional<BufferizationOptions::AllocationFn> allocationFn;
-  const std::optional<BufferizationOptions::MemCpyFn> memCpyFn;
+  const BufferizationOptions::AllocationFn allocationFn = defaultAllocationFn;
+  const BufferizationOptions::MemCpyFn memCpyFn = defaultMemCpyFn;
 };
 } // namespace
-
-// Default allocation functions.
-static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
-                                            MemRefType allocationType,
-                                            ValueRange dynamicSizes,
-                                            unsigned int alignment) {
-  MemRefType type = allocationType;
-  if (auto storage = type.getMemorySpace()) {
-    // We cannot allocate to generate a resultant MemRef type with descriptor
-    // type memory space; that's runtime allocations. So erase and fallback to
-    // the default 0 memory space. It is fine given this is just the default
-    // allocator; backends are expected to control by themselves.
-    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
-      type = MemRefType::get(type.getShape(), type.getElementType(),
-                             type.getLayout());
-  }
-  return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
-}
-static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
-                                     Value from, Value to) {
-  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
-  return success(static_cast<bool>(copyOp));
-}
 
 static IREEOneShotBufferizationOptions getBufferizationOptions() {
   IREEOneShotBufferizationOptions options;
@@ -227,11 +232,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createEliminateEmptyTensorsPass() {
-  return std::make_unique<EliminateEmptyTensorsPass>();
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
@@ -239,8 +239,8 @@ createIREEComprehensiveBufferizePass(
     allocationFn = defaultAllocationFn;
   if (!memCpyFn)
     memCpyFn = defaultMemCpyFn;
-  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn,
-                                                          memCpyFn);
+  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn.value(),
+                                                          memCpyFn.value());
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {

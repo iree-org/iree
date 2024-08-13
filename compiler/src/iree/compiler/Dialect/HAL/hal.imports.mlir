@@ -286,6 +286,8 @@ vm.import private @command_buffer.collective(
   %element_count : i64
 )
 
+// TODO(#18154): remove this in favor of inlined constants.
+//
 // Pushes constants for consumption by dispatches.
 vm.import private @command_buffer.push_constants(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -294,6 +296,8 @@ vm.import private @command_buffer.push_constants(
   %values : i32 ...
 )
 
+// TODO(#18154): remove this in favor of inlined bindings.
+//
 // Pushes a descriptor set to the given set number.
 vm.import private @command_buffer.push_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -325,6 +329,45 @@ vm.import private @command_buffer.dispatch.indirect(
   %workgroups_offset : i64,
   %flags : i64
 )
+
+// TODO(#18154): replace @command_buffer.dispatch.
+//
+// Dispatches an execution request.
+vm.import private @command_buffer.dispatch2(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %executable : !vm.ref<!hal.executable>,
+  %entry_point : i32,
+  %workgroup_x : i32,
+  %workgroup_y : i32,
+  %workgroup_z : i32,
+  %flags : i64,
+  %constants : i32 ...,
+  // <reserved, slot, buffer, offset, length>
+  %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
+)
+attributes {
+  minimum_version = 4 : i32
+}
+
+// TODO(#18154): replace @command_buffer.dispatch.indirect.
+//
+// Dispatches an execution request with the dispatch parameters loaded from the
+// given buffer.
+vm.import private @command_buffer.dispatch2.indirect(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %executable : !vm.ref<!hal.executable>,
+  %entry_point : i32,
+  %workgroups_buffer_slot : i32,
+  %workgroups_buffer : !vm.ref<!hal.buffer>,
+  %workgroups_offset : i64,
+  %flags : i64,
+  %constants : i32 ...,
+  // <reserved, slot, buffer, offset, length>
+  %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
+)
+attributes {
+  minimum_version = 4 : i32
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_layout_t
@@ -467,6 +510,19 @@ vm.import private @executable.create(
   %pipeline_layouts : !vm.ref<!hal.pipeline_layout>...
 ) -> !vm.ref<!hal.executable>
 attributes {nosideeffects}
+
+// TODO(#18154): replace @executable.create.
+// Creates an executable for use with the specified device.
+vm.import private @executable.create2(
+  %device : !vm.ref<!hal.device>,
+  %executable_format : !vm.buffer,
+  %executable_data : !vm.buffer,
+  %constants : !vm.buffer
+) -> !vm.ref<!hal.executable>
+attributes {
+  minimum_version = 4 : i32,
+  nosideeffects
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_fence_t
