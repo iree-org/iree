@@ -346,7 +346,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
       cuGraphCreate(&command_buffer->cu_graph, /*flags=*/0), "cuGraphCreate");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
 
   return iree_ok_status();
 }
@@ -361,7 +361,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
       iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
 
   // Reset state used during recording.
   command_buffer->cu_barrier_node = NULL;
@@ -396,7 +396,7 @@ static void iree_hal_cuda_graph_command_buffer_begin_debug_group(
 
   (void)command_buffer;
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE,
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE,
       location ? location->file.data : NULL, location ? location->file.size : 0,
       location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
@@ -408,7 +408,7 @@ static void iree_hal_cuda_graph_command_buffer_end_debug_group(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t
@@ -522,7 +522,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -562,7 +562,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       "cuGraphAddMemsetNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -574,7 +574,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -626,7 +626,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
       "cuGraphAddMemcpyNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -638,7 +638,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -686,7 +686,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       "cuGraphAddMemcpyNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -783,7 +783,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
               executable, entry_point, &kernel_info));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
       kernel_info.source_line, kernel_info.function_name.data,
       kernel_info.function_name.size,
@@ -887,7 +887,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       "cuGraphAddKernelNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -920,7 +920,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch2(
               executable, entry_point, &kernel_info));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
       kernel_info.source_line, kernel_info.function_name.data,
       kernel_info.function_name.size, /*name=*/NULL, 0);
@@ -1013,7 +1013,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch2(
       "cuGraphAddKernelNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

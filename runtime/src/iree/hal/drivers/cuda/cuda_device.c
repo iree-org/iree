@@ -448,12 +448,14 @@ static iree_status_t iree_hal_cuda_device_create_internal(
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
-    if (device->params.stream_tracing >= IREE_HAL_TRACING_VERBOSITY_MAX ||
-        device->params.stream_tracing < IREE_HAL_TRACING_VERBOSITY_OFF) {
+    if (device->params.stream_tracing >=
+            IREE_HAL_STREAM_TRACING_VERBOSITY_MAX ||
+        device->params.stream_tracing < IREE_HAL_STREAM_TRACING_VERBOSITY_OFF) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "invalid stream_tracing argument: expected to be between %d and %d",
-          IREE_HAL_TRACING_VERBOSITY_OFF, IREE_HAL_TRACING_VERBOSITY_MAX);
+          IREE_HAL_STREAM_TRACING_VERBOSITY_OFF,
+          IREE_HAL_STREAM_TRACING_VERBOSITY_MAX);
     }
 
     iree_hal_cuda_tracing_device_interface_t* tracing_device_interface = NULL;

@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/native_executable.h"
-#include "iree/hal/drivers/hip/pipeline_layout.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
@@ -59,12 +58,6 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
-
-  // TODO(#18154): drop state used by legacy bindings mechanism.
-  int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
-  struct {
-    hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
-  } descriptor_sets[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_COUNT];
 } iree_hal_hip_graph_command_buffer_t;
 
 static const iree_hal_command_buffer_vtable_t
@@ -352,7 +345,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin(
       "hipGraphCreate");
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE,
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_graph_command_buffer",
       strlen("iree_hal_hip_graph_command_buffer"),
       /*name=*/NULL, 0);
@@ -370,7 +363,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_end(
       iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
 
   // Reset state used during recording.
   command_buffer->hip_barrier_node = NULL;
@@ -405,7 +398,7 @@ static void iree_hal_hip_graph_command_buffer_begin_debug_group(
 
   (void)command_buffer;
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE,
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE,
       location ? location->file.data : NULL, location ? location->file.size : 0,
       location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
@@ -417,7 +410,7 @@ static void iree_hal_hip_graph_command_buffer_end_debug_group(
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t
@@ -531,7 +524,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -569,8 +562,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
           dependency_count, &params),
       "hipGraphAddMemsetNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer,
-                                               IREE_HAL_TRACING_VERBOSITY_FINE);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -587,7 +580,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -639,8 +632,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer,
-                                               IREE_HAL_TRACING_VERBOSITY_FINE);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -657,7 +650,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
@@ -703,8 +696,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer,
-                                               IREE_HAL_TRACING_VERBOSITY_FINE);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -730,186 +723,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_collective(
                                           recv_binding, element_count);
 }
 
-static iree_status_t iree_hal_hip_graph_command_buffer_push_constants(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
-    const void* values, iree_host_size_t values_length) {
-  iree_hal_hip_graph_command_buffer_t* command_buffer =
-      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
-
-  if (IREE_UNLIKELY(offset + values_length >=
-                    sizeof(command_buffer->push_constants))) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant range [%zu, %zu) out of range",
-                            offset, offset + values_length);
-  }
-
-  memcpy((uint8_t*)&command_buffer->push_constants + offset, values,
-         values_length);
-
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_hip_graph_command_buffer_push_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
-  if (binding_count > IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "exceeded available binding slots for push "
-        "descriptor set #%" PRIu32 "; requested %" PRIhsz " vs. maximal %d",
-        set, binding_count, IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT);
-  }
-
-  iree_hal_hip_graph_command_buffer_t* command_buffer =
-      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  hipDeviceptr_t* current_bindings =
-      command_buffer->descriptor_sets[set].bindings;
-  for (iree_host_size_t i = 0; i < binding_count; i++) {
-    const iree_hal_buffer_ref_t* binding = &bindings[i];
-    hipDeviceptr_t device_ptr = NULL;
-    if (binding->buffer) {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                           &binding->buffer));
-
-      hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
-          iree_hal_buffer_allocated_buffer(binding->buffer));
-      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
-      device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
-    }
-
-    current_bindings[binding->ordinal] = device_ptr;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
-    iree_hal_dispatch_flags_t flags) {
-  iree_hal_hip_graph_command_buffer_t* command_buffer =
-      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
-
-  // Lookup kernel parameters used for side-channeling additional launch
-  // information from the compiler.
-  iree_hal_hip_kernel_info_t kernel_info;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_native_executable_entry_point_kernel_info(
-              executable, entry_point, &kernel_info));
-
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size,
-      /*name=*/NULL, 0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                       &executable));
-  iree_hal_hip_dispatch_layout_t dispatch_params =
-      iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info.layout);
-  // The total number of descriptors across all descriptor sets.
-  iree_host_size_t descriptor_count = dispatch_params.total_binding_count;
-  // The total number of push constants.
-  iree_host_size_t push_constant_count = dispatch_params.push_constant_count;
-  // We append push constants to the end of descriptors to form a linear chain
-  // of kernel arguments.
-  iree_host_size_t kernel_params_count = descriptor_count + push_constant_count;
-  iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
-
-  iree_host_size_t total_size = kernel_params_length * 2;
-  uint8_t* storage_base = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_arena_allocate(&command_buffer->arena, total_size,
-                              (void**)&storage_base));
-  void** params_ptr = (void**)storage_base;
-
-  // Set up kernel arguments to point to the payload slots.
-  hipDeviceptr_t* payload_ptr =
-      (hipDeviceptr_t*)((uint8_t*)params_ptr + kernel_params_length);
-  for (size_t i = 0; i < kernel_params_count; i++) {
-    params_ptr[i] = &payload_ptr[i];
-  }
-
-  // Copy descriptors from all sets to the end of the current segment for later
-  // access.
-  iree_host_size_t set_count = dispatch_params.set_layout_count;
-  for (iree_host_size_t i = 0; i < set_count; ++i) {
-    // TODO: cache this information in the kernel info to avoid recomputation.
-    iree_host_size_t binding_count =
-        iree_hal_hip_descriptor_set_layout_binding_count(
-            iree_hal_hip_pipeline_layout_descriptor_set_layout(
-                kernel_info.layout, i));
-    iree_host_size_t index =
-        iree_hal_hip_pipeline_layout_base_binding_index(kernel_info.layout, i);
-    memcpy(payload_ptr + index, command_buffer->descriptor_sets[i].bindings,
-           binding_count * sizeof(hipDeviceptr_t));
-  }
-
-  // Append the push constants to the kernel arguments.
-  iree_host_size_t base_index = dispatch_params.push_constant_base_index;
-
-  // Each kernel parameter points to is a hipDeviceptr_t, which as the size of a
-  // pointer on the target machine. we are just storing a 32-bit value for the
-  // push constant here instead. So we must process one element each type, for
-  // 64-bit machines.
-  for (iree_host_size_t i = 0; i < push_constant_count; i++) {
-    *((uint32_t*)params_ptr[base_index + i]) =
-        command_buffer->push_constants[i];
-  }
-
-  hipKernelNodeParams params = {
-      .blockDim.x = kernel_info.block_size[0],
-      .blockDim.y = kernel_info.block_size[1],
-      .blockDim.z = kernel_info.block_size[2],
-      .gridDim.x = workgroup_x,
-      .gridDim.y = workgroup_y,
-      .gridDim.z = workgroup_z,
-      .func = kernel_info.function,
-      .kernelParams = params_ptr,
-      .sharedMemBytes = kernel_info.shared_memory_size,
-  };
-
-  if (command_buffer->graph_node_count >=
-      IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "exceeded max concurrent node limit");
-  }
-
-  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
-  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, command_buffer->symbols,
-      hipGraphAddKernelNode(
-          &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
-          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
-          dependency_count, &params),
-      "hipGraphAddKernelNode");
-
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer,
-                                               IREE_HAL_TRACING_VERBOSITY_FINE);
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_hip_graph_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect dispatch not yet implemented");
-}
-
 static iree_status_t iree_hal_hip_graph_command_buffer_dispatch2(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -924,16 +737,18 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch2(
 
   // Lookup kernel parameters used for side-channeling additional launch
   // information from the compiler.
-  iree_hal_hip_kernel_info_t kernel_info;
+  const iree_hal_hip_kernel_params_t* kernel_params = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_native_executable_entry_point_kernel_info(
-              executable, entry_point, &kernel_info));
+      z0, iree_hal_hip_native_executable_lookup_kernel_params(
+              executable, entry_point, &kernel_params));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size, /*name=*/NULL, 0);
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,
+      kernel_params->debug_info.source_filename.data,
+      kernel_params->debug_info.source_filename.size,
+      kernel_params->debug_info.source_line,
+      kernel_params->debug_info.function_name.data,
+      kernel_params->debug_info.function_name.size, /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -942,7 +757,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch2(
   // We append push constants to the end of descriptors to form a linear chain
   // of kernel arguments.
   iree_host_size_t kernel_params_count =
-      kernel_info.binding_count + kernel_info.constant_count;
+      kernel_params->binding_count + kernel_params->constant_count;
   iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
 
   // TODO: use packed parameters instead of the indirection mechanism - this
@@ -981,21 +796,21 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch2(
   // pointer on the target machine. we are just storing a 32-bit value for the
   // push constant here instead. So we must process one element each type, for
   // 64-bit machines.
-  for (iree_host_size_t i = 0; i < kernel_info.constant_count; i++) {
-    *((uint32_t*)params_ptr[kernel_info.binding_count + i]) =
+  for (iree_host_size_t i = 0; i < kernel_params->constant_count; i++) {
+    *((uint32_t*)params_ptr[kernel_params->binding_count + i]) =
         ((const uint32_t*)constants.data)[i];
   }
 
   hipKernelNodeParams params = {
-      .blockDim.x = kernel_info.block_size[0],
-      .blockDim.y = kernel_info.block_size[1],
-      .blockDim.z = kernel_info.block_size[2],
+      .blockDim.x = kernel_params->block_dims[0],
+      .blockDim.y = kernel_params->block_dims[1],
+      .blockDim.z = kernel_params->block_dims[2],
       .gridDim.x = workgroup_count[0],
       .gridDim.y = workgroup_count[1],
       .gridDim.z = workgroup_count[2],
-      .func = kernel_info.function,
+      .func = kernel_params->function,
       .kernelParams = params_ptr,
-      .sharedMemBytes = kernel_info.shared_memory_size,
+      .sharedMemBytes = kernel_params->block_shared_memory_size,
   };
 
   if (command_buffer->graph_node_count >=
@@ -1013,8 +828,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch2(
           dependency_count, &params),
       "hipGraphAddKernelNode");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer,
-                                               IREE_HAL_TRACING_VERBOSITY_FINE);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
+      command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -1046,12 +861,6 @@ static const iree_hal_command_buffer_vtable_t
         .update_buffer = iree_hal_hip_graph_command_buffer_update_buffer,
         .copy_buffer = iree_hal_hip_graph_command_buffer_copy_buffer,
         .collective = iree_hal_hip_graph_command_buffer_collective,
-        .push_constants = iree_hal_hip_graph_command_buffer_push_constants,
-        .push_descriptor_set =
-            iree_hal_hip_graph_command_buffer_push_descriptor_set,
-        .dispatch = iree_hal_hip_graph_command_buffer_dispatch,
-        .dispatch_indirect =
-            iree_hal_hip_graph_command_buffer_dispatch_indirect,
         .dispatch2 = iree_hal_hip_graph_command_buffer_dispatch2,
         .dispatch2_indirect =
             iree_hal_hip_graph_command_buffer_dispatch2_indirect,

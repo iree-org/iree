@@ -13,12 +13,10 @@ set(IREE_ALL_CTS_TESTS
   "command_buffer_fill_buffer"
   "command_buffer_push_constants"
   "command_buffer_update_buffer"
-  "descriptor_set_layout"
   "driver"
   "event"
   "executable_cache"
   "file"
-  "pipeline_layout"
   "semaphore"
   "semaphore_submission"
   PARENT_SCOPE
@@ -161,19 +159,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    descriptor_set_layout_test_library
-  HDRS
-    "descriptor_set_layout_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
     driver_test_library
   HDRS
     "driver_test.h"
@@ -216,19 +201,6 @@ iree_cc_library(
     file_test_library
   HDRS
     "file_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
-    pipeline_layout_test_library
-  HDRS
-    "pipeline_layout_test.h"
   DEPS
     ::cts_test_base
     iree::base
