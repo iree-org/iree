@@ -991,6 +991,30 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     return SmallVector<Value>(newSubviewOp->result_begin(),
                               newSubviewOp->result_end());
   }
+  if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
+    auto currResultType =
+        llvm::cast<MemRefType>(expandOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
+
+    FailureOr<MemRefType> newResultType =
+        memref::ExpandShapeOp::computeExpandedType(
+            newSourceType, currResultType.getShape(),
+            expandOp.getReassociationIndices());
+    if (failed(newResultType)) {
+      return std::nullopt;
+    }
+
+    auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
+        loc, *newResultType, replacement, expandOp.getReassociation(),
+        expandOp.getOutputShape(), expandOp.getStaticOutputShape());
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newExpandOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newExpandOp->result_begin(),
+                              newExpandOp->result_end());
+  }
   return std::nullopt;
 }
 
