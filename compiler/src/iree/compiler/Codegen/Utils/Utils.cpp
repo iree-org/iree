@@ -988,8 +988,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
       llvm::dbgs() << "\n";
     });
-    return SmallVector<Value>(newSubviewOp->result_begin(),
-                              newSubviewOp->result_end());
+    return llvm::to_vector_of<Value>(newSubviewOp->getResults());
   }
   if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
     auto currResultType =
@@ -1012,8 +1011,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       newExpandOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
       llvm::dbgs() << "\n";
     });
-    return SmallVector<Value>(newExpandOp->result_begin(),
-                              newExpandOp->result_end());
+    return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
   return std::nullopt;
 }
