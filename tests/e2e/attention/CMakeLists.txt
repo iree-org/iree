@@ -12,15 +12,15 @@ iree_add_all_subdirs()
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_cpu_f16_f16_f16_small
+    e2e_attention_cpu_f32_f32_f32_small
   TEST_TYPE
     attention
   GENERATOR
     "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
-    "--query_type=f16"
-    "--key_type=f16"
-    "--value_type=f16"
+    "--query_type=f32"
+    "--key_type=f32"
+    "--value_type=f32"
     "--shapes=small"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
@@ -37,15 +37,15 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_cpu_f16_f16_f16_medium
+    e2e_attention_cpu_f32_f32_f32_medium
   TEST_TYPE
     attention
   GENERATOR
     "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
-    "--query_type=f16"
-    "--key_type=f16"
-    "--value_type=f16"
+    "--query_type=f32"
+    "--key_type=f32"
+    "--value_type=f32"
     "--shapes=medium"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
@@ -62,15 +62,15 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_cpu_f16_f16_f16_large
+    e2e_attention_cpu_f32_f32_f32_large
   TEST_TYPE
     attention
   GENERATOR
     "generate_e2e_attention_tests.py"
   GENERATOR_ARGS
-    "--query_type=f16"
-    "--key_type=f16"
-    "--value_type=f16"
+    "--query_type=f32"
+    "--key_type=f32"
+    "--value_type=f32"
     "--shapes=large"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test

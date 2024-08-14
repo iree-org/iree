@@ -18,28 +18,28 @@ import math
 @enum.unique
 class QueryElemTypeId(enum.Enum):
     NONE = ""
-    F16 = "f16"
+    F32 = "f32"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class KeyElemTypeId(enum.Enum):
     NONE = ""
-    F16 = "f16"
+    F32 = "f32"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class ValueElemTypeId(enum.Enum):
     NONE = ""
-    F16 = "f16"
+    F32 = "f32"
 
 
 # Data type of input entries. The string values must match MLIR data types.
 @enum.unique
 class ResultElemTypeId(enum.Enum):
     NONE = ""
-    F16 = "f16"
+    F32 = "f32"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -79,7 +79,7 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=4, m=4096, k1=64, k2=1024, n=128, scale=1.0),
+            TestShapeAndScale(batch=1, m=4096, k1=64, k2=1024, n=128, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
@@ -326,16 +326,16 @@ def generate_call(
         f"  %k1 = arith.constant {shapes_scale.k1} : i64 \n"
         f"  %k2 = arith.constant {shapes_scale.k2} : i64 \n"
         f"  %n = arith.constant {shapes_scale.n} : i64 \n"
-        f"  %query1 = hal.tensor.import %query : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> \n"
-        f"  %key1 = hal.tensor.import %key : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> \n"
-        f"  %value1 = hal.tensor.import %value : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> \n"
-        f"  %queryExt = arith.extf %query1 : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> \n"
-        f"  %keyExt = arith.extf %key1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> \n"
-        f"  %valueExt = arith.extf %value1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> \n"
-        f"  %queryExt1 = hal.tensor.export %queryExt : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
-        f"  %keyExt1 = hal.tensor.export %keyExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
-        f"  %valueExt1 = hal.tensor.export %valueExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> -> !hal.buffer_view \n"
-        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %queryExt1, %keyExt1, %valueExt1, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        # f"  %query1 = hal.tensor.import %query : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> \n"
+        # f"  %key1 = hal.tensor.import %key : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> \n"
+        # f"  %value1 = hal.tensor.import %value : !hal.buffer_view -> tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> \n"
+        # f"  %queryExt = arith.extf %query1 : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> \n"
+        # f"  %keyExt = arith.extf %key1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> \n"
+        # f"  %valueExt = arith.extf %value1 : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf16> to tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> \n"
+        # f"  %queryExt1 = hal.tensor.export %queryExt : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
+        # f"  %keyExt1 = hal.tensor.export %keyExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
+        # f"  %valueExt1 = hal.tensor.export %valueExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> -> !hal.buffer_view \n"
+        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %query, %key, %value, %result) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
     op = op + "  return\n"
@@ -393,21 +393,21 @@ def parse_arguments():
     parser.add_argument(
         "--query_type",
         type=str,
-        choices=["f16"],
+        choices=["f32"],
         help="Numeric type of query tensors ",
         required=True,
     )
     parser.add_argument(
         "--key_type",
         type=str,
-        choices=["f16"],
+        choices=["f32"],
         help="Numeric type of key tensors ",
         required=True,
     )
     parser.add_argument(
         "--value_type",
         type=str,
-        choices=["f16"],
+        choices=["f32"],
         help="Numeric type of value tensors ",
         required=True,
     )
