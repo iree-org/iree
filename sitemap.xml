@@ -206,11 +206,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/developers/performance/benchmark-suites/</loc>
-         <lastmod>2024-08-14</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://iree.dev/developers/performance/benchmarking/</loc>
          <lastmod>2024-08-14</lastmod>
          <changefreq>daily</changefreq>

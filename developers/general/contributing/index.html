@@ -2940,8 +2940,6 @@
       
         
       
-        
-      
     
     
       
@@ -2994,29 +2992,6 @@
   
   <span class="md-ellipsis">
     Benchmarking
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../performance/benchmark-suites/" class="md-nav__link">
-        
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
-  
-  <span class="md-ellipsis">
-    Benchmark suites
   </span>
   
 
@@ -4444,8 +4419,6 @@ description.</p>
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-skip-llvm-integrate-benchmark: free form reason
-benchmark-extra: extra,benchmarks,to,run
 runner-env: [testing|prod]
 </code></pre></div>
 <details class="info -">
@@ -4477,21 +4450,6 @@ mutually exclusive with both "skip" and "extra".</li>
 <p>In all these cases, the setup does not make any effort to ensure that job
 dependencies are satisfied. Thus, if you request skipping the <code>build_all</code>
 job, all the jobs that depend on it will fail, not be skipped.</p>
-</details>
-<details class="info -">
-<summary>Using <code>benchmark-extra</code>, <code>skip-llvm-integrate-benchmark</code></summary>
-<div class="highlight"><pre><span></span><code>benchmark-extra: extra,benchmarks,to,run
-skip-llvm-integrate-benchmark: free form reason
-</code></pre></div>
-<p>Benchmarks don't run by default on PRs, and must be specifically requested.</p>
-<p>The <code>benchmark-extra</code> option allows specifying additional benchmark presets
-to run as part of benchmarking. It accepts a comma-separated list of
-benchmark presets. This combines with labels added to the PR (which are a
-more limited set of options). See the
-<a href="../../performance/benchmark-suites/">benchmark suites documentation</a>.</p>
-<p>Benchmarks <em>do</em> run by default on PRs detected to be an integration of LLVM
-into IREE, but this behavior can be disabled with
-<code>skip-llvm-integrate-benchmark</code>.</p>
 </details>
 <details class="info -">
 <summary>Using <code>runner-env</code></summary>

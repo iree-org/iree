@@ -2910,8 +2910,6 @@
       
         
       
-        
-      
     
     
       
@@ -2964,29 +2962,6 @@
   
   <span class="md-ellipsis">
     Benchmarking
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../performance/benchmark-suites/" class="md-nav__link">
-        
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
-  
-  <span class="md-ellipsis">
-    Benchmark suites
   </span>
   
 
@@ -4251,12 +4226,6 @@ need to build the special <code>iree-test-deps</code> target to generate test fi
 to running CTest (from the build directory):</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
 </code></pre></div>
-<p>To run e2e model tests in
-<a href="https://github.com/iree-org/iree/blob/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake">generated_e2e_model_tests.cmake</a>,
-because of their dependencies, <code>-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON</code> needs to be
-set when configuring CMake. Also see
-<a href="../../performance/benchmark-suites/#prerequisites">IREE Benchmark Suite Prerequisites</a>
-for required packages.</p>
 <h3 id="running-a-test_2">Running a Test<a class="headerlink" href="#running-a-test_2" title="Permanent link">link</a></h3>
 <p>For the test
 <a href="https://github.com/iree-org/iree/blob/main/tests/e2e/stablehlo_ops/floor.mlir"><code>tests/e2e/stablehlo_ops/floor.mlir</code></a>
