@@ -121,7 +121,7 @@ void iree_hal_deferred_work_queue_destroy(
 typedef void(IREE_API_PTR* iree_hal_deferred_work_queue_cleanup_callback_t)(
     void* user_data);
 
-// Enque command buffer submissions into the work queue to be executed
+// Enques command buffer submissions into the work queue to be executed
 // once all semaphores have been satisfied.
 iree_status_t iree_hal_deferred_work_queue_enque(
     iree_hal_deferred_work_queue_t* deferred_work_queue,
@@ -133,7 +133,7 @@ iree_status_t iree_hal_deferred_work_queue_enque(
     iree_hal_command_buffer_t* const* command_buffers,
     iree_hal_buffer_binding_table_t const* binding_tables);
 
-// Attempt to advance the work queue by processing using
+// Attempts to advance the work queue by processing using
 // the current thread, rather than the worker thread.
 iree_status_t iree_hal_deferred_work_queue_issue(
     iree_hal_deferred_work_queue_t* deferred_work_queue);
