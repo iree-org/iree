@@ -8,9 +8,9 @@ include "iree/schemas/executable_debug_info.fbs";
 
 namespace iree.hal.cuda;
 
-// 'CUDA Executable'.
-file_identifier "CUDA";
-file_extension "cuda";
+// 'CUDA v1 Executable'.
+file_identifier "CDA1";
+file_extension "cda1";
 
 // A struct for the kernel block size along each dimensions.
 struct BlockSize {

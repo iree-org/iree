@@ -8,9 +8,9 @@ include "iree/schemas/executable_debug_info.fbs";
 
 namespace iree.hal.hip;
 
-// 'HIP Executable'.
-file_identifier "HIPE";
-file_extension "hipe";
+// 'HIP v1 Executable'.
+file_identifier "HIP1";
+file_extension "hip1";
 
 // A struct for the kernel block size along each dimensions.
 struct BlockSize {

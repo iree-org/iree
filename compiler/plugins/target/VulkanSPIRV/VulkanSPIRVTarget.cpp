@@ -12,7 +12,7 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
-#include "iree/schemas/spirv_executable_def_builder.h"
+#include "iree/schemas/vulkan_executable_def_builder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -182,14 +182,14 @@ public:
     uint64_t ordinalCount = entryPointOrdinals.size();
 
     FlatbufferBuilder builder;
-    iree_hal_spirv_ExecutableDef_start_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_start_as_root(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(
         options.debugLevel, variantOp.getSourcesAttr(), builder);
 
     // The list of shader modules.
-    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
+    SmallVector<iree_hal_vulkan_ShaderModuleDef_ref_t> shaderModuleRefs;
 
     // Per entry-point data.
     // Note that the following vectors should all be of the same size and
@@ -237,7 +237,7 @@ public:
                                                       spvBinary.size());
       shaderModuleIndices[ordinal] = shaderModuleRefs.size();
       shaderModuleRefs.push_back(
-          iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
+          iree_hal_vulkan_ShaderModuleDef_create(builder, spvCodeRef));
 
       // The IREE runtime uses ordinals instead of names. We need to attach the
       // entry point name for VkShaderModuleCreateInfo.
@@ -303,31 +303,31 @@ public:
         hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
     flatbuffers_int32_vec_ref_t shaderModuleIndicesRef =
         builder.createInt32Vec(shaderModuleIndices);
-    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_vulkan_ExecutableDef_entry_points_add(builder, entryPointsRef);
     if (subgroupSizesRef) {
-      iree_hal_spirv_ExecutableDef_subgroup_sizes_add(builder,
-                                                      subgroupSizesRef);
+      iree_hal_vulkan_ExecutableDef_subgroup_sizes_add(builder,
+                                                       subgroupSizesRef);
     }
-    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+    iree_hal_vulkan_ExecutableDef_shader_module_indices_add(
         builder, shaderModuleIndicesRef);
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
-    iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
+    iree_hal_vulkan_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
     if (!sourceLocationRefs.empty()) {
       auto sourceLocationsRef =
           builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_spirv_ExecutableDef_source_locations_add(builder,
-                                                        sourceLocationsRef);
+      iree_hal_vulkan_ExecutableDef_source_locations_add(builder,
+                                                         sourceLocationsRef);
     }
     if (!stageLocationsRefs.empty()) {
       auto stageLocationsRef =
           builder.createOffsetVecDestructive(stageLocationsRefs);
-      iree_hal_spirv_ExecutableDef_stage_locations_add(builder,
-                                                       stageLocationsRef);
+      iree_hal_vulkan_ExecutableDef_stage_locations_add(builder,
+                                                        stageLocationsRef);
     }
-    iree_hal_spirv_ExecutableDef_source_files_add(builder, sourceFilesRef);
+    iree_hal_vulkan_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
-    iree_hal_spirv_ExecutableDef_end_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
@@ -380,26 +380,26 @@ public:
     }
 
     FlatbufferBuilder builder;
-    iree_hal_spirv_ExecutableDef_start_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_start_as_root(builder);
 
     auto spvCodeRef = flatbuffers_uint32_vec_create(
         builder, reinterpret_cast<const uint32_t *>(spvBinary.data()),
         spvBinary.size() / sizeof(uint32_t));
-    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
+    SmallVector<iree_hal_vulkan_ShaderModuleDef_ref_t> shaderModuleRefs;
     shaderModuleRefs.push_back(
-        iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
+        iree_hal_vulkan_ShaderModuleDef_create(builder, spvCodeRef));
 
     // Add top-level executable fields following their order of definition.
     auto entryPointsRef = builder.createStringVec(entryPointNames);
     auto shaderModuleIndicesRef = builder.createInt32Vec(shaderModuleIndices);
-    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+    iree_hal_vulkan_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_vulkan_ExecutableDef_shader_module_indices_add(
         builder, shaderModuleIndicesRef);
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
-    iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
+    iree_hal_vulkan_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
 
-    iree_hal_spirv_ExecutableDef_end_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
