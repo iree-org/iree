@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -24,6 +23,7 @@
 #include "mlir/Conversion/NVGPUToNVVM/NVGPUToNVVM.h"
 #include "mlir/Conversion/NVVMToLLVM/NVVMToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
@@ -35,6 +35,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_CONVERTTONVVMPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 
 /// A pass that replaces all occurrences of GPU device operations with their
@@ -42,7 +45,10 @@ namespace {
 ///
 /// This pass only handles device code and is not meant to be run on GPU host
 /// code.
-struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
+struct ConvertToNVVMPass final
+    : impl::ConvertToNVVMPassBase<ConvertToNVVMPass> {
+  using impl::ConvertToNVVMPassBase<ConvertToNVVMPass>::ConvertToNVVMPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
@@ -180,9 +186,4 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass() {
-  return std::make_unique<ConvertToNVVMPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -24,6 +23,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TESTLLVMGPUSCALARIZEMATHOPPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   SymbolTableCollection symbolTableCollection;
@@ -183,8 +185,9 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
 /// Pass to test in dialect transformation used to legalize the IR before
 /// convertToNVVM/ConvertToROCDL.
-class TestLLVMGPULegalizeOpPass
-    : public TestLLVMGPUScalarizeMathOpBase<TestLLVMGPULegalizeOpPass> {
+class TestLLVMGPULegalizeOpPass final
+    : public impl::TestLLVMGPUScalarizeMathOpPassBase<
+          TestLLVMGPULegalizeOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -540,10 +543,6 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
                HALInterfaceWorkgroupOpsConverter<
                    IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
       patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
-  return std::make_unique<TestLLVMGPULegalizeOpPass>();
 }
 
 static IntegerAttr wrapNumericMemorySpace(MLIRContext *ctx, unsigned space) {

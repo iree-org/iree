@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "llvm/ADT/SmallVector.h"
@@ -15,10 +14,14 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPUPREFETCHSHAREDMEMORYPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 
 struct LLVMGPUPrefetchSharedMemoryPass final
-    : LLVMGPUPrefetchSharedMemoryBase<LLVMGPUPrefetchSharedMemoryPass> {
+    : impl::LLVMGPUPrefetchSharedMemoryPassBase<
+          LLVMGPUPrefetchSharedMemoryPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp.getContext());
@@ -37,10 +40,4 @@ struct LLVMGPUPrefetchSharedMemoryPass final
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUPrefetchSharedMemoryPass() {
-  return std::make_unique<LLVMGPUPrefetchSharedMemoryPass>();
-}
-
 } // namespace mlir::iree_compiler

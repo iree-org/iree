@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -23,6 +22,9 @@
 #define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUVECTORDISTRIBUTEPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
@@ -44,9 +46,8 @@ private:
   RewritePatternSet patterns;
 };
 
-struct LLVMGPUVectorDistributePass
-    : public LLVMGPUVectorDistributeBase<LLVMGPUVectorDistributePass> {
-public:
+struct LLVMGPUVectorDistributePass final
+    : impl::LLVMGPUVectorDistributePassBase<LLVMGPUVectorDistributePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<affine::AffineDialect>();
@@ -116,10 +117,4 @@ public:
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUVectorDistribute() {
-  return std::make_unique<LLVMGPUVectorDistributePass>();
-}
-
 } // namespace mlir::iree_compiler

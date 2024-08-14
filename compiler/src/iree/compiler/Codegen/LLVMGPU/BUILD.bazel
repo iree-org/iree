@@ -32,7 +32,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
     ],
@@ -69,7 +68,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "ROCDLPassHeaders",
     hdrs = [
-        "ROCDLPassDetail.h",
         "ROCDLPasses.h",
         "ROCDLPasses.h.inc",
     ],
