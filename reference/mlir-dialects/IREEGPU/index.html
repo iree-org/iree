@@ -5389,6 +5389,7 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
   DenseI32ArrayAttr,   # max_workgroup_sizes
   uint32_t,   # max_thread_count_per_workgroup
   uint32_t,   # max_workgroup_memory_bytes
+  DenseI32ArrayAttr,   # max_workgroup_counts
   DictionaryAttr   # extra
 &gt;
 </code></pre></div>
@@ -5450,6 +5451,11 @@ NVIDIA GPUs.</p>
 <tr>
 <td style="text-align: center;">max_workgroup_memory_bytes</td>
 <td style="text-align: center;"><code>uint32_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">max_workgroup_counts</td>
+<td style="text-align: center;"><code>DenseI32ArrayAttr</code></td>
 <td></td>
 </tr>
 <tr>
