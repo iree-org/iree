@@ -249,6 +249,7 @@ iree_cc_library(
     ::deferred_command_buffer
     ::resource_set
     iree::base
+    iree::base::internal::arena
     iree::base::internal::synchronization
     iree::base::internal::threading
     iree::hal
