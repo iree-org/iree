@@ -10,14 +10,10 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/base/assert.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/internal/atomic_slist.h"
-#include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/hal/api.h"
-#include "iree/hal/semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
