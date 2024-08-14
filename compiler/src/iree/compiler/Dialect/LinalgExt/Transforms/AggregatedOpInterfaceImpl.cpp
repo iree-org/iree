@@ -28,7 +28,8 @@ static llvm::cl::opt<float> clAttentionSoftmaxMax(
     llvm::cl::desc("maximum expected value from attention softmax"),
     llvm::cl::init(1.0));
 
-static Value scaleValueInPlace(OpBuilder &builder, Location loc,
+template <typename T>
+static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
                                AffineMap inputMap, AffineMap scaleMap,
                                Value value, Value scale) {
   SmallVector<AffineMap> compressedMaps =
@@ -46,7 +47,7 @@ static Value scaleValueInPlace(OpBuilder &builder, Location loc,
         // Convert scale to the same datatype as input.
         Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                            /*isUnsignedCast=*/false);
-        Value result = b.create<arith::MulFOp>(loc, scale, args[1]);
+        Value result = b.create<T>(loc, scale, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
   return genericOp.getResult(0);
@@ -240,7 +241,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldAcc = getOutput();
   Value oldMax = getMax();
   Value oldSum = getSum();
-  Type elementType = getElementTypeOrSelf(getOutput().getType());
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(getIndexingMapsArray());
@@ -274,7 +274,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap qMap = getQueryMap();
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
+    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap, query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -301,7 +301,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
+    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, scale);
   }
 
   // TODO: This decomposition should be in a seperate op called
@@ -319,12 +319,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
-  Value normSum = scaleValueInPlace(b, loc, sumMap, normMap, oldSum, norm);
-
-  // P = exp2(S - newMax)
-  // PMap = SMap
-  AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap, normMap, oldSum, norm);
 
   // If we need to truncate to fp8 post softmax we apply a scaling to use the
   // full fp8 range. We can do this with a offset as post `exp2` this equates
@@ -336,11 +331,17 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
         APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
             .convertToDouble();
     Value offset =
-        b.create<arith::ConstantOp>(loc, b.getFloatAttr(elementType, mx));
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
+        b.create<arith::ConstantOp>(loc, b.getFloatAttr(sElementType, mx));
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    p = scaleValueInPlace(b, loc, pMap, scaleMap, p, offset);
+    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s, offset);
   }
+
+
+  // P = exp2(S - newMax)
+  // PMap = SMap
+  AffineMap pMap = sMap;
+  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
@@ -355,7 +356,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     p = truncateFloat(b, loc, pMap, pMap, p, convertP);
   }
 
-  Value newAcc = scaleValueInPlace(b, loc, accMap, normMap, oldAcc, norm);
+  Value newAcc = elementwiseValueInPlace<arith::MulFOp>(b, loc, accMap, normMap, oldAcc, norm);
 
   // ---- Matmul 2 ----
 
