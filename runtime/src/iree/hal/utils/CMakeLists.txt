@@ -250,6 +250,7 @@ iree_cc_library(
     ::resource_set
     iree::base
     iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::hal
   PUBLIC
 )
