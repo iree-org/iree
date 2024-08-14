@@ -1030,7 +1030,7 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
                ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
                : 0);
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, device_interface->vtable->create_command_buffer_for_deferred(
+          z0, device_interface->vtable->create_stream_command_buffer(
                   device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
                   &stream_command_buffer))
       IREE_RETURN_AND_END_ZONE_IF_ERROR(

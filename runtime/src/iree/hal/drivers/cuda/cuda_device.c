@@ -226,7 +226,7 @@ iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event(
 }
 
 static iree_status_t
-iree_hal_cuda_deferred_work_queue_device_interface_create_command_buffer_for_deferred(
+iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t categories,
     iree_hal_command_buffer_t** out) {
@@ -1058,8 +1058,8 @@ static const iree_hal_deferred_work_queue_device_interface_vtable_t
             iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event,
         .native_event_from_wait_event =
             iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event,
-        .create_command_buffer_for_deferred =
-            iree_hal_cuda_deferred_work_queue_device_interface_create_command_buffer_for_deferred,
+        .create_stream_command_buffer =
+            iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer,
         .submit_command_buffer =
             iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer,
 };

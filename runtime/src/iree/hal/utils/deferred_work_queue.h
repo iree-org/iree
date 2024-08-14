@@ -99,7 +99,7 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
 
   // Creates a command buffer to be used to record a submitted
   // iree_hal_deferred_command_buffer.
-  iree_status_t(IREE_API_PTR* create_command_buffer_for_deferred)(
+  iree_status_t(IREE_API_PTR* create_stream_command_buffer)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
       iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t category,
       iree_hal_command_buffer_t** out_command_buffer);
