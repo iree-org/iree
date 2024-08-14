@@ -73,16 +73,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   SmallVector<GPUMatmulShapeType> intrinsics;
-  SmallVector<IREE::GPU::MmaInterfaceAttr> supportedMmas;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    IREE::GPU::MMAIntrinsic type = mma.getIntrinsic().getValue();
-    // TODO: Drop this once all intrinsics are supported.
-    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16 &&
-        type != IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8) {
-      continue;
-    }
-    supportedMmas.push_back(mma);
-
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     if (mma.getSubgroupSize() != targetSubgroupSize)
@@ -185,7 +176,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   // Similarly the reduction tile size is just the post-packing tile count.
   reductionTileSizes[kDim] = schedule->kTileCount;
 
-  IREE::GPU::MmaInterfaceAttr mmaKind = supportedMmas[schedule->index];
+  IREE::GPU::MmaInterfaceAttr mmaKind =
+      target.getWgp().getMma()[schedule->index];
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.

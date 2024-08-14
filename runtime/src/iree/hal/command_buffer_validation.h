@@ -126,18 +126,21 @@ iree_status_t iree_hal_command_buffer_collective_validation(
     iree_hal_buffer_ref_t send_ref, iree_hal_buffer_ref_t recv_ref,
     iree_device_size_t element_count);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
@@ -145,11 +148,26 @@ iree_status_t iree_hal_command_buffer_dispatch_validation(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
     iree_hal_dispatch_flags_t flags);
 
+// TODO(#18154): deprecated and will be replaced with simplified bindings.
 iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags);
+
+iree_status_t iree_hal_command_buffer_dispatch2_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
+iree_status_t iree_hal_command_buffer_dispatch2_indirect_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
 iree_status_t iree_hal_command_buffer_binding_table_validation(
     iree_hal_command_buffer_t* command_buffer,

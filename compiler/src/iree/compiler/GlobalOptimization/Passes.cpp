@@ -45,12 +45,6 @@ static llvm::cl::opt<bool> clEnableEarlyMaterialization(
         "false eventually. This does not work for heterogeneous computing."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
-    "iree-global-opt-enable-fuse-horizontal-contractions",
-    llvm::cl::desc(
-        "Enables horizontal fusion of contractions with one common operand"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
     llvm::cl::desc("Demotes inputs (LHS, RHS) of contraction ops to BF16. "
@@ -156,13 +150,6 @@ void buildGlobalOptimizationPassPipeline(
           })
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
-
-  if (clEnableFuseHorizontalContractions) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(createFuseHorizontalContractionsPass)
-        .addPass(IREE::Flow::createCanonicalizerPass)
-        .addPass(mlir::createCSEPass);
-  }
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {

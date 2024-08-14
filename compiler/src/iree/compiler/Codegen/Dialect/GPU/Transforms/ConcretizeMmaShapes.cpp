@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -63,6 +62,13 @@ struct ConcretizeMmaOperandShape final : OpRewritePattern<MultiMmaOp> {
     if (failed(kind.materializeOperandConcreteShape(rewriter, fragment, operand,
                                                     permutation, reassociations,
                                                     concreteType))) {
+      return failure();
+    }
+
+    // Early exit if the operand is unaffected.
+    if (llvm::all_of(reassociations, [](ReassociationIndices reassoc) {
+          return reassoc.size() == 1;
+        })) {
       return failure();
     }
 

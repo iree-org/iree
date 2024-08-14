@@ -78,7 +78,6 @@ iree_lit_test_suite(
             "vectorize_memref_copy.mlir",
             "vectorize_tensor_pad.mlir",
             "vector_layout_analysis.mlir",
-            "workgroup_specialization.mlir",
         ],
         include = ["*.mlir"],
         exclude = [

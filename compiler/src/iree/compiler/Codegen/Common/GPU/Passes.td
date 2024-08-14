@@ -217,13 +217,4 @@ def VectorReductionToGPUPass :
   ];
 }
 
-def WorkgroupSpecializationPass :
-    InterfacePass<"iree-codegen-workgroup-specialization", "mlir::FunctionOpInterface"> {
-  let summary = "Specialize workgroup distribution loops";
-  let dependentDialects = [
-    "::mlir::affine::AffineDialect", "::mlir::linalg::LinalgDialect",
-    "::mlir::scf::SCFDialect", "::mlir::tensor::TensorDialect",
-  ];
-}
-
 #endif // IREE_CODEGEN_COMMON_GPU_PASSES
