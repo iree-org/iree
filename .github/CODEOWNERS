@@ -38,7 +38,6 @@
 
 # Infra Top-Level Directories
 /build_tools/ @ScottTodd
-/build_tools/benchmarks/ @antiagainst
 /build_tools/python_deploy/ @stellaraccident
 /build_tools/scripts/ @ScottTodd
 /build_tools/third_party/ @ScottTodd @stellaraccident
