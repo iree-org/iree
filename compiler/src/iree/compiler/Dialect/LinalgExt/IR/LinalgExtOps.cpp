@@ -1325,7 +1325,7 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
   auto maps = getIndexingMapsArray();
   return SmallVector<AffineMap>(maps.begin(),
-                                maps.end() + getNumDpsInputs() - 1);
+                                maps.begin() + getNumDpsInputs() - 1);
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
