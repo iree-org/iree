@@ -236,7 +236,7 @@ jobs:
   ##############################################################################
 
   # Disabled to reduce self-hosted runners needed. See #17957
-  # TODO(17957): migrate to pkgci
+  # TODO(#17957): migrate to pkgci
   # cross_compile_and_test:
   #   needs: [setup, build_all]
   #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'cross_compile_and_test')

@@ -374,7 +374,7 @@ runs.
 * Also run GPU tests (opt-in due to low availability):
 
     ``` text
-    ci-extra: test_nvidia_t4, test_amd_mi250, test_amd_mi300, test_amd_w7900
+    ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:
