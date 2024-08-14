@@ -20,5 +20,5 @@ iree_c_embed_data(
     c_file_output = "builtin_shaders.c",
     flatten = True,
     h_file_output = "builtin_shaders.h",
-    identifier = "iree_hal_wgsl_builtin_shaders",
+    identifier = "iree_hal_webgpu_builtin_shaders",
 )

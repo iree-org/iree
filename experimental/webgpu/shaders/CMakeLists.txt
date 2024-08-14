@@ -20,7 +20,7 @@ iree_c_embed_data(
   H_FILE_OUTPUT
     "builtin_shaders.h"
   IDENTIFIER
-    "iree_hal_wgsl_builtin_shaders"
+    "iree_hal_webgpu_builtin_shaders"
   FLATTEN
   PUBLIC
 )
