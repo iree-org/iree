@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_CONVERTCONV2DTOIM2COLOPPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
@@ -322,8 +324,8 @@ private:
   ControlFnTy controlFn;
 };
 
-struct ConvertConv2DToIm2ColOpPass
-    : ConvertConv2DToIm2ColOpBase<ConvertConv2DToIm2ColOpPass> {
+struct ConvertConv2DToIm2ColOpPass final
+    : impl::ConvertConv2DToIm2ColOpPassBase<ConvertConv2DToIm2ColOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
@@ -343,11 +345,6 @@ void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
                                       ControlFnTy controlFn) {
   patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(
       patterns.getContext(), std::move(controlFn));
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertConv2DToIm2ColOpPass() {
-  return std::make_unique<ConvertConv2DToIm2ColOpPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

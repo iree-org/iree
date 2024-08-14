@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
@@ -24,6 +23,10 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_DECOMPOSEWINOGRADTRANSFORMPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
+
 namespace {
 
 /// Pattern to remove unit dims from winograd ops after tililng. Tiling is
@@ -333,8 +336,8 @@ struct DecomposeWinogradOutputTransform
 } // namespace
 
 namespace {
-struct DecomposeWinogradTransformPass
-    : public DecomposeWinogradTransformBase<DecomposeWinogradTransformPass> {
+struct DecomposeWinogradTransformPass final
+    : impl::DecomposeWinogradTransformPassBase<DecomposeWinogradTransformPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
@@ -361,11 +364,6 @@ void DecomposeWinogradTransformPass::runOnOperation() {
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeWinogradTransformPass() {
-  return std::make_unique<DecomposeWinogradTransformPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
