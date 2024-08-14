@@ -205,7 +205,7 @@ iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event(
 }
 
 static iree_status_t
-iree_hal_hip_deferred_work_queue_device_interface_device_wait_on_host_event(
+iree_hal_cuda_deferred_work_queue_device_interface_device_wait_on_host_event(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_deferred_work_queue_host_device_event_t wait_event) {
   iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
@@ -1054,6 +1054,8 @@ static const iree_hal_deferred_work_queue_device_interface_vtable_t
             iree_hal_cuda_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event,
         .acquire_host_wait_event =
             iree_hal_cuda_deferred_work_queue_device_interface_acquire_host_wait_event,
+        .device_wait_on_host_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_device_wait_on_host_event,
         .release_wait_event =
             iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event,
         .native_event_from_wait_event =
