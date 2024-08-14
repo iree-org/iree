@@ -16,11 +16,6 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLinalgExtToLoopsPass();
-
-std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
-
 /// Function signature to control reduction splitting. This returns the split
 /// reduction ratio used to split the reduction dimension. The ratio is applied
 /// to the reduction dimension of TopK. If the ratio value is less or equal to 1
@@ -33,33 +28,11 @@ LogicalResult
 splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
                const TopkSplitReductionControlFn &splitReductionFn);
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTopkSplitReductionPass();
-
-/// Decompose im2col ops into a serial loop of insert and extract slice ops.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeIm2colPass();
-
-/// Decompose the winograd transform ops into a sequence of linalg ops.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeWinogradTransformPass();
-
-// Creates a pass to convert linalg convolution ops into a gemm with an im2col
-// op and reshapes on the inputs.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertConv2DToIm2ColOpPass();
-
 // Patterns to convert linalg convolution ops into a gemm with an im2col
 // op and reshapes on the inputs.
 void populateConv2DToIm2colOpPatterns(
     RewritePatternSet &patterns,
     std::optional<std::function<bool(Operation *)>> controlFn = std::nullopt);
-
-// Creates a pass to convert linalg convolution ops into a sequence of
-// linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
-// tranformation.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertConv2DToWinogradPass();
 
 IREE::LinalgExt::AttentionOp
 tileAttention(IREE::LinalgExt::AttentionOp attnOp,
@@ -75,17 +48,12 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                               SmallVectorImpl<Operation *> &ops,
                               RewriterBase &rewriter);
 
-// Creates a pass to tile the attention op along the reduction dim.
-std::unique_ptr<Pass> createTileAttentionPass();
-
-// Creates a pass to convert the attention op into a sequence of linalg ops.
-std::unique_ptr<Pass> createDecomposeAttentionPass();
-
-std::unique_ptr<Pass> createConvertAttentionToOnlineAttentionPass();
-
 //===---------------------------------------------------------------------===//
-// Codegen Strategy passes that are moved into IREE.
+// Register LinalgExt Passes.
 //===---------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc" // IWYU pragma: keep
 
 void registerPasses();
 
