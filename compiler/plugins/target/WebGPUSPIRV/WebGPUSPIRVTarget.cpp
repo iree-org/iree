@@ -14,7 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/schemas/wgsl_executable_def_builder.h"
+#include "iree/schemas/webgpu_executable_def_builder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -237,28 +237,28 @@ public:
 
     // Pack the WGSL and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_hal_wgsl_ExecutableDef_start_as_root(builder);
+    iree_hal_webgpu_ExecutableDef_start_as_root(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(
         serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
 
-    iree_hal_wgsl_ShaderModuleDef_start(builder);
+    iree_hal_webgpu_ShaderModuleDef_start(builder);
     auto wgslRef = builder.createString(wgsl.value());
-    iree_hal_wgsl_ShaderModuleDef_code_add(builder, wgslRef);
+    iree_hal_webgpu_ShaderModuleDef_wgsl_source_add(builder, wgslRef);
     // TODO(scotttodd): populate source map
-    auto shaderModuleRef = iree_hal_wgsl_ShaderModuleDef_end(builder);
+    auto shaderModuleRef = iree_hal_webgpu_ShaderModuleDef_end(builder);
 
-    auto shaderModulesVec = iree_hal_wgsl_ShaderModuleDef_vec_create(
+    auto shaderModulesVec = iree_hal_webgpu_ShaderModuleDef_vec_create(
         builder, &shaderModuleRef, /*len=*/1);
-    iree_hal_wgsl_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
+    iree_hal_webgpu_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
 
     auto entryPointsRef = flatbuffers_uint32_vec_create(
         builder, entryPointOrdinals.data(), entryPointOrdinals.size());
-    iree_hal_wgsl_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_wgsl_ExecutableDef_source_files_add(builder, sourceFilesRef);
+    iree_hal_webgpu_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_webgpu_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
-    iree_hal_wgsl_ExecutableDef_end_as_root(builder);
+    iree_hal_webgpu_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
