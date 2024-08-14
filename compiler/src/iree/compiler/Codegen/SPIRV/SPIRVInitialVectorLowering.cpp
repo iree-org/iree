@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -36,6 +35,9 @@
 #define DEBUG_TYPE "iree-spirv-initial-vector-lowering"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVINITIALVECTORLOWERINGPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -276,8 +278,9 @@ bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   return true;
 }
 
-class SPIRVInitialLoweringPass
-    : public SPIRVInitialVectorLoweringBase<SPIRVInitialLoweringPass> {
+class SPIRVInitialLoweringPass final
+    : public impl::SPIRVInitialVectorLoweringPassBase<
+          SPIRVInitialLoweringPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
@@ -501,10 +504,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVInitialVectorLoweringPass() {
-  return std::make_unique<SPIRVInitialLoweringPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -16,9 +15,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVVECTORTOGPUSUBGROUPMMAPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 struct SPIRVVectorToGPUSubgroupMMAPass final
-    : public SPIRVVectorToGPUSubgroupMMABase<SPIRVVectorToGPUSubgroupMMAPass> {
+    : public impl::SPIRVVectorToGPUSubgroupMMAPassBase<
+          SPIRVVectorToGPUSubgroupMMAPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,
                     memref::MemRefDialect>();

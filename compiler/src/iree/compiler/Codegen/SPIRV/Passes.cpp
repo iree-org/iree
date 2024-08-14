@@ -201,7 +201,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Turn scalar load/store from memrefs into vectorized ones if possible.
       // This gives better memory access patterns, which is very important for
       // perf.
-      .addPass(createSPIRVVectorizeLoadStore)
+      .addPass(createSPIRVVectorizeLoadStorePass)
       // Perform optimizations that need to across the scf.for region boundary.
       .addPass(createForOpCanonicalizationPass)
       // Perform various vector-level cross-op optimizations like load-store
@@ -385,8 +385,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
 
   // Tile to GPU workgroups and promote.
-  funcPassManager.addPass(createSPIRVTileAndPromotePass(
-      /*promoteCMatrix=*/true, /*skipThreadLevel=*/true));
+  funcPassManager.addPass(
+      createSPIRVTileAndPromotePass(SPIRVTileAndPromotePassOptions{
+          /*promoteCMatrix=*/true, /*skipThreadLevel=*/true}));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   // Run canonicalization patterns to propagate constant shape sizes after
   // removing trip-one loops.
@@ -443,7 +444,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createSPIRVVectorToGPUSubgroupMMAOpsPass());
+  funcPassManager.addPass(createSPIRVVectorToGPUSubgroupMMAPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   addSPIRVVectorLoweringPasses(funcPassManager);

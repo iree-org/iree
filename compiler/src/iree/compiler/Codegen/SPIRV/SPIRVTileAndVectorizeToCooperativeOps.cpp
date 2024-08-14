@@ -18,7 +18,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -43,6 +42,10 @@
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVTILETOCOOPERATIVEOPSPASS
+#define GEN_PASS_DEF_SPIRVVECTORIZETOCOOPERATIVEOPSPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -324,7 +327,8 @@ public:
 //===----------------------------------------------------------------------===//
 
 class SPIRVTileToCooperativeOpsPass final
-    : public SPIRVTileToCooperativeOpsBase<SPIRVTileToCooperativeOpsPass> {
+    : public impl::SPIRVTileToCooperativeOpsPassBase<
+          SPIRVTileToCooperativeOpsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
@@ -391,7 +395,7 @@ public:
 };
 
 class SPIRVVectorizeToCooperativeOpsPass final
-    : public SPIRVVectorizeToCooperativeOpsBase<
+    : public impl::SPIRVVectorizeToCooperativeOpsPassBase<
           SPIRVVectorizeToCooperativeOpsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -454,15 +458,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVTileToCooperativeOpsPass() {
-  return std::make_unique<SPIRVTileToCooperativeOpsPass>();
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVVectorizeToCooperativeOpsPass() {
-  return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
-}
-
 } // namespace mlir::iree_compiler
