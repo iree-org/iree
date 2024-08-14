@@ -209,6 +209,7 @@ iree_runtime_cc_library(
     deps = [
         ":deferred_command_buffer",
         ":resource_set",
+        ":semaphore_base",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/internal:synchronization",

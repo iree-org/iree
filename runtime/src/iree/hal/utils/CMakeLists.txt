@@ -248,6 +248,7 @@ iree_cc_library(
   DEPS
     ::deferred_command_buffer
     ::resource_set
+    ::semaphore_base
     iree::base
     iree::base::internal::arena
     iree::base::internal::synchronization
