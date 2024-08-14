@@ -8,9 +8,9 @@ include "iree/schemas/executable_debug_info.fbs";
 
 namespace iree.hal.metal;
 
-// 'Metal Executable'.
-file_identifier "MTLE";
-file_extension "mtle";
+// 'Metal v1 Executable'.
+file_identifier "MTL1";
+file_extension "mtl1";
 
 // A struct for Metal threadgroup size along each dimension.
 struct ThreadgroupSize {

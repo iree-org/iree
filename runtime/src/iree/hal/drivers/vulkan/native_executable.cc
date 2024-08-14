@@ -22,8 +22,8 @@
 #include "iree/base/internal/flatcc/parsing.h"
 #include "iree/schemas/executable_debug_info_reader.h"
 #include "iree/schemas/executable_debug_info_verifier.h"
-#include "iree/schemas/spirv_executable_def_reader.h"
-#include "iree/schemas/spirv_executable_def_verifier.h"
+#include "iree/schemas/vulkan_executable_def_reader.h"
+#include "iree/schemas/vulkan_executable_def_verifier.h"
 
 using namespace iree::hal::vulkan;
 
@@ -66,7 +66,7 @@ static void iree_hal_vulkan_destroy_shader_module(
 static iree_status_t iree_hal_vulkan_create_pipelines(
     VkDeviceHandle* logical_device, VkPipelineCache pipeline_cache,
     const iree_hal_executable_params_t* executable_params,
-    iree_hal_spirv_ExecutableDef_table_t executable_def,
+    iree_hal_vulkan_ExecutableDef_table_t executable_def,
     VkShaderModule* shader_modules, iree_host_size_t pipeline_count,
     iree_hal_vulkan_entry_point_t* out_entry_points) {
   IREE_TRACE_SCOPE();
@@ -104,11 +104,11 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
   }
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_entry_points_get(executable_def);
   flatbuffers_uint32_vec_t shader_module_indices_vec =
-      iree_hal_spirv_ExecutableDef_shader_module_indices_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_shader_module_indices_get(executable_def);
   flatbuffers_uint32_vec_t subgroup_sizes_vec =
-      iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_subgroup_sizes_get(executable_def);
   for (iree_host_size_t entry_ordinal = 0; entry_ordinal < pipeline_count;
        ++entry_ordinal) {
     iree_hal_pipeline_layout_t* pipeline_layout =
@@ -205,7 +205,7 @@ static void iree_hal_vulkan_destroy_pipeline(VkDeviceHandle* logical_device,
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
 // bounds check anything within the FlatBuffer after this succeeds.
-static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
+static iree_status_t iree_hal_vulkan_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     iree_host_size_t expected_entry_point_count) {
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
@@ -219,7 +219,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
   // the FlatBuffer meet our expectations.
-  int verify_ret = iree_hal_spirv_ExecutableDef_verify_as_root(
+  int verify_ret = iree_hal_vulkan_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -227,11 +227,11 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
                             flatcc_verify_error_string(verify_ret));
   }
 
-  iree_hal_spirv_ExecutableDef_table_t executable_def =
-      iree_hal_spirv_ExecutableDef_as_root(flatbuffer_data.data);
+  iree_hal_vulkan_ExecutableDef_table_t executable_def =
+      iree_hal_vulkan_ExecutableDef_as_root(flatbuffer_data.data);
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -249,7 +249,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   }
 
   flatbuffers_uint32_vec_t subgroup_sizes_vec =
-      iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_subgroup_sizes_get(executable_def);
   if (subgroup_sizes_vec) {
     size_t subgroup_sizes_count = flatbuffers_vec_len(subgroup_sizes_vec);
     if (subgroup_sizes_count != expected_entry_point_count) {
@@ -261,18 +261,18 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
     }
   }
 
-  iree_hal_spirv_ShaderModuleDef_vec_t shader_modules_vec =
-      iree_hal_spirv_ExecutableDef_shader_modules_get(executable_def);
+  iree_hal_vulkan_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_vulkan_ExecutableDef_shader_modules_get(executable_def);
   size_t shader_module_count = flatbuffers_vec_len(shader_modules_vec);
   if (shader_module_count == 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable provides no shader modules");
   }
   for (size_t i = 0; i < shader_module_count; ++i) {
-    iree_hal_spirv_ShaderModuleDef_table_t shader_module =
-        iree_hal_spirv_ShaderModuleDef_vec_at(shader_modules_vec, i);
+    iree_hal_vulkan_ShaderModuleDef_table_t shader_module =
+        iree_hal_vulkan_ShaderModuleDef_vec_at(shader_modules_vec, i);
     size_t code_size = flatbuffers_uint32_vec_len(
-        iree_hal_spirv_ShaderModuleDef_code_get(shader_module));
+        iree_hal_vulkan_ShaderModuleDef_spirv_code_get(shader_module));
     if (code_size == 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -281,7 +281,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   }
 
   flatbuffers_uint32_vec_t shader_module_indices_vec =
-      iree_hal_spirv_ExecutableDef_shader_module_indices_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_shader_module_indices_get(executable_def);
   size_t shader_module_index_count =
       flatbuffers_vec_len(shader_module_indices_vec);
   if (shader_module_index_count != expected_entry_point_count) {
@@ -339,16 +339,16 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   // Verify and fetch the executable FlatBuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_spirv_executable_flatbuffer_verify(
+      z0, iree_hal_vulkan_executable_flatbuffer_verify(
               executable_params->executable_data,
               executable_params->pipeline_layout_count));
-  iree_hal_spirv_ExecutableDef_table_t executable_def =
-      iree_hal_spirv_ExecutableDef_as_root(
+  iree_hal_vulkan_ExecutableDef_table_t executable_def =
+      iree_hal_vulkan_ExecutableDef_as_root(
           executable_params->executable_data.data);
 
   // Allocate space for Vulkan shader module handles.
-  iree_hal_spirv_ShaderModuleDef_vec_t shader_modules_vec =
-      iree_hal_spirv_ExecutableDef_shader_modules_get(executable_def);
+  iree_hal_vulkan_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_vulkan_ExecutableDef_shader_modules_get(executable_def);
   size_t shader_module_count = flatbuffers_vec_len(shader_modules_vec);
   VkShaderModule* shader_modules = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -360,10 +360,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   // TODO: perform the shader module creation in multiple threaded manner.
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < shader_module_count; ++i) {
-    iree_hal_spirv_ShaderModuleDef_table_t shader_module =
-        iree_hal_spirv_ShaderModuleDef_vec_at(shader_modules_vec, i);
+    iree_hal_vulkan_ShaderModuleDef_table_t shader_module =
+        iree_hal_vulkan_ShaderModuleDef_vec_at(shader_modules_vec, i);
     flatbuffers_uint32_vec_t code_vec =
-        iree_hal_spirv_ShaderModuleDef_code_get(shader_module);
+        iree_hal_vulkan_ShaderModuleDef_spirv_code_get(shader_module);
     size_t code_size = flatbuffers_uint32_vec_len(code_vec) * sizeof(uint32_t);
     status = iree_hal_vulkan_create_shader_module(
         logical_device, iree_make_const_byte_span(code_vec, code_size),
@@ -373,7 +373,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   // Create pipelines for each entry point.
   flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
+      iree_hal_vulkan_ExecutableDef_entry_points_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
@@ -407,7 +407,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   if (iree_status_is_ok(status)) {
     flatbuffers_string_vec_t entry_points_vec =
-        iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
+        iree_hal_vulkan_ExecutableDef_entry_points_get(executable_def);
     for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
       flatbuffers_string_t name =
           flatbuffers_string_vec_at(entry_points_vec, i);
@@ -420,24 +420,24 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   // Publish any embedded source files to the tracing infrastructure.
   if (iree_status_is_ok(status)) {
     iree_hal_debug_publish_source_files(
-        iree_hal_spirv_ExecutableDef_source_files_get(executable_def));
+        iree_hal_vulkan_ExecutableDef_source_files_get(executable_def));
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   if (iree_status_is_ok(status)) {
-    if (iree_hal_spirv_ExecutableDef_source_locations_is_present(
+    if (iree_hal_vulkan_ExecutableDef_source_locations_is_present(
             executable_def)) {
       iree_hal_debug_FileLineLocDef_vec_t source_locations_vec =
-          iree_hal_spirv_ExecutableDef_source_locations_get(executable_def);
+          iree_hal_vulkan_ExecutableDef_source_locations_get(executable_def);
       for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
         executable->entry_points[i].source_location =
             iree_hal_debug_FileLineLocDef_vec_at(source_locations_vec, i);
       }
     }
-    if (iree_hal_spirv_ExecutableDef_stage_locations_is_present(
+    if (iree_hal_vulkan_ExecutableDef_stage_locations_is_present(
             executable_def)) {
       iree_hal_debug_StageLocationsDef_vec_t stage_locations_vec =
-          iree_hal_spirv_ExecutableDef_stage_locations_get(executable_def);
+          iree_hal_vulkan_ExecutableDef_stage_locations_get(executable_def);
       for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
         iree_hal_debug_StageLocationsDef_table_t stage_locations =
             iree_hal_debug_StageLocationsDef_vec_at(stage_locations_vec, i);
