@@ -97,9 +97,7 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
         // Truncate to the `fp8` range so avoid nan values.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value gt = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
-                                           args[0], mx);
-        Value sel0 = b.create<arith::SelectOp>(loc, gt, mx, args[0]);
+        Value sel0 = b.create<arith::MinimumFOp>(loc, mx, args[0]);
 
         // Convert scale to the same datatype as input.
         Value trunc = convertScalarToDtype(b, loc, sel0, dstTy,
