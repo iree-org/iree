@@ -83,9 +83,9 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    spirv_executable_def_c_fbs
+    vulkan_executable_def_c_fbs
   SRCS
-    "spirv_executable_def.fbs"
+    "vulkan_executable_def.fbs"
   FLATCC_ARGS
     "--reader"
     "--builder"
@@ -98,9 +98,9 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    wgsl_executable_def_c_fbs
+    webgpu_executable_def_c_fbs
   SRCS
-    "wgsl_executable_def.fbs"
+    "webgpu_executable_def.fbs"
   FLATCC_ARGS
     "--reader"
     "--builder"

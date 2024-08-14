@@ -10,8 +10,8 @@
 #include "iree/base/api.h"
 
 static const char* iree_hal_webgpu_builtins_find_code(const char* file_name) {
-  const iree_file_toc_t* files = iree_hal_wgsl_builtin_shaders_create();
-  for (size_t i = 0; i < iree_hal_wgsl_builtin_shaders_size(); ++i) {
+  const iree_file_toc_t* files = iree_hal_webgpu_builtin_shaders_create();
+  for (size_t i = 0; i < iree_hal_webgpu_builtin_shaders_size(); ++i) {
     if (strcmp(file_name, files[i].name) == 0) {
       return files[i].data;
     }

@@ -6,18 +6,18 @@
 
 include "iree/schemas/executable_debug_info.fbs";
 
-namespace iree.hal.wgsl;
+namespace iree.hal.webgpu;
 
-// 'WGSL Executable'.
-file_identifier "WGSL";
-file_extension "wgsl";
+// 'WGSL v1 Executable'.
+file_identifier "WGS1";
+file_extension "wgs1";
 
 // Contents of one WGPUShaderModule, possibly with multiple entry points.
 // Entry points have the name "dN" where N is the executable-wide entry point
 // ordinal.
 table ShaderModuleDef {
   // WGSL source code.
-  code:string;
+  wgsl_source:string;
 
   // Optional `source-map-v3` format source map.
   source_map:string;

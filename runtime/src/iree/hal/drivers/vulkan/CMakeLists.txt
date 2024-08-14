@@ -80,7 +80,7 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::executable_debug_info_c_fbs
-    iree::schemas::spirv_executable_def_c_fbs
+    iree::schemas::vulkan_executable_def_c_fbs
   PUBLIC
 )
 

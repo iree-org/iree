@@ -6,15 +6,15 @@
 
 include "iree/schemas/executable_debug_info.fbs";
 
-namespace iree.hal.spirv;
+namespace iree.hal.vulkan;
 
-// 'SPIR-V Executable'.
-file_identifier "SPVE";
-file_extension "spve";
+// 'Vulkan v1 Executable'.
+file_identifier "VKE1";
+file_extension "vk1";
 
 table ShaderModuleDef {
   // SPIR-V code blob.
-  code:[uint32];
+  spirv_code:[uint32];
 }
 
 // A SPIR-V shader module and runtime pipeline layout description.

@@ -54,15 +54,15 @@ iree_flatbuffer_c_library(
 )
 
 iree_flatbuffer_c_library(
-    name = "spirv_executable_def_c_fbs",
-    srcs = ["spirv_executable_def.fbs"],
+    name = "vulkan_executable_def_c_fbs",
+    srcs = ["vulkan_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
     includes = ["executable_debug_info.fbs"],
 )
 
 iree_flatbuffer_c_library(
-    name = "wgsl_executable_def_c_fbs",
-    srcs = ["wgsl_executable_def.fbs"],
+    name = "webgpu_executable_def_c_fbs",
+    srcs = ["webgpu_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
     includes = ["executable_debug_info.fbs"],
 )
@@ -75,8 +75,8 @@ iree_build_test(
         ":executable_debug_info_c_fbs",
         ":hip_executable_def_c_fbs",
         ":metal_executable_def_c_fbs",
-        ":spirv_executable_def_c_fbs",
-        ":wgsl_executable_def_c_fbs",
+        ":vulkan_executable_def_c_fbs",
+        ":webgpu_executable_def_c_fbs",
     ],
 )
 
