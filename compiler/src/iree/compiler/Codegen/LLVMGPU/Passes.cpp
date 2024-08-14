@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -144,11 +145,31 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
+// Checks that the 2 subviews are equivalent. Checks that all operands,
+// attributes, offsets, sizes, and strides are equal for both subviews.
+static bool areEquivalentSubviews(Value from, Value to) {
+  auto fromSubview = from.getDefiningOp<memref::SubViewOp>();
+  auto toSubview = to.getDefiningOp<memref::SubViewOp>();
+  if (!fromSubview || !toSubview) {
+    return false;
+  }
+  return llvm::equal(fromSubview->getOperands(), toSubview->getOperands()) &&
+         llvm::equal(fromSubview->getAttrs(), toSubview->getAttrs()) &&
+         llvm::equal(fromSubview.getMixedOffsets(),
+                     toSubview.getMixedOffsets()) &&
+         llvm::equal(fromSubview.getMixedSizes(), toSubview.getMixedSizes()) &&
+         llvm::equal(fromSubview.getMixedStrides(),
+                     toSubview.getMixedStrides());
+}
+
 // Barriers are only needed when copying to/from workgroup memory. The only
 // other kind of memory that can be allocated is function memory, which is local
 // to a thread.
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
+  if (areEquivalentSubviews(from, to)) {
+    return success();
+  }
   bool needsBarrier = false;
   if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType()))) {
     needsBarrier = true;
