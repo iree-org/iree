@@ -90,7 +90,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
 
-
 //===---------------------------------------------------------------------===//
 // Wrappers that not use tablegen options.
 //===---------------------------------------------------------------------===//
