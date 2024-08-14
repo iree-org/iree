@@ -325,6 +325,14 @@ public:
   void runOnOperation() override;
 };
 
+/// Converts from iree_compiler::VscaleRange to vector::VscaleRange.
+static std::optional<vector::VscaleRange>
+toVectorVscaleRange(std::optional<iree_compiler::VscaleRange> vscaleRange) {
+  if (!vscaleRange.has_value())
+    return std::nullopt;
+  return vector::VscaleRange{vscaleRange->min, vscaleRange->max};
+}
+
 void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
@@ -376,6 +384,17 @@ void GenericVectorizationPass::runOnOperation() {
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
   };
+
+  {
+    // Eliminate (all-true) vector masks as early as possible (to avoid missing
+    // optimizations/folds). This is particularly beneficial for scalable
+    // vectors that use dynamic tensor shapes.
+    auto targetAttr =
+        iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    auto vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+    vector::eliminateVectorMasks(rewriter, funcOp,
+                                 toVectorVscaleRange(vscaleRange));
+  }
 
   {
     // Canonicalize mask related ops before we lower them.
