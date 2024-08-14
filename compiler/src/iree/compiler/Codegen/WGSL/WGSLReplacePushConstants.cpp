@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/WGSL/PassDetail.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -17,6 +16,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_WGSLREPLACEPUSHCONSTANTSPASS
+#include "iree/compiler/Codegen/WGSL/Passes.h.inc"
 
 namespace {
 
@@ -106,8 +108,9 @@ addSet3IfNeeded(IREE::HAL::PipelineLayoutAttr originalAttr) {
                                             setLayoutAttrs);
 }
 
-class WGSLReplacePushConstantsPass
-    : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
+class WGSLReplacePushConstantsPass final
+    : public impl::WGSLReplacePushConstantsPassBase<
+          WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect, mlir::tensor::TensorDialect,
                     mlir::vector::VectorDialect, IREE::Flow::FlowDialect,
@@ -194,10 +197,4 @@ class WGSLReplacePushConstantsPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWGSLReplacePushConstantsPass() {
-  return std::make_unique<WGSLReplacePushConstantsPass>();
-}
-
 } // namespace mlir::iree_compiler
