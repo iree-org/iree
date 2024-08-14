@@ -85,36 +85,31 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
-      - name: Check out external TestSuite repository
+      - name: Checkout test suites repository
         uses: actions/checkout@v4.1.7
         with:
-          repository: nod-ai/SHARK-TestSuite
-          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
-          path: SHARK-TestSuite
-          submodules: false
-          lfs: false
-      - name: Install external TestSuite Python requirements
+          repository: iree-org/iree-test-suites
+          ref: d944fed69ecacbfeb495d86b1b7b40b903ab668f
+          path: iree-test-suites
+      - name: Install ONNX ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
-          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
-
-      - name: Run external tests - ONNX test suite
+          python -m pip install -r iree-test-suites/onnx-ops/requirements.txt
+      - name: Run ONNX ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/onnx/ \
+          pytest iree-test-suites/onnx-ops/ \
               -rpfE \
               --numprocesses ${NUMPROCESSES} \
               --timeout=30 \
               --durations=20 \
-              --no-skip-tests-missing-files \
               --config-files=${CONFIG_FILE_PATH} \
               --report-log=${LOG_FILE_PATH}
       - name: "Updating config file with latest XFAIL lists"
         if: failure()
         run: |
           source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/update_config_xfails.py \
+          python iree-test-suites/onnx-ops/update_config_xfails.py \
             --log-file=${LOG_FILE_PATH} \
             --config-file=${CONFIG_FILE_PATH}
           cat ${CONFIG_FILE_PATH}
