@@ -457,7 +457,6 @@ func.func @depthwise_conv_fold_away_masking(%arg0: tensor<1x68x120x96xf32>, %arg
   attributes {hal.executable.target = #aarch64_sve}
 {
   %c3 = arith.constant 3 : index
-  %c96 = arith.constant 96 : index
   %c120 = arith.constant 120 : index
   %c68 = arith.constant 68 : index
   %c4 = arith.constant 4 : index
