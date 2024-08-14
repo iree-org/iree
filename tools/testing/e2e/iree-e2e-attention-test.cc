@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
@@ -278,6 +277,9 @@ static void attention_results_deinitialize(attention_results_t* results) {
   iree_allocator_free(results->host_allocator, results->query_contents.data);
   iree_allocator_free(results->host_allocator, results->key_contents.data);
   iree_allocator_free(results->host_allocator, results->value_contents.data);
+  iree_allocator_free(results->host_allocator, results->actual_contents.data);
+  iree_allocator_free(results->host_allocator, results->expected_contents.data);
+
   IREE_TRACE_ZONE_END(z0);
 }
 
