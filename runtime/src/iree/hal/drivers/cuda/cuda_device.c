@@ -91,8 +91,10 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable;
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
     iree_hal_cuda_deferred_work_queue_device_interface_vtable;
 
-// We put a CUEvent into a void*.
-static_assert(sizeof(CUevent) <= sizeof(void*), "Unexpected event size");
+// We put a CUEvent into a iree_hal_deferred_work_queue_native_event_t.
+static_assert(sizeof(CUevent) <=
+                  sizeof(iree_hal_deferred_work_queue_native_event_t),
+              "Unexpected event size");
 typedef struct iree_hal_cuda_deferred_work_queue_device_interface_t {
   iree_hal_deferred_work_queue_device_interface_t base;
   iree_hal_device_t* device;
@@ -103,124 +105,143 @@ typedef struct iree_hal_cuda_deferred_work_queue_device_interface_t {
   const iree_hal_cuda_dynamic_symbols_t* cuda_symbols;
 } iree_hal_cuda_deferred_work_queue_device_interface_t;
 
-void iree_hal_cuda_deferred_work_queue_symbol_table_destroy(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  iree_allocator_free(table->host_allocator, table);
+static void iree_hal_cuda_deferred_work_queue_device_interface_destroy(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  iree_allocator_free(device_interface->host_allocator, device_interface);
 }
 
-iree_status_t iree_hal_cuda_deferred_work_queue_symbol_table_bind_to_thread(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  return IREE_CURESULT_TO_STATUS(table->cuda_symbols,
-                                 cuCtxSetCurrent(table->cu_context),
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_bind_to_thread(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuCtxSetCurrent(device_interface->cu_context),
                                  "cuCtxSetCurrent");
 }
 
-iree_status_t iree_hal_cuda_deferred_work_queue_symbol_table_wait_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  CUevent cu_event = (CUevent)(event);
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_wait_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   return IREE_CURESULT_TO_STATUS(
-      table->cuda_symbols,
-      cuStreamWaitEvent(table->dispatch_cu_stream, cu_event,
+      device_interface->cuda_symbols,
+      cuStreamWaitEvent(device_interface->dispatch_cu_stream, (CUevent)event,
                         CU_EVENT_WAIT_DEFAULT),
       "cuStreamWaitEvent");
 }
 
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_create_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void** out_event) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  CUevent* out = (CUevent*)(out_event);
-  return IREE_CURESULT_TO_STATUS(table->cuda_symbols,
-                                 cuEventCreate(out, CU_EVENT_WAIT_DEFAULT),
-                                 "cuEventCreate");
-}
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_record_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  CUevent cu_event = (CUevent)(event);
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_create_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   return IREE_CURESULT_TO_STATUS(
-      table->cuda_symbols, cuEventRecord(cu_event, table->dispatch_cu_stream),
+      device_interface->cuda_symbols,
+      cuEventCreate((CUevent*)out_event, CU_EVENT_WAIT_DEFAULT),
       "cuEventCreate");
 }
 
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_synchronize_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  CUevent cu_event = (CUevent)(event);
-  return IREE_CURESULT_TO_STATUS(table->cuda_symbols,
-                                 cuEventSynchronize(cu_event));
-}
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_destroy_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  CUevent cu_event = (CUevent)(event);
-  return IREE_CURESULT_TO_STATUS(table->cuda_symbols, cuEventDestroy(cu_event));
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_record_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuEventRecord((CUevent)event, device_interface->dispatch_cu_stream),
+      "cuEventCreate");
 }
 
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_semaphore_acquire_timepoint_device_signal_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    struct iree_hal_semaphore_t* semaphore, uint64_t value, void** out_event) {
-  CUevent* out = (CUevent*)(out_event);
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_synchronize_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventSynchronize((CUevent)event));
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_destroy_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventDestroy((CUevent)event));
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
   return iree_hal_cuda_event_semaphore_acquire_timepoint_device_signal(
-      semaphore, value, out);
+      semaphore, value, (CUevent*)out_event);
 }
 
-bool iree_hal_cuda_deferred_work_queue_symbol_table_acquire_host_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    struct iree_hal_semaphore_t* semaphore, uint64_t value, void** out_event) {
+static bool
+iree_hal_cuda_deferred_work_queue_device_interface_acquire_host_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_host_device_event_t* out_event) {
   return iree_hal_cuda_semaphore_acquire_event_host_wait(
       semaphore, value, (iree_hal_cuda_event_t**)out_event);
 }
 
-void iree_hal_cuda_deferred_work_queue_symbol_table_release_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* wait_event) {
+static void
+iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
   iree_hal_cuda_event_release(wait_event);
 }
 
-void* iree_hal_cuda_deferred_work_queue_symbol_table_native_event_from_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_cuda_event_t* wait_event = (iree_hal_cuda_event_t*)event;
-  return iree_hal_cuda_event_handle(wait_event);
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_device_wait_on_host_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuStreamWaitEvent(
+          device_interface->dispatch_cu_stream,
+          iree_hal_cuda_event_handle((iree_hal_cuda_event_t*)wait_event), 0),
+      "cuStreamWaitEvent");
 }
 
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_create_command_buffer_for_deferred(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
+static void*
+iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t event) {
+  return iree_hal_cuda_event_handle((iree_hal_cuda_event_t*)event);
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_create_command_buffer_for_deferred(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t categories,
     iree_hal_command_buffer_t** out) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
-  return iree_hal_cuda_device_create_stream_command_buffer(table->device, mode,
-                                                           categories, 0, out);
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return iree_hal_cuda_device_create_stream_command_buffer(
+      device_interface->device, mode, categories, 0, out);
 }
 
-iree_status_t
-iree_hal_cuda_deferred_work_queue_symbol_table_submit_command_buffer(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_command_buffer_t* command_buffer) {
-  iree_hal_cuda_deferred_work_queue_device_interface_t* table =
-      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(symbol_table);
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   iree_status_t status = iree_ok_status();
   if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
     // Stream command buffer so nothing to do but notify it was submitted.
@@ -229,7 +250,8 @@ iree_hal_cuda_deferred_work_queue_symbol_table_submit_command_buffer(
     CUgraphExec exec =
         iree_hal_cuda_graph_command_buffer_handle(command_buffer);
     status = IREE_CURESULT_TO_STATUS(
-        table->cuda_symbols, cuGraphLaunch(exec, table->dispatch_cu_stream));
+        device_interface->cuda_symbols,
+        cuGraphLaunch(exec, device_interface->dispatch_cu_stream));
     if (IREE_LIKELY(iree_status_is_ok(status))) {
       iree_hal_cuda_graph_tracing_notify_submitted_commands(command_buffer);
     }
@@ -300,26 +322,26 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->dispatch_cu_stream = dispatch_stream;
   device->host_allocator = host_allocator;
 
-  iree_hal_cuda_deferred_work_queue_device_interface_t* symbol_table;
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface;
   iree_status_t status = iree_allocator_malloc(
       host_allocator,
       sizeof(iree_hal_cuda_deferred_work_queue_device_interface_t),
-      (void**)&symbol_table);
+      (void**)&device_interface);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_device_release((iree_hal_device_t*)device);
     return status;
   }
-  symbol_table->base._vtable =
+  device_interface->base.vtable =
       &iree_hal_cuda_deferred_work_queue_device_interface_vtable;
-  symbol_table->cu_context = context;
-  symbol_table->cuda_symbols = cuda_symbols;
-  symbol_table->cu_device = cu_device;
-  symbol_table->device = (iree_hal_device_t*)device;
-  symbol_table->dispatch_cu_stream = dispatch_stream;
-  symbol_table->host_allocator = host_allocator;
+  device_interface->cu_context = context;
+  device_interface->cuda_symbols = cuda_symbols;
+  device_interface->cu_device = cu_device;
+  device_interface->device = (iree_hal_device_t*)device;
+  device_interface->dispatch_cu_stream = dispatch_stream;
+  device_interface->host_allocator = host_allocator;
 
   status = iree_hal_deferred_work_queue_create(
-      (iree_hal_deferred_work_queue_device_interface_t*)symbol_table,
+      (iree_hal_deferred_work_queue_device_interface_t*)device_interface,
       &device->block_pool, host_allocator, &device->work_queue);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
@@ -1015,29 +1037,29 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
 
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
     iree_hal_cuda_deferred_work_queue_device_interface_vtable = {
-        .destroy = iree_hal_cuda_deferred_work_queue_symbol_table_destroy,
+        .destroy = iree_hal_cuda_deferred_work_queue_device_interface_destroy,
         .bind_to_thread =
-            iree_hal_cuda_deferred_work_queue_symbol_table_bind_to_thread,
+            iree_hal_cuda_deferred_work_queue_device_interface_bind_to_thread,
         .wait_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_wait_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_wait_native_event,
         .create_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_create_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_create_native_event,
         .record_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_record_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_record_native_event,
         .synchronize_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_synchronize_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_synchronize_native_event,
         .destroy_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_destroy_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_destroy_native_event,
         .semaphore_acquire_timepoint_device_signal_native_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_semaphore_acquire_timepoint_device_signal_native_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event,
         .acquire_host_wait_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_acquire_host_wait_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_acquire_host_wait_event,
         .release_wait_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_release_wait_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event,
         .native_event_from_wait_event =
-            iree_hal_cuda_deferred_work_queue_symbol_table_native_event_from_wait_event,
+            iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event,
         .create_command_buffer_for_deferred =
-            iree_hal_cuda_deferred_work_queue_symbol_table_create_command_buffer_for_deferred,
+            iree_hal_cuda_deferred_work_queue_device_interface_create_command_buffer_for_deferred,
         .submit_command_buffer =
-            iree_hal_cuda_deferred_work_queue_symbol_table_submit_command_buffer,
+            iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer,
 };

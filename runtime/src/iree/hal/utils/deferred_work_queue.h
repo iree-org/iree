@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_UTILS_WORK_QUEUE_H_
-#define IREE_HAL_UTILS_WORK_QUEUE_H_
+#ifndef IREE_HAL_UTILS_DEFERRED_WORK_QUEUE_H_
+#define IREE_HAL_UTILS_DEFERRED_WORK_QUEUE_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
@@ -30,65 +30,84 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t
 // bind_to_thread called on it or as a side-effect from one of the public
 // functions on the deferred work queue.
 typedef struct iree_hal_deferred_work_queue_device_interface_t {
-  const iree_hal_deferred_work_queue_device_interface_vtable_t* _vtable;
+  const iree_hal_deferred_work_queue_device_interface_vtable_t* vtable;
 } iree_hal_deferred_work_queue_device_interface_t;
+
+typedef void* iree_hal_deferred_work_queue_native_event_t;
+typedef void* iree_hal_deferred_work_queue_host_device_event_t;
 
 typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
   void (*destroy)(iree_hal_deferred_work_queue_device_interface_t*);
-  // Bind the device work queue to a thread. May be simulatneously
+  // Binds the device work queue to a thread. May be simulatneously
   // bound to multiple threads.
-  iree_status_t (*bind_to_thread)(
-      iree_hal_deferred_work_queue_device_interface_t*);
+  iree_status_t(IREE_API_PTR* bind_to_thread)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface);
 
-  // Create a native device event.
-  iree_status_t (*create_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void**);
+  // Creates a native device event.
+  iree_status_t(IREE_API_PTR* create_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_native_event_t* out_event);
 
-  // Wait on a native device event.
-  iree_status_t (*wait_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void*);
+  // Waits on a native device event.
+  iree_status_t(IREE_API_PTR* wait_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_native_event_t event);
 
-  // Record a native device event.
-  iree_status_t (*record_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void*);
+  // Records a native device event.
+  iree_status_t(IREE_API_PTR* record_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_native_event_t event);
 
-  // Synchronize the thread on a native device event.
-  iree_status_t (*synchronize_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void*);
+  // Synchronizes the thread on a native device event.
+  iree_status_t(IREE_API_PTR* synchronize_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_native_event_t event);
 
-  // Destroy a native device event.
-  iree_status_t (*destroy_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void*);
+  // Destroys a native device event.
+  iree_status_t(IREE_API_PTR* destroy_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_native_event_t event);
 
-  // Acquire a native device event for the given timepoint.
-  iree_status_t (*semaphore_acquire_timepoint_device_signal_native_event)(
-      iree_hal_deferred_work_queue_device_interface_t*,
-      struct iree_hal_semaphore_t*, uint64_t, void**);
+  // Acquires a native device event for the given timepoint.
+  iree_status_t(
+      IREE_API_PTR* semaphore_acquire_timepoint_device_signal_native_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      struct iree_hal_semaphore_t*, uint64_t,
+      iree_hal_deferred_work_queue_native_event_t* out_event);
 
-  // Acquire a mixed host/device event for the given timepoint.
-  bool (*acquire_host_wait_event)(
-      iree_hal_deferred_work_queue_device_interface_t*,
-      struct iree_hal_semaphore_t*, uint64_t, void**);
+  // Get the device to wait on the event associated wit hthe host event.
+  iree_status_t(IREE_API_PTR* device_wait_on_host_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_host_device_event_t event);
 
-  // Release a mixed host/device event for the given timepoint.
-  void (*release_wait_event)(iree_hal_deferred_work_queue_device_interface_t*,
-                             void*);
+  // Acquires a mixed host/device event for the given timepoint.
+  bool(IREE_API_PTR* acquire_host_wait_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      struct iree_hal_semaphore_t*, uint64_t,
+      iree_hal_deferred_work_queue_host_device_event_t* out_event);
 
-  // Return a device-side event from the given host/device event.
-  void* (*native_event_from_wait_event)(
-      iree_hal_deferred_work_queue_device_interface_t*, void*);
+  // Releases a mixed host/device event for the given timepoint.
+  void(IREE_API_PTR* release_wait_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_host_device_event_t event);
 
-  // Create a command buffer to be used to record a submitted
+  // Returns a device-side event from the given host/device event.
+  iree_hal_deferred_work_queue_native_event_t(
+      IREE_API_PTR* native_event_from_wait_event)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_deferred_work_queue_host_device_event_t event);
+
+  // Creates a command buffer to be used to record a submitted
   // iree_hal_deferred_command_buffer.
-  iree_status_t (*create_command_buffer_for_deferred)(
-      iree_hal_deferred_work_queue_device_interface_t*,
-      iree_hal_command_buffer_mode_t, iree_hal_command_category_t,
-      iree_hal_command_buffer_t**);
+  iree_status_t(IREE_API_PTR* create_command_buffer_for_deferred)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t category,
+      iree_hal_command_buffer_t** out_command_buffer);
 
-  // Submit a command buffer to the device.
-  iree_status_t (*submit_command_buffer)(
-      iree_hal_deferred_work_queue_device_interface_t*,
-      iree_hal_command_buffer_t*);
+  // Submits a command buffer to the device.
+  iree_status_t(IREE_API_PTR* submit_command_buffer)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface,
+      iree_hal_command_buffer_t* command_buffer);
 } iree_hal_deferred_work_queue_device_interface_vtable_t;
 
 iree_status_t iree_hal_deferred_work_queue_create(
@@ -123,4 +142,4 @@ iree_status_t iree_hal_deferred_work_queue_issue(
 }
 #endif  // __cplusplus
 
-#endif  //  IREE_HAL_UTILS_WORK_QUEUE_H_
+#endif  //  IREE_HAL_UTILS_DEFERRED_WORK_QUEUE_H_

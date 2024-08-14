@@ -91,7 +91,8 @@ typedef struct iree_hal_deferred_work_queue_action_t {
   iree_hal_semaphore_list_t signal_semaphore_list;
 
   // Scratch fields for analyzing whether actions are ready to issue.
-  void* wait_events[IREE_HAL_MAX_WAIT_EVENT_COUNT];
+  iree_hal_deferred_work_queue_host_device_event_t
+      wait_events[IREE_HAL_MAX_WAIT_EVENT_COUNT];
   iree_host_size_t event_count;
   // Whether the current action is still not ready for releasing to the GPU.
   bool is_pending;
@@ -103,7 +104,7 @@ static void iree_hal_deferred_work_queue_action_fail_locked(
 static void iree_hal_deferred_work_queue_action_clear_events(
     iree_hal_deferred_work_queue_action_t* action) {
   for (iree_host_size_t i = 0; i < action->event_count; ++i) {
-    action->device_interface->_vtable->release_wait_event(
+    action->device_interface->vtable->release_wait_event(
         action->device_interface, action->wait_events[i]);
   }
   action->event_count = 0;
@@ -257,7 +258,7 @@ typedef struct iree_hal_deferred_work_queue_completion_list_node_t {
   iree_status_t (*callback)(iree_status_t, void* user_data);
   void* user_data;
   // The event to wait for on the completion thread.
-  void* native_event;
+  iree_hal_deferred_work_queue_native_event_t native_event;
   // If this event was created just for the completion thread, and therefore
   // needs to be cleaned up.
   bool created_event;
@@ -317,8 +318,8 @@ static void iree_hal_deferred_work_queue_completion_list_deinitialize(
   iree_hal_deferred_work_queue_completion_list_node_t* head = list->head;
   while (head) {
     if (head->created_event) {
-      device_interface->_vtable->destroy_native_event(device_interface,
-                                                      head->native_event);
+      device_interface->vtable->destroy_native_event(device_interface,
+                                                     head->native_event);
     }
     list->head = list->head->next;
     iree_allocator_free(host_allocator, head);
@@ -626,7 +627,7 @@ void iree_hal_deferred_work_queue_destroy(
   iree_hal_deferred_work_queue_action_list_destroy(
       work_queue->action_list.head);
 
-  work_queue->device_interface->_vtable->destroy(work_queue->device_interface);
+  work_queue->device_interface->vtable->destroy(work_queue->device_interface);
   iree_allocator_free(host_allocator, work_queue);
 
   IREE_TRACE_ZONE_END(z0);
@@ -1001,10 +1002,8 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
   // First wait all the device events in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->event_count; ++i) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device_interface->_vtable->wait_native_event(
-                device_interface,
-                device_interface->_vtable->native_event_from_wait_event(
-                    device_interface, action->wait_events[i])));
+        z0, device_interface->vtable->device_wait_on_host_event(
+                device_interface, action->wait_events[i]));
   }
 
   // Then launch all command buffers to the dispatch stream.
@@ -1019,7 +1018,6 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
         action->payload.execution.binding_tables
             ? action->payload.execution.binding_tables[i]
             : iree_hal_buffer_binding_table_empty();
-    bool release = false;
     if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
@@ -1032,7 +1030,7 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
                ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
                : 0);
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, device_interface->_vtable->create_command_buffer_for_deferred(
+          z0, device_interface->vtable->create_command_buffer_for_deferred(
                   device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
                   &stream_command_buffer))
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -1043,40 +1041,39 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
           z0, iree_hal_deferred_command_buffer_apply(
                   command_buffer, stream_command_buffer, binding_table));
       command_buffer = stream_command_buffer;
-      release = true;
+    } else {
+      iree_hal_resource_retain(command_buffer);
     }
 
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device_interface->_vtable->submit_command_buffer(device_interface,
-                                                             command_buffer));
+        z0, device_interface->vtable->submit_command_buffer(device_interface,
+                                                            command_buffer));
 
-    if (release) {
-      // The stream_command_buffer is going to be retained by
-      // the action->resource_set and deleted after the action
-      // completes.
-      iree_hal_resource_release(command_buffer);
-    }
+    // The stream_command_buffer is going to be retained by
+    // the action->resource_set and deleted after the action
+    // completes.
+    iree_hal_resource_release(command_buffer);
   }
 
   IREE_TRACE_ZONE_END(z_dispatch_command_buffers);
 
-  void* completion_event = NULL;
+  iree_hal_deferred_work_queue_native_event_t completion_event = NULL;
   // Last record event signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
     // Grab an event for this semaphore value signaling.
-    void* event = NULL;
+    iree_hal_deferred_work_queue_native_event_t event = NULL;
 
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
-        device_interface->_vtable
+        device_interface->vtable
             ->semaphore_acquire_timepoint_device_signal_native_event(
                 device_interface, action->signal_semaphore_list.semaphores[i],
                 action->signal_semaphore_list.payload_values[i], &event));
 
     // Record the event signaling in the dispatch stream.
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device_interface->_vtable->record_native_event(device_interface,
-                                                           event));
+        z0,
+        device_interface->vtable->record_native_event(device_interface, event));
     completion_event = event;
   }
 
@@ -1086,14 +1083,14 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
   // then we create one. In my testing this is not a common case.
   if (IREE_UNLIKELY(!completion_event)) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device_interface->_vtable->create_native_event(device_interface,
-                                                           &completion_event));
+        z0, device_interface->vtable->create_native_event(device_interface,
+                                                          &completion_event));
     created_event = true;
   }
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, device_interface->_vtable->record_native_event(device_interface,
-                                                         completion_event));
+      z0, device_interface->vtable->record_native_event(device_interface,
+                                                        completion_event));
 
   iree_hal_deferred_work_queue_completion_list_node_t* entry = NULL;
   // TODO: avoid host allocator malloc; use some pool for the allocation.
@@ -1208,8 +1205,8 @@ iree_status_t iree_hal_deferred_work_queue_issue(
         // Here we must guarantee the event is indeed recorded, which means
         // it's associated with some already present device signal timepoint on
         // the semaphore timeline.
-        void* wait_event = NULL;
-        if (!action->device_interface->_vtable->acquire_host_wait_event(
+        iree_hal_deferred_work_queue_host_device_event_t wait_event = NULL;
+        if (!action->device_interface->vtable->acquire_host_wait_event(
                 action->device_interface, semaphores[i], values[i],
                 &wait_event)) {
           action->is_pending = true;
@@ -1220,7 +1217,7 @@ iree_status_t iree_hal_deferred_work_queue_issue(
           status = iree_make_status(
               IREE_STATUS_RESOURCE_EXHAUSTED,
               "exceeded maximum queue action wait event limit");
-          action->device_interface->_vtable->release_wait_event(
+          action->device_interface->vtable->release_wait_event(
               action->device_interface, wait_event);
           if (iree_status_is_ok(actions->status)) {
             actions->status = status;
@@ -1389,7 +1386,7 @@ static void iree_hal_deferred_work_queue_worker_process_completion(
 
     if (IREE_LIKELY(iree_status_is_ok(status))) {
       IREE_TRACE_ZONE_BEGIN_NAMED(z1, "synchronize_native_event");
-      status = actions->device_interface->_vtable->synchronize_native_event(
+      status = actions->device_interface->vtable->synchronize_native_event(
           actions->device_interface, entry->native_event);
       IREE_TRACE_ZONE_END(z1);
     }
@@ -1399,7 +1396,7 @@ static void iree_hal_deferred_work_queue_worker_process_completion(
 
     if (IREE_UNLIKELY(entry->created_event)) {
       status = iree_status_join(
-          status, actions->device_interface->_vtable->destroy_native_event(
+          status, actions->device_interface->vtable->destroy_native_event(
                       actions->device_interface, entry->native_event));
     }
     iree_allocator_free(actions->host_allocator, entry);
@@ -1419,7 +1416,7 @@ static int iree_hal_deferred_work_queue_completion_execute(
   iree_hal_deferred_work_queue_completion_area_t* completion_area =
       &actions->completion_area;
 
-  iree_status_t status = actions->device_interface->_vtable->bind_to_thread(
+  iree_status_t status = actions->device_interface->vtable->bind_to_thread(
       actions->device_interface);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_deferred_work_queue_fail(actions, status);
@@ -1464,7 +1461,7 @@ static int iree_hal_deferred_work_queue_worker_execute(
   // Some APIs store thread-local data. Allow the interface to bind
   // the thread-local data once for this thread rather than having to
   // do it every call.
-  iree_status_t status = actions->device_interface->_vtable->bind_to_thread(
+  iree_status_t status = actions->device_interface->vtable->bind_to_thread(
       actions->device_interface);
 
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {

@@ -92,8 +92,10 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable;
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
     iree_hal_hip_deferred_work_queue_device_interface_vtable;
 
-// We put a hipEvent_t into a void*.
-static_assert(sizeof(hipEvent_t) <= sizeof(void*), "Unexpected event size");
+// We put a hipEvent_t into a iree_hal_deferred_work_queue_native_event_t.
+static_assert(sizeof(hipEvent_t) <=
+                  sizeof(iree_hal_deferred_work_queue_native_event_t),
+              "Unexpected event size");
 typedef struct iree_hal_hip_deferred_work_queue_device_interface_t {
   iree_hal_deferred_work_queue_device_interface_t base;
   iree_hal_device_t* device;
@@ -104,121 +106,141 @@ typedef struct iree_hal_hip_deferred_work_queue_device_interface_t {
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
 } iree_hal_hip_deferred_work_queue_device_interface_t;
 
-void iree_hal_hip_deferred_work_queue_symbol_table_destroy(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  iree_allocator_free(table->host_allocator, table);
+static void iree_hal_hip_deferred_work_queue_device_interface_destroy(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  iree_allocator_free(device_interface->host_allocator, device_interface);
 }
 
-iree_status_t iree_hal_hip_deferred_work_queue_symbol_table_bind_to_thread(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  return IREE_HIP_RESULT_TO_STATUS(table->hip_symbols,
-                                   hipCtxSetCurrent(table->hip_context),
-                                   "hipCtxSetCurrent");
-}
-
-iree_status_t iree_hal_hip_deferred_work_queue_symbol_table_wait_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  hipEvent_t hip_event = (hipEvent_t)(event);
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_bind_to_thread(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
   return IREE_HIP_RESULT_TO_STATUS(
-      table->hip_symbols,
-      hipStreamWaitEvent(table->dispatch_hip_stream, hip_event, 0),
+      device_interface->hip_symbols,
+      hipCtxSetCurrent(device_interface->hip_context), "hipCtxSetCurrent");
+}
+
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_wait_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_HIP_RESULT_TO_STATUS(
+      device_interface->hip_symbols,
+      hipStreamWaitEvent(device_interface->dispatch_hip_stream,
+                         (hipEvent_t)event, 0),
       "hipStreamWaitEvent");
 }
 
-iree_status_t iree_hal_hip_deferred_work_queue_symbol_table_create_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void** out_event) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  hipEvent_t* out = (hipEvent_t*)(out_event);
-  return IREE_HIP_RESULT_TO_STATUS(table->hip_symbols, hipEventCreate(out),
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_create_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
+                                   hipEventCreate((hipEvent_t*)out_event),
                                    "hipEventCreate");
 }
-iree_status_t iree_hal_hip_deferred_work_queue_symbol_table_record_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  hipEvent_t hip_event = (hipEvent_t)(event);
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_record_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
   return IREE_HIP_RESULT_TO_STATUS(
-      table->hip_symbols, hipEventRecord(hip_event, table->dispatch_hip_stream),
+      device_interface->hip_symbols,
+      hipEventRecord((hipEvent_t)event, device_interface->dispatch_hip_stream),
       "hipEventRecord");
 }
 
-iree_status_t
-iree_hal_hip_deferred_work_queue_symbol_table_synchronize_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  hipEvent_t hip_event = (hipEvent_t)(event);
-  return IREE_HIP_RESULT_TO_STATUS(table->hip_symbols,
-                                   hipEventSynchronize(hip_event));
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_synchronize_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
+                                   hipEventSynchronize((hipEvent_t)event));
 }
-iree_status_t
-iree_hal_hip_deferred_work_queue_symbol_table_destroy_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  hipEvent_t hip_event = (hipEvent_t)(event);
-  return IREE_HIP_RESULT_TO_STATUS(table->hip_symbols,
-                                   hipEventDestroy(hip_event));
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_destroy_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
+                                   hipEventDestroy((hipEvent_t)event));
 }
 
-iree_status_t
-iree_hal_hip_deferred_work_queue_symbol_table_semaphore_acquire_timepoint_device_signal_native_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    struct iree_hal_semaphore_t* semaphore, uint64_t value, void** out_event) {
-  hipEvent_t* out = (hipEvent_t*)(out_event);
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
   return iree_hal_hip_event_semaphore_acquire_timepoint_device_signal(
-      semaphore, value, out);
+      semaphore, value, (hipEvent_t*)out_event);
 }
 
-bool iree_hal_hip_deferred_work_queue_symbol_table_acquire_host_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    struct iree_hal_semaphore_t* semaphore, uint64_t value, void** out_event) {
+static bool
+iree_hal_hip_deferred_work_queue_device_interface_acquire_host_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_host_device_event_t* out_event) {
   return iree_hal_hip_semaphore_acquire_event_host_wait(
       semaphore, value, (iree_hal_hip_event_t**)out_event);
 }
 
-void iree_hal_hip_deferred_work_queue_symbol_table_release_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* wait_event) {
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_device_wait_on_host_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_HIP_RESULT_TO_STATUS(
+      device_interface->hip_symbols,
+      hipStreamWaitEvent(
+          device_interface->dispatch_hip_stream,
+          iree_hal_hip_event_handle((iree_hal_hip_event_t*)wait_event), 0),
+      "hipStreamWaitEvent");
+}
+
+static void
+iree_hal_hip_deferred_work_queue_device_interface_release_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
   iree_hal_hip_event_release(wait_event);
 }
 
-void* iree_hal_hip_deferred_work_queue_symbol_table_native_event_from_wait_event(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
-    void* event) {
+static iree_hal_deferred_work_queue_native_event_t
+iree_hal_hip_deferred_work_queue_device_interface_native_event_from_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t event) {
   iree_hal_hip_event_t* wait_event = (iree_hal_hip_event_t*)event;
   return iree_hal_hip_event_handle(wait_event);
 }
 
-iree_status_t
-iree_hal_hip_deferred_work_queue_symbol_table_create_command_buffer_for_deferred(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_create_command_buffer_for_deferred(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t categories,
     iree_hal_command_buffer_t** out) {
-  iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
-  return iree_hal_hip_device_create_stream_command_buffer(table->device, mode,
-                                                          categories, 0, out);
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return iree_hal_hip_device_create_stream_command_buffer(
+      device_interface->device, mode, categories, 0, out);
 }
 
-iree_status_t
-iree_hal_hip_deferred_work_queue_symbol_table_submit_command_buffer(
-    iree_hal_deferred_work_queue_device_interface_t* symbol_table,
+static iree_status_t
+iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer(
+    iree_hal_deferred_work_queue_device_interface_t* device_interface,
     iree_hal_command_buffer_t* command_buffer) {
   iree_hal_hip_deferred_work_queue_device_interface_t* table =
-      (iree_hal_hip_deferred_work_queue_device_interface_t*)(symbol_table);
+      (iree_hal_hip_deferred_work_queue_device_interface_t*)(device_interface);
   iree_status_t status = iree_ok_status();
   if (iree_hal_hip_stream_command_buffer_isa(command_buffer)) {
     // Stream command buffer so nothing to do but notify it was submitted.
@@ -299,25 +321,25 @@ static iree_status_t iree_hal_hip_device_create_internal(
   device->hip_dispatch_stream = dispatch_stream;
   device->host_allocator = host_allocator;
 
-  iree_hal_hip_deferred_work_queue_device_interface_t* symbol_table;
+  iree_hal_hip_deferred_work_queue_device_interface_t* device_interface;
   iree_status_t status = iree_allocator_malloc(
       host_allocator,
       sizeof(iree_hal_hip_deferred_work_queue_device_interface_t),
-      (void**)&symbol_table);
+      (void**)&device_interface);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_device_release((iree_hal_device_t*)device);
     return status;
   }
-  symbol_table->base._vtable =
+  device_interface->base.vtable =
       &iree_hal_hip_deferred_work_queue_device_interface_vtable;
-  symbol_table->hip_context = context;
-  symbol_table->hip_symbols = symbols;
-  symbol_table->device = (iree_hal_device_t*)device;
-  symbol_table->hip_device = hip_device;
-  symbol_table->dispatch_hip_stream = dispatch_stream;
-  symbol_table->host_allocator = host_allocator;
+  device_interface->hip_context = context;
+  device_interface->hip_symbols = symbols;
+  device_interface->device = (iree_hal_device_t*)device;
+  device_interface->hip_device = hip_device;
+  device_interface->dispatch_hip_stream = dispatch_stream;
+  device_interface->host_allocator = host_allocator;
   status = iree_hal_deferred_work_queue_create(
-      (iree_hal_deferred_work_queue_device_interface_t*)symbol_table,
+      (iree_hal_deferred_work_queue_device_interface_t*)device_interface,
       &device->block_pool, host_allocator, &device->work_queue);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
@@ -1012,29 +1034,31 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
 
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
     iree_hal_hip_deferred_work_queue_device_interface_vtable = {
-        .destroy = iree_hal_hip_deferred_work_queue_symbol_table_destroy,
+        .destroy = iree_hal_hip_deferred_work_queue_device_interface_destroy,
         .bind_to_thread =
-            iree_hal_hip_deferred_work_queue_symbol_table_bind_to_thread,
+            iree_hal_hip_deferred_work_queue_device_interface_bind_to_thread,
         .wait_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_wait_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_wait_native_event,
         .create_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_create_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_create_native_event,
         .record_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_record_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_record_native_event,
         .synchronize_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_synchronize_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_synchronize_native_event,
         .destroy_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_destroy_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_destroy_native_event,
         .semaphore_acquire_timepoint_device_signal_native_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_semaphore_acquire_timepoint_device_signal_native_event,
+            iree_hal_hip_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event,
         .acquire_host_wait_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_acquire_host_wait_event,
+            iree_hal_hip_deferred_work_queue_device_interface_acquire_host_wait_event,
+        .device_wait_on_host_event =
+            iree_hal_hip_deferred_work_queue_device_interface_device_wait_on_host_event,
         .release_wait_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_release_wait_event,
+            iree_hal_hip_deferred_work_queue_device_interface_release_wait_event,
         .native_event_from_wait_event =
-            iree_hal_hip_deferred_work_queue_symbol_table_native_event_from_wait_event,
+            iree_hal_hip_deferred_work_queue_device_interface_native_event_from_wait_event,
         .create_command_buffer_for_deferred =
-            iree_hal_hip_deferred_work_queue_symbol_table_create_command_buffer_for_deferred,
+            iree_hal_hip_deferred_work_queue_device_interface_create_command_buffer_for_deferred,
         .submit_command_buffer =
-            iree_hal_hip_deferred_work_queue_symbol_table_submit_command_buffer,
+            iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer,
 };
