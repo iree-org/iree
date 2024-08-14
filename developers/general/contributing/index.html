@@ -4448,8 +4448,9 @@ It <em>is</em> an error to list a job in both "skip" and "extra".</li>
 mutually exclusive with both "skip" and "extra".</li>
 </ul>
 <p>In all these cases, the setup does not make any effort to ensure that job
-dependencies are satisfied. Thus, if you request skipping the <code>build_all</code>
-job, all the jobs that depend on it will fail, not be skipped.</p>
+dependencies are satisfied. Thus, if you request skipping the
+<code>build_packages</code> job, all the jobs that depend on it will fail, not be
+skipped.</p>
 </details>
 <details class="info -">
 <summary>Using <code>runner-env</code></summary>
@@ -4465,13 +4466,8 @@ who are working on the CI infrastructure itself.</p>
 runs.</p>
 <ul>
 <li>
-<p>Also run Windows and macOS builds that are normally post-merge only:</p>
-<div class="highlight"><pre><span></span><code>ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
-</code></pre></div>
-</li>
-<li>
-<p>Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):</p>
-<div class="highlight"><pre><span></span><code>ci-extra: test_nvidia_a100
+<p>Also run GPU tests (opt-in due to low availability):</p>
+<div class="highlight"><pre><span></span><code>ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
 </code></pre></div>
 </li>
 <li>
