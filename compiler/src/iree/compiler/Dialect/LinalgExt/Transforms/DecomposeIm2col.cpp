@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -33,6 +34,30 @@ struct DecomposeIm2col : public OpRewritePattern<Im2colOp> {
       return failure();
     }
     rewriter.replaceOp(im2colOp, decomposedIm2col.value().front());
+
+    // Unroll the loop nest created by the im2col op decomposition.
+    auto outerLoop =
+        decomposedIm2col.value().front().getDefiningOp<scf::ForOp>();
+    SmallVector<scf::ForOp> loopNest({outerLoop});
+    while (auto innerLoop =
+               outerLoop.getYieldedValues()[0].getDefiningOp<scf::ForOp>()) {
+      loopNest.push_back(innerLoop);
+      outerLoop = innerLoop;
+    }
+    for (auto loop : llvm::reverse(loopNest)) {
+      IntegerAttr ub;
+      if (!matchPattern(loop.getUpperBound(), m_Constant(&ub))) {
+        loop.emitOpError("upper bound should be a constant");
+        return failure();
+      }
+      if (ub.getInt() == 1) {
+        continue;
+      }
+      if (failed(mlir::loopUnrollByFactor(loop, ub.getInt()))) {
+        loop.emitOpError("failed unrolling by factor 1");
+        return failure();
+      }
+    }
     return success();
   }
 };
