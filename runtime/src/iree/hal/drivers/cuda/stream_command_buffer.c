@@ -10,7 +10,6 @@
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
 #include "iree/hal/drivers/cuda/nccl_channel.h"
-#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -38,12 +37,6 @@ typedef struct iree_hal_cuda_stream_command_buffer_t {
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
-
-  // TODO(#18154): drop state used by legacy bindings mechanism.
-  int32_t push_constants[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
-  struct {
-    CUdeviceptr bindings[IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT];
-  } descriptor_sets[IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_COUNT];
 } iree_hal_cuda_stream_command_buffer_t;
 
 static const iree_hal_command_buffer_vtable_t
@@ -475,183 +468,6 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_collective(
   return status;
 }
 
-static iree_status_t iree_hal_cuda_stream_command_buffer_push_constants(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
-    const void* values, iree_host_size_t values_length) {
-  iree_hal_cuda_stream_command_buffer_t* command_buffer =
-      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_host_size_t constant_base_index = offset / sizeof(int32_t);
-  for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
-    command_buffer->push_constants[i + constant_base_index] =
-        ((uint32_t*)values)[i];
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_stream_command_buffer_push_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
-  if (binding_count > IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "exceeded available binding slots for push "
-        "descriptor set #%" PRIu32 "; requested %" PRIhsz " vs. maximal %d",
-        set, binding_count, IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
-  }
-
-  iree_hal_cuda_stream_command_buffer_t* command_buffer =
-      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  CUdeviceptr* current_bindings = command_buffer->descriptor_sets[set].bindings;
-  for (iree_host_size_t i = 0; i < binding_count; i++) {
-    const iree_hal_buffer_ref_t* binding = &bindings[i];
-    CUdeviceptr device_ptr = 0;
-    if (binding->buffer) {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                           &binding->buffer));
-      CUdeviceptr device_buffer = iree_hal_cuda_buffer_device_pointer(
-          iree_hal_buffer_allocated_buffer(binding->buffer));
-      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
-      device_ptr = device_buffer + offset + binding->offset;
-    }
-    current_bindings[binding->ordinal] = device_ptr;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
-    iree_hal_dispatch_flags_t flags) {
-  iree_hal_cuda_stream_command_buffer_t* command_buffer =
-      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_cuda_stream_command_buffer_flush_collectives(command_buffer));
-
-  // Lookup kernel parameters used for side-channeling additional launch
-  // information from the compiler.
-  iree_hal_cuda_kernel_info_t kernel_info;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_native_executable_entry_point_kernel_info(
-              executable, entry_point, &kernel_info));
-
-  IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size,
-      /*name=*/NULL, 0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                       &executable));
-
-  // The total number of descriptors across all descriptor sets.
-  iree_host_size_t descriptor_count =
-      iree_hal_cuda_pipeline_layout_total_binding_count(kernel_info.layout);
-  // The total number of push constants.
-  iree_host_size_t push_constant_count =
-      iree_hal_cuda_pipeline_layout_push_constant_count(kernel_info.layout);
-  // We append push constants to the end of descriptors to form a linear chain
-  // of kernel arguments.
-  iree_host_size_t kernel_params_count = descriptor_count + push_constant_count;
-  iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
-
-  // Per CUDA API requirements, we need two levels of indirection for passing
-  // kernel arguments in.
-  //   "If the kernel has N parameters, then kernelParams needs to be an array
-  //   of N pointers. Each pointer, from kernelParams[0] to kernelParams[N-1],
-  //   points to the region of memory from which the actual parameter will be
-  //   copied."
-  //
-  // (From the cuGraphAddKernelNode API doc in
-  // https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__GRAPH.html#group__CUDA__GRAPH_1g50d871e3bd06c1b835e52f2966ef366b)
-  //
-  // It means each kernel_params[i] is itself a pointer to the corresponding
-  // element at the *second* inline allocation at the end of the current
-  // segment.
-  iree_host_size_t total_size = kernel_params_length * 2;
-  uint8_t* storage_base = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_arena_allocate(&command_buffer->arena, total_size,
-                              (void**)&storage_base));
-  void** params_ptr = (void**)storage_base;
-
-  // Set up kernel arguments to point to the payload slots.
-  CUdeviceptr* payload_ptr =
-      (CUdeviceptr*)((uint8_t*)params_ptr + kernel_params_length);
-  for (size_t i = 0; i < kernel_params_count; i++) {
-    params_ptr[i] = &payload_ptr[i];
-  }
-
-  // Copy descriptors from all sets to the end of the current segment for later
-  // access.
-  iree_host_size_t set_count =
-      iree_hal_cuda_pipeline_layout_descriptor_set_count(kernel_info.layout);
-  for (iree_host_size_t i = 0; i < set_count; ++i) {
-    // TODO: cache this information in the kernel info to avoid recomputation.
-    iree_host_size_t binding_count =
-        iree_hal_cuda_descriptor_set_layout_binding_count(
-            iree_hal_cuda_pipeline_layout_descriptor_set_layout(
-                kernel_info.layout, i));
-    iree_host_size_t index =
-        iree_hal_cuda_pipeline_layout_base_binding_index(kernel_info.layout, i);
-    memcpy(payload_ptr + index, command_buffer->descriptor_sets[i].bindings,
-           binding_count * sizeof(CUdeviceptr));
-  }
-
-  // Append the push constants to the kernel arguments.
-  iree_host_size_t base_index =
-      iree_hal_cuda_pipeline_layout_push_constant_index(kernel_info.layout);
-  // As commented in the above, what each kernel parameter points to is a
-  // CUdeviceptr, which as the size of a pointer on the target machine. we are
-  // just storing a 32-bit value for the push constant here instead. So we must
-  // process one element each type, for 64-bit machines.
-  for (iree_host_size_t i = 0; i < push_constant_count; i++) {
-    *((uint32_t*)params_ptr[base_index + i]) =
-        command_buffer->push_constants[i];
-  }
-
-  IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, command_buffer->cuda_symbols,
-      cuLaunchKernel(kernel_info.function, workgroup_x, workgroup_y,
-                     workgroup_z, kernel_info.block_size[0],
-                     kernel_info.block_size[1], kernel_info.block_size[2],
-                     kernel_info.shared_memory_size, command_buffer->cu_stream,
-                     params_ptr, NULL),
-      "cuLaunchKernel");
-
-  IREE_CUDA_STREAM_TRACE_ZONE_END(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation of dispatch indirect");
-}
-
 static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -667,17 +483,19 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
 
   // Lookup kernel parameters used for side-channeling additional launch
   // information from the compiler.
-  iree_hal_cuda_kernel_info_t kernel_info;
+  const iree_hal_cuda_kernel_params_t* kernel_params = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_native_executable_entry_point_kernel_info(
-              executable, entry_point, &kernel_info));
+      z0, iree_hal_cuda_native_executable_lookup_kernel_params(
+              executable, entry_point, &kernel_params));
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
       command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size, /*name=*/NULL, 0);
+      kernel_params->debug_info.source_filename.data,
+      kernel_params->debug_info.source_filename.size,
+      kernel_params->debug_info.source_line,
+      kernel_params->debug_info.name.data, kernel_params->debug_info.name.size,
+      /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -686,7 +504,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
   // We append push constants to the end of descriptors to form a linear chain
   // of kernel arguments.
   iree_host_size_t kernel_params_count =
-      kernel_info.binding_count + kernel_info.constant_count;
+      kernel_params->binding_count + kernel_params->constant_count;
   iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
 
   // TODO: use packed parameters instead of the indirection mechanism - this
@@ -735,17 +553,18 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
   // CUdeviceptr, which as the size of a pointer on the target machine. we are
   // just storing a 32-bit value for the push constant here instead. So we must
   // process one element each type, for 64-bit machines.
-  for (iree_host_size_t i = 0; i < kernel_info.constant_count; i++) {
-    *((uint32_t*)params_ptr[kernel_info.binding_count + i]) =
+  for (iree_host_size_t i = 0; i < kernel_params->constant_count; i++) {
+    *((uint32_t*)params_ptr[kernel_params->binding_count + i]) =
         ((const uint32_t*)constants.data)[i];
   }
 
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->cuda_symbols,
-      cuLaunchKernel(kernel_info.function, workgroup_count[0],
+      cuLaunchKernel(kernel_params->function, workgroup_count[0],
                      workgroup_count[1], workgroup_count[2],
-                     kernel_info.block_size[0], kernel_info.block_size[1],
-                     kernel_info.block_size[2], kernel_info.shared_memory_size,
+                     kernel_params->block_dims[0], kernel_params->block_dims[1],
+                     kernel_params->block_dims[2],
+                     kernel_params->block_shared_memory_size,
                      command_buffer->cu_stream, params_ptr, NULL),
       "cuLaunchKernel");
 
@@ -784,12 +603,6 @@ static const iree_hal_command_buffer_vtable_t
         .update_buffer = iree_hal_cuda_stream_command_buffer_update_buffer,
         .copy_buffer = iree_hal_cuda_stream_command_buffer_copy_buffer,
         .collective = iree_hal_cuda_stream_command_buffer_collective,
-        .push_constants = iree_hal_cuda_stream_command_buffer_push_constants,
-        .push_descriptor_set =
-            iree_hal_cuda_stream_command_buffer_push_descriptor_set,
-        .dispatch = iree_hal_cuda_stream_command_buffer_dispatch,
-        .dispatch_indirect =
-            iree_hal_cuda_stream_command_buffer_dispatch_indirect,
         .dispatch2 = iree_hal_cuda_stream_command_buffer_dispatch2,
         .dispatch2_indirect =
             iree_hal_cuda_stream_command_buffer_dispatch2_indirect,

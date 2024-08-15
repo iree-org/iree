@@ -23,7 +23,6 @@
 #include "iree/hal/drivers/cuda/nccl_channel.h"
 #include "iree/hal/drivers/cuda/nccl_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/nop_executable_cache.h"
-#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
 #include "iree/hal/drivers/cuda/tracing.h"
@@ -756,18 +755,6 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
   }
 }
 
-static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_flags_t flags,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_layout_binding_t* bindings,
-    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_descriptor_set_layout_create(
-      flags, binding_count, bindings, device->host_allocator,
-      out_descriptor_set_layout);
-}
-
 static iree_status_t iree_hal_cuda_device_create_event(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
@@ -797,17 +784,6 @@ static iree_status_t iree_hal_cuda_device_import_file(
   return iree_hal_memory_file_wrap(
       queue_affinity, access, handle, iree_hal_device_allocator(base_device),
       iree_hal_device_host_allocator(base_device), out_file);
-}
-
-static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
-    iree_hal_device_t* base_device, iree_host_size_t push_constants,
-    iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_pipeline_layout_t** out_pipeline_layout) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_pipeline_layout_create(
-      set_layout_count, set_layouts, push_constants, device->host_allocator,
-      out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
@@ -1023,12 +999,9 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_channel = iree_hal_cuda_device_create_channel,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
-    .create_descriptor_set_layout =
-        iree_hal_cuda_device_create_descriptor_set_layout,
     .create_event = iree_hal_cuda_device_create_event,
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
     .import_file = iree_hal_cuda_device_import_file,
-    .create_pipeline_layout = iree_hal_cuda_device_create_pipeline_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_cuda_device_query_semaphore_compatibility,

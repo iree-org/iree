@@ -12,33 +12,62 @@ namespace iree.hal.cuda;
 file_identifier "CDA1";
 file_extension "cda1";
 
-// A struct for the kernel block size along each dimensions.
-struct BlockSize {
+// A struct for the kernel block size along each dimension.
+struct BlockDims {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
-table ExecutableDef {
-  // A map of entry point ordinals to string names as used in the shader
-  // library.
-  entry_points:[string];
+// Describes the behavior of each binding.
+// Roughly maps to iree_hal_descriptor_flags_t but is not required to match
+// exactly; if there's additional binding information we want to pass through
+// to HIP we can encode that here.
+enum BindingBits:uint64 (bit_flags) {
+  // IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY
+  READ_ONLY = 0,  // 1u << 0
+  // IREE_HAL_DESCRIPTOR_FLAG_INDIRECT
+  INDIRECT = 1,  // 1u << 1
+}
 
-  // Block sizes for each entry point.
-  //
-  // Currently the thread group size/block size is decided during code gen but
-  // in CUDA it is set by the runtime.
-  block_sizes:[BlockSize];
-  // Size of dynamic shared memory.
-  shared_memory_size:[uint32];
+// Information about an exported function on the executable.
+table ExportDef {
+  // Ordinal of the shader library containing the entry point in the executable
+  // libraries list.
+  module_ordinal:uint32;
 
-  // PTX string of the module.
+  // String name of the exported kernel function in the module.
+  kernel_name:string;
+
+  // Grid block dimensions for the export.
+  block_dims:BlockDims;
+
+  // Size of dynamic shared memory per block.
+  block_shared_memory_size:uint32;
+
+  // Total number of 32-bit push constants used by the export.
+  constant_count:uint32;
+
+  // Binding count and flags for each binding.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// A library containing one or more exported functions.
+table ModuleDef {
+  // PTX image.
   ptx_image:string;
+}
 
-  // A map of entry point ordinals to source locations.
-  // This information is optional and may be used by debuggers and profilers to
-  // associate executable entry points with the source that generated them.
-  source_locations:[iree.hal.debug.FileLineLocDef];
+table ExecutableDef {
+  // Exported functions in canonical executable entry point order.
+  exports:[ExportDef];
+
+  // A list of all kernel modules used by the executable.
+  // Exports index into this list and multiple exports may use the same library.
+  modules:[ModuleDef];
 
   // Embedded source files sorted ascending by path.
   source_files:[iree.hal.debug.SourceFileDef];
