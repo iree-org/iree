@@ -659,7 +659,7 @@ static void iree_hal_deferred_work_queue_decrement_work_items_count(
   iree_slim_mutex_unlock(&actions->action_mutex);
 }
 
-iree_status_t iree_hal_deferred_work_queue_enque(
+iree_status_t iree_hal_deferred_work_queue_enqueue(
     iree_hal_deferred_work_queue_t* actions,
     iree_hal_deferred_work_queue_cleanup_callback_t cleanup_callback,
     void* callback_user_data,

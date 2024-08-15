@@ -37,7 +37,8 @@ typedef void* iree_hal_deferred_work_queue_native_event_t;
 typedef void* iree_hal_deferred_work_queue_host_device_event_t;
 
 typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
-  void (*destroy)(iree_hal_deferred_work_queue_device_interface_t*);
+  void(IREE_API_PTR* destroy)(
+      iree_hal_deferred_work_queue_device_interface_t* device_interface);
   // Binds the device work queue to a thread. May be simulatneously
   // bound to multiple threads.
   iree_status_t(IREE_API_PTR* bind_to_thread)(
@@ -121,9 +122,9 @@ void iree_hal_deferred_work_queue_destroy(
 typedef void(IREE_API_PTR* iree_hal_deferred_work_queue_cleanup_callback_t)(
     void* user_data);
 
-// Enques command buffer submissions into the work queue to be executed
+// Enqueues command buffer submissions into the work queue to be executed
 // once all semaphores have been satisfied.
-iree_status_t iree_hal_deferred_work_queue_enque(
+iree_status_t iree_hal_deferred_work_queue_enqueue(
     iree_hal_deferred_work_queue_t* deferred_work_queue,
     iree_hal_deferred_work_queue_cleanup_callback_t cleanup_callback,
     void* callback_userdata,
