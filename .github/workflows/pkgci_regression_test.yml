@@ -27,23 +27,23 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_sync
-            config-file: onnx_cpu_llvm_sync.json
+            config-file: onnx_ops_cpu_llvm_sync.json
             numprocesses: auto
             runs-on: ubuntu-20.04
 
           # AMD GPU
           - name: amdgpu_rocm_rdna3
             numprocesses: 1
-            config-file: onnx_gpu_rocm_rdna3.json
+            config-file: onnx_ops_gpu_rocm_rdna3.json
             runs-on: nodai-amdgpu-w7900-x86-64
           - name: amdgpu_vulkan
             numprocesses: 4
-            config-file: onnx_gpu_vulkan.json
+            config-file: onnx_ops_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           - name: nvidiagpu_cuda
-            config-file: onnx_gpu_cuda.json
+            config-file: onnx_ops_gpu_cuda.json
             numprocesses: 4
             runs-on:
               - self-hosted # must come first
@@ -52,7 +52,7 @@ jobs:
               - gpu # TODO(scotttodd): qualify further with vendor/model
               - os-family=Linux
           - name: nvidiagpu_vulkan
-            config-file: onnx_gpu_vulkan.json
+            config-file: onnx_ops_gpu_vulkan.json
             numprocesses: 4
             runs-on:
               - self-hosted # must come first
@@ -62,9 +62,9 @@ jobs:
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
+      CONFIG_FILE_PATH: tests/external/onnx_ops/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
-      LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
+      LOG_FILE_PATH: /tmp/test_onnx_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
