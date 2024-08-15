@@ -219,6 +219,20 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return VectorPreProcStrategy::None;
   }
 
+  // Walk the linalgOp code, if there is any instruction that could result in
+  // undefined behavior in mask strategy, fall back to using peel strategy.
+  bool usePeelingStrategy = false;
+  linalgOp.walk([&](Operation *op) -> WalkResult {
+    if (mlir::iree_compiler::mayHaveUndefinedBehaviorInMasking(op)) {
+      usePeelingStrategy = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  if (usePeelingStrategy) {
+    return VectorPreProcStrategy::Peeling;
+  }
+
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
 
