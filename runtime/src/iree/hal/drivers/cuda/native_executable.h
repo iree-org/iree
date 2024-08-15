@@ -19,20 +19,31 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_cuda_kernel_info_t {
-  // TODO(#18154): remove when using simplified bindings.
-  iree_hal_pipeline_layout_t* layout;
+// The max number of per-dispatch bindings allowed in the CUDA HAL
+// implementation.
+#define IREE_HAL_CUDA_MAX_DISPATCH_BINDING_COUNT 16
+
+// The max number of per-dispatch constants supported by the CUDA HAL
+// implementation.
+#define IREE_HAL_CUDA_MAX_DISPATCH_CONSTANT_COUNT 64
+
+typedef struct iree_hal_cuda_kernel_debug_info_t {
+  iree_string_view_t function_name;
+  iree_string_view_t source_filename;
+  uint32_t source_line;
+} iree_hal_cuda_kernel_debug_info_t;
+
+typedef struct iree_hal_cuda_kernel_params_t {
   CUfunction function;
+
   uint32_t constant_count;
   uint32_t binding_count;
-  // TODO(#18154): add bitfield indicating indirect bindings.
-  uint32_t block_size[3];
-  uint32_t shared_memory_size;
 
-  IREE_TRACE(iree_string_view_t function_name;)
-  IREE_TRACE(iree_string_view_t source_filename;)
-  IREE_TRACE(uint32_t source_line;)
-} iree_hal_cuda_kernel_info_t;
+  uint32_t block_dims[3];
+  uint32_t block_shared_memory_size;
+
+  IREE_TRACE(iree_hal_cuda_kernel_debug_info_t debug_info;)
+} iree_hal_cuda_kernel_params_t;
 
 // Creates an IREE executable from a CUDA PTX module. The module may contain
 // several kernels that can be extracted along with the associated block size.
@@ -43,9 +54,9 @@ iree_status_t iree_hal_cuda_native_executable_create(
 
 // Returns the kernel launch information for the given |entry_point| in the
 // |executable|.
-iree_status_t iree_hal_cuda_native_executable_entry_point_kernel_info(
+iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_cuda_kernel_info_t* out_info);
+    const iree_hal_cuda_kernel_params_t** out_params);
 
 #ifdef __cplusplus
 }  // extern "C"
