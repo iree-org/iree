@@ -184,6 +184,11 @@ def GPUTileReductionPass :
   let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
+def GPUVerifyDistributionPass :
+    InterfacePass<"iree-codegen-gpu-verify-distribution", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to verify writes before resolving distributed contexts.";
+}
+
 def GPUVectorAllocPass :
     InterfacePass<"iree-codegen-gpu-vector-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to create allocations for contraction inputs to copy "
