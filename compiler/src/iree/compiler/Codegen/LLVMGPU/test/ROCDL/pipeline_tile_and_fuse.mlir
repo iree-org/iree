@@ -498,3 +498,56 @@ hal.executable public @main {
 //       CHECK:   scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x16x1x1xf16>)
 // CHECK-COUNT-8:   amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
 //       CHECK:     scf.yield
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{
+  reduction = [0 : index, 0 : index, 0 : index, 0 : index, 1 : index, 3 : index, 3 : index],
+  thread = [1 : index, 1 : index, 1 : index, 1 : index, 0 : index, 0 : index, 0 : index],
+  workgroup = [1 : index, 1 : index, 4 : index, 8 : index, 0 : index, 0 : index, 0 : index]
+}>
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @conv_nchw_fused ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @conv_nchw_fused() attributes {translation_info = #translation_info} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x64x58x58xf32>>
+        %1 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x64x3x3xf32>>
+        %2 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 64, 58, 58], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x64x58x58xf32>> -> tensor<1x64x58x58xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x64x3x3xf32>> -> tensor<64x64x3x3xf32>
+        %5 = tensor.empty() : tensor<1x64x56x56xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+        %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, lowering_config = #lowering_config, strides = dense<1> : vector<2xi64>} ins(%3, %4 : tensor<1x64x58x58xf32>, tensor<64x64x3x3xf32>) outs(%6 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%7, %cst_0 : tensor<1x64x56x56xf32>, tensor<1x64xf32>) outs(%5 : tensor<1x64x56x56xf32>) {
+        ^bb0(%in: f32, %in_1: f32, %out: f32):
+          %9 = arith.addf %in, %in_1 : f32
+          %10 = arith.cmpf ugt, %9, %cst : f32
+          %11 = arith.select %10, %9, %cst : f32
+          linalg.yield %11 : f32
+        } -> tensor<1x64x56x56xf32>
+        flow.dispatch.tensor.store %8, %2, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : tensor<1x64x56x56xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+        return
+      }
+    }
+  }
+}
+
+// Verify that it compiles, meaning the consumer was successfully fused into
+// the producer's (convolution's) distributed scf.forall loop.
+// CHECK-LABEL: func @conv_nchw_fused
+//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c1
+//       CHECK:     linalg.conv_2d_nchw_fchw
+//       CHECK:   arith.addf
+//       CHECK:   arith.cmpf
+//       CHECK:   arith.select
