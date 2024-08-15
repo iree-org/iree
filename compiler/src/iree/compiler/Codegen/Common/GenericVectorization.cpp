@@ -53,7 +53,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     VEC_DBGS() << '\n';
   });
 
-  std::optional<VscaleRange> vscaleRange;
+  std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
     // (which is used to compute sizes for tensor.pack/unpack).
@@ -325,14 +325,6 @@ public:
   void runOnOperation() override;
 };
 
-/// Converts from iree_compiler::VscaleRange to vector::VscaleRange.
-static std::optional<vector::VscaleRange>
-toVectorVscaleRange(std::optional<iree_compiler::VscaleRange> vscaleRange) {
-  if (!vscaleRange.has_value())
-    return std::nullopt;
-  return vector::VscaleRange{vscaleRange->min, vscaleRange->max};
-}
-
 void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
@@ -392,8 +384,7 @@ void GenericVectorizationPass::runOnOperation() {
     auto targetAttr =
         iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     auto vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
-    vector::eliminateVectorMasks(rewriter, funcOp,
-                                 toVectorVscaleRange(vscaleRange));
+    vector::eliminateVectorMasks(rewriter, funcOp, vscaleRange);
   }
 
   {
