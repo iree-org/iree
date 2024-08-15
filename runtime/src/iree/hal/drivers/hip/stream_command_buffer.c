@@ -654,10 +654,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2(
 
   IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, kernel_info.source_filename.data,
-      kernel_info.source_filename.size, kernel_info.source_line,
-      kernel_info.function_name.data, kernel_info.function_name.size,
-      /*name=*/NULL, 0);
+      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size, /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -720,9 +720,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2(
           params_ptr, NULL),
       "hipModuleLaunchKernel");
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
-                                 &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+  IREE_HIP_STREAM_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
