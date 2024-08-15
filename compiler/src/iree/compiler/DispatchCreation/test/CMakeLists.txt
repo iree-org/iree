@@ -13,6 +13,28 @@ iree_add_all_subdirs()
 iree_lit_test_suite(
   NAME
     lit
+  SRCS
+    "collapse_dimensions.mlir"
+    "collapse_linalg_generic_on_tensors.mlir"
+    "collapse_reduction.mlir"
+    "dispatch_linalg_ext_fusion.mlir"
+    "dispatch_linalg_on_tensors.mlir"
+    "dispatch_linalg_on_tensors_default.mlir"
+    "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
+    "dispatch_linalg_transform_dialect.mlir"
+    "dispatch_region_formation_preprocessing.mlir"
+    "form_dispatch_regions.mlir"
+    "form_scalar_dispatches.mlir"
+    "fuse_horizontal_contractions.mlir"
+    "fuse_multiuse_elementwise_producer.mlir"
+    "fusion_preprocessing.mlir"
+    "pad_fusion_with_consumer.mlir"
+    "pad_fusion_with_producer.mlir"
+    "sink_reshapes.mlir"
+    "split_reduction.mlir"
+    "transform_dialect_dispatch_spec.mlir"
+    "transform_dispatch_region_formation.mlir"
+    "transpose_generic_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
