@@ -503,3 +503,6 @@ func.func @depthwise_conv_fold_away_masking(%arg0: tensor<1x68x120x96xf32>, %arg
 // CHECK-MASK-LABEL: func.func @depthwise_conv_fold_away_masking
 // CHECK-MASK-NOT: vector.create_mask
 // CHECK-MASK-NOT: vector.constant_mask
+// CHECK-MASK:     vector.fma
+// CHECK-MASK-NOT: vector.create_mask
+// CHECK-MASK-NOT: vector.constant_mask
