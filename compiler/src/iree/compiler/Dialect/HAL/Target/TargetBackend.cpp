@@ -52,7 +52,7 @@ void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
       llvm::join_items(llvm::sys::path::get_separator(), path, fileName);
   auto filePath = llvm::sys::path::convert_to_slash(fileParts);
   std::string error;
-  auto file = mlir::openOutputFile(filePath, &error);
+  auto file = mlir::openOutputFile(path == "-" ? path : filePath, &error);
   if (!file) {
     llvm::errs() << "Unable to dump debug output to " << filePath << "\n";
     return;
