@@ -426,7 +426,7 @@ void iree_hal_hip_stream_tracing_zone_begin_impl(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list, hipStream_t stream,
     const iree_tracing_location_t* src_loc) {
-  IREE_ASSERT_ARGUMENT(context);
+  if (!context) return;
   uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
       context, event_list, stream);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
@@ -438,7 +438,7 @@ void iree_hal_hip_stream_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
-  IREE_ASSERT_ARGUMENT(context);
+  if (!context) return;
   uint16_t query_id = iree_hal_hip_stream_tracing_context_insert_query(
       context, event_list, stream);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
