@@ -12,8 +12,8 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/pending_queue_actions.h"
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
+#include "iree/hal/utils/deferred_work_queue.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,14 +26,14 @@ extern "C" {
 // allocated from the |timepoint_pool|.
 //
 // This semaphore is meant to be used together with a pending queue actions; it
-// may advance the given |pending_queue_actions| if new values are signaled.
+// may advance the given |work_queue| if new values are signaled.
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
 iree_status_t iree_hal_cuda_event_semaphore_create(
     uint64_t initial_value, const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_hal_cuda_timepoint_pool_t* timepoint_pool,
-    iree_hal_cuda_pending_queue_actions_t* pending_queue_actions,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
+    iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
+    iree_hal_semaphore_t** out_semaphore);
 
 // Acquires a timepoint to signal the timeline to the given |to_value| from the
 // device. The underlying CUDA event is written into |out_event| for interacting

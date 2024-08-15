@@ -182,7 +182,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_cuda_stream_command_buffer",
       strlen("iree_hal_cuda_stream_command_buffer"), /*name=*/NULL, 0);
 
@@ -217,9 +217,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
                                        command_buffer->resource_set,
                                        &command_buffer->collective_batch);
 
-  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
-                                  &command_buffer->tracing_event_list,
-                                  command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -235,8 +235,9 @@ static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream, location ? location->file.data : NULL,
-      location ? location->file.size : 0, location ? location->line : 0,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE,
+      location ? location->file.data : NULL, location ? location->file.size : 0,
+      location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
 
   // TODO: pass along to CUPTI if available.
@@ -250,9 +251,9 @@ static void iree_hal_cuda_stream_command_buffer_end_debug_group(
 
   // TODO: pass along to CUPTI if available.
 
-  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
-                                  &command_buffer->tracing_event_list,
-                                  command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_execution_barrier(
@@ -550,9 +551,10 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream, kernel_info.source_filename.data,
-      kernel_info.source_filename.size, kernel_info.source_line,
-      kernel_info.function_name.data, kernel_info.function_name.size,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size,
       /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -634,9 +636,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
                      params_ptr, NULL),
       "cuLaunchKernel");
 
-  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
-                                  &command_buffer->tracing_event_list,
-                                  command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -672,10 +674,10 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->cu_stream, kernel_info.source_filename.data,
-      kernel_info.source_filename.size, kernel_info.source_line,
-      kernel_info.function_name.data, kernel_info.function_name.size,
-      /*name=*/NULL, 0);
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size, /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -747,9 +749,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch2(
                      command_buffer->cu_stream, params_ptr, NULL),
       "cuLaunchKernel");
 
-  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
-                                  &command_buffer->tracing_event_list,
-                                  command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
