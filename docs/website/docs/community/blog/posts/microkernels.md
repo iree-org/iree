@@ -165,12 +165,12 @@ interesting happens *to* it.:
 
 [➤ Appendix: IR dump after WrapEntryPointsPass](#ir-dump-after-wrapentrypointspass)
 
-Next, the first interesting thing is the `CPUMaterializeEncoding` pass, where
+Next, the first interesting thing is the `CPUMaterializeHostEncoding` pass, where
 the `linalg.matmul` gets rewritten into a `linalg.mmt4d` which is a matmul with
 a tiled data layout. This is where we start specializing to the target ISA
 feature set, AVX-512, favoring a 16x16 tile size for this float32 matmul.
 
-[➤ Appendix: IR Dump After CPUMaterializeEncoding](#ir-dump-after-cpumaterializeencoding)
+[➤ Appendix: IR Dump After CPUMaterializeHostEncoding](#ir-dump-after-cpumaterializehostencoding)
 
 The idea is that `linalg.mmt4d` is what we will have a microkernel for, below.
 There is no need to have microkernels for anything but the target-optimal tiled
