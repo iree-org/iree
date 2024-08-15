@@ -799,6 +799,8 @@ FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
   return llvm::cast<IntegerAttr>(stage).getInt();
 }
 
+/// Returns a small tiling factor for the given reduction `dimSize`.
+/// Returns 0 to avoid tiling.
 int getReductionTilingFactor(int64_t dimSize) {
   if (dimSize % 4 == 0)
     return 4;

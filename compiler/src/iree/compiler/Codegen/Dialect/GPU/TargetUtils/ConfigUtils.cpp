@@ -264,33 +264,36 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
   // Whether we can try to use the vectorization pipeline.
   SmallVector<int64_t> loopBounds = linalgOp.getStaticLoopRanges();
-  bool vectorizable =
-      // Require all affine maps to be projected permutation so that we can
-      // generate vector transfer ops.
-      llvm::all_of(
-          linalgOp.getIndexingMapsArray(),
-          [](AffineMap map) { return map.isProjectedPermutation(); }) &&
-      llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth) &&
-      llvm::none_of(loopBounds, ShapedType::isDynamic);
+  bool projPerm =
+      llvm::all_of(linalgOp.getIndexingMapsArray(),
+                   [](AffineMap map) { return map.isProjectedPermutation(); });
+  bool powTwo =
+      llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth);
+  bool staticShape = llvm::none_of(loopBounds, ShapedType::isDynamic);
+
+  // Require all affine maps to be projected permutation so that we can
+  // generate vector transfer ops.
+  bool vectorizable = projPerm && powTwo && staticShape;
 
   const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
   // Make sure we use a tile size that results in some integral number of bytes.
-  const unsigned scaleToByte = minBitwidth < 8 ? 8 / minBitwidth : 1;
+  const unsigned scaleToByte =
+      std::max(8 / minBitwidth, static_cast<unsigned>(1));
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
-    LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
+    LDBG("Loss factor: " << lossFactor << "\n");
     initConfiguration();
     // If there are more than 3 parallel dim try to tile the extra higher level
     // dimensions to 1 for extra dimensions.
     if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
-      for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; i++) {
-        if (workgroupTileSizes[i] != 0)
+      for (auto [i, tileSize] : llvm::enumerate(workgroupTileSizes)) {
+        if (tileSize != 0)
           break;
         if (loopBounds[i] != 1)
-          workgroupTileSizes[i] = 1;
+          tileSize = 1;
       }
     }
     // Scan from the innermost shape dimension and try to deduce the
@@ -311,7 +314,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       if (vectorizable && wgDim == 0 && !lossFactor) {
         candidates.push_back(4 * numThreads);
       }
-      // Try all power of two numbers upto the subgroup size.
+      // Try all power of two numbers up to the subgroup size.
       for (unsigned i = numThreads; i >= 1; i >>= 1) {
         candidates.push_back(i);
       }
@@ -418,8 +421,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   int64_t numLoops = linalgOp.getNumLoops();
   SmallVector<utils::IteratorType> iterTypes = linalgOp.getIteratorTypesArray();
   SmallVector<int64_t> loopTileSizes(numLoops, 0);
-  for (const auto &[reverseIdx, iter] :
-       llvm::enumerate(llvm::reverse(iterTypes))) {
+  for (auto [reverseIdx, iter] : llvm::enumerate(llvm::reverse(iterTypes))) {
     unsigned i = numLoops - reverseIdx - 1;
     if (linalg::isReductionIterator(iter) || i >= workgroupTileSizes.size() ||
         workgroupTileSizes[i] == 0) {
@@ -438,6 +440,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  LDBG("Selected tile and fuse lowering config: " << loweringConfig << "\n");
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
