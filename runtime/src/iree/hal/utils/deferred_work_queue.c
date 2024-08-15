@@ -32,16 +32,7 @@ typedef enum iree_hal_deferred_work_queue_action_kind_e {
 typedef enum iree_hal_deferred_work_queue_action_state_e {
   // The current action is active as waiting for or under execution.
   IREE_HAL_QUEUE_ACTION_STATE_ALIVE,
-  // The current action is done execution and waiting for destruction.
-  IREE_HAL_QUEUE_ACTION_STATE_ZOMBIE,
 } iree_hal_deferred_work_queue_action_state_t;
-
-// How many work items must complete in order for an action to complete.
-// We keep track of the remaining work for an action so we don't exit worker
-// threads prematurely.
-// +1 for issuing an execution of an action.
-// +1 for cleaning up a zombie action.
-static const iree_host_size_t total_work_items_to_complete_an_action = 2;
 
 // A work queue action.
 // Note that this struct does not have internal synchronization; it's expected
@@ -812,9 +803,7 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
                                                          action);
       // One work item is the callback that makes it across from the
       // completion thread.
-      // The other is the cleanup of the action.
-      actions->pending_work_items_count +=
-          total_work_items_to_complete_an_action;
+      actions->pending_work_items_count += 1;
     }
     iree_slim_mutex_unlock(&actions->action_mutex);
   } else {
@@ -848,20 +837,8 @@ static void iree_hal_deferred_work_queue_action_fail_locked(
   iree_hal_semaphore_list_fail(action->signal_semaphore_list,
                                iree_status_clone(status));
 
-  iree_host_size_t work_items_remaining = 0;
-  switch (action->state) {
-    case IREE_HAL_QUEUE_ACTION_STATE_ALIVE:
-      work_items_remaining = total_work_items_to_complete_an_action;
-      break;
-    case IREE_HAL_QUEUE_ACTION_STATE_ZOMBIE:
-      work_items_remaining = 1;
-      break;
-    default:
-      // Someone forgot to handle all enum values?
-      iree_abort();
-  }
   iree_slim_mutex_lock(&actions->action_mutex);
-  action->owning_actions->pending_work_items_count -= work_items_remaining;
+  action->owning_actions->pending_work_items_count -= 1;
   iree_hal_deferred_work_queue_fail_status_locked(actions, status);
   iree_hal_deferred_work_queue_action_destroy(action);
 }
@@ -944,8 +921,6 @@ iree_hal_deferred_work_queue_execution_device_signal_host_callback(
       (iree_hal_deferred_work_queue_action_t*)user_data;
   IREE_ASSERT_EQ(action->kind, IREE_HAL_QUEUE_ACTION_TYPE_EXECUTION);
   IREE_ASSERT_EQ(action->state, IREE_HAL_QUEUE_ACTION_STATE_ALIVE);
-  iree_hal_deferred_work_queue_t* actions = action->owning_actions;
-
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     iree_hal_deferred_work_queue_action_fail(action, status);
     IREE_TRACE_ZONE_END(z0);
@@ -963,20 +938,7 @@ iree_hal_deferred_work_queue_execution_device_signal_host_callback(
     return status;
   }
 
-  // Flip the action state to zombie and enqueue it again so that we can let
-  // the worker thread clean it up. Note that this is necessary because cleanup
-  // may involve GPU API calls like buffer releasing or unregistering, so we can
-  // not inline it here.
-  action->state = IREE_HAL_QUEUE_ACTION_STATE_ZOMBIE;
-  iree_slim_mutex_lock(&actions->action_mutex);
-  iree_hal_deferred_work_queue_action_list_push_back(&actions->action_list,
-                                                     action);
-  // The callback (work item) is complete.
-  --actions->pending_work_items_count;
-  iree_slim_mutex_unlock(&actions->action_mutex);
-
-  // We need to trigger execution of this action again, so it gets cleaned up.
-  status = iree_hal_deferred_work_queue_issue(actions);
+  iree_hal_deferred_work_queue_action_destroy(action);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -1113,21 +1075,6 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-}
-
-// Performs the given cleanup |action| on the CPU.
-static void iree_hal_deferred_work_queue_issue_cleanup(
-    iree_hal_deferred_work_queue_action_t* action) {
-  iree_hal_deferred_work_queue_t* actions = action->owning_actions;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_deferred_work_queue_action_destroy(action);
-
-  // Now we fully executed and cleaned up this action. Decrease the work items
-  // counter.
-  iree_hal_deferred_work_queue_decrement_work_items_count(actions);
-
-  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_status_t iree_hal_deferred_work_queue_issue(
@@ -1338,9 +1285,6 @@ static void iree_hal_deferred_work_queue_worker_process_ready_list(
         case IREE_HAL_QUEUE_ACTION_STATE_ALIVE:
           status = iree_hal_deferred_work_queue_issue_execution(action);
           break;
-        case IREE_HAL_QUEUE_ACTION_STATE_ZOMBIE:
-          iree_hal_deferred_work_queue_issue_cleanup(action);
-          break;
       }
 
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
@@ -1349,6 +1293,7 @@ static void iree_hal_deferred_work_queue_worker_process_ready_list(
             &actions->working_area.ready_worklist, entry);
         break;
       }
+      iree_hal_deferred_work_queue_decrement_work_items_count(actions);
     }
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
