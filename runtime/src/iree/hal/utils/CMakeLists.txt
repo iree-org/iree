@@ -238,6 +238,10 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+if(NOT IREE_ENABLE_THREADING)
+  return()
+endif()
+
 iree_cc_library(
   NAME
     deferred_work_queue
