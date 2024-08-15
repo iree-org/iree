@@ -55,7 +55,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 struct CUDAOptions {
-  bool dumpPtx = false;
   std::string clTarget = "sm_60";
   std::string clTargetFeatures = "+ptx76";
   bool clUsePtxas = false;
@@ -64,8 +63,6 @@ struct CUDAOptions {
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("CUDA HAL Target");
-    binder.opt<bool>("iree-cuda-dump-ptx", dumpPtx, llvm::cl::cat(category),
-                     llvm::cl::desc("Dump ptx to the debug stream."));
 
     binder.opt<std::string>(
         "iree-cuda-target", clTarget, llvm::cl::cat(category),
@@ -259,26 +256,14 @@ static std::string produceGpuImage(const CUDAOptions &options,
   return ptxImage;
 }
 
-static void dumpLLVMModuleToPath(StringRef path, StringRef baseName,
-                                 StringRef suffix, StringRef extPrefix,
-                                 llvm::Module &module) {
-  // Dump disassembly to path.
-  llvm::SmallVector<char> textData;
-  llvm::raw_svector_ostream textOstream(textData);
-
-  module.print(textOstream, nullptr);
-  std::string textExtension = extPrefix.str() + ".ll";
-  dumpDataToPath(path, baseName, suffix, textExtension,
-                 StringRef(textData.data(), textData.size()));
-
-  // Dump bitcode to path.
-  llvm::SmallVector<char> binaryData;
-  llvm::raw_svector_ostream binaryOstream(binaryData);
-  // Write the specified module to the specified output stream.
-  llvm::WriteBitcodeToFile(module, binaryOstream);
-  std::string binaryExtension = extPrefix.str() + ".bc";
-  dumpDataToPath(path, baseName, suffix, binaryExtension,
-                 StringRef(binaryData.data(), binaryData.size()));
+static void dumpModuleToPath(StringRef path, StringRef baseName,
+                             StringRef suffix, StringRef extension,
+                             llvm::Module &module) {
+  llvm::SmallVector<char, 0> data;
+  llvm::raw_svector_ostream ostream(data);
+  module.print(ostream, nullptr);
+  dumpDataToPath(path, baseName, suffix, extension,
+                 StringRef(data.data(), data.size()));
 }
 
 static std::string translateModuleToISA(llvm::Module &module,
@@ -399,19 +384,24 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
 
-    // TODO: device configuration attrs.
-    auto configAttr = b.getDictionaryAttr(configItems);
+    SmallVector<NamedAttribute> deviceConfigAttrs;
+    deviceConfigAttrs.emplace_back(b.getStringAttr("executable_create_2"),
+                                   b.getUnitAttr());
+    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
+
+    SmallVector<NamedAttribute> executableConfigAttrs;
+    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
     SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
     targetRegistry.getTargetBackend("cuda")->getDefaultExecutableTargets(
-        context, "cuda", configAttr, executableTargetAttrs);
+        context, "cuda", executableConfigAttr, executableTargetAttrs);
 
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("cuda"),
-                                            configAttr, executableTargetAttrs);
+                                            deviceConfigAttr,
+                                            executableTargetAttrs);
   }
 
 private:
@@ -476,6 +466,7 @@ public:
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
     StringRef targetFeatures = options.clTargetFeatures;
@@ -484,10 +475,6 @@ public:
       targetFeatures = attr.getFeatures();
     }
 
-    // Perform the translation in a separate context to avoid any
-    // multi-threading issues.
-    llvm::LLVMContext context;
-
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
     // intermediate code/binary files), and at runtime (loaded
@@ -495,41 +482,16 @@ public:
     auto libraryName =
         variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
-    // TODO(thomasraoux): property handle export ordinals; this code is assuming
-    // that ordinals are dense starting at 0 but that is not required.
-
-    // Collect all the entry point parameters.
-    SmallVector<std::array<int32_t, 3>> workgroupSizes;
-    SmallVector<uint32_t> workgroupLocalMemories;
-    for (auto exportOp : variantOp.getExportOps()) {
-      std::array<int32_t, 3> workgroupSize;
-      if (std::optional<ArrayAttr> workgroupSizeAttr =
-              exportOp.getWorkgroupSize()) {
-        for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
-          workgroupSize[it.index()] =
-              llvm::cast<IntegerAttr>(it.value()).getInt();
-        }
-      } else {
-        workgroupSize = {1, 1, 1};
-      }
-      workgroupSizes.push_back(workgroupSize);
-      uint32_t workgroupLocalMemory = 0;
-      if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
-        workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
-      }
-      workgroupLocalMemories.push_back(workgroupLocalMemory);
+    // Collect all the entry point names.
+    auto exportOps = llvm::to_vector_of<IREE::HAL::ExecutableExportOp>(
+        variantOp.getExportOps());
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
+    for (IREE::HAL::ExecutableExportOp exportOp : exportOps) {
+      exportOpMap[exportOp.getSymName()] = exportOp;
     }
 
-    FlatbufferBuilder builder;
-    iree_hal_cuda_ExecutableDef_start_as_root(builder);
-
-    // Attach embedded source file contents.
-    auto sourceFilesRef = createSourceFilesVec(
-        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
-
-    SmallVector<std::string> entryPointNames;
-    std::string ptxImage;
-    SmallVector<iree_hal_debug_FileLineLocDef_ref_t> sourceLocationRefs;
+    std::array<int32_t, 3> maxWorkgroupSize = {1, 1, 1};
+    std::string targetPTX;
     if (variantOp.isExternal()) {
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()
@@ -542,41 +504,31 @@ public:
                                           "supported for external variants";
       }
 
-      // Take exported names verbatim. The user must have already sanitized
-      // these to match the names in their kernels. We don't support any kind of
-      // mangling and if the user was silly enough to rely on nvcc C++ mangling
-      // they'll have to figure that out.
-      for (auto exportOp : variantOp.getExportOps()) {
-        entryPointNames.emplace_back(exportOp.getSymName());
-      }
-
+      // Read the PTX from the object file.
       auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
           variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
-        ptxImage = data.value();
+        targetPTX = data.value();
       } else {
         return variantOp.emitOpError()
                << "object file could not be loaded: " << objectAttr;
       }
     } else {
-      ModuleOp innerModuleOp = variantOp.getInnerModule();
+      // Perform the translation in a separate context to avoid any
+      // multi-threading issues.
+      llvm::LLVMContext context;
 
-      auto llvmModule =
+      std::unique_ptr<llvm::Module> llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
       if (!llvmModule) {
         return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                         "dialect to the native llvm::Module";
       }
 
-      for (auto [exportOp, workgroupSize] :
-           llvm::zip_equal(variantOp.getExportOps(), workgroupSizes)) {
-        auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
+      for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
+        llvm::Function *llvmFunc = llvmModule->getFunction(func.getName());
         if (llvmFunc->isDeclaration())
           continue;
-
-        // setName will make sure the function name is unique.
-        llvmFunc->setName(sanitizeSymbolName(exportOp.getName()));
-        entryPointNames.emplace_back(llvmFunc->getName());
 
         auto *annotations =
             llvmModule->getOrInsertNamedMetadata("nvvm.annotations");
@@ -591,18 +543,25 @@ public:
         };
         // Mark the entry point as a kernel.
         setMetadataValueI32("kernel", 1);
-        // Set the maximum number of threads in the thread block (CTA).
-        setMetadataValueI32("maxntidx", workgroupSize[0]);
-        setMetadataValueI32("maxntidy", workgroupSize[1]);
-        setMetadataValueI32("maxntidz", workgroupSize[2]);
 
-        // Optional source location information for debugging/profiling.
-        if (serOptions.debugLevel >= 1) {
-          if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-            auto filenameRef = builder.createString(loc->getFilename());
-            sourceLocationRefs.push_back(iree_hal_debug_FileLineLocDef_create(
-                builder, filenameRef, loc->getLine()));
-          }
+        // Set the maximum number of threads in the thread block (CTA).
+        auto exportOp = exportOpMap[func.getName()];
+        if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+          auto workgroupSizeValues = workgroupSizeAttr->getValue();
+          std::array<int32_t, 3> workgroupSize = {
+              static_cast<int32_t>(
+                  cast<IntegerAttr>(workgroupSizeValues[0]).getInt()),
+              static_cast<int32_t>(
+                  cast<IntegerAttr>(workgroupSizeValues[1]).getInt()),
+              static_cast<int32_t>(
+                  cast<IntegerAttr>(workgroupSizeValues[2]).getInt()),
+          };
+          maxWorkgroupSize[0] = std::max(maxWorkgroupSize[0], workgroupSize[0]);
+          maxWorkgroupSize[1] = std::max(maxWorkgroupSize[1], workgroupSize[1]);
+          maxWorkgroupSize[2] = std::max(maxWorkgroupSize[2], workgroupSize[2]);
+          setMetadataValueI32("maxntidx", workgroupSize[0]);
+          setMetadataValueI32("maxntidy", workgroupSize[1]);
+          setMetadataValueI32("maxntidz", workgroupSize[2]);
         }
       }
 
@@ -622,11 +581,17 @@ public:
         }
       }
 
-      // Dump just the codegen bitcode before linking and optimization.
-      if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
-                             serOptions.dumpBaseName, variantOp.getName(),
-                             ".codegen", *llvmModule);
+      llvmModule->setDataLayout(targetMachine->createDataLayout());
+
+      for (llvm::Function &f : llvmModule->functions())
+        f.addFnAttr(llvm::Attribute::AlwaysInline);
+
+      // Link user-provided modules.
+      llvm::Linker linker(*llvmModule);
+      if (failed(linkCmdlineBitcodeFiles(
+              variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
+              *targetMachine, llvmModule->getContext()))) {
+        return failure();
       }
 
       // Link user and device bitcode alongside the generated module.
@@ -635,77 +600,122 @@ public:
         return failure();
       }
 
-      // Dump all linked bitcode prior to optimization.
       if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
-                             serOptions.dumpBaseName, variantOp.getName(),
-                             ".linked", *llvmModule);
+        dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                         serOptions.dumpBaseName, variantOp.getName(),
+                         ".linked.ll", *llvmModule);
       }
 
-      std::array<int32_t, 3> maxWorkgroupSize = {1, 1, 1};
-      for (int64_t i = 0, e = workgroupSizes.size(); i < e; i++) {
-        for (int64_t j = 0; j < maxWorkgroupSize.size(); j++) {
-          maxWorkgroupSize[j] =
-              std::max(maxWorkgroupSize[j], workgroupSizes[i][j]);
-        }
-      }
-      // Run LTO-style full optimization on the linked modules.
+      // Run LLVM optimization passes.
       optimizeModule(*llvmModule, *targetMachine, maxWorkgroupSize);
-
-      // Dump bitcode post-linking and optimization.
       if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
-                             serOptions.dumpBaseName, variantOp.getName(),
-                             ".optimized", *llvmModule);
+        dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                         serOptions.dumpBaseName, variantOp.getName(),
+                         ".optimized.ll", *llvmModule);
       }
 
-      // Serialize CUDA kernel into the binary that we will embed in the
+      // Serialize ptx kernel into the binary that we will embed in the
       // final FlatBuffer.
-      ptxImage = translateModuleToISA(*llvmModule, *targetMachine);
+      targetPTX = translateModuleToISA(*llvmModule, *targetMachine);
+      if (targetPTX.empty())
+        return failure();
     }
 
-    if (options.dumpPtx) {
-      llvm::dbgs() << ptxImage;
-    }
     if (!serOptions.dumpBinariesPath.empty()) {
       dumpDataToPath(serOptions.dumpBinariesPath, serOptions.dumpBaseName,
-                     variantOp.getName(), ".ptx", ptxImage);
+                     variantOp.getName(), ".ptx", targetPTX);
     }
 
-    std::string gpuImage = produceGpuImage(options, targetArch, ptxImage);
-    auto gpuImageRef =
-        flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
-    iree_hal_cuda_BlockSize_vec_start(builder);
-    for (const auto &workgroupSize : workgroupSizes) {
-      iree_hal_cuda_BlockSize_vec_push_create(
-          builder, workgroupSize[0], workgroupSize[1], workgroupSize[2]);
-    }
-    auto blockSizesRef = iree_hal_cuda_BlockSize_vec_end(builder);
-    auto workgroupLocalMemoriesRef =
-        builder.createInt32Vec(workgroupLocalMemories);
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
+    FlatbufferBuilder builder;
+    iree_hal_cuda_ExecutableDef_start_as_root(builder);
 
-    iree_hal_cuda_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_cuda_ExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_hal_cuda_ExecutableDef_shared_memory_size_add(
-        builder, workgroupLocalMemoriesRef);
-    iree_hal_cuda_ExecutableDef_ptx_image_add(builder, gpuImageRef);
-    if (!sourceLocationRefs.empty()) {
-      auto sourceLocationsRef =
-          builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_cuda_ExecutableDef_source_locations_add(builder,
-                                                       sourceLocationsRef);
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
+
+    // Only a single module today.
+    SmallVector<iree_hal_cuda_ModuleDef_ref_t> moduleRefs;
+    {
+      auto ptxImageRef = flatbuffers_string_create(builder, targetPTX.c_str(),
+                                                   targetPTX.size());
+      moduleRefs.push_back(
+          iree_hal_cuda_ModuleDef_create(builder, ptxImageRef));
     }
+    auto modulesRef = builder.createOffsetVecDestructive(moduleRefs);
+
+    // Generate optional per-export debug information.
+    // May be empty if no debug information was requested.
+    auto exportDebugInfos =
+        createExportDefs(serOptions.debugLevel, exportOps, builder);
+
+    SmallVector<iree_hal_cuda_ExportDef_ref_t> exportRefs;
+    exportRefs.resize(exportOps.size(), 0);
+    for (auto exportOp : exportOps) {
+      auto ordinalAttr = exportOp.getOrdinalAttr();
+      if (!ordinalAttr) {
+        return mlir::emitError(exportOp.getLoc())
+               << "could not compile rocm binary: export op is missing ordinal";
+      }
+      int64_t ordinal = ordinalAttr.getInt();
+
+      auto kernelNameRef = builder.createString(exportOp.getName());
+
+      iree_hal_cuda_BlockDims_t blockDims = {0};
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSize = workgroupSizeAttr->getValue();
+        blockDims.x = cast<IntegerAttr>(workgroupSize[0]).getInt();
+        blockDims.y = cast<IntegerAttr>(workgroupSize[1]).getInt();
+        blockDims.z = cast<IntegerAttr>(workgroupSize[2]).getInt();
+      }
+
+      uint32_t blockSharedMemorySize = 0;
+      if (std::optional<APInt> workgroupLocalMemoryAttr =
+              exportOp.getWorkgroupLocalMemory()) {
+        blockSharedMemorySize = workgroupLocalMemoryAttr->getSExtValue();
+      }
+
+      auto layoutAttr = exportOp.getLayoutAttr();
+      uint32_t constantCount =
+          static_cast<uint32_t>(layoutAttr.getPushConstants());
+      SmallVector<iree_hal_cuda_BindingBits_enum_t> bindingFlags;
+      for (auto bindingAttr : layoutAttr.getSetLayout(0).getBindings()) {
+        iree_hal_cuda_BindingBits_enum_t flags = 0;
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::ReadOnly)) {
+          flags |= iree_hal_cuda_BindingBits_READ_ONLY;
+        }
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::Indirect)) {
+          flags |= iree_hal_cuda_BindingBits_INDIRECT;
+        }
+        bindingFlags.push_back(flags);
+      }
+      auto bindingFlagsRef = iree_hal_cuda_BindingBits_vec_create(
+          builder, bindingFlags.data(), bindingFlags.size());
+
+      iree_hal_cuda_ExportDef_start(builder);
+      iree_hal_cuda_ExportDef_module_ordinal_add(builder, 0); // always 0 today
+      iree_hal_cuda_ExportDef_kernel_name_add(builder, kernelNameRef);
+      iree_hal_cuda_ExportDef_block_dims_add(builder, &blockDims);
+      iree_hal_cuda_ExportDef_block_shared_memory_size_add(
+          builder, blockSharedMemorySize);
+      iree_hal_cuda_ExportDef_constant_count_add(builder, constantCount);
+      iree_hal_cuda_ExportDef_binding_flags_add(builder, bindingFlagsRef);
+      iree_hal_cuda_ExportDef_debug_info_add(builder,
+                                             exportDebugInfos[ordinal]);
+      exportRefs[ordinal] = iree_hal_cuda_ExportDef_end(builder);
+    }
+    auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
+
+    iree_hal_cuda_ExecutableDef_exports_add(builder, exportsRef);
+    iree_hal_cuda_ExecutableDef_modules_add(builder, modulesRef);
     iree_hal_cuda_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_cuda_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.setMimeTypeAttr(
-        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }
