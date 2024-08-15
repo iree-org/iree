@@ -480,7 +480,6 @@
     "onnx/node/generated/test_mod_mixed_sign_int32",
     "onnx/node/generated/test_mod_mixed_sign_int64",
     "onnx/node/generated/test_mod_mixed_sign_int8",
-    "onnx/node/generated/test_mod_uint64",
     "onnx/node/generated/test_pow",
     "onnx/node/generated/test_pow_example",
     "onnx/node/generated/test_pow_types_float32_int32",
