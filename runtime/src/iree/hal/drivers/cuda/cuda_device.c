@@ -952,7 +952,7 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_hal_deferred_work_queue_enque(
+  iree_status_t status = iree_hal_deferred_work_queue_enqueue(
       device->work_queue, iree_hal_cuda_device_collect_tracing_context,
       device->tracing_context, wait_semaphore_list, signal_semaphore_list,
       command_buffer_count, command_buffers, binding_tables);
