@@ -37,6 +37,11 @@ void buildDispatchCreationPassPipeline(
 
 void registerDispatchCreationPasses();
 
+//===----------------------------------------------------------------------===//
+// Register Pipelines
+//===----------------------------------------------------------------------===//
+void registerDispatchCreationPipelines();
+
 } // namespace mlir::iree_compiler::DispatchCreation
 
 #endif

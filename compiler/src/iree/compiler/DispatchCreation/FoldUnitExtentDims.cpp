@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,12 +25,12 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-fold-unit-extent-dims"
+#define DEBUG_TYPE "iree-dispatch-creation-fold-unit-extent-dims"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Pass helpers
@@ -107,9 +107,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
 }
 
 namespace {
-struct FoldUnitExtentDimsPass
-    : public IREE::Flow::impl::FoldUnitExtentDimsPassBase<
-          FoldUnitExtentDimsPass> {
+struct FoldUnitExtentDimsPass final
+    : public impl::FoldUnitExtentDimsPassBase<FoldUnitExtentDimsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -149,7 +148,7 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   auto defaultFn = options.controlFn;
   options.controlFn = [&](Operation *op) {
     // Ignore operations already in dispatches.
-    if (!isNonNullAndOutsideDispatch(op)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
       return SmallVector<unsigned>{};
     }
     return defaultFn(op);
@@ -162,4 +161,4 @@ void FoldUnitExtentDimsPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

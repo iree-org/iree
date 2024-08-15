@@ -283,6 +283,9 @@ void buildIREEVMTransformPassPipeline(
         hooks.afterPhase(IREEVMPipelinePhase::DispatchCreation, passManager);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "DispatchCreation");
     }
+    if (compileTo == IREEVMPipelinePhase::DispatchCreation)
+      return; // early-exit
+
     IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");

@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     DispatchCreation
   HDRS
+    "FormDispatchRegions.h"
     "FusionUtils.h"
     "Passes.h"
   SRCS
@@ -21,7 +22,6 @@ iree_cc_library(
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
-    "ConvertRegionToWorkgroups.cpp"
     "DispatchWithTransformDialect.cpp"
     "ElementwiseOpFusion.cpp"
     "FoldUnitExtentDims.cpp"
@@ -35,6 +35,7 @@ iree_cc_library(
     "SetEncoding.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
+    "TensorPadToTensorInsertSlice.cpp"
     "TransposeGenericOps.cpp"
   DEPS
     ::PassHeaders

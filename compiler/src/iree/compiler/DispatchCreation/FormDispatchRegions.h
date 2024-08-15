@@ -33,12 +33,12 @@ private:
 
 } // namespace mlir
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
-FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
-                                                    Operation *rootOp);
+FailureOr<IREE::Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
+                                                          Operation *rootOp);
 
 /// Simplfy the given tensor::DimOps as much as possible.
 /// * Static dimensions are replaced by constant.
@@ -49,6 +49,6 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps);
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_

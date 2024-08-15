@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-sink-reshapes))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-dispatch-creation-sink-reshapes))" --split-input-file %s | FileCheck %s
 
 /// If for a `tensor.expand_shape` -> consumer pair if the consumer
 /// can already be fused with an op by tile and fuse, do nothing. In

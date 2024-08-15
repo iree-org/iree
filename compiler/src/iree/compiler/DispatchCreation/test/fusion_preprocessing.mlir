@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-fusion-preprocessing --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-dispatch-creation-fusion-preprocessing --split-input-file %s | FileCheck %s
 
 util.func public @fold_insert_slices(%source : tensor<?x?xf32>,
     %dest0 : tensor<?x?xf32>, %dest1 : tensor<?x?xf32>, %val: f32,

@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{fuse-pad-with-producers}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-pad-with-producers}))" --split-input-file %s | FileCheck %s
 
 util.func public @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
     %arg1 : tensor<?x?x?x?xf32>, %arg2 : tensor<?x?x?x?xf32>,

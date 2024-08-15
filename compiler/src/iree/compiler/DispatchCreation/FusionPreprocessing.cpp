@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -30,10 +30,10 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FUSIONPREPROCESSINGPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
@@ -41,9 +41,9 @@ namespace {
 // ElementwiseOpInterchangePattern
 //===----------------------------------------------------------------------===//
 
-struct ElementwiseOpInterchangePattern
+struct ElementwiseOpInterchangePattern final
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1)
@@ -81,7 +81,7 @@ struct ElementwiseOpInterchangePattern
 /// %2 = linalg.fill ins(%cst : )
 /// %3 = tensor.insert_slice %a into %2
 /// ```
-struct FoldSuccessiveTensorInsertSliceOps
+struct FoldSuccessiveTensorInsertSliceOps final
     : public OpRewritePattern<tensor::InsertSliceOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
@@ -143,8 +143,8 @@ struct FoldSuccessiveTensorInsertSliceOps
 // cannot be fused because it there is no producer-consumer
 // relationship between the two generics. This is because the indexing
 // is not affine (index values come from a tensor).
-struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
+struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
     // Check if extractOp is inside a generic op
@@ -163,7 +163,8 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
 
     // Check if the producerOp is fusible
     if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) || !LinalgExt::isBitExtendOp(producerOp)) {
+        !isElementwise(producerOp) ||
+        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
@@ -197,9 +198,8 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
   }
 };
 
-struct FusionPreprocessingPass
-    : public IREE::Flow::impl::FusionPreprocessingPassBase<
-          FusionPreprocessingPass> {
+struct FusionPreprocessingPass final
+    : public impl::FusionPreprocessingPassBase<FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<ElementwiseOpInterchangePattern,
@@ -219,4 +219,4 @@ struct FusionPreprocessingPass
 
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

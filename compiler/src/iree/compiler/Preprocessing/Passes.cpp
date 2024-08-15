@@ -6,6 +6,7 @@
 #include "iree/compiler/Preprocessing/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -103,7 +104,7 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
       .addPass(createConvertConvToChannelsLastPass);
-  passManager.addPass(IREE::Flow::createFoldUnitExtentDimsPass());
+  passManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }

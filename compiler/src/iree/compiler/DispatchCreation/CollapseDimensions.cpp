@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/DispatchCreation/FormDispatchRegions.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -33,18 +33,17 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-collapse-dimensions"
+#define DEBUG_TYPE "iree-dispatch-creation-collapse-dimensions"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_COLLAPSEDIMENSIONSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 /// Pass declaration.
-struct CollapseDimensionsPass
-    : public IREE::Flow::impl::CollapseDimensionsPassBase<
-          CollapseDimensionsPass> {
+struct CollapseDimensionsPass final
+    : public impl::CollapseDimensionsPassBase<CollapseDimensionsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -464,10 +463,10 @@ void CollapseInfo::dump() const { print(llvm::dbgs()); }
 /// Traverses all the the Ops in DispatchRegionOps and finds a linalg.generic Op
 /// which is the sole producer of the flow.return's operand.
 static FailureOr<linalg::GenericOp>
-findRootGenericOp(DispatchRegionOp regionOp) {
+findRootGenericOp(IREE::Flow::DispatchRegionOp regionOp) {
   // Check the yielded value is from a single `linalg.generic`.
   auto returnOp =
-      cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+      cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   if (!returnOp->getOperands().size()) {
     return failure();
   }
@@ -492,17 +491,17 @@ findRootGenericOp(DispatchRegionOp regionOp) {
 /// Hoist `tensor.collapse_shape` ops at the beginning of the `dispatchOp`
 /// and `tensor.expand_shape` ops at the end of the `dispatchOp`, out of the
 /// dispatch.
-static FailureOr<DispatchRegionOp>
-hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
-                                       DispatchRegionOp dispatchOp) {
+static FailureOr<IREE::Flow::DispatchRegionOp>
+hoistTensorReshapesOutOfDispatchRegion(
+    RewriterBase &rewriter, IREE::Flow::DispatchRegionOp dispatchOp) {
   Block &body = dispatchOp.getBody().front();
-  auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
+  auto returnOp = cast<IREE::Flow::ReturnOp>(body.getTerminator());
 
   // 1. Get the slice of operations within `dispatchOp` that produce the yielded
   // value.
   BackwardSliceOptions sliceOptions;
   sliceOptions.filter = [&](Operation *op) {
-    return op->getParentOfType<DispatchRegionOp>();
+    return op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   };
   SetVector<Operation *> slice;
   getBackwardSlice(returnOp, &slice, sliceOptions);
@@ -598,7 +597,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
   }
 
   // 5. Create the new dispatch op.
-  auto newDispatchOp = rewriter.create<DispatchRegionOp>(
+  auto newDispatchOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
       loc, newReturnTypes, newDynamicDims, dispatchOp.getWorkload());
 
   // 5a. Move the body over, but replace the `flow.return` to use the new yield
@@ -609,7 +608,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
     Operation *terminator = newBody.front().getTerminator();
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(terminator);
-    rewriter.replaceOpWithNewOp<Flow::ReturnOp>(terminator, newYieldVals);
+    rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(terminator, newYieldVals);
   }
 
   // 5b. Move the workgroup count region over.
@@ -661,7 +660,7 @@ static void updateConsumersFromProducers(
 
     for (auto operand : genericOp.getDpsInputOperands()) {
       auto definingOp = operand->get().getDefiningOp();
-      if (!definingOp || isNonNullAndOutsideDispatch(definingOp)) {
+      if (!definingOp || IREE::Flow::isNonNullAndOutsideDispatch(definingOp)) {
         continue;
       }
 
@@ -749,8 +748,9 @@ static void updateProducersFromConsumers(
 // Construct a DAG of `linalg.generic` operations with 1 root op. Find
 // dimensions that can be collapsed all the way from the root to the leaves,
 // ensuring that all `collapse_shape` ops can be hoisted out of the dispatch.
-static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
-                                          DispatchRegionOp &regionOp) {
+static bool
+collapseDimensionsForDispatch(IRRewriter &rewriter,
+                              IREE::Flow::DispatchRegionOp &regionOp) {
   // Only collapse dispatches with 1 block
   if (!llvm::hasSingleElement(regionOp.getBody())) {
     return false;
@@ -766,7 +766,7 @@ static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
   sliceOptions.omitBlockArguments = true;
   sliceOptions.filter = [&](Operation *op) -> bool {
     auto genericOp = dyn_cast<linalg::GenericOp>(op);
-    auto parentOp = op->getParentOfType<DispatchRegionOp>();
+    auto parentOp = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
     return genericOp && isEligibleForCollapse(genericOp) &&
            parentOp == regionOp;
   };
@@ -848,8 +848,8 @@ void CollapseDimensionsPass::runOnOperation() {
   MLIRContext *context = funcOp->getContext();
   IRRewriter rewriter(context);
 
-  SmallVector<DispatchRegionOp> modifiedDispatchOps;
-  funcOp->walk([&](DispatchRegionOp dispatchOp) {
+  SmallVector<IREE::Flow::DispatchRegionOp> modifiedDispatchOps;
+  funcOp->walk([&](IREE::Flow::DispatchRegionOp dispatchOp) {
     if (collapseDimensionsForDispatch(rewriter, dispatchOp)) {
       modifiedDispatchOps.push_back(dispatchOp);
     }
@@ -867,9 +867,9 @@ void CollapseDimensionsPass::runOnOperation() {
     // Hoist tensor reshape ops out of dispatch region first. Otherwise, the
     // reshape(cst) will be folded into a constant living in the dispatch. It
     // could introduce big constants inlined in the dispatch.
-    FailureOr<DispatchRegionOp> newDispatchOp =
+    FailureOr<IREE::Flow::DispatchRegionOp> newDispatchOp =
         hoistTensorReshapesOutOfDispatchRegion(
-            rewriter, cast<DispatchRegionOp>(dispatchOp));
+            rewriter, cast<IREE::Flow::DispatchRegionOp>(dispatchOp));
     if (failed(newDispatchOp)) {
       dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
       return signalPassFailure();
@@ -897,4 +897,4 @@ void CollapseDimensionsPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

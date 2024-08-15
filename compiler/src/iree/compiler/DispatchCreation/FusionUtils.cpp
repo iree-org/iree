@@ -7,12 +7,12 @@
 //===--- FusionUtils.h --- Implementation of fusion utility functions -----===//
 //===----------------------------------------------------------------------===//
 
-#include "compiler/src/iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
+#include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
                                 bool fuseMultiReduction) {
@@ -65,7 +65,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // (except for bit-extend ops). If the consumer has only one use, then this
   // fusion is fine since cloning wont result in redundant computation of the
   // producer. (Also note that the producer is always an elementwise operation).
-  if (LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
+  if (IREE::LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
     return false;
   }
 
@@ -97,4 +97,4 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   return true;
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

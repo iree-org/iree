@@ -2,6 +2,7 @@
 // RUN: iree-opt --iree-abi-transformation-pipeline - | \
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=local})' --iree-hal-local-target-device-backends=vmvx - | \
 // RUN: iree-opt --iree-global-optimization-transformation-pipeline - | \
+// RUN: iree-opt --iree-dispatch-creation-pipeline - | \
 // RUN: iree-opt --iree-flow-transformation-pipeline - | \
 // RUN: iree-opt --iree-stream-transformation-pipeline - | \
 // RUN: iree-opt --iree-hal-transformation-pipeline - | \

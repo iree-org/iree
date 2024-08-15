@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-scalar-dispatches))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-scalar-dispatches))" --split-input-file %s | FileCheck %s
 
 #map = affine_map<() -> ()>
 util.func public @simpleDAG(

@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -29,16 +29,16 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-fuse-horizontal-contractions"
+#define DEBUG_TYPE "iree-dispatch-creation-fuse-horizontal-contractions"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
-struct FuseHorizontalContractionsPass
+struct FuseHorizontalContractionsPass final
     : public impl::FuseHorizontalContractionsPassBase<
           FuseHorizontalContractionsPass> {
   using Base::Base;
@@ -678,4 +678,4 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

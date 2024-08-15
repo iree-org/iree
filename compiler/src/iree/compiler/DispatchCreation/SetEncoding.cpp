@@ -14,8 +14,8 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -25,11 +25,11 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-set-encoding"
+#define DEBUG_TYPE "iree-dispatch-creation-set-encoding"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_SETENCODINGPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
 
@@ -293,7 +293,7 @@ private:
 
 /// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
 /// operation into a `linalg.fill` of the encoded type.
-struct FoldFillWithSetEncoding
+struct FoldFillWithSetEncoding final
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
   using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
 
@@ -317,11 +317,9 @@ struct FoldFillWithSetEncoding
   }
 };
 
-class SetEncodingPass : public impl::SetEncodingPassBase<SetEncodingPass> {
-
-public:
+struct SetEncodingPass final
+    : public impl::SetEncodingPassBase<SetEncodingPass> {
   using Base::Base;
-
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -337,4 +335,4 @@ public:
 };
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

@@ -12,30 +12,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-bubble-up-expand-shapes"
+#define DEBUG_TYPE "iree-dispatch-creation-bubble-up-expand-shapes"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_BUBBLEUPEXPANDSHAPESPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
-class BubbleUpExpandShapesPass
+struct BubbleUpExpandShapesPass final
     : public impl::BubbleUpExpandShapesPassBase<BubbleUpExpandShapesPass> {
-public:
-  using Base::Base;
-
   void runOnOperation() override;
 };
 
@@ -49,12 +46,12 @@ void BubbleUpExpandShapesPass::runOnOperation() {
       [](OpOperand *fusedOperand) {
         Operation *producer = fusedOperand->get().getDefiningOp();
         Operation *consumer = fusedOperand->getOwner();
-        if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+        if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
           return false;
         }
 
         // Do not fuse by expand if consumer is dequant.
-        if (LinalgExt::isBitExtendOp(consumer)) {
+        if (IREE::LinalgExt::isBitExtendOp(consumer)) {
           return false;
         }
 
@@ -96,4 +93,4 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

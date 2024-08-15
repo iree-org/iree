@@ -12,11 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -31,12 +31,12 @@
 #include "mlir/IR/Iterators.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-fusion-of-tensor-ops"
+#define DEBUG_TYPE "iree-dispatch-creation-fusion-of-tensor-ops"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FUSEMULTIUSEELEMENTWISEPRODUCERPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 // TODO: Remove this and the backing code once consteval is beyond being
 // rolled back.
@@ -147,7 +147,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
   DenseMap<Operation *, Operation *> opToRootMap;
   funcOp->walk<WalkOrder::PostOrder, ReverseIterator>(
       [&](linalg::GenericOp genericOp) {
-        if (!isNonNullAndOutsideDispatch(genericOp)) {
+        if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
           return;
         }
 
@@ -158,7 +158,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
         // Dequantization-like operations should be fused with consumers to keep
         // the smaller bit width on the dispatch boundary.
-        if (LinalgExt::isBitExtendOp(genericOp)) {
+        if (IREE::LinalgExt::isBitExtendOp(genericOp)) {
           return;
         }
 
@@ -198,7 +198,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
           // 7. Skip dequantization-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
-          if (LinalgExt::isBitExtendOp(producer)) {
+          if (IREE::LinalgExt::isBitExtendOp(producer)) {
             return;
           }
 
@@ -249,12 +249,10 @@ namespace {
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
-struct FuseMultiUseElementwiseProducerPass
-    : public IREE::Flow::impl::FuseMultiUseElementwiseProducerPassBase<
+struct FuseMultiUseElementwiseProducerPass final
+    : public impl::FuseMultiUseElementwiseProducerPassBase<
           FuseMultiUseElementwiseProducerPass> {
-  using IREE::Flow::impl::FuseMultiUseElementwiseProducerPassBase<
-      FuseMultiUseElementwiseProducerPass>::
-      FuseMultiUseElementwiseProducerPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 
@@ -281,4 +279,4 @@ void FuseMultiUseElementwiseProducerPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

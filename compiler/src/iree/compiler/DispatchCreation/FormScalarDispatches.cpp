@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -17,19 +18,18 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-#define DEBUG_TYPE "iree-flow-form-scalar-dispatches"
+#define DEBUG_TYPE "iree-dispatch-creation-form-scalar-dispatches"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FORMSCALARDISPATCHESPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
 /// Pass declaration.
-struct FormScalarDispatchesPass
-    : public IREE::Flow::impl::FormScalarDispatchesPassBase<
-          FormScalarDispatchesPass> {
+struct FormScalarDispatchesPass final
+    : public impl::FormScalarDispatchesPassBase<FormScalarDispatchesPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -89,7 +89,7 @@ static bool isScalarOperation(int workload, Operation *op) {
   // 3. Do not move operations that are cloned into the dispatch region.
   // TODO: This might prevent moving all scalar operations into dispatch
   // resulting in artifical splits. Revisit after more examples.
-  return !isClonableIntoDispatchOp(op);
+  return !IREE::Flow::isClonableIntoDispatchOp(op);
 }
 
 /// Given a `rootOp` return a DAG of the program that represents
@@ -127,22 +127,22 @@ llvm::SetVector<Operation *> computeSliceToMoveIntoDispatch(
 
 /// Return `true` if the op is to be treated as a root of a scalar dispatch.
 static bool isSliceRoot(int workload, Operation *op) {
-  return !op->getParentOfType<DispatchRegionOp>() &&
+  return !op->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
          isScalarOperation(workload, op);
 }
 
 // Form dispatch regions from slice of the operation.
-static FailureOr<DispatchRegionOp>
+static FailureOr<IREE::Flow::DispatchRegionOp>
 formDispatchRegionFromSlice(RewriterBase &rewriter, Operation *rootOp,
                             ArrayRef<Operation *> slice) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(rootOp);
-  FailureOr<DispatchRegionOp> dispatchRegionOp =
-      wrapOpInDispatchRegion(rewriter, rootOp);
+  FailureOr<IREE::Flow::DispatchRegionOp> dispatchRegionOp =
+      IREE::Flow::wrapOpInDispatchRegion(rewriter, rootOp);
   if (failed(dispatchRegionOp)) {
     return rootOp->emitOpError("failed to form dispatch region with root op");
   }
-  FailureOr<DispatchRegionOp> newDispatchOp =
+  FailureOr<IREE::Flow::DispatchRegionOp> newDispatchOp =
       movePrecedingOpsIntoDispatchRegion(rewriter, slice,
                                          dispatchRegionOp.value());
   if (failed(newDispatchOp)) {
@@ -268,8 +268,9 @@ void FormScalarDispatchesPass::runOnOperation() {
   IRRewriter rewriter(context);
   for (auto &currDispatch : dispatches) {
     rewriter.setInsertionPoint(currDispatch.rootOp);
-    FailureOr<DispatchRegionOp> dispatchRegionOp = formDispatchRegionFromSlice(
-        rewriter, currDispatch.rootOp, currDispatch.fusedOps);
+    FailureOr<IREE::Flow::DispatchRegionOp> dispatchRegionOp =
+        formDispatchRegionFromSlice(rewriter, currDispatch.rootOp,
+                                    currDispatch.fusedOps);
     if (failed(dispatchRegionOp)) {
       currDispatch.rootOp->emitOpError(
           "failed to form scalar dispatch region with operation as root");
@@ -284,9 +285,9 @@ void FormScalarDispatchesPass::runOnOperation() {
     rewriter.setInsertionPointToStart(countBody);
     auto one = rewriter.create<arith::ConstantIndexOp>(
         dispatchRegionOp.value()->getLoc(), 1);
-    rewriter.create<Flow::ReturnOp>(dispatchRegionOp.value()->getLoc(),
-                                    ValueRange{one, one, one});
+    rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.value()->getLoc(),
+                                          ValueRange{one, one, one});
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

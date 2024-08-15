@@ -4,17 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_COLLAPSEREDUCTIONDIMENSIONSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
@@ -47,7 +47,7 @@ static SmallVector<ReassociationIndices>
 collapseDimensions(linalg::LinalgOp linalgOp) {
   SmallVector<ReassociationIndices> collapseIndices;
 
-  if (!isNonNullAndOutsideDispatch(linalgOp)) {
+  if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
     return collapseIndices;
   }
 
@@ -68,8 +68,8 @@ collapseDimensions(linalg::LinalgOp linalgOp) {
   return collapseIndices;
 }
 
-struct CollapseReductionDimensionsPass
-    : public IREE::Flow::impl::CollapseReductionDimensionsPassBase<
+struct CollapseReductionDimensionsPass final
+    : public impl::CollapseReductionDimensionsPassBase<
           CollapseReductionDimensionsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
@@ -83,4 +83,4 @@ struct CollapseReductionDimensionsPass
 
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

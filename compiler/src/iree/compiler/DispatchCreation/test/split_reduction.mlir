@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(util.func(iree-flow-split-reduction-ops))' --iree-flow-split-matmul-reduction=4 %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(util.func(iree-dispatch-creation-split-reduction-ops))' --iree-dispatch-creation-split-matmul-reduction=4 %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>,

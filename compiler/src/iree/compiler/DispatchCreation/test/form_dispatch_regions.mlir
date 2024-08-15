@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {

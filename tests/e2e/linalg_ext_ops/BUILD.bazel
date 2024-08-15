@@ -148,7 +148,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "top-k.mlir",
     ],
-    compiler_flags = ["--iree-flow-topk-split-reduction=2"],
+    compiler_flags = ["--iree-dispatch-creation-topk-split-reduction=2"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -166,7 +166,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "top-k.mlir",
     ],
-    compiler_flags = ["--iree-flow-topk-split-reduction=3,2"],
+    compiler_flags = ["--iree-dispatch-creation-topk-split-reduction=3,2"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.

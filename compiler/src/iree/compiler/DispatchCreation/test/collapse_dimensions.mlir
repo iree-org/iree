@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-flow-collapse-dimensions))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-collapse-dimensions))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 util.func public @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {

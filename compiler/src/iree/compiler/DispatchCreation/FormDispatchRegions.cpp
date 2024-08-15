@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/DispatchCreation/FormDispatchRegions.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
@@ -41,7 +41,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
-#define DEBUG_TYPE "iree-flow-form-dispatch-regions"
+#define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -78,10 +78,10 @@ void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
 
 } // namespace mlir
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
@@ -227,7 +227,7 @@ static bool isRootOp(Operation *op) {
     return false;
   }
   // Dequantization-like ops get cloned into dispatches later.
-  if (LinalgExt::isBitExtendOp(op)) {
+  if (IREE::LinalgExt::isBitExtendOp(op)) {
     return false;
   }
   // Any Linalg named op or generic op with reduction iterator types is a root
@@ -242,7 +242,7 @@ static bool isRootOp(Operation *op) {
   if (isa<TilingInterface>(op)) {
     return !isa<tensor::PadOp, tensor::PackOp>(op);
   }
-  return isa<Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
+  return isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
 }
 
 /// Returns true if the operation is a `pack` op or a `set_encoding` op that
@@ -397,9 +397,9 @@ static bool hasCompatibleOuterParallelLoops(
 static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer =
-      operand.get().getDefiningOp<LinalgExt::LinalgFusionOpInterface>();
+      operand.get().getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
   auto consumer =
-      dyn_cast<LinalgExt::LinalgFusionOpInterface>(operand.getOwner());
+      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(operand.getOwner());
   if (!producer || !consumer)
     return false;
 
@@ -540,7 +540,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  if (LinalgExt::isBitExtendOp(consumer)) {
+  if (IREE::LinalgExt::isBitExtendOp(consumer)) {
     return false;
   }
 
@@ -618,9 +618,9 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   auto producerFusionOp =
-      dyn_cast<LinalgExt::LinalgFusionOpInterface>(producer);
+      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(producer);
   auto consumerFusionOp =
-      dyn_cast<LinalgExt::LinalgFusionOpInterface>(consumer);
+      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(consumer);
   if (!producerFusionOp || !consumerFusionOp)
     return false;
 
@@ -766,8 +766,8 @@ isFusableWithProducer(OpOperand &operand,
         .Default([](Operation *) { return false; });
   }
 
-  if (!isa<LinalgExt::LinalgFusionOpInterface>(consumer) ||
-      !isa<LinalgExt::LinalgFusionOpInterface>(producer)) {
+  if (!isa<IREE::LinalgExt::LinalgFusionOpInterface>(consumer) ||
+      !isa<IREE::LinalgExt::LinalgFusionOpInterface>(producer)) {
     return false;
   }
 
@@ -796,7 +796,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
       Operation *producer = operand.get().getDefiningOp();
       if (!producer)
         continue;
-      if (isClonableIntoDispatchOp(producer) ||
+      if (IREE::Flow::isClonableIntoDispatchOp(producer) ||
           hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
         continue;
       }
@@ -875,7 +875,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::Encoding::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || LinalgExt::isBitExtendOp(&op)) {
+          isa<linalg::FillOp>(op) || IREE::LinalgExt::isBitExtendOp(&op)) {
         continue;
       }
 
@@ -936,7 +936,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }
@@ -960,7 +960,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       // Simplify tensor::DimOps.
       {
         SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-        if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        if (failed(simplifyDimOps(rewriter, dimOps))) {
           return failure();
         }
       }
@@ -974,7 +974,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }
@@ -992,11 +992,9 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
 namespace {
 /// Pass declaration.
-struct FormDispatchRegionsPass
-    : public IREE::Flow::impl::FormDispatchRegionsPassBase<
-          FormDispatchRegionsPass> {
-  using IREE::Flow::impl::FormDispatchRegionsPassBase<
-      FormDispatchRegionsPass>::FormDispatchRegionsPassBase;
+struct FormDispatchRegionsPass final
+    : public impl::FormDispatchRegionsPassBase<FormDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -1013,4 +1011,4 @@ void FormDispatchRegionsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

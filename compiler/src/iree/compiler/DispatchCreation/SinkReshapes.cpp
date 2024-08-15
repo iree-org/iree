@@ -14,10 +14,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -25,19 +25,18 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-sink-reshapes"
+#define DEBUG_TYPE "iree-dispatch-creation-sink-reshapes"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_SINKRESHAPESPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
-class SinkReshapesPass : public impl::SinkReshapesPassBase<SinkReshapesPass> {
-public:
+struct SinkReshapesPass final
+    : public impl::SinkReshapesPassBase<SinkReshapesPass> {
   using Base::Base;
-
   void runOnOperation() override;
 };
 
@@ -49,7 +48,7 @@ public:
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
   return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
-                               Encoding::UnsetEncodingOp>(producer);
+                               IREE::Encoding::UnsetEncodingOp>(producer);
 }
 
 /// Control function to check if an `tensor.expand_shape` (which is producer of
@@ -62,7 +61,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
     return false;
   }
   Operation *consumer = opOperand->getOwner();
-  if (!isNonNullAndOutsideDispatch({reshapeOp, consumer})) {
+  if (!IREE::Flow::isNonNullAndOutsideDispatch({reshapeOp, consumer})) {
     return false;
   }
   auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer);
@@ -77,7 +76,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
 
   // Do not sink reshapes across dequantize operations since they are
   // cloned into their consumers.
-  if (LinalgExt::isBitExtendOp(consumer)) {
+  if (IREE::LinalgExt::isBitExtendOp(consumer)) {
     return false;
   }
 
@@ -176,4 +175,4 @@ void SinkReshapesPass::runOnOperation() {
 
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{fuse-pad-with-consumers}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-pad-with-consumers}))" --split-input-file %s | FileCheck %s
 
 util.func public @fuse_with_consumer(%arg0 : tensor<?x?x?x?xf32>, %arg1 : index,
     %arg2 : index, %arg3 : index, %arg4 : index,

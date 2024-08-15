@@ -52,6 +52,7 @@ inline void registerAllIreePasses() {
   InputConversion::registerCommonInputConversionPasses();
   ConstEval::registerConstEvalPasses();
   GlobalOptimization::registerGlobalOptimizationPipeline();
+  DispatchCreation::registerDispatchCreationPipelines();
   Preprocessing::registerPreprocessingPasses();
   DispatchCreation::registerDispatchCreationPasses();
   IREE::Flow::registerFlowPasses();

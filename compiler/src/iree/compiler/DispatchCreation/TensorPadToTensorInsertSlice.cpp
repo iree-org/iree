@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,10 +24,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_TENSORPADTOTENSORINSERTSLICEPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 /// Pattern to convert a tensor.tensor operation into a fill +
@@ -84,11 +84,10 @@ private:
   bool skipSingleLinalgOpUses = false;
 };
 
-struct TensorPadToTensorInsertSlicePass
-    : public IREE::Flow::impl::TensorPadToTensorInsertSlicePassBase<
+struct TensorPadToTensorInsertSlicePass final
+    : public impl::TensorPadToTensorInsertSlicePassBase<
           TensorPadToTensorInsertSlicePass> {
-  using IREE::Flow::impl::TensorPadToTensorInsertSlicePassBase<
-      TensorPadToTensorInsertSlicePass>::TensorPadToTensorInsertSlicePassBase;
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -102,4 +101,4 @@ struct TensorPadToTensorInsertSlicePass
 
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

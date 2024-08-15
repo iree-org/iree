@@ -12,11 +12,11 @@
 
 #include "mlir/IR/Operation.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 /// Return true of the producer and consumer of `operand` are fusable
 /// using elementwise op fusion transformation.
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
                                 bool fuseMultiReduction);
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

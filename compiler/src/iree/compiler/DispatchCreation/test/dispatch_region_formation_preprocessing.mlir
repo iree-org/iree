@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-flow-dispatch-region-formation-preprocessing-pipeline)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-preprocessing-pipeline)" %s | FileCheck %s
 
 util.func public @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %cst = arith.constant 1.000000e+00 : f32

@@ -15,160 +15,20 @@ include "mlir/Pass/PassBase.td"
 // formation passes are a couple of such groups. For any new pass add it to the
 // relevant group and keep them alphabetical within a group.
 
-//===---------------------------------------------------------------------===//
-// Dispatch region creation preprocessing passes :
-// Passes that transform the program before forming dispatches, like
-// - Elementwise operation fusion
-// - Reshape propagation passes
-//===---------------------------------------------------------------------===//
-
-def BubbleUpExpandShapesPass :
-    Pass<"iree-flow-bubble-up-expand-shapes"> {
-  let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-  ];
-}
-
-def CollapseReductionDimensionsPass :
-    Pass<"iree-flow-collapse-reduction-dimensions", ""> {
-  let summary = "Collapse reduction dimensions when possible.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-  ];
-}
-
-def ElementwiseOpFusionPass :
-    Pass<"iree-flow-elementwise-op-fusion", ""> {
-  let summary = "Fuse elementwise operations.";
-  let options = [
-    Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
-           /*default=*/"true", "Fuse ops that have multiple reduction iterators">
-  ];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-  ];
-}
-
-def FoldUnitExtentDimsPass :
-    Pass<"iree-flow-fold-unit-extent-dims", "mlir::ModuleOp"> {
-  let summary = "Fold unit extent dimension of operations.";
-  let description = [{
-    Imports upstream patterns to fold unit extent dims but with IREE control.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
-
-def FuseHorizontalContractionsPass:
-    InterfacePass<"iree-flow-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses horizontal contraction ops without fusions";
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-  let options = [
-    Option<"fusionLimit", "fusion-limit", "int",
-            /*default=*/"3", "Maximum number of contractions fused into one">
-  ];
-  let statistics = [
-    Statistic<"numFusionGroups", "num-fusion-groups", "Number of fusion groups found">,
-    Statistic<"numSize2FusionGroups", "num-size-2-groups", "Number of fusion groups of size 2">,
-    Statistic<"numSize3FusionGroups", "num-size-3-groups", "Number of fusion groups of size 3">
-  ];
-}
-
-def FuseMultiUseElementwiseProducerPass :
-    InterfacePass<"iree-flow-fuse-multi-use-elementwise-producer",
-                   "mlir::FunctionOpInterface"> {
-  let summary = "Fuse elementwise linalg operations on tensors when producers have multiple uses.";
-  let options = [
-    Option<"numIterations", "num-iterations", "unsigned",
-           /*default=*/"2", "Number of iterations to fuse multiuse ops">
-  ];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::math::MathDialect",
-  ];
-}
-
-def FusionPreprocessingPass :
-    Pass<"iree-flow-fusion-preprocessing", ""> {
-  let summary = "Run useful preprocessing patterns that help with fusion.";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-  ];
-}
-
-def SinkReshapesPass :
-    Pass<"iree-flow-sink-reshapes", ""> {
-  let summary = "Sink reshapes to allow for compute op -> consumer fusion.";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::arith::ArithDialect",
-  ];
-}
-
-def SplitReductionPass :
-    Pass<"iree-flow-split-reduction-ops", ""> {
-  let summary = "Split reduction dimension to increase parallelism.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-  ];
-}
-
-def TensorPadToTensorInsertSlicePass :
-    Pass<"iree-flow-tensor-pad-to-tensor-insert-slice", ""> {
-  let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice.";
-  let options = [
-    Option<"skipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
-           /*default=*/"false",
-           "Skip the op that has only one use which is used"
-           "by a Linalg op">,
-  ];
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::math::MathDialect",
-    "mlir::memref::MemRefDialect",
-  ];
-}
-
-def TransposeGenericOpsPass :
-    Pass<"iree-flow-transpose-generic-ops", ""> {
-  let summary = "Transpose generic op loops.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-  ];
-}
-
-//===---------------------------------------------------------------------===//
-// Dispatch region creation passes.
-//===---------------------------------------------------------------------===//
-
-def CloneProducersIntoDispatchRegionsPass :
-    InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
-  let summary = "Clone producers into dispatch regions to be isolated above.";
-  let description = [{
-    Pass to clone into dispatch regions producers of values used in the dispatch
-    regions but defined in the above. This prepares the dispatch regions for
-    converting to dispatch workgroups with explicit captures.
-  }];
-}
-
-def CollapseDimensionsPass :
-    InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
-  let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
-  let description = [{
-    Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
-    and hoist the reshaping operations out of the dispatch.
-  }];
+def MaterializeDefaultWorkgroupCountRegionPass:
+    InterfacePass<"iree-flow-materialize-default-workgroup-count-region",
+                  "mlir::FunctionOpInterface"> {
+      let summary = "Canonicalize dispatch workgroups ops.";
+      let description = [{
+        Apply dispatch workgroups canonicalization patterns.
+      }];
+      let dependentDialects = [
+        "mlir::affine::AffineDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::scf::SCFDialect",
+        "IREE::Flow::FlowDialect",
+      ];
 }
 
 def ConvertDispatchRegionsToWorkgroupsPass :
@@ -207,91 +67,6 @@ def ConvertTensorToFlowPass :
       Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",
                 "Number of slow copy dispatches (for handling slices) created">
     ];
-}
-
-def DispatchWithTransformDialectPass : Pass<"iree-flow-dispatch-with-transform-dialect"> {
-  let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter.";
-  let description = [{
-    Pass to perform dispatch of Linalg on tensor ops by using the transform
-    dialect. Dispatch regions are created as specified by the transform module
-    that is parsed from `transformSpecPath`.
-
-    TODO: Drop this pass in favor of the one upstream. The one upstream requires
-    separate loading of the module and thus isn't suited for single-use
-    transform scripts.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::pdl::PDLDialect",
-    "mlir::pdl_interp::PDLInterpDialect",
-    "mlir::scf::SCFDialect",
-    "mlir::tensor::TensorDialect",
-    "mlir::transform::TransformDialect",
-    "IREE::Flow::FlowDialect",
-    "IREE::LinalgExt::IREELinalgExtDialect",
-  ];
-  let options = [
-    Option<"disableExpensiveChecks", "disable-expensive-checks", "bool",
-           "false",
-           "Disable expensive checks in the interpreter for a faster run.">,
-    Option<"transformSpecPath", "transform-spec-path", "std::string",
-           /*default=*/"", "File path to the transform spec to use.">,
-  ];
-}
-
-def FormDispatchRegionsPass :
-    InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
-  let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions.";
-  let options = [
-    Option<"aggressiveFusion", "aggressive-fusion", "bool",
-           /*default=*/"false", "Aggressive mode enabling fusions not ready for all backends">,
-    Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
-           /*default=*/"false", "Enable fusing pad with consumer">,
-    Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
-           /*default=*/"false", "Enable fusion of pad with producers">
-  ];
-  let description = [{
-    Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
-    is created for each tiled loop nest. This pass only moves the root compute op
-    into the dispatch region, allowing producers to be outside.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::scf::SCFDialect",
-    "mlir::tensor::TensorDialect",
-    "IREE::Flow::FlowDialect",
-    "IREE::LinalgExt::IREELinalgExtDialect",
-  ];
-}
-
-def FormScalarDispatchesPass :
-    InterfacePass<"iree-flow-form-scalar-dispatches", "mlir::FunctionOpInterface"> {
-  let summary = "Form Dispatch Regions for scalar computations.";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-    "IREE::Flow::FlowDialect",
-  ];
-}
-
-def MaterializeDefaultWorkgroupCountRegionPass:
-    InterfacePass<"iree-flow-materialize-default-workgroup-count-region",
-                  "mlir::FunctionOpInterface"> {
-      let summary = "Canonicalize dispatch workgroups ops.";
-      let description = [{
-        Apply dispatch workgroups canonicalization patterns.
-      }];
-      let dependentDialects = [
-        "mlir::affine::AffineDialect",
-        "mlir::arith::ArithDialect",
-        "mlir::linalg::LinalgDialect",
-        "mlir::scf::SCFDialect",
-        "IREE::Flow::FlowDialect",
-      ];
 }
 
 //===---------------------------------------------------------------------===//
@@ -528,20 +303,6 @@ def OutlineDispatchRegionsPass :
   let dependentDialects = [
     "mlir::func::FuncDialect",
     "IREE::Flow::FlowDialect",
-  ];
-}
-
-def SetEncodingPass :
-    InterfacePass<"iree-flow-set-encoding", "mlir::FunctionOpInterface"> {
-  let summary = "Introduces tensor encoding for flow dispatch regions.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-    "IREE::Flow::FlowDialect",
-    "IREE::Encoding::IREEEncodingDialect",
-  ];
-  let options = [
-    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
-           "provides padding size hints that will be attached to encodings.">,
   ];
 }
 
