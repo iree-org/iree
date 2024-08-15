@@ -6,9 +6,16 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "mlir/IR/Operation.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-materialize-encoding"
 
@@ -30,16 +37,48 @@ static std::optional<TileMxNxK> getIntrinsicSize(TypeRange elementTypes) {
 
 // TODO: Query the value from GPU attributes.
 // TODO: Define a struct with meaningful name for the pair.
-std::optional<std::pair<int64_t, int64_t>>
-getIntrinsicVectorSize(TypeRange elementTypes, int64_t roleIdx) {
+SmallVector<int64_t> getIntrinsicVectorSize(TypeRange elementTypes,
+                                            int64_t roleIdx) {
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
-    if (roleIdx == 0 || roleIdx == 1) return std::make_pair(1, 1);
-    if (roleIdx == 2) return std::make_pair(4, 1);
+    if (roleIdx == 0 || roleIdx == 1) {
+      return {1, 1};
+    }
+    if (roleIdx == 2) {
+      return {4, 1};
+    }
   }
-  return std::nullopt;
+  return {};
+}
+
+// Given encoding's role index and element types, return the transpose
+// permutation used in GPU materialization.
+SmallVector<int64_t> getTransposePermutation(int64_t roleIdx,
+                                             TypeRange elementTypes) {
+  // For now, check that all types are f32:
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+  if (!lhs.isF32() || !rhs.isF32() || !out.isF32()) {
+    return {};
+  }
+
+  switch (roleIdx) {
+  case 0: // A
+  case 1: // B
+    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
+    // -> OuterTileY x OuterTileX x InnerTileY x InnerTileX
+    return {2, 0, 3, 1};
+  case 2: // C
+    // ACC:
+    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
+    // -> OuterTileX x OuterTileY x InnerTileX x InnerTileY
+    return {0, 2, 1, 3};
+  default:
+    return {};
+  }
 }
 
 // TODO(hanchung): Pass an ExecutableTargetAttr attribute for the target
@@ -88,7 +127,17 @@ materializeEncodingForTarget(RankedTensorType tensorType) {
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
   auto rank = tensorType.getRank();
-  return getEncodingInfoForMatmul(encoding, rank, enumeratedTileMxNxK[0]);
+
+  auto encodingInfo =
+      getEncodingInfoForMatmul(encoding, rank, enumeratedTileMxNxK[0]);
+
+  // insert inner tile shapes and permutation info
+  auto roleIdx = encoding.getOperandIndex().getInt();
+  auto intrinsicVectorSizes = getIntrinsicVectorSize(elementTypes, roleIdx);
+  auto permutation = getTransposePermutation(roleIdx, elementTypes);
+  encodingInfo.innerTileShapes = intrinsicVectorSizes;
+  encodingInfo.permutation = permutation;
+  return encodingInfo;
 }
 
 namespace {
@@ -114,6 +163,7 @@ struct GPUSetEncodingOpLoweringConversion
         getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
         converter->getMaterializeEncodingFn();
+
     auto packOp = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
         this->materializeEncodingValueFn);
@@ -136,6 +186,8 @@ struct GPUSetEncodingOpLoweringConversion
                                          "unhandled result encoding");
     }
     SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
+    SmallVector<int64_t> intrinsicVectorShape =
+        maybeEncodingInfo->innerTileShapes;
 
     // TODO(hanchung): Add a util to the encoding attribute, so we don't need
     // the map_to_vector method here.
@@ -144,26 +196,26 @@ struct GPUSetEncodingOpLoweringConversion
     auto elemTypes = llvm::map_to_vector(
         encoding.getElementTypes().getValue(),
         [](Attribute a) { return cast<TypeAttr>(a).getValue(); });
+    auto loc = encodingOp.getLoc();
+
     std::optional<TileMxNxK> intrinsicShape = getIntrinsicSize(elemTypes);
-    std::optional<std::pair<int64_t, int64_t>> intrinsicVectorShape =
-        getIntrinsicVectorSize(elemTypes, roleIdx);
-    if (!intrinsicShape || !intrinsicVectorShape) {
+    if (!intrinsicShape || intrinsicVectorShape.empty()) {
       return failure();
     }
 
     SmallVector<int64_t> targetShape; // for unrolling
-    switch(roleIdx) {
-      case 0:
-        targetShape = {intrinsicShape->M, intrinsicShape->K};
-        break;
-      case 1:
-        targetShape = {intrinsicShape->N, intrinsicShape->K};
-        break;
-      case 2:
-        targetShape = {intrinsicShape->M, intrinsicShape->N};
-        break;
-      default:
-        return failure();
+    switch (roleIdx) {
+    case 0: // A
+      targetShape = {intrinsicShape->M, intrinsicShape->K};
+      break;
+    case 1: // B
+      targetShape = {intrinsicShape->N, intrinsicShape->K};
+      break;
+    case 2: // C
+      targetShape = {intrinsicShape->M, intrinsicShape->N};
+      break;
+    default:
+      return failure();
     }
 
     assert(innerTiles.size() == targetShape.size());
@@ -175,28 +227,74 @@ struct GPUSetEncodingOpLoweringConversion
       assert(packedShape == targetShape);
     }
 
-    // TODO(lialan): create expand_shape. Take LHS as an example:
-    // 16x4xf32 -> 16x1x4x1. Because the vector size used in the intrinsic is
-    // 1x1.
-    // For C-Matrix (i.e., ACC), it is 16x16xf32 -> 4x4x16x1xf32. Because the
-    // vector size is 4x1.
+    // Create expand_shape op to tile the innermost two dimensions.
+    auto sourceShape = packOp->getDestType().getShape();
+    assert(intrinsicVectorShape.size() == 2); // TODO: relax this
+    auto iT1 = intrinsicVectorShape[0];
+    auto iT2 = intrinsicVectorShape[1];
+    auto oT1 = sourceShape[2] / iT1;
+    auto oT2 = sourceShape[3] / iT2;
+    SmallVector<int64_t> expandShapeShape = {
+        sourceShape[0], sourceShape[1], oT1, iT1, oT2, iT2};
+    assert(expandShapeShape.size() == 6);
+    auto expandShapeType = RankedTensorType::get(
+        expandShapeShape, encodingOp.getSourceType().getElementType());
 
-    // TODO(lialan): create linalg.transpose op.
-    // LHS: 16x1x4x1 -> 4x16x1x1 (perm = [2, 0, 3, 1])
-    // ACC: 4x4x16x1 -> 4x16x4x1 (perm = [0, 2, 1, 3])
+    std::optional<SmallVector<ReassociationIndices>> reassociationMap =
+        getReassociationIndicesForReshape(packOp->getDestType(),
+                                          expandShapeType);
+    assert(reassociationMap.has_value());
+    auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
+        loc, expandShapeType, packOp->getResult(), *reassociationMap);
 
-    // TODO(hanchung): We want to make the shape consistent, so we need to
-    // collpase and expand the shape. This is the shape we materialize for Flow
-    // and HAL ops.
-    // 1. Create tensor.collapse_shape.
-    //    LHS: 4x16x1x1 -> 64
-    //    ACC: 4x16x4x1 -> 256
-    // 2. Create tensor.expand_shape to recover the shape (i.e., innerTiles).
-    //    LHS: 64 -> 16x4 (innerTiles[0]xinnerTiles[1])
-    //    ACC: 256 -> 16x16 (innerTiles[0]xinnerTiles[1])
+    // create linalg.transpose on expandShapeShape
+    size_t origRank = encodingOp.getSourceType().getRank();
 
-    // TODO(lialan): Replace the op with the tensor.expand_shape op.
-    rewriter.replaceOp(encodingOp, packOp->getResult());
+    SmallVector<int64_t> transposePerm;
+    transposePerm.push_back(0);
+    transposePerm.push_back(1);
+    for (auto perm : maybeEncodingInfo->permutation) {
+      transposePerm.push_back(origRank + perm);
+    }
+    SmallVector<int64_t> transposeResultDims = expandShapeShape;
+    applyPermutationToVector(transposeResultDims, transposePerm);
+
+    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, transposeResultDims, encodingOp.getSourceType().getElementType());
+    auto transposeOp = rewriter.create<linalg::TransposeOp>(
+        loc, expandShapeOp, emptyTensor, transposePerm);
+
+    // We want to make the shape consistent, so we need to append it with a
+    // `collapse_shape` and a `expand_shape`, just to be conformant with how we
+    // materialize for Flow and HAL op.
+
+    // 1. collapse tiled dimensions into one dim
+    SmallVector<int64_t> collapsedShape = {sourceShape[0], sourceShape[1],
+                                           sourceShape[2] * sourceShape[3]};
+    auto revertShapeType = RankedTensorType::get(
+        collapsedShape, encodingOp.getSourceType().getElementType());
+
+    std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
+        getReassociationIndicesForReshape(emptyTensor.getType(),
+                                          revertShapeType);
+    assert(collapseReassoc.has_value());
+
+    auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
+        loc, revertShapeType, transposeOp->getResult(0), *collapseReassoc);
+
+    // 2. expand the collapsed shape to the shape intended by the encoding
+    assert(innerTiles.size() == 2); // TODO: relax this
+    auto expandTileShapeType = RankedTensorType::get(
+        {sourceShape[0], sourceShape[1], innerTiles[0], innerTiles[1]},
+        encodingOp.getSourceType().getElementType());
+    std::optional<SmallVector<ReassociationIndices>> tileAssoc =
+        getReassociationIndicesForReshape(collapseShapeOp.getType(),
+                                          expandTileShapeType);
+    assert(tileAssoc.has_value());
+    auto expandTileShapeOp = rewriter.create<tensor::ExpandShapeOp>(
+        loc, expandTileShapeType, collapseShapeOp, *tileAssoc);
+
+    rewriter.replaceOp(encodingOp, expandTileShapeOp);
     return success();
   }
 };

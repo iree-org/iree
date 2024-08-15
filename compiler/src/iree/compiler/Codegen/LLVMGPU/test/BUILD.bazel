@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "config_winograd.mlir",
             "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",
+            "gpu_materialize_encoding.mlir",
             "gpu_pipeline_generalize_named_ops.mlir",
             "nvvm_extract_address_computation.mlir",
             "nvvm_pipeline_test.mlir",
