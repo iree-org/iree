@@ -99,34 +99,27 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
-/// For a given tensor type with an encoding, return the materialized
-/// type to use for it. If no encoding is set, then return the tensor type
-/// itself.
-static RankedTensorType
-getMaterializedType(RankedTensorType tensorType,
-                    MaterializeEncodingFn materializeEncodingFn) {
-  RankedTensorType maybeTransposedTensorType =
-      transposeIfNarrowNResult(tensorType);
-  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(maybeTransposedTensorType);
-  if (failed(materializeEncodingInfo)) {
-    return dropEncoding(tensorType);
-  }
-  return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-      maybeTransposedTensorType, materializeEncodingInfo->innerTileSizes,
-      materializeEncodingInfo->innerDimsPos,
-      materializeEncodingInfo->outerDimsPerm));
-}
-
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    MaterializeEncodingFn materializeEncodingFn)
-    : materializeEncodingFn(materializeEncodingFn) {
+    MaterializeEncodingFn materializeEncodingFn,
+    IREE::HAL::ExecutableTargetAttr targetAttr)
+    : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
-  addConversion([=](RankedTensorType t) -> RankedTensorType {
-    return getMaterializedType(t, materializeEncodingFn);
+  addConversion([=](RankedTensorType type) -> RankedTensorType {
+    // For a given tensor type with an encoding, return the materialized
+    // type to use for it. If no encoding is set, then return the tensor type
+    // itself.
+    RankedTensorType tensorType = transposeIfNarrowNResult(type);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfo(tensorType);
+    if (failed(maybeEncodingInfo)) {
+      return dropEncoding(type);
+    }
+    return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+        tensorType, maybeEncodingInfo->innerTileSizes,
+        maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
   });
 }
 
