@@ -120,3 +120,19 @@ module {
 //       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1 : index, 1 : index]
 //  CHECK-SAME:     workgroup = [1 : index, 64 : index]
+
+// -----
+
+module @elementwise_unaligned {
+  func.func @elementwise_unaligned(%11: tensor<180x180xf16>, %12: tensor<180x180xf16>) -> tensor<180x180xf16> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %13 = tensor.empty() : tensor<180x180xf16>
+    %15 = linalg.add ins(%11, %12 : tensor<180x180xf16>, tensor<180x180xf16>) outs(%13 : tensor<180x180xf16>) -> tensor<180x180xf16>
+    return %15 : tensor<180x180xf16>
+  }
+}
+
+// Verify that this does not select this pipeline due to issues with resolving
+// dynamic scf.forall loops.
+// CHECK-LABEL: module @elementwise_unaligned
+//  CHECK-NOT:   LLVMGPUTileAndFuse

@@ -392,6 +392,22 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  // TODO(qedawkins): Currently scf.forall resolution only supports static
+  // trip counts, meaning the workgroup tile size must perfectly divide the
+  // loop bound (and thread tile size must perfectly divide the workgroup tile)
+  // so that the trip count won't be static. Remove this check once proper
+  // dynamic trip count resolution support is added.
+  for (auto [loopId, threadTile] : llvm::enumerate(threadTileSizes)) {
+    if (threadTile == 0) {
+      continue;
+    }
+    int64_t bound = loopBounds[loopId];
+    int64_t wkgpTile = workgroupTileSizes[loopId];
+    if (bound % wkgpTile != 0 || wkgpTile % threadTile != 0) {
+      return failure();
+    }
+  }
+
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
