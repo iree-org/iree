@@ -277,7 +277,7 @@ IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
   out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
   out_params->command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
-  out_params->stream_tracing = false;
+  out_params->stream_tracing = 0;
   out_params->async_allocations = true;
 }
 
@@ -346,9 +346,18 @@ static iree_status_t iree_hal_cuda_device_create_internal(
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
+    if (device->params.stream_tracing >= IREE_HAL_CUDA_TRACING_VERBOSITY_MAX ||
+        device->params.stream_tracing < IREE_HAL_CUDA_TRACING_VERBOSITY_OFF) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "invalid stream_tracing argument: expected to be between %d and %d",
+          IREE_HAL_CUDA_TRACING_VERBOSITY_OFF,
+          IREE_HAL_CUDA_TRACING_VERBOSITY_MAX);
+    }
     status = iree_hal_cuda_tracing_context_allocate(
         device->cuda_symbols, device->identifier, dispatch_stream,
-        &device->block_pool, host_allocator, &device->tracing_context);
+        device->params.stream_tracing, &device->block_pool, host_allocator,
+        &device->tracing_context);
   }
 
   // Memory pool support is conditional.
