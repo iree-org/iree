@@ -89,16 +89,16 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: iree-org/iree-test-suites
-          ref: d944fed69ecacbfeb495d86b1b7b40b903ab668f
+          ref: 323c2df477544d789c56e4dfda9b047580b77cbf
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/onnx-ops/requirements.txt
+          python -m pip install -r iree-test-suites/onnx_ops/requirements.txt
       - name: Run ONNX ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree-test-suites/onnx-ops/ \
+          pytest iree-test-suites/onnx_ops/ \
               -rpfE \
               --numprocesses ${NUMPROCESSES} \
               --timeout=30 \
@@ -109,7 +109,7 @@ jobs:
         if: failure()
         run: |
           source ${VENV_DIR}/bin/activate
-          python iree-test-suites/onnx-ops/update_config_xfails.py \
+          python iree-test-suites/onnx_ops/update_config_xfails.py \
             --log-file=${LOG_FILE_PATH} \
             --config-file=${CONFIG_FILE_PATH}
           cat ${CONFIG_FILE_PATH}
