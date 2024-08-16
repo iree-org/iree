@@ -330,8 +330,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     double mx =
         APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
             .convertToDouble();
-    Value offset =
-        b.create<arith::ConstantOp>(loc, b.getFloatAttr(sElementType, mx));
+    Value offset = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
     s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s, offset);
