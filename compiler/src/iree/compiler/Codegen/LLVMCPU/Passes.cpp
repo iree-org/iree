@@ -91,6 +91,11 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clTileDispatchUsingForall(
+    "iree-llvmcpu-tile-dispatch-using-forall",
+    llvm::cl::desc("Eanble tile and distribute to workgroups using scf.forall"),
+    llvm::cl::init(false));
+
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
 // presence of scalable vectors (even when using `+sme`), as currently there's
 // no cost model of when it could be beneficial. This flag will effectively make
@@ -105,10 +110,15 @@ static llvm::cl::opt<bool> clForceArmStreaming(
     llvm::cl::init(false));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
-  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass());
-  funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
+  if (clTileDispatchUsingForall) {
+    funcPassManager.addPass(
+        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  } else {
+    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
+    funcPassManager.addPass(createCSEPass());
+    funcPassManager.addPass(createConvertToDestinationPassingStylePass());
+    funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
+  }
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
@@ -790,13 +800,21 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool enableAArch64SME) {
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
-  FunctionLikeNest(modulePassManager)
-      .addPass(createLLVMCPULowerExecutableTargetPass);
+
+  {
+    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
+    FunctionLikeNest(modulePassManager)
+        .addPass(createLLVMCPULowerExecutableTargetPass);
+  }
+
+  variantPassManager.addPass(createReconcileTranslationInfoPass());
 
   // Run conversion to LLVM at `ModuleOp` granularity.
-  addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
+  {
+    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
+  }
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
     variantPassManager.printAsTextualPipeline(llvm::dbgs());
