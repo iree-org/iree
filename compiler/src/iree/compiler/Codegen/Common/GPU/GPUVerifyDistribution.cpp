@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -18,28 +19,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
-
-template <typename... Type>
-bool forallOpHasMappingType(scf::ForallOp forallOp) {
-  std::optional<ArrayAttr> mapping = forallOp.getMapping();
-  if (!mapping || mapping.value().empty()) {
-    return false;
-  }
-
-  return isa<Type...>(*mapping.value().begin());
-}
-
-template <typename... Type>
-bool operationHasParentForallOfMappingType(Operation *op) {
-  auto parentForallOp = op->getParentOfType<scf::ForallOp>();
-  while (parentForallOp) {
-    if (forallOpHasMappingType<Type...>(parentForallOp)) {
-      return true;
-    }
-    parentForallOp = parentForallOp->getParentOfType<scf::ForallOp>();
-  }
-  return false;
-}
 
 /// Pass to verify that writes only happen in distributed contexts. Code in
 /// shared contexts are executed uniformly across all threads after resolution

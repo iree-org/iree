@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -143,20 +144,6 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static FailureOr<Value> gpuWorkgroupAllocationFn(OpBuilder &builder,
-                                                 Location loc,
-                                                 MemRefType memRefType,
-                                                 ValueRange dynamicSizes,
-                                                 unsigned alignment) {
-  gpu::AddressSpaceAttr addressSpace = gpu::AddressSpaceAttr::get(
-      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  MemRefType allocType =
-      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
-                      AffineMap(), addressSpace);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
-      .getResult();
-}
-
 // Barriers are only needed when copying to/from workgroup memory. The only
 // other kind of memory that can be allocated is function memory, which is local
 // to a thread.
@@ -211,10 +198,8 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 // Common Pass Recipes
 //===----------------------------------------------------------------------===//
 
-static void addBufferizePasses(OpPassManager &funcPassManager,
-                               bool allowPrivateAllocations = true) {
-  BufferizationOptions::AllocationFn allocationFn =
-      allowPrivateAllocations ? gpuAllocationFn : gpuWorkgroupAllocationFn;
+static void addBufferizePasses(OpPassManager &funcPassManager) {
+  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
   funcPassManager.addPass(createCanonicalizerPass());
@@ -305,6 +290,34 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 // Tile and Fuse
 //===---------------------------------------------------------------------===//
 
+static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
+                                                       Location loc,
+                                                       MemRefType memRefType,
+                                                       ValueRange dynamicSizes,
+                                                       unsigned alignment) {
+  // Bail out if the memref type does not specify a memory space.
+  if (!isa<gpu::AddressSpaceAttr>(memRefType.getMemorySpace())) {
+    return failure();
+  }
+  return builder.create<memref::AllocOp>(loc, memRefType, dynamicSizes)
+      .getResult();
+}
+
+static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createEliminateEmptyTensorsPass());
+  funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
+  funcPassManager.addPass(createGPUInferMemorySpacePass());
+  BufferizationOptions::AllocationFn allocationFn =
+      gpuRequireMemSpaceAllocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  funcPassManager.addPass(
+      createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
+  addIREEPostBufferizationPasses(funcPassManager);
+
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+}
+
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager,
                                /*useWARForCooperativeMatrixCodegen=*/false,
@@ -371,6 +384,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
                                      /*normalizeForall=*/true}));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // TODO: This LICM instance is load bearing due to brittleness of the
+  // hoisting and fusion pass, as well as a lack of a fallback distribution
+  // pass.
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
@@ -385,7 +402,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
 
   // Step 7. Bufferize.
-  addBufferizePasses(funcPassManager, /*allowPrivateAllocations=*/true);
+  addGPUBufferizePasses(funcPassManager);
 
   // Step 8. Resolve remaining parallel loops.
   funcPassManager.addPass(createGPUVerifyDistributionPass());

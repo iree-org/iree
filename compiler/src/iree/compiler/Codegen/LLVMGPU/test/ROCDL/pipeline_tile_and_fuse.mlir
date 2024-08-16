@@ -558,6 +558,7 @@ hal.executable public @main {
 // CHECK-LABEL: func @conv_nchw_fused
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c1
 //       CHECK:     linalg.conv_2d_nchw_fchw
+//  CHECK-SAME:       outs(%{{.*}} : memref<1x1x1x1xf32, #gpu.address_space<private>>)
 //       CHECK:   arith.addf
 //       CHECK:   arith.cmpf
 //       CHECK:   arith.select
