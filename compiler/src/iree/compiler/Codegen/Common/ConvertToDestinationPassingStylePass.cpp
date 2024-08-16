@@ -624,9 +624,11 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
     return signalPassFailure();
   }
 
-  if (failed(adaptComputeConsumerToAvoidStackAllocation(
-          funcOp, useWARForCooperativeMatrixCodegen))) {
-    return signalPassFailure();
+  if (convertInputsToDestinations) {
+    if (failed(adaptComputeConsumerToAvoidStackAllocation(
+            funcOp, useWARForCooperativeMatrixCodegen))) {
+      return signalPassFailure();
+    }
   }
 
   {

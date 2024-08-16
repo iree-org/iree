@@ -223,14 +223,21 @@ static void addBufferizePasses(OpPassManager &funcPassManager,
 
 static void
 tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
-                             bool useWARForCooperativeMatrixCodegen = false) {
+                             bool useWARForCooperativeMatrixCodegen = false,
+                             bool convertInputsToDestinations = true) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      useWARForCooperativeMatrixCodegen));
+  {
+    ConvertToDestinationPassingStylePassOptions options;
+    options.convertInputsToDestinations = convertInputsToDestinations;
+    options.useWARForCooperativeMatrixCodegen =
+        useWARForCooperativeMatrixCodegen;
+    funcPassManager.addPass(
+        createConvertToDestinationPassingStylePass(options));
+  }
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
@@ -299,7 +306,9 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 //===---------------------------------------------------------------------===//
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager);
+  tileAndDistributeToWorkgroup(funcPassManager,
+                               /*useWARForCooperativeMatrixCodegen=*/false,
+                               /*convertInputsToDestinations=*/false);
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
