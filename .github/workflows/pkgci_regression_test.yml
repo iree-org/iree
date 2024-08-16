@@ -62,7 +62,7 @@ jobs:
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      CONFIG_FILE_PATH: tests/external/onnx_ops/${{ matrix.config-file }}
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/onnx_ops/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
       LOG_FILE_PATH: /tmp/test_onnx_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv

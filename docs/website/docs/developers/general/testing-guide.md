@@ -456,12 +456,13 @@ iree-run-module --module=model.vmfb --flagfile=run_module_io_flags.txt
 To run slices of the test suite, a [pytest](https://docs.pytest.org/en/stable/)
 runner is included that can be configured using JSON files. The JSON files
 tested in the IREE repo itself are stored in
-[`tests/external/onnx_ops/`](https://github.com/iree-org/iree/tree/main/tests/external/onnx_ops).
+[`tests/external/iree-test-suites/onnx_ops/`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops).
 
 For example, here is part of a config file for running ONNX tests on CPU:
 
-```json title="tests/external/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
---8<-- "tests/external/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
+<!-- markdownlint-disable-next-line -->
+```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
+--8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
 ```
 
 #### Updating config files
