@@ -744,7 +744,7 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
 
     Example:
     ```mlir
-    #hal.device.target<"llvm-cpu", {
+    #hal.device.target<"local", {
       device_configuration = ...
     }, [
       #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,

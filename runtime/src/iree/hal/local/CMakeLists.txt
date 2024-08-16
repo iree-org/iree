@@ -138,11 +138,9 @@ iree_cc_library(
     "inline_command_buffer.h"
     "local_executable.h"
     "local_executable_cache.h"
-    "local_pipeline_layout.h"
   SRCS
     "inline_command_buffer.c"
     "local_executable_cache.c"
-    "local_pipeline_layout.c"
   DEPS
     ::executable_environment
     ::executable_library
