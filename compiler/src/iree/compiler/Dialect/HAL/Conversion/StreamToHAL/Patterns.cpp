@@ -959,7 +959,7 @@ struct CmdDispatch2OpPattern
     SmallVector<IREE::HAL::BindingValue> bindings;
     for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
       auto descriptorFlags = layoutAttr.getSetLayout(bindingAttr.getSet())
-                                 .getBinding(i)
+                                 .getBinding(bindingAttr.getBinding())
                                  .getFlags();
       IREE::HAL::BindingValue binding;
       if (bitEnumContainsAll(descriptorFlags,

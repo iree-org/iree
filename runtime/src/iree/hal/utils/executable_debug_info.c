@@ -54,6 +54,22 @@ iree_status_t iree_hal_debug_verify_export_def(
   return iree_ok_status();
 }
 
+// TODO(benvanik): a way to select what location is chosen. For now we just
+// pick the first stage location if present and otherwise use the source
+// location.
+static iree_hal_debug_FileLineLocDef_table_t
+iree_hal_debug_select_source_location(
+    iree_hal_debug_ExportDef_table_t export_def) {
+  iree_hal_debug_StageLocationDef_vec_t stage_locations_vec =
+      iree_hal_debug_ExportDef_stage_locations_get(export_def);
+  if (iree_hal_debug_StageLocationDef_vec_len(stage_locations_vec) > 0) {
+    iree_hal_debug_StageLocationDef_table_t stage_location_def =
+        iree_hal_debug_StageLocationDef_vec_at(stage_locations_vec, 0);
+    return iree_hal_debug_StageLocationDef_location_get(stage_location_def);
+  }
+  return iree_hal_debug_ExportDef_location_get(export_def);
+}
+
 iree_host_size_t iree_hal_debug_calculate_export_info_size(
     iree_hal_debug_ExportDef_table_t export_def) {
   if (!export_def) return 0;
@@ -63,7 +79,7 @@ iree_host_size_t iree_hal_debug_calculate_export_info_size(
       flatbuffers_string_len(iree_hal_debug_ExportDef_name_get(export_def));
 
   iree_hal_debug_FileLineLocDef_table_t location_def =
-      iree_hal_debug_ExportDef_location_get(export_def);
+      iree_hal_debug_select_source_location(export_def);
   if (location_def) {
     total_size += flatbuffers_string_len(
         iree_hal_debug_FileLineLocDef_filename_get(location_def));
@@ -89,7 +105,7 @@ void iree_hal_debug_copy_export_info(
   }
 
   iree_hal_debug_FileLineLocDef_table_t location_def =
-      iree_hal_debug_ExportDef_location_get(export_def);
+      iree_hal_debug_select_source_location(export_def);
   if (location_def) {
     flatbuffers_string_t filename =
         iree_hal_debug_FileLineLocDef_filename_get(location_def);

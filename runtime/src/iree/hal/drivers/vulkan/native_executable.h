@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
+#include "iree/hal/drivers/vulkan/pipeline_layout.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,12 @@ typedef struct iree_hal_vulkan_source_location_t {
   iree_string_view_t func_name;
 } iree_hal_vulkan_source_location_t;
 
+typedef struct iree_hal_vulkan_pipeline_t {
+  VkPipeline handle;
+  iree_hal_vulkan_pipeline_layout_t* layout;
+  IREE_TRACE(iree_hal_vulkan_source_location_t source_location;)
+} iree_hal_vulkan_pipeline_t;
+
 // Creates a wrapper for one or more VkPipelines that are sourced from the same
 // IREE executable. Each of the pipelines will share the same shader module
 // and just differs by the entry point into the shader module they reference.
@@ -34,17 +41,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
     const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable);
 
-// Returns the source location for the given entry point. May be empty if not
-// available.
-void iree_hal_vulkan_native_executable_entry_point_source_location(
-    iree_hal_executable_t* executable, iree_host_size_t entry_ordinal,
-    iree_hal_vulkan_source_location_t* out_source_location);
-
-// Returns the cached VkPipeline for the given executable |entry_ordinal|.
-iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
-    iree_hal_executable_t* executable, iree_host_size_t entry_ordinal,
-    VkPipeline* out_pipeline_handle,
-    iree_hal_pipeline_layout_t** out_pipeline_layout);
+// Returns the pipeline for the given |entry_point| in the |executable|.
+iree_status_t iree_hal_vulkan_native_executable_lookup_pipeline(
+    iree_hal_executable_t* executable, uint32_t entry_ordinal,
+    const iree_hal_vulkan_pipeline_t** out_pipeline);
 
 #ifdef __cplusplus
 }  // extern "C"

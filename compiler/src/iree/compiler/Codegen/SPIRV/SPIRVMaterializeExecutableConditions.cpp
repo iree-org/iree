@@ -78,7 +78,7 @@ struct KernelFeatures {
 // and updates features.
 //
 // Note that the device queries used here should match the ones used in
-// iree_hal_vulkan_get_device_properties() on the runtime side.
+// iree_hal_vulkan_query_device_properties() on the runtime side.
 LogicalResult mapToDeviceQuery(IREE::HAL::ExecutableExportOp entryPoint,
                                spirv::Capability cap,
                                KernelFeatures &features) {
