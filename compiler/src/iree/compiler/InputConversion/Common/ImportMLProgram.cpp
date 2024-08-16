@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -25,9 +24,14 @@
 
 namespace mlir::iree_compiler::InputConversion {
 
+#define GEN_PASS_DEF_IMPORTMLPROGRAMPASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+
 namespace {
 
-struct ImportMLProgramPass : public ImportMLProgramBase<ImportMLProgramPass> {
+class ImportMLProgramPass final
+    : public impl::ImportMLProgramPassBase<ImportMLProgramPass> {
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, IREE::Util::UtilDialect>();
   }
@@ -262,10 +266,6 @@ void ImportMLProgramPass::runOnOperation() {
   if (!externGlobals.empty() &&
       failed(createExternInitFunction(getOperation(), externGlobals)))
     signalPassFailure();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass() {
-  return std::make_unique<ImportMLProgramPass>();
 }
 
 } // namespace mlir::iree_compiler::InputConversion
