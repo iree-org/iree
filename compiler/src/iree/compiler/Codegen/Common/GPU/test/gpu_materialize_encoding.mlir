@@ -39,15 +39,15 @@ func.func @set_encoding_LHS() attributes {
 }
 
 // CHECK-LABEL: func.func @set_encoding_LHS
-// CHECK: %[[EMPTY:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
-// CHECK: %[[PACK:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %[[EMPTY]] : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
-// CHECK: %[[EXPAND_LHS:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME: output_shape [33, 64, 16, 1, 4, 1] : tensor<33x64x16x4xf32> into tensor<33x64x16x1x4x1xf32>
-// CHECK: %[[EMPTY_LHS2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
-// CHECK: %[[TRANSPOSE:.*]] = linalg.transpose ins(%[[EXPAND_LHS]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_LHS2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3] 
-// CHECK: %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK: %[[EXPAND_LHS_2:.*]] = tensor.expand_shape %[[COLLAPSE]]
-// CHECK: flow.dispatch.tensor.store %[[EXPAND_LHS_2]]
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
+// CHECK:         %[[PACK:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %[[EMPTY]] : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
+// CHECK:         %[[EXPAND_LHS:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME:      output_shape [33, 64, 16, 1, 4, 1] : tensor<33x64x16x4xf32> into tensor<33x64x16x1x4x1xf32>
+// CHECK:         %[[EMPTY_LHS2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose ins(%[[EXPAND_LHS]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_LHS2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3]
+// CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
+// CHECK:         %[[EXPAND_LHS_2:.*]] = tensor.expand_shape %[[COLLAPSE]]
+// CHECK:         flow.dispatch.tensor.store %[[EXPAND_LHS_2]]
 
 func.func @set_encoding_RHS() attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
@@ -62,15 +62,15 @@ func.func @set_encoding_RHS() attributes {
 }
 
 // CHECK-LABEL: func.func @set_encoding_RHS
-// CHECK: %[[EMPTY_RHS:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
-// CHECK: %[[PACK_RHS:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %3 : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
-// CHECK: %[[EXPAND_RHS:.*]] = tensor.expand_shape %[[PACK_RHS]]
-// CHECK-SAME: output_shape [33, 64, 16, 1, 4, 1] : tensor<33x64x16x4xf32> into tensor<33x64x16x1x4x1xf32>
-// CHECK: %[[EMPTY_RHS2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
-// CHECK: %[[TRANSPOSE_RHS:.*]] = linalg.transpose ins(%[[EXPAND_RHS]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_RHS2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3]
-// CHECK: %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_RHS]]
-// CHECK: %[[EXPAND_RHS_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
-// CHECK: flow.dispatch.tensor.store %[[EXPAND_RHS_2]]
+// CHECK:         %[[EMPTY_RHS:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
+// CHECK:         %[[PACK_RHS:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %3 : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
+// CHECK:         %[[EXPAND_RHS:.*]] = tensor.expand_shape %[[PACK_RHS]]
+// CHECK-SAME:      output_shape [33, 64, 16, 1, 4, 1] : tensor<33x64x16x4xf32> into tensor<33x64x16x1x4x1xf32>
+// CHECK:         %[[EMPTY_RHS2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
+// CHECK:         %[[TRANSPOSE_RHS:.*]] = linalg.transpose ins(%[[EXPAND_RHS]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_RHS2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3]
+// CHECK:         %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_RHS]]
+// CHECK:         %[[EXPAND_RHS_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
+// CHECK:         flow.dispatch.tensor.store %[[EXPAND_RHS_2]]
 
 func.func @set_encoding_ACC() attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
@@ -85,12 +85,11 @@ func.func @set_encoding_ACC() attributes {
 }
 
 // CHECK-LABEL: func.func @set_encoding_ACC
-// CHECK: %[[EMPTY_ACC:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
-// CHECK: %[[PACK_ACC:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %[[EMPTY_ACC]] : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
-// CHECK: %[[EXPAND_ACC:.*]] = tensor.expand_shape %[[PACK_ACC]]
-// CHECK: %[[EMPTY_ACC2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
-// CHECK: %[[TRANSPOSE_ACC:.*]] = linalg.transpose ins(%[[EXPAND_ACC]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_ACC2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3] 
-
-// CHECK: %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_ACC]]
-// CHECK: %[[EXPAND_ACC_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
-// CHECK: flow.dispatch.tensor.store %[[EXPAND_ACC_2]]
+// CHECK:         %[[EMPTY_ACC:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
+// CHECK:         %[[PACK_ACC:.*]] = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4] into %[[EMPTY_ACC]] : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
+// CHECK:         %[[EXPAND_ACC:.*]] = tensor.expand_shape %[[PACK_ACC]]
+// CHECK:         %[[EMPTY_ACC2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
+// CHECK:         %[[TRANSPOSE_ACC:.*]] = linalg.transpose ins(%[[EXPAND_ACC]] : tensor<33x64x16x1x4x1xf32>) outs(%[[EMPTY_ACC2]] : tensor<33x64x4x16x1x1xf32>) permutation = [0, 1, 4, 2, 5, 3]
+// CHECK:         %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_ACC]]
+// CHECK:         %[[EXPAND_ACC_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
+// CHECK:         flow.dispatch.tensor.store %[[EXPAND_ACC_2]]
