@@ -212,3 +212,19 @@ func.func @gather_strided_memref() {
 // CHECK-LABEL: func.func @gather_strided_memref
 // CHECK-NOT: memref.subview {{.*}} : memref<2592000xf32, strided<[3]>
 // CHECK-NOT: vector.gather %subview[%c0] [%7], %cst_0, %cst : memref<2592000xf32, strided<[3]>
+
+// -----
+
+func.func @scalable_transpose_store(%vec: vector<4x[4]xf32>, %dest: memref<?x?xf32>, %i: index, %j: index) {
+  %transpose = vector.transpose %vec, [1, 0] : vector<4x[4]xf32> to vector<[4]x4xf32>
+  vector.transfer_write %transpose, %dest[%i, %j] {in_bounds = [true, true]} : vector<[4]x4xf32>,  memref<?x?xf32>
+  return
+}
+
+/// Note: The lowering for this is implemented/tested upstream (this just checks
+/// it is enabled in IREE).
+
+// CHECK-LABEL: func.func @scalable_transpose_store
+// CHECK-NOT: vector.transpose
+// CHECK: vector.store {{.*}} : memref<?x?xf32>, vector<4xf32>
+// CHECK-NOT: vector.transpose
