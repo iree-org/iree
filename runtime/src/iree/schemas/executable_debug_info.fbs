@@ -18,12 +18,6 @@ table StageLocationDef {
   location:FileLineLocDef;
 }
 
-// TODO(#18154): remove this when using ExportDef.
-// Table of stage locations sorted in ascending order by stage name.
-table StageLocationsDef {
-  locations:[StageLocationDef];
-}
-
 // Debug information for an exported function.
 // Empty/omitted if the compilation debug level is 0.
 table ExportDef {
