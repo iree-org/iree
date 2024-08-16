@@ -26,7 +26,7 @@ namespace vulkan {
 #define IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT 4
 #define IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET 3
 
-#define IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT 16
+#define IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANTS_SIZE 16
 
 class BuiltinExecutables {
  public:
@@ -43,22 +43,21 @@ class BuiltinExecutables {
   //
   // This only implements the unaligned edges of fills, vkCmdFillBuffer should
   // be used for the aligned interior (if any).
-  //
-  // |push_constants_to_restore| will be pushed using vkCmdPushConstants over
-  // the bytes used by this call.
-  iree_status_t FillBufferUnaligned(
-      VkCommandBuffer command_buffer, DescriptorSetArena* descriptor_set_arena,
-      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-      iree_device_size_t length, const void* pattern,
-      iree_host_size_t pattern_length, const void* push_constants_to_restore);
+  iree_status_t FillBufferUnaligned(VkCommandBuffer command_buffer,
+                                    DescriptorSetArena* descriptor_set_arena,
+                                    iree_hal_buffer_t* target_buffer,
+                                    iree_device_size_t target_offset,
+                                    iree_device_size_t length,
+                                    const void* pattern,
+                                    iree_host_size_t pattern_length);
 
  private:
   VkDeviceHandle* logical_device_ = NULL;
 
-  iree_hal_descriptor_set_layout_t*
+  iree_hal_vulkan_descriptor_set_layout_t*
       descriptor_set_layouts_[IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT] = {
           NULL};
-  iree_hal_pipeline_layout_t* pipeline_layout_ = NULL;
+  iree_hal_vulkan_pipeline_layout_t* pipeline_layout_ = NULL;
   VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 

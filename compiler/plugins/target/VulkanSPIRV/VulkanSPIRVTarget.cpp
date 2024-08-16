@@ -61,6 +61,91 @@ struct VulkanSPIRVTargetOptions {
 };
 } // namespace
 
+static std::tuple<iree_hal_vulkan_DescriptorSetLayoutDef_vec_ref_t,
+                  iree_hal_vulkan_PipelineLayoutDef_vec_ref_t,
+                  DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t>>
+createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
+                         FlatbufferBuilder &fbb) {
+  DenseMap<IREE::HAL::DescriptorSetLayoutAttr, size_t> descriptorSetLayoutMap;
+  DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t> pipelineLayoutMap;
+  SmallVector<iree_hal_vulkan_DescriptorSetLayoutDef_ref_t>
+      descriptorSetLayoutRefs;
+  SmallVector<iree_hal_vulkan_PipelineLayoutDef_ref_t> pipelineLayoutRefs;
+  for (auto exportOp : exportOps) {
+    auto pipelineLayoutAttr = exportOp.getLayout();
+    if (pipelineLayoutMap.contains(pipelineLayoutAttr)) {
+      continue; // already present
+    }
+
+    SmallVector<uint32_t> descriptorSetLayoutOrdinals;
+    for (auto descriptorSetLayoutAttr : pipelineLayoutAttr.getSetLayouts()) {
+      auto it = descriptorSetLayoutMap.find(descriptorSetLayoutAttr);
+      if (it != descriptorSetLayoutMap.end()) {
+        descriptorSetLayoutOrdinals.push_back(it->second);
+        continue;
+      }
+
+      SmallVector<iree_hal_vulkan_DescriptorSetLayoutBindingDef_ref_t>
+          bindingRefs;
+      for (auto bindingAttr : descriptorSetLayoutAttr.getBindings()) {
+        uint32_t ordinal = static_cast<uint32_t>(bindingAttr.getOrdinal());
+        iree_hal_vulkan_VkDescriptorType_enum_t descriptorType = 0;
+        switch (bindingAttr.getType()) {
+        case IREE::HAL::DescriptorType::UniformBuffer:
+          descriptorType = iree_hal_vulkan_VkDescriptorType_UNIFORM_BUFFER;
+          break;
+        case IREE::HAL::DescriptorType::StorageBuffer:
+          descriptorType = iree_hal_vulkan_VkDescriptorType_STORAGE_BUFFER;
+          break;
+        }
+        uint32_t descriptorCount = 1;
+        uint32_t stageFlags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT
+        bindingRefs.push_back(
+            iree_hal_vulkan_DescriptorSetLayoutBindingDef_create(
+                fbb, ordinal, descriptorType, descriptorCount, stageFlags));
+      }
+      auto bindingsRef = fbb.createOffsetVecDestructive(bindingRefs);
+
+      descriptorSetLayoutOrdinals.push_back(descriptorSetLayoutRefs.size());
+      descriptorSetLayoutMap[descriptorSetLayoutAttr] =
+          descriptorSetLayoutRefs.size();
+      descriptorSetLayoutRefs.push_back(
+          iree_hal_vulkan_DescriptorSetLayoutDef_create(fbb, bindingsRef));
+    }
+    auto descriptorSetLayoutOrdinalsRef =
+        fbb.createInt32Vec(descriptorSetLayoutOrdinals);
+
+    iree_hal_vulkan_PushConstantRange_vec_ref_t pushConstantRangesRef = 0;
+    if (int64_t pushConstantCount = pipelineLayoutAttr.getPushConstants()) {
+      SmallVector<iree_hal_vulkan_PushConstantRange> pushConstantRanges;
+      iree_hal_vulkan_PushConstantRange range0;
+      range0.stage_flags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT
+      range0.offset = 0;
+      range0.size = pushConstantCount * sizeof(uint32_t);
+      pushConstantRanges.push_back(range0);
+      pushConstantRangesRef = iree_hal_vulkan_PushConstantRange_vec_create(
+          fbb, pushConstantRanges.data(), pushConstantRanges.size());
+    }
+
+    pipelineLayoutMap[pipelineLayoutAttr] =
+        static_cast<uint32_t>(pipelineLayoutRefs.size());
+    iree_hal_vulkan_PipelineLayoutDef_start(fbb);
+    iree_hal_vulkan_PipelineLayoutDef_descriptor_set_layout_ordinals_add(
+        fbb, descriptorSetLayoutOrdinalsRef);
+    if (pushConstantRangesRef) {
+      iree_hal_vulkan_PipelineLayoutDef_push_constant_ranges_add(
+          fbb, pushConstantRangesRef);
+    }
+    pipelineLayoutRefs.push_back(iree_hal_vulkan_PipelineLayoutDef_end(fbb));
+  }
+
+  auto descriptorSetLayoutsRef =
+      fbb.createOffsetVecDestructive(descriptorSetLayoutRefs);
+  auto pipelineLayoutsRef = fbb.createOffsetVecDestructive(pipelineLayoutRefs);
+  return std::make_tuple(descriptorSetLayoutsRef, pipelineLayoutsRef,
+                         pipelineLayoutMap);
+}
+
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
 class VulkanTargetDevice : public TargetDevice {
 public:
@@ -71,17 +156,23 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    SmallVector<NamedAttribute> configItems;
 
-    auto configAttr = b.getDictionaryAttr(configItems);
+    SmallVector<NamedAttribute> deviceConfigAttrs;
+    deviceConfigAttrs.emplace_back(b.getStringAttr("executable_create_2"),
+                                   b.getUnitAttr());
+    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
+
+    SmallVector<NamedAttribute> executableConfigAttrs;
+    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
 
     SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
     targetRegistry.getTargetBackend("vulkan-spirv")
-        ->getDefaultExecutableTargets(context, "vulkan", configAttr,
+        ->getDefaultExecutableTargets(context, "vulkan", executableConfigAttr,
                                       executableTargetAttrs);
 
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("vulkan"),
-                                            configAttr, executableTargetAttrs);
+                                            deviceConfigAttr,
+                                            executableTargetAttrs);
   }
 
 private:
@@ -162,24 +253,47 @@ public:
       return variantOp.emitError() << "should contain some spirv.module ops";
     }
 
-    DenseMap<StringRef, uint64_t> entryPointOrdinals;
-
-    SmallVector<IREE::HAL::ExecutableExportOp> exportOps =
+    // Create a list of executable exports (by ordinal) to the SPIR-V module and
+    // entry point defining them.
+    auto unsortedExportOps =
         llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
-    for (auto exportOp : exportOps) {
+    DenseMap<StringRef, std::tuple<IREE::HAL::ExecutableExportOp, uint64_t>>
+        exportOrdinalMap;
+    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
       uint64_t ordinal = 0;
       if (std::optional<APInt> optionalOrdinal = exportOp.getOrdinal()) {
         ordinal = optionalOrdinal->getZExtValue();
       } else {
-        // For executables with only one entry point, linking doesn't kick in at
+        // For executables with only one entry point linking doesn't kick in at
         // all. So the ordinal can be missing for this case.
-        if (!llvm::hasSingleElement(exportOps)) {
+        if (!llvm::hasSingleElement(unsortedExportOps)) {
           return exportOp.emitError() << "should have ordinal attribute";
         }
       }
-      entryPointOrdinals[exportOp.getSymName()] = ordinal;
+      exportOrdinalMap[exportOp.getSymName()] =
+          std::make_tuple(exportOp, ordinal);
     }
-    uint64_t ordinalCount = entryPointOrdinals.size();
+    SmallVector<IREE::HAL::ExecutableExportOp> sortedExportOps;
+    sortedExportOps.resize(unsortedExportOps.size());
+    SmallVector<std::tuple<IREE::HAL::ExecutableExportOp, spirv::ModuleOp,
+                           spirv::EntryPointOp>>
+        exportOps;
+    exportOps.resize(unsortedExportOps.size());
+    for (spirv::ModuleOp spirvModuleOp : spirvModuleOps) {
+      // Currently the spirv.module op should only have one entry point.
+      auto spirvEntryPoints = spirvModuleOp.getOps<spirv::EntryPointOp>();
+      if (!llvm::hasSingleElement(spirvEntryPoints)) {
+        // TODO: support multiple entry points. We only need them here to get
+        // the module name for dumping files.
+        return spirvModuleOp.emitError()
+               << "expected to contain exactly one entry point";
+      }
+      spirv::EntryPointOp spirvEntryPointOp = *spirvEntryPoints.begin();
+      auto [exportOp, ordinal] = exportOrdinalMap.at(spirvEntryPointOp.getFn());
+      sortedExportOps[ordinal] = exportOp;
+      exportOps[ordinal] =
+          std::make_tuple(exportOp, spirvModuleOp, spirvEntryPointOp);
+    }
 
     FlatbufferBuilder builder;
     iree_hal_vulkan_ExecutableDef_start_as_root(builder);
@@ -188,143 +302,89 @@ public:
     auto sourceFilesRef = createSourceFilesVec(
         options.debugLevel, variantOp.getSourcesAttr(), builder);
 
-    // The list of shader modules.
+    // Generate optional per-export debug information.
+    // May be empty if no debug information was requested.
+    auto exportDebugInfos =
+        createExportDefs(options.debugLevel, sortedExportOps, builder);
+
+    // Create a list of all serialized SPIR-V modules.
+    // TODO: unique the modules when each contains multiple entry points.
+    DenseMap<spirv::EntryPointOp, uint32_t> entryPointToModuleMap;
     SmallVector<iree_hal_vulkan_ShaderModuleDef_ref_t> shaderModuleRefs;
-
-    // Per entry-point data.
-    // Note that the following vectors should all be of the same size and
-    // element at index #i is for entry point with ordinal #i!
-    SmallVector<StringRef> entryPointNames;
-    SmallVector<uint32_t> subgroupSizes;
-    SmallVector<uint32_t> shaderModuleIndices;
-    SmallVector<iree_hal_debug_FileLineLocDef_ref_t> sourceLocationRefs;
-    entryPointNames.resize(ordinalCount);
-    subgroupSizes.resize(ordinalCount);
-    shaderModuleIndices.resize(ordinalCount);
-
-    // Iterate over all spirv.module ops and encode them into the FlatBuffer
-    // data structure.
-    bool hasAnySubgroupSizes = false;
-    for (spirv::ModuleOp spvModuleOp : spirvModuleOps) {
-      // Currently the spirv.module op should only have one entry point. Get it.
-      auto spirvEntryPoints = spvModuleOp.getOps<spirv::EntryPointOp>();
-      if (!llvm::hasSingleElement(spirvEntryPoints)) {
-        return spvModuleOp.emitError()
-               << "expected to contain exactly one entry point";
-      }
-      spirv::EntryPointOp spvEntryPoint = *spirvEntryPoints.begin();
-      uint64_t ordinal = entryPointOrdinals.at(spvEntryPoint.getFn());
-
+    for (auto [exportOp, spirvModuleOp, spirvEntryPointOp] : exportOps) {
       if (!options.dumpIntermediatesPath.empty()) {
         std::string assembly;
         llvm::raw_string_ostream os(assembly);
-        spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+        spirvModuleOp.print(os, OpPrintingFlags().useLocalScope());
         dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
-                       spvEntryPoint.getFn(), ".spirv.mlir", assembly);
+                       spirvEntryPointOp.getFn(), ".spirv.mlir", assembly);
       }
 
       // Serialize the spirv::ModuleOp into the binary blob.
-      SmallVector<uint32_t, 0> spvBinary;
-      if (failed(spirv::serialize(spvModuleOp, spvBinary)) ||
-          spvBinary.empty()) {
-        return spvModuleOp.emitError() << "failed to serialize";
+      SmallVector<uint32_t, 0> spirvBinary;
+      if (failed(spirv::serialize(spirvModuleOp, spirvBinary)) ||
+          spirvBinary.empty()) {
+        return spirvModuleOp.emitError() << "failed to serialize";
       }
       if (!options.dumpBinariesPath.empty()) {
         dumpDataToPath<uint32_t>(options.dumpBinariesPath, options.dumpBaseName,
-                                 spvEntryPoint.getFn(), ".spv", spvBinary);
+                                 spirvEntryPointOp.getFn(), ".spv",
+                                 spirvBinary);
       }
-      auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
-                                                      spvBinary.size());
-      shaderModuleIndices[ordinal] = shaderModuleRefs.size();
+      auto spirvCodeRef = flatbuffers_uint32_vec_create(
+          builder, spirvBinary.data(), spirvBinary.size());
+      entryPointToModuleMap[spirvEntryPointOp] =
+          static_cast<uint32_t>(shaderModuleRefs.size());
       shaderModuleRefs.push_back(
-          iree_hal_vulkan_ShaderModuleDef_create(builder, spvCodeRef));
-
-      // The IREE runtime uses ordinals instead of names. We need to attach the
-      // entry point name for VkShaderModuleCreateInfo.
-      entryPointNames[ordinal] = spvEntryPoint.getFn();
-
-      // If there are subgroup size requests, we need to pick up too.
-      auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(spvEntryPoint.getFn());
-      auto abi = fn->getAttrOfType<spirv::EntryPointABIAttr>(
-          spirv::getEntryPointABIAttrName());
-      if (abi && abi.getSubgroupSize()) {
-        subgroupSizes[ordinal] = *abi.getSubgroupSize();
-        hasAnySubgroupSizes = true;
-      } else {
-        subgroupSizes[ordinal] = 0;
-      }
-
-      // Optional source location information for debugging/profiling.
-      if (options.debugLevel >= 1) {
-        if (auto loc = findFirstFileLoc(spvEntryPoint.getLoc())) {
-          // We only ever resize to the maximum -- so all previous data will be
-          // kept as-is.
-          sourceLocationRefs.resize(ordinalCount);
-          auto filenameRef = builder.createString(loc->getFilename());
-          sourceLocationRefs[ordinal] = iree_hal_debug_FileLineLocDef_create(
-              builder, filenameRef, loc->getLine());
-        }
-      }
+          iree_hal_vulkan_ShaderModuleDef_create(builder, spirvCodeRef));
     }
-
-    // Optional compilation stage source files.
-    SmallVector<iree_hal_debug_StageLocationsDef_ref_t> stageLocationsRefs;
-    if (options.debugLevel >= 3) {
-      for (auto exportOp : exportOps) {
-        SmallVector<iree_hal_debug_StageLocationDef_ref_t> stageLocationRefs;
-        if (auto locsAttr = exportOp.getSourceLocsAttr()) {
-          for (auto locAttr : locsAttr.getValue()) {
-            if (auto loc =
-                    findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
-              auto stageNameRef = builder.createString(locAttr.getName());
-              auto filenameRef = builder.createString(loc->getFilename());
-              stageLocationRefs.push_back(
-                  iree_hal_debug_StageLocationDef_create(
-                      builder, stageNameRef,
-                      iree_hal_debug_FileLineLocDef_create(builder, filenameRef,
-                                                           loc->getLine())));
-            }
-          }
-        }
-        if (!stageLocationRefs.empty()) {
-          // We only ever resize to the maximum -- so all previous data will
-          // be kept as-is.
-          stageLocationsRefs.resize(ordinalCount);
-          int64_t ordinal = exportOp.getOrdinalAttr().getInt();
-          stageLocationsRefs[ordinal] = iree_hal_debug_StageLocationsDef_create(
-              builder, builder.createOffsetVecDestructive(stageLocationRefs));
-        }
-      }
-    }
-
-    // Add top-level executable fields following their order of definition.
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
-    flatbuffers_int32_vec_ref_t subgroupSizesRef =
-        hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
-    flatbuffers_int32_vec_ref_t shaderModuleIndicesRef =
-        builder.createInt32Vec(shaderModuleIndices);
-    iree_hal_vulkan_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    if (subgroupSizesRef) {
-      iree_hal_vulkan_ExecutableDef_subgroup_sizes_add(builder,
-                                                       subgroupSizesRef);
-    }
-    iree_hal_vulkan_ExecutableDef_shader_module_indices_add(
-        builder, shaderModuleIndicesRef);
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
+
+    // Create unique descriptor and pipeline layouts for each entry point.
+    auto [descriptorSetLayoutsRef, pipelineLayoutsRef, pipelineLayoutMap] =
+        createPipelineLayoutDefs(sortedExportOps, builder);
+
+    // Create pipelines representing entry points.
+    // Note that the element at index #i is for entry point with ordinal #i.
+    SmallVector<iree_hal_vulkan_PipelineDef_ref_t> pipelineRefs;
+    for (auto [exportOp, spirvModuleOp, spirvEntryPointOp] : exportOps) {
+      int64_t ordinal = exportOp.getOrdinalAttr().getInt();
+
+      uint32_t shaderModuleOrdinal =
+          entryPointToModuleMap.at(spirvEntryPointOp);
+      uint32_t pipelineLayoutOrdinal =
+          pipelineLayoutMap.at(exportOp.getLayout());
+
+      // Subgroup size requests are optional.
+      auto spirvFuncOp =
+          spirvModuleOp.lookupSymbol<spirv::FuncOp>(spirvEntryPointOp.getFn());
+      auto abiAttr = spirvFuncOp->getAttrOfType<spirv::EntryPointABIAttr>(
+          spirv::getEntryPointABIAttrName());
+      uint32_t subgroupSize =
+          abiAttr ? abiAttr.getSubgroupSize().value_or(0) : 0;
+
+      auto entryPointRef = builder.createString(spirvEntryPointOp.getFn());
+      iree_hal_vulkan_PipelineDef_start(builder);
+      iree_hal_vulkan_PipelineDef_shader_module_ordinal_add(
+          builder, shaderModuleOrdinal);
+      iree_hal_vulkan_PipelineDef_entry_point_add(builder, entryPointRef);
+      iree_hal_vulkan_PipelineDef_pipeline_layout_ordinal_add(
+          builder, pipelineLayoutOrdinal);
+      iree_hal_vulkan_PipelineDef_subgroup_size_add(builder, subgroupSize);
+      iree_hal_vulkan_PipelineDef_debug_info_add(builder,
+                                                 exportDebugInfos[ordinal]);
+      pipelineRefs.push_back(iree_hal_vulkan_PipelineDef_end(builder));
+    }
+    auto pipelinesRef = builder.createOffsetVecDestructive(pipelineRefs);
+
+    // Add top-level executable fields following their order of definition.
+    iree_hal_vulkan_ExecutableDef_pipelines_add(builder, pipelinesRef);
+    iree_hal_vulkan_ExecutableDef_descriptor_set_layouts_add(
+        builder, descriptorSetLayoutsRef);
+    iree_hal_vulkan_ExecutableDef_pipeline_layouts_add(builder,
+                                                       pipelineLayoutsRef);
     iree_hal_vulkan_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
-    if (!sourceLocationRefs.empty()) {
-      auto sourceLocationsRef =
-          builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_vulkan_ExecutableDef_source_locations_add(builder,
-                                                         sourceLocationsRef);
-    }
-    if (!stageLocationsRefs.empty()) {
-      auto stageLocationsRef =
-          builder.createOffsetVecDestructive(stageLocationsRefs);
-      iree_hal_vulkan_ExecutableDef_stage_locations_add(builder,
-                                                        stageLocationsRef);
-    }
     iree_hal_vulkan_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
     iree_hal_vulkan_ExecutableDef_end_as_root(builder);
@@ -355,26 +415,17 @@ public:
                                         "supported for external variants";
     }
 
-    // Take exported names verbatim for passing into VkShaderModuleCreateInfo.
-    SmallVector<StringRef, 8> entryPointNames;
-    for (auto exportOp : variantOp.getExportOps()) {
-      entryPointNames.emplace_back(exportOp.getSymName());
-    }
-    // We only have one object file for now. So all entry points have shader
-    // module index 0.
-    SmallVector<uint32_t, 8> shaderModuleIndices(entryPointNames.size(), 0);
-
     // Load .spv object file.
     auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
         variantOp.getObjects()->getValue().front());
-    std::string spvBinary;
+    std::string spirvBinary;
     if (auto data = objectAttr.loadData()) {
-      spvBinary = data.value();
+      spirvBinary = data.value();
     } else {
       return variantOp.emitOpError()
              << "object file could not be loaded: " << objectAttr;
     }
-    if (spvBinary.size() % 4 != 0) {
+    if (spirvBinary.size() % 4 != 0) {
       return variantOp.emitOpError()
              << "object file is not 4-byte aligned as expected for SPIR-V";
     }
@@ -382,21 +433,50 @@ public:
     FlatbufferBuilder builder;
     iree_hal_vulkan_ExecutableDef_start_as_root(builder);
 
-    auto spvCodeRef = flatbuffers_uint32_vec_create(
-        builder, reinterpret_cast<const uint32_t *>(spvBinary.data()),
-        spvBinary.size() / sizeof(uint32_t));
+    // Wrap and embed shader module binary.
+    auto spirvCodeRef = flatbuffers_uint32_vec_create(
+        builder, reinterpret_cast<const uint32_t *>(spirvBinary.data()),
+        spirvBinary.size() / sizeof(uint32_t));
     SmallVector<iree_hal_vulkan_ShaderModuleDef_ref_t> shaderModuleRefs;
     shaderModuleRefs.push_back(
-        iree_hal_vulkan_ShaderModuleDef_create(builder, spvCodeRef));
-
-    // Add top-level executable fields following their order of definition.
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
-    auto shaderModuleIndicesRef = builder.createInt32Vec(shaderModuleIndices);
-    iree_hal_vulkan_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_vulkan_ExecutableDef_shader_module_indices_add(
-        builder, shaderModuleIndicesRef);
+        iree_hal_vulkan_ShaderModuleDef_create(builder, spirvCodeRef));
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
+
+    // Generate descriptor set and pipeline layouts from export ops.
+    auto exportOps = llvm::to_vector(variantOp.getExportOps());
+    auto [descriptorSetLayoutsRef, pipelineLayoutsRef, pipelineLayoutMap] =
+        createPipelineLayoutDefs(exportOps, builder);
+
+    // Create a pipeline for each export.
+    SmallVector<iree_hal_vulkan_PipelineDef_ref_t> pipelineRefs;
+    for (auto exportOp : exportOps) {
+      uint32_t shaderModuleOrdinal = 0; // only one today
+      uint32_t pipelineLayoutOrdinal =
+          pipelineLayoutMap.at(exportOp.getLayout());
+
+      // Subgroup size requests are optional.
+      // TODO: support annotation on an attribute to allow users to specify.
+      uint32_t subgroupSize = 0;
+
+      auto entryPointRef = builder.createString(exportOp.getName());
+      iree_hal_vulkan_PipelineDef_start(builder);
+      iree_hal_vulkan_PipelineDef_shader_module_ordinal_add(
+          builder, shaderModuleOrdinal);
+      iree_hal_vulkan_PipelineDef_entry_point_add(builder, entryPointRef);
+      iree_hal_vulkan_PipelineDef_pipeline_layout_ordinal_add(
+          builder, pipelineLayoutOrdinal);
+      iree_hal_vulkan_PipelineDef_subgroup_size_add(builder, subgroupSize);
+      pipelineRefs.push_back(iree_hal_vulkan_PipelineDef_end(builder));
+    }
+    auto pipelinesRef = builder.createOffsetVecDestructive(pipelineRefs);
+
+    // Add top-level executable fields following their order of definition.
+    iree_hal_vulkan_ExecutableDef_pipelines_add(builder, pipelinesRef);
+    iree_hal_vulkan_ExecutableDef_descriptor_set_layouts_add(
+        builder, descriptorSetLayoutsRef);
+    iree_hal_vulkan_ExecutableDef_pipeline_layouts_add(builder,
+                                                       pipelineLayoutsRef);
     iree_hal_vulkan_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
 
     iree_hal_vulkan_ExecutableDef_end_as_root(builder);
