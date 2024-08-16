@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +30,9 @@
 // Helper for reference_attention.
 // Function to allocate and initialize tensors
 float* allocate_tensor(int dim1, int dim2, int dim3) {
-  float* tensor = (float*)malloc(dim1 * dim2 * dim3 * sizeof(float));
-  for (int i = 0; i < dim1 * dim2 * dim3; ++i) {
+  const int size = dim1 * dim2 * dim3;
+  float* tensor = (float*)malloc(size * sizeof(float));
+  for (int i = 0; i < size; ++i) {
     tensor[i] = 0.0f;
   }
   return tensor;
@@ -68,12 +70,20 @@ static void reference_attention_f32_f32_f32_f32(
 
   // Compute softmax on Attention
   for (int m = 0; m < M; ++m) {
-    // Calculate softmax denominator
-    float sum = 0.0;
+    // Find the maximum value for the current sequence
+    float max_val = -FLT_MAX;
     for (int k2 = 0; k2 < K2; ++k2) {
       int att_idx = index_3d(0, m, k2, M, K2);
-      sum += exp(Attention[att_idx]);
+      max_val = MAX(max_val, Attention[att_idx]);
     }
+
+    // Calculate the softmax denominator
+    float sum = 0.0f;
+    for (int k2 = 0; k2 < K2; ++k2) {
+      int att_idx = index_3d(0, m, k2, M, K2);
+      sum += exp(Attention[att_idx] - max_val);
+    }
+
     // Apply softmax
     for (int k2 = 0; k2 < K2; ++k2) {
       int att_idx = index_3d(0, m, k2, M, K2);

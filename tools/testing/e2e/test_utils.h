@@ -17,6 +17,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 bool iree_test_utils_require_exact_results(void);
 
 float iree_test_utils_acceptable_fb_delta(void);
