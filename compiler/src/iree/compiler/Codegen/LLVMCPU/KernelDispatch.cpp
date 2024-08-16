@@ -1203,11 +1203,13 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
   }
 
   if (isAArch64(targetAttr)) {
-    sizes.append({8, 16, 1});
+    // Attempt to use ~24 vector registers (out of a total of 32). Attempting
+    // to use every register is likely to cause spills.
+    sizes.append({6, 16, 1});
 
     // Specialisation for scalable vectorization.
     if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
-      // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
+      // Mark middle dimensions as scalable, so sizes are (6, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
     return;
