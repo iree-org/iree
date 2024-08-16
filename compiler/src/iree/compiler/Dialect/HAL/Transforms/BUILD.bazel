@@ -108,3 +108,18 @@ iree_gentbl_cc_library(
         "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )
+
+iree_tablegen_doc(
+    name = "HALPassesDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "HALPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [":td_files"],
+)
