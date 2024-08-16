@@ -28,6 +28,10 @@ concurrency:
 jobs:
   linux_x64_gcc:
     runs-on: ubuntu-20.04
+    container: gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
+    defaults:
+      run:
+        shell: bash
     env:
       BUILD_DIR: build-gcc
     steps:
@@ -36,13 +40,10 @@ jobs:
         with:
           submodules: true
       - name: "Building IREE with gcc"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env CC=/usr/bin/gcc-9 \
-            --env CXX=/usr/bin/g++-9 \
-            --env CMAKE_BUILD_TYPE=Release \
-            --env "IREE_TARGET_BACKEND_WEBGPU_SPIRV=OFF" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
+        env:
+          CC: /usr/bin/gcc-9
+          CXX: /usr/bin/g++-9
+          CMAKE_BUILD_TYPE: Release
+          IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
+          IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
