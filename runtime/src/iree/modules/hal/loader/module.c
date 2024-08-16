@@ -199,8 +199,6 @@ IREE_HAL_ABI_EXPORT(iree_hal_loader_module_executable_load,  //
   executable_params.executable_format = executable_format_str;
   executable_params.executable_data = iree_make_const_byte_span(
       executable_data->data.data, executable_data->data.data_length);
-  executable_params.pipeline_layout_count = 0;
-  executable_params.pipeline_layouts = NULL;
   executable_params.constant_count = constant_count;
   executable_params.constants = constants;
 

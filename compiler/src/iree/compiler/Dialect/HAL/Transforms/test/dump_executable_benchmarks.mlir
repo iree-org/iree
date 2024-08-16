@@ -6,7 +6,7 @@
 // Ensure devices are copied and made available:
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 // CHECK: util.global private @device
-util.global private @device = #hal.device.target<"llvm-cpu", [
+util.global private @device = #hal.device.target<"local", [
   #executable_target_embedded_elf_x86_64
 ]> : !hal.device
 
@@ -174,10 +174,10 @@ util.func public @main(%dynamic_arg: i32) -> !stream.timepoint attributes {
 
 #executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-util.global private @device_a = #hal.device.target<"llvm-cpu", [
+util.global private @device_a = #hal.device.target<"local", [
   #executable_target_embedded_elf_aarch64
 ]> : !hal.device
-util.global private @device_b = #hal.device.target<"llvm-cpu", [
+util.global private @device_b = #hal.device.target<"local", [
   #executable_target_embedded_elf_x86_64
 ]> : !hal.device
 
