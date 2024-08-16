@@ -97,7 +97,7 @@ static tensor::ExpandShapeOp reshapeForInnerDims(RewriterBase &rewriter,
   auto srcType = cast<RankedTensorType>(src.getType());
   SmallVector<int64_t> intermediateShape(
       srcType.getShape().take_front(outerRank));
-  for (auto [a, b] : llvm::zip_equal(
+  for ([[maybe_unused]] auto [a, b] : llvm::zip_equal(
            intermediateShape, targetType.getShape().take_front(outerRank))) {
     assert(a == b &&
            "expect outerRank dimensions matched between src and targetType");
