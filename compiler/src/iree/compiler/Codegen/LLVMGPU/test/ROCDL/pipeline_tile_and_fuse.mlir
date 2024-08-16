@@ -509,11 +509,21 @@ hal.executable public @main {
 
 #translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
 
+#pipeline_layout = #hal.pipeline.layout<
+  push_constants = 0,
+  sets = [
+    <0, bindings = [
+      <0, storage_buffer, "ReadOnly|Indirect">,
+      <1, storage_buffer, ReadOnly>,
+      <2, storage_buffer, Indirect>
+    ], flags = Indirect>
+  ]>
+
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @conv_nchw_fused ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
+    hal.executable.export public @conv_nchw_fused ordinal(0) layout(#pipeline_layout) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
