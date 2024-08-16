@@ -437,15 +437,6 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }
 
-static MaterializeEncodingFn
-getMaterializeEncodingFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return
-      [targetAttr](
-          RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-        return materializeEncodingForTarget(tensorType, targetAttr);
-      };
-}
-
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
@@ -465,18 +456,14 @@ getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return {};
 }
 
-static LogicalResult materializeFuncOpEncodings(
-    FunctionOpInterface funcOp,
-    IREE::HAL::ExecutableTargetAttr executableTargetAttr) {
+static LogicalResult
+materializeFuncOpEncodings(FunctionOpInterface funcOp,
+                           IREE::HAL::ExecutableTargetAttr targetAttr) {
   RewritePatternSet materializeEncodingPattern(funcOp.getContext());
-  auto materializeEncodingFn = getMaterializeEncodingFn(executableTargetAttr);
-  if (!materializeEncodingFn) {
-    return failure();
-  }
-  MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn);
+  MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
+                                                 targetAttr);
   MaterializeEncodingConversionTarget target(*funcOp.getContext());
-  auto materializeEncodingValueFn =
-      getMaterializeEncodingValueFn(executableTargetAttr);
+  auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
   populateIREEMaterializeEncodingIntoPackUnPackPatterns(

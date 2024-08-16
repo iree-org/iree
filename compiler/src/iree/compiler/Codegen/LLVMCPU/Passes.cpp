@@ -306,7 +306,15 @@ void buildLLVMCPUVectorLoweringPipeline(
   // lower them and can't be optimized away anymore.
   funcPassManager.addPass(createCanonicalizerPass());
 
-  funcPassManager.addPass(createLLVMCPUVectorTransferLoweringPass());
+  LLVMCPUVectorTransferLoweringPassOptions transferLoweringOptions{};
+  if (!options.enableArmSME) {
+    // The ArmSME dialect has its own (more specific) lowerings for scalable
+    // vectors that occur later in the pipeline, so only enable the general
+    // lowerings if SME is not available.
+    transferLoweringOptions.enableScalableLowerings = true;
+  }
+  funcPassManager.addPass(
+      createLLVMCPUVectorTransferLoweringPass(transferLoweringOptions));
   funcPassManager.addPass(createLLVMCPUVectorTransposeLoweringPass(
       LLVMCPUVectorTransposeLoweringPassOptions{
           options.lowerVectorTransposeToAVX2}));
@@ -354,6 +362,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -396,7 +405,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createLLVMCPUPeelPass());
   }
 
-  if (pipelineOpt.enableAArch64SSVE) {
+  if (pipelineOpt.enableAArch64SME) {
     funcPassManager.addPass(createLLVMCPU2DScalableTo1DScalablePass());
   }
 
@@ -432,6 +441,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -451,8 +461,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
+      tilingConfig.getVectorReductionLevel()));
   funcPassManager.addPass(
       createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
@@ -494,6 +504,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "shuffle";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -542,6 +553,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
   options.splitVectorTransfersTo = "linalg-copy";
   options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+  options.enableArmSME = pipelineOpt.enableAArch64SME;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -583,6 +595,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -623,6 +636,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }

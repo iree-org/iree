@@ -69,6 +69,8 @@ struct iree_hal_cuda_tracing_context_t {
 
   uint32_t query_capacity;
 
+  iree_hal_cuda_tracing_verbosity_t verbosity;
+
   // Event pool reused to capture tracing timestamps.
   // The lifetime of the events are as follows.
   // 1) All events are allocated when the tracing context is created.
@@ -118,6 +120,7 @@ static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
 iree_status_t iree_hal_cuda_tracing_context_allocate(
     const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
+    iree_hal_cuda_tracing_verbosity_t stream_tracing_verbosity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda_tracing_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -138,6 +141,7 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
     context->query_capacity = IREE_ARRAYSIZE(context->event_pool);
     context->submitted_event_list.head = NULL;
     context->submitted_event_list.tail = NULL;
+    context->verbosity = stream_tracing_verbosity;
     iree_slim_mutex_initialize(&context->event_mutex);
   }
 
@@ -364,7 +368,8 @@ static void iree_hal_cuda_tracing_context_event_list_append_event(
 // event.
 static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
+    iree_hal_cuda_tracing_verbosity_t verbosity) {
   iree_slim_mutex_lock(&context->event_mutex);
   IREE_ASSERT_ARGUMENT(event_list);
 
@@ -392,7 +397,8 @@ static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
 static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list,
-    CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
+    CUgraphNode* out_node, CUgraph graph,
+    iree_hal_cuda_tracing_verbosity_t verbosity, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count) {
   IREE_ASSERT_ARGUMENT(event_list);
   iree_slim_mutex_lock(&context->event_mutex);
@@ -426,22 +432,26 @@ static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
 void iree_hal_cuda_stream_tracing_zone_begin_impl(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
+    iree_hal_cuda_tracing_verbosity_t verbosity,
     const iree_tracing_location_t* src_loc) {
-  IREE_ASSERT_ARGUMENT(context);
+  if (!context) return;
+  if (verbosity > context->verbosity) return;
+
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list, stream);
+      context, event_list, stream, verbosity);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
 }
 
 void iree_hal_cuda_stream_tracing_zone_begin_external_impl(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
-    const char* file_name, size_t file_name_length, uint32_t line,
-    const char* function_name, size_t function_name_length, const char* name,
-    size_t name_length) {
-  IREE_ASSERT_ARGUMENT(context);
+    iree_hal_cuda_tracing_verbosity_t verbosity, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length) {
+  if (!context) return;
+  if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list, stream);
+      context, event_list, stream, verbosity);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
@@ -450,13 +460,15 @@ void iree_hal_cuda_stream_tracing_zone_begin_external_impl(
 void iree_hal_cuda_graph_tracing_zone_begin_external_impl(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list,
-    CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
+    CUgraphNode* out_node, CUgraph graph,
+    iree_hal_cuda_tracing_verbosity_t verbosity, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count, const char* file_name,
     size_t file_name_length, uint32_t line, const char* function_name,
     size_t function_name_length, const char* name, size_t name_length) {
   if (!context) return;
+  if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_cuda_graph_tracing_context_insert_query(
-      context, event_list, out_node, graph, dependency_nodes,
+      context, event_list, out_node, graph, verbosity, dependency_nodes,
       dependency_nodes_count);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
@@ -465,21 +477,25 @@ void iree_hal_cuda_graph_tracing_zone_begin_external_impl(
 
 void iree_hal_cuda_stream_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
+    iree_hal_cuda_tracing_verbosity_t verbosity) {
   if (!context) return;
+  if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list, stream);
+      context, event_list, stream, verbosity);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
 void iree_hal_cuda_graph_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list,
-    CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
+    CUgraphNode* out_node, CUgraph graph,
+    iree_hal_cuda_tracing_verbosity_t verbosity, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count) {
   if (!context) return;
+  if (verbosity > context->verbosity) return;
   uint16_t query_id = iree_hal_cuda_graph_tracing_context_insert_query(
-      context, event_list, out_node, graph, dependency_nodes,
+      context, event_list, out_node, graph, verbosity, dependency_nodes,
       dependency_nodes_count);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
@@ -489,6 +505,7 @@ void iree_hal_cuda_graph_tracing_zone_end_impl(
 iree_status_t iree_hal_cuda_tracing_context_allocate(
     const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
+    iree_hal_cuda_tracing_verbosity_t stream_tracing_verbosity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda_tracing_context_t** out_context) {
   *out_context = NULL;

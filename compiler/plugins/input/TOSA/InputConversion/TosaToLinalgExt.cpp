@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -20,6 +19,11 @@ using namespace mlir;
 using namespace mlir::tosa;
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TOSATOLINALGEXTPASS
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc"
+
+namespace {
 
 // Converts tosa.scatter to the iree_linalg_ext.scatter operation. As the
 // LinalgExt version is not batched therefore we materialize the batch index
@@ -145,7 +149,9 @@ public:
   }
 };
 
-struct TosaToLinalgExtPass : public TosaToLinalgExtBase<TosaToLinalgExtPass> {
+class TosaToLinalgExtPass final
+    : public impl::TosaToLinalgExtPassBase<TosaToLinalgExtPass> {
+public:
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     ConversionTarget target(getContext());
@@ -159,13 +165,10 @@ struct TosaToLinalgExtPass : public TosaToLinalgExtBase<TosaToLinalgExtPass> {
   }
 };
 
+} // namespace
+
 void populateTosaToLinalgExtPatterns(RewritePatternSet *patterns) {
   patterns->add<ScatterConversion>(patterns->getContext());
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTosaToLinalgExt() {
-  return std::make_unique<TosaToLinalgExtPass>();
 }
 
 } // namespace mlir::iree_compiler

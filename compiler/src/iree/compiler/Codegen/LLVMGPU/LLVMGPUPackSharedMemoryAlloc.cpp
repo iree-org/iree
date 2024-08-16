@@ -4,19 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <algorithm>
-
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPUPACKSHAREDMEMORYALLOCPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 
-struct LLVMGPUPackSharedMemoryAllocPass
-    : public LLVMGPUPackSharedMemoryAllocBase<
+struct LLVMGPUPackSharedMemoryAllocPass final
+    : impl::LLVMGPUPackSharedMemoryAllocPassBase<
           LLVMGPUPackSharedMemoryAllocPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {

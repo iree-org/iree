@@ -25,8 +25,8 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> permutation;
 };
 
-using MaterializeEncodingFn =
-    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
+using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
+    RankedTensorType, IREE::HAL::ExecutableTargetAttr targetAttr)>;
 
 struct MaterializeEncodingValueInfo {
   SmallVector<Value> innerTileSizes;
@@ -41,14 +41,25 @@ using MaterializeEncodingValueFn =
 //===---------------------------------------------------------------------===//
 
 /// TypeConverter to use for materializing the encoding.
-struct MaterializeEncodingTypeConverter : public TypeConverter {
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
+class MaterializeEncodingTypeConverter : public TypeConverter {
+public:
+  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn,
+                                   IREE::HAL::ExecutableTargetAttr targetAttr);
+
   const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
   }
 
+  IREE::HAL::ExecutableTargetAttr getTargetAttr() const { return targetAttr; }
+
+  FailureOr<MaterializeEncodingInfo>
+  getEncodingInfo(RankedTensorType type) const {
+    return materializeEncodingFn(type, targetAttr);
+  }
+
 private:
   const MaterializeEncodingFn materializeEncodingFn;
+  const IREE::HAL::ExecutableTargetAttr targetAttr;
 };
 
 /// Conversion target to use for for materializing the encoding.

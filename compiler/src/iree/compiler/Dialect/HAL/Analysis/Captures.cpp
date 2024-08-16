@@ -12,16 +12,6 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 ValueOrigin categorizeValue(Value value) {
-  // If this is a captured argument of an execution region then look up to the
-  // SSA value that was captured.
-  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
-    if (auto closureOp = dyn_cast<IREE::Util::ClosureOpInterface>(
-            blockArg.getOwner()->getParentOp())) {
-      return categorizeValue(
-          closureOp.getClosureOperands()[blockArg.getArgNumber()]);
-    }
-  }
-
   // If we wanted to pull in entire IR slices this would have to use a
   // worklist (selects of globals based on globals, etc). For now this analysis
   // only looks at the value provided.

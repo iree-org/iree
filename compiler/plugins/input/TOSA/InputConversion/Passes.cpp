@@ -47,7 +47,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
   passManager.addNestedPass<func::FuncOp>(
-      iree_compiler::createTosaToLinalgExt());
+      iree_compiler::createTosaToLinalgExtPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   TosaToLinalgNamedOptions tosaToLinalgNamedOptions;
@@ -55,7 +55,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
                               tosaToLinalgNamedOptions);
   passManager.addNestedPass<func::FuncOp>(
-      iree_compiler::createConverti48Toi64());
+      iree_compiler::createConverti48Toi64Pass());
 
   // Sometimes we generate more TOSA operations during the lowering to linalg.
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
@@ -74,7 +74,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
-  passManager.addPass(createVerifyCompilerTOSAInputLegality());
+  passManager.addPass(createVerifyCompilerTOSAInputLegalityPass());
 }
 
 namespace {

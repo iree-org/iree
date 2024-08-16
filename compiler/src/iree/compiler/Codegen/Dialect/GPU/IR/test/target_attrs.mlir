@@ -11,7 +11,8 @@ func.func @test_target_wgp() attributes {
   // CHECK-SAME: subgroup_size_choices = [32, 64],
   // CHECK-SAME: max_workgroup_sizes = [1024, 1024, 1024],
   // CHECK-SAME: max_thread_count_per_workgroup = 1024,
-  // CHECK-SAME: max_workgroup_memory_bytes = 65536>
+  // CHECK-SAME: max_workgroup_memory_bytes = 65536,
+  // CHECK-SAME: max_workgroup_counts = [2147483647, 2147483647, 2147483647]>
   wgp = #iree_gpu.target_wgp<
     compute = fp16|fp32|int8, storage = b16|b32,
     subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
@@ -19,7 +20,8 @@ func.func @test_target_wgp() attributes {
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]
   >
 } { return }
 
@@ -37,7 +39,8 @@ func.func @test_target_wgp_none() attributes {
     subgroup_size_choices = [32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]
   >
 } { return }
 
@@ -67,7 +70,8 @@ func.func @test_target() attributes {
       subgroup_size_choices = [32, 64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
-      max_workgroup_memory_bytes = 65536>,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>,
     chip = <wgp_count = 304>
   >
 } { return }

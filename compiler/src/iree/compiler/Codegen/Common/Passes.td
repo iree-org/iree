@@ -70,6 +70,9 @@ def ConvertToDestinationPassingStylePass :
     comprehensive bufferization pass.
   }];
   let options = [
+    Option<"convertInputsToDestinations", "convert-inputs-to-destinations",
+           "bool", /*default=*/"true",
+           "Controls whether to adjust consumers to convert one of its inputs to a destination">,
     Option<"useWARForCooperativeMatrixCodegen", "use-war-for-cooperative-matrix-codegen",
            "bool", /*default=*/"false",
            "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">

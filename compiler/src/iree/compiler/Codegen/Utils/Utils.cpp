@@ -988,8 +988,30 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
       llvm::dbgs() << "\n";
     });
-    return SmallVector<Value>(newSubviewOp->result_begin(),
-                              newSubviewOp->result_end());
+    return llvm::to_vector_of<Value>(newSubviewOp->getResults());
+  }
+  if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
+    auto currResultType =
+        llvm::cast<MemRefType>(expandOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
+
+    FailureOr<MemRefType> newResultType =
+        memref::ExpandShapeOp::computeExpandedType(
+            newSourceType, currResultType.getShape(),
+            expandOp.getReassociationIndices());
+    if (failed(newResultType)) {
+      return std::nullopt;
+    }
+
+    auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
+        loc, *newResultType, replacement, expandOp.getReassociation(),
+        expandOp.getOutputShape(), expandOp.getStaticOutputShape());
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newExpandOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
   return std::nullopt;
 }
@@ -1145,13 +1167,13 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   return llvm::any_of(backwardSlice, llvm::IsaPred<linalg::LinalgOp>);
 }
 
-std::optional<VscaleRange>
+std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isAArch64(targetAttr)) {
     // On AArch64 the scalable vector length will always be between 128-bit and
     // 2048-bit. This works out as a vscale range of 1 to 16. See:
     // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
-    return VscaleRange{1, 16};
+    return vector::VscaleRange{1, 16};
   }
   // TODO: Implement for other architectures.
   return std::nullopt;
@@ -1159,7 +1181,7 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 FailureOr<DimBoundSize>
 computeDimUpperBound(Value shapedValue, unsigned dimNum,
-                     std::optional<VscaleRange> vscaleRange,
+                     std::optional<vector::VscaleRange> vscaleRange,
                      RoundUpVscaleMultiple roundUp) {
   if (!vscaleRange.has_value()) {
     FailureOr<int64_t> maybeDimBoundSize =
@@ -1174,8 +1196,8 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
   FailureOr<DimBound> maybeDimBound =
       vector::ScalableValueBoundsConstraintSet::computeScalableBound(
           shapedValue, dimNum,
-          /*vscaleMin=*/vscaleRange->min,
-          /*vscaleMax=*/vscaleRange->max, presburger::BoundType::UB);
+          /*vscaleMin=*/vscaleRange->vscaleMin,
+          /*vscaleMax=*/vscaleRange->vscaleMax, presburger::BoundType::UB);
   if (failed(maybeDimBound))
     return failure();
   auto boundSize = maybeDimBound->getSize();

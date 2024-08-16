@@ -74,6 +74,10 @@ extra_css:
   - assets/stylesheets/extra.css
   - assets/stylesheets/iree.css
 
+exclude_docs: |
+  *.gz
+  assets/images/README.md
+
 copyright: Copyright &copy; 2024 The IREE Authors
 
 markdown_extensions:
@@ -205,7 +209,6 @@ nav:
           - "developers/debugging/sanitizers.md"
       - "Performance":
           - "developers/performance/benchmarking.md"
-          - "developers/performance/benchmark-suites.md"
           - "developers/performance/profiling.md"
           - "developers/performance/profiling-cpu-events.md"
           - "developers/performance/profiling-gpu-vulkan.md"

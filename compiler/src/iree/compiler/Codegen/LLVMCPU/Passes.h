@@ -27,6 +27,7 @@ struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
   bool enableArmI8mm = false;
+  bool enableArmSME = false;
 };
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -40,6 +41,9 @@ createLLVMCPUTileAndFusePass(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel);
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUTileRootAndFuseInputOperands(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVerifyVectorSizeLegalityPass(
@@ -69,7 +73,7 @@ struct LLVMCPUPipelineOptions {
   bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
   bool enableVectorMasking = false;
-  bool enableAArch64SSVE = false;
+  bool enableAArch64SME = false;
   bool enableAArch64I8mm = false;
   bool lowerToAVX2 = false;
 };

@@ -423,8 +423,7 @@ struct DistributeReductions final
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp reductionOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    auto reductionDims = llvm::to_vector<4>(
-        reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+    ArrayRef<int64_t> reductionDims = reductionOp.getReductionDims();
     // TODO: Add support for reductions along multiple dimensions.
     if (reductionDims.size() > 1)
       return failure();
@@ -461,7 +460,7 @@ struct DistributeReductions final
     Value storeVec = rewriter.create<arith::ConstantOp>(
         loc, storeVectorType, rewriter.getZeroAttr(storeVectorType));
 
-    int reductionDim = reductionDims[0].getInt();
+    int reductionDim = reductionDims[0];
     int parallelDim = reductionDim ^ 1;
     if (!sourceLayout.getLane(reductionDim))
       return failure();

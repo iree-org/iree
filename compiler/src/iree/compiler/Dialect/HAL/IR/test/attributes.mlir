@@ -5,8 +5,8 @@
 "descriptor_set_layout_binding.basic"() {
   // CHECK: dslb0 = #hal.descriptor_set.binding<0, uniform_buffer>
   dslb0 = #hal.descriptor_set.binding<0, uniform_buffer>,
-  // CHECK: dslb1 = #hal.descriptor_set.binding<1, storage_buffer>
-  dslb1 = #hal.descriptor_set.binding<1, storage_buffer>
+  // CHECK: dslb1 = #hal.descriptor_set.binding<1, storage_buffer, "ReadOnly|Indirect">
+  dslb1 = #hal.descriptor_set.binding<1, storage_buffer, "ReadOnly|Indirect">
 } : () -> ()
 
 // -----

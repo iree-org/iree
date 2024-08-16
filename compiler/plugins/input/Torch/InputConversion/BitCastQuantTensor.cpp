@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
-
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -16,6 +14,9 @@
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::TorchInput {
+
+#define GEN_PASS_DEF_BITCASTQUANTTENSORPASS
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 namespace {
 
@@ -105,8 +106,8 @@ public:
 } // namespace
 
 namespace {
-class BitCastQuantTensorPass
-    : public BitCastQuantTensorPassBase<BitCastQuantTensorPass> {
+class BitCastQuantTensorPass final
+    : public impl::BitCastQuantTensorPassBase<BitCastQuantTensorPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<torch::Torch::TorchDialect>();
@@ -123,10 +124,5 @@ class BitCastQuantTensorPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createBitCastQuantTensorPass() {
-  return std::make_unique<BitCastQuantTensorPass>();
-}
 
 } // namespace mlir::iree_compiler::TorchInput

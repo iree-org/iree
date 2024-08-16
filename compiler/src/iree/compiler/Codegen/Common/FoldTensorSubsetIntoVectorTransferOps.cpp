@@ -140,7 +140,7 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
   if (writeOp.getMask())
     return false;
 
-  std::optional<iree_compiler::VscaleRange> vscaleRange;
+  std::optional<vector::VscaleRange> vscaleRange;
   auto vecType = writeOp.getVectorType();
   if (vecType.isScalable()) {
     auto targetAttr =

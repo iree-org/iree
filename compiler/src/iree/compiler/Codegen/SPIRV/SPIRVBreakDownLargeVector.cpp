@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVBREAKDOWNLARGEVECTORPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -136,7 +138,7 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
 };
 
 struct SPIRVBreakDownLargeVectorPass final
-    : public SPIRVBreakDownLargeVectorBase<SPIRVBreakDownLargeVectorPass> {
+    : impl::SPIRVBreakDownLargeVectorPassBase<SPIRVBreakDownLargeVectorPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -163,10 +165,4 @@ struct SPIRVBreakDownLargeVectorPass final
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVBreakDownLargeVectorPass() {
-  return std::make_unique<SPIRVBreakDownLargeVectorPass>();
-}
-
 } // namespace mlir::iree_compiler

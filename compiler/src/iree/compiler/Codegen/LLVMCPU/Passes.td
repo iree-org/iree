@@ -140,13 +140,20 @@ def LLVMCPUTileAndFusePass :
   ];
 }
 
-def LLVMCPUTileRootAndFuseProducerConsumerPass :
-    InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to tile root op and fuse with producer and consumer TilingInterface ops.";
-  let options = [
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
-  ];
+def LLVMCPUTileRootAndFuseProducerConsumerPass
+    : InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile root op and fuse with producer and consumer "
+                "TilingInterface ops.";
+  let options =
+      [Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+              "Use default tiling level used to retrieve the configuration "
+              "from lowering_config">,
+       Option<"onlyFuseProducerInputOperands",
+              "only-fuse-producer-input-operands", "bool",
+              /*default=*/"false",
+              "Specifies if we only want to fuse producer's input operands. "
+              "This is helpful to tile&fuse in case of reduction dimensions.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :
@@ -206,6 +213,11 @@ def LLVMCPUVirtualVectorLoweringPass :
 def LLVMCPUVectorTransferLoweringPass :
     InterfacePass<"iree-llvmcpu-vector-transfer-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";
+  let options = [
+    Option<"enableScalableLowerings", "enable-scalable-lowerings", "bool",
+      /*default=*/"false",
+      "Enables scalable vector specific transfer lowerings">,
+  ];
 }
 
 def LLVMCPUVectorTransposeLoweringPass :

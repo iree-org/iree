@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <tuple>
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -63,6 +62,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTTOSPIRVPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -470,13 +472,16 @@ struct RemoveIdentityConversionCast final
 /// Converts remaining interface ops into SPIR-V global variables, GPU processor
 /// ID ops into SPIR-V global variables, loop/standard ops into corresponding
 /// SPIR-V ops.
-class ConvertToSPIRVPass final : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
+class ConvertToSPIRVPass final
+    : public impl::ConvertToSPIRVPassBase<ConvertToSPIRVPass> {
 public:
+  using impl::ConvertToSPIRVPassBase<
+      ConvertToSPIRVPass>::ConvertToSPIRVPassBase;
+  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
-
-  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   LogicalResult initializeOptions(
       StringRef options,

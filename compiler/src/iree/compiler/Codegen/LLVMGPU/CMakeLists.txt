@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -52,7 +51,6 @@ iree_cc_library(
   NAME
     ROCDLPassHeaders
   HDRS
-    "ROCDLPassDetail.h"
     "ROCDLPasses.h"
     "ROCDLPasses.h.inc"
   DEPS

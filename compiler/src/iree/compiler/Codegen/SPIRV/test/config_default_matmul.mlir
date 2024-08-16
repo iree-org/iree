@@ -13,7 +13,8 @@
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @batch_matmul_1x3x32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -55,7 +56,8 @@ func.func @batch_matmul_1x3x32() attributes {hal.executable.target = #executable
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @matmul_64x16xi8() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -96,7 +98,8 @@ func.func @matmul_64x16xi8() attributes {hal.executable.target = #executable_tar
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int64|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @matmul_64x16xi64() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -137,7 +140,8 @@ func.func @matmul_64x16xi64() attributes {hal.executable.target = #executable_ta
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -189,7 +193,8 @@ func.func @matmul_400x273() attributes {hal.executable.target = #executable_targ
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -243,7 +248,8 @@ func.func @matmul_25x546() attributes {hal.executable.target = #executable_targe
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @matmul_pointwise_256x1024() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {

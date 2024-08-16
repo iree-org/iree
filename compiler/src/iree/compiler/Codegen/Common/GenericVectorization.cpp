@@ -53,7 +53,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     VEC_DBGS() << '\n';
   });
 
-  std::optional<VscaleRange> vscaleRange;
+  std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
     // (which is used to compute sizes for tensor.pack/unpack).
@@ -376,6 +376,16 @@ void GenericVectorizationPass::runOnOperation() {
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
   };
+
+  {
+    // Eliminate (all-true) vector masks as early as possible (to avoid missing
+    // optimizations/folds). This is particularly beneficial for scalable
+    // vectors that use dynamic tensor shapes.
+    auto targetAttr =
+        iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    auto vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+    vector::eliminateVectorMasks(rewriter, funcOp, vscaleRange);
+  }
 
   {
     // Canonicalize mask related ops before we lower them.

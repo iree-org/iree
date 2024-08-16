@@ -71,10 +71,10 @@ iree_cc_library(
     "GPUTileReduction.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
+    "GPUVerifyDistribution.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
     "WorkgroupReordering.cpp"
-    "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

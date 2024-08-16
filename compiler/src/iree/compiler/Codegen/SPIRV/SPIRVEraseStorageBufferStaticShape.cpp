@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -21,10 +20,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVERASESTORAGEBUFFERSTATICSHAPEPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 
 class EraseStorageBufferStaticShapePass final
-    : public SPIRVEraseStorageBufferStaticShapeBase<
+    : public impl::SPIRVEraseStorageBufferStaticShapePassBase<
           EraseStorageBufferStaticShapePass> {
   void runOnOperation() override;
 };
@@ -127,11 +129,6 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-std::unique_ptr<mlir::InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVEraseStorageBufferStaticShapePass() {
-  return std::make_unique<EraseStorageBufferStaticShapePass>();
 }
 
 } // namespace mlir::iree_compiler
