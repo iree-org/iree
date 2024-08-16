@@ -112,7 +112,9 @@ makeDispatchFunctionType(llvm::LLVMContext &context) {
 // %struct.iree_hal_executable_dispatch_attrs_v0_t = type {
 //   i16,
 //   i8,
-//   i8
+//   i8,
+//   i32,
+//   i64[8]
 // }
 static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
   if (auto *existingType = llvm::StructType::getTypeByName(
@@ -121,12 +123,20 @@ static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
   }
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *i64Type = llvm::IntegerType::getInt64Ty(context);
   auto *type =
       llvm::StructType::create(context,
                                {
-                                   i16Type,
-                                   i8Type,
-                                   i8Type,
+                                   i16Type, i8Type, i8Type, i32Type,
+                                   i64Type, // [0]
+                                   i64Type, // [1]
+                                   i64Type, // [2]
+                                   i64Type, // [3]
+                                   i64Type, // [4]
+                                   i64Type, // [5]
+                                   i64Type, // [6]
+                                   i64Type, // [7]
                                },
                                "iree_hal_executable_dispatch_attrs_v0_t",
                                /*isPacked=*/false);
@@ -490,6 +500,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *i64Type = llvm::IntegerType::getInt64Ty(context);
 
   // iree_hal_executable_export_table_v0_t::ptrs
   SmallVector<llvm::Constant *> exportPtrValues;
@@ -520,6 +531,24 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
               llvm::ConstantInt::get(i8Type, dispatch.attrs.constantCount),
               // binding_count=
               llvm::ConstantInt::get(i8Type, dispatch.attrs.bindingCount),
+              // reserved_0=
+              llvm::ConstantInt::get(i32Type, 0),
+              // reserved_1[0]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[1]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[2]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[3]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[4]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[5]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[6]=
+              llvm::ConstantInt::get(i64Type, 0),
+              // reserved_1[7]=
+              llvm::ConstantInt::get(i64Type, 0),
           }));
     }
     exportAttrs = createArrayConstant(libraryName + "_attrs", dispatchAttrsType,

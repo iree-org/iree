@@ -45,7 +45,9 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary (CPU + Vulkan, etc).
-#cpu_target = #hal.device.target<"llvm-cpu", [
+#cpu_target = #hal.device.target<"local", {
+  executable_create_2
+}, [
   #arm_64_target,
   #x86_64_target
 ]> : !hal.device

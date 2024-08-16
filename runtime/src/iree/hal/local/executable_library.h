@@ -392,9 +392,11 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   uint8_t constant_count;
   // Total number of bindings used by the dispatch.
   uint8_t binding_count;
-  // TODO(#18154): add ~8 uint64_t fields for binding bits (readonly/indirect).
+  // Unused to pad the structure. Must be 0.
+  uint32_t reserved_0;
+  // Unused. Must be 0.
+  uint64_t reserved_1[8];
 } iree_hal_executable_dispatch_attrs_v0_t;
-static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
 // Source location information for a dispatch function indicating what code was
 // used to generate it. This only represents a single source snapshot, of which
