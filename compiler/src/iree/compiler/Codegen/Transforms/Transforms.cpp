@@ -454,12 +454,11 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   std::optional<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
   if (!exportOp) {
-    return entryPointFn.emitOpError(
-        "expected function to be entry point function");
+    return success();
   }
   Block *body = exportOp->getWorkgroupCountBody();
   if (!body) {
-    return exportOp->emitOpError("unexpected empty workgroup count region");
+    return success();
   }
   auto countOps = body->getOps<IREE::Flow::DispatchWorkgroupCountFromSliceOp>();
   if (countOps.empty()) {
