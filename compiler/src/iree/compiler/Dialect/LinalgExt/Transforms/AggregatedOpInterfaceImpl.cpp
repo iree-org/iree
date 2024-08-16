@@ -294,14 +294,27 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
 
-  // For low bit-depth types we perform post Q @ K scaling. This is to avoid
-  // losing numerical precision due to the low dynamic range of fp8 types when
-  // pre applying the sclaing.
   if (qETy.getIntOrFloatBitWidth() <= 8) {
+    // For low bit-depth types we perform post Q @ K scaling. This is to avoid
+    // losing numerical precision due to the low dynamic range of fp8 types when
+    // pre applying the sclaing.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
     s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, scale);
+
+    // If we need to truncate to fp8 post softmax we apply a scaling to use the
+    // full fp8 range. We can do this with a offset as post `exp2` this equates
+    // to multiplying by a static value. We are able to do this as `max` and
+    // `sum` are scaled by the same value so the end result is the same.
+    auto fpTy = cast<FloatType>(qETy);
+    double mx =
+        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+            .convertToDouble();
+    Value offset = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
+    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
+                                               offset);
   }
 
   // TODO: This decomposition should be in a seperate op called
@@ -320,23 +333,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap, normMap, oldSum, norm);
-
-  // If we need to truncate to fp8 post softmax we apply a scaling to use the
-  // full fp8 range. We can do this with a offset as post `exp2` this equates
-  // to multiplying by a static value. We are able to do this as `max` and `sum`
-  // are scaled by the same value so the end result is the same.
-  if (isa<FloatType>(qETy) && qETy.getIntOrFloatBitWidth() == 8) {
-    auto fpTy = cast<FloatType>(qETy);
-    double mx =
-        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-            .convertToDouble();
-    Value offset = b.create<arith::ConstantOp>(
-        loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s, offset);
-  }
-
 
   // P = exp2(S - newMax)
   // PMap = SMap
