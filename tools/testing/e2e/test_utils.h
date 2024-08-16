@@ -17,7 +17,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define FINDMAX(a, b) ((a) > (b) ? (a) : (b))
 
 bool iree_test_utils_require_exact_results(void);
 
