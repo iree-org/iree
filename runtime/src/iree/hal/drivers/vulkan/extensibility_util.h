@@ -106,6 +106,28 @@ iree_hal_vulkan_device_extensions_t
 iree_hal_vulkan_infer_enabled_device_extensions(
     const iree::hal::vulkan::DynamicSymbols* device_syms);
 
+// A subset of relevant device limits.
+// These come from VkPhysicalDeviceLimits and other extension structures and are
+// condensed here to avoid the need for handling extension/versioning
+// compatibility in all places that may be interested in the limits.
+typedef struct iree_hal_vulkan_device_limits_t {
+  // maxPerStageDescriptorUniformBuffers is the maximum number of uniform
+  // buffers that can be accessible to a single shader stage in a pipeline
+  // layout. Descriptors with a type of VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER or
+  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC count against this limit.
+  uint32_t max_per_stage_descriptor_uniform_buffers;
+  // maxPerStageDescriptorStorageBuffers is the maximum number of storage
+  // buffers that can be accessible to a single shader stage in a pipeline
+  // layout. Descriptors with a type of VK_DESCRIPTOR_TYPE_STORAGE_BUFFER or
+  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC count against this limit.
+  uint32_t max_per_stage_descriptor_storage_buffers;
+  // maxPushConstantsSize is the maximum size, in bytes, of the pool of push
+  // constant memory. For each of the push constant ranges indicated by the
+  // pPushConstantRanges member of the VkPipelineLayoutCreateInfo structure,
+  // (offset + size) must be less than or equal to this limit.
+  uint32_t max_push_constants_size;
+} iree_hal_vulkan_device_limits_t;
+
 // Struct for supported device properties.
 //
 // Note that the fields used here should match the ones used in KernelFeatures
@@ -144,6 +166,9 @@ typedef struct iree_hal_vulkan_device_properties_t {
   // ("address.<mode>")
   // * 0b01: address.physical64
   uint32_t address : 8;
+
+  // Device limits.
+  iree_hal_vulkan_device_limits_t limits;
 } iree_hal_vulkan_iree_hal_vulkan_device_properties_t;
 
 #endif  // IREE_HAL_DRIVERS_VULKAN_EXTENSIBILITY_UTIL_H_
