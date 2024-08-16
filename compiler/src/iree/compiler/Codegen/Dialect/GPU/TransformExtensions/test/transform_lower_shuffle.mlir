@@ -1,6 +1,7 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
-func.func @shuffle_tensor(%init: tensor<6x6xf32>, %source: tensor<2x3xf32>, %x: index) -> tensor<3x2xf32> {
+func.func @shuffle_tensor(%source: tensor<2x3xf32>, %x: index) -> tensor<3x2xf32> {
+  %init = tensor.empty() : tensor<6x6xf32>
   %0 = iree_gpu.shuffle_tensor %source[%x, 0] [2, 3] [1, 1] to %init {
   ^bb0(%intermediate: tensor<6x6xf32>):
     %slice = tensor.extract_slice %intermediate[0, %x] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
@@ -20,10 +21,10 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @shuffle_tensor
-//  CHECK-SAME:   %[[INIT:[A-Za-z0-9]+]]: tensor<6x6xf32>
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<2x3xf32>
 //  CHECK-SAME:   %[[X:[A-Za-z0-9]+]]: index
 
+//       CHECK:   %[[INIT:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<6x6xf32>
 //       CHECK:   %[[IN:.+]] = tensor.insert_slice %[[ARG1]] into %[[INIT]][%[[X]], 0] [2, 3] [1, 1] : tensor<2x3xf32> into tensor<6x6xf32>
 //       CHECK:   %[[WRITE_BARRIER:.+]] = iree_gpu.value_barrier %[[IN]]
 //       CHECK:   %[[OUT:.+]] = tensor.extract_slice %[[WRITE_BARRIER]][0, %[[X]]] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
@@ -32,9 +33,10 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-func.func @rank_reducing_shuffle_tensor(%init: tensor<1x6x6xf32>, %source: tensor<2x3xf32>, %x: index, %y: index) -> vector<3x2xf32> {
+func.func @rank_reducing_shuffle_tensor(%source: tensor<2x3xf32>, %x: index, %y: index) -> vector<3x2xf32> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
+  %init = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<1x6x6xf32>
   %0 = iree_gpu.shuffle_tensor %source[0, %x, %y] [1, 2, 3] [1, 1, 1] to %init {
   ^bb0(%intermediate: tensor<1x6x6xf32>):
     %slice = tensor.extract_slice %intermediate[0, %y, %x] [1, 3, 2] [1, 1, 1] : tensor<1x6x6xf32> to tensor<3x2xf32>
@@ -55,11 +57,11 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @rank_reducing_shuffle_tensor
-//  CHECK-SAME:   %[[INIT:[A-Za-z0-9]+]]: tensor<1x6x6xf32>
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<2x3xf32>
 //  CHECK-SAME:   %[[X:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[Y:[A-Za-z0-9]+]]: index
 
+//       CHECK:   %[[INIT:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<1x6x6xf32>
 //       CHECK:   %[[IN:.+]] = tensor.insert_slice %[[ARG1]] into %[[INIT]][0, %[[X]], %[[Y]]] [1, 2, 3] [1, 1, 1] : tensor<2x3xf32> into tensor<1x6x6xf32>
 //       CHECK:   %[[WRITE_BARRIER:.+]] = iree_gpu.value_barrier %[[IN]]
 //       CHECK:   %[[OUT:.+]] = tensor.extract_slice %[[WRITE_BARRIER]][0, %[[Y]], %[[X]]] [1, 3, 2] [1, 1, 1] : tensor<1x6x6xf32> to tensor<3x2xf32>
@@ -69,9 +71,10 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-func.func @reshape_shuffle_tensor(%init: tensor<12x12xf32>, %source: tensor<2x3xf32>) -> vector<2x1x3x2xf32> {
+func.func @reshape_shuffle_tensor(%source: tensor<2x3xf32>) -> vector<2x1x3x2xf32> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<12x12xf32>
   %0 = iree_gpu.shuffle_tensor %source[0, 0] [2, 3] [1, 1] to %init {
   ^bb0(%intermediate: tensor<12x12xf32>):
     %expand = tensor.expand_shape %intermediate [[0, 1], [2, 3]] output_shape [4, 3, 3, 4] : tensor<12x12xf32> into tensor<4x3x3x4xf32>
@@ -92,9 +95,9 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @reshape_shuffle_tensor
-//  CHECK-SAME:   %[[INIT:[A-Za-z0-9]+]]: tensor<12x12xf32>
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<2x3xf32>
 
+//       CHECK:   %[[INIT:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<12x12xf32>
 //       CHECK:   %[[IN:.+]] = tensor.insert_slice %[[ARG1]] into %[[INIT]][0, 0] [2, 3] [1, 1] : tensor<2x3xf32> into tensor<12x12xf32>
 //       CHECK:   %[[WRITE_BARRIER:.+]] = iree_gpu.value_barrier %[[IN]]
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[WRITE_BARRIER]]

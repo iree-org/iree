@@ -923,13 +923,32 @@ struct LowerShuffleTensor
                                 PatternRewriter &rewriter) const final {
     Location loc = shuffleOp.getLoc();
 
+    Value dest = shuffleOp.getDest();
+
+    // If the destination is a tensor.empty, replace it with an alloc_tensor.
+    if (auto emptyDest = shuffleOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
+      Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
+          rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+      auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
+          emptyDest->getLoc(), emptyDest->getResultTypes()[0],
+          emptyDest.getDynamicSizes());
+      allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+      dest = allocTensor.getResult();
+    }
+
+    if (!dest.getDefiningOp<bufferization::AllocTensorOp>()) {
+      return rewriter.notifyMatchFailure(shuffleOp,
+                                         "unimplemented: could not convert "
+                                         "destination to shared memory space");
+    }
+
     // Step 1. Insert the source slice into the intermediate tensor.
     SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
     SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
     Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), shuffleOp.getDest(), sourceOffsets,
-        sourceSizes, sourceStrides);
+        loc, shuffleOp.getSource(), dest, sourceOffsets, sourceSizes,
+        sourceStrides);
 
     // Step 2. Synchronize the workers.
     auto writeBarrier =
