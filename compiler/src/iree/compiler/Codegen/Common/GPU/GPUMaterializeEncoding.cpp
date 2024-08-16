@@ -125,7 +125,12 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   }
 
   // Enumerate available tile shapes for the given encoding and target.
-  IREE::GPU::TargetAttr gpuTargetAttr = getGPUTargetAttr(targetAttr);
+  IREE::GPU::TargetAttr gpuTargetAttr;
+  if (targetAttr) {
+    gpuTargetAttr = getGPUTargetAttr(targetAttr);
+  } else {
+    gpuTargetAttr = getCLGPUTarget(tensorType.getContext());
+  }
   auto elementTypes = llvm::to_vector(
       llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
         return cast<TypeAttr>(a).getValue();
