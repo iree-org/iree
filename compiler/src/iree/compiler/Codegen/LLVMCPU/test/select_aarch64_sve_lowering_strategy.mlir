@@ -30,7 +30,7 @@ func.func @matmul_tensors() attributes {hal.executable.target = #executable_targ
   return
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [6, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: func.func @matmul_tensors()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -126,7 +126,7 @@ func.func @matmul_tensors() attributes {hal.executable.target = #executable_targ
   return
 }
 
-//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [6, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //  DISABLE-ARM-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      DISABLE-ARM-SME: func.func @matmul_tensors()
 //  DISABLE-ARM-SME-SAME:     translation_info = #[[TRANSLATION]]
@@ -189,8 +189,8 @@ func.func @matmul_with_fill() attributes {hal.executable.target = #executable_ta
   return
 }
 
-// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [8, [16]], [0, 0], [0, 0]]>
-// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [4, [16]], [0, 0], [0, 0]]>
+// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, [16], 0], [0, 0, 1], [0, 0, 0]]>
 // CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 // CHECK:      func.func @matmul_with_fill()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
