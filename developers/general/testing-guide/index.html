@@ -2457,30 +2457,36 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#external-test-suite" class="md-nav__link">
+  <a href="#external-test-suites" class="md-nav__link">
     <span class="md-ellipsis">
-      External test suite
+      External test suites
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="External test suite">
+    <nav class="md-nav" aria-label="External test suites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#adding-new-test-cases" class="md-nav__link">
+  <a href="#onnx-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding new test cases
+      ONNX operator tests
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ONNX operator tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-config-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating config files
     </span>
   </a>
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#usage-from-other-projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      Usage from other projects
-    </span>
-  </a>
+      </ul>
+    </nav>
   
 </li>
         
@@ -3972,30 +3978,36 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#external-test-suite" class="md-nav__link">
+  <a href="#external-test-suites" class="md-nav__link">
     <span class="md-ellipsis">
-      External test suite
+      External test suites
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="External test suite">
+    <nav class="md-nav" aria-label="External test suites">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#adding-new-test-cases" class="md-nav__link">
+  <a href="#onnx-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding new test cases
+      ONNX operator tests
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ONNX operator tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-config-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Updating config files
     </span>
   </a>
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#usage-from-other-projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      Usage from other projects
-    </span>
-  </a>
+      </ul>
+    </nav>
   
 </li>
         
@@ -4357,42 +4369,56 @@ our <code>CMakeLists.txt</code> file by
 <p>There are other test targets that generate tests based on template configuraton
 and platform detection, such as <code>iree_static_linker_test</code>. Those targets are
 not supported by Bazel rules at this point.</p>
-<h2 id="external-test-suite">External test suite<a class="headerlink" href="#external-test-suite" title="Permanent link">link</a></h2>
-<p>An out-of-tree test suite is under development at
-<a href="https://github.com/nod-ai/SHARK-TestSuite/tree/main/iree_tests">nod-ai/SHARK-TestSuite</a>
-for large collections of generated tests and machine learning models that are
-too large to fit into the main git repository.</p>
-<p>Testing these programs follows several stages:</p>
+<h2 id="external-test-suites">External test suites<a class="headerlink" href="#external-test-suites" title="Permanent link">link</a></h2>
+<p>Multiple test suites are under development in the
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
+repository.</p>
+<ul>
+<li>Many program, input, and output files are too large to store directly in Git,
+  especially in a monorepo, so test suites may use
+  <a href="https://git-lfs.com/">Git LFS</a>, cloud storage, and persistent caches on
+  test machines as needed.</li>
+<li>Keeping tests out of tree forces them to use public project APIs and allows
+  the core project to keep its infrastructure simpler.</li>
+</ul>
+<p>The <a href="https://github.com/nod-ai/SHARK-TestSuite">nod-ai/SHARK-TestSuite</a>
+repository also contains tests for many machine learning models. Some of these
+tests are planned to be migrated into
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>.</p>
+<h3 id="onnx-operator-tests">ONNX operator tests<a class="headerlink" href="#onnx-operator-tests" title="Permanent link">link</a></h3>
+<p>Tests for individual ONNX operators are included at
+<a href="https://github.com/iree-org/iree-test-suites/tree/main/onnx-ops"><code>onnx-ops/</code></a>
+in the
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
+repository. These tests are generated from the upstream tests at
+<a href="https://github.com/onnx/onnx/tree/main/onnx/backend/test/data/node"><code>onnx/backend/test/data/node/</code></a>
+in the <a href="https://github.com/onnx/onnx">onnxx/onnx</a> repository.</p>
+<p>Testing ONNX programs follows several stages:</p>
 <pre class="mermaid"><code>graph LR
   Import -. "\n(offline)" .-&gt; Compile
   Compile --&gt; Run</code></pre>
-<p>This particular test suite treats importing (e.g. from ONNX, PyTorch, or
-TensorFlow) as an offline step and contains test cases organized into folders
-of programs, inputs, and expected outputs:</p>
+<p>This particular test suite treats importing as an offline step and contains
+test cases organized into folders of programs, inputs, and expected outputs:</p>
 <div class="highlight"><span class="filename">Sample test case directory</span><pre><span></span><code>test_case_name/
   model.mlir
-  input_0.npy
-  output_0.npy
-  test_data_flags.txt
+  input_0.bin
+  output_0.bin
+  run_module_io_flags.txt
 </code></pre></div>
-<div class="highlight"><span class="filename">Sample test_data_flags.txt</span><pre><span></span><code>--input=@input_0.npy
---expected_output=@output_0.npy
+<div class="highlight"><span class="filename">Sample run_module_io_flags.txt</span><pre><span></span><code>--input=2x3xf32=@input_0.bin
+--expected_output=2x3xf32=@output_0.bin
 </code></pre></div>
-<ul>
-<li>Many model, input, and output files are too large to store directly in Git,
-so the external test suite also uses <a href="https://git-lfs.com/">Git LFS</a> and cloud
-storage.</li>
-</ul>
 <p>Each test case can be run using a sequence of commands like:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>model.mlir<span class="w"> </span><span class="o">{</span>flags<span class="o">}</span><span class="w"> </span>-o<span class="w"> </span>model.vmfb
-iree-run-module<span class="w"> </span>--module<span class="o">=</span>model.vmfb<span class="w"> </span>--flagfile<span class="o">=</span>test_data_flags.txt
+iree-run-module<span class="w"> </span>--module<span class="o">=</span>model.vmfb<span class="w"> </span>--flagfile<span class="o">=</span>run_module_io_flags.txt
 </code></pre></div>
 <p>To run slices of the test suite, a <a href="https://docs.pytest.org/en/stable/">pytest</a>
 runner is included that can be configured using JSON files. The JSON files
 tested in the IREE repo itself are stored in
-<a href="https://github.com/iree-org/iree/tree/main/build_tools/pkgci/external_test_suite"><code>build_tools/pkgci/external_test_suite/</code></a>.</p>
+<a href="https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops"><code>tests/external/iree-test-suites/onnx_ops/</code></a>.</p>
 <p>For example, here is part of a config file for running ONNX tests on CPU:</p>
-<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<!-- markdownlint-disable-next-line -->
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
 <span class="normal"> 2</span>
 <span class="normal"> 3</span>
 <span class="normal"> 4</span>
@@ -4432,30 +4458,19 @@ tested in the IREE repo itself are stored in
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_adam&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_adam_multiple&quot;</span><span class="p">,</span>
 </code></pre></div></td></tr></table></div>
-<h3 id="adding-new-test-cases">Adding new test cases<a class="headerlink" href="#adding-new-test-cases" title="Permanent link">link</a></h3>
-<p>To add new test cases to the external test suite:</p>
-<ol>
-<li>Import the programs you want to test into MLIR. This can be done manually or
-   using automation. Prefer to automate, or at least document, the process so
-   test cases can be regenerated later.</li>
-<li>Construct sets of inputs and expected outputs (as .npy or .bin files). These
-   can be manually authored or imported by running the program through a
-   reference backend.</li>
-<li>Group the program, inputs, and outputs together using a flagfile.</li>
-</ol>
-<p>To start running new test cases:</p>
-<ol>
-<li>Bump the commit of the test suite that is used in IREE's
-   <a href="https://github.com/iree-org/iree/tree/main/.github/workflows"><code>.github/workflows/</code> files</a></li>
-<li>Add new pytest invocations and/or config files that run the new tests</li>
-</ol>
-<h3 id="usage-from-other-projects">Usage from other projects<a class="headerlink" href="#usage-from-other-projects" title="Permanent link">link</a></h3>
-<p>The external test suite only needs <code>iree-compile</code> and <code>iree-run-module</code> to run,
-so it is well suited for use in downstream projects that implement plugins for
-IREE. The
-<a href="https://github.com/nod-ai/SHARK-TestSuite/blob/main/iree_tests/conftest.py"><code>conftest.py</code></a>
-file can also be forked (or bypassed entirely) to further customize the test
-runner behavior.</p>
+<h4 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h4>
+<p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
+for the nature of the failure. Often, a test is <em>newly passing</em>, with logs
+like this:</p>
+<div class="highlight"><pre><span></span><code>=================================== FAILURES ===================================
+_ IREE compile and run: test_mod_uint64::model.mlir::model.mlir::cpu_llvm_sync _
+[gw1] linux -- Python 3.11.9 /home/runner/work/iree/iree/venv/bin/python
+[XPASS(strict)] Expected run to fail (included in &#39;expected_run_failures&#39;)
+</code></pre></div>
+<p>The workflow job that failed should then upload a new config file as an
+"Artifact", which can be downloaded from the action run summary page and then
+committed:</p>
+<p><img alt="image" src="https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2" /></p>
 
 
 
