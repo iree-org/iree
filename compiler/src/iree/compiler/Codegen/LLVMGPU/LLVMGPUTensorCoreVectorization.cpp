@@ -96,6 +96,7 @@ public:
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractionPatterns);
       vector::populateVectorReductionToContractPatterns(contractionPatterns);
+      vector::populateSinkVectorOpsPatterns(contractionPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(contractionPatterns)))) {
         return signalPassFailure();

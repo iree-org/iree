@@ -167,7 +167,7 @@ struct ConvertToNVVMPass final
           LLVM::RoundEvenOp, LLVM::RoundOp, LLVM::SinOp, LLVM::SqrtOp>();
 
       // TODO: Remove once we support replacing non-root ops.
-      target.addLegalOp<gpu::YieldOp, gpu::GPUModuleOp, gpu::ModuleEndOp>();
+      target.addLegalOp<gpu::YieldOp, gpu::GPUModuleOp>();
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
