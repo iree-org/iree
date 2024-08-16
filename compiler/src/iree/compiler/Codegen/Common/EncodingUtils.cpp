@@ -201,6 +201,7 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
     encodingInfo.innerDimsPos.push_back(kDim.value());
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
+  encodingInfo.srcRank = rank;
   return encodingInfo;
 }
 
