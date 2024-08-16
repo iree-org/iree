@@ -39,6 +39,10 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    container: gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
+    defaults:
+      run:
+        shell: bash
     env:
       BUILD_DIR: build-debug
     steps:
@@ -46,16 +50,21 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
-      - name: "Building IREE in Debug configuration"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+      - name: Install Python requirements
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      # Note: not using ccache here. Debug builds need a lot of cache space
+      # and caching only provides marginal build time improvements.
+      - name: CMake - configure
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CMAKE_BUILD_TYPE=Debug" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON
+      - name: CMake - build
+        run: cmake --build ${BUILD_DIR} -- -k 0
+      # We could build `iree-test-deps` or run some unit tests here, but the
+      # main thing we want coverage for is the build itself and those steps
+      # would add 10+ minutes to the job.
