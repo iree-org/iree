@@ -1,16 +1,34 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-materialize-device-encoding))" --split-input-file %s | FileCheck %s
 
+//-----------------------------------------------------------------------------
+// 1. MFMA_F32_16x16x4_F32
+//-----------------------------------------------------------------------------
+
 #encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+    features = "",
+    wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+    storage =  b64|b32|b16|b8,
+    subgroup =  shuffle|arithmetic,
+    dot =  dp4xi8toi32,
+    mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+    subgroup_size_choices = [64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536>>
+}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-func.func @set_encoding_LHS() {
+func.func @set_encoding_LHS() attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
@@ -31,9 +49,9 @@ func.func @set_encoding_LHS() {
 // CHECK: %[[EXPAND_LHS_2:.*]] = tensor.expand_shape %[[COLLAPSE]]
 // CHECK: flow.dispatch.tensor.store %[[EXPAND_LHS_2]]
 
-//---------
-
-func.func @set_encoding_RHS() {
+func.func @set_encoding_RHS() attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
@@ -54,9 +72,9 @@ func.func @set_encoding_RHS() {
 // CHECK: %[[EXPAND_RHS_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
 // CHECK: flow.dispatch.tensor.store %[[EXPAND_RHS_2]]
 
-//---------
-
-func.func @set_encoding_ACC() {
+func.func @set_encoding_ACC() attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
