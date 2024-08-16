@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/PassManager.h"
@@ -33,10 +34,9 @@ struct MaterializeEncodingIntoNopPass final
     MLIRContext *context = &getContext();
     auto operation = getOperation();
 
-    auto materializeEncodingFn =
-        [](RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-      return failure();
-    };
+    auto materializeEncodingFn = [](RankedTensorType,
+                                    IREE::HAL::ExecutableTargetAttr)
+        -> FailureOr<MaterializeEncodingInfo> { return failure(); };
     auto materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder &,
            Location) -> FailureOr<MaterializeEncodingValueInfo> {
@@ -44,7 +44,8 @@ struct MaterializeEncodingIntoNopPass final
     };
 
     RewritePatternSet materializeEncodingPattern(context);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn);
+    MaterializeEncodingTypeConverter typeConverter(
+        materializeEncodingFn, IREE::HAL::ExecutableTargetAttr());
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, target, typeConverter,
