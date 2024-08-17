@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "lowering_config_attr.mlir"
     "ukernel_ops.mlir"
     "ukernel_ops_cse.mlir"
+    "workgroup_mapping_attrs.mlir"
   TOOLS
     FileCheck
     iree-opt
