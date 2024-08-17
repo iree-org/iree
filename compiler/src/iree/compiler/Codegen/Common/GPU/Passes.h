@@ -9,6 +9,8 @@
 #define IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 
 #include <cstdint>
+
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -72,6 +74,12 @@ LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory
 // marker.
 LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
+
+/// Returns the encoding info based on the type and targetAttr. This is expected
+/// to be used by MaterializeEncodingTypeConverter.
+FailureOr<MaterializeEncodingInfo>
+gpuMaterializeEncodingForTarget(RankedTensorType tensorType,
+                                IREE::HAL::ExecutableTargetAttr targetAttr);
 
 //===----------------------------------------------------------------------===//
 // Passes

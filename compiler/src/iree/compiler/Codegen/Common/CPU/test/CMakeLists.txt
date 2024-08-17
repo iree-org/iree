@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "emulate_gpu_materialize_encoding.mlir"
     "llvmcpu_materialize_encoding.mlir"
     "lower_to_ukernel_ops.mlir"
     "prepare_ukernels.mlir"

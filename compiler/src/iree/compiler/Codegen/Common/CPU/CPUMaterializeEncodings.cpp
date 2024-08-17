@@ -6,8 +6,11 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
@@ -33,6 +36,13 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CPUMATERIALIZEDEVICEENCODINGPASS
 #define GEN_PASS_DEF_CPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
+
+static llvm::cl::opt<bool> clEmulateGPUDataTiling(
+    "iree-codegen-cpu-experimental-emulate-gpu-data-tiling",
+    llvm::cl::desc("Materilize encodings targeting GPU layouts. The target GPU "
+                   "is specified by iree-gpu-test-target, see "
+                   "Codegen/Utils/GPUUtils.cpp for more details."),
+    llvm::cl::init(false));
 
 // Enumerate tile sizes to choose from when no specific architecture is
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
@@ -400,8 +410,8 @@ enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
 }
 
 static FailureOr<MaterializeEncodingInfo>
-materializeEncodingForTarget(RankedTensorType tensorType,
-                             IREE::HAL::ExecutableTargetAttr targetAttr) {
+cpuMaterializeEncodingForTarget(RankedTensorType tensorType,
+                                IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto encoding =
       dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
@@ -460,14 +470,22 @@ static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr) {
   RewritePatternSet materializeEncodingPattern(funcOp.getContext());
-  MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                 targetAttr);
-  MaterializeEncodingConversionTarget target(*funcOp.getContext());
+  std::unique_ptr<MaterializeEncodingTypeConverter> typeConverter;
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-  populateMaterializeEncodingIntoPackUnPackPatterns(
-      materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
+  if (!clEmulateGPUDataTiling) {
+    typeConverter = std::make_unique<MaterializeEncodingTypeConverter>(
+        cpuMaterializeEncodingForTarget, targetAttr);
+    populateMaterializeEncodingIntoPackUnPackPatterns(
+        materializeEncodingPattern, *typeConverter, materializeEncodingValueFn);
+  } else {
+    typeConverter = std::make_unique<MaterializeEncodingTypeConverter>(
+        gpuMaterializeEncodingForTarget, IREE::HAL::ExecutableTargetAttr());
+    populateGPUMaterializeEncodingPatterns(
+        materializeEncodingPattern, *typeConverter, materializeEncodingValueFn);
+  }
+  MaterializeEncodingConversionTarget target(*funcOp.getContext());
   populateIREEMaterializeEncodingIntoPackUnPackPatterns(
-      materializeEncodingPattern, target, typeConverter,
+      materializeEncodingPattern, target, *typeConverter,
       materializeEncodingValueFn);
 
   if (failed(applyPartialConversion(funcOp, target,
@@ -524,8 +542,9 @@ struct CPUMaterializeHostEncodingPass
     : public impl::CPUMaterializeHostEncodingPassBase<
           CPUMaterializeHostEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+    registry
+        .insert<arith::ArithDialect, tensor::TensorDialect,
+                IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void runOnOperation() override {
@@ -584,8 +603,9 @@ struct CPUMaterializeDeviceEncodingPass
     : public impl::CPUMaterializeDeviceEncodingPassBase<
           CPUMaterializeDeviceEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+    registry
+        .insert<arith::ArithDialect, tensor::TensorDialect,
+                IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void runOnOperation() override {
