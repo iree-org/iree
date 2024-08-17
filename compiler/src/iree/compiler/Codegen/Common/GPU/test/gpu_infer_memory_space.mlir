@@ -47,28 +47,8 @@ func.func @already_annotated_alloc() -> tensor<2x3xi32> {
 // -----
 
 // expected-error@+1 {{failed to set the gpu memory space for all `bufferization.alloc_tensor` ops}}
-func.func @write_in_unspecified_forall(%dest : tensor<4x3xi32>) -> tensor<4x3xi32> {
-  // expected-error@+1 {{op failed to infer missing memory space}}
-  %alloc = bufferization.alloc_tensor() : tensor<2x3xi32>
-  %cst = arith.constant dense<0> : vector<2x3xi32>
-  %c0 = arith.constant 0 : index
-  %res = scf.forall (%arg0) in (2) shared_outs(%arg1 = %dest) -> tensor<4x3xi32> {
-    %w = vector.transfer_write %cst, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<2x3xi32>, tensor<2x3xi32>
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %w into %arg1[%arg0, 0] [2, 3] [1, 1] : tensor<2x3xi32> into tensor<4x3xi32>
-    }
-  }
-  return %res : tensor<4x3xi32>
-}
-
-// -----
-
-// expected-error@+1 {{failed to set the gpu memory space for all `bufferization.alloc_tensor` ops}}
-func.func @write_outside_forall() -> tensor<2x3xi32> {
-  // expected-error@+1 {{op failed to infer missing memory space}}
-  %alloc = bufferization.alloc_tensor() : tensor<2x3xi32>
-  %cst = arith.constant dense<0> : vector<2x3xi32>
-  %c0 = arith.constant 0 : index
-  %w = vector.transfer_write %cst, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<2x3xi32>, tensor<2x3xi32>
-  return %w : tensor<2x3xi32>
+func.func @unknown_memory_space() -> tensor<2x3xi32> {
+  // expected-error@+1 {{unexpected gpu memory space must be private or workgroup.}}
+  %alloc = bufferization.alloc_tensor() {memory_space = "bad"} : tensor<2x3xi32>
+  return %alloc : tensor<2x3xi32>
 }

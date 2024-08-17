@@ -25,51 +25,13 @@ namespace {
 /// ops. Inferring the memory space during bufferization (in the allocation
 /// function) is infeasible due to some limited analysis of surrounding loop
 /// structures needed. After this pass, any unexpected allocations are then
-/// treated as a compiler failure indicating something went wrong during or
-/// near bufferization.
+/// treated as a compiler failure indicating something went wrong during
+/// bufferization.
 struct GPUInferMemorySpacePass final
     : impl::GPUInferMemorySpacePassBase<GPUInferMemorySpacePass> {
 
   void runOnOperation() override;
 };
-
-bool isDefinitelyThreadLocal(bufferization::AllocTensorOp alloc) {
-  ArrayRef<int64_t> allocShape = alloc.getType().getShape();
-  // Give up on dynamic shapes because we can't easily verify that
-  // the destination is overwritten.
-  if (ShapedType::isDynamicShape(allocShape)) {
-    return false;
-  }
-
-  // An allocation can safely be allocated as private if from within a
-  // distributed context all threads overwrite the whole allocation. The logic
-  // below checks for a limited version of this by only looking for
-  // `vector.transfer_write` ops that fully overwrite the tensor.
-  for (auto user : alloc->getUsers()) {
-    if (!operationHasParentForallOfMappingType<gpu::GPUThreadMappingAttr,
-                                               IREE::GPU::LaneIdAttr>(user)) {
-      return false;
-    }
-    auto write = dyn_cast<vector::TransferWriteOp>(user);
-    // TODO: look through reshapes and linalg op destinations if necessary.
-    if (!write) {
-      return false;
-    }
-
-    ArrayRef<int64_t> sourceVecShape = write.getVectorType().getShape();
-    if (!llvm::all_of_zip(allocShape, sourceVecShape,
-                          [](int64_t l, int64_t r) { return l == r; })) {
-      return false;
-    }
-
-    if (!llvm::all_of(write.getIndices(), [](Value value) {
-          return getConstantIntValue(value) == static_cast<int64_t>(0);
-        })) {
-      return false;
-    }
-  }
-  return true;
-}
 
 bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
   // An allocation can be inferred as shared if it is the destination of a
@@ -96,23 +58,40 @@ void GPUInferMemorySpacePass::runOnOperation() {
       context, gpu::GPUDialect::getWorkgroupAddressSpace());
 
   WalkResult res = funcOp.walk([&](bufferization::AllocTensorOp alloc) {
-    // Continue if the allocation already has a memory space.
-    if (alloc.getMemorySpace().has_value()) {
-      return WalkResult::advance();
+    // Continue if the allocation already has a valid memory space.
+    std::optional<Attribute> currentMemSpace = alloc.getMemorySpace();
+    if (currentMemSpace.has_value()) {
+      if (currentMemSpace.value() == privateAddressSpace ||
+          currentMemSpace.value() == sharedAddressSpace) {
+        return WalkResult::advance();
+      }
+      alloc.emitOpError(
+          "unexpected gpu memory space must be private or workgroup.");
+      return WalkResult::interrupt();
     }
 
-    if (isDefinitelyThreadLocal(alloc)) {
-      alloc.setMemorySpaceAttr(privateAddressSpace);
-      return WalkResult::advance();
-    }
-
+    /// Determining GPU memory spaces must be trivial by the time of this pass.
+    /// Because this pass runs immediately before bufferization, input IR is
+    /// expected to mix (thread) distributed and shared contexts. Because after
+    /// bufferization distributed loops (scf.forall) ops are expected to be
+    /// inlined as-is with no further tiling occurring, all tensors at this
+    /// point in the IR are assumed to be thread-local unless it is explicitly
+    /// marked as shared. This gives the following invariants:
+    ///
+    /// 1. If the alloc_tensor is annotated with `#gpu.address_space<private>`
+    ///    already, or if it is used as the immediate destination of a thread
+    ///    or warp distributed `scf.forall` op, then the allocation must be
+    ///    shared memory.
+    /// 2. All other allocations are thread local.
+    ///
+    /// Any allocation that is not explicitly marked as shared memory that is
+    /// supposed to be indicates a bug in earlier passes/lowerings.
     if (isDefinitelyShared(alloc)) {
       alloc.setMemorySpaceAttr(sharedAddressSpace);
-      return WalkResult::advance();
+    } else {
+      alloc.setMemorySpaceAttr(privateAddressSpace);
     }
-
-    alloc->emitOpError("failed to infer missing memory space.");
-    return WalkResult::interrupt();
+    return WalkResult::advance();
   });
 
   if (res.wasInterrupted()) {
