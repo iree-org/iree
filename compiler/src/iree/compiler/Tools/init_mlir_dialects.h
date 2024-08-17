@@ -29,6 +29,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/Transforms/InlinerInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
@@ -94,6 +95,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format on
   cf::registerBufferizableOpInterfaceExternalModels(registry);
   func::registerInlinerExtension(registry);
+  LLVM::registerInlinerInterface(registry);
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
   tensor::registerTilingInterfaceExternalModels(registry);
 

@@ -409,6 +409,7 @@ void GenericVectorizationPass::runOnOperation() {
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+    vector::populateSinkVectorOpsPatterns(vectorizationPatterns);
   }
   if (foldCastIntoContract) {
     vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
