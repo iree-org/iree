@@ -119,10 +119,14 @@ replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
   OpBuilder::InsertionGuard g(rewriter);
   Value shuffleDest = parallelInsert.getDest();
   auto empty = shuffleDest.getDefiningOp<tensor::EmptyOp>();
+  // Fail if the destination is not a `tensor.empty` op and cannot be trivially
+  // converted to a `bufferization.alloc_tensor`.
   if (!empty) {
     return failure();
   }
 
+  // Replace the destination with a `bufferization.alloc_tensor` op with
+  // memory space `#gpu.address_space<workgroup>`.
   {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(empty);
@@ -133,19 +137,27 @@ replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
     allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
     shuffleDest = allocTensor.getResult();
   }
-  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
-      loc, extractSlice.getType(), parallelInsert.getSource(), shuffleDest,
-      parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
-      parallelInsert.getMixedStrides());
-  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+
+  // Create an insert_slice for the result of the first forall op into the
+  // shared memory alloc_tensor.
+  SmallVector<OpFoldResult, 4> sourceOffsets = parallelInsert.getMixedOffsets();
+  SmallVector<OpFoldResult, 4> sourceSizes = parallelInsert.getMixedSizes();
+  SmallVector<OpFoldResult, 4> sourceStrides = parallelInsert.getMixedStrides();
+  Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
+      loc, parallelInsert.getSource(), shuffleDest, sourceOffsets, sourceSizes,
+      sourceStrides);
+
+  auto barrierRegionOp = rewriter.create<IREE::GPU::BarrierRegionOp>(
+      loc, extractSlice.getType(), insertedSlice);
+  rewriter.setInsertionPointToStart(barrierRegionOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
   for (auto consumer : consumerChain) {
     rewriter.moveOpBefore(consumer, terminator);
   }
   (*consumerChain.begin())
-      ->replaceUsesOfWith(source, shuffleOp.getBody()->getArgument(0));
-  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+      ->replaceUsesOfWith(source, barrierRegionOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), barrierRegionOp,
                                 terminator);
   return success();
 }
@@ -912,69 +924,41 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 }
 
 //===---------------------------------------------------------------------===//
-// ShuffleTensor Lowering
+// BarrierRegion Lowering
 //===---------------------------------------------------------------------===//
 
 namespace {
-struct LowerShuffleTensor
-    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
-  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffleOp,
+struct LowerBarrierRegion
+    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+  using OpRewritePattern<IREE::GPU::BarrierRegionOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
-    Location loc = shuffleOp.getLoc();
+    Location loc = barrierRegionOp.getLoc();
 
-    Value dest = shuffleOp.getDest();
-    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
-        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+    // Step 1. Synchronize the workers on the shared dest.
+    auto writeBarrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
+        loc, barrierRegionOp.getDest());
 
-    // If the destination is a tensor.empty, replace it with an alloc_tensor.
-    if (auto emptyDest = shuffleOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
-      auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-          emptyDest->getLoc(), emptyDest->getResultTypes()[0],
-          emptyDest.getDynamicSizes());
-      allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
-      dest = allocTensor.getResult();
-    } else {
-      // Otherwise, verify that the destination is already shared memory.
-      auto allocTensor = dest.getDefiningOp<bufferization::AllocTensorOp>();
-      if (!allocTensor || !allocTensor.getMemorySpace().has_value() ||
-          allocTensor.getMemorySpaceAttr() != sharedMemoryAddrSpace) {
-        return rewriter.notifyMatchFailure(
-            shuffleOp, "shuffle tensor op destination does not have shared "
-                       "memory address space.");
-      }
-    }
-
-    // Step 1. Insert the source slice into the intermediate tensor.
-    SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
-    Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), dest, sourceOffsets, sourceSizes,
-        sourceStrides);
-
-    // Step 2. Synchronize the workers.
-    Value writeBarrier =
-        rewriter.create<IREE::GPU::ValueBarrierOp>(loc, insertedSlice)
-            .getResult(0);
-
-    auto terminator = shuffleOp.getBody()->getTerminator();
+    // Step 2. Inline the barrier op region.
+    auto terminator = barrierRegionOp.getBody()->getTerminator();
     Value replacement = terminator->getOperand(0);
-    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {writeBarrier});
+    rewriter.inlineBlockBefore(barrierRegionOp.getBody(), barrierRegionOp,
+                               {writeBarrier.getResult(0)});
     rewriter.setInsertionPointAfterValue(replacement);
     Value barrier;
-    // Step 3. Synchronize the read value.
+
+    // Step 3. Synchronize the result value.
     barrier = rewriter.create<IREE::GPU::ValueBarrierOp>(loc, replacement)
                   .getResult(0);
-    rewriter.replaceAllUsesWith(shuffleOp.getResult(), barrier);
+    rewriter.replaceAllUsesWith(barrierRegionOp.getResult(), barrier);
     rewriter.eraseOp(terminator);
     return success();
   }
 };
 } // namespace
 
-void populateIREEGPULowerShuffleTensorPatterns(RewritePatternSet &patterns) {
-  patterns.add<LowerShuffleTensor>(patterns.getContext());
+void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerBarrierRegion>(patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//
@@ -1044,10 +1028,10 @@ struct VectorizeStaticMultiMmaOpPattern final
 } // namespace
 
 static LogicalResult
-vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
-                                   IREE::GPU::ShuffleTensorOp shuffle) {
+vectorizeStaticBarrierRegionResult(RewriterBase &rewriter,
+                                   IREE::GPU::BarrierRegionOp barrier) {
   auto tensorResultType =
-      dyn_cast<RankedTensorType>(shuffle.getResult().getType());
+      dyn_cast<RankedTensorType>(barrier.getResult().getType());
   if (!tensorResultType || !tensorResultType.hasStaticShape()) {
     return failure();
   }
@@ -1056,18 +1040,16 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
                                              tensorResultType.getElementType());
 
   auto paddingValue = rewriter.create<arith::ConstantOp>(
-      shuffle.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
+      barrier.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
 
-  auto newShuffle = rewriter.create<IREE::GPU::ShuffleTensorOp>(
-      shuffle.getLoc(), newResultType, shuffle.getSource(), shuffle.getDest(),
-      shuffle.getMixedOffsets(), shuffle.getMixedSizes(),
-      shuffle.getMixedStrides());
+  auto newBarrier = rewriter.create<IREE::GPU::BarrierRegionOp>(
+      barrier.getLoc(), newResultType, barrier.getDest());
 
   auto currentTerminator =
-      cast<IREE::GPU::YieldOp>(shuffle.getBody()->getTerminator());
-  rewriter.mergeBlocks(shuffle.getBody(), newShuffle.getBody(),
-                       newShuffle.getBody()->getArguments());
-  rewriter.setInsertionPointToEnd(newShuffle.getBody());
+      cast<IREE::GPU::YieldOp>(barrier.getBody()->getTerminator());
+  rewriter.mergeBlocks(barrier.getBody(), newBarrier.getBody(),
+                       newBarrier.getBody()->getArguments());
+  rewriter.setInsertionPointToEnd(newBarrier.getBody());
 
   auto innerRead = vector::createReadOrMaskedRead(
       rewriter, currentTerminator.getLoc(), currentTerminator->getOperand(0),
@@ -1076,17 +1058,17 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
   rewriter.create<IREE::GPU::YieldOp>(currentTerminator->getLoc(), innerRead);
   rewriter.eraseOp(currentTerminator);
 
-  rewriter.setInsertionPointAfter(newShuffle);
+  rewriter.setInsertionPointAfter(newBarrier);
 
   // Create the write back to a tensor.
   auto empty = rewriter.create<tensor::EmptyOp>(
-      shuffle.getLoc(), tensorResultType.getShape(),
+      barrier.getLoc(), tensorResultType.getShape(),
       tensorResultType.getElementType());
   int64_t rank = tensorResultType.getRank();
-  auto zero = rewriter.create<arith::ConstantIndexOp>(shuffle.getLoc(), 0);
+  auto zero = rewriter.create<arith::ConstantIndexOp>(barrier.getLoc(), 0);
   rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      shuffle,
-      /*vector=*/newShuffle,
+      barrier,
+      /*vector=*/newBarrier,
       /*source=*/empty,
       /*indices=*/SmallVector<Value>(rank, zero),
       /*inBounds=*/SmallVector<bool>(rank, true));
@@ -1094,19 +1076,19 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
 }
 
 namespace {
-struct VectorizeStaticShuffleTensorResultPattern
-    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
-  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffle,
+struct VectorizeStaticBarrierRegionResultPattern
+    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+  using OpRewritePattern<IREE::GPU::BarrierRegionOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp shuffle,
                                 PatternRewriter &rewriter) const override {
-    return vectorizeStaticShuffleTensorResult(rewriter, shuffle);
+    return vectorizeStaticBarrierRegionResult(rewriter, shuffle);
   }
 };
 } // namespace
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeStaticMultiMmaOpPattern>(patterns.getContext());
-  patterns.add<VectorizeStaticShuffleTensorResultPattern>(
+  patterns.add<VectorizeStaticBarrierRegionResultPattern>(
       patterns.getContext());
 }
 

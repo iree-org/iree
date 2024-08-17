@@ -74,12 +74,12 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-func.func @shuffle_tensor(%init: tensor<6x6xf32>, %source: tensor<2x3xf32>) -> tensor<3x2xf32> {
-  %0 = iree_gpu.shuffle_tensor %source[0, 0] [2, 3] [1, 1] to %init {
+func.func @barrier_region(%init: tensor<6x6xf32>) -> tensor<3x2xf32> {
+  %0 = iree_gpu.barrier_region %init {
   ^bb0(%intermediate: tensor<6x6xf32>):
     %slice = tensor.extract_slice %intermediate[0, 0] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
     iree_gpu.yield %slice : tensor<3x2xf32>
-  } : tensor<2x3xf32> -> tensor<6x6xf32> -> tensor<3x2xf32>
+  } : tensor<6x6xf32> -> tensor<3x2xf32>
   return %0 : tensor<3x2xf32>
 }
 
@@ -93,12 +93,12 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: func @shuffle_tensor
-//       CHECK:   %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %arg1[0, 0] [2, 3] [1, 1] to %arg0 {
+// CHECK-LABEL: func @barrier_region
+//       CHECK:   %[[SHUFFLE:.+]] = iree_gpu.barrier_region
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<6x6xf32>):
-//       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INTERMEDIATE]][0, 0] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
+//       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INTERMEDIATE]][0, 0] [3, 2] [1, 1]
 //       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : tensor<3x2xf32>, vector<3x2xf32>
 //       CHECK:       iree_gpu.yield %[[READ]] : vector<3x2xf32>
-//       CHECK:   } : tensor<2x3xf32> -> tensor<6x6xf32> -> vector<3x2xf32>
+//       CHECK:   } : tensor<6x6xf32> -> vector<3x2xf32>
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<3x2xf32>
 //       CHECK:   vector.transfer_write %[[SHUFFLE]], %[[EMPTY]]

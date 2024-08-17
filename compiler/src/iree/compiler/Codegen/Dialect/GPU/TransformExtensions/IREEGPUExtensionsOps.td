@@ -42,12 +42,12 @@ def ApplyLowerMultiMmaOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerShuffleTensorPatternsOp : Op<Transform_Dialect,
-    "apply_patterns.iree.lower_shuffle_tensor",
+def ApplyLowerBarrierRegionPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_barrier_region",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate patterns that lowers iree_gpu.shuffle_tensor ops to allocations
+    Populate patterns that lowers iree_gpu.barrier_region ops to allocations
     and copies.
   }];
 

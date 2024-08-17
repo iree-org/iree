@@ -45,12 +45,12 @@ void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyLowerShuffleTensorPatternsOp
+// ApplyLowerBarrierRegionPatternsOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
+void transform_dialect::ApplyLowerBarrierRegionPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
-  GPU::populateIREEGPULowerShuffleTensorPatterns(patterns);
+  GPU::populateIREEGPULowerBarrierRegionPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//

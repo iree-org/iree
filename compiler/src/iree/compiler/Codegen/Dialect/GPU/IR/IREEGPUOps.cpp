@@ -26,6 +26,48 @@
 // clang-format on
 
 namespace mlir::iree_compiler::IREE::GPU {
+//===----------------------------------------------------------------------===//
+// BarrierRegionOp
+//===----------------------------------------------------------------------===//
+
+// Build a BarrierRegionOp with an empty.
+void BarrierRegionOp::build(OpBuilder &b, OperationState &result,
+                            Type resultType, Value dest) {
+  result.addOperands(dest);
+  (void)result.addRegion();
+  result.addTypes(resultType);
+
+  Region *region = result.regions[0].get();
+
+  // `builder.createBlock` changes the insertion point within the block. Create
+  // a guard to reset the insertion point of the builder after it is destroyed.
+  OpBuilder::InsertionGuard guard(b);
+  b.createBlock(region, region->end(), ArrayRef<Type>{dest.getType()},
+                ArrayRef<Location>{result.location});
+}
+
+LogicalResult BarrierRegionOp::verify() { return success(); }
+
+LogicalResult BarrierRegionOp::verifyRegions() {
+  auto &region = getRegion();
+  Block &block = region.front();
+  if (block.getNumArguments() != 1) {
+    return emitError("expected the block to have a single argument");
+  }
+
+  if (block.getArgumentTypes()[0] != getDestType()) {
+    return emitError("expected block to have single argument type of")
+           << getDestType();
+  }
+
+  // Ensure that the region yields an element of the right type.
+  auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
+  if (yieldOp.getValue().getType() != getResult().getType()) {
+    return emitOpError("expected yield type to match result type");
+  }
+
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // MultiMmaOp
@@ -280,80 +322,6 @@ std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
   SmallVector<int64_t, 4> shape;
   getIterationBounds(shape);
   return shape;
-}
-
-//===----------------------------------------------------------------------===//
-// ShuffleTensorOp
-//===----------------------------------------------------------------------===//
-
-// Build a ShuffleTensorOp with mixed static and dynamic entries and an empty
-// body.
-void ShuffleTensorOp::build(OpBuilder &b, OperationState &result,
-                            Type resultType, Value source, Value dest,
-                            ArrayRef<OpFoldResult> offsets,
-                            ArrayRef<OpFoldResult> sizes,
-                            ArrayRef<OpFoldResult> strides) {
-  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
-  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
-  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
-  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
-  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
-  build(b, result, resultType, source, dynamicOffsets, dynamicSizes,
-        dynamicStrides, b.getDenseI64ArrayAttr(staticOffsets),
-        b.getDenseI64ArrayAttr(staticSizes),
-        b.getDenseI64ArrayAttr(staticStrides), dest);
-  Region *region = result.regions[0].get();
-
-  // `builder.createBlock` changes the insertion point within the block. Create
-  // a guard to reset the insertion point of the builder after it is destroyed.
-  OpBuilder::InsertionGuard guard(b);
-  b.createBlock(region, region->end(), ArrayRef<Type>{dest.getType()},
-                ArrayRef<Location>{result.location});
-}
-
-LogicalResult ShuffleTensorOp::verify() {
-  // Get the equivalent tensor type for the alloc to verify against.
-  RankedTensorType destType = getDestType();
-  Type allocElementType = destType.getElementType();
-  RankedTensorType allocTensorType =
-      RankedTensorType::get(destType.getShape(), allocElementType);
-
-  // Verify source type against inferred type. Slice insertion and extraction
-  // use the same verification logic.
-  RankedTensorType expectedType = tensor::ExtractSliceOp::inferResultType(
-      allocTensorType, getMixedOffsets(), getMixedSizes(), getMixedStrides());
-  SliceVerificationResult result =
-      isRankReducedType(expectedType, getSourceType());
-  if (result != SliceVerificationResult::Success) {
-    return emitError("Invalid source slice type");
-  }
-
-  if (allocElementType != getSourceType().getElementType() ||
-      allocElementType != getType().getElementType()) {
-    return emitError("Element type mismatch between source and destination");
-  }
-  return success();
-}
-
-LogicalResult ShuffleTensorOp::verifyRegions() {
-  auto &region = getRegion();
-  Block &block = region.front();
-  if (block.getNumArguments() != 1) {
-    return emitError("expected the block to have a single argument");
-  }
-
-  if (block.getArgumentTypes()[0] != getDestType()) {
-    return emitError("expected block to have single argument type of")
-           << getDestType();
-  }
-
-  // Ensure that the region yields an element of the right type.
-  auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
-  if (yieldOp.getValue().getType() != getResult().getType()) {
-    return emitOpError("expected yield type to match result type");
-  }
-
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

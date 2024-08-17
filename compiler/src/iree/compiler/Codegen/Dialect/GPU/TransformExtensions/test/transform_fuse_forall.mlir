@@ -55,11 +55,12 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     %[[INSLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
 //       CHECK:     %[[INSLICE1:.+]] = tensor.extract_slice %[[EMPTY]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
 //       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[INSLICE0]] : tensor<2x128xf32>) outs(%[[INSLICE1]] : tensor<2x128xf32>) -> tensor<2x128xf32>
-//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %[[COPY]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] to %[[ALLOC]]
+//       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ALLOC]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1]
+//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.barrier_region %[[INSERT]]
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
 //       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INTERMEDIATE]][%[[OUTID0]], %[[OUTID1]]] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
 //       CHECK:       iree_gpu.yield %[[SLICE]]
-//       CHECK:     } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
+//       CHECK:     } : tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:     %[[OUTSLICE:.+]] = tensor.extract_slice %[[INIT]][%[[OUTID0]], %[[OUTID1]]] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
 //       CHECK:     %[[MM:.+]] = linalg.matmul ins(%[[SHUFFLE]], %[[SHUFFLE]] : tensor<16x16xf32>, tensor<16x16xf32>)
 //  CHECK-SAME:       outs(%[[OUTSLICE]] : tensor<16x16xf32>) -> tensor<16x16xf32>
@@ -117,8 +118,9 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
 //   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
-//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %{{.*}} to %[[ALLOC]]
-//       CHECK:       } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
+//       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %{{.*}} into %[[ALLOC]]
+//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.barrier_region %[[INSERT]]
+//       CHECK:       } : tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:   } {mapping = [#gpu.warp<y>, #gpu.warp<x>]}
 
 // -----
@@ -171,12 +173,13 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
 //   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
-//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %{{.*}} to %[[ALLOC]]
+//       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %{{.*}} into %[[ALLOC]]
+//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.barrier_region %[[INSERT]]
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
 //       CHECK:       %[[EXPAND:.+]] = tensor.expand_shape %[[INTERMEDIATE]] {{\[}}[0, 1], [2]{{\]}} output_shape [2, 64, 128]
 //       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[EXPAND]][0, %{{.*}}, %{{.*}}] [1, 16, 16] [1, 1, 1] : tensor<2x64x128xf32> to tensor<16x16xf32>
 //       CHECK:       iree_gpu.yield %[[SLICE]]
-//       CHECK:       } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
+//       CHECK:       } : tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:   } {mapping = [#gpu.warp<y>, #gpu.warp<x>]}
 
 // -----
@@ -239,8 +242,8 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:       %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (%c64, %c1) : index, index
 //   CHECK-DAG:       %[[IDX:.+]] = affine.apply #[[$MAP4]](%[[IDS]]#0)
 //       CHECK:       %[[COPY:.+]] = linalg.copy
-//       CHECK:       %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor
-//  CHECK-SAME:         %[[COPY]][%[[IDX]], %[[IDS]]#1] [2, 128] [1, 1] to %[[ALLOC]]
-//       CHECK:       } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
+//       CHECK:       %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ALLOC]][%[[IDX]], %[[IDS]]#1] [2, 128]
+//       CHECK:       %[[SHUFFLE:.+]] = iree_gpu.barrier_region %[[INSERT]]
+//       CHECK:       } : tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:     } {mapping = [#iree_gpu.lane_id<1>, #iree_gpu.lane_id<0>]}
 //       CHECK:   } {mapping = [#gpu.warp<y>, #gpu.warp<x>]}
