@@ -385,10 +385,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
 
   // Step 7. Bufferize.
-  // TODO: This is a workaround for a bug in the lowering of
-  // `iree_gpu.shuffle_tensor` which does not properly represent the concurrent
-  // nature of the write to the intermediate tensor.
-  addBufferizePasses(funcPassManager, /*allowPrivateAllocations=*/false);
+  addBufferizePasses(funcPassManager, /*allowPrivateAllocations=*/true);
 
   // Step 8. Resolve remaining parallel loops.
   funcPassManager.addPass(createGPUVerifyDistributionPass());
