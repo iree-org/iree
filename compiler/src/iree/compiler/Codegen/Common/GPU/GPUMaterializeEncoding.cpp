@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -83,6 +84,49 @@ static SmallVector<int64_t> getTransposePermutation(IREE::GPU::MMAAttr mma,
   default:
     return {};
   }
+}
+
+/// Reshapes the `src` to `targetType` type using tensor.collapse_shape +
+/// tensor.expand_shape. The tensor.expand_shape is returned. Note that it
+/// assumes the `outerRank` dimensions of `src` type and `targetType` are
+/// identical, and the number of elements in the inner dimensions are the same.
+static tensor::ExpandShapeOp reshapeForInnerDims(RewriterBase &rewriter,
+                                                 Value src,
+                                                 RankedTensorType targetType,
+                                                 int64_t outerRank) {
+  auto srcType = cast<RankedTensorType>(src.getType());
+  SmallVector<int64_t> intermediateShape(
+      srcType.getShape().take_front(outerRank));
+  for ([[maybe_unused]] auto [a, b] : llvm::zip_equal(
+           intermediateShape, targetType.getShape().take_front(outerRank))) {
+    assert(a == b &&
+           "expect outerRank dimensions matched between src and targetType");
+  }
+
+  ArrayRef<int64_t> innerShape = srcType.getShape().drop_front(outerRank);
+  assert(llvm::all_of(innerShape,
+                      [](int64_t v) { return !ShapedType::isDynamic(v); }) &&
+         "expect all the inner dimensions are static");
+  int64_t numElem = 1;
+  for (auto v : innerShape) {
+    numElem *= v;
+  }
+  intermediateShape.push_back(numElem);
+
+  Location loc = src.getLoc();
+  Type elemType = srcType.getElementType();
+  auto intermediateShapeType =
+      RankedTensorType::get(intermediateShape, elemType);
+  std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
+      getReassociationIndicesForReshape(srcType, intermediateShapeType);
+  assert(collapseReassoc.has_value());
+  auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
+      loc, intermediateShapeType, src, *collapseReassoc);
+  std::optional<SmallVector<ReassociationIndices>> expandAssoc =
+      getReassociationIndicesForReshape(intermediateShapeType, targetType);
+  assert(expandAssoc.has_value());
+  return rewriter.create<tensor::ExpandShapeOp>(loc, targetType,
+                                                collapseShapeOp, *expandAssoc);
 }
 
 static std::optional<IREE::GPU::MMAAttr>
@@ -287,34 +331,11 @@ struct GPUSetEncodingOpLoweringConversion
     // We want to make the shape consistent, so we need to append it with a
     // `collapse_shape` and a `expand_shape`, just to be conformant with how we
     // materialize for Flow and HAL op.
+    tensor::ExpandShapeOp result =
+        reshapeForInnerDims(rewriter, transposeOp->getResult(0),
+                            packOp->getDestType(), packOp->getSourceRank());
 
-    // 1. collapse tiled dimensions into one dim
-    SmallVector<int64_t> collapsedShape = {sourceShape[0], sourceShape[1],
-                                           sourceShape[2] * sourceShape[3]};
-    auto revertShapeType = RankedTensorType::get(
-        collapsedShape, encodingOp.getSourceType().getElementType());
-
-    std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
-        getReassociationIndicesForReshape(emptyTensor.getType(),
-                                          revertShapeType);
-    assert(collapseReassoc.has_value());
-
-    auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
-        loc, revertShapeType, transposeOp->getResult(0), *collapseReassoc);
-
-    // 2. expand the collapsed shape to the shape intended by the encoding
-    assert(innerTiles.size() == 2); // TODO: relax this
-    auto expandTileShapeType = RankedTensorType::get(
-        {sourceShape[0], sourceShape[1], innerTiles[0], innerTiles[1]},
-        encodingOp.getSourceType().getElementType());
-    std::optional<SmallVector<ReassociationIndices>> tileAssoc =
-        getReassociationIndicesForReshape(collapseShapeOp.getType(),
-                                          expandTileShapeType);
-    assert(tileAssoc.has_value());
-    auto expandTileShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandTileShapeType, collapseShapeOp, *tileAssoc);
-
-    rewriter.replaceOp(encodingOp, expandTileShapeOp);
+    rewriter.replaceOp(encodingOp, result);
     return success();
   }
 };
