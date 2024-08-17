@@ -343,6 +343,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
+        // TODO: Try to take into account element type bit width to get
+        // 4xdword reads instead of 4x{elements}.
         workgroupTileSizes[shapeDim] = scaledTileSize;
         LLVM_DEBUG(llvm::dbgs()
                    << "Chosen workgroup tile size: " << scaledTileSize << "\n");
