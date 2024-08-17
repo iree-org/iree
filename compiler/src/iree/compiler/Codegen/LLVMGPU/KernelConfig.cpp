@@ -46,13 +46,13 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUEnableTileAndFuse(
-    "iree-codegen-llvmgpu-use-tile-and-fuse",
-    llvm::cl::desc("enable the usage of the tile and fuse pipeline"),
+llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+    llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
     llvm::cl::init(false));
 
-llvm::cl::opt<bool> clGPUTestTileAndFuse(
-    "iree-codegen-llvmgpu-test-tile-and-fuse",
+llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
     llvm::cl::desc(
         "test the tile and fuse pipeline for all supported operations"),
     llvm::cl::init(false));
@@ -1952,18 +1952,18 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
-  if (clGPUEnableTileAndFuse) {
+  if (clGPUTestTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {
       LDBG("Tile and fuse matmul config");
       return success();
     }
-    if (clGPUTestTileAndFuse) {
-      if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
-              target, entryPointFn, computeOp))) {
-        LDBG("Tile and fuse default config");
-        return success();
-      }
+  }
+  if (clGPUTestTileAndFuseVectorize) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          computeOp))) {
+      LDBG("Tile and fuse default config");
+      return success();
     }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
@@ -2017,14 +2017,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         return setUKernelConfig(entryPointFn, ukernelOp);
       })
       .Default([&](auto op) {
-        if (clGPUEnableTileAndFuse) {
-          // Default lowering config using tile and fuse instead.
-          if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
-                  target, entryPointFn, computeOp))) {
-            LDBG("Tile and fuse default config");
-            return success();
-          }
-        }
         LDBG("Default Config");
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       });

@@ -1,5 +1,5 @@
-// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx940 --iree-codegen-llvmgpu-test-tile-and-fuse \
-// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse --iree-codegen-llvmgpu-use-vector-distribution=false \
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx940 \
+// RUN: --iree-codegen-llvmgpu-test-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
