@@ -56,7 +56,13 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
+        # TODO(hanchung): Remove the dep. We should ideally mave
+        # CPU/GPUMaterializeEncodingPatterns files to Codegen/Common, so they
+        # can both populate the set of patterns based on encoding target.
+        # This should be fixed when we land it to main branch.
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",

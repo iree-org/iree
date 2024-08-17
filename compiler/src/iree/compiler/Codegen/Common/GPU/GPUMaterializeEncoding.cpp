@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -153,9 +154,9 @@ enumerateMmaIntrinsic(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   return std::nullopt;
 }
 
-static FailureOr<MaterializeEncodingInfo>
-materializeEncodingForTarget(RankedTensorType tensorType,
-                             IREE::HAL::ExecutableTargetAttr targetAttr) {
+FailureOr<MaterializeEncodingInfo>
+gpuMaterializeEncodingForTarget(RankedTensorType tensorType,
+                                IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto encoding =
       dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
@@ -348,8 +349,8 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   {
     RewritePatternSet patterns(ctx);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                   targetAttr);
+    MaterializeEncodingTypeConverter typeConverter(
+        gpuMaterializeEncodingForTarget, targetAttr);
     MaterializeEncodingConversionTarget target(*funcOp.getContext());
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,
@@ -357,8 +358,8 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
     populateIREEMaterializeEncodingIntoPackUnPackPatterns(
         patterns, target, typeConverter, materializeEncodingValueFn);
 
-    patterns.insert<GPUSetEncodingOpLoweringConversion>(
-        ctx, typeConverter, materializeEncodingValueFn);
+    populateGPUMaterializeEncodingPatterns(patterns, typeConverter,
+                                           materializeEncodingValueFn);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       funcOp.emitOpError("materialization failed");
@@ -377,6 +378,14 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
       return signalPassFailure();
     }
   }
+}
+
+void populateGPUMaterializeEncodingPatterns(
+    RewritePatternSet &patterns,
+    const MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn) {
+  patterns.insert<GPUSetEncodingOpLoweringConversion>(
+      patterns.getContext(), typeConverter, materializeEncodingValueFn);
 }
 
 } // namespace mlir::iree_compiler

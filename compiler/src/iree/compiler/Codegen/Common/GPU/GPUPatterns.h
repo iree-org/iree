@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_
 
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler {
@@ -48,6 +49,11 @@ void populateGPUDistributeNestedLayoutContractAMDGPUPatterns(
 
 void populateGPULayoutResolutionDistributionPatterns(
     RewritePatternSet &patterns);
+
+void populateGPUMaterializeEncodingPatterns(
+    RewritePatternSet &patterns,
+    const MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn);
 
 } // namespace mlir::iree_compiler
 
