@@ -924,22 +924,25 @@ struct LowerShuffleTensor
     Location loc = shuffleOp.getLoc();
 
     Value dest = shuffleOp.getDest();
+    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
+        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
 
     // If the destination is a tensor.empty, replace it with an alloc_tensor.
     if (auto emptyDest = shuffleOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
-      Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
-          rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
       auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
           emptyDest->getLoc(), emptyDest->getResultTypes()[0],
           emptyDest.getDynamicSizes());
       allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
       dest = allocTensor.getResult();
-    }
-
-    if (!dest.getDefiningOp<bufferization::AllocTensorOp>()) {
-      return rewriter.notifyMatchFailure(shuffleOp,
-                                         "unimplemented: could not convert "
-                                         "destination to shared memory space");
+    } else {
+      // Otherwise, verify that the destination is already shared memory.
+      auto allocTensor = dest.getDefiningOp<bufferization::AllocTensorOp>();
+      if (!allocTensor || !allocTensor.getMemorySpace().has_value() ||
+          allocTensor.getMemorySpaceAttr() != sharedMemoryAddrSpace) {
+        return rewriter.notifyMatchFailure(
+            shuffleOp, "shuffle tensor op destination does not have shared "
+                       "memory address space.");
+      }
     }
 
     // Step 1. Insert the source slice into the intermediate tensor.
