@@ -92,7 +92,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-const-eval=false",
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-global-opt-propagate-transposes=true",
-    "--iree-global-opt-enable-fuse-horizontal-contractions=true",
+    "--iree-flow-enable-fuse-horizontal-contractions=true",
     "--iree-flow-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
@@ -103,7 +103,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-codegen-llvmgpu-use-vector-distribution",
     "--iree-rocm-waves-per-eu=2",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
     "--iree-scheduling-dump-statistics-format=json",
     "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]

@@ -63,6 +63,8 @@ void populateIREEGPULowerShuffleTensorPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(
     RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
+// Version of unrolling with a preset configuration.
+void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU

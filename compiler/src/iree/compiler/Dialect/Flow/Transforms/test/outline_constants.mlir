@@ -67,11 +67,13 @@ util.func private @func_1() {
 
 // Tests that any hoistable attrs are propagated to the outlined globals.
 
+util.global private @device : !hal.device
+
 //      CHECK: util.global private @__constant_tensor_2xi32
-// CHECK-SAME:   stream.affinity = #hal.affinity.queue<[0]>
+// CHECK-SAME:   stream.affinity = #hal.device.affinity<@device, [0]>
 // CHECK-NEXT: util.func private @set_affinity
 util.func private @set_affinity() attributes {
-  stream.affinity = #hal.affinity.queue<[0]>
+  stream.affinity = #hal.device.affinity<@device, [0]>
 } {
   // CHECK-NEXT: = util.global.load immutable @__constant_tensor_2xi32
   %cst = arith.constant dense<[0, 1]> : tensor<2xi32>

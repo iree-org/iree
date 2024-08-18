@@ -158,7 +158,8 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
               IREE_HAL_QUEUE_AFFINITY_ANY, 1, &command, &command_buffer));
 
   iree_hal_semaphore_t* semaphore = NULL;
-  iree_status_t status = iree_hal_semaphore_create(device, 0ull, &semaphore);
+  iree_status_t status = iree_hal_semaphore_create(
+      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore);
 
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {

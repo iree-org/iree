@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -24,7 +25,13 @@ include "mlir/IR/OpBase.td"
 def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     Pure,
     AllTypesMatch<["acc", "result"]>,
+    DestinationStyleOpInterface,
     DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
+    DeclareOpInterfaceMethods<TilingInterface,
+       ["getIterationDomain",
+        "getLoopIteratorTypes",
+        "getTiledImplementation",
+        "getResultTilePosition"]>
     ]> {
   let summary = "Models a contraction of multiple mma operations";
   let description = [{
@@ -56,7 +63,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
     }
     %3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
       : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
@@ -99,7 +106,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = [],
-      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
     }
     %3 = iree_gpu.multi_mma %0, %1, %2 #contraction_trait
       : vector<4xf16>, vector<4xf16> into vector<4xf32>
@@ -127,7 +134,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       rhs_permutation = [1, 0]
     }
     %7 = iree_gpu.multi_mma %4, %5, %6 #contraction_trait
@@ -266,6 +273,16 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
 
     int64_t getAccOuterRank() {
       return getIndexingMapsArray()[2].getNumResults();
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      if (hasTensorSemantics()) {
+        return getAccMutable();
+      }
+      // There are no destinations with vector semantics.
+      return MutableOperandRange(*this, 0, 0);
     }
   }];
 

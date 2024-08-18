@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <numeric>
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -423,8 +423,7 @@ struct DistributeReductions final
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp reductionOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    auto reductionDims = llvm::to_vector<4>(
-        reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+    ArrayRef<int64_t> reductionDims = reductionOp.getReductionDims();
     // TODO: Add support for reductions along multiple dimensions.
     if (reductionDims.size() > 1)
       return failure();
@@ -461,7 +460,7 @@ struct DistributeReductions final
     Value storeVec = rewriter.create<arith::ConstantOp>(
         loc, storeVectorType, rewriter.getZeroAttr(storeVectorType));
 
-    int reductionDim = reductionDims[0].getInt();
+    int reductionDim = reductionDims[0];
     int parallelDim = reductionDim ^ 1;
     if (!sourceLayout.getLane(reductionDim))
       return failure();
@@ -750,7 +749,7 @@ struct DistributeBroadcastLayoutAttr final
 ///     sequence of multiplications and additions.
 ///
 struct DistributeLayoutConflictResolutions final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   VectorValue reshapeVector(Location loc, RewriterBase &rewriter,
@@ -792,18 +791,22 @@ struct DistributeLayoutConflictResolutions final
     return newVector;
   }
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    auto vector = cast<VectorValue>(resolutionOp.getInput());
+    auto result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout)
       return failure();
     LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
     if (!targetLayout)
       return failure();
+
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
+    }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
     SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
@@ -837,16 +840,15 @@ struct DistributeLayoutConflictResolutions final
 /// especially used when we don't have an optimized way
 /// to resolve the conflict.
 struct DistributeLayoutConflictToSharedMemory final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp resolutionOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
     auto loc = resolutionOp.getLoc();
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
+    auto vector = cast<VectorValue>(resolutionOp.getInput());
+    auto result = cast<VectorValue>(resolutionOp.getOutput());
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!currentLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
@@ -856,6 +858,11 @@ struct DistributeLayoutConflictToSharedMemory final
     if (!targetLayout) {
       return rewriter.notifyMatchFailure(resolutionOp,
                                          "Target layout must be LayoutAttr.");
+    }
+
+    if (currentLayout == targetLayout) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Layout conversion is not a conflict.");
     }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
@@ -1004,6 +1011,30 @@ struct DistributeLayoutConflictToSharedMemory final
   }
 };
 
+struct DistributeTrivialLayoutConversions final
+    : OpDistributionPattern<IREE::VectorExt::ToLayoutOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    auto input = cast<VectorValue>(toLayoutOp.getInput());
+    auto output = cast<VectorValue>(toLayoutOp.getOutput());
+    VectorLayoutInterface currentLayout =
+        dyn_cast<LayoutAttr>(signature[input]);
+    VectorLayoutInterface targetLayout =
+        dyn_cast<LayoutAttr>(signature[output]);
+
+    if (currentLayout != targetLayout) {
+      return rewriter.notifyMatchFailure(toLayoutOp,
+                                         "Non-trivial layout conversion.");
+    }
+
+    rewriter.replaceOp(toLayoutOp, toLayoutOp.getOperand());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -1015,6 +1046,7 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
+  patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,

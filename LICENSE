@@ -216,3 +216,14 @@ conflicts with the conditions of the GPLv2, you may retroactively and
 prospectively choose to deem waived or otherwise exclude such Section(s) of
 the License, but only in their entirety and only with respect to the Combined
 Software.
+
+
+==============================================================================
+Use of logo
+==============================================================================
+
+The above license does not apply to IREE related logos and artwork
+originally provided through https://github.com/iree-org/artwork.
+
+Please refer to Linux Foundation Trademark Usage page to learn about the usage
+policy and guidelines: https://www.linuxfoundation.org/trademark-usage.

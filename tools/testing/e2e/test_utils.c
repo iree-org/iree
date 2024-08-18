@@ -413,7 +413,7 @@ iree_status_t iree_test_utils_check_module_requirements(
       return iree_make_status(
           // The error status matters. We distinguish "feature not supported"
           // which is a normal thing to happen from actual errors.
-          IREE_STATUS_UNAVAILABLE,
+          IREE_STATUS_NOT_FOUND,
           "target device does not have the required feature '%.*s'",
           (int)required_feature.size, required_feature.data);
     }

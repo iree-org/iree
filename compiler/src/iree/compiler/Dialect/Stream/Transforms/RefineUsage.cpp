@@ -65,7 +65,7 @@ static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
 // Returns either the affinity of |op| or nullptr.
 static IREE::Stream::AffinityAttr getOpAffinity(Operation *op) {
   if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-    return affinityOp.getAffinity();
+    return affinityOp.getAffinityAttr();
   }
   return {};
 }

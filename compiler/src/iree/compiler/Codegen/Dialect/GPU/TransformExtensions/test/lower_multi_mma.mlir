@@ -9,7 +9,7 @@ func.func @lower_multi_mma_mfma_16x16x16(%lhs: vector<4xf16>, %rhs: vector<4xf16
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<4xf16>, vector<4xf16> into vector<4xf32>
   return %0 : vector<4xf32>
 }
@@ -43,7 +43,7 @@ func.func @lower_multi_mma_mfma_32x32x8(%lhs: vector<4xf16>, %rhs: vector<4xf16>
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } : vector<4xf16>, vector<4xf16> into vector<16xf32>
   return %0 : vector<16xf32>
 }
@@ -77,7 +77,7 @@ func.func @lower_multi_mma_wmma_16x16x16(%lhs: vector<16xf16>, %rhs: vector<16xf
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
   } : vector<16xf16>, vector<16xf16> into vector<8xf32>
   return %0 : vector<8xf32>
 }
@@ -110,7 +110,7 @@ func.func @lower_multi_mma_mfma_shape_cast_16x16x16(%lhs: vector<1x4xf16>, %rhs:
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<1x4xf16>, vector<4x1xf16> into vector<4x1xf32>
   return %0 : vector<4x1xf32>
 }

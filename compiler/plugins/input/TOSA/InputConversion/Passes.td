@@ -9,22 +9,19 @@
 
 include "mlir/Pass/PassBase.td"
 
-def Converti48Toi64 :
+def Converti48Toi64Pass :
     InterfacePass<"iree-tosa-convert-i48-to-i64", "mlir::FunctionOpInterface"> {
   let summary = "Converts all i48s to i64s";
-  let constructor = "mlir::iree_compiler::createConverti48Toi64()";
 }
 
-def StripSignedness :
+def StripSignednessPass :
     InterfacePass<"iree-tosa-strip-signedness", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes ui tensors constants to uis";
-  let constructor = "mlir::iree_compiler::createStripSignednessPass()";
 }
 
-def TosaToLinalgExt :
+def TosaToLinalgExtPass :
     InterfacePass<"iree-tosa-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert TOSA operations to their equivalent linalg-ext operations.";
-  let constructor = "mlir::iree_compiler::createTosaToLinalgExt()";
   let dependentDialects = [
     "arith::ArithDialect",
     "linalg::LinalgDialect",
@@ -33,10 +30,9 @@ def TosaToLinalgExt :
   ];
 }
 
-def VerifyCompilerTOSAInputLegality :
+def VerifyCompilerTOSAInputLegalityPass :
     Pass<"iree-tosa-verify-compiler-input-legality", "ModuleOp"> {
   let summary = "Verifies that only supported IR constructs are passed to the compiler.";
-  let constructor = "mlir::iree_compiler::createVerifyCompilerTOSAInputLegality()";
 }
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_TOSA_INPUTCONVERSION_PASSES

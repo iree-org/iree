@@ -111,7 +111,8 @@ template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
     MemRefType allocLikeType, ValueRange dynamicSizes,
-    std::optional<uint64_t> alignment, std::optional<VscaleRange> vscaleRange) {
+    std::optional<uint64_t> alignment,
+    std::optional<vector::VscaleRange> vscaleRange) {
   IntegerAttr alignmentAttr =
       alignment ? builder.getI64IntegerAttr(alignment.value()) : nullptr;
   // For static case just create a new allocation in the entry block of the same
@@ -142,8 +143,8 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       // Scalability supported: Allocations could be scalable.
       FailureOr<vector::ConstantOrScalableBound> ub =
           vector::ScalableValueBoundsConstraintSet::computeScalableBound(
-              value, std::nullopt, vscaleRange->min, vscaleRange->max,
-              presburger::BoundType::UB);
+              value, std::nullopt, vscaleRange->vscaleMin,
+              vscaleRange->vscaleMax, presburger::BoundType::UB);
       if (failed(ub))
         return failure();
 
@@ -234,7 +235,8 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder,
-    AllocLikeOpType allocLikeOp, std::optional<VscaleRange> vscaleRange) {
+    AllocLikeOpType allocLikeOp,
+    std::optional<vector::VscaleRange> vscaleRange) {
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(allocLikeOp);
   return hoistOneStaticallyBoundAllocation<AllocLikeOpType>(
@@ -254,7 +256,7 @@ static bool isUseReplaceableWithSubview(OpOperand &use) {
 template <typename AllocLikeOpType>
 void hoistStaticallyBoundAllocationsInFunc(
     RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
-    std::optional<VscaleRange> vscaleRange) {
+    std::optional<vector::VscaleRange> vscaleRange) {
   SmallVector<AllocLikeOpType> allocLikeOps;
 
   // Collect all allocLikes that are hoistable.
@@ -312,26 +314,30 @@ template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocOp>(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
     MemRefType allocLikeType, ValueRange dynamicSizes,
-    std::optional<uint64_t> alignment, std::optional<VscaleRange> vscaleRange);
+    std::optional<uint64_t> alignment,
+    std::optional<vector::VscaleRange> vscaleRange);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
     MemRefType allocLikeType, ValueRange dynamicSizes,
-    std::optional<uint64_t> alignment, std::optional<VscaleRange> vscaleRange);
+    std::optional<uint64_t> alignment,
+    std::optional<vector::VscaleRange> vscaleRange);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocOp>(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder,
-    memref::AllocOp allocLikeOp, std::optional<VscaleRange> vscaleRange);
+    memref::AllocOp allocLikeOp,
+    std::optional<vector::VscaleRange> vscaleRange);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder,
-    memref::AllocaOp allocLikeOp, std::optional<VscaleRange> vscaleRange);
+    memref::AllocaOp allocLikeOp,
+    std::optional<vector::VscaleRange> vscaleRange);
 template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
     RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
-    std::optional<VscaleRange> vscaleRange);
+    std::optional<vector::VscaleRange> vscaleRange);
 template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
     RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
-    std::optional<VscaleRange> vscaleRange);
+    std::optional<vector::VscaleRange> vscaleRange);
 
 //===---------------------------------------------------------------------===//
 // Lowering `flow.dispatch.workgroup_count_from_slice` operation.
@@ -544,10 +550,10 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-        subspanOp.getBinding(), subspanOp.getDescriptorType(),
-        subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+        subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp,
@@ -616,10 +622,10 @@ struct FoldExpandShapeIntoInterfaceTensorStore
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-          subspanOp.getBinding(), subspanOp.getDescriptorType(),
-          subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-          subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+          subspanOp.getDescriptorFlagsAttr());
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
@@ -752,10 +758,10 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
-          subspanOp.getBinding(), subspanOp.getDescriptorType(),
-          subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-          subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+          subspanOp.getDescriptorFlagsAttr());
     }
 
     SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),

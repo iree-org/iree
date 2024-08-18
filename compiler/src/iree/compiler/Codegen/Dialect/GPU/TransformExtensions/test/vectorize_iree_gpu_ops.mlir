@@ -9,7 +9,7 @@ func.func @tensor_multi_mma(%lhs: tensor<2x3x4xf16>, %rhs: tensor<3x5x4xf16>, %a
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : tensor<2x3x4xf16>, tensor<3x5x4xf16> into tensor<2x5x4xf32>
   return %0 : tensor<2x5x4xf32>
 }
@@ -46,7 +46,7 @@ func.func @tensor_single_multi_mma(%lhs: tensor<4xf16>, %rhs: tensor<4xf16>, %ac
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : tensor<4xf16>, tensor<4xf16> into tensor<4xf32>
   return %0 : tensor<4xf32>
 }

@@ -156,7 +156,7 @@ def test_correctness_gfx90a_rocm(
 ):
     iree_run_module(
         argmax_ukernel_gfx90a_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f16i32",
         args=[
             f"--input=@{argmax_input_f16.path}",
@@ -165,7 +165,7 @@ def test_correctness_gfx90a_rocm(
     )
     iree_run_module(
         argmax_ukernel_gfx90a_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f16i64",
         args=[
             f"--input=@{argmax_input_f16.path}",
@@ -175,7 +175,7 @@ def test_correctness_gfx90a_rocm(
 
     iree_run_module(
         argmax_ukernel_gfx90a_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f32i32",
         args=[
             f"--input=@{argmax_input_f32.path}",
@@ -184,7 +184,7 @@ def test_correctness_gfx90a_rocm(
     )
     iree_run_module(
         argmax_ukernel_gfx90a_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f32i64",
         args=[
             f"--input=@{argmax_input_f32.path}",
@@ -205,7 +205,7 @@ def test_correctness_gfx940_rocm(
 ):
     iree_run_module(
         argmax_ukernel_gfx940_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f16i32",
         args=[
             f"--input=@{argmax_input_f16.path}",
@@ -214,7 +214,7 @@ def test_correctness_gfx940_rocm(
     )
     iree_run_module(
         argmax_ukernel_gfx940_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f16i64",
         args=[
             f"--input=@{argmax_input_f16.path}",
@@ -224,7 +224,7 @@ def test_correctness_gfx940_rocm(
 
     iree_run_module(
         argmax_ukernel_gfx940_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f32i32",
         args=[
             f"--input=@{argmax_input_f32.path}",
@@ -233,7 +233,7 @@ def test_correctness_gfx940_rocm(
     )
     iree_run_module(
         argmax_ukernel_gfx940_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="argmax_3d_dyn_f32i64",
         args=[
             f"--input=@{argmax_input_f32.path}",

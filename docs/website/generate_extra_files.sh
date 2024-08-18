@@ -56,7 +56,6 @@ done
 
 # Rename iree-dialect files.
 mv "${BUILD_DOCS_PROCESSED_DIR}/InputOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEInput.md"
-mv "${BUILD_DOCS_PROCESSED_DIR}/VectorExtOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEVectorExt.md"
 # mv "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEStructuredTransformExt.md"
 
 # Postprocess the dialect docs (e.g. making tweaks to the markdown source).

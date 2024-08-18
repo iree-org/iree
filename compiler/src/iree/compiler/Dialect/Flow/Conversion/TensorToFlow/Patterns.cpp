@@ -187,17 +187,33 @@ struct ConvertTensorFromElementsPattern
     }
     auto tensorType = op.getType();
     if (!tensorType.hasRank()) {
-      return failure();
+      return rewriter.notifyMatchFailure(op,
+                                         "unranked result type not supported");
     }
 
-    // Check that all the dimensions are 1.
-    if (!llvm::all_of(tensorType.getShape(),
-                      [](int64_t dim) { return dim == 1; })) {
-      return failure();
+    if (op.getNumOperands() == 1) {
+      rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+          op, tensorType, op.getOperand(0), ValueRange());
+      return success();
     }
 
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
-        op, tensorType, op.getOperand(0), ValueRange());
+    const int64_t rank = tensorType.getRank();
+    Value result = rewriter.create<tensor::EmptyOp>(
+        op.getLoc(), tensorType.getShape(), tensorType.getElementType());
+    SmallVector<Value> ivs(rank);
+    for (int i = 0, s = op.getNumOperands(); i < s; ++i) {
+      int64_t index = i;
+      for (int j = rank - 1; j >= 0; --j) {
+        int64_t iv = index % tensorType.getDimSize(j);
+        index = index / tensorType.getDimSize(j);
+        ivs[j] = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), iv);
+      }
+
+      result = rewriter.create<Flow::TensorStoreOp>(
+          op.getLoc(), op.getOperand(i), result, ivs);
+    }
+
+    rewriter.replaceOp(op, result);
     return success();
   }
 };

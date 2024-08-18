@@ -98,6 +98,37 @@ util.func @foo(%arg0: index) -> (index, index, index) {
 
 // -----
 
+// CHECK: util.global private @immutable_initializer_local
+util.global private mutable @immutable_initializer_local : index
+// CHECK: util.global private @immutable_initializer_callee
+util.global private mutable @immutable_initializer_callee : index
+// CHECK: util.global private mutable @mutable : index
+util.global private mutable @mutable : index
+util.func private @generate_value() -> index
+util.initializer {
+  %value = util.call @generate_value() : () -> index
+  util.global.store %value, @immutable_initializer_local : index
+  util.return
+}
+util.func @public_func() -> (index, index, index) {
+  util.call @public_callee() : () -> ()
+  // CHECK-DAG: %[[LOCAL:.+]] = util.global.load immutable @immutable_initializer_local
+  %0 = util.global.load @immutable_initializer_local : index
+  // CHECK-DAG: %[[CALLEE:.+]] = util.global.load immutable @immutable_initializer_callee
+  %1 = util.global.load @immutable_initializer_callee : index
+  // CHECK-DAG: %[[MUTABLE:.+]] = util.global.load @mutable
+  %2 = util.global.load @mutable : index
+  // CHECK: return %[[LOCAL]], %[[CALLEE]], %[[MUTABLE]]
+  util.return %0, %1, %2 : index, index, index
+}
+util.func private @public_callee() {
+  %value = util.call @generate_value() : () -> index
+  util.global.store %value, @mutable : index
+  util.return
+}
+
+// -----
+
 // CHECK: util.global private mutable @used0 = 5 : index
 util.global private mutable @used0 = 5 : index
 // CHECK: util.global private mutable @used1 : index

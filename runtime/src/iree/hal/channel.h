@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/hal/allocator.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus

@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/VMVX/Conversion/StandardToVMVX/ConvertStandardToVMVX.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXTypes.h"
-#include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
@@ -32,10 +31,13 @@
 
 namespace mlir::iree_compiler::IREE::VMVX {
 
+#define GEN_PASS_DEF_CONVERSIONPASS
+#include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
+
 namespace {
 
 // Runs conversion with registered input dialects.
-class ConversionPass : public ConversionBase<ConversionPass> {
+class ConversionPass final : public impl::ConversionPassBase<ConversionPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -100,9 +102,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
-  return std::make_unique<ConversionPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::VMVX

@@ -95,11 +95,11 @@ ROCM_COMPILE_FLAGS = [
     "--iree-rocm-waves-per-eu=2",
     "--iree-llvmgpu-enable-prefetch",
     "--iree-flow-enable-aggressive-fusion",
-    "--iree-global-opt-enable-fuse-horizontal-contractions=true",
+    "--iree-flow-enable-fuse-horizontal-contractions=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv}))",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})",
     "--iree-scheduling-dump-statistics-format=json",
     "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]

@@ -2,25 +2,19 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target,canonicalize)))))' \
 // RUN:   %s | FileCheck %s
 
-#layout = #hal.pipeline.layout<push_constants = 0,
-  sets = [
-    <0, bindings = [
-      <0, storage_buffer, ReadOnly>,
-      <1, storage_buffer, ReadOnly>,
-      <2, storage_buffer, ReadOnly>,
-      <3, storage_buffer>
-    ]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
   ]>
+]>
 hal.executable private @conv_nchw_dispatch_1 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16 ordinal(0) layout(#layout) attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>,
-        #hal.interface.binding<0, 3>
-      ],
-      translation_info = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [16, 2, 1]>} {
+    hal.executable.export public @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16 ordinal(0) layout(#pipeline_layout) attributes {
+      translation_info = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [16, 2, 1]>
+    } {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
@@ -29,10 +23,10 @@ hal.executable private @conv_nchw_dispatch_1 {
       func.func @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16() {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x320x130x130xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf16>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320xf16>>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x320x130x130xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320xf16>>
+        %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
         %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 320, 130, 130], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x320x130x130xf16>> -> tensor<2x320x130x130xf16>
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [320, 320, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf16>> -> tensor<320x320x3x3xf16>
         %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [320], strides = [1] : !flow.dispatch.tensor<readonly:tensor<320xf16>> -> tensor<320xf16>

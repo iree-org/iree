@@ -54,8 +54,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     DenseSet<Operation *> clonedOps;
     void insert(Operation *op) {
       if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-        affinity = affinity ? affinity.joinAND(affinityOp.getAffinity())
-                            : affinityOp.getAffinity();
+        affinity = affinity ? affinity.joinAND(affinityOp.getAffinityAttr())
+                            : affinityOp.getAffinityAttr();
       }
       ops.insert(op);
     }
@@ -109,7 +109,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     IREE::Stream::AffinityAttr affinityAttr;
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-      affinityAttr = affinityOp.getAffinity();
+      affinityAttr = affinityOp.getAffinityAttr();
     }
 
     LLVM_DEBUG({

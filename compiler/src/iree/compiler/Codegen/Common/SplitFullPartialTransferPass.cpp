@@ -6,7 +6,6 @@
 
 #include <string>
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -16,14 +15,15 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPLITFULLPARTIALTRANSFERPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
-struct SplitFullPartialTransferPass
-    : public SplitFullPartialTransferBase<SplitFullPartialTransferPass> {
-  SplitFullPartialTransferPass() = default;
-  SplitFullPartialTransferPass(StringRef option) {
-    this->splitVectorTransfersTo = std::string(option);
-  }
+struct SplitFullPartialTransferPass final
+    : impl::SplitFullPartialTransferPassBase<SplitFullPartialTransferPass> {
+  using impl::SplitFullPartialTransferPassBase<
+      SplitFullPartialTransferPass>::SplitFullPartialTransferPassBase;
 
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
@@ -46,14 +46,4 @@ struct SplitFullPartialTransferPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSplitFullPartialTransferPass() {
-  return std::make_unique<SplitFullPartialTransferPass>();
-}
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSplitFullPartialTransferPass(StringRef option) {
-  return std::make_unique<SplitFullPartialTransferPass>(option);
-}
-
 } // namespace mlir::iree_compiler

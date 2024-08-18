@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -12,9 +11,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_STRIPSIGNEDNESSPASS
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc"
+
 namespace {
 
-class StripSignednessPass : public StripSignednessBase<StripSignednessPass> {
+class StripSignednessPass final
+    : public impl::StripSignednessPassBase<StripSignednessPass> {
 public:
   explicit StripSignednessPass() {}
   void runOnOperation() override;
@@ -124,10 +127,5 @@ void StripSignednessPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createStripSignednessPass() {
-  return std::make_unique<StripSignednessPass>();
-}
 
 } // namespace mlir::iree_compiler

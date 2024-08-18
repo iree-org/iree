@@ -13,20 +13,16 @@ include "mlir/Pass/PassBase.td"
 // ROCDL Passes (keep alphabetical)
 //===----------------------------------------------------------------------===//
 
-def ROCDLLowerExecutableTarget : InterfacePass<
+def ROCDLLowerExecutableTargetPass : InterfacePass<
     "iree-rocdl-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Lower an IREE hal.executable.variant op using a suitable "
                 "pass pipeline";
-  let constructor =
-      "mlir::iree_compiler::createROCDLLowerExecutableTargetPass()";
 }
 
-def ROCDLSelectLoweringStrategy :
+def ROCDLSelectLoweringStrategyPass :
     Pass<"iree-rocdl-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a suitable lowering strategy for an IREE "
                 "hal.executable.variant op";
-  let constructor =
-      "mlir::iree_compiler::createROCDLSelectLoweringStrategyPass()";
 }
 
 

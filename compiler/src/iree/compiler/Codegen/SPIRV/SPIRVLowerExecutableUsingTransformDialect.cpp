@@ -6,14 +6,16 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVLOWEREXECUTABLEUSINGTRANSFORMDIALECTPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
-class SPIRVLowerExecutableUsingTransformDialectPass
-    : public SPIRVLowerExecutableUsingTransformDialectBase<
+class SPIRVLowerExecutableUsingTransformDialectPass final
+    : public impl::SPIRVLowerExecutableUsingTransformDialectPassBase<
           SPIRVLowerExecutableUsingTransformDialectPass> {
 public:
   void runOnOperation() override;
@@ -67,11 +69,6 @@ void SPIRVLowerExecutableUsingTransformDialectPass::runOnOperation() {
                         "translation_info to use None");
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createSPIRVLowerExecutableUsingTransformDialectPass() {
-  return std::make_unique<SPIRVLowerExecutableUsingTransformDialectPass>();
 }
 
 } // namespace mlir::iree_compiler

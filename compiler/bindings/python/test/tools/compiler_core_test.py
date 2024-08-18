@@ -32,12 +32,6 @@ class CompilerTest(unittest.TestCase):
         # The VMVX target is always enabled.
         self.assertIn("vmvx", target_names)
 
-    def testNoTargetBackends(self):
-        with self.assertRaisesRegex(
-            ValueError, "Expected a non-empty list for 'target_backends'"
-        ):
-            binary = iree.compiler.tools.compile_str(SIMPLE_MUL_ASM)
-
     def testCompileStr(self):
         binary = iree.compiler.tools.compile_str(
             SIMPLE_MUL_ASM, target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS

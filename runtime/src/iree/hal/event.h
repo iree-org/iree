@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -18,6 +19,16 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_device_t iree_hal_device_t;
+
+//===----------------------------------------------------------------------===//
+// Types and Enums
+//===----------------------------------------------------------------------===//
+
+// A bitmask of flags controlling the behavior of an event.
+enum iree_hal_event_flag_bits_t {
+  IREE_HAL_EVENT_FLAG_NONE = 0u,
+};
+typedef uint32_t iree_hal_event_flags_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_event_t
@@ -35,10 +46,12 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 typedef struct iree_hal_event_t iree_hal_event_t;
 
 // Creates an event for recording into command buffers.
-// The returned event object is only usable with this device and events must
-// only be used to synchronize within the same queue.
-IREE_API_EXPORT iree_status_t
-iree_hal_event_create(iree_hal_device_t* device, iree_hal_event_t** out_event);
+// The returned event object is only usable with the device it is created on and
+// only on the queues specified. Events must only be used to synchronize within
+// the same queue.
+IREE_API_EXPORT iree_status_t iree_hal_event_create(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_event_flags_t flags, iree_hal_event_t** out_event);
 
 // Retains the given |event| for the caller.
 IREE_API_EXPORT void iree_hal_event_retain(iree_hal_event_t* event);

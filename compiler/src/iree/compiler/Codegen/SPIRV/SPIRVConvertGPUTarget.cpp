@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -19,6 +18,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVCONVERTGPUTARGETPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -252,7 +254,7 @@ convertGPUTarget(IREE::HAL::ExecutableVariantOp variant) {
 }
 
 struct SPIRVConvertGPUTargetPass final
-    : SPIRVConvertGPUTargetBase<SPIRVConvertGPUTargetPass> {
+    : impl::SPIRVConvertGPUTargetPassBase<SPIRVConvertGPUTargetPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
@@ -270,10 +272,4 @@ struct SPIRVConvertGPUTargetPass final
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSPIRVConvertGPUTargetPass() {
-  return std::make_unique<SPIRVConvertGPUTargetPass>();
-}
-
 } // namespace mlir::iree_compiler

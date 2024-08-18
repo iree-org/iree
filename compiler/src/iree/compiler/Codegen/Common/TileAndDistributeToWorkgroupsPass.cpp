@@ -15,7 +15,6 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -44,6 +43,9 @@
 #define DEBUG_TYPE "iree-codegen-tile-and-distribute-to-workgroups"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TILEANDDISTRIBUTETOWORKGROUPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Method to return the configuration to use for first-level tile and
 /// distribute. Returns the
@@ -260,14 +262,17 @@ static LogicalResult lowerWorkgroupCount(
 
 namespace {
 
-struct TileAndDistributeToWorkgroupsPass
-    : public TileAndDistributeToWorkgroupsBase<
+struct TileAndDistributeToWorkgroupsPass final
+    : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
+  using impl::TileAndDistributeToWorkgroupsPassBase<
+      TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;
+
   TileAndDistributeToWorkgroupsPass(
       int32_t maxWorkgroupParallelDims,
       linalg::DistributionMethod distributionMethod) {
     this->maxWorkgroupParallelDims = maxWorkgroupParallelDims;
-    this->distributionMethod = (int32_t)distributionMethod;
+    this->distributionMethod = distributionMethod;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,

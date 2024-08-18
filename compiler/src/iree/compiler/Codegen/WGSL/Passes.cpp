@@ -6,7 +6,6 @@
 
 #include "mlir/Transforms/Passes.h"
 
-#include "iree/compiler/Codegen/WGSL/PassDetail.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "mlir/Pass/PassManager.h"
 

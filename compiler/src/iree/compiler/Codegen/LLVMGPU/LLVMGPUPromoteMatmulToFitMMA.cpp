@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,14 +15,18 @@
 #define DEBUG_TYPE "iree-llvmgpu-promote-matmul-to-fit-mma"
 
 namespace mlir::iree_compiler {
-#define GEN_PASS_DECL_LLVMGPUPROMOTEMATMULTOFITMMA
+
+#define GEN_PASS_DEF_LLVMGPUPROMOTEMATMULTOFITMMAPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 
-class LLVMGPUPromoteMatmulToFitMMAPass
-    : public LLVMGPUPromoteMatmulToFitMMABase<
+class LLVMGPUPromoteMatmulToFitMMAPass final
+    : public impl::LLVMGPUPromoteMatmulToFitMMAPassBase<
           LLVMGPUPromoteMatmulToFitMMAPass> {
 public:
+  using impl::LLVMGPUPromoteMatmulToFitMMAPassBase<
+      LLVMGPUPromoteMatmulToFitMMAPass>::LLVMGPUPromoteMatmulToFitMMAPassBase;
   explicit LLVMGPUPromoteMatmulToFitMMAPass(
       const LLVMGPUMatmulPadOption &option) {
     this->targetDimensions.setValue(option);

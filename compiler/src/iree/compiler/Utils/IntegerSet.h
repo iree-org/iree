@@ -33,6 +33,15 @@ public:
     return memoizedValue;
   }
 
+  Value add(StorageT lhs, StorageT rhs) { return get(lhs + rhs); }
+  Value add(Value lhs, StorageT rhs) {
+    APInt lhsValue;
+    if (matchPattern(lhs, m_ConstantInt(&lhsValue))) {
+      return add(lhsValue.getSExtValue(), rhs);
+    }
+    return builder.create<arith::AddIOp>(loc, lhs, get(rhs));
+  }
+
   void populate(ValueRange values) {
     for (auto value : values) {
       APInt intValue;
@@ -65,6 +74,15 @@ public:
     return memoizedValue;
   }
   Value get(APInt value) { return get(value.getSExtValue()); }
+
+  Value add(int64_t lhs, int64_t rhs) { return get(lhs + rhs); }
+  Value add(Value lhs, int64_t rhs) {
+    APInt lhsValue;
+    if (matchPattern(lhs, m_ConstantInt(&lhsValue))) {
+      return add(lhsValue.getSExtValue(), rhs);
+    }
+    return builder.create<arith::AddIOp>(loc, lhs, get(rhs));
+  }
 
   void populate(ValueRange values) {
     for (auto value : values) {

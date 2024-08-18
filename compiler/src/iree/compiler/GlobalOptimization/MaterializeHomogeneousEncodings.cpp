@@ -6,13 +6,14 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -22,17 +23,19 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_MATERIALIZEHOMOGENEOUSENCODINGSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 using FunctionLikeNest =
     MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
+namespace {
 class MaterializeHomogeneousEncodingsPass
-    : public MaterializeHomogeneousEncodingsBase<
+    : public impl::MaterializeHomogeneousEncodingsPassBase<
           MaterializeHomogeneousEncodingsPass> {
 public:
-  MaterializeHomogeneousEncodingsPass() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect>();
   }
 
   void runNopPipeline(ModuleOp &moduleOp) {
@@ -46,11 +49,16 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto executableTargets =
-        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(moduleOp);
+    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run()))
+      return signalPassFailure();
+
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
+    deviceAnalysis.gatherAllExecutableTargets(executableTargets);
     if (executableTargets.size() != 1) {
       return runNopPipeline(moduleOp);
     }
+
     // TODO: vmvx has its own logic about supporting dynamic tile
     // sizes. It is not fully integrated into the pipeline, so we remain the
     // materialization to the end.
@@ -65,21 +73,11 @@ public:
     }
 
     OpPassManager passManager(moduleOp.getOperationName());
-    FunctionLikeNest(passManager).addPass([&]() {
-      return createCPUMaterializeUpperBoundTileSizePass(executableTargets);
-    });
-    FunctionLikeNest(passManager).addPass([&]() {
-      return createCPUMaterializeEncodingPass(executableTarget);
-    });
+    passManager.addPass(createCPUMaterializeHostEncodingPass());
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
     }
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createMaterializeHomogeneousEncodingsPass() {
-  return std::make_unique<MaterializeHomogeneousEncodingsPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::GlobalOptimization

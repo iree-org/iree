@@ -66,9 +66,13 @@ static const iree_hal_executable_dispatch_v0_t entry_points[2] = {
 static const iree_hal_executable_dispatch_attrs_v0_t entry_attrs[2] = {
     {
         .local_memory_pages = 0,
+        .constant_count = 1,
+        .binding_count = 2,
     },
     {
         .local_memory_pages = 0,
+        .constant_count = 0,
+        .binding_count = 0,
     },
 };
 // Names for each entry point.

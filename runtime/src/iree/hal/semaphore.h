@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -18,6 +19,16 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_device_t iree_hal_device_t;
+
+//===----------------------------------------------------------------------===//
+// Types and Enums
+//===----------------------------------------------------------------------===//
+
+// A bitmask of flags controlling the behavior of a semaphore.
+enum iree_hal_semaphore_flag_bits_t {
+  IREE_HAL_SEMAPHORE_FLAG_NONE = 0u,
+};
+typedef uint32_t iree_hal_semaphore_flags_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
@@ -81,9 +92,9 @@ typedef struct iree_hal_semaphore_t iree_hal_semaphore_t;
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
 // first be exported.
-IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_create(iree_hal_device_t* device, uint64_t initial_value,
-                          iree_hal_semaphore_t** out_semaphore);
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
+    iree_hal_device_t* device, uint64_t initial_value,
+    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
 IREE_API_EXPORT void iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
@@ -164,6 +175,7 @@ iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list);
 
 // Signals each semaphore in |semaphore_list| to indicate failure with
 // |signal_status|.
+// Takes ownership of |signal_status|.
 IREE_API_EXPORT void iree_hal_semaphore_list_fail(
     iree_hal_semaphore_list_t semaphore_list, iree_status_t signal_status);
 
@@ -209,6 +221,11 @@ IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_semaphore_vtable_t);
 
 IREE_API_EXPORT void iree_hal_semaphore_destroy(
     iree_hal_semaphore_t* semaphore);
+
+// Erases the i-th semaphore from the list in-place with O(1).
+// Expects that the index |i| is in bounds.
+IREE_API_EXPORT void iree_hal_semaphore_list_erase(
+    iree_hal_semaphore_list_t* semaphore_list, iree_host_size_t i);
 
 #ifdef __cplusplus
 }  // extern "C"

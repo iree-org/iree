@@ -1262,41 +1262,6 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 // Everything Default Configuration
 //===----------------------------------------------------------------------===//
 
-/// Returns a small tiling factor for the given reduction `dimSize`.
-/// Returns 0 to avoid tiling.
-static int getReductionTilingFactor(int64_t dimSize) {
-  if (dimSize % 4 == 0)
-    return 4;
-
-  // Try to find the smallest prime factor as the tiling factor. As a trade off
-  // between generated code size and compilation time, only look at prime
-  // numbers less than 50 right now.
-  static constexpr std::array<int, 15> primeNumbers = {
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47};
-  for (int n : primeNumbers) {
-    if (dimSize % n == 0)
-      return n;
-  }
-
-  return 1; // Otherwise just tile with size 1.
-}
-
-/// Returns the minimal element bitwidth used in the operands and results of the
-/// given Linalg op.
-static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
-  unsigned bitwidth = std::numeric_limits<unsigned>::max();
-  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    unsigned b =
-        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand->get()));
-    bitwidth = std::min(bitwidth, b);
-  }
-  for (Value result : linalgOp.getDpsInits()) {
-    unsigned b = IREE::Util::getTypeBitWidth(getElementTypeOrSelf(result));
-    bitwidth = std::min(bitwidth, b);
-  }
-  return bitwidth;
-};
-
 static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
                                         Operation *op,
                                         bool allowVectorization = true) {
@@ -1312,8 +1277,8 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
     // single thread to run everything.
     auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
-                                                 workgroupSize);
+    return setOpConfigAndEntryPointFnTranslation(
+        funcOp, op, TileSizesListType{}, pipeline, workgroupSize);
   }
 
   int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);

@@ -1,0 +1,69 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Test AMD MI250
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  test:
+    runs-on: nodai-amdgpu-mi250-x86-64
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      BUILD_DIR: build-tests
+      VENV_DIR: ${{ github.workspace }}/.venv
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 1
+      IREE_CUDA_DISABLE: 1
+      IREE_HIP_DISABLE: 0
+      IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: false
+      - name: Check out runtime submodules
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@v5.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake clang ninja-build libstdc++-12-dev
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+
+      - name: Build tests
+        run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
+      - name: Run GPU tests
+        env:
+          CTEST_PARALLEL_LEVEL: 2
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
+          IREE_AMD_RDNA3_TESTS_DISABLE: 1
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+        run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}

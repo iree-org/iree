@@ -288,7 +288,6 @@ struct ElideRedundantWorkloadValues
 struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
     : OpRewritePattern<DispatchWorkgroupsOp> {
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
                                 PatternRewriter &rewriter) const override {
     Region &count = op.getWorkgroupCount();
@@ -369,7 +368,6 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 // Bubble up the ordinal ops so that all uses go through this operation.
 struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
                                 PatternRewriter &rewriter) const override {
     auto blockArg = llvm::dyn_cast<BlockArgument>(ordinalOp.getOperand());
@@ -894,7 +892,6 @@ namespace {
 template <typename CastOpTy>
 struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
   using OpRewritePattern<CastOpTy>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(CastOpTy reshapeOp,
                                 PatternRewriter &rewriter) const override {
     // We want the same result value/shape but to source from the ancestor. We
@@ -1157,6 +1154,40 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.transfer
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Attempts to identify trivial cases where we locally recognize that a tensor
+// is transferred to the same context it's already on. This does not look across
+// control flow edges or globals and is mostly for simplifying IR that may come
+// in with a transfer on every single tensor.
+struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto baseValue =
+        IREE::Util::TiedOpInterface::findTiedBaseValue(op.getOperand());
+    if (auto transferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
+            baseValue.getDefiningOp())) {
+      if (transferOp.getTarget() == op.getTarget()) {
+        rewriter.replaceOp(op, op.getOperand());
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.insert<ElideRedundantTransfer>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.slice
 //===----------------------------------------------------------------------===//
 
@@ -1294,7 +1325,6 @@ namespace {
 // to be updated to use the source of the cast as the target tensor.
 struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
   using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();

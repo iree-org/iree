@@ -52,10 +52,12 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     int m = cDims->m[0];
     int n = cDims->n[0];
     std::swap(permIndices[m], permIndices[n]);
-    int mDim = encoding.mapDimToOperandIndex(m);
-    int nDim = encoding.mapDimToOperandIndex(n);
-    std::swap(newShape[mDim], newShape[nDim]);
-    std::swap(newOriginalShape[mDim], newOriginalShape[nDim]);
+    std::optional<unsigned> mDim = encoding.mapDimToOperandIndex(m);
+    std::optional<unsigned> nDim = encoding.mapDimToOperandIndex(n);
+    if (mDim.has_value() && nDim.has_value()) {
+      std::swap(newShape[mDim.value()], newShape[nDim.value()]);
+      std::swap(newOriginalShape[mDim.value()], newOriginalShape[nDim.value()]);
+    }
   }
   // Vector case: there is no N dimension to swap the M dimension with. We
   // swap the maps themselves.
@@ -85,44 +87,39 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 
   auto opTypeAttr = IREE::Encoding::EncodingOpTypeAttr::get(
       context, IREE::Encoding::EncodingOpType::matmul);
+  // TODO(#17718): Handle the broadcast map for transpose cases. It is on the
+  // experimental path, so it is not clear what needs to be done here. For now
+  // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
-      newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
+      newIndexingMaps, encoding.getBcastMap(),
+      DenseI64ArrayAttr::get(context, newRoundDimsTo));
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
-/// For a given tensor type with an encoding, return the materialized
-/// type to use for it. If no encoding is set, then return the tensor type
-/// itself.
-static RankedTensorType
-getMaterializedType(RankedTensorType tensorType,
-                    MaterializeEncodingFn materializeEncodingFn) {
-  RankedTensorType maybeTransposedTensorType =
-      transposeIfNarrowNResult(tensorType);
-  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(maybeTransposedTensorType);
-  if (failed(materializeEncodingInfo)) {
-    return dropEncoding(tensorType);
-  }
-  return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-      getOriginalTypeWithEncoding(maybeTransposedTensorType)
-          .clone(tensorType.getElementType()),
-      materializeEncodingInfo->innerTileSizes,
-      materializeEncodingInfo->innerDimsPos,
-      materializeEncodingInfo->outerDimsPerm));
-}
-
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
-    MaterializeEncodingFn materializeEncodingFn)
-    : materializeEncodingFn(materializeEncodingFn) {
+    MaterializeEncodingFn materializeEncodingFn,
+    IREE::HAL::ExecutableTargetAttr targetAttr)
+    : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
-  addConversion([=](RankedTensorType t) -> RankedTensorType {
-    return getMaterializedType(t, materializeEncodingFn);
+  addConversion([=](RankedTensorType type) -> RankedTensorType {
+    // For a given tensor type with an encoding, return the materialized
+    // type to use for it. If no encoding is set, then return the tensor type
+    // itself.
+    RankedTensorType tensorType = transposeIfNarrowNResult(type);
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfo(tensorType);
+    if (failed(maybeEncodingInfo)) {
+      return dropEncoding(type);
+    }
+    return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+        tensorType, maybeEncodingInfo->innerTileSizes,
+        maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
   });
 }
 
@@ -170,36 +167,38 @@ int64_t getIntOrZero(IntegerAttr a) {
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {
-  auto index = encoding.getOperandIndex().getValue();
   MaterializeEncodingInfo encodingInfo;
   auto cDims = getEncodingContractionDims(encoding);
   // The following expects M, N, K, and Batch sizes of at most 1 for now
-  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() <= 1 &&
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
          cDims->batch.size() <= 1 &&
          "Expected at most one M, N, K, and Batch dimension");
-  if (!cDims->batch.empty()) {
-    encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToOperandIndex(cDims->batch[0]));
+  std::optional<unsigned> batchDim =
+      cDims->batch.empty() ? std::nullopt
+                           : encoding.mapDimToOperandIndex(cDims->batch[0]);
+  std::optional<unsigned> mDim =
+      cDims->m.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->m[0]);
+  std::optional<unsigned> nDim =
+      cDims->n.empty() ? std::nullopt
+                       : encoding.mapDimToOperandIndex(cDims->n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
+  if (batchDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(batchDim.value());
   }
-  if (index != IREE::Encoding::MATMUL_RHS && !cDims->m.empty()) {
-    encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToOperandIndex(cDims->m[0]));
-    encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToOperandIndex(cDims->m[0]));
+  if (mDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(mDim.value());
+    encodingInfo.innerDimsPos.push_back(mDim.value());
     encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
   }
-  if (index != IREE::Encoding::MATMUL_LHS && !cDims->n.empty()) {
-    encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToOperandIndex(cDims->n[0]));
-    encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToOperandIndex(cDims->n[0]));
+  if (nDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(nDim.value());
+    encodingInfo.innerDimsPos.push_back(nDim.value());
     encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
   }
-  if (index != IREE::Encoding::MATMUL_RESULT) {
-    encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToOperandIndex(cDims->k[0]));
-    encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToOperandIndex(cDims->k[0]));
+  if (kDim.has_value()) {
+    encodingInfo.outerDimsPerm.push_back(kDim.value());
+    encodingInfo.innerDimsPos.push_back(kDim.value());
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;

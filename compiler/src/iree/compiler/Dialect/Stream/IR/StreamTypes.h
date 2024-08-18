@@ -69,9 +69,7 @@ class AffinityAttr;
 
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrInterfaces.h.inc" // IWYU pragma: export
 
-namespace mlir::iree_compiler::IREE::Stream {
 #include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.h.inc" // IWYU pragma: export
-} // namespace mlir::iree_compiler::IREE::Stream
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES
@@ -99,7 +97,11 @@ struct AsyncAccessRange {
                          const AsyncAccessRange &rhs);
 };
 
+} // namespace mlir::iree_compiler::IREE::Stream
+
 #include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.h.inc" // IWYU pragma: export
+
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // custom<ParameterReference>($scope, $key)

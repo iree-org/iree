@@ -24,13 +24,3 @@ nice_curl https://raw.githubusercontent.com/iree-org/iree/main/build_tools/docke
 # Basically everything uses a derivative of one of these
 grep 'gcr.io/iree-oss/base@' /tmp/prod_digests.txt | xargs docker pull
 grep 'gcr.io/iree-oss/base-bleeding-edge@' /tmp/prod_digests.txt | xargs docker pull
-
-RUNNER_TYPE="$(get_attribute github-runner-type)"
-
-if [[ "${RUNNER_TYPE}" == gpu || "${RUNNER_TYPE}" == a100 ]]; then
-  grep 'gcr.io/iree-oss/nvidia@' /tmp/prod_digests.txt | xargs docker pull
-fi
-
-if [[ "${RUNNER_TYPE}" == a100 ]]; then
-  grep 'gcr.io/iree-oss/nvidia-bleeding-edge@' /tmp/prod_digests.txt | xargs docker pull
-fi

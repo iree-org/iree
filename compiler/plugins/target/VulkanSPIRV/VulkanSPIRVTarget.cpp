@@ -101,10 +101,6 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    if (indirectBindings) {
-      addConfig("hal.bindings.indirect", b.getUnitAttr());
-    }
-
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
       addConfig("iree.gpu.target", target);
     } else {

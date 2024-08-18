@@ -13,22 +13,12 @@
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Passes
-//===----------------------------------------------------------------------===//
-
-/// Creates a pass that calls a dynamic pipeline to progressively lower Linalg
-/// with tensor semantics to ROCDL.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createROCDLLowerExecutableTargetPass();
-
-/// Creates a pass to select the lowering strategy for converting to ROCDL.
-std::unique_ptr<OperationPass<ModuleOp>>
-createROCDLSelectLoweringStrategyPass();
-
-//===----------------------------------------------------------------------===//
 // Pass Registration
 //===----------------------------------------------------------------------===//
 
+#define GEN_PASS_DECL
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h.inc" // IWYU pragma: keep
+                                                           //
 void registerCodegenROCDLPasses();
 
 } // namespace mlir::iree_compiler

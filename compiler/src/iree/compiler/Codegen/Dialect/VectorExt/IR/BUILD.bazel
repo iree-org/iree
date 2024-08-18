@@ -1,0 +1,189 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "VectorExtAttrs.td",
+    "VectorExtBase.td",
+    "VectorExtOps.td",
+    "VectorExtInterfaces.td",
+])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "VectorExtAttrs.td",
+            "VectorExtBase.td",
+            "VectorExtOps.td",
+            "VectorExtInterfaces.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IREEVectorExtDialect",
+    srcs = [
+        "VectorExtAttrs.cpp",
+        "VectorExtDialect.cpp",
+        "VectorExtOps.cpp",
+    ],
+    hdrs = [
+        "VectorExtDialect.h",
+        "VectorExtInterfaces.h",
+        "VectorExtOps.h",
+    ],
+    textual_hdrs = [
+        "VectorExtDialect.h.inc",
+        "VectorExtDialect.cpp.inc",
+        "VectorExtAttrs.h.inc",
+        "VectorExtAttrs.cpp.inc",
+        "VectorExtEnums.h.inc",
+        "VectorExtEnums.cpp.inc",
+        "VectorExtAttrInterfaces.h.inc",
+        "VectorExtAttrInterfaces.cpp.inc",
+        "VectorExtOps.h.inc",
+        "VectorExtOps.cpp.inc",
+    ],
+    deps = [
+        ":IREEVectorExtAttrsGen",
+        ":IREEVectorExtDialectGen",
+        ":IREEVectorExtEnumsGen",
+        ":IREEVectorExtInterfacesGen",
+        ":IREEVectorExtOpsGen",
+        "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:VectorDialect",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtDialectGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "VectorExtDialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "VectorExtDialect.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtBase.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtEnumsGen",
+    tbl_outs = [
+        (
+            ["--gen-enum-decls"],
+            "VectorExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "VectorExtEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtAttrs.td",
+    deps = [
+        ":td_files",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtAttrsGen",
+    tbl_outs = [
+        (
+            ["--gen-attrdef-decls"],
+            "VectorExtAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "VectorExtAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtAttrs.td",
+    deps = [
+        ":td_files",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "VectorExtAttrInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "VectorExtAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "VectorExtOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "VectorExtOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtOps.td",
+    deps = [
+        ":td_files",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "IREEVectorExtDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=iree_vector_ext",
+            ],
+            "IREEVectorExtDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtOps.td",
+    deps = [":td_files"],
+)

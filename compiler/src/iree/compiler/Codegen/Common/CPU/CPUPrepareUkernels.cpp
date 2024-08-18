@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -15,6 +14,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+#define GEN_PASS_DEF_CPUPREPAREUKERNELSPASS
+#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 namespace {
 
@@ -392,7 +393,7 @@ struct Convert5DUnPackto4DUnPackPattern
 };
 
 struct CPUPrepareUkernelsPass
-    : public CPUPrepareUkernelsBase<CPUPrepareUkernelsPass> {
+    : public impl::CPUPrepareUkernelsPassBase<CPUPrepareUkernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect,
                     tensor::TensorDialect, scf::SCFDialect>();
@@ -437,10 +438,4 @@ void CPUPrepareUkernelsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUPrepareUkernelsPass() {
-  return std::make_unique<CPUPrepareUkernelsPass>();
-}
-
 } // namespace mlir::iree_compiler

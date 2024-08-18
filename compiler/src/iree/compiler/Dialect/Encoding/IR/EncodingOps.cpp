@@ -102,6 +102,7 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
                                ArrayRef<AffineMap> maps,
+                               std::optional<AffineMap> bcastMap,
                                ArrayRef<int64_t> roundDimsTo) {
   Builder b(ctx);
   auto optionalToAttr = [&](std::optional<int64_t> x) {
@@ -112,10 +113,13 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
+  auto bcastMapAttr = bcastMap.has_value()
+                          ? AffineMapAttr::get(bcastMap.value())
+                          : AffineMapAttr();
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
              b.getTypeArrayAttr(elemTypes), origTypeAttr,
              optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps), roundDimsToAttr);
+             b.getAffineMapArrayAttr(maps), bcastMapAttr, roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() {
@@ -123,19 +127,22 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
   switch (index) {
   case MATMUL_LHS:
   case MATMUL_RHS:
-  case MATMUL_RESULT:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index])
-        .getAffineMap();
+  case MATMUL_RESULT: {
+    auto indexingMap =
+        llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index]).getAffineMap();
+    if (auto bcastMap = getBcastMap()) {
+      indexingMap = bcastMap.getAffineMap().compose(indexingMap);
+    }
+    return indexingMap;
+  }
   default:
     return AffineMap();
   }
 }
 
-unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
-  AffineMap map = getMapForOperandIndex();
-  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
-  assert(idx.has_value());
-  return idx.value();
+std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+  return getMapForOperandIndex().getResultPosition(
+      getAffineDimExpr(dimPos, getContext()));
 }
 
 ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {

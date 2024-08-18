@@ -22,9 +22,9 @@ hal.executable @simpleMath_ex_dispatch_0 {
   builtin.module {
     func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<16xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<16xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<16xf32>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16xf32>>
       %3 = tensor.empty() : tensor<16xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
@@ -69,9 +69,9 @@ hal.executable @dot_dispatch_0 {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
         %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:tensor<1024x1024xf32>> -> tensor<1024x1024xf32>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
@@ -123,9 +123,9 @@ hal.executable @ext_fp8_dispatch {
     builtin.module {
       func.func @ext_fp8_dispatch() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>> -> tensor<4096xf8E4M3FNUZ>
         %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>> -> tensor<4096xf8E5M2FNUZ>
         %5 = tensor.empty() : tensor<4096xf32>

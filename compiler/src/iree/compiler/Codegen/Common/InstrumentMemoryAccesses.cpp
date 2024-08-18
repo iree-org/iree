@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -16,10 +15,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_INSTRUMENTMEMORYACCESSESPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 struct InstrumentMemoryAccessesPass
-    : InstrumentMemoryAccessesBase<InstrumentMemoryAccessesPass> {
+    : impl::InstrumentMemoryAccessesPassBase<InstrumentMemoryAccessesPass> {
   void runOnOperation() override {
     // Lookup the root instrumentation op. If not present it means the dispatch
     // is not instrumented and we can skip it.
@@ -83,10 +85,4 @@ struct InstrumentMemoryAccessesPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createInstrumentMemoryAccessesPass() {
-  return std::make_unique<InstrumentMemoryAccessesPass>();
-}
-
 } // namespace mlir::iree_compiler

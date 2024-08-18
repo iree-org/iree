@@ -27,23 +27,23 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_sync
-            config-file: onnx_cpu_llvm_sync.json
+            config-file: onnx_ops_cpu_llvm_sync.json
             numprocesses: auto
             runs-on: ubuntu-20.04
 
           # AMD GPU
           - name: amdgpu_rocm_rdna3
             numprocesses: 1
-            config-file: onnx_gpu_rocm_rdna3.json
+            config-file: onnx_ops_gpu_rocm_rdna3.json
             runs-on: nodai-amdgpu-w7900-x86-64
           - name: amdgpu_vulkan
             numprocesses: 4
-            config-file: onnx_gpu_vulkan.json
+            config-file: onnx_ops_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           - name: nvidiagpu_cuda
-            config-file: onnx_gpu_cuda.json
+            config-file: onnx_ops_gpu_cuda.json
             numprocesses: 4
             runs-on:
               - self-hosted # must come first
@@ -52,7 +52,7 @@ jobs:
               - gpu # TODO(scotttodd): qualify further with vendor/model
               - os-family=Linux
           - name: nvidiagpu_vulkan
-            config-file: onnx_gpu_vulkan.json
+            config-file: onnx_ops_gpu_vulkan.json
             numprocesses: 4
             runs-on:
               - self-hosted # must come first
@@ -62,10 +62,9 @@ jobs:
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/onnx_ops/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
-      LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
+      LOG_FILE_PATH: /tmp/test_onnx_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
@@ -86,36 +85,31 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
-      - name: Check out external TestSuite repository
+      - name: Checkout test suites repository
         uses: actions/checkout@v4.1.7
         with:
-          repository: nod-ai/SHARK-TestSuite
-          ref: 1da89a12a8b00dc77506d702f61300803b6240b7
-          path: SHARK-TestSuite
-          submodules: false
-          lfs: false
-      - name: Install external TestSuite Python requirements
+          repository: iree-org/iree-test-suites
+          ref: 323c2df477544d789c56e4dfda9b047580b77cbf
+          path: iree-test-suites
+      - name: Install ONNX ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
-          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
-
-      - name: Run external tests - ONNX test suite
+          python -m pip install -r iree-test-suites/onnx_ops/requirements.txt
+      - name: Run ONNX ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/onnx/ \
+          pytest iree-test-suites/onnx_ops/ \
               -rpfE \
               --numprocesses ${NUMPROCESSES} \
               --timeout=30 \
               --durations=20 \
-              --no-skip-tests-missing-files \
               --config-files=${CONFIG_FILE_PATH} \
               --report-log=${LOG_FILE_PATH}
       - name: "Updating config file with latest XFAIL lists"
         if: failure()
         run: |
           source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/update_config_xfails.py \
+          python iree-test-suites/onnx_ops/update_config_xfails.py \
             --log-file=${LOG_FILE_PATH} \
             --config-file=${CONFIG_FILE_PATH}
           cat ${CONFIG_FILE_PATH}
@@ -139,17 +133,21 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             models-config-file: models_gpu_rocm_gfx942.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -162,8 +160,7 @@ jobs:
           # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
@@ -198,7 +195,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 1da89a12a8b00dc77506d702f61300803b6240b7
+          ref: f5615ab29da491c0047146258dfa3a0c40c735e5
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -243,21 +240,23 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
+            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
+            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
@@ -285,6 +284,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -e experimental/regression_suite
 
       # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests
@@ -335,8 +336,8 @@ jobs:
             --goldentime-rocm-unet-ms 370.0 \
             --goldentime-rocm-clip-ms 18.5 \
             --goldentime-rocm-vae-ms 315.0 \
-            --goldendispatch-rocm-unet 1714 \
-            --goldendispatch-rocm-clip 1569 \
+            --goldendispatch-rocm-unet 1691 \
+            --goldendispatch-rocm-clip 1225 \
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2280000  \
             --goldensize-rocm-clip-bytes 860000 \
@@ -357,8 +358,8 @@ jobs:
             --goldentime-rocm-unet-ms 77.0 \
             --goldentime-rocm-clip-ms 15.5 \
             --goldentime-rocm-vae-ms 74.0 \
-            --goldendispatch-rocm-unet 1714 \
-            --goldendispatch-rocm-clip 1569 \
+            --goldendispatch-rocm-unet 1691 \
+            --goldendispatch-rocm-clip 1225 \
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \

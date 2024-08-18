@@ -9,19 +9,25 @@
 #
 # Prerequisites:
 #   * Environment must be configured for Emscripten
-#   * Host tools must be built (default at IREE_SOURCE_DIR/build-host/install).
-#     The build_tools/cmake/build_host_tools.sh script can do this for you.
+#   * Host tools must be available at the $1 arg
 #
-# Usage:
-#   build_sample.sh (optional install path) && serve_sample.sh
+# Sample usage:
+#   python -m venv .venv
+#   source .venv/bin/activate
+#   python -m pip install iree-compiler iree-runtime
+#   build_sample.sh .venv/bin && serve_sample.sh
+#
+# The build directory for the emscripten build is taken from the environment
+# variable IREE_EMPSCRIPTEN_BUILD_DIR, defaulting to "build-emscripten".
+# Designed for CI, but can be run manually. It reuses the build directory if it
+# already exists.
 
 set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
+HOST_TOOLS_BINARY_DIR="$1"
 BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
-INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
 SOURCE_DIR="${ROOT_DIR}/experimental/web/sample_webgpu"
 BINARY_DIR="${BUILD_DIR}/experimental/web/sample_webgpu"
 
@@ -44,12 +50,11 @@ mkdir -p ${BINARY_DIR}
 ###############################################################################
 
 echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
-COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 
 # TODO(#11321): Enable iree-codegen-gpu-native-math-precision by default?
 compile_sample() {
   echo "  Compiling '$1' sample for WebGPU..."
-  ${COMPILE_TOOL?} $3 \
+  "${HOST_TOOLS_BINARY_DIR}/iree-compile" $3 \
     --iree-input-type=$2 \
     --iree-hal-target-backends=webgpu-spirv \
     --iree-codegen-gpu-native-math-precision=true \
@@ -82,7 +87,7 @@ pushd ${BUILD_DIR}
 # Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BIN_DIR="${INSTALL_ROOT}/bin" \
+  -DIREE_HOST_BIN_DIR="${HOST_TOOLS_BINARY_DIR}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_ENABLE_THREADING=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -442,10 +443,16 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     accPerm = accInnerPerm;
   }
 
+  IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+      getLoweringConfig(linalgOp);
+
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::GPU::MultiMmaOp>(
       linalgOp, inputs[0], inputs[1], inputs[2],
       ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
       mmaKind, lhsPerm, rhsPerm, accPerm);
+  if (maybeLoweringConfig) {
+    setLoweringConfig(newMmaOp, maybeLoweringConfig);
+  }
   return newMmaOp;
 }
 
@@ -456,7 +463,8 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
                                             IREE::GPU::MultiMmaOp mmaOp) {
   if (!mmaOp.hasTensorSemantics() || mmaOp.hasThreadSemantics()) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        mmaOp, "mmaOp must have vector and subgroup for distribution.");
   }
 
   OpBuilder::InsertionGuard g(rewriter);
@@ -501,7 +509,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Lhs, laneId, lhsPermutation,
           lhsOffsets, lhsSizes, lhsStrides))) {
-    return failure();
+    return mmaOp->emitOpError("failed to populate lhs offsets");
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
   // vector shape.
@@ -521,7 +529,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Rhs, laneId, rhsPermutation,
           rhsOffsets, rhsSizes, rhsStrides))) {
-    return failure();
+    return mmaOp->emitOpError("failed to populate rhs offsets");
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
   // vector shape.
@@ -541,7 +549,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
           rewriter, loc, IREE::GPU::MMAFragment::Acc, laneId, accPermutation,
           accOffsets, accSizes, accStrides))) {
-    return failure();
+    return mmaOp->emitOpError("failed to populate acc offsets");
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
   // inner vector shape.
@@ -796,6 +804,65 @@ void populateIREEGPUVectorUnrollPatterns(
   patterns.add<UnrollMultiMmaPattern>(patterns.getContext(), options);
 }
 
+static bool isReductionIterator(Attribute attr) {
+  return cast<IREE::GPU::IteratorTypeAttr>(attr).getValue() ==
+         utils::IteratorType::reduction;
+}
+static bool isParallelIterator(Attribute attr) {
+  return cast<IREE::GPU::IteratorTypeAttr>(attr).getValue() ==
+         utils::IteratorType::parallel;
+}
+
+/// Pick an unrolling order that reuses the LHS register.
+static std::optional<SmallVector<int64_t>>
+gpuMultiMmaUnrollOrder(Operation *op) {
+  IREE::GPU::MultiMmaOp mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
+  if (!mmaOp) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> order;
+  // First make reduction the outer dimensions.
+  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+    if (isReductionIterator(iter)) {
+      order.push_back(index);
+    }
+  }
+
+  llvm::SmallDenseSet<int64_t> dimsInLhs;
+  for (AffineExpr expr : mmaOp.getIndexingMapsArray()[0].getResults()) {
+    dimsInLhs.insert(cast<AffineDimExpr>(expr).getPosition());
+  }
+  // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
+  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+    if (isParallelIterator(iter) && dimsInLhs.count(index)) {
+      order.push_back(index);
+    }
+  }
+  // Then the remaining parallel loops.
+  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+    if (isParallelIterator(iter) && !dimsInLhs.count(index)) {
+      order.push_back(index);
+    }
+  }
+  return order;
+}
+
+static std::optional<SmallVector<int64_t>> getMultiMmaUnitShape(Operation *op) {
+  IREE::GPU::MultiMmaOp mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
+  if (!mmaOp) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> targetOuterShape(mmaOp.getIteratorTypes().size(), 1);
+  return targetOuterShape;
+}
+
+void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns) {
+  populateIREEGPUVectorUnrollPatterns(
+      patterns, vector::UnrollVectorOptions()
+                    .setNativeShapeFn(getMultiMmaUnitShape)
+                    .setUnrollTraversalOrderFn(gpuMultiMmaUnrollOrder));
+}
+
 //===---------------------------------------------------------------------===//
 // Resolving lane mapped forall ops
 //===---------------------------------------------------------------------===//
@@ -856,13 +923,35 @@ struct LowerShuffleTensor
                                 PatternRewriter &rewriter) const final {
     Location loc = shuffleOp.getLoc();
 
+    Value dest = shuffleOp.getDest();
+    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
+        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+
+    // If the destination is a tensor.empty, replace it with an alloc_tensor.
+    if (auto emptyDest = shuffleOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
+      auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
+          emptyDest->getLoc(), emptyDest->getResultTypes()[0],
+          emptyDest.getDynamicSizes());
+      allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+      dest = allocTensor.getResult();
+    } else {
+      // Otherwise, verify that the destination is already shared memory.
+      auto allocTensor = dest.getDefiningOp<bufferization::AllocTensorOp>();
+      if (!allocTensor || !allocTensor.getMemorySpace().has_value() ||
+          allocTensor.getMemorySpaceAttr() != sharedMemoryAddrSpace) {
+        return rewriter.notifyMatchFailure(
+            shuffleOp, "shuffle tensor op destination does not have shared "
+                       "memory address space.");
+      }
+    }
+
     // Step 1. Insert the source slice into the intermediate tensor.
     SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
     SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
     Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), shuffleOp.getDest(), sourceOffsets,
-        sourceSizes, sourceStrides);
+        loc, shuffleOp.getSource(), dest, sourceOffsets, sourceSizes,
+        sourceStrides);
 
     // Step 2. Synchronize the workers.
     auto writeBarrier =

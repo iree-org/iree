@@ -1,57 +1,96 @@
 // RUN: iree-opt --split-input-file --iree-hal-fixup-legacy-sync %s | FileCheck %s
 
-// Tests that command buffers that are reusable don't execute inline.
-// Reusable + inline is not a valid combination.
-
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {legacy_sync}>]} {
-// CHECK-LABEL: @command_buffer_reusable
-util.func public @command_buffer_reusable(%arg0: !hal.device) {
-  // CHECK: hal.command_buffer.create device(%arg0 : !hal.device) mode("None")
-  %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode("None") categories("Transfer|Dispatch") : !hal.command_buffer
+// TODO(multi-device): remove once device globals are used. This is a fallback
+// path during the transition.
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+  ]
+} {
+// CHECK-LABEL: @default_device_targets
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
+util.func public @default_device_targets(%device: !hal.device, %affinity: i64) {
+  // CHECK: hal.command_buffer.create device(%[[DEVICE]] : !hal.device) mode("None")
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("None") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
   util.return
 }
 }  // module
+
+// -----
+
+// Tests that unknown devices (here passed as an arg on a public function)
+// don't trigger the pass, as we default to non-legacy behavior.
+
+// CHECK-LABEL: @unknown_device
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
+util.func public @unknown_device(%device: !hal.device, %affinity: i64) {
+  // CHECK: hal.command_buffer.create device(%[[DEVICE]] : !hal.device) mode("None")
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("None") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
+  util.return
+}
+
+// -----
+
+// Tests that command buffers that are reusable don't execute inline.
+// Reusable + inline is not a valid combination.
+
+util.global private @device = #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+
+// CHECK-LABEL: @command_buffer_reusable
+util.func public @command_buffer_reusable(%affinity: i64) {
+  // CHECK: %[[DEVICE:.+]] = util.global.load @device
+  %device = util.global.load @device : !hal.device
+  // CHECK: hal.command_buffer.create device(%[[DEVICE]] : !hal.device) mode("None")
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("None") categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
+  util.return
+}
 
 // -----
 
 // Tests that one-shot command buffers are allowed to execute inline.
 
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {legacy_sync}>]} {
+util.global private @device = #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+
 // CHECK-LABEL: @command_buffer_oneshot
-util.func public @command_buffer_oneshot(%arg0: !hal.device) {
-  // CHECK: hal.command_buffer.create device(%arg0 : !hal.device) mode("OneShot|AllowInlineExecution")
-  %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+util.func public @command_buffer_oneshot(%affinity: i64) {
+  // CHECK: %[[DEVICE:.+]] = util.global.load @device
+  %device = util.global.load @device : !hal.device
+  // CHECK: hal.command_buffer.create device(%[[DEVICE]] : !hal.device) mode("OneShot|AllowInlineExecution")
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
   util.return
 }
-}  // module
 
 // -----
 
 // Tests for a no-op if there are no devices requiring legacy mode.
 
-module attributes {hal.device.targets = [
+util.global private @device = #hal.device.select<[
   #hal.device.target<"local", {}>,
   #hal.device.target<"vulkan", {}>
-]} {
+]> : !hal.device
+
 // CHECK-LABEL: @legacy_mode_not_required
-util.func public @legacy_mode_not_required(%arg0: !hal.device) {
-  // CHECK: hal.command_buffer.create device(%arg0 : !hal.device) mode(OneShot)
-  %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode(OneShot) categories("Transfer|Dispatch") : !hal.command_buffer
+util.func public @legacy_mode_not_required(%affinity: i64) {
+  // CHECK: %[[DEVICE:.+]] = util.global.load @device
+  %device = util.global.load @device : !hal.device
+  // CHECK: hal.command_buffer.create device(%[[DEVICE]] : !hal.device) mode(OneShot)
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode(OneShot) categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
   util.return
 }
-}  // module
 
 // -----
 
-// Tests that any device requiring legacy_sync will trigger the pass.
+// Tests that any device requiring legacy_sync in a set will trigger the pass.
 
-module attributes {hal.device.targets = [
+util.global private @device = #hal.device.select<[
   #hal.device.target<"local", {}>,
   #hal.device.target<"vulkan", {legacy_sync}>
-]} {
+]> : !hal.device
+
 // CHECK-LABEL: @mixed_legacy_mode_required
-util.func public @mixed_legacy_mode_required(%device: !hal.device, %wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
-  %affinity = arith.constant 0 : i64
+util.func public @mixed_legacy_mode_required(%wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+  %device = util.global.load @device : !hal.device
+  %affinity = arith.constant 1 : i64
   // CHECK: hal.fence.await
   // CHECK: hal.device.queue.execute
   // CHECK: hal.fence.await
@@ -61,17 +100,50 @@ util.func public @mixed_legacy_mode_required(%device: !hal.device, %wait: !hal.f
       commands([%cmd])
   util.return
 }
-}  // module
+
+// -----
+
+// Tests that only devices with legacy_sync trigger the pass.
+
+util.global private @device_async = #hal.device.target<"local", {}> : !hal.device
+util.global private @device_sync = #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+
+// CHECK-LABEL: @mixed_legacy_mode_scoped
+util.func public @mixed_legacy_mode_scoped(%wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+  // CHECK-DAG: %[[DEVICE_ASYNC:.+]] = util.global.load @device_async
+  %device_async = util.global.load @device_async : !hal.device
+  // CHECK-DAG: %[[DEVICE_SYNC:.+]] = util.global.load @device_sync
+  %device_sync = util.global.load @device_sync : !hal.device
+  %affinity = arith.constant 1 : i64
+  // CHECK-NOT: hal.fence.await
+  // CHECK: hal.device.queue.execute<%[[DEVICE_ASYNC]]
+  // CHECK-NOT: hal.fence.await
+  hal.device.queue.execute<%device_async : !hal.device>
+      affinity(%affinity)
+      wait(%wait) signal(%signal)
+      commands([%cmd])
+  // CHECK: hal.fence.await
+  // CHECK: hal.device.queue.execute<%[[DEVICE_SYNC]]
+  // CHECK: hal.fence.await
+  hal.device.queue.execute<%device_sync : !hal.device>
+      affinity(%affinity)
+      wait(%wait) signal(%signal)
+      commands([%cmd])
+  util.return
+}
 
 // -----
 
 // Tests that queued operations get the appropriate waits before/after.
 
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {legacy_sync}>]} {
+util.global private @device = #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+
 // CHECK-LABEL: @blocking_execute
-// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[WAIT:.+]]: !hal.fence, %[[CMD:.+]]: !hal.command_buffer, %[[SIGNAL:.+]]: !hal.fence)
-util.func public @blocking_execute(%device: !hal.device, %wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
-  %affinity = arith.constant 0 : i64
+// CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[CMD:.+]]: !hal.command_buffer, %[[SIGNAL:.+]]: !hal.fence)
+util.func public @blocking_execute(%wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+  %affinity = arith.constant 1 : i64
+  // CHECK: %[[DEVICE:.+]] = util.global.load @device
+  %device = util.global.load @device : !hal.device
   //  CHECK-DAG: %[[NULL:.+]] = util.null : !hal.fence
   //  CHECK-DAG: hal.fence.await until([%[[WAIT]]])
   // CHECK-NEXT: hal.device.queue.execute<%[[DEVICE]] : !hal.device>
@@ -84,16 +156,18 @@ util.func public @blocking_execute(%device: !hal.device, %wait: !hal.fence, %cmd
       commands([%cmd])
   util.return
 }
-}  // module
 
 // -----
 
 // Tests that waits are not inserted if they already exist.
 
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {legacy_sync}>]} {
+util.global private @device = #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
+
 // CHECK-LABEL: @blocking_execute
-// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[WAIT:.+]]: !hal.fence, %[[CMD:.+]]: !hal.command_buffer, %[[SIGNAL:.+]]: !hal.fence)
-util.func public @blocking_execute(%device: !hal.device, %wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+// CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[CMD:.+]]: !hal.command_buffer, %[[SIGNAL:.+]]: !hal.fence)
+util.func public @blocking_execute(%wait: !hal.fence, %cmd: !hal.command_buffer, %signal: !hal.fence) {
+  // CHECK: %[[DEVICE:.+]] = util.global.load @device
+  %device = util.global.load @device : !hal.device
   // CHECK-NEXT: %[[TIMEOUT:.+]] = arith.constant 100
   %timeout = arith.constant 100 : i32
   // CHECK-NEXT: hal.fence.await until([%[[WAIT]]]) timeout_millis(%[[TIMEOUT]])
@@ -114,4 +188,3 @@ util.func public @blocking_execute(%device: !hal.device, %wait: !hal.fence, %cmd
   // CHECK-NEXT: util.return
   util.return
 }
-}  // module

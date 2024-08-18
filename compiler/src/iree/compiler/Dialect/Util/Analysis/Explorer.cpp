@@ -320,7 +320,8 @@ WalkResult Explorer::recursiveWalk(Operation *parentOp,
   return WalkResult::advance();
 }
 
-TraversalResult Explorer::walkValues(ValueWalkFn fn) {
+TraversalResult Explorer::walkAllValues(ValueWalkFn fn,
+                                        std::optional<TypeID> typeID) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Explorer::walkValues ]]\n");
   TraversalResult result = TraversalResult::COMPLETE;
 
@@ -357,7 +358,8 @@ TraversalResult Explorer::walkValues(ValueWalkFn fn) {
 
       LLVM_DEBUG(llvm::dbgs() << "   + entering callable region @"
                               << getRegionName(callableRegion) << "\n");
-      auto emitResult = recursiveWalkValues(callableOp, visitedValues, fn);
+      auto emitResult =
+          recursiveWalkValues(callableOp, visitedValues, fn, typeID);
       if (emitResult.wasInterrupted())
         break;
       if (emitResult.wasSkipped())
@@ -384,7 +386,8 @@ TraversalResult Explorer::walkValues(Operation *op, ValueWalkFn fn) {
 
 WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
                                          DenseSet<Value> &visitedValues,
-                                         const ValueWalkFn &fn) {
+                                         const ValueWalkFn &fn,
+                                         std::optional<TypeID> typeID) {
   auto parentAction = getTraversalAction(parentOp);
   if (parentAction == TraversalAction::IGNORE) {
     LLVM_DEBUG(llvm::dbgs()
@@ -396,6 +399,8 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
     LLVM_DEBUG(llvm::dbgs()
                << "   + processing op results " << getOpName(parentOp) << "\n");
     for (auto result : parentOp->getResults()) {
+      if (typeID.has_value() && result.getType().getTypeID() != *typeID)
+        continue;
       if (visitedValues.insert(result).second) {
         LLVM_DEBUG({
           llvm::dbgs() << "  == emitting value ";
@@ -425,6 +430,8 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
           llvm::dbgs() << " arguments\n";
         });
         for (auto arg : block.getArguments()) {
+          if (typeID.has_value() && arg.getType().getTypeID() != *typeID)
+            continue;
           if (visitedValues.insert(arg).second) {
             LLVM_DEBUG({
               llvm::dbgs() << "  == emitting block arg ";
@@ -437,7 +444,7 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
         }
       }
       for (auto &op : block) {
-        auto opResult = recursiveWalkValues(&op, visitedValues, fn);
+        auto opResult = recursiveWalkValues(&op, visitedValues, fn, typeID);
         if (opResult.wasInterrupted())
           return WalkResult::interrupt();
       }
@@ -672,7 +679,8 @@ TraversalResult Explorer::walkOutgoingBranchOperandArguments(
 // traversal algorithm separated from the policy here. This would let us
 // reuse the traversal for other kinds of walks that are more specific (like
 // only getting the ops or values instead of both, etc).
-TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
+TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
+                                          TraversalBehavior options) {
   // Fast-path short-circuit for constants, which are like 25% of all IR.
   if (value.getDefiningOp() &&
       value.getDefiningOp()->hasTrait<OpTrait::ConstantLike>()) {
@@ -849,15 +857,17 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
 
     // If the op is tied we may need to walk up to the operand the result is
     // tied to.
-    if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
-      auto tiedOperand = tiedOp.getTiedResultOperand(resultValue);
-      if (tiedOperand) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "   + queuing tied operand ";
-          tiedOperand.printAsOperand(llvm::dbgs(), asmState);
-          llvm::dbgs() << "\n";
-        });
-        worklist.insert(tiedOperand);
+    if (!bitEnumContains(options, TraversalBehavior::DONT_WALK_TIED_VALUES)) {
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+        auto tiedOperand = tiedOp.getTiedResultOperand(resultValue);
+        if (tiedOperand) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "   + queuing tied operand ";
+            tiedOperand.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "\n";
+          });
+          worklist.insert(tiedOperand);
+        }
       }
     }
 
@@ -884,7 +894,8 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
   return result;
 }
 
-TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
+TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
+                                             TraversalBehavior options) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Explorer::walkTransitiveUses ]]\n");
   TraversalResult result = TraversalResult::COMPLETE;
 
@@ -1083,15 +1094,17 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
 
       // If the op is tied we may need to walk down to the results the operand
       // is tied to (multiple results can tie the same operand).
-      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(ownerOp)) {
-        for (auto tiedResult :
-             tiedOp.getOperandTiedResults(use.getOperandNumber())) {
-          LLVM_DEBUG({
-            llvm::dbgs() << "   + queuing tied result ";
-            tiedResult.printAsOperand(llvm::dbgs(), asmState);
-            llvm::dbgs() << "\n";
-          });
-          worklist.insert(tiedResult);
+      if (!bitEnumContains(options, TraversalBehavior::DONT_WALK_TIED_VALUES)) {
+        if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(ownerOp)) {
+          for (auto tiedResult :
+               tiedOp.getOperandTiedResults(use.getOperandNumber())) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "   + queuing tied result ";
+              tiedResult.printAsOperand(llvm::dbgs(), asmState);
+              llvm::dbgs() << "\n";
+            });
+            worklist.insert(tiedResult);
+          }
         }
       }
 
@@ -1142,14 +1155,18 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
   return result;
 }
 
-TraversalResult Explorer::walkTransitiveUsers(Value value, OperationWalkFn fn) {
+TraversalResult Explorer::walkTransitiveUsers(Value value, OperationWalkFn fn,
+                                              TraversalBehavior options) {
   DenseSet<Operation *> visitedOwners;
-  return walkTransitiveUses(value, [&](OpOperand &use) {
-    if (visitedOwners.insert(use.getOwner()).second) {
-      return fn(use.getOwner());
-    }
-    return WalkResult::advance();
-  });
+  return walkTransitiveUses(
+      value,
+      [&](OpOperand &use) {
+        if (visitedOwners.insert(use.getOwner()).second) {
+          return fn(use.getOwner());
+        }
+        return WalkResult::advance();
+      },
+      options);
 }
 
 } // namespace mlir::iree_compiler

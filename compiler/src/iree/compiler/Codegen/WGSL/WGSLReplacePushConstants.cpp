@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/WGSL/PassDetail.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -17,6 +16,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_WGSLREPLACEPUSHCONSTANTSPASS
+#include "iree/compiler/Codegen/WGSL/Passes.h.inc"
 
 namespace {
 
@@ -65,14 +67,14 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
   OpBuilder builder(op);
 
   // tensor.extract -> vector<4xi32>
-  uint64_t vec4Index = op.getIndex().getZExtValue() / 4;
+  uint64_t vec4Index = op.getOrdinal().getZExtValue() / 4;
   auto tensorOffsetValue =
       builder.createOrFold<arith::ConstantIndexOp>(op.getLoc(), vec4Index);
   auto tensorExtractOp = builder.createOrFold<tensor::ExtractOp>(
       op.getLoc(), loadOp, tensorOffsetValue);
 
   // vector<4xi32> -> i32
-  uint64_t elementIndex = op.getIndex().getZExtValue() % 4;
+  uint64_t elementIndex = op.getOrdinal().getZExtValue() % 4;
   auto vectorOffsetValue =
       builder.createOrFold<arith::ConstantIndexOp>(op.getLoc(), elementIndex);
   auto vectorExtractElementOp = builder.create<vector::ExtractElementOp>(
@@ -85,8 +87,30 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
   op.erase();
 }
 
-class WGSLReplacePushConstantsPass
-    : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
+// Adds set 3 with the emulated push descriptor binding, if needed.
+static IREE::HAL::PipelineLayoutAttr
+addSet3IfNeeded(IREE::HAL::PipelineLayoutAttr originalAttr) {
+  for (auto setLayoutAttr : originalAttr.getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == 3) {
+      return originalAttr;
+    }
+  }
+  SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs(
+      originalAttr.getSetLayouts());
+  SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
+  bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
+      originalAttr.getContext(), 0, IREE::HAL::DescriptorType::UniformBuffer,
+      IREE::HAL::DescriptorFlags::None));
+  setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
+      originalAttr.getContext(), 3, bindingAttrs, std::nullopt));
+  return IREE::HAL::PipelineLayoutAttr::get(originalAttr.getContext(),
+                                            originalAttr.getPushConstants(),
+                                            setLayoutAttrs);
+}
+
+class WGSLReplacePushConstantsPass final
+    : public impl::WGSLReplacePushConstantsPassBase<
+          WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect, mlir::tensor::TensorDialect,
                     mlir::vector::VectorDialect, IREE::Flow::FlowDialect,
@@ -108,16 +132,16 @@ class WGSLReplacePushConstantsPass
     // and load from it once using `flow.dispatch.tensor.load`, then extract
     // individual push constants with `tensor.extract`.
 
-    // Find the range of push constant indices (0 to some maximum).
-    uint64_t maxConstantIndex = 0;
+    // Get the pipeline layout from the first constant load. It should be
+    // uniform across all constants. Add set 3 so we can use it.
+    IREE::HAL::PipelineLayoutAttr layoutAttr =
+        addSet3IfNeeded(constantLoadOps.front().getLayout());
+
     // Inspect the alignment values. These are just hints, so if all are equal
     // then use the value, otherwise drop the alignment hint.
     SmallVector<uint64_t> alignmentValues;
     bool missingAlignmentValue = false;
     for (auto constantLoadOp : constantLoadOps) {
-      maxConstantIndex =
-          std::max(constantLoadOp.getIndex().getZExtValue(), maxConstantIndex);
-
       auto alignmentAttr = constantLoadOp.getAlignmentAttr();
       if (alignmentAttr) {
         uint64_t alignmentValue = alignmentAttr.getValue().getZExtValue();
@@ -138,7 +162,7 @@ class WGSLReplacePushConstantsPass
     //   max index 0 -> 1 vec4
     //   max index 3 -> 1 vec4
     //   max index 4 -> 2 vec4s
-    uint64_t numberOfVec4s = maxConstantIndex / 4 + 1;
+    int64_t numberOfVec4s = layoutAttr.getPushConstants() / 4 + 1;
 
     // hal.interface.binding.subspan ->
     // !flow.dispatch.tensor<readonly:tensor<Nxvector<4xi32>>>
@@ -154,10 +178,9 @@ class WGSLReplacePushConstantsPass
     // analysis using the hint should have been performed by earlier passes.
     auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
     auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        loc, dispatchTensorType,
+        loc, dispatchTensorType, layoutAttr,
         /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
         /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
-        IREE::HAL::DescriptorType::UniformBuffer,
         /*byte_offset=*/zero, dynamicDims, alignmentAttr, nullptr);
 
     // flow.dispatch.tensor.load -> tensor<Nxvector<4xi32>>
@@ -174,10 +197,4 @@ class WGSLReplacePushConstantsPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWGSLReplacePushConstantsPass() {
-  return std::make_unique<WGSLReplacePushConstantsPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -2,7 +2,9 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"rocm", [#hal.executable.target<"rocm", "rocm-hsaco-fb">]>
+    #hal.device.target<"hip", [
+      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+    ]> : !hal.device
   ]
 } {
 
@@ -44,7 +46,9 @@ stream.executable public @add_dispatch_0 {
 #loc = loc(unknown)
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"rocm", [#hal.executable.target<"rocm", "rocm-hsaco-fb">]>
+    #hal.device.target<"hip", [
+      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+    ]> : !hal.device
   ]
 } {
 

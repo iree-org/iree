@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
@@ -38,6 +39,7 @@ iree_cc_library(
     "ScheduleConcurrency.cpp"
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
+    "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"
   DEPS

@@ -97,8 +97,18 @@ static void fixupGlobalMutability(Operation *moduleOp,
       // No uses - erase the global entirely.
       deadOps.push_back(globalInfo->op);
     } else {
-      // If there are stores mark the global as mutable.
-      globalInfo->op.setGlobalMutable(!globalInfo->getStores().empty());
+      // TODO(benvanik): verify we want this behavior - we likely want to change
+      // this to be mutable only if stores exist outside of initializers.
+      //
+      // If there are stores mark the global as mutable. We need to update all
+      // of the loads if this changes anything.
+      bool hasStores = !globalInfo->getStores().empty();
+      bool didChange = globalInfo->op.isGlobalMutable() != hasStores;
+      globalInfo->op.setGlobalMutable(hasStores);
+      if (didChange) {
+        for (auto loadOp : globalInfo->getLoads())
+          loadOp.setGlobalImmutable(!hasStores);
+      }
     }
     for (auto loadOp : globalInfo->getLoads())
       loadOp.setGlobalImmutable(!globalInfo->op.isGlobalMutable());

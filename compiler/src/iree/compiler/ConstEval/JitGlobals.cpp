@@ -619,10 +619,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     requestedTargetDevice = resolveTargetDevice(*targetRegistry.value);
     hasRequestedTargetDevice =
         targetRegistry->getTargetDevice(requestedTargetDevice) != nullptr;
-    compileOptions->executableOptions.targets.push_back(requestedTargetDevice);
+    compileOptions->executableOptions.legacyTargetBackends.push_back(
+        requestedTargetDevice);
     compileOptions->targetOptions.f32Extension = true;
     compileOptions->targetOptions.f64Extension = true;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
+    compileOptions->inputOptions.demoteF64ToF32 = false;
     if (requestedTargetDevice == "vmvx" || !hasRequestedTargetDevice) {
       targetDevice = targetRegistry->getTargetDevice("vmvx");
     } else {
