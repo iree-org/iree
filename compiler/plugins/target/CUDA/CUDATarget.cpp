@@ -68,11 +68,13 @@ struct CUDAOptions {
 
     binder.opt<std::string>(
         "iree-cuda-target", clTarget, llvm::cl::cat(category),
-        llvm::cl::desc(
-            "CUDA target as expected by LLVM NVPTX backend; e.g., "
-            "'sm_80'/'sm_90' for targeting Ampere/Hopper GPUs. See for "
-            "https://iree.dev/guides/deployment-configurations/gpu-cuda for "
-            "more schemes and details."));
+        llvm::cl::desc("CUDA target as expected by LLVM NVPTX backend; e.g., "
+                       "'sm_80'/'sm_90' for targeting Ampere/Hopper GPUs. "
+                       "Additionally this also supports architecture code "
+                       "names like 'turing'/'ampere' or some product names "
+                       "like 'a100'/'rtx3090ti' for a better experience. See "
+                       "https://iree.dev/guides/deployment-configurations/"
+                       "gpu-cuda for more details."));
 
     binder.opt<std::string>(
         "iree-cuda-target-features", clTargetFeatures, llvm::cl::cat(category),

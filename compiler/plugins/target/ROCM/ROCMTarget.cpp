@@ -65,24 +65,32 @@ struct ROCmOptions {
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
-    static cl::OptionCategory category("ROCm HAL Target");
-    binder.opt<std::string>("iree-hip-target", target, cl::cat(category),
-                            cl::desc("HIP LLVM target."));
+    static cl::OptionCategory category("HIP HAL Target");
+    binder.opt<std::string>(
+        "iree-hip-target", target, cl::cat(category),
+        cl::desc("HIP target as expected by LLVM AMDGPU backend; e.g., "
+                 "'gfx90a'/'gfx942' for targeting MI250/MI300 GPUs. "
+                 "Additionally this also supports architecture code names like "
+                 "'cdna3'/'rdna3' or some product names like "
+                 "'mi300x'/'rtx7900xtx' for a better experience. See "
+                 "https://iree.dev/guides/deployment-configurations/gpu-rocm/ "
+                 "for more details"));
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
-        cl::desc("HIP target features; e.g., '+sramecc,+xnack'."));
-    binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
+        cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
+                 "e.g., '+sramecc,+xnack'."));
+    binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
                             cl::cat(category),
-                            cl::desc("Directory of ROCm Bitcode."));
-    binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
+                            cl::desc("Directory of HIP Bitcode."));
+    binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
     binder.opt<std::string>(
-        "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
-        cl::desc("Enables microkernels in the rocm compiler backend. May be "
+        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
+        cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<bool>("iree-rocm-legacy-sync", legacySync, cl::cat(category),
+    binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
   }
@@ -517,7 +525,7 @@ public:
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
-                  "--iree-rocm-bc-dir= to a path on your system.";
+                  "--iree-hip-bc-dir= to a path on your system.";
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
                                         targetArch, bitcodeDirectory))) {

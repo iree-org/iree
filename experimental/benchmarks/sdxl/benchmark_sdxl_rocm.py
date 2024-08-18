@@ -55,7 +55,7 @@ def run_sdxl_rocm_benchmark(rocm_chip, gpu_number):
         "--iree-global-opt-propagate-transposes=true",
         "--iree-codegen-llvmgpu-use-vector-distribution",
         "--iree-codegen-gpu-native-math-precision=true",
-        "--iree-rocm-waves-per-eu=2",
+        "--iree-hip-waves-per-eu=2",
         "--iree-opt-outer-dim-concat=true",
         "--iree-llvmgpu-enable-prefetch",
         "-o",

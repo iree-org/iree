@@ -111,10 +111,9 @@ iree-compile \
     mobilenet_iree_input.mlir -o mobilenet_cuda.vmfb
 ```
 
-Canonically a cuda target architecture (`iree-cuda-target`) matching the LLVM
-NVPTX backend of the form `sm_<arch_number>` is needed to compile towards each
-GPU architecture. If no architecture is specified then we will default to
-`sm_60`.
+Canonically a CUDA target (`iree-cuda-target`) matching the LLVM NVPTX backend
+of the form `sm_<arch_number>` is needed to compile towards each GPU
+architecture. If no architecture is specified then we will default to `sm_60`.
 
 Here is a table of commonly used architectures:
 

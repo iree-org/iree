@@ -106,7 +106,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
-    "--iree-rocm-waves-per-eu=2",
+    "--iree-hip-waves-per-eu=2",
     "--iree-llvmgpu-enable-prefetch",
     "--iree-flow-enable-aggressive-fusion",
     "--iree-flow-enable-fuse-horizontal-contractions=true",
