@@ -102,8 +102,7 @@ struct CUDAOptions {
             "flag can be used (e.g.'--iree-cuda-use-ptxas-params=-v')."));
 
     binder.opt<std::string>(
-        "iree-cuda-use-ptxas-params", clUsePtxasParams,
-        llvm::cl::cat(category),
+        "iree-cuda-use-ptxas-params", clUsePtxasParams, llvm::cl::cat(category),
         llvm::cl::desc("Passes the given additional parameters to ptxas."));
   }
 
