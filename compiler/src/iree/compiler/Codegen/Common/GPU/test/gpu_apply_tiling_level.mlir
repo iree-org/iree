@@ -41,13 +41,13 @@ module {
 //       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (2, 16)
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
 //       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
 // SUBGROUP-LABEL: func.func @add_tensor
 //       SUBGROUP:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (2, 16)
 //       SUBGROUP:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
 //       SUBGROUP:     scf.forall.in_parallel
-//       SUBGROUP:   mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]
+//       SUBGROUP:   mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]
 
 // -----
 
@@ -138,13 +138,13 @@ func.func @matmul_transpose_b() attributes {translation_info = #iree_codegen.tra
 // THREAD-LABEL: func.func @matmul_transpose_b
 //       THREAD:   scf.forall ({{.*}}) in (64, 4)
 //       THREAD:     linalg.copy
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 //       THREAD:   scf.forall ({{.*}}) in (64, 4)
 //       THREAD:     linalg.copy
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 //       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 64) step (4, 4)
 //       THREAD:     linalg.matmul
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
 // -----
 
@@ -310,7 +310,7 @@ module {
 //       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (8, 4)
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
 //       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
 // -----
 
@@ -344,7 +344,7 @@ module {
 //       THREAD:   scf.forall ({{.*}}) = (0, 0, 0) to (2, 128, 8) step (1, 1, 4)
 //       THREAD:     iree_linalg_ext.im2col {{.*}} ins(%{{.*}}: tensor<1x34x34x128xf16>) outs({{.*}}: tensor<1x1x4xf16>)
 //       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_2>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
 // -----
 
