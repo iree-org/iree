@@ -74,7 +74,7 @@ struct ROCmOptions {
                  "'cdna3'/'rdna3' or some product names like "
                  "'mi300x'/'rtx7900xtx' for a better experience. See "
                  "https://iree.dev/guides/deployment-configurations/gpu-rocm/ "
-                 "for more details"));
+                 "for more details."));
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features as expected by LLVM AMDGPU backend; "

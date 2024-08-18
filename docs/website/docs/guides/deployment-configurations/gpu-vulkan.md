@@ -27,7 +27,7 @@ GPU Vendor | Category | Performance | Focus Architecture
 ARM Mali GPU | Mobile |  Good | Valhall+
 Qualcomm Adreno GPU | Mobile | Reasonable | 640+
 AMD GPU | Desktop/server | Good | RDNA+
-NVIDIA GPU | Desktop/server | Good | Turing+
+NVIDIA GPU | Desktop/server | Reasonable | Turing+
 
 ## :octicons-download-16: Prerequisites
 
@@ -190,30 +190,28 @@ iree-compile \
     mobilenet_iree_input.mlir -o mobilenet_vulkan.vmfb
 ```
 
+`iree-vulkan-target` specifies the GPU architecture to target. It accepts a few
+schemes:
+
+* LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
+  like `gfx1100` for AMD RX 7900XTX and `sm_86` for NVIDIA RTX 3090 GPUs.
+* Architecture code name style: e.g., using `rdna3`/`valhall4`/`ampere`/`adreno`
+  for AMD/ARM/NVIDIA/Qualcomm GPUs
+* Product name style(1): e.g., using `rx7900xtx`/`a100` for corresponding GPUs.
+
+If no target is specified, then a safe but more limited default will be used.
+
 !!! note annotate
-    Currently a target triple of the form `<vendor/arch>-<product>-<os>` is needed
-    to compile towards a specific GPU architecture.
-
-    We don't support the full spectrum here(1); the following table summarizes
-    the currently recognized ones.
-
-    If no triple is specified, then a safe but more limited default will be used.
-
+    Note that We don't support the full spectrum of GPUs here(2).
     This is more of a mechanism to help us develop IREE itself--in the long term
     we want to perform multiple targetting to generate to multiple architectures
-    if no target triple is given.
+    if no target is given.
 
-1. It's also impossible to capture all details of a Vulkan implementation
+1. Note that we only support very limited GPUs that we are actively developing
+   against in this category, particularly for desktops.
+2. It's also impossible to capture all details of a Vulkan implementation
    with a target triple, given the allowed variances on extensions, properties,
    limits, etc. So the target triple is just an approximation for usage.
-
-| GPU Vendor          | Target Triple                                 |
-| ------------------- | --------------------------------------------- |
-| ARM Mali GPU        | e.g. `valhall-unknown-{android30|android31}`  |
-| Qualcomm Adreno GPU | e.g. `adreno-unknown-{android30|android31}`   |
-| AMD GPU             | e.g. `{rdna1|rdna2|rdna3}-unknown-unknown`    |
-| NVIDIA GPU          | e.g. `{turing|ampere}-unknown-unknown`        |
-| SwiftShader CPU     | `cpu-swiftshader-unknown`                     |
 
 ### :octicons-terminal-16: Run a compiled program
 

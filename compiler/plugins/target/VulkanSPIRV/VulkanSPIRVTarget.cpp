@@ -42,7 +42,16 @@ struct VulkanSPIRVTargetOptions {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
     binder.opt<std::string>(
         "iree-vulkan-target", target,
-        llvm::cl::desc("Vulkan target controlling the SPIR-V environment."));
+        llvm::cl::desc(
+            "Vulkan target controlling the SPIR-V environment. Given the wide "
+            "support of Vulkan, this option supports a few schemes: 1) LLVM "
+            "CodeGen backend style: e.g., 'gfx*' for AMD GPUs and 'sm_*' for "
+            "NVIDIA GPUs; 2) architecture code name style: e.g., "
+            "'rdna3'/'valhall4'/'ampere'/'adreno' for AMD/ARM/NVIDIA/Qualcomm "
+            "GPUs; 3) product name style: 'rx7900xtx'/'a100' for AMD/NVIDIA "
+            "GPUs. See "
+            "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
+            "more details."));
     binder.opt<bool>(
         "iree-vulkan-experimental-indirect-bindings", indirectBindings,
         llvm::cl::desc(
