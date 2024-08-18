@@ -196,7 +196,7 @@ schemes:
 * LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
   like `gfx1100` for AMD RX 7900XTX and `sm_86` for NVIDIA RTX 3090 GPUs.
 * Architecture code name style: e.g., using `rdna3`/`valhall4`/`ampere`/`adreno`
-  for AMD/ARM/NVIDIA/Qualcomm GPUs
+  for AMD/ARM/NVIDIA/Qualcomm GPUs.
 * Product name style(1): e.g., using `rx7900xtx`/`a100` for corresponding GPUs.
 
 If no target is specified, then a safe but more limited default will be used.
