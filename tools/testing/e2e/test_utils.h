@@ -8,7 +8,6 @@
 #define IREE_TOOLS_TESTING_E2E_TEST_UTILS_H_
 #include <stdio.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
