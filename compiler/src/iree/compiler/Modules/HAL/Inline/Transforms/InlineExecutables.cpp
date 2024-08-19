@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
-#include "iree/compiler/Modules/HAL/Inline/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Utils/IntegerSet.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
@@ -24,8 +23,13 @@
 
 namespace mlir::iree_compiler::IREE::HAL::Inline {
 
-class InlineExecutablesPass
-    : public InlineExecutablesBase<InlineExecutablesPass> {
+#define GEN_PASS_DEF_INLINEEXECUTABLESPASS
+#include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h.inc"
+
+namespace {
+
+class InlineExecutablesPass final
+    : public impl::InlineExecutablesPassBase<InlineExecutablesPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -420,8 +424,5 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createInlineExecutablesPass() {
-  return std::make_unique<InlineExecutablesPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::HAL::Inline
