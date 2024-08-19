@@ -85,3 +85,10 @@ jobs:
     uses: ./.github/workflows/pkgci_test_android.yml
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  test_riscv64:
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_riscv64')
+    uses: ./.github/workflows/pkgci_test_riscv64.yml
+    with:
+      write-caches: ${{ needs.setup.outputs.write-caches }}
