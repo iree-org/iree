@@ -388,7 +388,7 @@ def get_test_compilation_infos(
     elif compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
         tile_workgroup_size_pairs = [
             TileWorkgroupSizePair(
-                [[64, 64], [16, 64], [0, 0, 16], [16, 16, 16]], [64, 4, 1]
+                [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]], [64, 2, 1]
             )
         ]
     elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:

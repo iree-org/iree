@@ -158,8 +158,7 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
 /// Returns std::nullopt if none found.
-std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func,
-                                      bool pickLargest);
+std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
 } // namespace mlir::iree_compiler
 
