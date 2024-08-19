@@ -367,11 +367,14 @@ void ValueBarrierOp::build(OpBuilder &builder, OperationState &result,
 }
 
 LogicalResult ValueBarrierOp::verify() {
+  if (getNumOperands() == 0) {
+    return emitOpError("Atleast one input required");
+  }
+
   // Make sure we either have all tensors or all vectors.
   if (hasTensorSemantics()) {
-    bool allTensor = llvm::all_of(getInputTypes(), [](ShapedType ty) {
-      return isa<RankedTensorType>(ty);
-    });
+    bool allTensor =
+        llvm::all_of(getInputTypes(), llvm::IsaPred<RankedTensorType>);
     if (!allTensor) {
       return emitOpError(
           "All inputs should be either of tensor or vector type");
@@ -379,9 +382,7 @@ LogicalResult ValueBarrierOp::verify() {
     return success();
   }
 
-  bool allVector = llvm::all_of(
-      getInputTypes(), [](ShapedType ty) { return isa<VectorType>(ty); });
-
+  bool allVector = llvm::all_of(getInputTypes(), llvm::IsaPred<VectorType>);
   if (!allVector) {
     return emitOpError("All inputs should be either of tensor or vector type");
   }
