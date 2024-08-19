@@ -72,7 +72,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: ScottTodd/iree-test-suites
-          ref: affdb261852372f80fb6ab1e58d695fdf43b3997
+          ref: dc027ded6175dbd753ac08d6d76ba7be36494730
           path: iree-test-suites
       - name: Configure out-of-tree test suite CMake project
         run: |
