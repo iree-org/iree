@@ -46,9 +46,15 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUEnableTileAndFuse(
-    "iree-codegen-llvmgpu-use-tile-and-fuse",
-    llvm::cl::desc("enable the usage of the tile and fuse pipeline"),
+llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+    llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
+    llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for all supported operations"),
     llvm::cl::init(false));
 
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
@@ -1946,10 +1952,19 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
-  if (clGPUEnableTileAndFuse && succeeded(IREE::GPU::setMatmulLoweringConfig(
-                                    target, entryPointFn, computeOp))) {
-    LDBG("Tile and fuse matmul config");
-    return success();
+  if (clGPUTestTileAndFuseMatmul) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     computeOp))) {
+      LDBG("Tile and fuse matmul config");
+      return success();
+    }
+  }
+  if (clGPUTestTileAndFuseVectorize) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          computeOp))) {
+      LDBG("Tile and fuse default config");
+      return success();
+    }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
     return success();
@@ -2070,6 +2085,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
         }
       }
     }
+    // Translation info (lowering pipeline) is already set.
     return success();
   }
 

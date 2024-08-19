@@ -146,7 +146,7 @@ struct EmulateNarrowTypePass final
     }
 
     RewritePatternSet sinkBroadcast(ctx);
-    vector::populateSinkVectorBroadcastPatterns(sinkBroadcast);
+    vector::populateSinkVectorOpsPatterns(sinkBroadcast);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(sinkBroadcast)))) {
       getOperation()->emitOpError("failed in sinking of broadcasts");

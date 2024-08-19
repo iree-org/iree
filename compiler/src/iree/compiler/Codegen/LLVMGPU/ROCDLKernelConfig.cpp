@@ -280,6 +280,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       return success();
     }
+    // TODO: Add configurations for matmul here too.
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          computeOp))) {
+      return success();
+    }
   }
 
   return failure();
@@ -386,7 +391,10 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
   if (failed(setRootConfig(target, funcOp, rootOp)))
     return failure();
 
-  propagateLoweringConfig(rootOp, computeOps);
+  if (getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+    propagateLoweringConfig(rootOp, computeOps);
+  }
   return success();
 }
 

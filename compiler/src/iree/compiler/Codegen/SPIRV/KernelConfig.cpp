@@ -702,7 +702,7 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
     llvm::dbgs() << ")\n";
   });
 
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
   const int maxBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // We want a 2-stage pipeline without multi-buffering if the depth is 0 to
@@ -908,7 +908,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 
   // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
   // wave32 mode for better performance.
-  int64_t subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/false);
+  int64_t subgroupSize = target.getPreferredSubgroupSize();
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
   SmallVector<AffineMap> maps = op.getIndexingMapsArray();
@@ -999,7 +999,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 static LogicalResult setFftOpConfig(IREE::GPU::TargetAttr target,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
   auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
@@ -1121,7 +1121,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   if (!foundSingleReductionOutput)
     return failure();
 
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
 
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1262,41 +1262,6 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 // Everything Default Configuration
 //===----------------------------------------------------------------------===//
 
-/// Returns a small tiling factor for the given reduction `dimSize`.
-/// Returns 0 to avoid tiling.
-static int getReductionTilingFactor(int64_t dimSize) {
-  if (dimSize % 4 == 0)
-    return 4;
-
-  // Try to find the smallest prime factor as the tiling factor. As a trade off
-  // between generated code size and compilation time, only look at prime
-  // numbers less than 50 right now.
-  static constexpr std::array<int, 15> primeNumbers = {
-      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47};
-  for (int n : primeNumbers) {
-    if (dimSize % n == 0)
-      return n;
-  }
-
-  return 1; // Otherwise just tile with size 1.
-}
-
-/// Returns the minimal element bitwidth used in the operands and results of the
-/// given Linalg op.
-static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
-  unsigned bitwidth = std::numeric_limits<unsigned>::max();
-  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    unsigned b =
-        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand->get()));
-    bitwidth = std::min(bitwidth, b);
-  }
-  for (Value result : linalgOp.getDpsInits()) {
-    unsigned b = IREE::Util::getTypeBitWidth(getElementTypeOrSelf(result));
-    bitwidth = std::min(bitwidth, b);
-  }
-  return bitwidth;
-};
-
 static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
                                         Operation *op,
                                         bool allowVectorization = true) {
@@ -1316,7 +1281,7 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
         funcOp, op, TileSizesListType{}, pipeline, workgroupSize);
   }
 
-  int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  int subgroupSize = target.getPreferredSubgroupSize();
   const unsigned loopDepth = partitionedLoops.back() + 1;
 
   // Configurations we need to decide.

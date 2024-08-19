@@ -413,8 +413,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(context);
-    populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns,
-                                                         linalgTilingOptions);
+    populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("Tile+Distribute clean up patterns failed");
       return signalPassFailure();

@@ -240,3 +240,25 @@ func.func @vector_barrier(%input: vector<8xf16>) -> vector<8xf16> {
 // CHECK-LABEL: func @vector_barrier
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<8xf16>
 //       CHECK:   iree_gpu.value_barrier %[[INPUT]] : vector<8xf16>
+
+// -----
+
+func.func @vector_barrier_multiple_inputs(%input: vector<8xf16>) -> (vector<8xf16>, vector<8xf16>) {
+  %out:2 = iree_gpu.value_barrier %input, %input : vector<8xf16>, vector<8xf16>
+  return %out#0, %out#1 : vector<8xf16>, vector<8xf16>
+}
+
+// CHECK-LABEL: func @vector_barrier_multiple_inputs
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<8xf16>
+//       CHECK:   iree_gpu.value_barrier %[[INPUT]], %[[INPUT]] : vector<8xf16>, vector<8xf16>
+
+// -----
+
+func.func @tensor_barrier_multiple_inputs(%input: tensor<?xf16>) -> (tensor<?xf16>, tensor<?xf16>) {
+  %out:2 = iree_gpu.value_barrier %input, %input : tensor<?xf16>, tensor<?xf16>
+  return %out#0, %out#1 : tensor<?xf16>, tensor<?xf16>
+}
+
+// CHECK-LABEL: func @tensor_barrier_multiple_inputs
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
+//       CHECK:   iree_gpu.value_barrier %[[INPUT]], %[[INPUT]] : tensor<?xf16>, tensor<?xf16>

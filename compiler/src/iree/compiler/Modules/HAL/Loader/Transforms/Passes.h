@@ -38,23 +38,11 @@ void buildHALInlineDynamicTransformPassPipeline(
     const TargetOptions &targetOptions);
 
 //===----------------------------------------------------------------------===//
-// Passes
-//===----------------------------------------------------------------------===//
-
-// Converts from the stream dialect into the hal_inline + hal_loader dialects.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
-
-// Materializes executable globals and loader code.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeExecutablesPass();
-
-// Resolves dispatch operation target export entry point ordinals.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createResolveExportOrdinalsPass();
-
-//===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h.inc"
 
 void registerHALLoaderPasses();
 

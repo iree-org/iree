@@ -198,6 +198,14 @@ getSoftwarePipeliningAttrDict(MLIRContext *context,
 FailureOr<int64_t> getSoftwarePipelineDepth(DictionaryAttr);
 FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr);
 
+// Returns a small tiling factor for the given reduction `dimSize`.
+// Returns 0 to avoid tiling.
+int getReductionTilingFactor(int64_t dimSize);
+
+// Returns the minimal element bitwidth used in the operands and results of the
+// given Linalg op.
+int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
+
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//

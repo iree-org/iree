@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -23,6 +22,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::InputConversion {
+
+#define GEN_PASS_DEF_LINALGQUANTIZEDCONVTOCONVPASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
 
 namespace {
 
@@ -336,8 +338,10 @@ struct QuantizedDepthwiseConvToDepthwiseConv
 };
 
 /// Pass that lowers quantized_conv to conv.
-struct LinalgQuantizedConvToConvPass
-    : public LinalgQuantizedConvToConvPassBase<LinalgQuantizedConvToConvPass> {
+class LinalgQuantizedConvToConvPass final
+    : public impl::LinalgQuantizedConvToConvPassBase<
+          LinalgQuantizedConvToConvPass> {
+public:
   void runOnOperation() override {
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
@@ -353,10 +357,4 @@ struct LinalgQuantizedConvToConvPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLinalgQuantizedConvToConvPass() {
-  return std::make_unique<LinalgQuantizedConvToConvPass>();
-}
-
 } // namespace mlir::iree_compiler::InputConversion

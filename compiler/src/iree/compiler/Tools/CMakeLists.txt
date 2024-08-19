@@ -90,6 +90,7 @@ iree_cc_library(
     MLIRGPUToSPIRV
     MLIRIR
     MLIRLLVMDialect
+    MLIRLLVMIRTransforms
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMLProgramDialect

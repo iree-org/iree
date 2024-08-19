@@ -199,10 +199,7 @@ spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetAttr target) {
         spirv::ScopeAttr::get(context, spirv::Scope::Subgroup)));
   }
 
-  // This is mostly to match RDNA behavior on Vulkan--RDNA supports either 32 or
-  // 64 as subgroup sizes; the default subgroup size is 64.
-  const int preferredSubgroupSize =
-      target.getPreferredSubgroupSize(/*pickLargest=*/true);
+  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
 
   return spirv::ResourceLimitsAttr::get(
       context, wgp.getMaxWorkgroupMemoryBytes(),

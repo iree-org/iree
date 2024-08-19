@@ -13,6 +13,8 @@ set(LIBS
   MLIRFuncDialect
   MLIRFuncInlinerExtension
   MLIRIndexToLLVM
+  MLIRLLVMDialect
+  MLIRLLVMIRTransforms
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect

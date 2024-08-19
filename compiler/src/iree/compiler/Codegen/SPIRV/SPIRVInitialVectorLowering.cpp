@@ -314,6 +314,7 @@ public:
       // cancel them or embed into contract ops. Embedding in the flexible
       // contract ops will help to sustain the structure through various
       // transformations.
+      vector::populateSinkVectorOpsPatterns(patterns);
       vector::populateVectorReductionToContractPatterns(patterns);
       // Pull in patterns to canonicalize transfer ops.
       vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);

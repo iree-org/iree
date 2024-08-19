@@ -438,39 +438,50 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
-    Pure,
-    AllTypesMatch<["input", "result"]>,
-    ]> {
+  Pure,
+  AllTypesMatch<["inputs", "results"]>]> {
   let summary = "Shuffles a private tensor across a shared allocation";
   let description = [{
-    This operation acts as a barrier on a value semantic SSA value (tensor or
-    vector). It takes a single operand and produces a value equivalent to the
+    This operation acts as a barrier on a value semantic SSA values (tensor or
+    vector). It takes multiple operands and produces a value equivalent to each
     input. This does not have copy and/or data movement semantics and simply
     represents a barrier on all writes in the tensor case, and a barrier until
     all threads acquire the input vector in the vector case.
+
+    The inputs must be either all tensors, or all vectors.
 
     This operation is a no-op when not present in a parallel context. This
     operation is pure as it only requires synchronization for the value it
     produces.
   }];
 
-  let arguments = (ins AnyRankedTensorOrVector:$input);
-  let results = (outs AnyRankedTensorOrVector:$result);
+  let arguments = (ins  Variadic<AnyRankedTensorOrVector>:$inputs);
+  let results   = (outs Variadic<AnyRankedTensorOrVector>:$results);
 
   let assemblyFormat = [{
-    $input attr-dict `:` type($result)
+    $inputs attr-dict `:` type($inputs)
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$input)>
+    OpBuilder<(ins "ValueRange":$inputs)>
   ];
+
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {
-      return isa<::mlir::RankedTensorType>(getInput().getType());
+      return isa<::mlir::RankedTensorType>(getOperand(0).getType());
     }
-    ::mlir::ShapedType getInputType() {
-      return ::llvm::cast<::mlir::ShapedType>(getInput().getType());
+    ::mlir::ShapedType getInputType(int operandNum) {
+      return ::llvm::cast<::mlir::ShapedType>(
+          getInputs()[operandNum].getType());
+    }
+    SmallVector<::mlir::ShapedType> getInputTypes() {
+      return llvm::map_to_vector(
+          getInputs(),
+          [](Value v) {
+            return ::llvm::cast<::mlir::ShapedType>(v.getType());
+          });
     }
   }];
 }
