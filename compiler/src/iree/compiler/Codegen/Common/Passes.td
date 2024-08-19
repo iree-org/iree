@@ -497,6 +497,19 @@ def TileAndDistributeToWorkgroupsPass :
   ];
 }
 
+def TileAndDistributeToWorkgroupsUsingForallOpPass :
+    InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups-using-forall-op",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Tile and distribute operation to workgroups (using scf.forall op)";
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "IREE::Codegen::IREECodegenDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect",
+  ];
+}
+
 def TransformDialectInterpreterPass :
     Pass<"iree-transform-dialect-interpreter"> {
   let summary = "Pass to apply transform dialect operations.";
