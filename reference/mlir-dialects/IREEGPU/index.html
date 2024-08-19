@@ -4861,14 +4861,13 @@ and flexible.
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
 <p><em>Shuffles a private tensor across a shared allocation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.value_barrier` $inputs attr-dict `:` type($inputs)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.value_barrier` $input attr-dict `:` type($result)
 </code></pre></div>
-<p>This operation acts as a barrier on a value semantic SSA values (tensor or
-vector). It takes multiple operands and produces a value equivalent to each
+<p>This operation acts as a barrier on a value semantic SSA value (tensor or
+vector). It takes a single operand and produces a value equivalent to the
 input. This does not have copy and/or data movement semantics and simply
 represents a barrier on all writes in the tensor case, and a barrier until
 all threads acquire the input vector in the vector case.</p>
-<p>The inputs must be either all tensors, or all vectors.</p>
 <p>This operation is a no-op when not present in a parallel context. This
 operation is pure as it only requires synchronization for the value it
 produces.</p>
@@ -4885,8 +4884,8 @@ produces.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
+<td style="text-align: center;"><code>input</code></td>
+<td>ranked tensor or vector of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -4900,8 +4899,8 @@ produces.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor or vector of any type values</td>
 </tr>
 </tbody>
 </table>
