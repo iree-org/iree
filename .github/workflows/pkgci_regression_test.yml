@@ -179,7 +179,7 @@ jobs:
           cmake -G Ninja -S iree-test-suites/matmul -B build/ \
               -DCMAKE_BUILD_TYPE=RelWithDebInfo \
               -DIREE_USE_LOCAL_REPO=ON \
-              -DIREE_LOCAL_REPO_PATH=. \
+              -DIREE_LOCAL_REPO_PATH=${GITHUB_WORKSPACE} \
               -DIREE_HOST_BIN_DIR=${VENV_DIR}/bin
       - name: Build test suite CMake project
         run: |
