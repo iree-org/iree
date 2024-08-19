@@ -167,6 +167,12 @@ jobs:
           repository: ScottTodd/iree-test-suites
           ref: affdb261852372f80fb6ab1e58d695fdf43b3997
           path: iree-test-suites
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake clang ninja-build libstdc++-12-dev
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
       - name: Configure test suite CMake project
         run: |
           source ${VENV_DIR}/bin/activate
