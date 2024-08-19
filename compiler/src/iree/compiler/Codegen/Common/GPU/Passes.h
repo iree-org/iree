@@ -98,8 +98,7 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true,
-                                      bool pickLargestSubroupSize = false);
+createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true);
 
 enum class ReorderWorkgroupsStrategy { None, Swizzle, Transpose };
 

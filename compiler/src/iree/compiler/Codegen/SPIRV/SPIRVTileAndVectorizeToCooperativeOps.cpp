@@ -366,8 +366,7 @@ public:
     // Then tile and distribute to subgroups.
 
     {
-      std::optional<int> subgroupSize =
-          getGPUSubgroupSize(funcOp, /*pickLargest=*/true);
+      std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
       if (!subgroupSize) {
         funcOp.emitError("failed to query subgroup size");
         return signalPassFailure();
