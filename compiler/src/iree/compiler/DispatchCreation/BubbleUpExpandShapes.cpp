@@ -199,6 +199,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   };
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
       bubbleExpandShapePatterns, linalgExtExpansionFn);
+  tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
