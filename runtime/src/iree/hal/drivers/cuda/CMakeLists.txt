@@ -44,8 +44,6 @@ iree_cc_library(
     "stream_command_buffer.h"
     "timepoint_pool.c"
     "timepoint_pool.h"
-    "tracing.c"
-    "tracing.h"
   DEPS
     ::dynamic_symbols
     iree::base
@@ -66,6 +64,7 @@ iree_cc_library(
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
+    iree::hal::utils::tracing
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )

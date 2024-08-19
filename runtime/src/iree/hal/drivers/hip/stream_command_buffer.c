@@ -12,9 +12,9 @@
 #include "iree/hal/drivers/hip/pipeline_layout.h"
 #include "iree/hal/drivers/hip/rccl_channel.h"
 #include "iree/hal/drivers/hip/status_util.h"
-#include "iree/hal/drivers/hip/tracing.h"
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
+#include "iree/hal/utils/tracing.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_hal_command_buffer_t base;
@@ -24,8 +24,8 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols;
 
   // Per-stream HIP tracing context.
-  iree_hal_hip_tracing_context_t* tracing_context;
-  iree_hal_hip_tracing_context_event_list_t tracing_event_list;
+  iree_hal_tracing_context_t* tracing_context;
+  iree_hal_tracing_context_event_list_t tracing_event_list;
 
   hipStream_t hip_stream;
 
@@ -61,7 +61,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
-    iree_hal_hip_tracing_context_t* tracing_context,
+    iree_hal_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,
@@ -124,8 +124,8 @@ static void iree_hal_hip_stream_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_hip_tracing_free(command_buffer->tracing_context,
-                            &command_buffer->tracing_event_list);
+  iree_hal_tracing_free(command_buffer->tracing_context,
+                        &command_buffer->tracing_event_list);
 
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -149,8 +149,8 @@ void iree_hal_hip_stream_notify_submitted_commands(
     return;
   }
 
-  iree_hal_hip_tracing_notify_submitted(command_buffer->tracing_context,
-                                        &command_buffer->tracing_event_list);
+  iree_hal_tracing_notify_submitted(command_buffer->tracing_context,
+                                    &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
@@ -181,9 +181,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_begin(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE,
+      IREE_HAL_TRACING_VERBOSITY_COARSE,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_stream_command_buffer",
       strlen("iree_hal_hip_stream_command_buffer"),
       /*name=*/NULL, 0);
@@ -212,9 +212,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
       z0, iree_hal_resource_set_allocate(command_buffer->arena.block_pool,
                                          &command_buffer->resource_set));
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE);
+  IREE_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                             &command_buffer->tracing_event_list,
+                             IREE_HAL_TRACING_VERBOSITY_COARSE);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -228,11 +228,10 @@ static void iree_hal_hip_stream_command_buffer_begin_debug_group(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE,
-      location ? location->file.data : NULL, location ? location->file.size : 0,
-      location ? location->line : 0,
+      IREE_HAL_TRACING_VERBOSITY_COARSE, location ? location->file.data : NULL,
+      location ? location->file.size : 0, location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
 }
 
@@ -242,9 +241,9 @@ static void iree_hal_hip_stream_command_buffer_end_debug_group(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_COARSE);
+  IREE_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                             &command_buffer->tracing_event_list,
+                             IREE_HAL_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
@@ -541,12 +540,11 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       z0, iree_hal_hip_native_executable_entry_point_kernel_info(
               executable, entry_point, &kernel_info));
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size,
+      IREE_HAL_TRACING_VERBOSITY_FINE, kernel_info.source_filename.data,
+      kernel_info.source_filename.size, kernel_info.source_line,
+      kernel_info.function_name.data, kernel_info.function_name.size,
       /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -617,9 +615,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
           command_buffer->hip_stream, params_ptr, NULL),
       "hipModuleLaunchKernel");
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
+  IREE_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                             &command_buffer->tracing_event_list,
+                             IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -652,12 +650,12 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2(
       z0, iree_hal_hip_native_executable_entry_point_kernel_info(
               executable, entry_point, &kernel_info));
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size, /*name=*/NULL, 0);
+      IREE_HAL_TRACING_VERBOSITY_FINE, kernel_info.source_filename.data,
+      kernel_info.source_filename.size, kernel_info.source_line,
+      kernel_info.function_name.data, kernel_info.function_name.size,
+      /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -720,9 +718,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2(
           params_ptr, NULL),
       "hipModuleLaunchKernel");
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(
-      command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, IREE_HAL_HIP_TRACING_VERBOSITY_FINE);
+  IREE_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                             &command_buffer->tracing_event_list,
+                             IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

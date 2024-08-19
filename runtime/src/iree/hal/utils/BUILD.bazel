@@ -202,6 +202,15 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "tracing",
+    srcs = ["tracing.c"],
+    hdrs = ["tracing.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
 iree_cmake_extra_content(
     content = """
 if(NOT IREE_ENABLE_THREADING)

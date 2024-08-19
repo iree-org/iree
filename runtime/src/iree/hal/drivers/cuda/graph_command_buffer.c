@@ -15,9 +15,9 @@
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
 #include "iree/hal/drivers/cuda/pipeline_layout.h"
-#include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
+#include "iree/hal/utils/tracing.h"
 
 // The maximal number of CUDA graph nodes that can run concurrently between
 // barriers.
@@ -32,8 +32,8 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   const iree_hal_cuda_dynamic_symbols_t* symbols;
 
   // Per-stream CUDA tracing context.
-  iree_hal_cuda_tracing_context_t* tracing_context;
-  iree_hal_cuda_tracing_context_event_list_t tracing_event_list;
+  iree_hal_tracing_context_t* tracing_context;
+  iree_hal_tracing_context_event_list_t tracing_event_list;
 
   // A resource set to maintain references to all resources used within the
   // command buffer.
@@ -96,12 +96,13 @@ static void iree_cuda_graph_command_buffer_trace_zone_begin_external(
   CUgraphNode* tracing_event_node =
       &command_buffer->cu_graph_nodes[command_buffer->graph_node_count++];
   size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
-  IREE_CUDA_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      tracing_event_node, command_buffer->cu_graph, verbosity,
-      &command_buffer->cu_barrier_node, dependency_count, file_name,
-      file_name_length, line, function_name, function_name_length, name,
-      name_length);
+      (iree_hal_tracing_native_graph_node_t*)tracing_event_node,
+      (iree_hal_tracing_native_graph_t*)command_buffer->cu_graph, verbosity,
+      (iree_hal_tracing_native_graph_node_t*)&command_buffer->cu_barrier_node,
+      dependency_count, file_name, file_name_length, line, function_name,
+      function_name_length, name, name_length);
 
   // Move the barrier forward to make sure that the tracing event is recorded
   // before work starts.
@@ -123,10 +124,12 @@ static void iree_cuda_graph_command_buffer_trace_zone_end(
   size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_ASSERT_GT(dependency_count, 0,
                  "ending a zone should at least depend on the beginning");
-  IREE_CUDA_GRAPH_TRACE_ZONE_END(
+  IREE_GRAPH_TRACE_ZONE_END(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      tracing_event_node, command_buffer->cu_graph, verbosity,
-      &command_buffer->cu_barrier_node, dependency_count);
+      (iree_hal_tracing_native_graph_node_t*)tracing_event_node,
+      (iree_hal_tracing_native_graph_t*)command_buffer->cu_graph, verbosity,
+      (iree_hal_tracing_native_graph_node_t*)&command_buffer->cu_barrier_node,
+      dependency_count);
 
   // We need to wait on the tracing end before other work starts.
   // GPU tracing zones are first-in, last-out.
@@ -161,7 +164,7 @@ static void iree_cuda_graph_command_buffer_trace_zone_end(
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
     iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
-    iree_hal_cuda_tracing_context_t* tracing_context, CUcontext context,
+    iree_hal_tracing_context_t* tracing_context, CUcontext context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
@@ -230,8 +233,8 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_tracing_free(command_buffer->tracing_context,
-                             &command_buffer->tracing_event_list);
+  iree_hal_tracing_free(command_buffer->tracing_context,
+                        &command_buffer->tracing_event_list);
 
   // Drop any pending collective batches before we tear things down.
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
@@ -278,8 +281,8 @@ void iree_hal_cuda_graph_tracing_notify_submitted_commands(
     return;
   }
 
-  iree_hal_cuda_tracing_notify_submitted(command_buffer->tracing_context,
-                                         &command_buffer->tracing_event_list);
+  iree_hal_tracing_notify_submitted(command_buffer->tracing_context,
+                                    &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
@@ -339,7 +342,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
       cuGraphCreate(&command_buffer->cu_graph, /*flags=*/0), "cuGraphCreate");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
 
   return iree_ok_status();
 }
@@ -354,7 +357,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
       iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
 
   // Reset state used during recording.
   command_buffer->cu_barrier_node = NULL;
@@ -389,7 +392,7 @@ static void iree_hal_cuda_graph_command_buffer_begin_debug_group(
 
   (void)command_buffer;
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE,
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE,
       location ? location->file.data : NULL, location ? location->file.size : 0,
       location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
@@ -401,7 +404,7 @@ static void iree_hal_cuda_graph_command_buffer_end_debug_group(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_COARSE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t
@@ -515,7 +518,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -555,7 +558,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       "cuGraphAddMemsetNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -567,7 +570,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -619,7 +622,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
       "cuGraphAddMemcpyNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -631,7 +634,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
@@ -679,7 +682,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       "cuGraphAddMemcpyNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -776,7 +779,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
               executable, entry_point, &kernel_info));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
       kernel_info.source_line, kernel_info.function_name.data,
       kernel_info.function_name.size,
@@ -880,7 +883,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       "cuGraphAddKernelNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -913,7 +916,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch2(
               executable, entry_point, &kernel_info));
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE,
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
       kernel_info.source_line, kernel_info.function_name.data,
       kernel_info.function_name.size, /*name=*/NULL, 0);
@@ -1006,7 +1009,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch2(
       "cuGraphAddKernelNode");
 
   IREE_CUDA_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(
-      command_buffer, IREE_HAL_CUDA_TRACING_VERBOSITY_FINE);
+      command_buffer, IREE_HAL_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

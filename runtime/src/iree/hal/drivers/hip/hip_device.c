@@ -27,11 +27,11 @@
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/stream_command_buffer.h"
 #include "iree/hal/drivers/hip/timepoint_pool.h"
-#include "iree/hal/drivers/hip/tracing.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/deferred_work_queue.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
+#include "iree/hal/utils/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_device_t
@@ -63,7 +63,7 @@ typedef struct iree_hal_hip_device_t {
   // The hipStream_t used to issue device kernels and allocations.
   hipStream_t hip_dispatch_stream;
 
-  iree_hal_hip_tracing_context_t* tracing_context;
+  iree_hal_tracing_context_t* tracing_context;
 
   iree_allocator_t host_allocator;
 
@@ -257,6 +257,107 @@ iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer(
   return status;
 }
 
+typedef struct iree_hal_hip_tracing_device_interface_t {
+  iree_hal_tracing_device_interface_t base;
+  hipDevice_t device;
+  hipCtx_t context;
+  hipStream_t dispatch_stream;
+  iree_allocator_t host_allocator;
+  const iree_hal_hip_dynamic_symbols_t* hip_symbols;
+} iree_hal_hip_tracing_device_interface_t;
+static const iree_hal_tracing_device_interface_vtable_t
+    iree_hal_hip_tracing_device_interface_vtable_t;
+
+void iree_hal_hip_tracing_device_interface_destroy(
+    iree_hal_tracing_device_interface_t* base_device_interface) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  iree_allocator_free(device_interface->host_allocator, device_interface);
+}
+
+iree_status_t iree_hal_hip_tracing_device_interface_synchronize_native_event(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_event_t base_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
+                                   hipEventSynchronize((hipEvent_t)base_event));
+}
+
+iree_status_t iree_hal_hip_tracing_device_interface_create_native_event(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_event_t* base_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_HIP_RESULT_TO_STATUS(
+      device_interface->hip_symbols,
+      hipEventCreateWithFlags((hipEvent_t*)base_event, hipEventDefault));
+}
+
+iree_status_t iree_hal_hip_tracing_device_interface_query_native_event(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_event_t base_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_HIP_RESULT_TO_STATUS(device_interface->hip_symbols,
+                                   hipEventQuery((hipEvent_t)base_event));
+}
+
+void iree_hal_hip_tracing_device_interface_event_elapsed_time(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    float* relative_millis, iree_hal_tracing_native_event_t start_event,
+    iree_hal_tracing_native_event_t end_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  IREE_HIP_IGNORE_ERROR(
+      device_interface->hip_symbols,
+      hipEventElapsedTime(relative_millis, (hipEvent_t)start_event,
+                          (hipEvent_t)end_event));
+}
+
+void iree_hal_hip_tracing_device_interface_destroy_native_event(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_event_t base_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  IREE_HIP_IGNORE_ERROR(device_interface->hip_symbols,
+                        hipEventDestroy((hipEvent_t)base_event));
+}
+
+iree_status_t iree_hal_hip_tracing_device_interface_record_native_event(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_event_t base_event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_HIP_RESULT_TO_STATUS(
+      device_interface->hip_symbols,
+      hipEventRecord((hipEvent_t)base_event,
+                     (hipStream_t)device_interface->dispatch_stream));
+}
+
+iree_status_t iree_hal_hip_tracing_device_interface_add_graph_event_record_node(
+    iree_hal_tracing_device_interface_t* base_device_interface,
+    iree_hal_tracing_native_graph_node_t* out_node,
+    iree_hal_tracing_native_graph_t graph,
+    iree_hal_tracing_native_graph_node_t* dependency_nodes,
+    size_t dependency_nodes_count, iree_hal_tracing_native_event_t event) {
+  iree_hal_hip_tracing_device_interface_t* device_interface =
+      (iree_hal_hip_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_HIP_RESULT_TO_STATUS(
+      device_interface->hip_symbols,
+      hipGraphAddEventRecordNode((hipGraphNode_t*)out_node, (hipGraph_t)graph,
+                                 (hipGraphNode_t*)dependency_nodes,
+                                 dependency_nodes_count, (hipEvent_t)event));
+}
+
 static iree_hal_hip_device_t* iree_hal_hip_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_hip_device_vtable);
@@ -344,18 +445,36 @@ static iree_status_t iree_hal_hip_device_create_internal(
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
-    if (device->params.stream_tracing >= IREE_HAL_HIP_TRACING_VERBOSITY_MAX ||
-        device->params.stream_tracing < IREE_HAL_HIP_TRACING_VERBOSITY_OFF) {
+    if (device->params.stream_tracing >= IREE_HAL_TRACING_VERBOSITY_MAX ||
+        device->params.stream_tracing < IREE_HAL_TRACING_VERBOSITY_OFF) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "invalid stream_tracing argument: expected to be between %d and %d",
-          IREE_HAL_HIP_TRACING_VERBOSITY_OFF,
-          IREE_HAL_HIP_TRACING_VERBOSITY_MAX);
+          IREE_HAL_TRACING_VERBOSITY_OFF, IREE_HAL_TRACING_VERBOSITY_MAX);
     }
-    status = iree_hal_hip_tracing_context_allocate(
-        device->hip_symbols, device->identifier, dispatch_stream,
-        device->params.stream_tracing, &device->block_pool, host_allocator,
-        &device->tracing_context);
+
+    iree_hal_hip_tracing_device_interface_t* tracing_device_interface = NULL;
+    status = iree_allocator_malloc(
+        host_allocator, sizeof(iree_hal_hip_tracing_device_interface_t),
+        (void**)&tracing_device_interface);
+
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      iree_hal_device_release((iree_hal_device_t*)device);
+      return status;
+    }
+
+    tracing_device_interface->base.vtable =
+        &iree_hal_hip_tracing_device_interface_vtable_t;
+    tracing_device_interface->context = context;
+    tracing_device_interface->device = hip_device;
+    tracing_device_interface->dispatch_stream = dispatch_stream;
+    tracing_device_interface->host_allocator = host_allocator;
+    tracing_device_interface->hip_symbols = symbols;
+
+    status = iree_hal_tracing_context_allocate(
+        (iree_hal_tracing_device_interface_t*)tracing_device_interface,
+        device->identifier, device->params.stream_tracing, &device->block_pool,
+        host_allocator, &device->tracing_context);
   }
 
   // Memory pool support is conditional.
@@ -502,7 +621,7 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   // Destroy memory pools that hold on to reserved memory.
   iree_hal_hip_memory_pools_deinitialize(&device->memory_pools);
 
-  iree_hal_hip_tracing_context_free(device->tracing_context);
+  iree_hal_tracing_context_free(device->tracing_context);
 
   // Destroy various pools for synchronization.
   if (device->timepoint_pool) {
@@ -945,8 +1064,7 @@ static iree_status_t iree_hal_hip_device_queue_write(
 }
 
 static void iree_hal_hip_device_collect_tracing_context(void* user_data) {
-  iree_hal_hip_tracing_context_collect(
-      (iree_hal_hip_tracing_context_t*)user_data);
+  iree_hal_tracing_context_collect((iree_hal_tracing_context_t*)user_data);
 }
 
 static iree_status_t iree_hal_hip_device_queue_execute(
@@ -1070,4 +1188,23 @@ static const iree_hal_deferred_work_queue_device_interface_vtable_t
             iree_hal_hip_deferred_work_queue_device_interface_create_stream_command_buffer,
         .submit_command_buffer =
             iree_hal_hip_deferred_work_queue_device_interface_submit_command_buffer,
+};
+
+static const iree_hal_tracing_device_interface_vtable_t
+    iree_hal_hip_tracing_device_interface_vtable_t = {
+        .destroy = iree_hal_hip_tracing_device_interface_destroy,
+        .synchronize_native_event =
+            iree_hal_hip_tracing_device_interface_synchronize_native_event,
+        .create_native_event =
+            iree_hal_hip_tracing_device_interface_create_native_event,
+        .query_native_event =
+            iree_hal_hip_tracing_device_interface_query_native_event,
+        .event_elapsed_time =
+            iree_hal_hip_tracing_device_interface_event_elapsed_time,
+        .destroy_native_event =
+            iree_hal_hip_tracing_device_interface_destroy_native_event,
+        .record_native_event =
+            iree_hal_hip_tracing_device_interface_record_native_event,
+        .add_graph_event_record_node =
+            iree_hal_hip_tracing_device_interface_add_graph_event_record_node,
 };

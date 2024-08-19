@@ -43,8 +43,6 @@ iree_runtime_cc_library(
         "stream_command_buffer.h",
         "timepoint_pool.c",
         "timepoint_pool.h",
-        "tracing.c",
-        "tracing.h",
     ],
     hdrs = [
         "api.h",
@@ -69,6 +67,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:memory_file",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
+        "//runtime/src/iree/hal/utils:tracing",
         "//runtime/src/iree/schemas:cuda_executable_def_c_fbs",
     ],
 )

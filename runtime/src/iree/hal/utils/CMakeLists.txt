@@ -238,6 +238,18 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_library(
+  NAME
+    tracing
+  HDRS
+    "tracing.h"
+  SRCS
+    "tracing.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
