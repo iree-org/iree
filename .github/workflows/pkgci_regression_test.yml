@@ -139,6 +139,8 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           submodules: false
+      - name: Check out runtime submodules
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@v5.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
