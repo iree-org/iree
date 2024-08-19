@@ -30,8 +30,8 @@ static llvm::cl::opt<float> clAttentionSoftmaxMax(
 
 template <typename T>
 static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap scaleMap,
-                               Value value, Value scale) {
+                                     AffineMap inputMap, AffineMap scaleMap,
+                                     Value value, Value scale) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
   inputMap = compressedMaps[0];
@@ -275,7 +275,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap qMap = getQueryMap();
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap, query, scale);
+    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
+                                                   query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -302,7 +303,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, scale);
+    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
+                                               scale);
 
     // If we need to truncate to fp8 post softmax we apply a scaling to use the
     // full fp8 range. We can do this with a offset as post `exp2` this equates
@@ -333,7 +335,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
-  Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap, normMap, oldSum, norm);
+  Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap,
+                                                         normMap, oldSum, norm);
 
   // P = exp2(S - newMax)
   // PMap = SMap
@@ -353,7 +356,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     p = truncateFloat(b, loc, pMap, pMap, p, convertP);
   }
 
-  Value newAcc = elementwiseValueInPlace<arith::MulFOp>(b, loc, accMap, normMap, oldAcc, norm);
+  Value newAcc = elementwiseValueInPlace<arith::MulFOp>(b, loc, accMap, normMap,
+                                                        oldAcc, norm);
 
   // ---- Matmul 2 ----
 
