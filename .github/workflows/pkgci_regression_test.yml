@@ -170,7 +170,7 @@ jobs:
       - name: Configure test suite CMake project
         run: |
           source ${VENV_DIR}/bin/activate
-          cmake -G Ninja -B build/ iree-test-suites \
+          cmake -G Ninja -S iree-test-suites/matmul -B build/ \
               -DCMAKE_BUILD_TYPE=RelWithDebInfo \
               -DIREE_USE_LOCAL_REPO=ON \
               -DIREE_LOCAL_REPO_PATH=. \
