@@ -85,7 +85,7 @@ option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using instal
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
-option(IREE_EMBED_RELEASE_INFO "Embed the IREE version information in built artifacts." OFF)
+option(IREE_EMBEDDED_RELEASE_INFO "Embed the IREE version information in built artifacts." OFF)
 
 # Using already built host binaries, such as for cross-compilation.
 set(IREE_HOST_BIN_DIR_DEFAULT "")
