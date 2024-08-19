@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -17,7 +16,13 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
-struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
+#define GEN_PASS_DEF_DUMPMODULEPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
+namespace {
+
+class DumpModulePass final : public impl::DumpModulePassBase<DumpModulePass> {
+public:
   DumpModulePass(std::string path) { this->path = path; }
   DumpModulePass(const DumpModulePass &pass) {}
 
@@ -53,6 +58,8 @@ struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
       *this, "path",
       llvm::cl::desc("File path to write the module text or binary into.")};
 };
+
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpModulePass(std::string path) {

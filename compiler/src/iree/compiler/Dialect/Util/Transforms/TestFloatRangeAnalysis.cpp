@@ -8,15 +8,17 @@
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::IREE::Util {
 
+#define GEN_PASS_DEF_TESTFLOATRANGEANALYSISPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
-class TestFloatRangeAnalysisPass
-    : public TestFloatRangeAnalysisBase<TestFloatRangeAnalysisPass> {
+class TestFloatRangeAnalysisPass final
+    : public impl::TestFloatRangeAnalysisPassBase<TestFloatRangeAnalysisPass> {
 public:
   void runOnOperation() override {
     Explorer explorer(getOperation(), TraversalAction::SHALLOW);
@@ -52,9 +54,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass() {
-  return std::make_unique<TestFloatRangeAnalysisPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::Util

@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
@@ -18,6 +17,9 @@
 #define DEBUG_TYPE "iree-util-import-resources"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_IMPORTRESOURCESPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -67,7 +69,8 @@ static void copyFPAttrIntoBlob(AsmResourceBlob &blob,
   }
 }
 
-class ImportResourcesPass : public ImportResourcesBase<ImportResourcesPass> {
+class ImportResourcesPass final
+    : public impl::ImportResourcesPassBase<ImportResourcesPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<BuiltinDialect>();
@@ -199,9 +202,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createImportResourcesPass() {
-  return std::make_unique<ImportResourcesPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::Util

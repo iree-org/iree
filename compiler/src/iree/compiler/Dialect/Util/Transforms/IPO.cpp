@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/SmallVector.h"
@@ -27,6 +26,10 @@
 #define DEBUG_TYPE "iree-util-ipo"
 
 namespace mlir::iree_compiler::IREE::Util {
+
+#define GEN_PASS_DEF_IPOPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
 struct LocAttr {
@@ -641,7 +644,7 @@ static bool isFuncEmpty(FunctionOpInterface funcOp) {
   }
 }
 
-class IPOPass : public IPOBase<IPOPass> {
+class IPOPass final : public impl::IPOPassBase<IPOPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
@@ -704,11 +707,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass() {
-  return std::make_unique<IPOPass>();
-}
-
-static PassRegistration<IPOPass> pass;
-
 } // namespace mlir::iree_compiler::IREE::Util

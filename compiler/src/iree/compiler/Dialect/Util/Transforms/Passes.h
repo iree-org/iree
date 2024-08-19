@@ -20,21 +20,13 @@ class Value;
 
 namespace mlir::iree_compiler::IREE::Util {
 
-std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
-std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
+#define GEN_PASS_DECL
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: keep
+
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpModulePass(std::string path = "");
 std::unique_ptr<OperationPass<void>>
 createFixedPointIteratorPass(OpPassManager pipeline);
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
-std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createStripAndSplatConstantsPass();
-std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 
 // Expression hoisting.
 struct ExprHoistingOptions {
@@ -51,14 +43,6 @@ struct ExprHoistingOptions {
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createHoistIntoGlobalsPass(const ExprHoistingOptions &options);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
-
-// Resource Management.
-std::unique_ptr<OperationPass<void>> createImportResourcesPass();
-
-// Debug/test passes.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateOpOrdinalsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();
-std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 
 // Register all Passes
 void registerTransformPasses();

@@ -7,14 +7,18 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Util {
 
-class DropCompilerHintsPass
-    : public DropCompilerHintsBase<DropCompilerHintsPass> {
+#define GEN_PASS_DEF_DROPCOMPILERHINTSPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
+namespace {
+
+class DropCompilerHintsPass final
+    : public impl::DropCompilerHintsPassBase<DropCompilerHintsPass> {
 public:
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
@@ -26,8 +30,5 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
-  return std::make_unique<DropCompilerHintsPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::Util

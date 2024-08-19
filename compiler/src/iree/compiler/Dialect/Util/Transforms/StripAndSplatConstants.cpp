@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -18,8 +17,13 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
-class StripAndSplatConstantsPass
-    : public StripAndSplatConstantsBase<StripAndSplatConstantsPass> {
+#define GEN_PASS_DEF_STRIPANDSPLATCONSTANTSPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
+namespace {
+
+class StripAndSplatConstantsPass final
+    : public impl::StripAndSplatConstantsPassBase<StripAndSplatConstantsPass> {
 public:
   StripAndSplatConstantsPass() = default;
 
@@ -50,9 +54,5 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createStripAndSplatConstantsPass() {
-  return std::make_unique<StripAndSplatConstantsPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::Util

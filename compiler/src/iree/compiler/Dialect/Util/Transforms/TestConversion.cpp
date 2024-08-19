@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -18,9 +17,13 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
+#define GEN_PASS_DEF_TESTCONVERSIONPASS
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc"
+
 namespace {
 
-class TestConversionPass : public TestConversionBase<TestConversionPass> {
+class TestConversionPass final
+    : public impl::TestConversionPassBase<TestConversionPass> {
 public:
   TestConversionPass() = default;
   TestConversionPass(const TestConversionPass &) {}
@@ -71,9 +74,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createTestConversionPass() {
-  return std::make_unique<TestConversionPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::Util
