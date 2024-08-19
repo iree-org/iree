@@ -135,22 +135,6 @@ func.func @gemm_unit_N(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
 
 // -----
 
-func.func @gemm_unit_N(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
-    %arg2 : tensor<?x1xf32>) -> tensor<?x1xf32> {
-  %0 = linalg.matmul {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>}
-      ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x1xf32>)
-      outs(%arg2 : tensor<?x1xf32>) -> tensor<?x1xf32>
-  return %0 : tensor<?x1xf32>
-}
-// CHECK-LABEL: func.func @gemm_unit_N(
-//       CHECK:   %[[RESULT:.+]] = scf.forall (%[[IV0:[a-zA-Z0-9]+]])
-//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
-//       CHECK:     scf.forall.in_parallel {
-//       CHECK:       tensor.parallel_insert_slice %[[MATMUL]] into %{{.+}}[%[[IV0]], 0] [%{{.+}}, 1]
-
-// -----
-
 func.func @gemm_unit_M_unit_N(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf32>,
     %arg2 : tensor<1x1xf32>) -> tensor<1x1xf32> {
   %0 = linalg.matmul {
@@ -351,3 +335,74 @@ func.func @matmul_fusion_test(%arg0 : tensor<?x?xf16>,
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[MATMUL]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @avoid_unit_range_distribute(
+    %arg0 : tensor<32x?x?x16x16xf16>, %arg1 : tensor<32x?x8x16x16xf16>,
+    %arg2 : tensor<32x?x16x8x16xf16>) -> tensor<32x?x16x8x16xf16> {
+   %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d5, d2, d6)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d3, d6, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+      ins(%arg0, %arg1 : tensor<32x?x?x16x16xf16>, tensor<32x?x8x16x16xf16>)
+      outs(%arg2 : tensor<32x?x16x8x16xf16>)
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 16, 1, 16, 1, 16]]>} {
+    ^bb0(%b0: f16, %b1: f16, %b2 : f16):
+      %1 = arith.mulf %b0, %b1 : f16
+      %2 = arith.addf %b2, %1 : f16
+      linalg.yield %2 : f16
+  } -> tensor<32x?x16x8x16xf16>
+  return %0 : tensor<32x?x16x8x16xf16>
+}
+// CHECK-LABEL: func @avoid_unit_range_distribute(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) in (32, %{{.+}}, 8)
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// This just verifies that constant dim propagation works as expected after tiling.
+func.func @set_size_to_tilesize_when_divisible(
+    %arg0 : tensor<?x16x32x128xf16>, %arg1 : tensor<4096x32x28xf16>,
+    %arg2 : tensor<?x16x4096xf16>) -> tensor<?x16x4096xf16> {
+   %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
+      ins(%arg0, %arg1 : tensor<?x16x32x128xf16>, tensor<4096x32x28xf16>)
+      outs(%arg2 : tensor<?x16x4096xf16>)
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 16, 128, 1, 128]]>} {
+    ^bb0(%b0: f16, %b1: f16, %b2 : f16):
+      %1 = arith.mulf %b0, %b1 : f16
+      %2 = arith.addf %b2, %1 : f16
+      linalg.yield %2 : f16
+  } -> tensor<?x16x4096xf16>
+  return %0 : tensor<?x16x4096xf16>
+}
+// CHECK-LABEL: func @set_size_to_tilesize_when_divisible(
+//       CHECK:   scf.forall
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice %[[GENERIC]]
+//  CHECK-SAME:           tensor<1x16x128xf16> into tensor<?x16x4096xf16>
+
+// -----
+
+// This just verifies that constant dim propagation works as expected after tiling.
+func.func @generate_no_distribution(%arg0 : tensor<16xf16>) -> tensor<16xf16> {
+   %empty = tensor.empty() : tensor<16xf16>
+   %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<16xf16>) outs(%empty : tensor<16xf16>)
+      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16]]>} {
+    ^bb0(%b0: f16, %b1: f16):
+      %1 = arith.mulf %b0, %b0 : f16
+      linalg.yield %1 : f16
+  } -> tensor<16xf16>
+  return %0 : tensor<16xf16>
+}
+// CHECK-LABEL: func @generate_no_distribution(
+//   CHECK-NOT:   scf.forall

@@ -382,6 +382,19 @@ WorkgroupMappingAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+WorkgroupMappingAttr
+WorkgroupMappingAttr::getAttributeFromMappingId(MLIRContext *context,
+                                                int64_t mappingId) {
+  int64_t linearizedDim = std::max<int64_t>(mappingId - 2, 0);
+  WorkgroupId id =
+      symbolizeWorkgroupId(std::min<uint64_t>(mappingId, 2)).value();
+  return WorkgroupMappingAttr::get(context, id, linearizedDim);
+}
+
+bool WorkgroupMappingAttr::operator<(const WorkgroupMappingAttr &rhs) const {
+  return getMappingId() < rhs.getMappingId();
+}
+
 LogicalResult WorkgroupMappingAttr::verifyAttrList(
     MLIRContext *context, function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<Attribute> attrs) {
@@ -404,14 +417,8 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(
     mappingAttrs.push_back(typedAttr);
   }
 
-  llvm::sort(mappingAttrs, [](const IREE::Codegen::WorkgroupMappingAttr &lhs,
-                              const IREE::Codegen::WorkgroupMappingAttr &rhs) {
-    if (lhs.getId() != rhs.getId()) {
-      return lhs.getId() < rhs.getId();
-    }
-    assert(lhs.getId() == IREE::Codegen::WorkgroupId::IdZ);
-    return lhs.getDelinearizedDim() < rhs.getDelinearizedDim();
-  });
+  llvm::sort(mappingAttrs);
+
   // First element has to be `workgroup_mapping<x>`.
   if (mappingAttrs.front().getId() != IREE::Codegen::WorkgroupId::IdX) {
     return emitError() << "missing `workgroup_mapping<x>`";
