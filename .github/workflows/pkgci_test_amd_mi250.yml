@@ -98,5 +98,5 @@ jobs:
             --timeout 900 \
             --output-on-failure \
             --no-tests=error \
-            --label-regex "^requires-gpu|^driver=hip$"
+            --label-regex "^requires-gpu|^driver=hip$" \
             --label-exclude "(^nodocker$|^driver=vulkan$|^driver=metal$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^requires-gpu-sm80$|^requires-gpu-rdna3$)"
