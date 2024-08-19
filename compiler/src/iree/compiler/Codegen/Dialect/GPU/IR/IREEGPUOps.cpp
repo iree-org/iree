@@ -361,9 +361,33 @@ LogicalResult ShuffleTensorOp::verifyRegions() {
 //===----------------------------------------------------------------------===//
 
 void ValueBarrierOp::build(OpBuilder &builder, OperationState &result,
-                           Value input) {
-  result.addOperands({input});
-  result.addTypes(input.getType());
+                           ValueRange input) {
+  result.addOperands(input);
+  result.addTypes(llvm::map_range(input, [](Value v) { return v.getType(); }));
+}
+
+LogicalResult ValueBarrierOp::verify() {
+  if (getNumOperands() == 0) {
+    return emitOpError("Atleast one input required");
+  }
+
+  // Make sure we either have all tensors or all vectors.
+  if (hasTensorSemantics()) {
+    bool allTensor =
+        llvm::all_of(getInputTypes(), llvm::IsaPred<RankedTensorType>);
+    if (!allTensor) {
+      return emitOpError(
+          "All inputs should be either of tensor or vector type");
+    }
+    return success();
+  }
+
+  bool allVector = llvm::all_of(getInputTypes(), llvm::IsaPred<VectorType>);
+  if (!allVector) {
+    return emitOpError("All inputs should be either of tensor or vector type");
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

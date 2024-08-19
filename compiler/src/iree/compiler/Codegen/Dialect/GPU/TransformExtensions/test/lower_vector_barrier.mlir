@@ -5,6 +5,13 @@ func.func @lower_value_barrier(%input: vector<4xf32>) -> vector<4xf32> {
   return %0 : vector<4xf32>
 }
 
+func.func @lower_value_barrier_multiple_inputs(%input: vector<4xf32>,
+                                               %input_t : vector<4xf32>)
+                                               -> (vector<4xf32>, vector<4xf32>) {
+  %0:2 = iree_gpu.value_barrier %input, %input_t : vector<4xf32>, vector<4xf32>
+  return %0#0, %0#1 : vector<4xf32>, vector<4xf32>
+}
+
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
@@ -19,3 +26,9 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<4xf32>
 //  CHECK-NEXT:   gpu.barrier
 //  CHECK-NEXT:   return %[[INPUT]]
+
+// CHECK-LABEL: func @lower_value_barrier_multiple_inputs
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<4xf32>
+//  CHECK-SAME:   %[[INPUT_T:[A-Za-z0-9]+]]: vector<4xf32>
+//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   return %[[INPUT]], %[[INPUT_T]]
