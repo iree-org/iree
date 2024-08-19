@@ -8,6 +8,7 @@
 #define IREE_TOOLS_TESTING_E2E_TEST_UTILS_H_
 #include <stdio.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
@@ -16,8 +17,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-#define FINDMAX(a, b) ((a) > (b) ? (a) : (b))
 
 bool iree_test_utils_require_exact_results(void);
 

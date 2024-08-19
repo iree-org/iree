@@ -74,7 +74,7 @@ static void reference_attention_f32_f32_f32_f32(
     float max_val = -FLT_MAX;
     for (int k2 = 0; k2 < K2; ++k2) {
       int att_idx = index_3d(0, m, k2, M, K2);
-      max_val = FINDMAX(max_val, Attention[att_idx]);
+      max_val = iree_max(max_val, Attention[att_idx]);
     }
 
     // Calculate the softmax denominator
