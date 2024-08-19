@@ -531,9 +531,9 @@ hal.executable public @main {
         %cst = arith.constant 0.000000e+00 : f32
         %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x64x58x58xf32>>
-        %1 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x64x3x3xf32>>
-        %2 = hal.interface.binding.subspan layout(<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, "ReadOnly|Indirect">, <1, storage_buffer, ReadOnly>, <2, storage_buffer, Indirect>], flags = Indirect>]>) set(0) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x64x58x58xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x64x3x3xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 64, 58, 58], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x64x58x58xf32>> -> tensor<1x64x58x58xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x64x3x3xf32>> -> tensor<64x64x3x3xf32>
         %5 = tensor.empty() : tensor<1x64x56x56xf32>
@@ -561,3 +561,77 @@ hal.executable public @main {
 //       CHECK:   arith.addf
 //       CHECK:   arith.cmpf
 //       CHECK:   arith.select
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{
+  reduction = [0 : index, 0 : index, 4 : index],
+  thread = [1 : index, 4 : index, 0 : index],
+  workgroup = [4 : index, 32 : index, 0 : index]
+}>
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+
+#pipeline_layout = #hal.pipeline.layout<
+  push_constants = 0,
+  sets = [
+    <0, bindings = [
+      <0, storage_buffer, ReadOnly>,
+      <1, storage_buffer, "ReadOnly|Indirect">,
+      <2, storage_buffer, Indirect>
+    ], flags = Indirect>
+  ]>
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @skinny_matmul_config ordinal(0) layout(#pipeline_layout) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @skinny_matmul_config() attributes {translation_info = #translation_info} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c102227904 = arith.constant 102227904 : index
+        %c111444672 = arith.constant 111444672 : index
+        %c4014080 = arith.constant 4014080 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c102227904) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c4014080) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<256x3136xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c111444672) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
+        %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<128x3136xf32>>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 3136], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x3136xf32>> -> tensor<256x3136xf32>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
+        %7 = tensor.empty() : tensor<128x3136xf32>
+        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128x3136xf32>) -> tensor<128x3136xf32>
+        %9 = linalg.matmul {lowering_config = #lowering_config} ins(%4, %5 : tensor<128x256xf32>, tensor<256x3136xf32>) outs(%8 : tensor<128x3136xf32>) -> tensor<128x3136xf32>
+        %10 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel"]}
+          ins(%9, %6 : tensor<128x3136xf32>, tensor<128xf32>) outs(%7 : tensor<128x3136xf32>) {
+        ^bb0(%in: f32, %in_0: f32, %out: f32):
+          %11 = arith.addf %in, %in_0 : f32
+          %12 = arith.cmpf ugt, %11, %cst : f32
+          %13 = arith.select %12, %11, %cst : f32
+          linalg.yield %13 : f32
+        } -> tensor<128x3136xf32>
+        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [128, 3136], strides = [1, 1] : tensor<128x3136xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x3136xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 * 8)>
+
+// CHECK-LABEL: func @skinny_matmul_config
+
+//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
+//   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
+//       CHECK:   %[[LINID:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]]]
+//       CHECK:   scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
+//       CHECK:     scf.for %{{.*}} = %[[LINID]] to %c4 step %c32
+//       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}storage_buffer>>, vector<4xf32>
+//       CHECK:       vector.transfer_write %[[READ]], %{{.*}} : vector<4xf32>, memref<4x6xf32, #gpu.address_space<workgroup>>
+//       CHECK:     vector.contract
