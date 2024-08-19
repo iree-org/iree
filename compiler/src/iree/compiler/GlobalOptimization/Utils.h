@@ -55,6 +55,9 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                    SmallVector<Operation *> ops);
 
+Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
+                               Type accETy, ArrayRef<bool> is_reduction);
+
 } // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

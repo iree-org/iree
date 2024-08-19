@@ -19,16 +19,6 @@ def ImportMLProgramPass :
   let summary = "Imports MLProgram dialect to IREE Equivalents.";
 }
 
-def LinalgQuantizedConvToConvPass
-    : InterfacePass<"iree-linalg-quantized-conv-to-conv", "mlir::FunctionOpInterface"> {
-  let summary = "lower quantized_conv to conv";
-}
-
-def LinalgQuantizedMatmulToMatmulPass
-    : InterfacePass<"iree-linalg-quantized-matmul-to-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "lower quantized_matmul to matmul";
-}
-
 def SanitizeModuleNamesPass :
     Pass<"iree-sanitize-module-names", "ModuleOp"> {
   let summary = "Sanitizes module names for uniformity across target implementations.";
