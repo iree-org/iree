@@ -45,6 +45,7 @@ namespace {
 struct CollapseDimensionsPass
     : public IREE::Flow::impl::CollapseDimensionsPassBase<
           CollapseDimensionsPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -765,7 +766,8 @@ static bool updateProducersFromConsumers(
 // dimensions that can be collapsed all the way from the root to the leaves,
 // ensuring that all `collapse_shape` ops can be hoisted out of the dispatch.
 static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
-                                          DispatchRegionOp &regionOp) {
+                                          DispatchRegionOp &regionOp,
+                                          int maxIterations) {
   // Only collapse dispatches with 1 block
   if (!llvm::hasSingleElement(regionOp.getBody())) {
     return false;
@@ -815,7 +817,7 @@ static bool collapseDimensionsForDispatch(IRRewriter &rewriter,
     // Cap the max number of iterations at 10. If it hasn't converged by then,
     // don't collapse any ops in this dispatch.
     iterationCount++;
-    if (iterationCount > 10) {
+    if (iterationCount > maxIterations) {
       return false;
     }
     // Step 4. For each producer, reduce the number of collapsed dimensions
@@ -880,7 +882,7 @@ void CollapseDimensionsPass::runOnOperation() {
 
   SmallVector<DispatchRegionOp> modifiedDispatchOps;
   funcOp->walk([&](DispatchRegionOp dispatchOp) {
-    if (collapseDimensionsForDispatch(rewriter, dispatchOp)) {
+    if (collapseDimensionsForDispatch(rewriter, dispatchOp, maxIterations)) {
       modifiedDispatchOps.push_back(dispatchOp);
     }
   });

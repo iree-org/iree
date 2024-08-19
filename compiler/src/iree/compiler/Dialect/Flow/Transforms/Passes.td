@@ -147,6 +147,12 @@ def CloneProducersIntoDispatchRegionsPass :
 def CollapseDimensionsPass :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
+  let options = [
+    Option<"maxIterations", "max-iterations", "int",
+    /*default=*/"10",
+    "Maximum number of iterations to wait for collapse dimensions to converge"
+>,
+  ];
   let description = [{
     Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
     and hoist the reshaping operations out of the dispatch.
