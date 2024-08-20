@@ -26,13 +26,78 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Move the topologically sorted slice before the given operation.
-static void moveSliceBeforeOp(RewriterBase &rewriter,
-                              llvm::SetVector<Operation *> &slice,
-                              Operation *insertionPoint) {
-  for (auto sliceOp : slice) {
+/// Move the given backward slice before the given operation.
+static LogicalResult
+moveBackwardSliceBeforeOp(RewriterBase &rewriter,
+                          llvm::SetVector<Operation *> &slice,
+                          Operation *insertionPoint) {
+  SetVector<Operation *> toMove;
+  // First remove all operations that are already before the insertion point.
+  for (Operation *op : slice) {
+    if (op == insertionPoint) {
+      // A slice containing the insertion point itself cannot be moved
+      // behind the insertion point.
+      return failure();
+    }
+
+    if (insertionPoint->isBeforeInBlock(op)) {
+      toMove.insert(op);
+    }
+  }
+
+  // Sort operations to be moved topologically.
+  toMove = topologicalSort(toMove);
+
+  // It is always valid (w.r.t. dominance) to move topologically sorted
+  // operations in a backward slice which come after the insertion point, to
+  // before the insertion point. This is because:
+  //  - Since we are operating on a backward slice, producers to every operation
+  //  in the slice already in the slice, and will be moved behind the insertion
+  //  point.
+  //  - Any consumers will still remain after the operation, as we are only
+  //  moving the operation before.
+  for (Operation *sliceOp : toMove) {
     rewriter.moveOpBefore(sliceOp, insertionPoint);
   }
+
+  return success();
+}
+
+/// Move the slice after the given operation.
+static LogicalResult
+moveForwardSliceAfterOp(RewriterBase &rewriter,
+                        llvm::SetVector<Operation *> &slice,
+                        Operation *insertionPoint) {
+  SetVector<Operation *> toMove;
+  // First remove all operations that are already after the insertion point.
+  for (Operation *op : slice) {
+    if (op == insertionPoint) {
+      // A slice containing the insertion point itself cannot be moved
+      // behind the insertion point.
+      return failure();
+    }
+
+    if (op->isBeforeInBlock(insertionPoint)) {
+      toMove.insert(op);
+    }
+  }
+
+  // Sort operations to be moved topologically.
+  toMove = topologicalSort(toMove);
+
+  // It is always valid (w.r.t. dominance) to move topologically sorted
+  // operations in a forward slice which come before the insertion point, to
+  // after the insertion point. This is because:
+  //  - Since we are operating on a forward slice, consumers to every operation
+  //  in the slice are already in the slice, and will be moved after the
+  //  insertion point,
+  //  - Any producers will still remain before the operation, as we are only
+  //  moving the operation after.
+  for (Operation *sliceOp : llvm::reverse(toMove)) {
+    rewriter.moveOpAfter(sliceOp, insertionPoint);
+  }
+
+  return success();
 }
 
 /// Combine all value barriers into a single value barrier.
@@ -61,161 +126,139 @@ combineValueBarrierOps(RewriterBase &rewriter, Location loc,
   return success();
 }
 
-static LogicalResult
-combineValueBarriersInBackwardSliceOf(RewriterBase &rewriter, Operation *op) {
-  // 1. First compute the backward slice which contains ops in the same basic
-  // block
-  //    but the `value_barrier` ops are treated as stopping points for the
-  //    slice.
-  BackwardSliceOptions options;
-  SmallVector<IREE::GPU::ValueBarrierOp> valueBarriers;
-  options.filter = [&](Operation *candidate) {
-    if (candidate->getBlock() != op->getBlock()) {
+/// Given two barriers, barrierA and barrierB, combine them into a single
+/// barrier.
+static FailureOr<IREE::GPU::ValueBarrierOp>
+combineValueBarrierPair(RewriterBase &rewriter,
+                        IREE::GPU::ValueBarrierOp barrierA,
+                        IREE::GPU::ValueBarrierOp barrierB) {
+  // Both barriers need to have either tensor semantics or vector semantics.
+  if (barrierA.hasTensorSemantics() && !barrierB.hasTensorSemantics()) {
+    return failure();
+  }
+  if (!barrierA.hasTensorSemantics() && barrierB.hasTensorSemantics()) {
+    return failure();
+  }
+
+  // We assume barrierA is always before barrierB.
+  if (barrierB->isBeforeInBlock(barrierA)) {
+    std::swap(barrierA, barrierB);
+  }
+
+  // barrierA and barrierB are in the same block.
+  Block *block = barrierA->getBlock();
+
+  auto sliceFilter = [&block](Operation *candidate) -> bool {
+    if (candidate->getBlock() != block) {
       return false;
     }
-    if (auto valueBarrierOp = dyn_cast<IREE::GPU::ValueBarrierOp>(candidate)) {
-      valueBarriers.push_back(valueBarrierOp);
+    if (candidate == block->getTerminator()) {
+      // Do not move the terminator.
       return false;
     }
     return true;
   };
-  llvm::SetVector<Operation *> slice;
-  mlir::getBackwardSlice(op, &slice, options);
 
-  // Return early with no value barrier ops.
-  if (valueBarriers.size() <= 1) {
-    return success();
-  }
-
-  // 2. The slice is already topologically sorted. Just move them before the
-  // op.
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(op);
-  moveSliceBeforeOp(rewriter, slice, op);
-
-  // 3. At this point we should be able to combine all the value barriers into
-  // a single value barrier before the first op of the slice that has been
-  // moved.
-  if (!slice.empty()) {
-    rewriter.setInsertionPoint(slice.front());
-  }
-  return combineValueBarrierOps(rewriter, op->getLoc(), valueBarriers);
-}
-
-/// Combine `value_barrier`s at the ends of blocsk
-static LogicalResult combineTrailingValueBarriers(RewriterBase &rewriter,
-                                                  Block *block) {
-  auto terminator = block->getTerminator();
-  return combineValueBarriersInBackwardSliceOf(rewriter, terminator);
-}
-
-/// Combine `value_barriers` at the beginning of blocks.
-static LogicalResult combineLeadingValueBarriers(RewriterBase &rewriter,
-                                                 Block *block) {
-  // 1. Find all the leading `value_barrier`s in the block
-  //    whose slice does not contain any other `value_barrier`
-  SmallVector<IREE::GPU::ValueBarrierOp> candidateValueBarriers;
-  Operation *insertionPoint = nullptr;
-  llvm::SetVector<Operation *> sliceUnion;
-  for (Operation &op : *block) {
-    auto valueBarrierOp = dyn_cast<IREE::GPU::ValueBarrierOp>(&op);
-    if (!valueBarrierOp) {
-      continue;
-    }
-
-    // Check the slice in the block to see it has no other `value_barrier`s.
-    BackwardSliceOptions options;
-    bool hasValueBarrierInSlice = false;
-    options.filter = [&](Operation *candidate) {
-      if (candidate->getBlock() != op.getBlock()) {
-        return false;
-      }
-      if ((candidate != &op) && isa<IREE::GPU::ValueBarrierOp>(candidate)) {
-        hasValueBarrierInSlice = true;
-        return false;
-      }
-      return true;
-    };
-    llvm::SetVector<Operation *> currSlice;
-    mlir::getBackwardSlice(&op, &currSlice, options);
-
-    if (hasValueBarrierInSlice) {
-      continue;
-    }
-    candidateValueBarriers.push_back(valueBarrierOp);
-    sliceUnion.insert(currSlice.begin(), currSlice.end());
-    if (!insertionPoint) {
-      // The first barrier is the insertion point.
-      // All dependent ops will be moved before this.
-      insertionPoint = &op;
-    }
-  }
-
-  if (candidateValueBarriers.size() <= 1) {
-    return success();
-  }
-
-  // 2. Topologically sort the union of slices.
-  mlir::topologicalSort(sliceUnion);
-
-  // 3. Move the operations before the insertion point;
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(insertionPoint);
-  moveSliceBeforeOp(rewriter, sliceUnion, insertionPoint);
-
-  // 4. Now combine the value barrier ops.
-  return combineValueBarrierOps(rewriter, block->getParentOp()->getLoc(),
-                                candidateValueBarriers);
-}
-
-/// Main dispatch method to combine value barries in region.
-static LogicalResult combineValueBarriersInRegion(RewriterBase &rewriter,
-                                                  Region *region) {
-  if (region->getBlocks().size() != 1) {
-    return region->getParentOp()->emitOpError(
-        "expected region with single block");
-  }
-
-  Block *block = &region->front();
-  // Note: the order of the following steps shouldnt matter.
-  // 1. Combine the value barriers "at the ends of blocks".
-  if (failed(combineTrailingValueBarriers(rewriter, block))) {
+  // Find the combined backward slice of barrierA and barrierB and try
+  // to move it before barrierA (before both the barriers).
+  BackwardSliceOptions bOptions;
+  bOptions.filter = sliceFilter;
+  SetVector<Operation *> backwardSliceA;
+  SetVector<Operation *> backwardSliceB;
+  getBackwardSlice(barrierA, &backwardSliceA, bOptions);
+  getBackwardSlice(barrierB, &backwardSliceB, bOptions);
+  backwardSliceA.insert(backwardSliceB.begin(), backwardSliceB.end());
+  // Move the backward slice before barrierA.
+  if (failed(moveBackwardSliceBeforeOp(rewriter, backwardSliceA, barrierA))) {
     return failure();
   }
 
-  // 2. Combine the value barriers "at the begining of blocks"
-  if (failed(combineLeadingValueBarriers(rewriter, block))) {
+  // Find the combined forward slice of barrierA and barrierB and try to
+  // move it after barrierB (after both the barriers).
+  ForwardSliceOptions fOptions;
+  fOptions.filter = sliceFilter;
+  SetVector<Operation *> forwardSliceA;
+  SetVector<Operation *> forwardSliceB;
+  getForwardSlice(barrierA, &forwardSliceA, fOptions);
+  getForwardSlice(barrierB, &forwardSliceB, fOptions);
+  forwardSliceA.insert(forwardSliceB.begin(), forwardSliceB.end());
+  // Move the forward slice after barrierB.
+  if (failed(moveForwardSliceAfterOp(rewriter, forwardSliceA, barrierB))) {
     return failure();
   }
 
-  // TODO: We could also combine value barries in middle of operations
-  // by anchoring on operations.
-  return success();
+  // We add the new barrier after both the barriers (it is always better
+  // to sink barriers).
+  rewriter.setInsertionPointAfter(barrierB);
+
+  SmallVector<Value> barrierOperands;
+  barrierOperands.append(barrierA.getOperands().begin(),
+                         barrierA.getOperands().end());
+  barrierOperands.append(barrierB.getOperands().begin(),
+                         barrierB.getOperands().end());
+
+  auto combinedBarrierOp = rewriter.create<IREE::GPU::ValueBarrierOp>(
+      barrierB.getLoc(), barrierOperands);
+
+  int numOperandsA = barrierA.getNumOperands();
+  int numOperandsB = barrierB.getNumOperands();
+  rewriter.replaceOp(barrierA,
+                     combinedBarrierOp->getResults().slice(0, numOperandsA));
+  rewriter.replaceOp(barrierB, combinedBarrierOp->getResults().slice(
+                                   numOperandsA, numOperandsB));
+
+  return combinedBarrierOp;
+}
+
+static void combineValueBarriersInBlock(RewriterBase &rewriter, Block *block) {
+  SmallVector<IREE::GPU::ValueBarrierOp> barriers;
+  for (Operation &op : block->getOperations()) {
+    if (auto barrier = dyn_cast<IREE::GPU::ValueBarrierOp>(op)) {
+      barriers.push_back(barrier);
+    }
+  }
+
+  // We iterate over all pairs. This could be optimized to O(n) to take
+  // into account deletions, but we do the simplest thing for now.
+  int numBarriers = barriers.size();
+  for (int i = 0; i < numBarriers; ++i) {
+    if (!barriers[i]) {
+      continue;
+    }
+
+    for (int j = i + 1; j < numBarriers; ++j) {
+      if (!barriers[j]) {
+        continue;
+      }
+
+      FailureOr<IREE::GPU::ValueBarrierOp> combined =
+          combineValueBarrierPair(rewriter, barriers[i], barriers[j]);
+      if (succeeded(combined)) {
+        barriers[i] = combined.value();
+        barriers[j] = nullptr;
+      }
+    }
+  }
 }
 
 struct GPUCombineValueBarriersPass final
     : impl::GPUCombineValueBarriersPassBase<GPUCombineValueBarriersPass> {
 
   void runOnOperation() override {
-    auto operation = getOperation();
-
-    SetVector<Region *> barrierRegions;
-    // 1. Walk the operation to get all regions that have value barriers
-    // (restrict to operations with single block);
-    operation->walk([&](IREE::GPU::ValueBarrierOp valueBarrierOp) {
-      Region *parentRegion = valueBarrierOp->getBlock()->getParent();
-      if (parentRegion->getBlocks().size() == 1) {
-        barrierRegions.insert(parentRegion);
+    // Walk the operation to get all blocks that have value barriers. We
+    // restrict ourselves to blocks, because the order of operations in a block
+    // is easy to determine.
+    SmallVector<Block *> blocks;
+    getOperation()->walk([&blocks](Block *block) {
+      if (llvm::any_of(block->getOperations(),
+                       llvm::IsaPred<IREE::GPU::ValueBarrierOp>)) {
+        blocks.push_back(block);
       }
     });
 
     IRRewriter rewriter(&getContext());
-    for (Region *region : barrierRegions) {
-      if (failed(combineValueBarriersInRegion(rewriter, region))) {
-        region->getParentOp()->emitOpError(
-            "failed to combined value barriers for this op");
-        return signalPassFailure();
-      }
+    for (auto *block : blocks) {
+      combineValueBarriersInBlock(rewriter, block);
     }
 
     return;
