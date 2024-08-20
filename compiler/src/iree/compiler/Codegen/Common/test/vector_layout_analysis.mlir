@@ -188,6 +188,63 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+// This test checks that we can propagate layout through arith.select.
+// arith.select is special since the condition that is part of arith.select
+// is not likely to have a layout.
+
+// This test is also useful to ensure that layout analysis is not emitting
+// redundant to_layout ops that convert elemwise ops to the 2nd layout
+// prematurely. Especially useful during chained contraction cases.
+
+#layoutA = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 8]>>
+#layoutB = #iree_vector_ext.layout<<[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 8]>, <[BATCHY, LANEX], [2, 32]>>
+#layoutC = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>
+
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d1, d0)>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @contract(%A : vector<64x64xf16>, %B : vector<64x64xf16>, %C : vector<64x64xf16>, %condition : i1) -> vector<64x64xf16> {
+    %a = iree_vector_ext.to_layout %A to #layoutA : vector<64x64xf16>
+    %b = iree_vector_ext.to_layout %B to #layoutB : vector<64x64xf16>
+    %c = iree_vector_ext.to_layout %C to #layoutC : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %offset_0 = arith.constant dense<2.0> : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %offset_1 = arith.constant dense<4.0> : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %contract_0 = vector.contract
+        {indexing_maps = [#map1, #map2, #map3],
+         iterator_types = ["parallel", "parallel", "reduction"],
+         kind = #vector.kind<add>
+        } %a, %b, %c : vector<64x64xf16>, vector<64x64xf16> into vector<64x64xf16>
+
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %sel = arith.select %condition, %offset_0, %offset_1 : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %add = arith.addf %contract_0, %sel : vector<64x64xf16>
+    %add_layout = iree_vector_ext.to_layout %add to #layoutA : vector<64x64xf16>
+    // CHECK-COUNT-4: iree_vector_ext.to_layout
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %contract_1 = vector.contract
+        {indexing_maps = [#map1, #map2, #map3],
+         iterator_types = ["parallel", "parallel", "reduction"],
+         kind = #vector.kind<add>
+        } %add_layout, %b, %c : vector<64x64xf16>, vector<64x64xf16> into vector<64x64xf16>
+
+    func.return %contract_1 : vector<64x64xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 #layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
 
 // Propagate and enforce through scf.for

@@ -608,12 +608,12 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
 
-// CHECK: %[[VEC_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x16xf32
+// CHECK: %[[VEC_INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x16xf16
 // CHECK: %[[TID_X:.+]] = gpu.thread_id  x
 // CHECK: %[[TID_Y:.+]] = gpu.thread_id  y
 // CHECK: %[[TID_Z:.+]] = gpu.thread_id  z
 // CHECK: %[[SUBGROUP_OFFSET:.+]] = affine.apply #[[$MAP0]]()[%[[TID_X]], %[[TID_Y]], %[[TID_Z]]]
-// CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<16x32xf32, #gpu.address_space<workgroup>>
+// CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
 // CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]][0, %[[SUBGROUP_OFFSET]]] [16, 16] [1, 1]
 // CHECK: %[[HALF_LANE_ID:.+]] = affine.apply #[[$MAP1]]()[%[[TID_X]]]
 // CHECK-COUNT-8: vector.store %{{.+}}, %[[SUBVIEW]][%{{.+}}, %[[HALF_LANE_ID]]]
@@ -621,15 +621,15 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
 
 // CHECK: %[[LANE_OFFSET:.+]] = arith.addi %[[SUBGROUP_OFFSET]], %[[HALF_LANE_ID]]
 // CHECK: %[[LOAD0:.+]] = vector.load %[[ALLOC]][%[[C0]], %[[LANE_OFFSET]]]
-// CHECK: %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[VEC_INIT]] {offsets = [0, 0, 0], strides = [1]} : vector<1xf32> into vector<1x1x16xf32>
+// CHECK: %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[VEC_INIT]] {offsets = [0, 0, 0], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK: %[[LOAD1:.+]] = vector.load %[[ALLOC]][%[[C1]], %[[LANE_OFFSET]]]
-// CHECK: %[[INSERT1:.+]] = vector.insert_strided_slice %[[LOAD1]], %[[INSERT0]] {offsets = [0, 0, 1], strides = [1]} : vector<1xf32> into vector<1x1x16xf32>
+// CHECK: %[[INSERT1:.+]] = vector.insert_strided_slice %[[LOAD1]], %[[INSERT0]] {offsets = [0, 0, 1], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK: %[[LOAD2:.+]] = vector.load %[[ALLOC]][%[[C2]], %[[LANE_OFFSET]]]
-// CHECK: %[[INSERT2:.+]] = vector.insert_strided_slice %[[LOAD2]], %[[INSERT1]] {offsets = [0, 0, 2], strides = [1]} : vector<1xf32> into vector<1x1x16xf32>
+// CHECK: %[[INSERT2:.+]] = vector.insert_strided_slice %[[LOAD2]], %[[INSERT1]] {offsets = [0, 0, 2], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK: %[[LOAD3:.+]] = vector.load %[[ALLOC]][%[[C3]], %[[LANE_OFFSET]]]
-// CHECK: %[[INSERT3:.+]] = vector.insert_strided_slice %[[LOAD3]], %[[INSERT2]] {offsets = [0, 0, 3], strides = [1]} : vector<1xf32> into vector<1x1x16xf32>
+// CHECK: %[[INSERT3:.+]] = vector.insert_strided_slice %[[LOAD3]], %[[INSERT2]] {offsets = [0, 0, 3], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK: %[[LOAD4:.+]] = vector.load %[[ALLOC]][%[[C4]], %[[LANE_OFFSET]]]
-// CHECK: %[[INSERT4:.+]] = vector.insert_strided_slice %[[LOAD4]], %[[INSERT3]] {offsets = [0, 0, 4], strides = [1]} : vector<1xf32> into vector<1x1x16xf32>
+// CHECK: %[[INSERT4:.+]] = vector.insert_strided_slice %[[LOAD4]], %[[INSERT3]] {offsets = [0, 0, 4], strides = [1]} : vector<1xf16> into vector<1x1x16xf16>
 // CHECK-COUNT-11: %[[LOADN:.+]] = vector.load %[[ALLOC]]
 // CHECK-AFTER: vector.insert_strided_slice %[[LOADN]]
 
@@ -653,22 +653,20 @@ builtin.module attributes { transform.with_named_sequence } {
 
 func.func @resolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16xf16>) {
   // CHECK: func.func @resolved_layout_conflict(%[[MEM:.*]]: memref<32x16xf16>, %[[MEM1:.*]]: memref<32x16xf16>
-  // CHECK-DAG: %[[CST0:.*]] = arith.constant dense<0.000000e+00> : vector<2x1x4xf16>
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant dense<0.000000e+00> : vector<1x1x8xf16>
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
   // CHECK-COUNT-8: vector.load %[[MEM]]
   %vec = vector.transfer_read  %a[%c0, %c0], %cst : memref<32x16xf16>, vector<32x16xf16>
   %vecl = iree_vector_ext.to_layout %vec to #layout1 : vector<32x16xf16>
-  // CHECK: %[[V0:.*]] = vector.insert_strided_slice {{.*}} : vector<1xf16> into vector<1x1x8xf16>
-  // CHECK: %[[R0:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 0], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
-  // CHECK: %[[R1:.*]] = vector.insert_strided_slice %[[R0]], %[[CST0]] {offsets = [0, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
-  // CHECK: %[[R2:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 4], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
-  // CHECK: %[[R3:.*]] = vector.insert_strided_slice %[[R2]], %[[R1]] {offsets = [1, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
-  // CHECK: %[[R4:.*]] = arith.addf %[[R3]], %[[R3]] {{.*}} : vector<2x1x4xf16>
+  // CHECK: %[[R0:.+]] = vector.insert_strided_slice {{.*}} {offsets = [0, 0, 7], strides = [1]} : vector<1xf16> into vector<1x1x8xf16>
+  // CHECK: %[[ADD:.*]] = arith.addf %[[R0]], %[[R0]] {{.*}} : vector<1x1x8xf16>
   %vec2 = arith.addf %vecl, %vecl : vector<32x16xf16>
-  // CHECK-COUNT-8: vector.store {{.*}}, vector<1xf16>
   %vec2l = iree_vector_ext.to_layout %vec2 to #layout0 : vector<32x16xf16>
+  // CHECK: %[[R1:.*]] = vector.extract_strided_slice %[[ADD]] {offsets = [0, 0, 0], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
+  // CHECK: %[[R2:.*]] = vector.extract_strided_slice %[[ADD]] {offsets = [0, 0, 4], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
   vector.transfer_write %vec2l, %b[%c0, %c0] {in_bounds = [true, true]} : vector<32x16xf16>, memref<32x16xf16>
+  // CHECK-COUNT-8: vector.store {{.*}}, vector<1xf16>
   func.return
 }
 
