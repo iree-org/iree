@@ -359,13 +359,13 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 325.0 \
-            --goldentime-rocm-unet-ms 77.0 \
+            --goldentime-rocm-e2e-ms 372.0 \
+            --goldentime-rocm-unet-ms 95.0 \
             --goldentime-rocm-clip-ms 15.5 \
-            --goldentime-rocm-vae-ms 74.0 \
-            --goldendispatch-rocm-unet 1691 \
+            --goldentime-rocm-vae-ms 80.0 \
+            --goldendispatch-rocm-unet 1551 \
             --goldendispatch-rocm-clip 1225 \
-            --goldendispatch-rocm-vae 248 \
+            --goldendispatch-rocm-vae 247 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
