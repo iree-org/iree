@@ -21,7 +21,7 @@ iree_lit_test_suite(
     "lower_multi_mma.mlir"
     "lower_vector_barrier.mlir"
     "transform_fuse_forall.mlir"
-    "transform_lower_shuffle.mlir"
+    "transform_lower_barrier_region.mlir"
     "unroll_multi_mma.mlir"
     "vectorize_iree_gpu_ops.mlir"
   TOOLS
