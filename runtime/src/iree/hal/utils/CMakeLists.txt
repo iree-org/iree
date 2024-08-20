@@ -240,13 +240,14 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    tracing
+    stream_tracing
   HDRS
-    "tracing.h"
+    "stream_tracing.h"
   SRCS
-    "tracing.c"
+    "stream_tracing.c"
   DEPS
     iree::base
+    iree::base::internal::arena
   PUBLIC
 )
 

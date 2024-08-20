@@ -17,7 +17,8 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
-typedef struct iree_hal_tracing_context_t iree_hal_tracing_context_t;
+typedef struct iree_hal_stream_tracing_context_t
+    iree_hal_stream_tracing_context_t;
 
 // Creates a command buffer that records into a CUDA graph.
 //
@@ -27,7 +28,7 @@ typedef struct iree_hal_tracing_context_t iree_hal_tracing_context_t;
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
     iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
-    iree_hal_tracing_context_t* tracing_context, CUcontext context,
+    iree_hal_stream_tracing_context_t* tracing_context, CUcontext context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,

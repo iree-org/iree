@@ -203,11 +203,12 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "tracing",
-    srcs = ["tracing.c"],
-    hdrs = ["tracing.h"],
+    name = "stream_tracing",
+    srcs = ["stream_tracing.c"],
+    hdrs = ["stream_tracing.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
     ],
 )
 

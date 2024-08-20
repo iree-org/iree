@@ -64,7 +64,7 @@ iree_cc_library(
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
-    iree::hal::utils::tracing
+    iree::hal::utils::stream_tracing
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )
