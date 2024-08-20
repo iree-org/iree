@@ -62,8 +62,8 @@ static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAAttr mma,
 
 // Given encoding's role index and element types, return the transpose
 // permutation used in GPU materialization.
-static SmallVector<int64_t> getTransposePermutation(IREE::GPU::MMAAttr mma,
-                                                    int64_t roleIdx) {
+static SmallVector<int64_t> getEncodingTransposePerm(IREE::GPU::MMAAttr mma,
+                                                     int64_t roleIdx) {
   // TODO: Support other intrinsics.
   if (mma.getIntrinsic().getValue() !=
       IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
@@ -92,18 +92,18 @@ static SmallVector<int64_t> getTransposePermutation(IREE::GPU::MMAAttr mma,
 /// identical, and the number of elements in the inner dimensions are the same.
 static tensor::ExpandShapeOp reshapeForInnerDims(RewriterBase &rewriter,
                                                  Value src,
+                                                 RankedTensorType sourceType,
                                                  RankedTensorType targetType,
                                                  int64_t outerRank) {
-  auto srcType = cast<RankedTensorType>(src.getType());
   SmallVector<int64_t> intermediateShape(
-      srcType.getShape().take_front(outerRank));
+      sourceType.getShape().take_front(outerRank));
   for ([[maybe_unused]] auto [a, b] : llvm::zip_equal(
            intermediateShape, targetType.getShape().take_front(outerRank))) {
     assert(a == b &&
            "expect outerRank dimensions matched between src and targetType");
   }
 
-  ArrayRef<int64_t> innerShape = srcType.getShape().drop_front(outerRank);
+  ArrayRef<int64_t> innerShape = sourceType.getShape().drop_front(outerRank);
   assert(llvm::all_of(innerShape,
                       [](int64_t v) { return !ShapedType::isDynamic(v); }) &&
          "expect all the inner dimensions are static");
@@ -114,11 +114,16 @@ static tensor::ExpandShapeOp reshapeForInnerDims(RewriterBase &rewriter,
   intermediateShape.push_back(numElem);
 
   Location loc = src.getLoc();
-  Type elemType = srcType.getElementType();
+
+  if (src.getType() != sourceType) {
+    src = rewriter.create<tensor::CastOp>(loc, sourceType, src);
+  }
+
+  Type elemType = sourceType.getElementType();
   auto intermediateShapeType =
       RankedTensorType::get(intermediateShape, elemType);
   std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
-      getReassociationIndicesForReshape(srcType, intermediateShapeType);
+      getReassociationIndicesForReshape(sourceType, intermediateShapeType);
   assert(collapseReassoc.has_value());
   auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
       loc, intermediateShapeType, src, *collapseReassoc);
@@ -196,7 +201,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // insert inner tile shapes and permutation info
   auto roleIdx = encoding.getOperandIndex().getInt();
   auto intrinsicVectorSizes = getIntrinsicVectorSize(*mma, roleIdx);
-  auto permutation = getTransposePermutation(*mma, roleIdx);
+  auto permutation = getEncodingTransposePerm(*mma, roleIdx);
   encodingInfo.innerTileShapes = intrinsicVectorSizes;
   encodingInfo.permutation = permutation;
   return encodingInfo;
@@ -331,11 +336,107 @@ struct GPUSetEncodingOpLoweringConversion
     // We want to make the shape consistent, so we need to append it with a
     // `collapse_shape` and a `expand_shape`, just to be conformant with how we
     // materialize for Flow and HAL op.
-    tensor::ExpandShapeOp result =
-        reshapeForInnerDims(rewriter, transposeOp->getResult(0),
-                            packOp->getDestType(), packOp->getSourceRank());
+    tensor::ExpandShapeOp result = reshapeForInnerDims(
+        rewriter, transposeOp->getResult(0),
+        cast<RankedTensorType>(transposeOp->getResult(0).getType()),
+        packOp->getDestType(), packOp->getSourceRank());
 
     rewriter.replaceOp(encodingOp, result);
+    return success();
+  }
+};
+
+struct GPUUnsetEncodingOpLoweringConversion
+    : public OpMaterializeEncodingPattern<IREE::Encoding::UnsetEncodingOp> {
+  using OpMaterializeEncodingPattern<
+      IREE::Encoding::UnsetEncodingOp>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Encoding::UnsetEncodingOp unsetEncodingOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
+
+    Location loc = unsetEncodingOp.getLoc();
+
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
+    if (failed(maybeEncodingInfo)) {
+      return rewriter.notifyMatchFailure(unsetEncodingOp,
+                                         "unhandled result encoding");
+    }
+    SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
+    SmallVector<int64_t> intrinsicVectorShape =
+        maybeEncodingInfo->innerTileShapes;
+
+    // compute sourceShape:
+    auto srcConvertedType =
+        cast<RankedTensorType>(adaptor.getSource().getType());
+    SmallVector<int64_t> unpackSrcShape(
+        srcConvertedType.getShape().take_front(maybeEncodingInfo->srcRank));
+    unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
+                          maybeEncodingInfo->innerTileSizes.end());
+    auto unpackSrcType = RankedTensorType::get(
+        unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
+
+    auto iT1 = intrinsicVectorShape[0];
+    auto iT2 = intrinsicVectorShape[1];
+    auto oT1 = unpackSrcShape[2] / iT1;
+    auto oT2 = unpackSrcShape[3] / iT2;
+    SmallVector<int64_t> transposeSourceDims = {
+        unpackSrcShape[0], unpackSrcShape[1], oT1, iT1, oT2, iT2};
+    assert(transposeSourceDims.size() == 6);
+
+    size_t targetRank = unsetEncodingOp.getResultType().getRank();
+
+    SmallVector<int64_t> transposePerm;
+    transposePerm.push_back(0);
+    transposePerm.push_back(1);
+    for (auto perm : maybeEncodingInfo->permutation) {
+      transposePerm.push_back(targetRank + perm);
+    }
+    SmallVector<int64_t> expandShapeResultDims = transposeSourceDims;
+    applyPermutationToVector(expandShapeResultDims, transposePerm);
+    auto invertedTransposePerm = invertPermutationVector(transposePerm);
+
+    auto elemType = unsetEncodingOp.getSourceType().getElementType();
+    auto expandShapeResultType =
+        RankedTensorType::get(expandShapeResultDims, elemType);
+
+    tensor::ExpandShapeOp expandShapeOp = reshapeForInnerDims(
+        rewriter, adaptor.getSource(), unpackSrcType, expandShapeResultType,
+        unsetEncodingOp.getResultType().getRank());
+
+    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, transposeSourceDims,
+        unsetEncodingOp.getSourceType().getElementType());
+    auto transposeOp = rewriter.create<linalg::TransposeOp>(
+        loc, expandShapeOp, emptyTensor, invertedTransposePerm);
+
+    auto transposeResultType = RankedTensorType::get(
+        transposeSourceDims, unsetEncodingOp.getSourceType().getElementType());
+    std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
+        getReassociationIndicesForReshape(transposeResultType, unpackSrcType);
+    assert(collapseReassoc.has_value());
+    auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
+        loc, unpackSrcType, transposeOp->getResult(0), *collapseReassoc);
+
+    auto unPackOp = lowerUnsetEncodingToUnpackOp(
+        rewriter, unsetEncodingOp, collapseShapeOp, *converter,
+        this->materializeEncodingValueFn);
+    if (failed(unPackOp)) {
+      Value result = adaptor.getSource();
+      Type targetType =
+          getTypeConverter()->convertType(unsetEncodingOp.getResultType());
+      if (targetType != result.getType()) {
+        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
+                                                 targetType, result);
+      }
+      rewriter.replaceOp(unsetEncodingOp, result);
+      return success();
+    }
+    rewriter.replaceOp(unsetEncodingOp, unPackOp->getResult());
     return success();
   }
 };
@@ -357,7 +458,8 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
     populateIREEMaterializeEncodingIntoPackUnPackPatterns(
         patterns, target, typeConverter, materializeEncodingValueFn);
 
-    patterns.insert<GPUSetEncodingOpLoweringConversion>(
+    patterns.insert<GPUSetEncodingOpLoweringConversion,
+                    GPUUnsetEncodingOpLoweringConversion>(
         ctx, typeConverter, materializeEncodingValueFn);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
