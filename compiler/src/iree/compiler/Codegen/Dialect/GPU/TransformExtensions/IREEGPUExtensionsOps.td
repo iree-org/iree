@@ -198,6 +198,12 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
     `extract_slice` of the consumer. If specified, uses |address_space| for
     the intermediate allocation.
 
+    The mapping attributes of both the producer and consumer `scf.forall` ops
+    must be in a relative descending order, for example:
+     [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>]
+    or
+     [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+
     NOTE: This pattern implicitly REQUIRES that the resulting scf.forall
     is capable of synchronizing all threads at the point of fusion (i.e.
     inserting a barrier). This invalidates certain kinds of lowerings of
