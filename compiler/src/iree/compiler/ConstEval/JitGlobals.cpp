@@ -628,6 +628,7 @@ public:
         requestedTargetDevice);
     compileOptions->targetOptions.f32Extension = true;
     compileOptions->targetOptions.f64Extension = true;
+    compileOptions->targetOptions.indexBits = 64;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
     compileOptions->inputOptions.demoteF64ToF32 = false;
     if (requestedTargetDevice == "vmvx" || !hasRequestedTargetDevice) {
@@ -677,14 +678,15 @@ public:
     s.addScalarType(b.getIntegerType(16));
     s.addScalarType(b.getIntegerType(32));
     s.addScalarType(b.getIntegerType(64));
+    s.addScalarType(b.getIndexType());
     s.addScalarType(b.getF32Type());
 
     s.addElementType(b.getIntegerType(1));
-
     s.addElementType(b.getIntegerType(8));
     s.addElementType(b.getIntegerType(16));
     s.addElementType(b.getIntegerType(32));
     s.addElementType(b.getIntegerType(64));
+    s.addElementType(b.getIndexType());
     s.addElementType(b.getF32Type());
     if (requestedTargetDevice != "vmvx" && hasRequestedTargetDevice) {
       // The full compilers support additional types.
