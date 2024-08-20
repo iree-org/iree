@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -408,26 +409,32 @@ public:
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
 
-    IREE::GPU::TargetAttr gpuTargetAttr =
-        getGPUTargetAttr(converter->getTargetAttr());
+    // TODO(hanchung): Perhaps the MaterializedEncodingInfo should carry the
+    // target intrinsic attribute, so we don't need to query it again.
+    IREE::HAL::ExecutableTargetAttr targetAttr = converter->getTargetAttr();
+    IREE::GPU::TargetAttr gpuTargetAttr;
+    if (targetAttr) {
+      gpuTargetAttr = getGPUTargetAttr(targetAttr);
+    } else {
+      gpuTargetAttr = getCLGPUTarget(op.getContext());
+    }
     auto elementTypes = llvm::to_vector(llvm::map_range(
         resultEncoding.getElementTypes().getValue(),
         [](Attribute a) { return cast<TypeAttr>(a).getValue(); }));
     std::optional<IREE::GPU::MMAAttr> mma =
         enumerateMmaIntrinsic(elementTypes, gpuTargetAttr);
-
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();
     }
-    LLVM_DEBUG(llvm::dbgs() << "Kind: " << mma.value() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma.value() << "\n");
 
     FailureOr<linalg::ContractionDimensions> contractionDims =
         linalg::inferContractionDims(linalgOp);
     assert(
         succeeded(contractionDims) &&
         "should always be able to infer contraction dims for contraction ops");
-   // TODO(hanchung): Support batch gemms.
+    // TODO(hanchung): Support batch gemms.
     if (!contractionDims->batch.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "batch gemm is not yet implemented\n");
       return failure();
@@ -436,8 +443,6 @@ public:
     // TODO(hanchung): Support unrolling cases. We likely need to teach
     // multi_mma op about interleaving K dimension.
     MLIRContext *ctx = rewriter.getContext();
-    AffineExpr d0, d1, d2;
-    bindDims(ctx, d0, d1, d2);
     AffineExpr mExpr = rewriter.getAffineDimExpr(0);
     AffineExpr nExpr = rewriter.getAffineDimExpr(1);
     AffineExpr kExpr = rewriter.getAffineDimExpr(2);
@@ -451,12 +456,56 @@ public:
         linalgOp.getIteratorTypesArray();
 
     // TODO(hanchung): Support batch gemms.
+    // The current multi_mma op is not able to represent the data-tiled mma
+    // layouts. There are internal details about layout after we data-tile a
+    // matrix. The matrix is in row-major fashion for outer dimensions. The
+    // inner dimensions were in row-major, and then we swizzle them to be
+    // column-major. The number of inner dimensions is greater than 2 after tile
+    // swizzling. Here we use the "row-major" layout for inner dimensions. The
+    // shape is exacatly innerTile[0]xinnerTile[1] where innerTile can be
+    // derived from the encoding info. The chunk of the inner tiles are in
+    // column-major fashion, but it does not really matter. Because they are
+    // opaque. I don't find a way to represent it, so I added a
+    // `__is_data_tiled__` magic attribute to the op. The expectation is that
+    // there is a pass to resolve the `__is_data_tiled__` attribute before
+    // additional lowering. It should unroll the op and resolve the layout; each
+    // multi_mma op maps to a single intrisic at subgroup level. Then we do the
+    // lowering that we've been doing in TileAndFuse pipeline.
+    //
+    // E.g., say that the intrinsic is MFMA_f32_16x16x4_f32, and the unrolling
+    // factors for [M, N, K] are [2, 4, 1], then we have:
+    //
+    //   iree_gpu.multi_mma %lhs, %rhs, %acc {
+    //     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+    //     lhs_permutation = array<i64: 0, 1>,
+    //     rhs_permutation = array<i64: 0, 1>,
+    //     __is_data_tiled__
+    //   } : tensor<?x?x32x4xf32>, tensor<?x?x16x4xf32>
+    //     into tensor<?x?x32x64xf32>
+    //
+    // The data-tiled chunk represents in row-major favor, so the permutation is
+    // identiy; the `__is_data_tiled__` attribute is attached.
+    //
+    // Then we resolve the `__is_data_tiled__` layout, which do the unrolling.
+    // It becomes a sequence of
+    //
+    //   iree_gpu.multi_mma %lhs_i, %rhs_i, %acc_i {
+    //     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+    //     lhs_permutation = array<i64: 1, 0>,
+    //     rhs_permutation = array<i64: 1, 0>,
+    //   } : tensor<?x?x4x16xf32>, tensor<?x?x4x16xf32>
+    //     into tensor<?x?x16x16xf32>
+    //
+    // This is what we usually have in TileAndFuse pipeline. IMO, this step
+    // happens after we distribute the op to subgroups/threads; before we
+    // distribute them to lanes.
     Location loc = op.getLoc();
     SmallVector<int64_t> identityPerm = {0, 1};
     auto mmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
         loc, operands[0], operands[1], operands[2],
-        ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
-        mma.value());
+        ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma.value(),
+        identityPerm, identityPerm, identityPerm);
+    mmaOp->setAttr("__is_data_tiled__", rewriter.getUnitAttr());
     rewriter.replaceOp(op, mmaOp);
     return success();
   }
