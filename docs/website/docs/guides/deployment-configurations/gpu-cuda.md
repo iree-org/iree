@@ -135,7 +135,7 @@ supports two additonal schemes to make a better developer experience:
 
 These two schemes are translated into the canonical form under the hood.
 We add support for common code/product names without aiming to be exhaustive.
-If the ones you want is missing, please use the canonical form.
+If the ones you want are missing, please use the canonical form.
 
 ### :octicons-terminal-16: Run a compiled program
 

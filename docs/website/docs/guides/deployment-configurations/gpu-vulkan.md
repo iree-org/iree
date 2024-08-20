@@ -199,6 +199,24 @@ schemes:
   for AMD/ARM/NVIDIA/Qualcomm GPUs.
 * Product name style(1): e.g., using `rx7900xtx`/`a100` for corresponding GPUs.
 
+Here are a few examples showing how you can target various recent common GPUs:
+
+| GPU                 | Target Architecture | Architecture Code Name | Product Name
+| ------------------- | ------------------- | ---------------------- | ------------
+| AMD RX7900XTX       | `gfx1100`           | `rdna3`                | `rx7900xtx`
+| AMD RX7900XT        | `gfx1100`           | `rdna3`                | `rx7900xt`
+| AMD RX7800XT        | `gfx1101`           | `rdna3`                | `rx7800xt`
+| AMD RX7700XT        | `gfx1101`           | `rdna3`                | `rx7700xt`
+| AMD RX6000 series   |                     | `rdna2`                |
+| AMD RX5000 series   |                     | `rdna1`                |
+| ARM Mali G715       |                     | `valhall4`             | e.g., `mali-g715`
+| ARM Mali G510       |                     | `valhall3`             | e.g., `mali-g510`
+| ARM GPUs            |                     | `valhall`              |
+| NVIDIA RTX40 series | `sm_89`             | `ada`                  | e.g., `rtx4090`
+| NVIDIA RTX30 series | `sm_86`             | `ampere`               | e.g., `rtx3080ti`
+| NVIDIA RTX20 series | `sm_75`             | `turing`               | e.g., `rtx2070super`
+| Qualcomm GPUs       |                     | `adreno`               |
+
 If no target is specified, then a safe but more limited default will be used.
 
 !!! note annotate

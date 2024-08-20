@@ -105,6 +105,9 @@ Here is a table of commonly used architectures:
 | AMD RX7800XT  | `gfx1101`   | `rdna3`
 | AMD RX7700XT  | `gfx1101`   | `rdna3`
 
+For a more comprehensive list of prior GPU generations, you can refer to the
+[LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).
+
 In addition to the canonical `gfx<arch_number>` scheme, `iree-hip-target` also
 supports two additonal schemes to make a better developer experience:
 
@@ -113,7 +116,7 @@ supports two additonal schemes to make a better developer experience:
 
 These two schemes are translated into the canonical form under the hood.
 We add support for common code/product names without aiming to be exhaustive.
-If the ones you want is missing, please use the canonical form.
+If the ones you want are missing, please use the canonical form.
 
 ### :octicons-terminal-16: Run a compiled program
 

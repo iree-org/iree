@@ -68,13 +68,17 @@ struct ROCmOptions {
     static cl::OptionCategory category("HIP HAL Target");
     binder.opt<std::string>(
         "iree-hip-target", target, cl::cat(category),
-        cl::desc("HIP target as expected by LLVM AMDGPU backend; e.g., "
-                 "'gfx90a'/'gfx942' for targeting MI250/MI300 GPUs. "
-                 "Additionally this also supports architecture code names like "
-                 "'cdna3'/'rdna3' or some product names like "
-                 "'mi300x'/'rtx7900xtx' for a better experience. See "
-                 "https://iree.dev/guides/deployment-configurations/gpu-rocm/ "
-                 "for more details."));
+        cl::desc(
+            // clang-format off
+            "HIP target as expected by LLVM AMDGPU backend; e.g., "
+            "'gfx90a'/'gfx942' for targeting MI250/MI300 GPUs. "
+            "Additionally this also supports architecture code names like "
+            "'cdna3'/'rdna3' or some product names like 'mi300x'/'rtx7900xtx' "
+            "for a better experience. See "
+            "https://iree.dev/guides/deployment-configurations/gpu-rocm/ "
+            "for more details."
+            // clang-format on
+            ));
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features as expected by LLVM AMDGPU backend; "

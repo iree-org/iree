@@ -48,7 +48,7 @@ struct VulkanSPIRVTargetOptions {
             "CodeGen backend style: e.g., 'gfx*' for AMD GPUs and 'sm_*' for "
             "NVIDIA GPUs; 2) architecture code name style: e.g., "
             "'rdna3'/'valhall4'/'ampere'/'adreno' for AMD/ARM/NVIDIA/Qualcomm "
-            "GPUs; 3) product name style: 'rx7900xtx'/'a100' for AMD/NVIDIA "
+            "GPUs; 3) product name style: 'rx7900xtx'/'rtx4090' for AMD/NVIDIA "
             "GPUs. See "
             "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
             "more details."));
