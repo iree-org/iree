@@ -11,8 +11,11 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-flow-clone-producers-into-dispatch-regions"
 
@@ -28,7 +31,8 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
           FuseEncodingOpsIntoDispatchRegionsPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
-    IRRewriter rewriter(funcOp->getContext());
+    MLIRContext *context = &getContext();
+    IRRewriter rewriter(context);
 
     FormDispatchRegionsPassOptions options;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
@@ -77,6 +81,12 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
         return signalPassFailure();
       }
     });
+
+    RewritePatternSet patterns(context);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
