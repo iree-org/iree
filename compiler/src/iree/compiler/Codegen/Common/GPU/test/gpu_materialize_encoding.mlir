@@ -148,7 +148,6 @@ func.func @unset_encoding_LHS() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_LHS() {
-// CHECK: %[[UNSET_EMPTY_LHS:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK: %[[UNSET_COLLAPSE_LHS:.*]] = tensor.collapse_shape
 // CHECK-SAME: tensor<16x129x16x4xf32> into tensor<16x129x64xf32>
 // CHECK: %[[UNSET_EXPAND_LHS:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_LHS]]
@@ -158,6 +157,7 @@ func.func @unset_encoding_LHS() {
 // CHECK-SAME: outs(%[[UNSET_EMPTY_LHS2]] : tensor<16x129x16x1x4x1xf32>)
 // CHECK: %[[UNSET_COLLAPSE_LHS:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_LHS]]
 // CHECK-SAME: tensor<16x129x16x1x4x1xf32> into tensor<16x129x16x4xf32>
+// CHECK: %[[UNSET_EMPTY_LHS:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK:  tensor.unpack %[[UNSET_COLLAPSE_LHS:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 4]
 // CHECK-SAME: tensor<16x129x16x4xf32> -> tensor<255x513xf32>
 
@@ -183,7 +183,6 @@ func.func @unset_encoding_RHS() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_RHS() {
-// CHECK: %[[UNSET_EMPTY_RHS:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK: %[[UNSET_COLLAPSE_RHS:.*]] = tensor.collapse_shape
 // CHECK-SAME: tensor<33x64x16x4xf32> into tensor<33x64x64xf32>
 // CHECK: %[[UNSET_EXPAND_RHS:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_RHS]]
@@ -193,6 +192,7 @@ func.func @unset_encoding_RHS() {
 // CHECK-SAME: outs(%[[UNSET_EMPTY_RHS2]] : tensor<33x64x16x1x4x1xf32>) permutation = [0, 1, 3, 5, 2, 4]
 // CHECK: %[[UNSET_COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_RHS]]
 // CHECK-SAME: tensor<33x64x16x1x4x1xf32> into tensor<33x64x16x4xf32>
+// CHECK: %[[UNSET_EMPTY_RHS:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK:  tensor.unpack %[[UNSET_COLLAPSE_RHS:.*]] outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4]
 // CHECK-SAME: tensor<33x64x16x4xf32> -> tensor<255x513xf32>
 
@@ -218,7 +218,6 @@ func.func @unset_encoding_ACC() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_ACC() {
-// CHECK: %[[UNSET_EMPTY_ACC:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK: %[[UNSET_COLLAPSE_ACC:.*]] = tensor.collapse_shape
 // CHECK-SAME: tensor<16x33x16x16xf32> into tensor<16x33x256xf32>
 // CHECK: %[[UNSET_EXPAND_ACC:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_ACC]]
@@ -228,5 +227,6 @@ func.func @unset_encoding_ACC() {
 // CHECK-SAME: outs(%[[UNSET_EMPTY_ACC2]] : tensor<16x33x4x4x16x1xf32>) permutation = [0, 1, 2, 4, 3, 5]
 // CHECK: %[[UNSET_COLLAPSE_ACC:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_ACC]]
 // CHECK-SAME: tensor<16x33x4x4x16x1xf32> into tensor<16x33x16x16xf32>
+// CHECK: %[[UNSET_EMPTY_ACC:.*]] = tensor.empty() : tensor<255x513xf32>
 // CHECK:  tensor.unpack %[[UNSET_COLLAPSE_ACC:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into
 // CHECK-SAME: tensor<16x33x16x16xf32> -> tensor<255x513xf32>
