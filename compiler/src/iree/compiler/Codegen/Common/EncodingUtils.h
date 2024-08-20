@@ -52,7 +52,11 @@ public:
     return materializeEncodingFn;
   }
 
-  IREE::HAL::ExecutableTargetAttr getTargetAttr() const { return targetAttr; }
+  IREE::HAL::ExecutableTargetAttr getTargetAttr() const {
+    puts("hi");
+    targetAttr.dump();
+    return targetAttr;
+  }
 
   FailureOr<MaterializeEncodingInfo>
   getEncodingInfo(RankedTensorType type) const {
