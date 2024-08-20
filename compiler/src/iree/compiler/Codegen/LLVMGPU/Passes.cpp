@@ -206,13 +206,14 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
 static void
 tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
                              bool useWARForCooperativeMatrixCodegen = false,
-                             bool convertInputsToDestinations = true) {
+                             bool convertInputsToDestinations = true,
+                             bool convertToDps = true) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
   funcPassManager.addPass(createCSEPass());
 
-  {
+  if (convertToDps) {
     ConvertToDestinationPassingStylePassOptions options;
     options.convertInputsToDestinations = convertInputsToDestinations;
     options.useWARForCooperativeMatrixCodegen =
@@ -327,7 +328,8 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager,
                                /*useWARForCooperativeMatrixCodegen=*/false,
-                               /*convertInputsToDestinations=*/false);
+                               /*convertInputsToDestinations=*/false,
+                               /*convertToDps=*/false);
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
