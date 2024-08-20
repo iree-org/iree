@@ -59,6 +59,14 @@ def GPUGeneralizeNamedOpsPass :
   let summary = "Convert named Linalg ops to linalg.generic ops";
 }
 
+def GPUInferMemorySpacePass :
+    InterfacePass<"iree-codegen-gpu-infer-memory-space", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to infer and set the memory space for all alloc_tensor ops.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect"
+  ];
+}
+
 def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
   let summary = "Separate out parts of the IR that lower to a micro-kernel";
