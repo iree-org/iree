@@ -127,6 +127,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
