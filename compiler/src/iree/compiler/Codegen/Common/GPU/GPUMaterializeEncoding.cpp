@@ -114,7 +114,7 @@ static tensor::ExpandShapeOp reshapeForInnerDims(RewriterBase &rewriter,
   intermediateShape.push_back(numElem);
 
   Location loc = src.getLoc();
-  
+
   if (src.getType() != sourceType) {
     src = rewriter.create<tensor::CastOp>(loc, sourceType, src);
   }
@@ -376,7 +376,7 @@ struct GPUUnsetEncodingOpLoweringConversion
     SmallVector<int64_t> unpackSrcShape(
         srcConvertedType.getShape().take_front(maybeEncodingInfo->srcRank));
     unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
-                       maybeEncodingInfo->innerTileSizes.end());
+                          maybeEncodingInfo->innerTileSizes.end());
     auto unpackSrcType = RankedTensorType::get(
         unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
 
@@ -401,8 +401,8 @@ struct GPUUnsetEncodingOpLoweringConversion
     auto invertedTransposePerm = invertPermutationVector(transposePerm);
 
     auto elemType = unsetEncodingOp.getSourceType().getElementType();
-    auto expandShapeResultType = RankedTensorType::get(
-        expandShapeResultDims, elemType);
+    auto expandShapeResultType =
+        RankedTensorType::get(expandShapeResultDims, elemType);
 
     tensor::ExpandShapeOp expandShapeOp = reshapeForInnerDims(
         rewriter, adaptor.getSource(), unpackSrcType, expandShapeResultType,
@@ -417,12 +417,10 @@ struct GPUUnsetEncodingOpLoweringConversion
     auto transposeResultType = RankedTensorType::get(
         transposeSourceDims, unsetEncodingOp.getSourceType().getElementType());
     std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
-        getReassociationIndicesForReshape(transposeResultType,
-                                          unpackSrcType);
+        getReassociationIndicesForReshape(transposeResultType, unpackSrcType);
     assert(collapseReassoc.has_value());
     auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
-        loc, unpackSrcType, transposeOp->getResult(0),
-        *collapseReassoc);
+        loc, unpackSrcType, transposeOp->getResult(0), *collapseReassoc);
 
     auto unPackOp = lowerUnsetEncodingToUnpackOp(
         rewriter, unsetEncodingOp, collapseShapeOp, *converter,
