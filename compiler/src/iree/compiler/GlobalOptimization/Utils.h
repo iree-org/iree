@@ -55,6 +55,7 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                    SmallVector<Operation *> ops);
 
+// Reduce the input value along the reduction dimensions.
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction);
 

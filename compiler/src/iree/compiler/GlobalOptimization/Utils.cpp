@@ -121,7 +121,7 @@ wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
   return IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
                                                         regionOp);
 }
-// Reduce the input value along the reduction dimensions
+
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction) {
   auto context = val.getContext();
