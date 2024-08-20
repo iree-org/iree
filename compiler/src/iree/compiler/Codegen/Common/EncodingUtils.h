@@ -20,8 +20,10 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
   unsigned srcRank = 0;
-  // Metadata for a generalized expand_shape + transpose
+  // Metadata for inner packed tile swizzling (i.e., generalized
+  // tensor.expand_shape + linalg.transpose).
   SmallVector<int64_t> innerTileShapes;
+  SmallVector<int64_t> intrinsicSize;
   SmallVector<int64_t> permutation;
 };
 
@@ -86,6 +88,17 @@ protected:
 //===---------------------------------------------------------------------===//
 // Utility methods about Encoding.
 //===---------------------------------------------------------------------===//
+
+/// Returns the type that applies tile swizzling on `packedType`. If there are
+/// tile swizzling config in the `encodingInfo`, returns the `packedType`.
+RankedTensorType resolveTileSwizzlingType(RankedTensorType packedType,
+                                          MaterializeEncodingInfo encodingInfo);
+
+/// Returns the shape that applies tile swizzling on `packedType`. If there are
+/// tile swizzling config in the `encodingInfo`, returns the `packedShape`.
+SmallVector<OpFoldResult>
+resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
+                          MaterializeEncodingInfo encodingInfo);
 
 /// Returns the original type that carried by encoding.
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);

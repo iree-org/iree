@@ -542,7 +542,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
       tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
                                      encodingInfo->innerDimsPos,
                                      encodingInfo->outerDimsPerm);
-  return convertedTargetShape;
+  return resolveTileSwizzlingShape(convertedTargetShape, *encodingInfo);
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,

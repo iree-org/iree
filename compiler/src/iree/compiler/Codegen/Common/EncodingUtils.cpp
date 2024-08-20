@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include <numeric>
 
@@ -99,6 +100,66 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
+RankedTensorType
+resolveTileSwizzlingType(RankedTensorType packedType,
+                         MaterializeEncodingInfo encodingInfo) {
+  if (encodingInfo.innerTileShapes.empty()) {
+    return packedType;
+  }
+
+  int64_t srcRank = encodingInfo.srcRank;
+  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
+  for (auto i : encodingInfo.permutation) {
+    perm.push_back(i + srcRank);
+  }
+
+  // TODO(lialan): Support unrolling and K-interleaving.
+  SmallVector<int64_t> intrinsicVectorShape = encodingInfo.innerTileShapes;
+  auto iT1 = intrinsicVectorShape[0];
+  auto iT2 = intrinsicVectorShape[1];
+  auto oT1 = encodingInfo.innerTileSizes[0] / iT1;
+  auto oT2 = encodingInfo.innerTileSizes[1] / iT2;
+  SmallVector<int64_t> newShape(packedType.getShape().take_front(srcRank));
+  newShape.push_back(oT1);
+  newShape.push_back(iT1);
+  newShape.push_back(oT2);
+  newShape.push_back(iT2);
+  applyPermutationToVector(newShape, perm);
+
+  return RankedTensorType::get(newShape, packedType.getElementType());
+}
+
+SmallVector<OpFoldResult>
+resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
+                          MaterializeEncodingInfo encodingInfo) {
+  if (packedShape.empty() || encodingInfo.innerTileShapes.empty()) {
+    return SmallVector<OpFoldResult>(packedShape);
+  }
+
+  int64_t srcRank = encodingInfo.srcRank;
+  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
+  for (auto i : encodingInfo.permutation) {
+    perm.push_back(i + srcRank);
+  }
+
+  // TODO(lialan): Support unrolling and K-interleaving.
+  SmallVector<int64_t> intrinsicVectorShape = encodingInfo.innerTileShapes;
+  auto iT1 = intrinsicVectorShape[0];
+  auto iT2 = intrinsicVectorShape[1];
+  auto oT1 = encodingInfo.innerTileSizes[0] / iT1;
+  auto oT2 = encodingInfo.innerTileSizes[1] / iT2;
+  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
+  MLIRContext *ctx = packedShape[0].getContext();
+  Builder b(ctx);
+  newShape.push_back(b.getIndexAttr(oT1));
+  newShape.push_back(b.getIndexAttr(iT1));
+  newShape.push_back(b.getIndexAttr(oT2));
+  newShape.push_back(b.getIndexAttr(iT2));
+  applyPermutationToVector(newShape, perm);
+
+  return newShape;
+}
+
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     MaterializeEncodingFn materializeEncodingFn,
     IREE::HAL::ExecutableTargetAttr targetAttr)
@@ -117,9 +178,11 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     if (failed(maybeEncodingInfo)) {
       return dropEncoding(type);
     }
-    return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+    auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
         tensorType, maybeEncodingInfo->innerTileSizes,
         maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
+
+    return resolveTileSwizzlingType(packedType, *maybeEncodingInfo);
   });
 }
 

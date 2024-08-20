@@ -39,11 +39,7 @@ func.func @set_encoding_LHS() {
 // CHECK-SASME:     ins(%[[EXPAND_LHS]]
 // CHECK-SAME:      outs(%[[EMPTY_LHS2]]
 // CHECK-SAME:      permutation = [0, 1, 4, 2, 5, 3]
-// CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<16x129x4x16x1x1xf32> into tensor<16x129x64xf32>
-// CHECK:         %[[EXPAND_LHS_2:.*]] = tensor.expand_shape %[[COLLAPSE]]
-// CHECK-SAME:      : tensor<16x129x64xf32> into tensor<16x129x16x4xf32>
-// CHECK:         flow.dispatch.tensor.store %[[EXPAND_LHS_2]]
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
 
@@ -67,24 +63,20 @@ func.func @set_encoding_RHS() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_RHS
-// CHECK:         %[[EMPTY_RHS:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
-// CHECK:         %[[PACK_RHS:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<33x64x16x4xf32>
+// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
 // CHECK-SAME:      inner_dims_pos = [1, 0]
-// CHECK-SAME:      inner_tiles = [16, 4] into %[[EMPTY_RHS]]
+// CHECK-SAME:      inner_tiles = [16, 4] into %[[EMPTY]]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<33x64x16x4xf32>
-// CHECK:         %[[EXPAND_RHS:.*]] = tensor.expand_shape %[[PACK_RHS]]
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
 // CHECK-SAME:      output_shape [33, 64, 16, 1, 4, 1] : tensor<33x64x16x4xf32> into tensor<33x64x16x1x4x1xf32>
-// CHECK:         %[[EMPTY_RHS2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
-// CHECK:         %[[TRANSPOSE_RHS:.*]] = linalg.transpose
-// CHECK-SAME:      ins(%[[EXPAND_RHS]]
-// CHECK-SAME:      outs(%[[EMPTY_RHS2]]
+// CHECK:         %[[EMPTY2:.*]] = tensor.empty() : tensor<33x64x4x16x1x1xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]]
+// CHECK-SAME:      outs(%[[EMPTY2]]
 // CHECK-SAME:      permutation = [0, 1, 4, 2, 5, 3]
-// CHECK:         %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_RHS]]
-// CHECK-SAME:      : tensor<33x64x4x16x1x1xf32> into tensor<33x64x64xf32>
-// CHECK:         %[[EXPAND_RHS_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
-// CHECK-SAME:      : tensor<33x64x64xf32> into tensor<33x64x16x4xf32>
-// CHECK:         flow.dispatch.tensor.store %[[EXPAND_RHS_2]]
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
 
@@ -108,23 +100,19 @@ func.func @set_encoding_ACC() {
 }
 
 // CHECK-LABEL: func.func @set_encoding_ACC
-// CHECK:         %[[EMPTY_ACC:.*]] = tensor.empty() : tensor<16x33x16x16xf32>
-// CHECK:         %[[PACK_ACC:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x33x16x16xf32>
+// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [16, 16] into %[[EMPTY_ACC]]
+// CHECK-SAME:      inner_tiles = [16, 16] into %[[EMPTY]]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<16x33x16x16xf32>
-// CHECK:         %[[EXPAND_ACC:.*]] = tensor.expand_shape %[[PACK_ACC]]
-// CHECK:         %[[EMPTY_ACC2:.*]] = tensor.empty() : tensor<16x33x4x16x4x1xf32>
-// CHECK:         %[[TRANSPOSE_ACC:.*]] = linalg.transpose
-// CHECK-SAME:      ins(%[[EXPAND_ACC]]
-// CHECK-SAME:      outs(%[[EMPTY_ACC2]]
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK:         %[[EMPTY2:.*]] = tensor.empty() : tensor<16x33x4x16x4x1xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]]
+// CHECK-SAME:      outs(%[[EMPTY2]]
 // CHECK-SAME:      permutation = [0, 1, 2, 4, 3, 5]
-// CHECK:         %[[COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[TRANSPOSE_ACC]]
-// CHECK-SAME:      : tensor<16x33x4x16x4x1xf32> into tensor<16x33x256xf32>
-// CHECK:         %[[EXPAND_ACC_2:.*]] = tensor.expand_shape %[[COLLAPSE_RHS]]
-// CHECK-SAME:      : tensor<16x33x256xf32> into tensor<16x33x16x16xf32>
-// CHECK:         flow.dispatch.tensor.store %[[EXPAND_ACC_2]]
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
 
@@ -148,18 +136,14 @@ func.func @unset_encoding_LHS() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_LHS() {
-// CHECK: %[[UNSET_COLLAPSE_LHS:.*]] = tensor.collapse_shape
-// CHECK-SAME: tensor<16x129x16x4xf32> into tensor<16x129x64xf32>
-// CHECK: %[[UNSET_EXPAND_LHS:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_LHS]]
-// CHECK-SAME: output_shape [16, 129, 4, 16, 1, 1] : tensor<16x129x64xf32> into tensor<16x129x4x16x1x1xf32>
-// CHECK: %[[UNSET_EMPTY_LHS2:.*]] = tensor.empty() : tensor<16x129x16x1x4x1xf32>
-// CHECK: %[[UNSET_TRANSPOSE_LHS:.*]] = linalg.transpose ins(%[[UNSET_EXPAND_LHS]] : tensor<16x129x4x16x1x1xf32>)
-// CHECK-SAME: outs(%[[UNSET_EMPTY_LHS2]] : tensor<16x129x16x1x4x1xf32>)
-// CHECK: %[[UNSET_COLLAPSE_LHS:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_LHS]]
-// CHECK-SAME: tensor<16x129x16x1x4x1xf32> into tensor<16x129x16x4xf32>
-// CHECK: %[[UNSET_EMPTY_LHS:.*]] = tensor.empty() : tensor<255x513xf32>
-// CHECK:  tensor.unpack %[[UNSET_COLLAPSE_LHS:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 4]
-// CHECK-SAME: tensor<16x129x16x4xf32> -> tensor<255x513xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<16x129x16x1x4x1xf32>
+// CHECK:         %[[UNSET_TRANSPOSE:.*]] = linalg.transpose ins(%{{.+}} : tensor<16x129x4x16x1x1xf32>)
+// CHECK-SAME:      outs(%[[UNSET_EMPTY]] : tensor<16x129x16x1x4x1xf32>)
+// CHECK:         %[[UNSET_COLLAPSE:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE]]
+// CHECK-SAME:      tensor<16x129x16x1x4x1xf32> into tensor<16x129x16x4xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xf32>
+// CHECK:         tensor.unpack %[[UNSET_COLLAPSE:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 4]
+// CHECK-SAME:       tensor<16x129x16x4xf32> -> tensor<255x513xf32>
 
 // -----
 
@@ -183,18 +167,14 @@ func.func @unset_encoding_RHS() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_RHS() {
-// CHECK: %[[UNSET_COLLAPSE_RHS:.*]] = tensor.collapse_shape
-// CHECK-SAME: tensor<33x64x16x4xf32> into tensor<33x64x64xf32>
-// CHECK: %[[UNSET_EXPAND_RHS:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_RHS]]
-// CHECK-SAME: output_shape [33, 64, 4, 16, 1, 1] : tensor<33x64x64xf32> into tensor<33x64x4x16x1x1xf32>
-// CHECK: %[[UNSET_EMPTY_RHS2:.*]] = tensor.empty() : tensor<33x64x16x1x4x1xf32>
-// CHECK: %[[UNSET_TRANSPOSE_RHS:.*]] = linalg.transpose ins(%[[UNSET_EXPAND_RHS]] : tensor<33x64x4x16x1x1xf32>)
-// CHECK-SAME: outs(%[[UNSET_EMPTY_RHS2]] : tensor<33x64x16x1x4x1xf32>) permutation = [0, 1, 3, 5, 2, 4]
-// CHECK: %[[UNSET_COLLAPSE_RHS:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_RHS]]
-// CHECK-SAME: tensor<33x64x16x1x4x1xf32> into tensor<33x64x16x4xf32>
-// CHECK: %[[UNSET_EMPTY_RHS:.*]] = tensor.empty() : tensor<255x513xf32>
-// CHECK:  tensor.unpack %[[UNSET_COLLAPSE_RHS:.*]] outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4]
-// CHECK-SAME: tensor<33x64x16x4xf32> -> tensor<255x513xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<33x64x16x1x4x1xf32>
+// CHECK:         %[[UNSET_TRANSPOSE:.*]] = linalg.transpose ins(%{{.+}} : tensor<33x64x4x16x1x1xf32>)
+// CHECK-SAME:      outs(%[[UNSET_EMPTY]] : tensor<33x64x16x1x4x1xf32>) permutation = [0, 1, 3, 5, 2, 4]
+// CHECK:         %[[UNSET_COLLAPSE:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE]]
+// CHECK-SAME:      tensor<33x64x16x1x4x1xf32> into tensor<33x64x16x4xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xf32>
+// CHECK:         tensor.unpack %[[UNSET_COLLAPSE:.*]] outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 4]
+// CHECK-SAME:      tensor<33x64x16x4xf32> -> tensor<255x513xf32>
 
 // -----
 
@@ -218,15 +198,11 @@ func.func @unset_encoding_ACC() {
 }
 
 // CHECK-LABEL: func.func @unset_encoding_ACC() {
-// CHECK: %[[UNSET_COLLAPSE_ACC:.*]] = tensor.collapse_shape
-// CHECK-SAME: tensor<16x33x16x16xf32> into tensor<16x33x256xf32>
-// CHECK: %[[UNSET_EXPAND_ACC:.*]] = tensor.expand_shape %[[UNSET_COLLAPSE_ACC]]
-// CHECK-SAME: output_shape [16, 33, 4, 16, 4, 1] : tensor<16x33x256xf32> into tensor<16x33x4x16x4x1xf32>
-// CHECK: %[[UNSET_EMPTY_ACC2:.*]] = tensor.empty() : tensor<16x33x4x4x16x1xf32>
-// CHECK: %[[UNSET_TRANSPOSE_ACC:.*]] = linalg.transpose ins(%[[UNSET_EXPAND_ACC]] : tensor<16x33x4x16x4x1xf32>)
-// CHECK-SAME: outs(%[[UNSET_EMPTY_ACC2]] : tensor<16x33x4x4x16x1xf32>) permutation = [0, 1, 2, 4, 3, 5]
-// CHECK: %[[UNSET_COLLAPSE_ACC:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE_ACC]]
-// CHECK-SAME: tensor<16x33x4x4x16x1xf32> into tensor<16x33x16x16xf32>
-// CHECK: %[[UNSET_EMPTY_ACC:.*]] = tensor.empty() : tensor<255x513xf32>
-// CHECK:  tensor.unpack %[[UNSET_COLLAPSE_ACC:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into
-// CHECK-SAME: tensor<16x33x16x16xf32> -> tensor<255x513xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<16x33x4x4x16x1xf32>
+// CHECK:         %[[UNSET_TRANSPOSE:.*]] = linalg.transpose ins(%{{.+}} : tensor<16x33x4x16x4x1xf32>)
+// CHECK-SAME:       outs(%[[UNSET_EMPTY]] : tensor<16x33x4x4x16x1xf32>) permutation = [0, 1, 2, 4, 3, 5]
+// CHECK:         %[[UNSET_COLLAPSE:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE]]
+// CHECK-SAME:      tensor<16x33x4x4x16x1xf32> into tensor<16x33x16x16xf32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xf32>
+// CHECK:         tensor.unpack %[[UNSET_COLLAPSE:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into
+// CHECK-SAME:      tensor<16x33x16x16xf32> -> tensor<255x513xf32>
