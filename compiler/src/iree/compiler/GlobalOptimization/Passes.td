@@ -114,6 +114,16 @@ def PropagateLinalgTransposePass :
   ];
 }
 
+def LinalgQuantizedConvToConvPass
+    : InterfacePass<"iree-global-opt-quantized-conv-to-conv", "mlir::FunctionOpInterface"> {
+  let summary = "lower quantized_conv to conv";
+}
+
+def LinalgQuantizedMatmulToMatmulPass
+    : InterfacePass<"iree-global-opt-quantized-matmul-to-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "lower quantized_matmul to matmul";
+}
+
 def RaiseSpecialOpsPass :
     Pass<"iree-global-opt-raise-special-ops", ""> {
   let summary = "Raises special ops like softmax to the high level linalg.ext representation.";

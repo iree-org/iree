@@ -48,14 +48,10 @@ iree_compiler_cc_library(
         "IREEImportPublic.cpp",
         "ImportMLProgram.cpp",
         "Passes.cpp",
-        "QuantizedConvToConv.cpp",
-        "QuantizedMatmulToMatmul.cpp",
         "SanitizeModuleNames.cpp",
-        "Utils.cpp",
     ],
     hdrs = [
         "Passes.h",
-        "Utils.h",
     ],
     deps = [
         ":PassHeaders",
@@ -96,7 +92,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "Passes.h",
-        "Utils.h",
     ],
     deps = [
         ":PassHeaders",

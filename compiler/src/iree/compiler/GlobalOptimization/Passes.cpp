@@ -91,6 +91,9 @@ void buildGlobalOptimizationPassPipeline(
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
+      .addPass(createLinalgQuantizedConvToConvPass)
+      .addPass(createLinalgQuantizedMatmulToMatmulPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
