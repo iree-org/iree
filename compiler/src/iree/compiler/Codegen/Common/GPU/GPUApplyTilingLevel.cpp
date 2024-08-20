@@ -124,7 +124,7 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
           }
         }
       }
-      tilingOptions.setMapping(mapping);
+      tilingOptions.setMapping(llvm::to_vector(llvm::reverse(mapping)));
     }
 
     scf::SCFTileAndFuseOptions tileAndFuseOptions;

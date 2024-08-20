@@ -23,7 +23,7 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<128x4xf16>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     %10 = scf.forall (%arg2, %arg3) in (2, 32) shared_outs(%arg4 = %7) -> (tensor<4x128xf16>) {
       %12 = affine.apply #map(%arg2)
       %13 = affine.apply #map1(%arg3)
@@ -35,7 +35,7 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<4x128xf16>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     %11 = scf.forall (%arg2, %arg3) in (8, 8) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf32>) {
       %12 = affine.apply #map4(%arg2)
       %13 = affine.apply #map4(%arg3)
@@ -46,7 +46,7 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %14 into %arg4[%12, %13] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     scf.yield %11 : tensor<128x128xf32>
   }
   return %8 : tensor<128x128xf32>
@@ -85,7 +85,7 @@ func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: te
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg5[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<128x4xf16>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_2>]}
+    } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     %11 = scf.forall (%arg2, %arg3) in (8, 8) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf32>) {
       %12 = affine.apply #map3(%arg2)
       %13 = affine.apply #map3(%arg3)
@@ -96,7 +96,7 @@ func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: te
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %14 into %arg4[%12, %13] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     scf.yield %11 : tensor<128x128xf32>
   }
   return %8 : tensor<128x128xf32>
@@ -139,7 +139,7 @@ func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<128x4xf16>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     %10 = scf.forall (%arg2, %arg3) in (2, 32) shared_outs(%arg4 = %7) -> (tensor<4x128xf16>) {
       %12 = affine.apply #map(%arg2)
       %13 = affine.apply #map1(%arg3)
@@ -151,7 +151,7 @@ func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<4x128xf16>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     %11 = scf.forall (%arg2, %arg3) in (8, 8) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf32>) {
       %12 = affine.apply #map4(%arg2)
       %13 = affine.apply #map4(%arg3)
@@ -162,7 +162,7 @@ func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %14 into %arg4[%12, %13] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
       }
-    } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
     scf.yield %11 : tensor<128x128xf32>
   }
   return %8 : tensor<128x128xf32>
@@ -194,11 +194,11 @@ func.func @multi_hoist_and_fuse_trailing_stuff(%2: tensor<128x128xf16>) -> tenso
         scf.forall.in_parallel {
           tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<64x64xf16>
         }
-      } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<64x64xf16> into tensor<128x128xf16>
       }
-    } {mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]}
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
     scf.yield %9 : tensor<128x128xf16>
   }
   %transpose = linalg.transpose ins(%8: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) permutation = [1, 0]
@@ -234,11 +234,11 @@ func.func @multi_hoist_and_fuse_trailing_with_producer_fusion(%2: tensor<128x128
         scf.forall.in_parallel {
           tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<64x64xf16>
         }
-      } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<64x64xf16> into tensor<128x128xf16>
       }
-    } {mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]}
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
     scf.yield %9 : tensor<128x128xf16>
   }
   %transpose_input = linalg.transpose ins(%3: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) permutation = [1, 0]
