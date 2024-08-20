@@ -1700,6 +1700,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.barrier_region (GPU::BarrierRegionOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.multi_mma (GPU::MultiMmaOp)
@@ -1720,15 +1729,6 @@
         
       </ul>
     </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpushuffle_tensor-gpushuffletensorop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.shuffle_tensor (GPU::ShuffleTensorOp)
-    </span>
-  </a>
   
 </li>
         
@@ -1756,7 +1756,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_1" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -4055,6 +4055,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.barrier_region (GPU::BarrierRegionOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpumulti_mma-gpumultimmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.multi_mma (GPU::MultiMmaOp)
@@ -4075,15 +4084,6 @@
         
       </ul>
     </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpushuffle_tensor-gpushuffletensorop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.shuffle_tensor (GPU::ShuffleTensorOp)
-    </span>
-  </a>
   
 </li>
         
@@ -4111,7 +4111,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_1" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -4501,16 +4501,16 @@ SPIR-V/LLVM are handled separately.</p>
 <ul>
 <li><a href="#iree_gpu-dialect">'iree_gpu' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
+<li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
 <li><a href="#iree_gpumulti_mma-gpumultimmaop">iree_gpu.multi_mma (GPU::MultiMmaOp)</a><ul>
 <li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
 </ul>
 </li>
-<li><a href="#iree_gpushuffle_tensor-gpushuffletensorop">iree_gpu.shuffle_tensor (GPU::ShuffleTensorOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_2">Attributes</a><ul>
+<li><a href="#attributes_1">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
 <li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
 <li><a href="#dotproductopsattr">DotProductOpsAttr</a></li>
@@ -4568,6 +4568,98 @@ SPIR-V/LLVM are handled separately.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
+<h3 id="iree_gpubarrier_region-gpubarrierregionop"><code>iree_gpu.barrier_region</code> (GPU::BarrierRegionOp)<a class="headerlink" href="#iree_gpubarrier_region-gpubarrierregionop" title="Permanent link">link</a></h3>
+<p><em>Synchronizes uses of a shared tensor.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.barrier_region` $dest $region attr-dict
+              `:` type($dest) `-&gt;` type($result)
+</code></pre></div>
+<p>This op is designed to represent synchronization of workers on a
+particular shared tensor. This operation naturally arises when combining
+the regions of producer-consumer <code>scf.forall</code> operations that share a
+mapping type.</p>
+<p>For example, consider the following pair of parallel loops.
+<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (2, 32) shared_outs(%init = %empty) -&gt; (tensor&lt;4x128xf32&gt;) {
+    %in = ...
+    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%idy)
+    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%idx)
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %in into %init[%2, %3] [2, 4] [1, 1]
+        : tensor&lt;2x4xf32&gt; into tensor&lt;4x128xf32&gt;
+    }
+  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
+  %1 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;128x128xf32&gt;) {
+    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
+    %extracted_slice = tensor.extract_slice %0[0, %4] [4, 16] [1, 1]
+      : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
+    ...
+  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
+</code></pre></div></p>
+<p>Because these loops share the same worker type and total count, the bodies
+of these two loops can be merged with a barrier an insert_slice and a
+shuffle where the boundary of the loops currently is.</p>
+<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;4x128xf32&gt;) {
+    %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
+    %in = ...
+    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%ids#0)
+    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%ids#1)
+    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
+    %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space&lt;workgroup&gt;}
+      : tensor&lt;4x128xf32&gt;
+    %inserted_slice = tensor.insert_slice %in into %alloc[%2, %3] [2, 4] [1, 1]
+      : tensor&lt;2x4xf32&gt; to tensor&lt;4x128xf32&gt;
+    %slice = iree_gpu.barrier_region %inserted_slice {
+    ^bb0(%shared: tensor&lt;4x128xf32&gt;):
+      %slice = tensor.extract_slice %shared[0, %4] [4, 16] [1, 1] : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
+      iree_gpu.yield %slice : tensor&lt;4x16xf32&gt;
+    } : tensor&lt;4x128xf32&gt; -&gt; tensor&lt;4x16xf32&gt;
+    ...
+  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
+</code></pre></div>
+<p>A barrier_region can be lowered to two barriers, one on the |dest| input
+operand, and a second one on the result. Note that the |dest| operand must
+bufferize with memory space <code>#gpu.address_space&lt;workgroup&gt;</code>.</p>
+<p>Movtivation and Intended Use Cases:</p>
+<p>The primary way this op is generated is when fusing parallel loops with
+tensor results. This operation helps to make lowerings more progressive
+and flexible.
+  - Lowering directly to an alloc + reads and writes breaks the dependency
+    chain making transformations like barrier placement and pipelining
+    potentially more difficult.
+  - Allows the option of non-vector based lowering paths.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>dest</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor or vector of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_gpumulti_mma-gpumultimmaop"><code>iree_gpu.multi_mma</code> (GPU::MultiMmaOp)<a class="headerlink" href="#iree_gpumulti_mma-gpumultimmaop" title="Permanent link">link</a></h3>
 <p><em>Models a contraction of multiple mma operations</em></p>
 <p>Syntax:</p>
@@ -4691,7 +4783,7 @@ implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 <tr><td><code>acc_permutation</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4714,135 +4806,6 @@ implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpushuffle_tensor-gpushuffletensorop"><code>iree_gpu.shuffle_tensor</code> (GPU::ShuffleTensorOp)<a class="headerlink" href="#iree_gpushuffle_tensor-gpushuffletensorop" title="Permanent link">link</a></h3>
-<p><em>Shuffles a private tensor across a shared allocation</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.shuffle_tensor` $source ``
-              custom&lt;DynamicIndexList&gt;($offsets, $static_offsets)
-              custom&lt;DynamicIndexList&gt;($sizes, $static_sizes)
-              custom&lt;DynamicIndexList&gt;($strides, $static_strides)
-              `to` $dest $region attr-dict
-              `:` type($source) `-&gt;` type($dest) `-&gt;` type($result)
-</code></pre></div>
-<p>This op is designed to represent a shuffle of private tensor data
-collectively held across a set of workers. This operation naturally arises
-when combining the regions of producer-consumer <code>scf.forall</code> operations
-that share a mapping type and worker count.</p>
-<p>For example, consider the following pair of parallel loops.
-<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (2, 32) shared_outs(%init = %empty) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %in = ...
-    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%idy)
-    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%idx)
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %in into %init[%2, %3] [2, 4] [1, 1]
-        : tensor&lt;2x4xf32&gt; into tensor&lt;4x128xf32&gt;
-    }
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-  %1 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;128x128xf32&gt;) {
-    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
-    %extracted_slice = tensor.extract_slice %0[0, %4] [4, 16] [1, 1]
-      : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
-    ...
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-</code></pre></div></p>
-<p>Because these loops share the same worker type and total count, the bodies
-of these two loops can be merged with a barrier and a shuffle where the
-boundary of the loops currently is.</p>
-<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
-    %in = ...
-    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%ids#0)
-    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%ids#1)
-    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
-    %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %empty {
-    ^bb0(%intermediate: tensor&lt;4x128xf32&gt;):
-      %slice = tensor.extract_slice %intermediate[0, %4] [4, 16] [1, 1] : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
-      iree_gpu.yield %slice : tensor&lt;4x16xf32&gt;
-    } : tensor&lt;2x4xf32&gt; -&gt; tensor&lt;4x128xf32&gt; -&gt; tensor&lt;4x16xf32&gt;
-    ...
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-</code></pre></div>
-<p>A shuffle can be lowered to a shared allocation with a write of the source
-slice, a barrier, inlining the body of the shuffle op (the read), and then
-a barrier to synchronize all workers on the result of the read. Note that
-it is undefined behavior if there are any conflicting writes to the
-intermediate. Also to execute the barrier, any lowerings of the enclosing
-<code>scf.forall</code> to serial loops is invalid. In other words, the lowerings must
-provide the number of workers requested by the loop.</p>
-<p>This op takes an input |source| tensor to represent the slice held by this
-worker before the shuffle, an intermediate tensor |dest| that all workers
-insert into, and performs a synchronized read from that intermediate
-tensor.</p>
-<p>It is undefined behavior if the source tensor is out of bounds of the
-intermediate allocation.</p>
-<p>Movtivation and Intended Use Cases:</p>
-<p>The primary way this op is generated is when fusing parallel loops with
-tensor results. This operation helps to make lowerings more progressive
-and flexible.
-  - Rather than lowering straight to vector ops for the reads/writes
-    for the shuffle, this allows separating out the vectorization of the
-    shared memory accesses from earlier tiling steps.
-  - Lowering directly to an alloc + reads and writes breaks the dependency
-    chain making transformations like barrier placement and pipelining
-    potentially more difficult.
-  - Allows the option of non-vector based lowering paths.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>static_offsets</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_sizes</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-<tr><td><code>static_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-</table>
-
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>offsets</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>sizes</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>strides</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>dest</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
 <h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4859,7 +4822,7 @@ and flexible.
 </tbody>
 </table>
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
-<p><em>Shuffles a private tensor across a shared allocation</em></p>
+<p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.value_barrier` $inputs attr-dict `:` type($inputs)
 </code></pre></div>
@@ -4911,7 +4874,7 @@ produces.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` $value attr-dict `:` type($value)
 </code></pre></div>
 <p>This operation is used to yield a single value from a within a region.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::ShuffleTensorOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
@@ -4929,7 +4892,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_2">Attributes<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h2>
+<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
 <h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
 <p>Supported bitwidths for compute</p>
 <p>Syntax:</p>
