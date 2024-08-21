@@ -100,7 +100,9 @@ private:
   /// should only be used when you know there will be no layout conflicts.
   /// Otherwise, the resolve-like functions should be used.
   void setInnerLayout(const VectorLayoutInterface &layout) {
-    assert(layout && layout.isValidLayout(getValue()).succeeded());
+    assert(layout &&
+           layout.isValidLayout(getValue().getType(), getValue().getLoc())
+               .succeeded());
     vectorLayout = layout;
   }
 

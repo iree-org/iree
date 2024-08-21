@@ -50,8 +50,11 @@ EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_beg
 EXPORT_FN("command_buffer.collective", iree_hal_module_command_buffer_collective, rriiiirrIIIII, v)
 EXPORT_FN("command_buffer.copy_buffer", iree_hal_module_command_buffer_copy_buffer, riirIrII, v)
 EXPORT_FN("command_buffer.create", iree_hal_module_command_buffer_create, riiIi, r)
+// TODO(#18154): replace base dispatch with new `2` versions.
 EXPORT_FN("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rriiiiI, v)
 EXPORT_FN("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dispatch_indirect, rriirII, v)
+EXPORT_FN_CUSTOM("command_buffer.dispatch2", iree_hal_module_command_buffer_dispatch2, rriiiiICiDCiirIID, v)
+EXPORT_FN_CUSTOM("command_buffer.dispatch2.indirect", iree_hal_module_command_buffer_dispatch2_indirect, rriirIICiDCiirIID, v)
 EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_debug_group, r, v)
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riii, v)
 EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rrIIiii, v)
@@ -77,7 +80,9 @@ EXPORT_FN("devices.get", iree_hal_module_devices_get, i, r)
 
 EXPORT_FN("ex.file.from_memory", iree_hal_module_ex_file_from_memory, rIirIIi, r)
 
+// TODO(#18154): replace base executable create with new `2` versions.
 EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)
+EXPORT_FN("executable.create2", iree_hal_module_executable_create2, rrrr, r)
 
 EXPORT_FN("fence.await", iree_hal_module_fence_await, iCrD, i)
 EXPORT_FN("fence.create", iree_hal_module_fence_create, ri, r)

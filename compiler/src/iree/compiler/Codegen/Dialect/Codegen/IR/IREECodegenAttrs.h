@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -112,6 +113,24 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 void setLoweringConfig(Operation *op, Attribute config);
 
 /// Convenience function that sets the lowering configuration on the operation
+/// and translation info for a generic lowering config, lowering pipeline,
+/// and optional workgroup/subgroup size.
+inline LogicalResult setOpConfigAndEntryPointFnTranslation(
+    mlir::FunctionOpInterface entryPointFn, Operation *op,
+    IREE::Codegen::LoweringConfigAttrInterface config,
+    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workgroupSize = {},
+    std::optional<int64_t> subgroupSize = {},
+    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+  MLIRContext *context = entryPointFn.getContext();
+  setLoweringConfig(op, config);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      context, passPipeline, SymbolRefAttr(), workgroupSize, subgroupSize,
+      pipelineConfig);
+  return setTranslationInfo(entryPointFn, translationInfo);
+}
+
+/// Convenience function that sets the lowering configuration on the operation
 /// and translation info on the entry point op for the common case of specifying
 /// tile sizes to use for the operation, and pass pipeline to use for the
 /// translation.
@@ -126,11 +145,9 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
-  setLoweringConfig(op, config);
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, SymbolRefAttr(), workgroupSize,
-      subgroupSize, pipelineConfig);
-  return setTranslationInfo(entryPointFn, translationInfo);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
+                                               passPipeline, workgroupSize,
+                                               subgroupSize, pipelineConfig);
 }
 
 /// Overload of setOpConfigAndEntryPointFnTranslation() for the "no scalable

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -14,6 +13,9 @@
 static const char kAttributeName[] = "__test_interface__";
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TESTPARTITIONABLELOOPSINTERFACEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -45,8 +47,8 @@ struct TestPartitionableLoopsInterfacePattern
   }
 };
 
-struct TestPartitionableLoopsInterfacePass
-    : public TestPartitionableLoopsInterfaceBase<
+struct TestPartitionableLoopsInterfacePass final
+    : impl::TestPartitionableLoopsInterfacePassBase<
           TestPartitionableLoopsInterfacePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
@@ -63,10 +65,4 @@ struct TestPartitionableLoopsInterfacePass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>>
-createTestPartitionableLoopsInterfacePass() {
-  return std::make_unique<TestPartitionableLoopsInterfacePass>();
-}
-
 } // namespace mlir::iree_compiler

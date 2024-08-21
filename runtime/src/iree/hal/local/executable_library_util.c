@@ -39,6 +39,30 @@ iree_status_t iree_hal_executable_library_verify(
                             executable_params->constant_count);
   }
 
+  // If dispatch attributes are present validate they are in range.
+  if (library->exports.attrs) {
+    for (uint32_t i = 0; i < library->exports.count; ++i) {
+      const iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
+          library->exports.attrs[i];
+      if (dispatch_attrs.constant_count >
+          IREE_HAL_EXECUTABLE_MAX_CONSTANT_COUNT) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "dispatch requiring %u constants exceeds limit of %d",
+            dispatch_attrs.constant_count,
+            IREE_HAL_EXECUTABLE_MAX_CONSTANT_COUNT);
+      }
+      if (dispatch_attrs.binding_count >
+          IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "dispatch requiring %u bindings exceeds limit of %d",
+            dispatch_attrs.binding_count,
+            IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT);
+      }
+    }
+  }
+
   return iree_ok_status();
 }
 

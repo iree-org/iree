@@ -6,7 +6,7 @@ module @static_1d_mesh_grouping_along_axis_0 {
   // CHECK-NOT: util.global private @_mesh_mesh_1d_axes_0
   mesh.mesh @mesh_1d(shape = 2)
   util.func public @f(%arg0: tensor<1xi8>) -> tensor<1xi8> {
-    %0 = mesh.all_reduce %arg0 on @mesh_1d mesh_axes = [0] reduction = <sum> : tensor<1xi8> -> tensor<1xi8>
+    %0 = mesh.all_reduce %arg0 on @mesh_1d mesh_axes = [0] reduction = sum : tensor<1xi8> -> tensor<1xi8>
     util.return %0 : tensor<1xi8>
   }
 }

@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
@@ -19,6 +18,9 @@
 using llvm::SmallPtrSet;
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_INFERNUMERICNARROWINGPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -47,7 +49,7 @@ IntegerType deriveIntegerTypeFromRange(MLIRContext *context, int64_t minValue,
 }
 
 class InferNumericNarrowingPass
-    : public InferNumericNarrowingBase<InferNumericNarrowingPass> {
+    : public impl::InferNumericNarrowingPassBase<InferNumericNarrowingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -128,9 +130,4 @@ class InferNumericNarrowingPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createInferNumericNarrowingPass() {
-  return std::make_unique<InferNumericNarrowingPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

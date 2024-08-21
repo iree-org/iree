@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -50,7 +49,6 @@ iree_cc_library(
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "FuseDequantizationMatmul.cpp"
-    "FuseHorizontalContractions.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
@@ -59,6 +57,8 @@ iree_cc_library(
     "OptimizeNumerics.cpp"
     "Passes.cpp"
     "PropagateLinalgTranspose.cpp"
+    "QuantizedConvToConv.cpp"
+    "QuantizedMatmulToMatmul.cpp"
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"

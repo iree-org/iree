@@ -15,10 +15,12 @@ iree_cc_library(
     Analysis
   HDRS
     "BindingLayout.h"
+    "Captures.h"
     "DeviceAnalysis.h"
     "DeviceSet.h"
   SRCS
     "BindingLayout.cpp"
+    "Captures.cpp"
     "DeviceAnalysis.cpp"
     "DeviceSet.cpp"
   DEPS

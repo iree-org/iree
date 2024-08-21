@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_CONVERTCONV2DTOIM2COLOPPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
@@ -36,6 +38,8 @@ static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
 }
 
 namespace {
+
+using ControlFnTy = std::optional<std::function<bool(Operation *)>>;
 
 // Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
 // and linalg.matmul.
@@ -75,8 +79,16 @@ class ConvertConv2DNhwcHwcf final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  ConvertConv2DNhwcHwcf(MLIRContext *context, ControlFnTy controlFn)
+      : OpRewritePattern<linalg::Conv2DNhwcHwcfOp>(context),
+        controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(convOp)) {
+      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
+    }
+
     auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
     auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
@@ -181,6 +193,9 @@ public:
 
     return success();
   }
+
+private:
+  ControlFnTy controlFn;
 };
 
 // For nchw, because the channels are to the left of the image shape dimensions,
@@ -192,8 +207,16 @@ class ConvertConv2DNchwFchw final
 public:
   using OpRewritePattern::OpRewritePattern;
 
+  ConvertConv2DNchwFchw(MLIRContext *context, ControlFnTy controlFn)
+      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context),
+        controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn.has_value() && !controlFn.value()(convOp)) {
+      return rewriter.notifyMatchFailure(convOp, "controlFn failed.");
+    }
+
     auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
     auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
@@ -296,18 +319,19 @@ public:
 
     return success();
   }
+
+private:
+  ControlFnTy controlFn;
 };
 
-struct ConvertConv2DToIm2ColOpPass
-    : ConvertConv2DToIm2ColOpBase<ConvertConv2DToIm2ColOpPass> {
+struct ConvertConv2DToIm2ColOpPass final
+    : impl::ConvertConv2DToIm2ColOpPassBase<ConvertConv2DToIm2ColOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<tensor::TensorDialect, IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
   void runOnOperation() override {
-    MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(context);
+    populateConv2DToIm2colOpPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -317,9 +341,10 @@ struct ConvertConv2DToIm2ColOpPass
 
 } // namespace
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertConv2DToIm2ColOpPass() {
-  return std::make_unique<ConvertConv2DToIm2ColOpPass>();
+void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
+                                      ControlFnTy controlFn) {
+  patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(
+      patterns.getContext(), std::move(controlFn));
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

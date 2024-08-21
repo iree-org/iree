@@ -9,7 +9,7 @@ func.func @drop_multi_mma_unit_dims(%lhs: vector<1x1x4xf16>, %rhs: vector<1x1x4x
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<1x1x4xf16>, vector<1x1x4xf16> into vector<1x1x4xf32>
   return %0 : vector<1x1x4xf32>
 }
@@ -35,7 +35,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[ACC_EXT:.+]] = vector.extract %[[ACC]][0, 0] : vector<4xf32> from vector<1x1x4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_EXT]], %[[RHS_EXT]], %[[ACC_EXT]]
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   vector.broadcast %[[MMA]] : vector<4xf32> to vector<1x1x4xf32>
 
 // -----
@@ -49,7 +49,7 @@ func.func @drop_multi_mma_unit_dims_no_kn(%lhs: vector<1x4xf16>, %rhs: vector<4x
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<1x4xf16>, vector<4xf16> into vector<1x4xf32>
   return %0 : vector<1x4xf32>
 }
@@ -74,5 +74,5 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[ACC_EXT:.+]] = vector.extract %[[ACC]][0] : vector<4xf32> from vector<1x4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_EXT]], %[[RHS]], %[[ACC_EXT]]
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = []
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   vector.broadcast %[[MMA]] : vector<4xf32> to vector<1x4xf32>

@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,10 +24,14 @@
 
 namespace mlir::iree_compiler::InputConversion {
 
+#define GEN_PASS_DEF_IREEIMPORTPUBLICPASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+
 namespace {
 
-struct IREEImportPublicPass
-    : public IREEImportPublicBase<IREEImportPublicPass> {
+class IREEImportPublicPass final
+    : public impl::IREEImportPublicPassBase<IREEImportPublicPass> {
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Input::IREEInputDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, IREE::Util::UtilDialect,
@@ -78,17 +81,16 @@ convertDescriptorType(IREE::Input::DescriptorType src) {
   }
 }
 
-static std::optional<IREE::HAL::DescriptorFlags>
+static IREE::HAL::DescriptorFlags
 convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
   if (!src.has_value())
-    return std::nullopt;
+    return IREE::HAL::DescriptorFlags::None;
   switch (*src) {
+  default:
   case IREE::Input::DescriptorFlags::None:
     return IREE::HAL::DescriptorFlags::None;
   case IREE::Input::DescriptorFlags::ReadOnly:
     return IREE::HAL::DescriptorFlags::ReadOnly;
-  default:
-    return std::nullopt;
   }
 }
 
@@ -596,10 +598,6 @@ void IREEImportPublicPass::runOnOperation() {
 
   if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass() {
-  return std::make_unique<IREEImportPublicPass>();
 }
 
 } // namespace mlir::iree_compiler::InputConversion

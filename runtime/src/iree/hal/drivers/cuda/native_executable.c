@@ -224,15 +224,32 @@ iree_status_t iree_hal_cuda_native_executable_create(
       }
       if (!iree_status_is_ok(status)) break;
 
+      // TODO(#18189): embed all of this on a single flatbuffer table
+      // per-export.
+      //
       // Package required parameters for kernel launches for each entry point.
       iree_hal_cuda_kernel_info_t* info = &executable->entry_points[i];
       info->layout = executable_params->pipeline_layouts[i];
       iree_hal_pipeline_layout_retain(info->layout);
       info->function = function;
+      info->constant_count =
+          iree_hal_cuda_pipeline_layout_push_constant_count(info->layout);
+      info->binding_count =
+          iree_hal_cuda_pipeline_layout_total_binding_count(info->layout);
       info->block_size[0] = block_sizes_vec[i].x;
       info->block_size[1] = block_sizes_vec[i].y;
       info->block_size[2] = block_sizes_vec[i].z;
       info->shared_memory_size = shared_memory_sizes[i];
+
+      if (info->binding_count >
+          IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+        status = iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "exceeded available binding slots; requested %u of maximum %d",
+            info->binding_count,
+            IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+      }
+      if (!iree_status_is_ok(status)) break;
 
       // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({

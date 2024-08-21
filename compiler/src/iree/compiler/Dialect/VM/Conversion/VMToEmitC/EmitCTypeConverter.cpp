@@ -64,7 +64,7 @@ Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) const {
   return convertedType;
 }
 
-Type EmitCTypeConverter::convertTypeAsPointer(Type type) const {
+emitc::PointerType EmitCTypeConverter::convertTypeAsPointer(Type type) const {
   return emitc::PointerType::get(convertTypeAsNonPointer(type));
 }
 

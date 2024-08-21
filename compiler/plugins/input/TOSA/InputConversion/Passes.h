@@ -29,26 +29,12 @@ void registerTOSAConversionPassPipeline();
 // Set of patterns for materializing TOSA operations to linalg_ext.
 void populateTosaToLinalgExtPatterns(RewritePatternSet *patterns);
 
-// Converts i48 to i64.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConverti48Toi64();
-
-// Strips the signed/unsigned portion off of tensors.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createStripSignednessPass();
-
-// Converts TOSA operations to linalg_ext.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTosaToLinalgExt();
-
-// Verifies that a module only contains IR structures that are supported by the
-// core compiler.
-std::unique_ptr<OperationPass<ModuleOp>>
-createVerifyCompilerTOSAInputLegality();
-
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc" // IWYU pragma: export
 
 void registerTOSAConversionPasses();
 

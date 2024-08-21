@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -22,6 +21,9 @@
 #define DEBUG_TYPE "iree-spirv-map-memref-storage-class"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVMAPMEMREFSTORAGECLASSPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -90,7 +92,7 @@ bool allowsKernelCapability(ArrayRef<StringRef> features) {
 }
 
 struct SPIRVMapMemRefStorageClassPass final
-    : public SPIRVMapMemRefStorageClassBase<SPIRVMapMemRefStorageClassPass> {
+    : impl::SPIRVMapMemRefStorageClassPassBase<SPIRVMapMemRefStorageClassPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
@@ -99,10 +101,7 @@ struct SPIRVMapMemRefStorageClassPass final
     MLIRContext *context = &getContext();
     Operation *op = getOperation();
 
-    bool useIndirectBindings = false;
-    if (UnitAttr indirectBindingsAttr = getIndirectBindingsAttr(op)) {
-      useIndirectBindings = true;
-    };
+    bool useIndirectBindings = usesIndirectBindingsAttr(op);
 
     spirv::MemorySpaceToStorageClassMap memorySpaceMap;
 
@@ -141,10 +140,4 @@ struct SPIRVMapMemRefStorageClassPass final
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVMapMemRefStorageClassPass() {
-  return std::make_unique<SPIRVMapMemRefStorageClassPass>();
-}
-
 } // namespace mlir::iree_compiler

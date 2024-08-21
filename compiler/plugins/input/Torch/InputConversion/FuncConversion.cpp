@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -24,6 +23,9 @@ namespace Torch = mlir::torch::Torch;
 namespace TorchConversion = mlir::torch::TorchConversion;
 
 namespace mlir::iree_compiler::TorchInput {
+
+#define GEN_PASS_DEF_FUNCCONVERSIONPASS
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 namespace {
 
@@ -545,7 +547,9 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
 
 } // namespace
 
-struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
+class FuncConversionPass final
+    : public impl::FuncConversionPassBase<FuncConversionPass> {
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::HAL::HALDialect>();
@@ -757,9 +761,5 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
     return emitError(loc) << "unhandled torch type: " << torchType;
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createFuncConversionPass() {
-  return std::make_unique<FuncConversionPass>();
-}
 
 } // namespace mlir::iree_compiler::TorchInput

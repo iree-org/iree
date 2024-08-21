@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -36,6 +35,9 @@ constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVVECTORIZELOADSTOREPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -647,8 +649,8 @@ public:
                                          "cannot get vectorized memref type");
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, *vecMemRef, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), subspanOp.getByteOffset(),
+        subspanOp, *vecMemRef, subspanOp.getLayout(), subspanOp.getSet(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
     return success();
@@ -1019,7 +1021,8 @@ struct ReifyExtractOfCreateMask final
 //===----------------------------------------------------------------------===//
 
 class SPIRVVectorizeLoadStorePass final
-    : public SPIRVVectorizeLoadStoreBase<SPIRVVectorizeLoadStorePass> {
+    : public impl::SPIRVVectorizeLoadStorePassBase<
+          SPIRVVectorizeLoadStorePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, memref::MemRefDialect>();
   }
@@ -1101,11 +1104,6 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
           applyPatternsAndFoldGreedily(funcOp, std::move(rewritingPatterns)))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createSPIRVVectorizeLoadStore() {
-  return std::make_unique<SPIRVVectorizeLoadStorePass>();
 }
 
 } // namespace mlir::iree_compiler

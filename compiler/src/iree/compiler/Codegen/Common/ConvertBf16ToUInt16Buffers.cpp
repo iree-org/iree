@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -24,6 +23,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -34,9 +34,12 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-spirv-emulate-bf16"
+#define DEBUG_TYPE "iree-codegen-convert-bf16-to-uint16-buffers"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTBF16TOUINT16BUFFERSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -89,8 +92,8 @@ struct ConvertHalInterfaceBindingSubspan final
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-            op, newResultTy, adaptor.getSet(), adaptor.getBinding(),
-            adaptor.getDescriptorType(), adaptor.getByteOffset(),
+            op, newResultTy, adaptor.getLayout(), adaptor.getSet(),
+            adaptor.getBinding(), adaptor.getByteOffset(),
             adaptor.getDynamicDims(), adaptor.getAlignmentAttr(),
             adaptor.getDescriptorFlagsAttr());
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
@@ -249,7 +252,7 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
 //===----------------------------------------------------------------------===//
 
 struct ConvertBf16ToUInt16BuffersPass final
-    : public ConvertBf16ToUInt16BuffersBase<ConvertBf16ToUInt16BuffersPass> {
+    : impl::ConvertBf16ToUInt16BuffersPassBase<ConvertBf16ToUInt16BuffersPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -288,19 +291,19 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::BroadcastOp, vector::ShuffleOp, vector::ExtractElementOp,
           vector::ExtractOp, vector::InsertElementOp, vector::InsertOp,
           vector::ScalableInsertOp, vector::ScalableExtractOp,
-          vector::InsertStridedSliceOp, vector::ReshapeOp,
-          vector::ExtractStridedSliceOp, vector::TransferReadOp,
-          vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
-          vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
-          vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
-          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
-          vector::MaskOp, vector::TransposeOp, vector::FlatTransposeOp,
-          vector::SplatOp, vector::YieldOp>([&typeConverter](Operation *op) {
-        bool legal = typeConverter.isLegal(op);
-        LLVM_DEBUG(if (!legal) llvm::dbgs()
-                   << "Bf16Emulation: illegal op: " << *op << "\n");
-        return legal;
-      });
+          vector::InsertStridedSliceOp, vector::ExtractStridedSliceOp,
+          vector::TransferReadOp, vector::TransferWriteOp, vector::LoadOp,
+          vector::StoreOp, vector::MaskedLoadOp, vector::MaskedStoreOp,
+          vector::GatherOp, vector::ScatterOp, vector::ExpandLoadOp,
+          vector::CompressStoreOp, vector::ShapeCastOp, vector::ConstantMaskOp,
+          vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
+          vector::FlatTransposeOp, vector::SplatOp, vector::YieldOp>(
+          [&typeConverter](Operation *op) {
+            bool legal = typeConverter.isLegal(op);
+            LLVM_DEBUG(if (!legal) llvm::dbgs()
+                       << "Bf16Emulation: illegal op: " << *op << "\n");
+            return legal;
+          });
 
       RewritePatternSet patterns(ctx);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);
@@ -312,13 +315,4 @@ struct ConvertBf16ToUInt16BuffersPass final
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-// Public interface
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<OperationPass<>> createConvertBf16ToUInt16BuffersPass() {
-  return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
-}
-
 } // namespace mlir::iree_compiler

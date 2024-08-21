@@ -5,8 +5,8 @@
 // TODO: Figure out how to parameterize the tile sizes without duplicating
 // the attention function.
 
-#layout_16 = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
-#layout = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
+#layout_16 = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+#layout = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 
 module attributes { transform.with_named_sequence } {
 //===----------------------------------------------------------------------===//
@@ -521,7 +521,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [128, 1, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 1, subgroup_n_count = 2>
          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -539,7 +539,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 2, subgroup_n_count = 1>
          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -557,7 +557,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 2, subgroup_n_count = 1>
          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -575,7 +575,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 2, subgroup_n_count = 1>
          }>
       > -> !transform.any_param
@@ -593,7 +593,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [128, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 2, subgroup_n_count = 2>
          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -611,7 +611,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 4, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-           intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+           intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
            subgroup_m_count = 4, subgroup_n_count = 1>
          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -635,7 +635,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [320, 1, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>
            , reorder_workgroups = "transpose"}>
       > -> !transform.any_param
@@ -655,7 +655,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [256, 1, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
               subgroup_m_count = 1, subgroup_n_count = 4>
            , reorder_workgroups = "transpose", llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -675,7 +675,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [320, 1, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>
            , reorder_workgroups = "transpose"}>
       > -> !transform.any_param
@@ -695,7 +695,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [320, 1, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>
            , reorder_workgroups = "transpose"}>
       > -> !transform.any_param
@@ -715,7 +715,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [128, 4, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 4, subgroup_n_count = 2>
            , reorder_workgroups = "transpose", llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -735,7 +735,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
          workgroup_size = [320, 1, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>
            , reorder_workgroups = "transpose"}>
       > -> !transform.any_param
@@ -759,7 +759,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [64, 4, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 4, subgroup_n_count = 1>
           , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -779,7 +779,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [64, 4, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 4, subgroup_n_count = 1>
           }>
       > -> !transform.any_param
@@ -799,7 +799,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [64, 4, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
               subgroup_m_count = 4, subgroup_n_count = 1>
            , llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>
       > -> !transform.any_param
@@ -819,7 +819,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [128, 2, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 2, subgroup_n_count = 2>
            , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -839,7 +839,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [128, 2, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 2, subgroup_n_count = 2>
           }>
       > -> !transform.any_param
@@ -859,7 +859,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [128, 2, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
               subgroup_m_count = 2, subgroup_n_count = 2>
           }>
       > -> !transform.any_param
@@ -879,7 +879,7 @@ module attributes { transform.with_named_sequence } {
         translation_info = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
          workgroup_size = [128, 2, 1] subgroup_size = 64,
           {mma_schedule = #iree_gpu.mma_schedule<
-              intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+              intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
               subgroup_m_count = 2, subgroup_n_count = 2>
           , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -914,7 +914,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 4, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-          intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+          intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
           subgroup_m_count = 4, subgroup_n_count = 1>
         , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -945,7 +945,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 4, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-          intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+          intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
           subgroup_m_count = 4, subgroup_n_count = 1>
         , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
@@ -976,7 +976,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [128, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-          intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+          intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
           subgroup_m_count = 2, subgroup_n_count = 2>
         }>
       > -> !transform.any_param
@@ -1007,7 +1007,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [128, 2, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-          intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+          intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
           subgroup_m_count = 2, subgroup_n_count = 2>
         }>
       > -> !transform.any_param
@@ -1038,7 +1038,7 @@ module attributes { transform.with_named_sequence } {
       translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute
         workgroup_size = [64, 4, 1] subgroup_size = 64,
         {mma_schedule = #iree_gpu.mma_schedule<
-          intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+          intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
           subgroup_m_count = 4, subgroup_n_count = 1>
         }>
       > -> !transform.any_param

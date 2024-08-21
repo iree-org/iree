@@ -621,6 +621,5 @@ setup(
     },
     install_requires=[
         "numpy",
-        "PyYAML",
     ],
 )

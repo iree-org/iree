@@ -14,15 +14,8 @@ Projects built by community members:
   [iree-turbine](https://github.com/iree-org/iree-turbine) and
   [sharktank](https://github.com/nod-ai/sharktank).
 
-* The [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
-  shows how to build IREE with the
-  [Arm GNU Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain)
-  for bare-metal Arm targets using the open-source firmware libraries
-  [CMSIS](https://github.com/ARM-software/CMSIS_5) and
-  [libopencm3](https://github.com/libopencm3/libopencm3).
-
-* The [IREE C++ Template](https://github.com/iml130/iree-template-cpp)
-  shows one way to integrate IREE's runtime into a project with CMake.
+* The [IREE C++ Template](https://github.com/iml130/iree-template-cpp) *(archived)*
+  showed one way to integrate IREE's runtime into a project with CMake.
 
 Official repositories:
 
@@ -38,3 +31,10 @@ Official repositories:
 * [iree-llvm-sandbox](https://github.com/iree-org/iree-llvm-sandbox)
   contains experimental work by the IREE team closely related to LLVM and
   MLIR, usually with the aim of contributing back to those upstream projects.
+
+* [iree-org/iree-bare-metal-arm](https://github.com/iree-org/iree-bare-metal-arm)
+  contains a various samples that demonstrate how to build IREE with the
+  [Arm GNU Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain)
+  for bare-metal Arm targets using the open-source firmware libraries
+  [CMSIS](https://github.com/ARM-software/CMSIS_5) and
+  [libopencm3](https://github.com/libopencm3/libopencm3).

@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -34,6 +33,9 @@
 #define DEBUG_TYPE "iree-codegen-fold-affinemin-in-distributed-loops"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_FOLDAFFINEMININDISTRIBUTEDLOOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 #ifndef NDEBUG
 inline raw_ostream &operator<<(raw_ostream &os,
@@ -154,7 +156,7 @@ private:
 };
 
 struct FoldAffineMinInDistributedLoopsPass final
-    : public FoldAffineMinInDistributedLoopsBase<
+    : impl::FoldAffineMinInDistributedLoopsPassBase<
           FoldAffineMinInDistributedLoopsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
@@ -181,10 +183,4 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
                                                 numWorkgroups);
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFoldAffineMinInDistributedLoopsPass() {
-  return std::make_unique<FoldAffineMinInDistributedLoopsPass>();
-}
-
 } // namespace mlir::iree_compiler

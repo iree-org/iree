@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
@@ -12,15 +11,19 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-cast-address-space-function"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPUCASTADDRESSSPACEFUNCTIONPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 
-struct LLVMGPUCastAddressSpaceFunctionPass
-    : public LLVMGPUCastAddressSpaceFunctionBase<
+struct LLVMGPUCastAddressSpaceFunctionPass final
+    : impl::LLVMGPUCastAddressSpaceFunctionPassBase<
           LLVMGPUCastAddressSpaceFunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect>();
@@ -75,10 +78,4 @@ struct LLVMGPUCastAddressSpaceFunctionPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUCastAddressSpaceFunction() {
-  return std::make_unique<LLVMGPUCastAddressSpaceFunctionPass>();
-}
-
 } // namespace mlir::iree_compiler

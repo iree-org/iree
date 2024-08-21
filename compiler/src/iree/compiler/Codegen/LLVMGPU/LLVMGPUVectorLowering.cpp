@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -16,13 +16,16 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPUVECTORLOWERINGPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 //====---------------------------------------------------------------------===//
 // Patterns for late vector op lowering.
 //====---------------------------------------------------------------------===//
 
 namespace {
-struct LLVMGPUVectorLoweringPass
-    : public LLVMGPUVectorLoweringBase<LLVMGPUVectorLoweringPass> {
+struct LLVMGPUVectorLoweringPass final
+    : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect>();
     registry.insert<memref::MemRefDialect>();
@@ -70,10 +73,4 @@ struct LLVMGPUVectorLoweringPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUVectorLoweringPass() {
-  return std::make_unique<LLVMGPUVectorLoweringPass>();
-}
-
 } // namespace mlir::iree_compiler

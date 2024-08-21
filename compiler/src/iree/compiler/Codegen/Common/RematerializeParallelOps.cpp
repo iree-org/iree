@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -13,6 +12,9 @@
 #define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_REMATERIALIZEPARALLELOPSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -61,8 +63,8 @@ struct RematerializeParallelOpsPattern
   }
 };
 
-struct RematerializeParallelOpsPass
-    : public RematerializeParallelOpsBase<RematerializeParallelOpsPass> {
+struct RematerializeParallelOpsPass final
+    : impl::RematerializeParallelOpsPassBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
@@ -76,10 +78,4 @@ struct RematerializeParallelOpsPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createRematerializeParallelOpsPass() {
-  return std::make_unique<RematerializeParallelOpsPass>();
-}
-
 } // namespace mlir::iree_compiler

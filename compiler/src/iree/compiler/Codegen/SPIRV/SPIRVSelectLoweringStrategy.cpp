@@ -8,13 +8,13 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -24,6 +24,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVSELECTLOWERINGSTRATEGYPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 namespace {
@@ -31,12 +34,12 @@ namespace {
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code,
 /// - then convert to SPIRV dialect.
-class SPIRVSelectLoweringStrategyPass
-    : public SPIRVSelectLoweringStrategyBase<SPIRVSelectLoweringStrategyPass> {
+class SPIRVSelectLoweringStrategyPass final
+    : public impl::SPIRVSelectLoweringStrategyPassBase<
+          SPIRVSelectLoweringStrategyPass> {
 public:
-  SPIRVSelectLoweringStrategyPass() = default;
-  SPIRVSelectLoweringStrategyPass(const SPIRVSelectLoweringStrategyPass &pass) {
-  }
+  using impl::SPIRVSelectLoweringStrategyPassBase<
+      SPIRVSelectLoweringStrategyPass>::SPIRVSelectLoweringStrategyPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
@@ -118,11 +121,6 @@ void SPIRVSelectLoweringStrategyPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createSPIRVSelectLoweringStrategyPass() {
-  return std::make_unique<SPIRVSelectLoweringStrategyPass>();
 }
 
 } // namespace mlir::iree_compiler

@@ -297,8 +297,7 @@ static void propagateLayoutToReduceBroadcastTranspose(
   if (!layoutMap.count(reductionSrc))
     return;
   // Get the reduction dims
-  auto reductionDims =
-      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  ArrayRef<int64_t> reductionDims = reductionOp.getReductionDims();
   // Get the transpose permutation
   ArrayRef<int64_t> perm = transposeOp.getPermutation();
   // Don't support dim-1 broadcasted dims
@@ -325,8 +324,7 @@ static void propagateLayoutToReduceBroadcastTranspose(
     return;
   // Check that transpose(reductionDim) == broadcastDim
   // and that the shapes match
-  for (IntegerAttr dimAttr : reductionDims) {
-    int64_t dim = dimAttr.getInt();
+  for (int64_t dim : reductionDims) {
     int64_t transposedDim = perm[dim];
     if (!broadcastedDims.contains(transposedDim))
       return;
@@ -816,13 +814,12 @@ static void distributeReductionBroadcastTranspose(
     return;
   Location loc = reductionOp.getLoc();
   Layout layout = layoutMap.at(source);
-  auto reductionDims =
-      llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  ArrayRef<int64_t> reductionDims = reductionOp.getReductionDims();
   vector::CombiningKind combiningKind = reductionOp.getKind();
   // Only support reduction on one dimension
   if (reductionDims.size() > 1)
     return;
-  int reductionDim = reductionDims[0].getInt();
+  int reductionDim = reductionDims[0];
   std::array<int, 4> reductionOrder = layout.order[reductionDim];
   std::array<int, 4> parallelOrder = layout.order[!reductionDim];
   Value acc = reductionOp.getAcc();

@@ -7,6 +7,5 @@ requires = [
     "ninja",
     "numpy>=2.0.0b1",
     "packaging",
-    "PyYAML",
 ]
 build-backend = "setuptools.build_meta"

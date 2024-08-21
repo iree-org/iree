@@ -38,21 +38,11 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager);
 void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager);
 
 //===----------------------------------------------------------------------===//
-// Dialect conversion
-//===----------------------------------------------------------------------===//
-
-// Converts from various dialects (HAL, standard, etc) to the VMVX dialect.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
-
-// Materializes executable constant global values.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeConstantsPass();
-
-// Resolves any outstanding get_buffer_descriptor ops.
-std::unique_ptr<OperationPass<>> createResolveBufferDescriptorsPass();
-
-//===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
 
 void registerVMVXPasses();
 

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 
+#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -61,8 +62,7 @@ assumeExportLayout(IREE::HAL::PipelineLayoutAttr layoutAttr) {
       DescriptorSetLayoutBinding setBinding;
       setBinding.ordinal = bindingAttr.getOrdinal();
       setBinding.type = bindingAttr.getType();
-      setBinding.flags =
-          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None);
+      setBinding.flags = bindingAttr.getFlags();
       setLayout.bindings[setBinding.ordinal] = setBinding;
       pipelineLayout.resourceMap.emplace_back(setLayout.ordinal,
                                               setBinding.ordinal);
@@ -121,19 +121,54 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
   }
 
   // Check the usage of each binding at each dispatch site.
-  SmallVector<DescriptorFlags> bindingFlags(bindingCount);
+  struct DescriptorInfo {
+    DescriptorFlags flags = DescriptorFlags::None;
+  };
+  SmallVector<DescriptorInfo> descriptorInfos(bindingCount);
   for (auto dispatchOp : dispatchOps) {
+    // If any dispatch is performed within a reusable (non-one-shot) execution
+    // region we may opt in to indirect references. For those only executed once
+    // (though maybe from multiple dispatch sites) we try to bias towards direct
+    // references to avoid additional overheads.
+    auto parentOp = dispatchOp->getParentOfType<IREE::Stream::CmdExecuteOp>();
+    bool isRegionExecutedOnce = parentOp ? parentOp.getOnce() : false;
+
     auto resourceAccessesAttrs = dispatchOp.getResourceAccesses().getValue();
     for (unsigned i = 0; i < bindingCount; ++i) {
-      auto resourceAccessAttr = cast<IREE::Stream::ResourceAccessBitfieldAttr>(
-          resourceAccessesAttrs[i]);
+      auto &descriptorInfo = descriptorInfos[i];
+
+      // Opt into indirect descriptors when dynamic values are used from
+      // execution regions that may be executed more than once.
+      if (!isRegionExecutedOnce) {
+        Value resource = dispatchOp.getResources()[i];
+        if (auto blockArg = dyn_cast<BlockArgument>(resource)) {
+          if (blockArg.getOwner()->getParentOp() == parentOp) {
+            resource = parentOp.getResourceOperands()[blockArg.getArgNumber()];
+          }
+        }
+        switch (categorizeValue(resource)) {
+        default:
+        case ValueOrigin::Unknown:
+        case ValueOrigin::MutableGlobal:
+          descriptorInfo.flags =
+              descriptorInfo.flags | IREE::HAL::DescriptorFlags::Indirect;
+          break;
+        case ValueOrigin::LocalConstant:
+        case ValueOrigin::ImmutableGlobal:
+          break;
+        }
+      }
+
+      // Set binding flags based on the OR of all dispatch site access.
       auto resourceAccess = static_cast<IREE::Stream::ResourceAccessBitfield>(
-          resourceAccessAttr.getInt());
+          cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccessesAttrs[i])
+              .getInt());
       if (!bitEnumContainsAll(resourceAccess,
                               IREE::Stream::ResourceAccessBitfield::Write)) {
         // Read-only.
-        bindingFlags[i] =
-            bindingFlags[i] | IREE::HAL::DescriptorFlags::ReadOnly;
+        descriptorInfo.flags =
+            descriptorInfo.flags | IREE::HAL::DescriptorFlags::ReadOnly;
       }
     }
   }
@@ -142,18 +177,23 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
   pipelineLayout.pushConstantCount = operandCount;
   pipelineLayout.resourceMap.resize(bindingCount);
 
-  // Only one set today - this creates a lot of pushes that we can't elide later
-  // on once interfaces are materialized.
+  // TODO(#18154): simplify binding setup.
   DescriptorSetLayout setLayout;
   setLayout.ordinal = 0;
   setLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::None;
-  setLayout.bindings.resize(bindingCount);
+  setLayout.bindings.reserve(bindingCount);
   for (unsigned i = 0; i < bindingCount; ++i) {
+    const auto &descriptorInfo = descriptorInfos[i];
+    if (allEnumBitsSet(descriptorInfo.flags,
+                       IREE::HAL::DescriptorFlags::Indirect)) {
+      setLayout.flags =
+          setLayout.flags | IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+    }
     DescriptorSetLayoutBinding setBinding;
-    setBinding.ordinal = i;
+    setBinding.ordinal = setLayout.bindings.size();
     setBinding.type = IREE::HAL::DescriptorType::StorageBuffer;
-    setBinding.flags = bindingFlags[i];
-    setLayout.bindings[i] = setBinding;
+    setBinding.flags = descriptorInfo.flags;
+    setLayout.bindings.push_back(setBinding);
     pipelineLayout.resourceMap[i] =
         std::make_pair(setLayout.ordinal, setBinding.ordinal);
   }

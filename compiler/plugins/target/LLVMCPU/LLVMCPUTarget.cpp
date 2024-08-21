@@ -387,12 +387,21 @@ public:
         llvmFunc->addParamAttr(i, align16);
       }
 
-      // Optionally entry points may specify that they require workgroup local
+      LibraryBuilder::DispatchAttrs dispatchAttrs = {0};
+
+      // Entry points may optionally specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
-      int64_t localMemorySize = exportOp.getWorkgroupLocalMemory()
-                                    .value_or(APInt(64, 0))
-                                    .getSExtValue();
+      dispatchAttrs.localMemorySize = exportOp.getWorkgroupLocalMemory()
+                                          .value_or(APInt(64, 0))
+                                          .getSExtValue();
+
+      // Specify the constant and binding information used to validate
+      // dispatches.
+      // TODO(#18189): pack per-binding information bitfields.
+      dispatchAttrs.constantCount = exportOp.getLayout().getPushConstants();
+      dispatchAttrs.bindingCount =
+          exportOp.getLayout().getSetLayout(0).getBindings().size();
 
       LibraryBuilder::SourceLocation sourceLocation;
       if (options.debugLevel >= 1) {
@@ -417,8 +426,7 @@ public:
       }
       libraryBuilder.addExport(exportOp.getName(), std::move(sourceLocation),
                                std::move(stageLocations), /*tag=*/"",
-                               LibraryBuilder::DispatchAttrs{localMemorySize},
-                               llvmFunc);
+                               dispatchAttrs, llvmFunc);
     }
 
     // Embed source files (if present).

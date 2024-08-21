@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
@@ -19,6 +18,9 @@
 #define DEBUG_TYPE "iree-spirv-link-executable"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVLINKEXECUTABLESPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace IREE::HAL {
 // Compares two ExecutableTargetAttr according to the alphabetical order of used
@@ -45,7 +47,7 @@ namespace {
 using IREE::HAL::ExecutableTargetAttr;
 
 struct SPIRVLinkExecutablesPass final
-    : SPIRVLinkExecutablesBase<SPIRVLinkExecutablesPass> {
+    : impl::SPIRVLinkExecutablesPassBase<SPIRVLinkExecutablesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 
@@ -211,10 +213,4 @@ struct SPIRVLinkExecutablesPass final
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSPIRVLinkExecutablesPass() {
-  return std::make_unique<SPIRVLinkExecutablesPass>();
-}
-
 } // namespace mlir::iree_compiler

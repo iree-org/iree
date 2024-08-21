@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -20,6 +19,9 @@
 #define DEBUG_TYPE "iree-llvmgpu-tensor-pad"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUTENSORPADPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
@@ -108,8 +110,8 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
          linalgOp.getNumParallelLoops() <= 3;
 }
 
-struct LLVMGPUTensorPadPass
-    : public LLVMGPUTensorPadBase<LLVMGPUTensorPadPass> {
+struct LLVMGPUTensorPadPass final
+    : impl::LLVMGPUTensorPadPassBase<LLVMGPUTensorPadPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<bufferization::BufferizationDialect>();
   }
@@ -166,10 +168,4 @@ struct LLVMGPUTensorPadPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUTensorPadPass() {
-  return std::make_unique<LLVMGPUTensorPadPass>();
-}
-
 } // namespace mlir::iree_compiler

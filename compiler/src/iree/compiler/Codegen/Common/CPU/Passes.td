@@ -13,37 +13,41 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for CPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def CPUMaterializeHostEncoding :
+def CPUMaterializeHostEncodingPass :
     Pass<"iree-codegen-cpu-materialize-host-encoding", "mlir::ModuleOp"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend.";
-  let constructor = "mlir::iree_compiler::createCPUMaterializeHostEncodingPass()";
+  let summary = "Convert encoding-specific operations based on target attributes.";
+  let description = [{
+    Examples:
+      encoding.set_encoding   -> tensor.pack
+      encoding.unset_encoding -> tensor.unpack
+      linalg.matmul             -> linalg.mmt4d  "}];
 }
 
-def CPUMaterializeDeviceEncoding :
+def CPUMaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-cpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize the encoding for tensor as specified by the backend.";
-  let constructor = "mlir::iree_compiler::createCPUMaterializeDeviceEncodingPass()";
+  let summary = "Convert encoding-specific operations based on target attributes.";
+  let description = [{
+    Examples:
+      encoding.set_encoding   -> tensor.pack
+      encoding.unset_encoding -> tensor.unpack
+      linalg.matmul             -> linalg.mmt4d  "}];
 }
 
-def CPULowerToUKernels :
+def CPULowerToUKernelsPass :
     Pass<"iree-codegen-cpu-lower-to-ukernels", ""> {
   let summary =
       "Separate out parts of the IR that lower to a micro-kernel";
-  let constructor =
-      "mlir::iree_compiler::createCPULowerToUKernelsPass()";
   let options = [
-    Option<"optionSkipIntermediateRoundings", "skip-intermediate-roundings",
+    Option<"skipIntermediateRoundings", "skip-intermediate-roundings",
       "bool", /*default=*/"true",
       "Allow skipping intermediate roundings, e.g. in f16 ukernels internally doing f32 arithmetic.">,
   ];
 }
 
-def CPUPrepareUkernels :
+def CPUPrepareUkernelsPass :
     InterfacePass<"iree-codegen-cpu-prepare-ukernels", "mlir::FunctionOpInterface"> {
   let summary = "Rank reduce operations to fit existing ukernels requirements."
                 "For example, batch_mmt4d ops are decomposed to mmt4d ops";
-  let constructor =
-      "mlir::iree_compiler::createCPUPrepareUkernelsPass()";
 }
 
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

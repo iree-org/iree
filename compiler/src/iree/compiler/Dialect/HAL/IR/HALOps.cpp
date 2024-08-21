@@ -112,6 +112,61 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<Bindings>($binding_buffers,
+//                  type($binding_buffers),
+//                  $binding_offsets,
+//                  $binding_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult
+parseBindings(OpAsmParser &parser,
+              SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
+              SmallVectorImpl<Type> &bufferTypes,
+              SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferOffsets,
+              SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferLengths) {
+  do {
+    OpAsmParser::UnresolvedOperand buffer;
+    Type bufferType;
+    OpAsmParser::UnresolvedOperand bufferOffset;
+    OpAsmParser::UnresolvedOperand bufferLength;
+    if (failed(parser.parseLParen()) || failed(parser.parseOperand(buffer)) ||
+        failed(parser.parseColonType(bufferType)) ||
+        failed(parser.parseRParen()) || failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(bufferOffset)) ||
+        failed(parser.parseComma()) ||
+        failed(parser.parseOperand(bufferLength)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    buffers.push_back(buffer);
+    bufferTypes.push_back(bufferType);
+    bufferOffsets.push_back(bufferOffset);
+    bufferLengths.push_back(bufferLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printBindings(OpAsmPrinter &p, Operation *op, ValueRange buffers,
+                          TypeRange bufferTypes, ValueRange bufferOffsets,
+                          ValueRange bufferLengths) {
+  llvm::interleaveComma(
+      llvm::zip_equal(buffers, bufferTypes, bufferOffsets, bufferLengths), p,
+      [&](std::tuple<Value, Type, Value, Value> it) {
+        p.printNewline();
+        p << "  (";
+        p.printOperand(std::get<0>(it));
+        p << " : ";
+        p.printType(std::get<1>(it));
+        p << ")[";
+        p.printOperand(std::get<2>(it));
+        p << ", ";
+        p.printOperand(std::get<3>(it));
+        p << "]";
+      });
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // custom<BindingTable>($binding_buffers,
 //                      type($binding_buffers),
 //                      $binding_offsets,
@@ -1055,6 +1110,108 @@ void CommandBufferPushDescriptorSetOp::build(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.command_buffer.dispatch2 + .indirect
+//===----------------------------------------------------------------------===//
+
+void CommandBufferDispatch2Op::build(OpBuilder &builder, OperationState &state,
+                                     Value commandBuffer, Value executable,
+                                     Value entryPoint, ValueRange workgroups,
+                                     ValueRange constants,
+                                     ArrayRef<BindingValue> bindings,
+                                     IREE::HAL::DispatchFlags flags) {
+  state.addOperands({commandBuffer, executable, entryPoint});
+  state.addOperands(workgroups);
+  state.addOperands(constants);
+  SmallVector<Value> bindingBuffers;
+  SmallVector<Value> bindingOffsets;
+  SmallVector<Value> bindingLengths;
+  for (auto binding : bindings) {
+    bindingBuffers.push_back(binding.buffer);
+    bindingOffsets.push_back(binding.byteOffset);
+    bindingLengths.push_back(binding.byteLength);
+  }
+  state.addOperands(bindingBuffers);
+  state.addOperands(bindingOffsets);
+  state.addOperands(bindingLengths);
+  state.addAttribute("flags",
+                     builder.getAttr<IREE::HAL::DispatchFlagsAttr>(flags));
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
+                         1,
+                         1,
+                         1,
+                         1,
+                         1,
+                         1,
+                         static_cast<int32_t>(constants.size()),
+                         static_cast<int32_t>(bindingBuffers.size()),
+                         static_cast<int32_t>(bindingOffsets.size()),
+                         static_cast<int32_t>(bindingLengths.size()),
+                     }));
+}
+
+void CommandBufferDispatch2IndirectOp::build(
+    OpBuilder &builder, OperationState &state, Value commandBuffer,
+    Value executable, Value entryPoint, Value workgroupsBuffer,
+    Value workgroupsOffset, ValueRange constants,
+    ArrayRef<BindingValue> bindings, IREE::HAL::DispatchFlags flags) {
+  state.addOperands({commandBuffer, executable, entryPoint, workgroupsBuffer,
+                     workgroupsOffset});
+  state.addOperands(constants);
+  SmallVector<Value> bindingBuffers;
+  SmallVector<Value> bindingOffsets;
+  SmallVector<Value> bindingLengths;
+  for (auto binding : bindings) {
+    bindingBuffers.push_back(binding.buffer);
+    bindingOffsets.push_back(binding.byteOffset);
+    bindingLengths.push_back(binding.byteLength);
+  }
+  state.addOperands(bindingBuffers);
+  state.addOperands(bindingOffsets);
+  state.addOperands(bindingLengths);
+  state.addAttribute("flags",
+                     builder.getAttr<IREE::HAL::DispatchFlagsAttr>(flags));
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
+                         1,
+                         1,
+                         1,
+                         1,
+                         1,
+                         static_cast<int32_t>(constants.size()),
+                         static_cast<int32_t>(bindingBuffers.size()),
+                         static_cast<int32_t>(bindingOffsets.size()),
+                         static_cast<int32_t>(bindingLengths.size()),
+                     }));
+}
+
+static LogicalResult verifyDispatch2Bindings(Operation *op,
+                                             ValueRange bindingBuffers,
+                                             ValueRange bindingOffsets,
+                                             ValueRange bindingLengths) {
+  if (bindingBuffers.size() != bindingOffsets.size() ||
+      bindingBuffers.size() != bindingLengths.size()) {
+    return op->emitOpError() << "requires that binding fields all have the "
+                                "same number of elements";
+  }
+  return success();
+}
+
+LogicalResult CommandBufferDispatch2Op::verify() {
+  CommandBufferDispatch2Op op = *this;
+  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
+                                 op.getBindingOffsets(),
+                                 op.getBindingLengths());
+}
+
+LogicalResult CommandBufferDispatch2IndirectOp::verify() {
+  CommandBufferDispatch2IndirectOp op = *this;
+  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
+                                 op.getBindingOffsets(),
+                                 op.getBindingLengths());
+}
+
+//===----------------------------------------------------------------------===//
 // hal.descriptor_set_layout.create
 //===----------------------------------------------------------------------===//
 
@@ -1165,7 +1322,7 @@ void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
                                          OperationState &state, Value device,
                                          Value queueAffinity, Value waitFence,
                                          Value signalFence, Value commandBuffer,
-                                         ArrayRef<BindingTableValue> bindings) {
+                                         ArrayRef<BindingValue> bindings) {
   state.addOperands(
       {device, queueAffinity, waitFence, signalFence, commandBuffer});
   SmallVector<Value> bindingBuffers;
@@ -1749,6 +1906,16 @@ void ExecutableCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable.create2
+//===----------------------------------------------------------------------===//
+
+void ExecutableCreate2Op::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
+  setNameFn(getResult(), StringRef("executable"));
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable.lookup
 //===----------------------------------------------------------------------===//
 
@@ -1769,20 +1936,33 @@ void ExecutableExportOrdinalOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.constant.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult InterfaceConstantLoadOp::verify() {
+  InterfaceConstantLoadOp op = *this;
+  auto layoutAttr = op.getLayout();
+  if (op.getOrdinal().getZExtValue() >= layoutAttr.getPushConstants()) {
+    return op.emitOpError("push constant ordinal out of bounds");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
 void InterfaceBindingSubspanOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
-    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
-    ValueRange dynamic_dims, IntegerAttr alignment,
+    OpBuilder &builder, OperationState &result, Type resultType,
+    IREE::HAL::PipelineLayoutAttr layout, APInt set, APInt binding,
+    Value byte_offset, ValueRange dynamic_dims, IntegerAttr alignment,
     std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
                                                          flags.value());
   }
-  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+  build(builder, result, resultType, layout, set, binding, byte_offset,
         dynamic_dims, alignment, descriptorAttr);
 }
 
@@ -1796,8 +1976,56 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
              << " associated dimension SSA values";
     }
   }
-
+  int64_t set = op.getSet().getSExtValue();
+  int64_t binding = op.getBinding().getSExtValue();
+  bool foundSet = false;
+  bool foundBinding = false;
+  for (auto setLayoutAttr : op.getLayout().getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == set) {
+      foundSet = true;
+      for (auto bindingAttr : setLayoutAttr.getBindings()) {
+        if (bindingAttr.getOrdinal() == binding) {
+          foundBinding = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!foundSet) {
+    return op.emitOpError("set ordinal ")
+           << set << " not present in pipeline layout";
+  } else if (!foundBinding) {
+    return op.emitOpError("binding ordinal ")
+           << binding << " not present in descriptor set layout";
+  }
   return success();
+}
+
+IREE::HAL::DescriptorSetBindingAttr
+InterfaceBindingSubspanOp::getDescriptorSetBindingAttr() {
+  int64_t set = getSet().getSExtValue();
+  int64_t binding = getBinding().getSExtValue();
+  for (auto setLayoutAttr : getLayout().getSetLayouts()) {
+    if (setLayoutAttr.getOrdinal() == set) {
+      for (auto bindingAttr : setLayoutAttr.getBindings()) {
+        if (bindingAttr.getOrdinal() == binding) {
+          return bindingAttr;
+        }
+      }
+    }
+  }
+  return {};
+}
+
+IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
+  auto bindingAttr = getDescriptorSetBindingAttr();
+  return bindingAttr.getType();
+}
+
+int64_t InterfaceBindingSubspanOp::getFlatBindingIndex() {
+  int64_t set = getSet().getSExtValue();
+  int64_t binding = getBinding().getSExtValue();
+  return getLayout().getFlatBindingIndex(set, binding);
 }
 
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {

@@ -36,8 +36,14 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Function to fuse the given producer-consumer pair of forall loops into
 /// the single consumer loop at the given |slice| within the consumer of the
-/// producer. This is managed by inserting an `iree_gpu.tensor_shuffle` at the
+/// producer. This is managed by inserting an `iree_gpu.barrier_region` at the
 /// boundary to synchronize the workers at the fusion point.
+///
+/// The mapping attributes of both the producer and consumer `scf.forall` ops
+/// must be in a relative descending order, for example:
+///  [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>]
+/// or
+///  [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp producer,
                                   scf::ForallOp consumer,
@@ -59,10 +65,12 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 // Various populate pattern methods.
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
-void populateIREEGPULowerShuffleTensorPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(
     RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
+// Version of unrolling with a preset configuration.
+void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU

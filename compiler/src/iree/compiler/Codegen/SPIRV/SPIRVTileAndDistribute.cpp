@@ -13,7 +13,6 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -37,6 +36,9 @@
 #define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVTILEANDDISTRIBUTEPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Invocation tiling utils
@@ -104,11 +106,11 @@ tileReduction(mlir::FunctionOpInterface funcOp,
 namespace {
 /// Function pass that implements tiling and distributing Linalg ops with
 /// buffer semantics.
-class SPIRVTileAndDistributePass
-    : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
+class SPIRVTileAndDistributePass final
+    : public impl::SPIRVTileAndDistributePassBase<SPIRVTileAndDistributePass> {
 public:
-  SPIRVTileAndDistributePass() = default;
-  SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
+  using impl::SPIRVTileAndDistributePassBase<
+      SPIRVTileAndDistributePass>::SPIRVTileAndDistributePassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,
@@ -195,15 +197,6 @@ void SPIRVTileAndDistributePass::runOnOperation() {
       llvm::dbgs() << "\n\n";
     });
   }
-}
-
-//===----------------------------------------------------------------------===//
-// Pass entry point and registration
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVTileAndDistributePass() {
-  return std::make_unique<SPIRVTileAndDistributePass>();
 }
 
 } // namespace mlir::iree_compiler

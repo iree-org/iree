@@ -45,42 +45,6 @@ enum PreprocessorDirective {
   PRAGMA
 };
 
-enum UnaryOperator {
-  // arithmetic
-  PLUS = 0,
-  MINUS,
-  BITWISE_NOT,
-  // logical
-  LOGICAL_NOT,
-};
-
-enum BinaryOperator {
-  // arithmetic
-  ADDITION = 0,
-  SUBTRACTION,
-  PRODUCT,
-  DIVISION,
-  REMAINDER,
-  BITWISE_AND,
-  BITWISE_OR,
-  BITWISE_XOR,
-  BITWISE_LEFT_SHIFT,
-  BITWISE_RIGHT_SHIFT,
-  // logical
-  LOGICAL_AND,
-  LOGICAL_OR,
-  // comparison
-  EQUAL_TO,
-  NOT_EQUAL_TO,
-  LESS_THAN,
-  GREATER_THAN,
-  LESS_THAN_OR_EQUAL,
-  GREATER_THAN_OR_EQUAL,
-};
-
-Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
-                    Value operand, Type resultType);
-
 Value allocateVariable(OpBuilder builder, Location location, Type type,
                        Attribute initializer);
 
@@ -119,6 +83,10 @@ void structDefinition(OpBuilder builder, Location location,
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand);
 
+Value structMemberAddress(OpBuilder builder, Location location,
+                          emitc::PointerType type, StringRef memberName,
+                          Value operand);
+
 void structMemberAssign(OpBuilder builder, Location location,
                         StringRef memberName, Value operand, Value data);
 
@@ -127,6 +95,10 @@ void structMemberAssign(OpBuilder builder, Location location,
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand);
+
+Value structPtrMemberAddress(OpBuilder builder, Location location,
+                             emitc::PointerType type, StringRef memberName,
+                             Value operand);
 
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data);

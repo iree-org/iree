@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_OPTIMIZENUMERICSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -254,7 +256,8 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
   }
 };
 
-class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
+class OptimizeNumericsPass
+    : public impl::OptimizeNumericsPassBase<OptimizeNumericsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -274,9 +277,4 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createOptimizeNumericsPass() {
-  return std::make_unique<OptimizeNumericsPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

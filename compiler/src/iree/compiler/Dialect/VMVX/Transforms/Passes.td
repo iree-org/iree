@@ -9,19 +9,16 @@
 
 include "mlir/Pass/PassBase.td"
 
-def Conversion : Pass<"iree-vmvx-conversion", "mlir::ModuleOp"> {
+def ConversionPass : Pass<"iree-vmvx-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from various dialects to the VMVX dialect";
-  let constructor = "mlir::iree_compiler::IREE::VMVX::createConversionPass()";
 }
 
-def MaterializeConstants : Pass<"iree-vmvx-materialize-constants", "mlir::ModuleOp"> {
+def MaterializeConstantsPass : Pass<"iree-vmvx-materialize-constants", "mlir::ModuleOp"> {
   let summary = "Materializes executable constant global values";
-  let constructor = "mlir::iree_compiler::IREE::VMVX::createMaterializeConstantsPass()";
 }
 
-def ResolveBufferDescriptors : Pass<"iree-vmvx-resolve-buffer-descriptors", ""> {
+def ResolveBufferDescriptorsPass : Pass<"iree-vmvx-resolve-buffer-descriptors", ""> {
   let summary = "Resolves any existing vmvx.get_buffer_descriptor ops";
-  let constructor = "mlir::iree_compiler::IREE::VMVX::createResolveBufferDescriptorsPass()";
 }
 
 #endif  // IREE_MODULES_VMVX_PASSES

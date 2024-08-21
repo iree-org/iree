@@ -147,9 +147,11 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
   // TODO(benvanik): remove reflection attrs as a concept and use something more
   // MLIRish like an attribute interface/dialect interface.
   // DictionaryAttr is not very friendly for modification :/
-  auto existingAttr =
-      getOperation()->getAttrOfType<DictionaryAttr>("iree.reflection");
-  SmallVector<NamedAttribute> attrs(existingAttr.begin(), existingAttr.end());
+  SmallVector<NamedAttribute> attrs;
+  if (auto existingAttr =
+          getOperation()->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+    llvm::append_range(attrs, existingAttr);
+  }
   bool didFind = false;
   for (size_t i = 0; i < attrs.size(); ++i) {
     if (attrs[i].getName() == name) {

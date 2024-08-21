@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -13,6 +12,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_EXPANDF16OPTOF32PASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -52,7 +54,7 @@ public:
 };
 
 struct ExpandF16OpToF32Pass
-    : public ExpandF16OpToF32Base<ExpandF16OpToF32Pass> {
+    : public impl::ExpandF16OpToF32PassBase<ExpandF16OpToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -71,9 +73,4 @@ struct ExpandF16OpToF32Pass
   }
 };
 } // namespace
-
-std::unique_ptr<Pass> createExpandF16OpToF32Pass() {
-  return std::make_unique<ExpandF16OpToF32Pass>();
-}
-
 } // namespace mlir::iree_compiler

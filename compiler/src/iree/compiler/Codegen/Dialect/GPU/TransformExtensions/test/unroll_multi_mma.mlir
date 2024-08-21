@@ -9,7 +9,7 @@ func.func @unroll_multi_mma_order(%lhs: vector<2x2x4xf16>, %rhs: vector<2x2x4xf1
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4xf32>
   return %0 : vector<2x2x4xf32>
 }
@@ -75,7 +75,7 @@ func.func @unroll_multi_mma_count(%lhs: vector<2x3x4xf16>, %rhs: vector<3x5x4xf1
   %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
     indexing_maps = #contraction_accesses,
     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
   return %0 : vector<2x5x4xf32>
 }

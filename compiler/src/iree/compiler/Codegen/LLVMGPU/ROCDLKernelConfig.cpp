@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -272,7 +273,16 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     linalgOp))) {
+      return success();
+    }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
+      return success();
+    }
+    // TODO: Add configurations for matmul here too.
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          computeOp))) {
       return success();
     }
   }
@@ -326,12 +336,17 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
   }
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  if (getTranslationInfo(funcOp)) {
-    // Currently ROCDL requires propagation of user lowering configs.
-    for (auto op : computeOps) {
-      if (getLoweringConfig(op)) {
-        propagateLoweringConfig(op, computeOps);
-        break;
+  if (IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(funcOp)) {
+    // Currently ROCDL requires propagation of user lowering configs for
+    // all pipelines except TileAndFuse.
+    if (translationInfo.getDispatchLoweringPassPipeline() !=
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+      for (auto op : computeOps) {
+        if (getLoweringConfig(op)) {
+          propagateLoweringConfig(op, computeOps);
+          break;
+        }
       }
     }
   }
@@ -376,7 +391,10 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
   if (failed(setRootConfig(target, funcOp, rootOp)))
     return failure();
 
-  propagateLoweringConfig(rootOp, computeOps);
+  if (getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+    propagateLoweringConfig(rootOp, computeOps);
+  }
   return success();
 }
 

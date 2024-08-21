@@ -217,7 +217,8 @@ TransferBuffersToHost(
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer.get()));
   vm::ref<iree_hal_semaphore_t> semaphore;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(device, 0ull, &semaphore));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
   vm::ref<iree_hal_fence_t> fence;
   IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
       semaphore.get(), 1ull, iree_hal_device_host_allocator(device), &fence));

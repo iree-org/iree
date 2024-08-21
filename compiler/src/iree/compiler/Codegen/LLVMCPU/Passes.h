@@ -19,112 +19,38 @@ namespace mlir::iree_compiler {
 
 class TilingConfig;
 
-/// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>>
-createConvertToLLVMPass(bool reassociateFpReordering = false);
-
-/// Checks CPU backend specific IR constraints (like no stack allocations)
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds = true);
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUEmitVectorizationRemarksPass();
-
-/// Pass to select a lowering strategy for a hal.executable.variant operation.
-/// The variant is annotated with the selected strategies, which are
-/// subsequently ingested by LLVMCPULowerExecutableTargetPass.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUSelectLoweringStrategyPass();
-
-/// Pass to lower the module an hal.executable.variant operation to external
-/// dialect. Currently this pass lowers to LLVM dialect, but could be
-/// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPULowerExecutableTargetPass();
-
-/// Pass to handel F16 bit operations, but converting f16 operands to F32.
-/// Currently this pass is handeling fmaxf conversion from f16 to f32,
-/// and then returing a f16 output back after preforming the operation.
-/// Can handel more operations if required in future.
-std::unique_ptr<Pass> createExpandF16OpToF32Pass();
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUMmt4dVectorLoweringPass(
-    bool enableVectorContractCustomKernels = true);
-
-/// Pass to perform peeling on non-distributed loops.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUPeelPass();
-
-/// Pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
-
-/// Synchronizes LLVM linkage with MLIR symbol visibility.
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUSynchronizeSymbolVisibilityPass();
-
-/// Pass to tile and fuse TilingInterface ops with given tilingLevel.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPU2DScalableTo1DScalablePass();
-
-/// Pass to tile TilingInterface ops with given tilingLevel.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel = -1);
-
-/// Replaces llvm.intr.fma with its unfused mul and add ops.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUUnfuseFMAOpsPass();
-
-/// Signals errors when there are large vectors in the IR.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVerifyVectorSizeLegalityPass(
-    int64_t maxAllowedNumberOfNativeVectors = 512);
-
 //------------------------------------------------------------------------------
-// Passes to lower Vector ops before conversion to LLVM.
+// Wrappers that not use tablegen options.
 //------------------------------------------------------------------------------
 
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
   bool enableArmI8mm = false;
+  bool enableArmSME = false;
 };
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUDropVectorUnitDimsPass();
+createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "",
-                                       bool enableArmI8mm = false);
+createLLVMCPUTilePass(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorTransferLoweringPass();
+createLLVMCPUTileAndFusePass(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorTransposeLoweringPass(
-    bool lowerVectorTransposeToAVX2 = false);
+createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorShapeCastLoweringPass();
+createLLVMCPUTileRootAndFuseInputOperands(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorLoweringPass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorLoweringPass(
-    const LLVMCPUVectorLoweringPassOptions &options);
+createLLVMCPUVerifyVectorSizeLegalityPass(
+    int64_t maxAllowedNumberOfNativeVectors);
 
-/// A pass that converts certain vector.contract ops to custom kernels.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createVectorContractCustomKernelsPass();
-
-// Verifies that only supported IR constructs are passed to the compiler (like
-// no Linalg transform markers are set).
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createVerifyLinalgTransformLegalityPass();
+std::unique_ptr<OperationPass<ModuleOp>>
+createConvertToLLVMPass(bool reassociateFpReordering);
 
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
@@ -147,7 +73,7 @@ struct LLVMCPUPipelineOptions {
   bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
   bool enableVectorMasking = false;
-  bool enableAArch64SSVE = false;
+  bool enableAArch64SME = false;
   bool enableAArch64I8mm = false;
   bool lowerToAVX2 = false;
 };
@@ -229,24 +155,15 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
 // LLVMCPU Linking Passes and Pipelines
 //----------------------------------------------------------------------------//
 
-/// Assigns executable constant ordinals across all LLVMCPU variants.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPUAssignConstantOrdinalsPass();
-
-/// Assigns executable import ordinals across all LLVMCPU variants.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPUAssignImportOrdinalsPass();
-
-/// Links LLVMCPU HAL executables within the top-level program module.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createLLVMCPULinkExecutablesPass();
-
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager);
 
 //----------------------------------------------------------------------------//
 // Register LLVMCPU Passes
 //----------------------------------------------------------------------------//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc" // IWYU pragma: keep
 
 void registerCodegenLLVMCPUPasses();
 

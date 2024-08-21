@@ -405,6 +405,7 @@ static iree_status_t iree_io_parameter_op_batch_advance_timeline(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_semaphore_create(
                 batch->device, batch->timeline_values[timeline_index],
+                IREE_HAL_SEMAPHORE_FLAG_NONE,
                 &batch->timeline_semaphores[timeline_index]));
     timeline_semaphore = batch->timeline_semaphores[timeline_index];
   }

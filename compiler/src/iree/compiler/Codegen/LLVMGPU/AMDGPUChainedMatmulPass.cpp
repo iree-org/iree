@@ -5,13 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <numeric>
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_AMDGPUPREPAREFORCHAINEDMATMULPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 using VectorValue = TypedValue<VectorType>;
 
@@ -59,8 +62,8 @@ namespace {
 ///   C = A @ B --> C.T = B.T @ A.T
 /// is only defined on standard "@" function, it may be a different
 /// transformation for other indexing maps.
-struct AMDGPUPrepareForChainedMatmulPass
-    : public AMDGPUPrepareForChainedMatmulBase<
+struct AMDGPUPrepareForChainedMatmulPass final
+    : impl::AMDGPUPrepareForChainedMatmulPassBase<
           AMDGPUPrepareForChainedMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -255,10 +258,4 @@ struct AMDGPUPrepareForChainedMatmulPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createAMDGPUPrepareForChainedMatmulPass() {
-  return std::make_unique<AMDGPUPrepareForChainedMatmulPass>();
-}
-
 } // namespace mlir::iree_compiler

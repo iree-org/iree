@@ -51,6 +51,9 @@ bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 ///   argument corresponding to the input.
 bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp);
 
+/// Returns true if the op could result in undefined behavior.
+bool mayHaveUndefinedBehaviorInMasking(Operation *op);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_

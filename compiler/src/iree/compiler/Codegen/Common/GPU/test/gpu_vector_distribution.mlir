@@ -582,7 +582,7 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
                                           affine_map<(d0, d1, d2) -> (d0, d1)>],
                          iterator_types = ["parallel", "parallel", "reduction"],
                          kind = #vector.kind<add>,
-                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>}
+                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>}
         %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   %TM1 = arith.truncf %M1 : vector<16x16xf32> to vector<16x16xf16>
@@ -596,7 +596,7 @@ func.func @resolve_wmma_layout_conflict_with_shared_memory(%15 : vector<16x16xf1
                                           affine_map<(d0, d1, d2) -> (d0, d1)>],
                          iterator_types = ["parallel", "parallel", "reduction"],
                          kind = #vector.kind<add>,
-                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>}
+                         iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>}
        %A2, %B2, %C2  : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   func.return %M2 : vector<16x16xf32>

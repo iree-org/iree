@@ -35,26 +35,6 @@ struct DistributeMmaToLanesPass final
 };
 } // namespace
 
-struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    auto loweringConfig =
-        getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
-    if (!loweringConfig) {
-      return failure();
-    }
-    IREE::GPU::MmaInterfaceAttr kind = loweringConfig.getMmaKind();
-    if (!kind) {
-      return failure();
-    }
-    if (failed(convertContractionToMultiMma(rewriter, linalgOp, kind))) {
-      return failure();
-    }
-    return success();
-  }
-};
-
 LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
                                     scf::ForallOp laneForall) {
 
@@ -100,17 +80,7 @@ void DistributeMmaToLanesPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // Step 1. Convert configured linalg ops to multi_mma.
-  {
-    RewritePatternSet patterns(context);
-    patterns.add<ConvertToMultiMma>(context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitError() << "failed to convert linalg to multi_mma";
-      return signalPassFailure();
-    }
-  }
-
-  // Step 2. Distribute multi_mma ops to lanes and greedily fuse producers.
+  // Distribute multi_mma ops to lanes and greedily fuse producers.
   SmallVector<IREE::GPU::MultiMmaOp> mmaOps;
   funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) { mmaOps.push_back(mmaOp); });
   IRRewriter rewriter(funcOp);

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,6 +22,9 @@
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_FUSEDEQUANTIZATIONMATMULPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -767,19 +769,12 @@ static LogicalResult reassociateDequantMatmul(RewriterBase &rewriter,
 }
 
 struct FuseDequantizationMatmulPass
-    : public FuseDequantizationMatmulBase<FuseDequantizationMatmulPass> {
-
+    : public impl::FuseDequantizationMatmulPassBase<
+          FuseDequantizationMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::Flow::FlowDialect,
                     math::MathDialect>();
   }
-  FuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
-    this->enableQuantizedMatmulReassociation =
-        enableQuantizedMatmulReassociation;
-  }
-  FuseDequantizationMatmulPass(const FuseDequantizationMatmulPass &pass)
-      : FuseDequantizationMatmulPass(pass.enableQuantizedMatmulReassociation) {}
-
   void runOnOperation() override;
 };
 
@@ -789,56 +784,45 @@ void FuseDequantizationMatmulPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // Perform reassociation if enabled
-  if (this->enableQuantizedMatmulReassociation) {
-    int quantizeBitWidth = 16;
-    SmallVector<std::pair<linalg::GenericOp, linalg::GenericOp>> candidates;
-    for (auto genericOp :
-         funcOp.getFunctionBody().getOps<linalg::GenericOp>()) {
-      if (failed(isContractionWithTwoReductions(genericOp))) {
-        continue;
-      }
+  int quantizeBitWidth = 16;
+  SmallVector<std::pair<linalg::GenericOp, linalg::GenericOp>> candidates;
+  for (auto genericOp : funcOp.getFunctionBody().getOps<linalg::GenericOp>()) {
+    if (failed(isContractionWithTwoReductions(genericOp))) {
+      continue;
+    }
 
-      OpOperand *lhs = genericOp.getDpsInputOperand(0);
-      OpOperand *rhs = genericOp.getDpsInputOperand(1);
-      auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
-      auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-      if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
-               .hasStaticShape() ||
-          !llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
-               .hasStaticShape() ||
-          !llvm::cast<ShapedType>(genericOp.getResults()[0].getType())
-               .hasStaticShape()) {
-        // Codegen can't handle the dynamic case yet.
+    OpOperand *lhs = genericOp.getDpsInputOperand(0);
+    OpOperand *rhs = genericOp.getDpsInputOperand(1);
+    auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
+    auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+    if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
+             .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
+             .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getResults()[0].getType())
+             .hasStaticShape()) {
+      // Codegen can't handle the dynamic case yet.
+      continue;
+    }
+    if (lhsOp) {
+      if (!failed(isGroupedDequantizationOp(lhsOp))) {
+        candidates.push_back(std::make_pair(lhsOp, genericOp));
         continue;
-      }
-      if (lhsOp) {
-        if (!failed(isGroupedDequantizationOp(lhsOp))) {
-          candidates.push_back(std::make_pair(lhsOp, genericOp));
-          continue;
-        }
-      }
-      if (rhsOp) {
-        if (!failed(isGroupedDequantizationOp(rhsOp))) {
-          candidates.push_back(std::make_pair(rhsOp, genericOp));
-        }
       }
     }
-    IRRewriter rewriter(context);
-    for (auto candidate : candidates) {
-      rewriter.setInsertionPointAfter(candidate.second);
-      if (failed(reassociateDequantMatmul(
-              rewriter, candidate.first, candidate.second, quantizeBitWidth))) {
-        return signalPassFailure();
+    if (rhsOp) {
+      if (!failed(isGroupedDequantizationOp(rhsOp))) {
+        candidates.push_back(std::make_pair(rhsOp, genericOp));
       }
     }
   }
+  IRRewriter rewriter(context);
+  for (auto candidate : candidates) {
+    rewriter.setInsertionPointAfter(candidate.second);
+    if (failed(reassociateDequantMatmul(rewriter, candidate.first,
+                                        candidate.second, quantizeBitWidth))) {
+      return signalPassFailure();
+    }
+  }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
-  return std::make_unique<FuseDequantizationMatmulPass>(
-      enableQuantizedMatmulReassociation);
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

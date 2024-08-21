@@ -395,3 +395,103 @@ util.func public @command_buffer_dispatch_indirect_indirect(
       flags(None)
   util.return
 }
+
+// -----
+
+// CHECK-LABEL: @command_buffer_dispatch2
+//  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !vm.ref<!hal.buffer>,
+//  CHECK-SAME:  %[[SLOT:.+]]: i32)
+util.func public @command_buffer_dispatch2(
+  %cmd: !hal.command_buffer,
+  %executable: !hal.executable,
+  %buffer: !hal.buffer,
+  %slot: index
+) {
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
+  %ordinal = arith.constant 123 : index
+  // CHECK-DAG: %[[X:.+]] = vm.const.i32 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[Y:.+]] = vm.const.i32 200
+  %y = arith.constant 200 : index
+  // CHECK-DAG: %[[Z:.+]] = vm.const.i32 300
+  %z = arith.constant 300 : index
+  // CHECK-DAG: %[[CONSTANT0:.+]] = vm.const.i32 31
+  %constant0 = arith.constant 31 : i32
+  // CHECK-DAG: %[[CONSTANT1:.+]] = vm.const.i32 32
+  %constant1 = arith.constant 32 : i32
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c8000 = arith.constant 8000 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call.variadic @hal.command_buffer.dispatch2
+  // CHECK-SAME: %[[CMD]],
+  // CHECK-SAME: %[[EXECUTABLE]], %[[ORDINAL]],
+  // CHECK-SAME: %[[X]], %[[Y]], %[[Z]],
+  // CHECK-SAME: %[[FLAGS]],
+  // CHECK-SAME: [%[[CONSTANT0]], %[[CONSTANT1]]],
+  // CHECK-SAME: [(%[[C0]], %[[C0]], %[[BUFFER]], %c4096, %c8000),
+  // CHECK-SAME:  (%[[C0]], %[[SLOT]], %[[NULL_BUFFER]], %c4, %c4096)]
+  hal.command_buffer.dispatch2<%cmd : !hal.command_buffer>
+      target(%executable : !hal.executable)[%ordinal]
+      workgroups([%x, %y, %z])
+      constants([%constant0, %constant1])
+      bindings([
+        (%buffer : !hal.buffer)[%c4096, %c8000],
+        (%slot : index)[%c4, %c4096]
+      ])
+      flags(None)
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: vm.func private @command_buffer_dispatch2
+//  CHECK-SAME: (%[[CMD:[a-z0-9]+]]: !vm.ref<!hal.command_buffer>,
+//  CHECK-SAME:  %[[EXECUTABLE:[a-z0-9]+]]: !vm.ref<!hal.executable>,
+//  CHECK-SAME:  %[[WORKGROUPS_SLOT:[a-z0-9]+]]: i32,
+//  CHECK-SAME:  %[[BUFFER:[a-z0-9]+]]: !vm.ref<!hal.buffer>,
+//  CHECK-SAME:  %[[SLOT:[a-z0-9]+]]: i32)
+util.func public @command_buffer_dispatch2(
+  %cmd: !hal.command_buffer,
+  %executable: !hal.executable,
+  %workgroups_slot: index,
+  %buffer: !hal.buffer,
+  %slot: index
+) {
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
+  %ordinal = arith.constant 123 : index
+  // CHECK-DAG: %[[WORKGROUPS_OFFSET:.+]] = vm.const.i64 100
+  %workgroups_offset = arith.constant 100 : index
+  // CHECK-DAG: %[[CONSTANT0:.+]] = vm.const.i32 31
+  %constant0 = arith.constant 31 : i32
+  // CHECK-DAG: %[[CONSTANT1:.+]] = vm.const.i32 32
+  %constant1 = arith.constant 32 : i32
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c8000 = arith.constant 8000 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
+  // CHECK: vm.call.variadic @hal.command_buffer.dispatch2.indirect
+  // CHECK-SAME: %[[CMD]],
+  // CHECK-SAME: %[[EXECUTABLE]], %[[ORDINAL]],
+  // CHECK-SAME: %[[WORKGROUPS_SLOT]], %[[NULL_BUFFER]], %[[WORKGROUPS_OFFSET]],
+  // CHECK-SAME: %[[FLAGS]],
+  // CHECK-SAME: [%[[CONSTANT0]], %[[CONSTANT1]]],
+  // CHECK-SAME: [(%[[C0]], %[[C0]], %[[BUFFER]], %c4096, %c8000),
+  // CHECK-SAME:  (%[[C0]], %[[SLOT]], %[[NULL_BUFFER]], %c4, %c4096)]
+  hal.command_buffer.dispatch2.indirect<%cmd : !hal.command_buffer>
+      target(%executable : !hal.executable)[%ordinal]
+      workgroups(%workgroups_slot : index)[%workgroups_offset]
+      constants([%constant0, %constant1])
+      bindings([
+        (%buffer : !hal.buffer)[%c4096, %c8000],
+        (%slot : index)[%c4, %c4096]
+      ])
+      flags(None)
+  util.return
+}

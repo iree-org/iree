@@ -5,19 +5,21 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/ExtractAddressComputation.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "extract-address-computation-gpu"
 
-using namespace mlir;
-
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_EXTRACTADDRESSCOMPUTATIONGPUPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Helper functions for the `load base[off0...]`
@@ -80,8 +82,8 @@ populateExtractAddressComputationGPUPatterns(RewritePatternSet &patterns) {
 // Pass registration
 //===----------------------------------------------------------------------===//
 namespace {
-struct ExtractAddressComputationGPUPass
-    : public ExtractAddressComputationGPUBase<
+struct ExtractAddressComputationGPUPass final
+    : impl::ExtractAddressComputationGPUPassBase<
           ExtractAddressComputationGPUPass> {
   void runOnOperation() override;
 };
@@ -96,7 +98,4 @@ void ExtractAddressComputationGPUPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<Pass> createExtractAddressComputationGPUPass() {
-  return std::make_unique<ExtractAddressComputationGPUPass>();
-}
 } // namespace mlir::iree_compiler

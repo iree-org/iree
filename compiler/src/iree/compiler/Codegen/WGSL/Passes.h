@@ -17,14 +17,12 @@
 
 namespace mlir::iree_compiler {
 
-// Removes push constants by replacing hal.interface.constant.loads with
-// hal.interface.binding.subspan + flow.dispatch.tensor.load.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWGSLReplacePushConstantsPass();
-
 //----------------------------------------------------------------------------//
 // Register WGSL Passes
 //----------------------------------------------------------------------------//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Codegen/WGSL/Passes.h.inc" // IWYU pragma: keep
 
 void registerCodegenWGSLPasses();
 

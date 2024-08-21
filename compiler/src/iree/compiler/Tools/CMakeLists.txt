@@ -26,12 +26,12 @@ iree_cc_library(
     IREEInputDialect
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
-    IREEVectorExtDialect
     MLIRIR
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::Interfaces
     iree::compiler::ConstEval
     iree::compiler::Dialect::Flow::IR
@@ -90,6 +90,7 @@ iree_cc_library(
     MLIRGPUToSPIRV
     MLIRIR
     MLIRLLVMDialect
+    MLIRLLVMIRTransforms
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMLProgramDialect

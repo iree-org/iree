@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -15,6 +14,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_DECOMPOSECONCATPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -78,12 +80,15 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
   }
 };
 
-struct DecomposeConcatPass : public DecomposeConcatBase<DecomposeConcatPass> {
+struct DecomposeConcatPass
+    : public impl::DecomposeConcatPassBase<DecomposeConcatPass> {
+  using impl::DecomposeConcatPassBase<
+      DecomposeConcatPass>::DecomposeConcatPassBase;
+  explicit DecomposeConcatPass(bool enableConcatTransposition) {
+    this->enableConcatTransposition = enableConcatTransposition;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
-  }
-  DecomposeConcatPass(bool enableConcatTransposition) {
-    this->enableConcatTransposition = enableConcatTransposition;
   }
   DecomposeConcatPass(const DecomposeConcatPass &pass)
       : DecomposeConcatPass(pass.enableConcatTransposition) {}

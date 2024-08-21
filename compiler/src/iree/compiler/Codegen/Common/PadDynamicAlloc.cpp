@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -13,6 +12,9 @@
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_PADDYNAMICALLOCPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// If a value is defined by `%dim = affine_max(0, %src)` kind of op return
 /// `%src` otherwise return `%dim`.
@@ -76,7 +78,8 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
 
 namespace {
 
-struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
+struct PadDynamicAllocPass final
+    : impl::PadDynamicAllocPassBase<PadDynamicAllocPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
@@ -91,10 +94,4 @@ struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createPadDynamicAlloc() {
-  return std::make_unique<PadDynamicAllocPass>();
-}
-
 } // namespace mlir::iree_compiler

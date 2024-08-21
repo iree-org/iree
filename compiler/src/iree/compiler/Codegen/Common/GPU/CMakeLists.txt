@@ -56,6 +56,7 @@ iree_cc_library(
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
+    "GPUInferMemorySpace.cpp"
     "GPULowerToUKernels.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
@@ -70,14 +71,13 @@ iree_cc_library(
     "GPUTileReduction.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
+    "GPUVerifyDistribution.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
     "WorkgroupReordering.cpp"
-    "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect
@@ -121,6 +121,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

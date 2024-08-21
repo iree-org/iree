@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -12,10 +11,14 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_TESTEXECUTABLEPREPROCESSINGPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
-struct TestExecutablePreprocessingPass
-    : public TestExecutablePreprocessingBase<TestExecutablePreprocessingPass> {
+struct TestExecutablePreprocessingPass final
+    : impl::TestExecutablePreprocessingPassBase<
+          TestExecutablePreprocessingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
   }
@@ -45,9 +48,4 @@ struct TestExecutablePreprocessingPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass() {
-  return std::make_unique<TestExecutablePreprocessingPass>();
-}
-
 } // namespace mlir::iree_compiler

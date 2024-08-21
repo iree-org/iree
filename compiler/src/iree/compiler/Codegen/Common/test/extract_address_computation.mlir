@@ -1,6 +1,6 @@
-// RUN: iree-opt -extract-address-computation %s --split-input-file | FileCheck %s
-// RUN: iree-opt -extract-address-computation -expand-strided-metadata \
-// RUN:   -loop-invariant-code-motion -decompose-affine-ops -loop-invariant-code-motion \
+// RUN: iree-opt -iree-codegen-extract-address-computation %s --split-input-file | FileCheck %s
+// RUN: iree-opt -iree-codegen-extract-address-computation -expand-strided-metadata \
+// RUN:   -loop-invariant-code-motion -iree-codegen-decompose-affine-ops -loop-invariant-code-motion \
 // RUN:   %s --split-input-file | FileCheck --check-prefix=INTEGRATION %s
 
 // Simple test: check that we extract the address computation of a load into

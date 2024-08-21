@@ -219,6 +219,15 @@ class VmTest(unittest.TestCase):
         logging.info("result: %s", result)
         np.testing.assert_allclose(result, [4.0, 10.0, 18.0, 28.0])
 
+    def test_create_vm_module_with_multiple_devices(self):
+        """Sanity test that we can create a VM module with 2 devices."""
+        devices = [
+            iree.runtime.get_device("local-task"),
+            iree.runtime.get_device("local-sync"),
+        ]
+        module = iree.runtime.create_hal_module(self.instance, devices=devices)
+        assert isinstance(module, iree.runtime.VmModule)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

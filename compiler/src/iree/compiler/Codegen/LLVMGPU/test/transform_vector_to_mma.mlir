@@ -1,5 +1,12 @@
 // RUN: iree-opt %s --split-input-file -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @matmul  {
 builtin.module {
 // CHECK-LABEL: func.func @matmul
@@ -10,11 +17,11 @@ func.func @matmul() {
   %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
   %cst_0 = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %0, 64 : memref<32x32xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %1, 64 : memref<32x32xf32>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %2, 64 : memref<32x32xf32>
   %3 = gpu.thread_id  x
   %4 = gpu.thread_id  y
@@ -70,6 +77,13 @@ module attributes { transform.with_named_sequence } {
 // -----
 
 // Verify that unrolling does not apply to rank 1 elementwise vector ops.
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @gathered_matmul  {
 builtin.module {
 // CHECK-LABEL: func.func @gathered_matmul
@@ -84,11 +98,11 @@ func.func @gathered_matmul() {
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant dense<[0, 1, 2, 3]> : vector<4xindex>
   %cst_2 = arith.constant dense<1> : vector<4x4xindex>
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %0, 64 : memref<32x32xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %1, 64 : memref<32x32xf32>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<32x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
   memref.assume_alignment %2, 64 : memref<32x32xf32>
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
   %3 = gpu.thread_id  x

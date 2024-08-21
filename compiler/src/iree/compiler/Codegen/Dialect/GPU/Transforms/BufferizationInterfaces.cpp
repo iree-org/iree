@@ -41,19 +41,25 @@ struct ValueBarrierOpBufferizationInterface
   bufferization::AliasingValueList
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
-    return {{op->getOpResult(0), BufferRelation::Equivalent}};
+    SmallVector<bufferization::AliasingValue> alist;
+    alist.reserve(op->getNumResults());
+    for (Value result : op->getResults()) {
+      alist.push_back({result, BufferRelation::Equivalent});
+    }
+    return alist;
   }
 
   FailureOr<BaseMemRefType>
   getBufferType(Operation *op, Value value, const BufferizationOptions &options,
                 SmallVector<Value> &invocationStack) const {
     auto barrierOp = cast<IREE::GPU::ValueBarrierOp>(op);
-    assert(value == barrierOp.getResult() && "invalid value");
+    assert(value.getDefiningOp() == barrierOp && "invalid value");
     if (!barrierOp.hasTensorSemantics()) {
       return failure();
     }
-    auto srcMemrefType = bufferization::getBufferType(barrierOp.getInput(),
-                                                      options, invocationStack);
+    auto srcMemrefType = bufferization::getBufferType(
+        barrierOp.getInputs()[cast<OpResult>(value).getResultNumber()], options,
+        invocationStack);
     if (failed(srcMemrefType))
       return failure();
     return srcMemrefType;
@@ -65,16 +71,21 @@ struct ValueBarrierOpBufferizationInterface
     if (!barrierOp.hasTensorSemantics()) {
       return failure();
     }
-    FailureOr<Value> buffer =
-        getBuffer(rewriter, barrierOp.getInput(), options);
-    if (failed(buffer)) {
-      return failure();
-    }
 
     rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
 
+    SmallVector<Value> buffers;
+    buffers.reserve(barrierOp.getNumOperands());
+    for (auto input : barrierOp.getInputs()) {
+      FailureOr<Value> buffer = getBuffer(rewriter, input, options);
+      if (failed(buffer)) {
+        return failure();
+      }
+      buffers.push_back(buffer.value());
+    }
+
     // This operation bufferizes in place
-    bufferization::replaceOpWithBufferizedValues(rewriter, op, *buffer);
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);
     return success();
   }
 };

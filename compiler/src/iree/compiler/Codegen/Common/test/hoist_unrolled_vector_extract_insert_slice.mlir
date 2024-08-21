@@ -1,16 +1,23 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-vector-extract-insert-slice))" %s | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 func.func @hoist_unrolled_vector_for_mma() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant dense<0.000000e+00> : vector<32x32xf32>
   %c64 = arith.constant 64 : index
   %c2048 = arith.constant 2048 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<3456x2048xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<3456x2048xf16>
   memref.assume_alignment %0, 64 : memref<3456x2048xf16>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<2048x1024xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<2048x1024xf16>
   memref.assume_alignment %1, 64 : memref<2048x1024xf16>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<3456x1024xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<3456x1024xf32>
   memref.assume_alignment %2, 64 : memref<3456x1024xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %3 = gpu.thread_id  x

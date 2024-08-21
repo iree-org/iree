@@ -26,7 +26,7 @@ struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
   iree_allocator_t allocator;
 
-  char name[16];
+  char name[32];
   pthread_t handle;
   mach_port_t mach_port;
 
@@ -253,6 +253,12 @@ void iree_thread_resume(iree_thread_t* thread) {
     thread_resume(thread->mach_port);
   }
 
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_thread_join(iree_thread_t* thread) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  pthread_join(thread->handle, NULL);
   IREE_TRACE_ZONE_END(z0);
 }
 

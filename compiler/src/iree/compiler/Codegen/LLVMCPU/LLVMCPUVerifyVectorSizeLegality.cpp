@@ -7,7 +7,6 @@
 #include <climits>
 #include <numeric>
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Alignment.h"
@@ -18,10 +17,18 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMCPUVERIFYVECTORSIZELEGALITYPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 struct LLVMCPUVerifyVectorSizeLegalityPass
-    : LLVMCPUVerifyVectorSizeLegalityBase<LLVMCPUVerifyVectorSizeLegalityPass> {
-  LLVMCPUVerifyVectorSizeLegalityPass(int64_t maxAllowedNumberOfNativeVectors) {
+    : impl::LLVMCPUVerifyVectorSizeLegalityPassBase<
+          LLVMCPUVerifyVectorSizeLegalityPass> {
+  using impl::LLVMCPUVerifyVectorSizeLegalityPassBase<
+      LLVMCPUVerifyVectorSizeLegalityPass>::
+      LLVMCPUVerifyVectorSizeLegalityPassBase;
+  explicit LLVMCPUVerifyVectorSizeLegalityPass(
+      int64_t maxAllowedNumberOfNativeVectors) {
     this->maxAllowedNumberOfNativeVectors = maxAllowedNumberOfNativeVectors;
   }
 

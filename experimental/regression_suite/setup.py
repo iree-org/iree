@@ -23,7 +23,6 @@ setup(
         "pytest-timeout",
         "pytest-xdist",
         "pytest-check",
-        "PyYAML",
         "tabulate",
         "tqdm",
         "azure-storage-blob",

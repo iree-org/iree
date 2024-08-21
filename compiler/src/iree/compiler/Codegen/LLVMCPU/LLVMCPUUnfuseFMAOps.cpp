@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
@@ -12,6 +11,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUUNFUSEFMAOPSPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -36,7 +38,7 @@ public:
 
 namespace {
 struct LLVMCPUUnfuseFMAOpsPass
-    : LLVMCPUUnfuseFMAOpsBase<LLVMCPUUnfuseFMAOpsPass> {
+    : impl::LLVMCPUUnfuseFMAOpsPassBase<LLVMCPUUnfuseFMAOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect>();
   }
@@ -58,10 +60,4 @@ void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUUnfuseFMAOpsPass() {
-  return std::make_unique<LLVMCPUUnfuseFMAOpsPass>();
-}
-
 } // namespace mlir::iree_compiler

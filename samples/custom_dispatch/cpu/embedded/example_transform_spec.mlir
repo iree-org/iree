@@ -20,6 +20,14 @@
   #x86_64_target
 ]>
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
+  <0, bindings = [
+      <0, storage_buffer, ReadOnly>,
+      <1, storage_buffer, ReadOnly>,
+      <2, storage_buffer>
+  ]>
+]>
+
 module attributes {transform.with_named_sequence} {
 
   // Executable containing exported shims and calls to external functions.
@@ -31,14 +39,7 @@ module attributes {transform.with_named_sequence} {
         path = "samples/custom_dispatch/cpu/embedded/functions_x86_64.o"
       }>
     ]) {
-      hal.executable.export public @simple_mul_abs_negate ordinal(0)
-          layout(#hal.pipeline.layout<push_constants = 1, sets = [
-            <0, bindings = [
-                <0, storage_buffer, ReadOnly>,
-                <1, storage_buffer, ReadOnly>,
-                <2, storage_buffer>
-            ]>
-          ]>) {
+      hal.executable.export public @simple_mul_abs_negate ordinal(0) layout(#pipeline_layout) {
       ^bb0(%device: !hal.device, %workload: index):
         %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
         %c1 = arith.constant 1 : index
@@ -50,14 +51,14 @@ module attributes {transform.with_named_sequence} {
         }
         func.func @simple_mul_abs_negate() {
           %c0 = arith.constant 0 : index
-          %dim_i32 = hal.interface.constant.load[0] : i32
+          %dim_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
           %dim = arith.index_castui %dim_i32 : i32 to index
           %workgroup_id_x = hal.interface.workgroup.id[0] : index
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
-          %binding0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           func.call @simple_mul_abs_negate_workgroup(%binding0, %binding1, %binding2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
           return

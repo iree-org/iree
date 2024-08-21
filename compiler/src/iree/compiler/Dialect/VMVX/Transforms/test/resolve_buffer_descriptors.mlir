@@ -60,9 +60,15 @@ func.func @resolve_subview_rankreducing_not_at_the_end(%arg0: memref<8x16x4xf32>
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+
 func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index, index, index, index) {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<512x384xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<512x384xf32>
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xf32> -> !util.buffer, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
@@ -71,13 +77,19 @@ func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index,
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+
 func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer, index, index, index, index, index) {
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%arg0) : memref<512x384xindex>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%arg0) : memref<512x384xindex>
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xindex> -> !util.buffer, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
@@ -88,20 +100,26 @@ func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer,
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[INDEX_SIZE:.+]] = util.sizeof index
 // CHECK-DAG:   %[[OFFSET:.+]] = affine.apply #map()[%arg0, %[[INDEX_SIZE]]]
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+
 func.func @resolve_binding_subspan_dyn_dims(%arg0 : index, %arg1 : index) -> (!util.buffer, index, index, index, index, index) {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?x?xindex>{%arg0, %arg1}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?x?xindex>{%arg0, %arg1}
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<?x?xindex> -> !util.buffer, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
 //     CHECK: func @resolve_binding_subspan_dyn_dims(
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
+//     CHECK:   %[[CAST:.+]] = vmvx.get_raw_interface_binding_buffer layout({{.+}}) set(0) binding(0)
 //     CHECK:   return %[[CAST]], %{{.+}}, %arg0, %arg1, %arg1, %[[C1]]
 
 // -----

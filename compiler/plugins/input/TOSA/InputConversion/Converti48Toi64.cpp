@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/InputConversion/PassDetail.h"
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
@@ -16,7 +14,13 @@ using namespace mlir;
 
 namespace mlir::iree_compiler {
 
-class Converti48Toi64Pass : public Converti48Toi64Base<Converti48Toi64Pass> {
+#define GEN_PASS_DEF_CONVERTI48TOI64PASS
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc"
+
+namespace {
+
+class Converti48Toi64Pass final
+    : public impl::Converti48Toi64PassBase<Converti48Toi64Pass> {
 public:
   explicit Converti48Toi64Pass() = default;
   void runOnOperation() override;
@@ -174,9 +178,5 @@ void Converti48Toi64Pass::runOnOperation() {
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConverti48Toi64() {
-  return std::make_unique<Converti48Toi64Pass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler

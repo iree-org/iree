@@ -100,12 +100,16 @@ def EncodingAttr :
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the indexing map used by the operand index in the encoding.
+    /// Returns the bcast_map composed with the user_indexing_map for the
+    /// operand_index. The dimensions of the returned map are those of the
+    /// data-tiled op's iteration space, and the results of the map are in
+    /// the domain of the encoded tensor type.
     AffineMap getMapForOperandIndex();
 
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
-    /// matching index of the given encoding's tensor.
-    unsigned mapDimToOperandIndex(int64_t dimPos);
+    /// matching index of the given encoding's tensor, using getMapForOperandIndex
+    /// bcast_map and user_indexing_map.
+    std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos);
 
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();

@@ -127,6 +127,26 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the given operand fragment.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"materializeOperandConcreteShape",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
+        "::mlir::Value":$operand,
+        "std::optional<::llvm::ArrayRef<int64_t>>":$permutation,
+        "::llvm::SmallVector<::mlir::SmallVector<int64_t, 2>>&":$reassociations,
+        "::mlir::RankedTensorType&":$result_type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 }
 

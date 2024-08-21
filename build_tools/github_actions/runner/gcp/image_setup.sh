@@ -325,9 +325,6 @@ EOF
           bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
     }
 
-    check_docker gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807
-    check_docker gcr.io/iree-oss/nvidia-bleeding-edge@sha256:a3b7b78c66c6fe3383b01c7662982c63f708637af1f92a7890b3256c2f178aa7
-
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
     # images into the VM image, but that should be a separate decision.
     docker system prune --force --all

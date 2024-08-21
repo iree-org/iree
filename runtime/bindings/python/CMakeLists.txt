@@ -328,6 +328,14 @@ install(
   FILES_MATCHING PATTERN "*.py"
 )
 
+# Install iree/runtime/*.py files verbatim into the tree.
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/iree/_runtime/"
+  COMPONENT "${_INSTALL_COMPONENT}"
+  DESTINATION "${_INSTALL_DIR}/iree/_runtime/"
+  FILES_MATCHING PATTERN "*.py"
+)
+
 # _runtime.so -> python_packages/iree_runtime/iree/_runtime.so
 install(
   TARGETS iree_runtime_bindings_python_PyExtRt

@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -24,15 +23,17 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_MATERIALIZEHOMOGENEOUSENCODINGSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 using FunctionLikeNest =
     MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
+namespace {
 class MaterializeHomogeneousEncodingsPass
-    : public MaterializeHomogeneousEncodingsBase<
+    : public impl::MaterializeHomogeneousEncodingsPassBase<
           MaterializeHomogeneousEncodingsPass> {
 public:
-  MaterializeHomogeneousEncodingsPass() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, tensor::TensorDialect>();
   }
@@ -78,10 +79,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createMaterializeHomogeneousEncodingsPass() {
-  return std::make_unique<MaterializeHomogeneousEncodingsPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::GlobalOptimization

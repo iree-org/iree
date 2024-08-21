@@ -528,8 +528,8 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
   dst_buffer.reset();
 
   iree::vm::ref<iree_hal_semaphore_t> semaphore;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_create(device_.device(), 0ull, &semaphore));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      device_.device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
 
   // Signaled when `dst_buffer` is ready to be consumed.
   iree::vm::ref<iree_hal_fence_t> dst_buffer_ready_fence;
@@ -759,10 +759,10 @@ iree_status_t DeviceInstance::OpenDevice() {
       driver_, /*device_id=*/info_.device_id(),
       /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
       &device_));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_create(device(), 0ull, &main_timeline_));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_create(device(), 0ull, &transfer_timeline_));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &main_timeline_));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &transfer_timeline_));
 
   return iree_ok_status();
 }

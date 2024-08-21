@@ -27,6 +27,7 @@ Dialect                     | Description
 [IO/Parameters](./IOParameters.md) | External parameter resource management APIs
 [IREECodegen](./IREECodegen.md) | Common functionality used by IREE code generation
 [IREEGPU](./IREEGPU.md) | Common functionality used by GPU focused IREE code generation
+[IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 [LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
 [Util](./Util.md)           | Types and ops common across IREE subdialects
@@ -44,6 +45,5 @@ mechanism.
 Dialect                             | Description
 ------------------------------------| -----------
 [IREEInput](./IREEInput.md)         | Structural ops legal as input to IREE's compiler
-[IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 
 [^1]: Hardware Abstraction Layer

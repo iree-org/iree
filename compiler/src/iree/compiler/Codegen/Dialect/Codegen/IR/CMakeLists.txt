@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRInferTypeOpInterface
     MLIRMemRefDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRSupport
     MLIRTransformDialect
     MLIRTransformDialectTransforms

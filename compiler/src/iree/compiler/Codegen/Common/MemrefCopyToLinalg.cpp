@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -13,6 +12,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_MEMREFCOPYTOLINALGPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
@@ -30,8 +32,8 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
   }
 };
 
-struct MemrefCopyToLinalgPass
-    : public MemrefCopyToLinalgPassBase<MemrefCopyToLinalgPass> {
+struct MemrefCopyToLinalgPass final
+    : impl::MemrefCopyToLinalgPassBase<MemrefCopyToLinalgPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -48,10 +50,4 @@ struct MemrefCopyToLinalgPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createMemrefCopyToLinalgPass() {
-  return std::make_unique<MemrefCopyToLinalgPass>();
-}
-
 } // namespace mlir::iree_compiler

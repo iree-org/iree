@@ -60,7 +60,6 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
-        "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
     ],

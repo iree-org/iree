@@ -9,14 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
-def Conversion : Pass<"iree-hal-inline-conversion", "mlir::ModuleOp"> {
+def ConversionPass : Pass<"iree-hal-inline-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from various dialects to the HAL inline dialect";
-  let constructor = "mlir::iree_compiler::IREE::HAL::Inline::createConversionPass()";
 }
 
-def InlineExecutables : Pass<"iree-hal-inline-executables", "mlir::ModuleOp"> {
+def InlineExecutablesPass : Pass<"iree-hal-inline-executables", "mlir::ModuleOp"> {
   let summary = "Inlines translated executable functions into the host program";
-  let constructor = "mlir::iree_compiler::IREE::HAL::Inline::createInlineExecutablesPass()";
 }
 
 #endif  // IREE_MODULES_HAL_INLINE_PASSES

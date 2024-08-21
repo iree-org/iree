@@ -14,6 +14,3 @@ sympy==1.12.1
 # TODO: nanobind is used in the runtime but the compiler uses pybind and
 # removing this breaks CI bots; remove this.
 pybind11>=2.10.1
-
-# TODO: not required but needed for weird CI reasons; remove this.
-PyYAML>=5.4.1

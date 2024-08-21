@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -19,6 +18,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -32,6 +32,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVLOWEREXECUTABLETARGETPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 namespace {
@@ -39,11 +42,12 @@ namespace {
 /// code. Invokes different compilation pipeline to
 /// - first lower to scalar/native-vector code,
 /// - then convert to SPIRV dialect.
-class SPIRVLowerExecutableTargetPass
-    : public SPIRVLowerExecutableTargetBase<SPIRVLowerExecutableTargetPass> {
+class SPIRVLowerExecutableTargetPass final
+    : public impl::SPIRVLowerExecutableTargetPassBase<
+          SPIRVLowerExecutableTargetPass> {
 public:
-  SPIRVLowerExecutableTargetPass() = default;
-  SPIRVLowerExecutableTargetPass(const SPIRVLowerExecutableTargetPass &pass) {}
+  using impl::SPIRVLowerExecutableTargetPassBase<
+      SPIRVLowerExecutableTargetPass>::SPIRVLowerExecutableTargetPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -138,11 +142,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   if (failed(runPipeline(pipeline, funcOp))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createSPIRVLowerExecutableTargetPass() {
-  return std::make_unique<SPIRVLowerExecutableTargetPass>();
 }
 
 } // namespace mlir::iree_compiler

@@ -117,11 +117,11 @@ util.func public @fuse_generic_gather2(
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
-util.func @output_transpose_map(%arg0: tensor<2x128x128x320xf32>) -> tensor<2x320x128x128xf16> {
+#ident = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#perm = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2, d1)>
+util.func @single_input_interchange(%arg0: tensor<2x128x128x320xf32>) -> tensor<2x320x128x128xf16> {
   %0 = tensor.empty() : tensor<2x320x128x128xf16>
-  %1 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<2x128x128x320xf32>) outs(%0 : tensor<2x320x128x128xf16>) {
+  %1 = linalg.generic {indexing_maps = [#perm, #ident], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<2x128x128x320xf32>) outs(%0 : tensor<2x320x128x128xf16>) {
   ^bb0(%in: f32, %out: f16):
     %2 = arith.truncf %in : f32 to f16
     linalg.yield %2 : f16
@@ -129,8 +129,62 @@ util.func @output_transpose_map(%arg0: tensor<2x128x128x320xf32>) -> tensor<2x32
   util.return %1 : tensor<2x320x128x128xf16>
 }
 
-// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: util.func public @output_transpose_map
+// CHECK-DAG: #[[$IDENT_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[$PERM_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2, d1)>
+// CHECK-LABEL: util.func public @single_input_interchange
+// CHECK-SAME:    %[[ARG0:.*]]: tensor<2x128x128x320xf32>
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<2x320x128x128xf16>
 // CHECK:         linalg.generic
-// CHECK-SAME:      indexing_maps = [#[[$MAP0]], #[[$MAP1]]]
+// CHECK-SAME:      indexing_maps = [#[[$IDENT_MAP]], #[[$PERM_MAP]]]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<2x128x128x320xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<2x320x128x128xf16>)
+
+// -----
+
+#ident = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#perm = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2, d1)>
+util.func @multi_input_interchange(%arg0: tensor<2x128x128x320xf32>) -> tensor<2x320x128x128xf16> {
+  %0 = tensor.empty() : tensor<2x320x128x128xf16>
+  %1 = linalg.generic {indexing_maps = [#perm, #perm, #ident], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0, %arg0 : tensor<2x128x128x320xf32>, tensor<2x128x128x320xf32>) outs(%0 : tensor<2x320x128x128xf16>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f16):
+    %2 = arith.addf %in, %in_1 : f32
+    %3 = arith.truncf %2 : f32 to f16
+    linalg.yield %3 : f16
+  } -> tensor<2x320x128x128xf16>
+  util.return %1 : tensor<2x320x128x128xf16>
+}
+
+// CHECK-DAG: #[[$IDENT_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[$PERM_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2, d1)>
+// CHECK-LABEL: util.func public @multi_input_interchange
+// CHECK-SAME:    %[[ARG0:.*]]: tensor<2x128x128x320xf32>
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<2x320x128x128xf16>
+// CHECK:         linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$IDENT_MAP]], #[[$IDENT_MAP]], #[[$PERM_MAP]]]
+// CHECK-SAME:      ins(%[[ARG0]], %[[ARG0]] : tensor<2x128x128x320xf32>, tensor<2x128x128x320xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<2x320x128x128xf16>)
+
+// -----
+
+#ident = affine_map<(d0, d1) -> (d0, d1)>
+#perm0 = affine_map<(d0, d1) -> (d1, d0)>
+util.func @multi_input_no_interchange(%arg0: tensor<10x10xf32>) -> tensor<10x10xf16> {
+  %0 = tensor.empty() : tensor<10x10xf16>
+  %1 = linalg.generic {indexing_maps = [#ident, #perm0, #perm0], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg0 : tensor<10x10xf32>, tensor<10x10xf32>) outs(%0 : tensor<10x10xf16>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f16):
+    %2 = arith.addf %in, %in_1 : f32
+    %3 = arith.truncf %2 : f32 to f16
+    linalg.yield %3 : f16
+  } -> tensor<10x10xf16>
+  util.return %1 : tensor<10x10xf16>
+}
+
+// CHECK-DAG: #[[$IDENT_MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[$PERM_MAP0:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-LABEL: util.func public @multi_input_no_interchange
+// CHECK-SAME:    %[[ARG0:.*]]: tensor<10x10xf32>
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<10x10xf16>
+// CHECK:         linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$IDENT_MAP]], #[[$PERM_MAP0]], #[[$PERM_MAP0]]]
+// CHECK-SAME:      ins(%[[ARG0]], %[[ARG0]] : tensor<10x10xf32>, tensor<10x10xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<10x10xf16>)

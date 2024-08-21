@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
@@ -26,6 +25,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_CONVERTCONV2DTOWINOGRADPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 static const char kWinogradAttr[] = "__winograd_conv";
 
@@ -403,8 +405,11 @@ private:
 ///   }
 /// }
 /// ```
-struct ConvertConv2DToWinogradPass
-    : ConvertConv2DToWinogradBase<ConvertConv2DToWinogradPass> {
+struct ConvertConv2DToWinogradPass final
+    : impl::ConvertConv2DToWinogradPassBase<ConvertConv2DToWinogradPass> {
+  using impl::ConvertConv2DToWinogradPassBase<
+      ConvertConv2DToWinogradPass>::ConvertConv2DToWinogradPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>();
@@ -423,10 +428,4 @@ struct ConvertConv2DToWinogradPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertConv2DToWinogradPass() {
-  return std::make_unique<ConvertConv2DToWinogradPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::LinalgExt

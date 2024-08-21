@@ -5,15 +5,18 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_CLEANUPNUMERICNARROWINGPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 namespace {
 
 class CleanupNumericNarrowingPass
-    : public CleanupNumericNarrowingBase<CleanupNumericNarrowingPass> {
+    : public impl::CleanupNumericNarrowingPassBase<
+          CleanupNumericNarrowingPass> {
   void runOnOperation() override {
     getOperation()->walk([](IREE::Util::NumericOptionalNarrowOp op) {
       op.getResult().replaceAllUsesWith(op.getOperand());
@@ -23,9 +26,4 @@ class CleanupNumericNarrowingPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createCleanupNumericNarrowingPass() {
-  return std::make_unique<CleanupNumericNarrowingPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

@@ -36,93 +36,27 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions);
 
-//===----------------------------------------------------------------------===//
-// Input canonicalization and legalization
-//===----------------------------------------------------------------------===//
+//------------------------------------------------------------------------------
+// Wrappers that not use tablegen options.
+//------------------------------------------------------------------------------
 
-/// Cleans up any numeric narrowing ops inserted by
-/// iree-global-opt-infer-numeric-narrowing.
-std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
-
-/// Converts linalg convolution ops with 1x1 kernels into linalg.matmul.
-std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
-
-/// Fuses dequantization and matmul linalg.generic ops
-std::unique_ptr<Pass>
-createDecomposeConcatPass(bool enableConcatTransposition = false);
+std::unique_ptr<Pass> createDecomposeConcatPass(bool enableConcatTransposition);
 
 // Used by the demoteContractionInputsToBF16 pass to determine which op inputs
 // to demote.
 enum class DemotionOption { All, Conv, Matmul, None };
+std::unique_ptr<Pass>
+createDemoteContractionInputsToBF16Pass(DemotionOption option);
 
-/// Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.
-std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass(
-    DemotionOption option = DemotionOption::None);
-
-/// Detaches elementwise ops from named Linalg ops.
-std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
-
-/// Applies patterns to erase unused linalg operands and remove dead code
-/// associated.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createEraseUnusedLinalgOperands();
-
-/// Expands tensor shape dimensions into SSA values across the program.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
-
-/// Fuses dequantization and matmul linalg.generic ops
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseDequantizationMatmulPass(
-    bool enableQuantizedMatmulReassociation = false);
+createPropagateLinalgTransposePass(bool enableAggressivePropagation);
 
-/// Horizontally fuses multiple contraction ops.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseHorizontalContractionsPass();
+//----------------------------------------------------------------------------//
+// Register GlobalOptimization Passes
+//----------------------------------------------------------------------------//
 
-/// Fuses two matmul ops and a linalg.generic Silu op
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseSiluHorizontalMatmulPass();
-
-/// Generalizes some named Linalg ops into `linalg.generic` operations since the
-/// compiler can handle that better.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass();
-
-/// Infers and inserts util.numeric.optional_narrow ops at points that may be
-/// beneficial.
-std::unique_ptr<Pass> createInferNumericNarrowingPass();
-
-/// Materializes logical encodings to physical encodings if there is a single
-/// device target.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeHomogeneousEncodingsPass();
-
-/// Optimizes numerics given annotations added via
-/// iree-global-opt-infer-numeric-narrowing.
-std::unique_ptr<Pass> createOptimizeNumericsPass();
-
-/// Propagates linalg.transpose ops to a restricted set of operations.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createPropagateLinalgTransposePass(bool enableAggressivePropagation = false);
-
-/// Performs specialized raisings of various sequences of ops to a
-/// representation easier for the compiler to handle.
-std::unique_ptr<Pass> createRaiseSpecialOps();
-
-/// Removes tensors that have 0-extents.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createRemoveZeroExtentTensorsPass();
-
-/// Simplifies tensor pack/unpack ops to reshape ops.
-std::unique_ptr<Pass> createSimplifyPackUnpackPass();
-
-/// Hoist loop invariants out of loops with zero-trip-check.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGlobalLoopInvariantCodeMotionPass();
-
-/// Propagate pack/unpack ops across other ops to improve fusion.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDataLayoutPropagationPass();
+#define GEN_PASS_DECL
+#include "iree/compiler/GlobalOptimization/Passes.h.inc" // IWYU pragma: keep
 
 void registerGlobalOptimizationPipeline();
 

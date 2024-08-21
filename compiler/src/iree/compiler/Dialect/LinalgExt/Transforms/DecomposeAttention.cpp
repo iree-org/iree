@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -15,6 +14,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_DECOMPOSEATTENTIONPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -337,19 +339,15 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 }
 
 namespace {
-struct DecomposeAttentionPass
-    : public DecomposeAttentionBase<DecomposeAttentionPass> {
+struct DecomposeAttentionPass final
+    : impl::DecomposeAttentionPassBase<DecomposeAttentionPass> {
+  using impl::DecomposeAttentionPassBase<
+      DecomposeAttentionPass>::DecomposeAttentionPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
         linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
-  }
-  DecomposeAttentionPass() = default;
-  DecomposeAttentionPass(bool onlyTile, uint64_t tileSize) {
-    this->tileSize = tileSize;
-  }
-  DecomposeAttentionPass(const DecomposeAttentionPass &pass) {
-    tileSize = pass.tileSize;
   }
   void runOnOperation() override;
 };
@@ -377,9 +375,4 @@ void DecomposeAttentionPass::runOnOperation() {
     rewriter.replaceOp(onlineAtt, results.value());
   });
 }
-
-std::unique_ptr<Pass> createDecomposeAttentionPass() {
-  return std::make_unique<DecomposeAttentionPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::LinalgExt

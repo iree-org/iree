@@ -50,7 +50,7 @@ util.func public @all_reduce_min_non_default_channel(%arg: tensor<1xi8>) -> tens
   // CHECK-DAG: %[[INITIAL_VAL:.+]] = tensor.empty() : tensor<1xi8>
   //      CHECK: %[[RES:.+]] = flow.collective.all_reduce minimum, ui8, %[[INITIAL_VAL]], %[[ARG]], %[[CHANNEL]]
   // CHECK-SAME: (tensor<1xi8>, tensor<1xi8>, !flow.channel) -> %[[INITIAL_VAL]] as tensor<1xi8>
-  %0 = mesh.all_reduce %arg on @mesh_2d mesh_axes = [1, 0] reduction = <min>
+  %0 = mesh.all_reduce %arg on @mesh_2d mesh_axes = [1, 0] reduction = min
       : tensor<1xi8> -> tensor<1xi8>
   //      CHECK: util.return %[[RES]] : tensor<1xi8>
   util.return %0 : tensor<1xi8>

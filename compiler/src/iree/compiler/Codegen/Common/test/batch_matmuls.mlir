@@ -1,6 +1,5 @@
 // RUN: iree-opt %s \
-// RUN: --iree-codegen-transform-dialect-library=%p/batch_matmul_match_spec.mlir \
-// RUN: --iree-transform-dialect-interpreter \
+// RUN: --iree-transform-dialect-interpreter="library-file-name=%p/batch_matmul_match_spec.mlir" \
 // RUN: --split-input-file --verify-diagnostics
 
 !lhs = tensor<128x80x32xf32>

@@ -70,11 +70,9 @@ iree_lit_test_suite(
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
     "ukernel_pipeline_transform.mlir"
-    "vector_distribute_conversion.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
-    "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck
     iree-opt

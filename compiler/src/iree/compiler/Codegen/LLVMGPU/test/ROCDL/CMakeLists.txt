@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "config_tile_and_fuse.mlir"
     "config_user_vector_distribute.mlir"
     "config_vector_distribute.mlir"
     "lowering_scalar_dispatch.mlir"

@@ -193,10 +193,8 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 struct VectorReductionToGPUPass final
     : impl::VectorReductionToGPUPassBase<VectorReductionToGPUPass> {
-  VectorReductionToGPUPass(bool expandSubgroupReduction,
-                           bool pickLargestSubroupSize)
-      : expandSubgroupReduction(expandSubgroupReduction),
-        pickLargestSubroupSize(pickLargestSubroupSize) {}
+  VectorReductionToGPUPass(bool expandSubgroupReduction)
+      : expandSubgroupReduction(expandSubgroupReduction) {}
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
@@ -258,8 +256,7 @@ struct VectorReductionToGPUPass final
     // 4. Distribute transfer write operations and propagate vector
     // distribution.
     {
-      std::optional<int> subgroupSize =
-          getGPUSubgroupSize(funcOp, pickLargestSubroupSize);
+      std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
       if (!subgroupSize) {
         funcOp->emitOpError("missing subgroup size");
         return signalPassFailure();
@@ -316,16 +313,13 @@ struct VectorReductionToGPUPass final
 
 private:
   bool expandSubgroupReduction;
-  bool pickLargestSubroupSize;
 };
 
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertVectorReductionToGPUPass(bool expandSubgroupReduction,
-                                      bool pickLargestSubroupSize) {
-  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction,
-                                                    pickLargestSubroupSize);
+createConvertVectorReductionToGPUPass(bool expandSubgroupReduction) {
+  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction);
 }
 
 } // namespace mlir::iree_compiler

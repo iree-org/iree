@@ -9,19 +9,16 @@
 
 include "mlir/Pass/PassBase.td"
 
-def Conversion : Pass<"iree-hal-loader-conversion", "mlir::ModuleOp"> {
+def ConversionPass : Pass<"iree-hal-loader-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from various dialects to the HAL loader dialect";
-  let constructor = "mlir::iree_compiler::IREE::HAL::Loader::createConversionPass()";
 }
 
-def MaterializeExecutables : Pass<"iree-hal-loader-materialize-executables", "mlir::ModuleOp"> {
+def MaterializeExecutablesPass : Pass<"iree-hal-loader-materialize-executables", "mlir::ModuleOp"> {
   let summary = "Materializes executable globals and loader code";
-  let constructor = "mlir::iree_compiler::IREE::HAL::Loader::createMaterializeExecutablesPass()";
 }
 
-def ResolveExportOrdinals : Pass<"iree-hal-loader-resolve-export-ordinals", "mlir::ModuleOp"> {
+def ResolveExportOrdinalsPass : Pass<"iree-hal-loader-resolve-export-ordinals", "mlir::ModuleOp"> {
   let summary = "Resolves dispatch operation target export entry point ordinals";
-  let constructor = "mlir::iree_compiler::IREE::HAL::Loader::createResolveExportOrdinalsPass()";
 }
 
 #endif  // IREE_MODULES_HAL_LOADER_PASSES

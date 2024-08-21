@@ -268,39 +268,35 @@ makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
     SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
       bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
-          builder.getContext(), binding.ordinal, binding.type,
-          binding.flags != IREE::HAL::DescriptorFlags::None
-              ? binding.flags
-              : std::optional<IREE::HAL::DescriptorFlags>{}));
-    }
-    std::optional<IREE::HAL::DescriptorSetLayoutFlags> flags;
-    if (targetAttr.hasConfigurationAttr("hal.bindings.indirect")) {
-      flags = IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+          builder.getContext(), binding.ordinal, binding.type, binding.flags));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
-        builder.getContext(), setLayout.ordinal, bindingAttrs, flags));
+        builder.getContext(), setLayout.ordinal, bindingAttrs,
+        setLayout.flags));
   }
   return IREE::HAL::PipelineLayoutAttr::get(
       builder.getContext(), pipelineLayout.pushConstantCount, setLayoutAttrs);
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
-static void convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp,
-                                BlockArgument arg, unsigned pushConstantIdx,
-                                OpBuilder &builder) {
+static void
+convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
+                    IREE::HAL::PipelineLayoutAttr pipelineLayoutAttr,
+                    unsigned pushConstantIdx, OpBuilder &builder) {
   auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
       arg.getArgNumber(), "stream.alignment");
   auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
                                                              "stream.values");
   auto loadOp = builder.create<IREE::HAL::InterfaceConstantLoadOp>(
-      arg.getLoc(), arg.getType(), builder.getIndexAttr(pushConstantIdx),
-      alignmentAttr, valuesAttr);
+      arg.getLoc(), arg.getType(), pipelineLayoutAttr,
+      builder.getIndexAttr(pushConstantIdx), alignmentAttr, valuesAttr);
   arg.replaceAllUsesWith(loadOp);
 }
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
 static void
 convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
+                    IREE::HAL::PipelineLayoutAttr pipelineLayoutAttr,
                     IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
                     IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
   if (arg.use_empty())
@@ -312,10 +308,10 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
-        APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
-        oldOp.getByteOffset(), oldOp.getDynamicDims(), alignmentAttr,
-        bindingAttr.getFlags());
+        oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
+        APInt(64, setLayoutAttr.getOrdinal()),
+        APInt(64, bindingAttr.getOrdinal()), oldOp.getByteOffset(),
+        oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }
@@ -342,7 +338,8 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
     if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
-      convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
+      convertOperandUsage(sourceFuncOp, arg, layoutAttr, operandIdx++,
+                          entryBuilder);
     }
   }
   unsigned resourceIdx = 0;
@@ -351,9 +348,12 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
       continue; // unhandled arg type (primitive/etc)
     }
     auto setBinding = resourceMap[resourceIdx++];
-    auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
-    auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
-    convertBindingUsage(sourceFuncOp, arg, setLayoutAttr, bindingAttr);
+    auto setLayoutAttr = layoutAttr.getSetLayout(setBinding.first);
+    assert(setLayoutAttr && "layout must be consistent");
+    auto bindingAttr = setLayoutAttr.getBinding(setBinding.second);
+    assert(bindingAttr && "layout must be consistent");
+    convertBindingUsage(sourceFuncOp, arg, layoutAttr, setLayoutAttr,
+                        bindingAttr);
   }
 
   // Remove all arguments now that we've turned them into lookup ops.

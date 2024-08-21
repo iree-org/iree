@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXTypes.h"
-#include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,11 +20,16 @@
 
 namespace mlir::iree_compiler::IREE::VMVX {
 
+#define GEN_PASS_DEF_MATERIALIZECONSTANTSPASS
+#include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
+
+namespace {
+
 static const char *kConstantBlockGlobalPrefix = "__constant_";
 static const char *kConstantBlockSetterName = "__set_constants";
 
-class MaterializeConstantsPass
-    : public MaterializeConstantsBase<MaterializeConstantsPass> {
+class MaterializeConstantsPass final
+    : public impl::MaterializeConstantsPassBase<MaterializeConstantsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -128,10 +132,5 @@ public:
     setterBuilder.create<func::ReturnOp>(setterOp.getLoc());
   }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeConstantsPass() {
-  return std::make_unique<MaterializeConstantsPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::VMVX

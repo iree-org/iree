@@ -5,6 +5,12 @@
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android29"}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 func.func @mmt4d_kernel_dispatch() attributes {hal.executable.target = #target} {
   %c0_i8 = arith.constant 0 : i8
   %cst = arith.constant dense<0> : vector<1x1x8x8xi32>
@@ -13,11 +19,11 @@ func.func @mmt4d_kernel_dispatch() attributes {hal.executable.target = #target} 
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c64 = arith.constant 64 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x2x8x4xi8>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<1x2x8x4xi8>
   memref.assume_alignment %0, 64 : memref<1x2x8x4xi8>
-  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c64) : memref<1x2x8x4xi8>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c64) : memref<1x2x8x4xi8>
   memref.assume_alignment %1, 64 : memref<1x2x8x4xi8>
-  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c128) : memref<1x1x8x8xi32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c128) : memref<1x1x8x8xi32>
   memref.assume_alignment %2, 64 : memref<1x1x8x8xi32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index

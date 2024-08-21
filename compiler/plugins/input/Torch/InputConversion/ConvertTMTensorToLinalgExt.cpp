@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <numeric>
 
-#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -19,6 +18,9 @@
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
 
 namespace mlir::iree_compiler::TorchInput {
+
+#define GEN_PASS_DEF_CONVERTTMTENSORTOLINALGEXTPASS
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 namespace {
 
@@ -156,8 +158,10 @@ namespace {
 // Pass
 //===----------------------------------------------------------------------===//
 
-struct ConvertTMTensorToLinalgExtPass
-    : public ConvertTMTensorToLinalgExtBase<ConvertTMTensorToLinalgExtPass> {
+class ConvertTMTensorToLinalgExtPass final
+    : public impl::ConvertTMTensorToLinalgExtPassBase<
+          ConvertTMTensorToLinalgExtPass> {
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
     registry.insert<tensor::TensorDialect>();
@@ -189,10 +193,5 @@ struct ConvertTMTensorToLinalgExtPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertTMTensorToLinalgExtPass() {
-  return std::make_unique<ConvertTMTensorToLinalgExtPass>();
-}
 
 } // namespace mlir::iree_compiler::TorchInput

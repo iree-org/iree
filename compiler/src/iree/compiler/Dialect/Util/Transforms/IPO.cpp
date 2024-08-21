@@ -537,7 +537,7 @@ static bool applyFuncChanges(FuncAnalysis &analysis,
 
 // Returns true if any changes were made.
 static bool applyCallChanges(FuncAnalysis &analysis,
-                             IREE::Util::CallOp callOp) {
+                             IREE::Util::CallOp &callOp) {
   // Build the new set of call operands.
   SmallVector<Value> oldOperands = callOp.getOperands();
   SmallVector<Value> newOperands;
@@ -622,7 +622,23 @@ static bool applyCallChanges(FuncAnalysis &analysis,
   // Erase old op now that all uses are (or should be) replaced.
   callOp.erase();
 
+  callOp = newCallOp;
   return true;
+}
+
+// Returns true if |funcOp| performs no work (no args/results, no ops).
+// We could make this a little smarter in the future by checking that there's
+// no side-effecting work.
+static bool isFuncEmpty(FunctionOpInterface funcOp) {
+  if (funcOp.isExternal()) {
+    return false;
+  } else if (funcOp.getNumArguments() > 0 || funcOp.getNumResults() > 0) {
+    return false;
+  } else if (funcOp.getBlocks().size() > 1) {
+    return false;
+  } else {
+    return funcOp.front().getOperations().size() == 1;
+  }
 }
 
 class IPOPass : public IPOBase<IPOPass> {
@@ -661,11 +677,21 @@ public:
     // Use analysis results to mutate functions.
     bool anyChanges = false;
     for (auto &analysis : analysisResults) {
-      if (analysis.isIncomplete)
+      if (analysis.isIncomplete) {
         continue;
+      }
       anyChanges = applyFuncChanges(analysis, analysis.funcOp) || anyChanges;
-      for (auto callOp : analysis.callOps) {
+      for (auto &callOp : analysis.callOps) {
         anyChanges = applyCallChanges(analysis, callOp) || anyChanges;
+      }
+      if (isFuncEmpty(analysis.funcOp)) {
+        // If the function is empty after the changes then erase it and all
+        // calls to it.
+        for (auto callOp : analysis.callOps) {
+          callOp.erase();
+        }
+        analysis.funcOp.erase();
+        anyChanges = true;
       }
     }
 

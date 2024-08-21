@@ -28,8 +28,8 @@ hal.executable private @pooling_nhwc_sum_f32 {
         %c8 = arith.constant 8 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
         %2 = tensor.empty() : tensor<12x12xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index

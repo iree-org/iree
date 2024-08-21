@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
-#include "iree/compiler/Modules/HAL/Loader/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -18,6 +17,11 @@
 #include "mlir/Pass/PassRegistry.h"
 
 namespace mlir::iree_compiler::IREE::HAL::Loader {
+
+#define GEN_PASS_DEF_MATERIALIZEEXECUTABLESPASS
+#include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h.inc"
+
+namespace {
 
 static void replaceExecutableWithGlobal(
     IREE::HAL::ExecutableOp executableOp,
@@ -130,8 +134,8 @@ static void replaceExecutableWithGlobal(
 }
 
 // Runs conversion with registered input dialects.
-class MaterializeExecutablesPass
-    : public MaterializeExecutablesBase<MaterializeExecutablesPass> {
+class MaterializeExecutablesPass final
+    : public impl::MaterializeExecutablesPassBase<MaterializeExecutablesPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -164,9 +168,5 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeExecutablesPass() {
-  return std::make_unique<MaterializeExecutablesPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::HAL::Loader

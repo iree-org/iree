@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -48,18 +47,20 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_CONVERTTODESTINATIONPASSINGSTYLEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
-class ConvertToDestinationPassingStylePass
-    : public ConvertToDestinationPassingStyleBase<
+class ConvertToDestinationPassingStylePass final
+    : public impl::ConvertToDestinationPassingStylePassBase<
           ConvertToDestinationPassingStylePass> {
 public:
-  ConvertToDestinationPassingStylePass() = default;
-  ConvertToDestinationPassingStylePass(bool useWARForCooperativeMatrixCodegen) {
+  using impl::ConvertToDestinationPassingStylePassBase<
+      ConvertToDestinationPassingStylePass>::
+      ConvertToDestinationPassingStylePassBase;
+  explicit ConvertToDestinationPassingStylePass(
+      bool useWARForCooperativeMatrixCodegen) {
     this->useWARForCooperativeMatrixCodegen = useWARForCooperativeMatrixCodegen;
-  }
-  ConvertToDestinationPassingStylePass(
-      const ConvertToDestinationPassingStylePass &pass) {
-    useWARForCooperativeMatrixCodegen = pass.useWARForCooperativeMatrixCodegen;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -623,9 +624,11 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
     return signalPassFailure();
   }
 
-  if (failed(adaptComputeConsumerToAvoidStackAllocation(
-          funcOp, useWARForCooperativeMatrixCodegen))) {
-    return signalPassFailure();
+  if (convertInputsToDestinations) {
+    if (failed(adaptComputeConsumerToAvoidStackAllocation(
+            funcOp, useWARForCooperativeMatrixCodegen))) {
+      return signalPassFailure();
+    }
   }
 
   {

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -13,10 +12,14 @@
 
 namespace mlir::iree_compiler::InputConversion {
 
+#define GEN_PASS_DEF_SANITIZEMODULENAMESPASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+
 namespace {
 
-struct SanitizeModuleNamesPass
-    : public SanitizeModuleNamesBase<SanitizeModuleNamesPass> {
+class SanitizeModuleNamesPass final
+    : public impl::SanitizeModuleNamesPassBase<SanitizeModuleNamesPass> {
+public:
   void runOnOperation() override {
     // MLIR identifiers must match this regex:
     //   (letter|[_]) (letter|digit|[_$.])*
@@ -36,9 +39,4 @@ struct SanitizeModuleNamesPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass() {
-  return std::make_unique<SanitizeModuleNamesPass>();
-}
-
 } // namespace mlir::iree_compiler::InputConversion

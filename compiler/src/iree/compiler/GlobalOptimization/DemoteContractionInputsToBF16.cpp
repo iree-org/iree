@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -18,6 +17,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_DEMOTECONTRACTIONINPUTSTOBF16PASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -133,12 +135,13 @@ private:
 };
 
 class DemoteContractionInputsToBF16Pass
-    : public DemoteContractionInputsToBF16Base<
+    : public impl::DemoteContractionInputsToBF16PassBase<
           DemoteContractionInputsToBF16Pass> {
-
 public:
+  using impl::DemoteContractionInputsToBF16PassBase<
+      DemoteContractionInputsToBF16Pass>::DemoteContractionInputsToBF16PassBase;
   explicit DemoteContractionInputsToBF16Pass(const DemotionOption &option) {
-    this->demoteOnly.setValue(option);
+    this->demoteOnly = option;
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();

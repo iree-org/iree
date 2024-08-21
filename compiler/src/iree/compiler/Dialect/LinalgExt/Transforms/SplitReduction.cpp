@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,6 +24,10 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_TOPKSPLITREDUCTIONPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
+
 namespace {
 
 // Marker used as attribute the depth of the split reduction transformations.
@@ -289,8 +292,11 @@ void setSplitReductionDepth(TopkOp topkOp, RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct TopkSplitReductionPass
-    : public TopkSplitReductionBase<TopkSplitReductionPass> {
+struct TopkSplitReductionPass final
+    : impl::TopkSplitReductionPassBase<TopkSplitReductionPass> {
+  using impl::TopkSplitReductionPassBase<
+      TopkSplitReductionPass>::TopkSplitReductionPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, arith::ArithDialect, math::MathDialect,
@@ -397,8 +403,4 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   return success();
 }
 
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createTopkSplitReductionPass() {
-  return std::make_unique<TopkSplitReductionPass>();
-}
 } // namespace mlir::iree_compiler::IREE::LinalgExt

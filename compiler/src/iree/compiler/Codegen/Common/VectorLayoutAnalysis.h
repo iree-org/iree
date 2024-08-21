@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 #define IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 
 namespace mlir {

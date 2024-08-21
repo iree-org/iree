@@ -28,7 +28,7 @@ void VectorizeIREEGPUOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   populateIREEGPUVectorizationPatterns(patterns);
-  populateIREEGPULowerShuffleTensorPatterns(patterns);
+  populateIREEGPULowerBarrierRegionPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

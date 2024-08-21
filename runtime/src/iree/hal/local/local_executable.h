@@ -31,8 +31,8 @@ typedef struct iree_hal_local_executable_t {
 
   // Defines per-entry point how much workgroup local memory is required.
   // Contains entries with 0 to indicate no local memory is required or >0 in
-  // units of IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE for the minimum amount
-  // of memory required by the function.
+  // units of IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE for the
+  // minimum amount of memory required by the function.
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs;
 
   // Execution environment.

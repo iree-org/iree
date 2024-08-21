@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -23,9 +22,10 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_FUSESILUHORIZONTALMATMULPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -169,16 +169,12 @@ public:
 };
 
 struct FuseSiluHorizontalMatmulPass
-    : public FuseSiluHorizontalMatmulBase<FuseSiluHorizontalMatmulPass> {
-
+    : public impl::FuseSiluHorizontalMatmulPassBase<
+          FuseSiluHorizontalMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, IREE::Flow::FlowDialect,
                     math::MathDialect>();
   }
-  FuseSiluHorizontalMatmulPass() {}
-  FuseSiluHorizontalMatmulPass(const FuseSiluHorizontalMatmulPass &pass)
-      : FuseSiluHorizontalMatmulPass() {}
-
   void runOnOperation() override;
 };
 
@@ -195,11 +191,4 @@ void FuseSiluHorizontalMatmulPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseSiluHorizontalMatmulPass() {
-  return std::make_unique<FuseSiluHorizontalMatmulPass>();
-}
-
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

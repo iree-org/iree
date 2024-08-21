@@ -38,18 +38,11 @@ void buildHALInlineStaticTransformPassPipeline(
     const TargetOptions &targetOptions);
 
 //===----------------------------------------------------------------------===//
-// Passes
-//===----------------------------------------------------------------------===//
-
-// Inlines translated executable functions into the host program.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createInlineExecutablesPass();
-
-// Converts from the stream dialect into the hal_inline dialect.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
-
-//===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h.inc"
 
 void registerHALInlinePasses();
 

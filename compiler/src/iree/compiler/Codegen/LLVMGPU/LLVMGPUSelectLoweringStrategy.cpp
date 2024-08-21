@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -28,13 +27,19 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPUSELECTLOWERINGSTRATEGYPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 /// Selects a lowering strategy for taking a hal.executable.variant operation
 /// to scalar/native-vector code.
-class LLVMGPUSelectLoweringStrategyPass
-    : public LLVMGPUSelectLoweringStrategyBase<
+class LLVMGPUSelectLoweringStrategyPass final
+    : public impl::LLVMGPUSelectLoweringStrategyPassBase<
           LLVMGPUSelectLoweringStrategyPass> {
 public:
+  using impl::LLVMGPUSelectLoweringStrategyPassBase<
+      LLVMGPUSelectLoweringStrategyPass>::LLVMGPUSelectLoweringStrategyPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
     // unnecessary dialect registrations.
@@ -55,10 +60,6 @@ public:
                 vector::VectorDialect>();
     // clang-format on
   }
-
-  LLVMGPUSelectLoweringStrategyPass() = default;
-  LLVMGPUSelectLoweringStrategyPass(
-      const LLVMGPUSelectLoweringStrategyPass &pass) {}
 
   void runOnOperation() override;
 };
@@ -114,11 +115,6 @@ void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMGPUSelectLoweringStrategyPass() {
-  return std::make_unique<LLVMGPUSelectLoweringStrategyPass>();
 }
 
 } // namespace mlir::iree_compiler

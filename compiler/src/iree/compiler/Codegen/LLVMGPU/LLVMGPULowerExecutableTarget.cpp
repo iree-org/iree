@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -39,6 +38,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMGPULOWEREXECUTABLETARGETPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 namespace {
 /// Lowers an hal.executable.variant operation to scalar/native-vector
 /// code. Invokes different compilation pipeline to
@@ -46,10 +48,13 @@ namespace {
 /// - then convert to NVVM/ROCDL dialect.
 /// This should be merged with the equivalent pass in LinalgToLLVM. Fo
 /// simplicity it is currently a separate pass.
-class LLVMGPULowerExecutableTargetPass
-    : public LLVMGPULowerExecutableTargetBase<
+class LLVMGPULowerExecutableTargetPass final
+    : public impl::LLVMGPULowerExecutableTargetPassBase<
           LLVMGPULowerExecutableTargetPass> {
 public:
+  using impl::LLVMGPULowerExecutableTargetPassBase<
+      LLVMGPULowerExecutableTargetPass>::LLVMGPULowerExecutableTargetPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
@@ -68,10 +73,6 @@ public:
                 vector::VectorDialect>();
     // clang-format on
   }
-
-  LLVMGPULowerExecutableTargetPass() = default;
-  LLVMGPULowerExecutableTargetPass(
-      const LLVMGPULowerExecutableTargetPass &pass) {}
 
   void runOnOperation() override;
 };
@@ -215,11 +216,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   if (failed(runPipeline(pipeline, funcOp))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMGPULowerExecutableTargetPass() {
-  return std::make_unique<LLVMGPULowerExecutableTargetPass>();
 }
 
 } // namespace mlir::iree_compiler

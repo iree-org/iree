@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
@@ -23,9 +22,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-namespace IREE = mlir::iree_compiler::IREE;
-using namespace IREE::LinalgExt;
+namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_LINALGEXTTOLOOPSPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 /// Recursive method that lowers one dimension of the `TiledOpInterface` to
 /// scalar loops at a time.
@@ -100,8 +100,8 @@ struct TilingInterfaceLowerToLoopsPattern : public RewritePattern {
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LinalgExtToLoopsPass
-    : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
+struct LinalgExtToLoopsPass final
+    : impl::LinalgExtToLoopsPassBase<LinalgExtToLoopsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, mlir::arith::ArithDialect,
@@ -120,8 +120,4 @@ struct LinalgExtToLoopsPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-IREE::LinalgExt::createLinalgExtToLoopsPass() {
-  return std::make_unique<LinalgExtToLoopsPass>();
-}
+} // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -31,8 +31,9 @@ const char *getSPIRVDistributeAttrName();
 /// Given an operation, returns the HAL target config attribute.
 DictionaryAttr getTargetConfigAttr(Operation *op);
 
-/// Given an operation, returns the `hal.bindings.indirect` attribute.
-UnitAttr getIndirectBindingsAttr(Operation *op);
+/// Returns whether indirect bindings are supported based on the target config
+/// applicable to the given |op|.
+bool usesIndirectBindingsAttr(Operation *op);
 
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.

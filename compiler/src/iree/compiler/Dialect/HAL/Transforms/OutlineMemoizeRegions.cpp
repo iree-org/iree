@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -92,23 +93,18 @@ computeMemoizeAnalysis(IREE::HAL::DeviceMemoizeOp memoizeOp) {
     // Match ops by type.
     // If we wanted to pull in entire IR slices this would have to use a
     // worklist (selects of globals based on globals, etc).
-    auto *definingOp = capturedValue.getDefiningOp();
-    if (definingOp && definingOp->hasTrait<OpTrait::ConstantLike>()) {
-      // Op producing the value is constant-like and we should be able to
-      // outline it by cloning.
-      memoizeAnalysis.constantValues.insert(capturedValue);
-    } else if (auto loadOp =
-                   dyn_cast_if_present<IREE::Util::GlobalLoadOp>(definingOp)) {
-      // We only support immutable global loads - mutable ones are dynamic
-      // values that may change over time and we can't memoize with them.
-      if (loadOp.isGlobalImmutable()) {
-        memoizeAnalysis.globalValues.insert(capturedValue);
-      } else {
-        memoizeAnalysis.dynamicValues.insert(capturedValue);
-      }
-    } else {
-      // Dynamic value that is only available at the memoization site.
+    switch (categorizeValue(capturedValue)) {
+    default:
+    case ValueOrigin::Unknown:
+    case ValueOrigin::MutableGlobal:
       memoizeAnalysis.dynamicValues.insert(capturedValue);
+      break;
+    case ValueOrigin::LocalConstant:
+      memoizeAnalysis.constantValues.insert(capturedValue);
+      break;
+    case ValueOrigin::ImmutableGlobal:
+      memoizeAnalysis.globalValues.insert(capturedValue);
+      break;
     }
   }
 

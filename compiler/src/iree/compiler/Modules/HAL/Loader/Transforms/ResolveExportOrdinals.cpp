@@ -6,15 +6,19 @@
 
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderOps.h"
-#include "iree/compiler/Modules/HAL/Loader/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::HAL::Loader {
 
-class ResolveExportOrdinalsPass
-    : public ResolveExportOrdinalsBase<ResolveExportOrdinalsPass> {
+#define GEN_PASS_DEF_RESOLVEEXPORTORDINALSPASS
+#include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h.inc"
+
+namespace {
+
+class ResolveExportOrdinalsPass final
+    : public impl::ResolveExportOrdinalsPassBase<ResolveExportOrdinalsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
@@ -38,10 +42,5 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
-  return std::make_unique<ResolveExportOrdinalsPass>();
-}
-
-static PassRegistration<ResolveExportOrdinalsPass> pass;
-
+} // namespace
 } // namespace mlir::iree_compiler::IREE::HAL::Loader

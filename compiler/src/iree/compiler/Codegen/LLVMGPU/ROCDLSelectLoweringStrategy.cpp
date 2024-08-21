@@ -7,17 +7,20 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLKernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/ROCDLPassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_ROCDLSELECTLOWERINGSTRATEGYPASS
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h.inc"
+
 namespace {
 /// Selects a strategy for lowering an IREE hal.executable.variant to ROCDL.
-class ROCDLSelectLoweringStrategyPass
-    : public ROCDLSelectLoweringStrategyBase<ROCDLSelectLoweringStrategyPass> {
+class ROCDLSelectLoweringStrategyPass final
+    : public impl::ROCDLSelectLoweringStrategyPassBase<
+          ROCDLSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -36,10 +39,4 @@ public:
   }
 };
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createROCDLSelectLoweringStrategyPass() {
-  return std::make_unique<ROCDLSelectLoweringStrategyPass>();
-}
-
 } // namespace mlir::iree_compiler

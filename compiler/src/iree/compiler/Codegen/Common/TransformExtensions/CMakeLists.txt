@@ -33,7 +33,6 @@ iree_cc_library(
     ::CommonExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -71,6 +70,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

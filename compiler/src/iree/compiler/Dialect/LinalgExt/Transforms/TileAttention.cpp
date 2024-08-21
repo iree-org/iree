@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -16,6 +15,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_TILEATTENTIONPASS
+#define GEN_PASS_DEF_CONVERTATTENTIONTOONLINEATTENTIONPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -185,7 +188,10 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
   return attentionMaps;
 }
 
-struct TileAttentionPass : public TileAttentionBase<TileAttentionPass> {
+struct TileAttentionPass final
+    : impl::TileAttentionPassBase<TileAttentionPass> {
+  using impl::TileAttentionPassBase<TileAttentionPass>::TileAttentionPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
@@ -200,7 +206,7 @@ struct TileAttentionPass : public TileAttentionBase<TileAttentionPass> {
 };
 
 struct ConvertAttentionToOnlineAttentionPass final
-    : ConvertAttentionToOnlineAttentionBase<
+    : impl::ConvertAttentionToOnlineAttentionPassBase<
           ConvertAttentionToOnlineAttentionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -463,14 +469,6 @@ void ConvertAttentionToOnlineAttentionPass::runOnOperation() {
     SmallVector<Operation *> ops;
     convertToOnlineAttention(attnOp, ops, rewriter);
   });
-}
-
-std::unique_ptr<Pass> createTileAttentionPass() {
-  return std::make_unique<TileAttentionPass>();
-}
-
-std::unique_ptr<Pass> createConvertAttentionToOnlineAttentionPass() {
-  return std::make_unique<ConvertAttentionToOnlineAttentionPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

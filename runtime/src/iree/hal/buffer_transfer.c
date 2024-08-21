@@ -62,8 +62,8 @@ static iree_status_t iree_hal_device_transfer_and_wait(
   // run out-of-order/overlapped with other work and return earlier than device
   // idle.
   iree_hal_semaphore_t* fence_semaphore = NULL;
-  iree_status_t status =
-      iree_hal_semaphore_create(device, 0ull, &fence_semaphore);
+  iree_status_t status = iree_hal_semaphore_create(
+      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &fence_semaphore);
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
     iree_hal_semaphore_list_t wait_semaphores = {

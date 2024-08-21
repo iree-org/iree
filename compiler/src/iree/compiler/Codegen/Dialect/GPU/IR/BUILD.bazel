@@ -39,6 +39,7 @@ iree_td_library(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SCFTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+        "@llvm-project//mlir:TilingInterfaceTdFiles",
         "@llvm-project//mlir:VectorInterfacesTdFiles",
     ],
 )
@@ -46,12 +47,15 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "IREEGPUDialect",
     srcs = [
+        "DerivedConfigUtils.cpp",
         "IREEGPUAttrs.cpp",
         "IREEGPUDialect.cpp",
         "IREEGPUInterfaces.cpp",
         "IREEGPUOps.cpp",
+        "TilingInterfaceImpl.cpp",
     ],
     hdrs = [
+        "DerivedConfigUtils.h",
         "IREEGPUAttrs.h",
         "IREEGPUDialect.h",
         "IREEGPUEnums.h",
@@ -77,9 +81,9 @@ iree_compiler_cc_library(
         ":IREEGPUInterfaces",
         ":IREEGPUOpsGen",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
-        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:ConfigUtils",
+        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
-        "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:AffineDialect",
@@ -93,6 +97,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorInterfaces",
     ],

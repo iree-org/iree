@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/Input/InputOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,9 +15,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-namespace IREE = mlir::iree_compiler::IREE;
-using namespace IREE::LinalgExt;
+namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_PADCONTRACTIONTOBLOCKSIZEPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 static Operation *sliceTensor(Location loc, Value expanded, Value original,
                               OpBuilder &builder) {
@@ -87,8 +87,11 @@ static bool padTensor(Location loc, OpOperand *operand,
 
 namespace {
 
-struct PadContractionToBlockSizePass
-    : public PadContractionToBlockSizeBase<PadContractionToBlockSizePass> {
+struct PadContractionToBlockSizePass final
+    : impl::PadContractionToBlockSizePassBase<PadContractionToBlockSizePass> {
+  using impl::PadContractionToBlockSizePassBase<
+      PadContractionToBlockSizePass>::PadContractionToBlockSizePassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Input::IREEInputDialect>();
   }
@@ -126,8 +129,4 @@ struct PadContractionToBlockSizePass
   }
 };
 } // namespace
-
-std::unique_ptr<OperationPass<>>
-IREE::LinalgExt::createPadContractionToBlockSizePass() {
-  return std::make_unique<PadContractionToBlockSizePass>();
-}
+} // namespace mlir::iree_compiler::IREE::LinalgExt

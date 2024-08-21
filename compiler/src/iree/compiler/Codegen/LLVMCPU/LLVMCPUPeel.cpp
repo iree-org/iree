@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -20,6 +19,9 @@
 #define DEBUG_TYPE "iree-llvmcpu-peel"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUPEELPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -49,7 +51,7 @@ void collectLoopsToPeel(Operation *op,
   }
 }
 
-class LLVMCPUPeelPass : public LLVMCPUPeelBase<LLVMCPUPeelPass> {
+class LLVMCPUPeelPass : public impl::LLVMCPUPeelPassBase<LLVMCPUPeelPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
@@ -91,12 +93,5 @@ void LLVMCPUPeelPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUPeelPass() {
-  return std::make_unique<LLVMCPUPeelPass>();
-}
-
 } // namespace mlir::iree_compiler

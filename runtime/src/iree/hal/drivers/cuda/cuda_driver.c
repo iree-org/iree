@@ -19,7 +19,7 @@
 // Maximum device name length supported by the CUDA HAL driver.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
 
-// Utility macros to convert between CUDevice and iree_hal_device_id_t.
+// Utility macros to convert between CUdevice and iree_hal_device_id_t.
 #define IREE_CUDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
 #define IREE_DEVICE_ID_TO_CUDEVICE(device_id) (CUdevice)((device_id) - 1)
 

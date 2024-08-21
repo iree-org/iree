@@ -38,7 +38,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
 // CHECK:   linalg.yield
-// P = exp2(S - newMax)
+// norm = exp2(oldMax - newMax)
 // CHECK: linalg.generic
 // CHECK:   arith.subf
 // CHECK:   math.exp2
@@ -47,12 +47,12 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.mulf
 // CHECK:   linalg.yield
-// norm = exp2(oldMax - newMax)
+// P = exp2(S - newMax)
 // CHECK: linalg.generic
 // CHECK:   arith.subf
 // CHECK:   math.exp2
 // CHECK:   linalg.yield
-// newSum = normSum + rowMax(P)
+// newSum = normSum + rowSum(P)
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
@@ -103,6 +103,11 @@ func.func @attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // S = S * scale
 // CHECK:   linalg.generic
 // CHECK:   arith.mulf
+// CHECK-NEXT:   linalg.yield
+// S = S + F8_linear_offset
+// CHECK:   linalg.generic
+// CHECK:   arith.addf
+// CHECK-NEXT:   linalg.yield
 // newMax = max(oldMax, rowMax(S))
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
@@ -121,14 +126,13 @@ func.func @attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK:   arith.subf
 // CHECK:   math.exp2
 // CHECK:   linalg.yield
-// newSum = normSum + rowMax(P)
+// newSum = normSum + rowSum(P)
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 // clamp = clamp(norm)
 // CHECK: linalg.generic
-// CHECK:   arith.cmpf ogt
-// CHECK:   arith.select
+// CHECK:   arith.minimumf
 // CHECK:   arith.truncf
 // newAcc = norm * oldAcc
 // CHECK: linalg.generic

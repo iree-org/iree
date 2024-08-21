@@ -39,6 +39,32 @@ llvm::SmallVector<linalg::ProcInfo, 2>
 getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
                         unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups);
 
+// Indicates whether the given `scf.forall` op has a processor ID mapping of
+// the template type(s).
+template <typename... Type>
+bool forallOpHasMappingType(scf::ForallOp forallOp) {
+  std::optional<ArrayAttr> mapping = forallOp.getMapping();
+  if (!mapping || mapping.value().empty()) {
+    return false;
+  }
+
+  return isa<Type...>(*mapping.value().begin());
+}
+
+// Indicates whether an operation is within a distributed context with the
+// specified mapping type(s).
+template <typename... Type>
+bool operationHasParentForallOfMappingType(Operation *op) {
+  auto parentForallOp = op->getParentOfType<scf::ForallOp>();
+  while (parentForallOp) {
+    if (forallOpHasMappingType<Type...>(parentForallOp)) {
+      return true;
+    }
+    parentForallOp = parentForallOp->getParentOfType<scf::ForallOp>();
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -158,8 +184,7 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
 /// Returns std::nullopt if none found.
-std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func,
-                                      bool pickLargest);
+std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 
 } // namespace mlir::iree_compiler
 

@@ -139,6 +139,112 @@ util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<e
 
 // -----
 
+// Partitioning with device assignment.
+// Ops on different devices are interleaved and interdependent according to
+//         arg0 arg1
+//          ↓    ↓
+// device_0 0    1 device_1
+//          |\  /|
+//          | \/ |
+//          | /\ |
+//          |/  \|
+//          ↓    ↓
+// device_0 2    3 device_1
+//          |\  /|
+//          | \/ |
+//          | /\ |
+//          |/  \|
+//          ↓    ↓
+// device_0 4    5 device_1
+//
+// This will result in partition assignment
+//   arg0 arg1
+//    ↓    ↓
+// P0 0    1 P1
+//    |\  /|
+//    | \/ |
+//    | /\ |
+//    |/  \|
+//    ↓    ↓
+// P2 2    3 P1
+//    |\  /|
+//    | \/ |
+//    | /\ |
+//    |/  \|
+//    ↓    ↓
+// P2 4    5 P3
+//
+// CHECK-LABEL: @partitionWithInterdependentInterleavedDeviceAffinites
+util.func public @partitionWithInterdependentInterleavedDeviceAffinites(
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>,
+  %arg0: !stream.resource<external>,
+// CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>)
+  %arg1: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
+  // CHECK: %[[C1:.+]] = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
+
+  %0 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e00[%c1](
+    %arg0[%c1 to %c1 for %c1]
+    ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
+  %1 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e01[%c1](
+    %arg1[%c1 to %c1 for %c1]
+    ) : (!stream.resource<external>{%c1}) -> !stream.resource<transient>{%c1}
+
+  %2 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e10[%c1](
+    %0[%c1 to %c1 for %c1], %1[%c1 to %c1 for %c1]
+    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  %3 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e11[%c1](
+    %0[%c1 to %c1 for %c1], %1[%c1 to %c1 for %c1]
+    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+
+  %4 = stream.async.dispatch on(#hal.device.affinity<@device_0>) @ex::@e20[%c1](
+    %2[%c1 to %c1 for %c1], %3[%c1 to %c1 for %c1]
+    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
+  %5 = stream.async.dispatch on(#hal.device.affinity<@device_1>) @ex::@e21[%c1](
+    %2[%c1 to %c1 for %c1], %3[%c1 to %c1 for %c1]
+    ) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<external>{%c1}
+
+  // Partition 0
+  // CHECK: %[[RESULTS:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute on(#hal.device.affinity<@device_0>)
+  // CHECK-SAME: with(%[[ARG0]] as %{{.+}}: !stream.resource<external>{%[[C1]]})
+  // CHECK: stream.async.dispatch @ex::@e00
+
+  // Partition 1
+  // CHECK: %[[RESULTS_0:.+]]:2, %[[RESULT_TIMEPOINT_1:.+]] = stream.async.execute on(#hal.device.affinity<@device_1>)
+  // CHECK-SAME: await(%[[RESULT_TIMEPOINT]]) => with(
+  // CHECK-SAME: %[[ARG1]] as %{{.+}}: !stream.resource<external>{%[[C1]]},
+  // CHECK-SAME: %[[RESULTS]] as %{{.+}}: !stream.resource<transient>{%[[C1]]})
+  // CHECK-DAG: stream.async.dispatch @ex::@e01
+  // CHECK-DAG: stream.async.dispatch @ex::@e11
+
+  // CHECK: %[[T0:.+]] = stream.timepoint.join max(%[[RESULT_TIMEPOINT]], %[[RESULT_TIMEPOINT_1]]) => !stream.timepoint
+
+  // Partition 2
+  // CHECK: %[[RESULTS_2:.+]]:2, %[[RESULT_TIMEPOINT_3:.+]] = stream.async.execute on(#hal.device.affinity<@device_0>)
+  // CHECK-SAME: await(%[[T0]]) => with(
+  // CHECK-SAME: %[[RESULTS]] as %{{[A-Za-z0-9_]+}}: !stream.resource<transient>{%[[C1]]},
+  // CHECK-SAME: %[[RESULTS_0]]#0 as %{{.+}}: !stream.resource<transient>{%[[C1]]},
+  // CHECK-SAME: %[[RESULTS_0]]#1 as %{{.+}}: !stream.resource<transient>{%[[C1]]})
+  // CHECK-DAG: stream.async.dispatch @ex::@e10
+  // CHECK-DAG: stream.async.dispatch @ex::@e20
+
+  // CHECK: %[[T1:.+]] = stream.timepoint.join max(%[[RESULT_TIMEPOINT_3]], %[[RESULT_TIMEPOINT_1]]) => !stream.timepoint
+
+  // Partition 3
+  // CHECK: %[[RESULTS_4:.+]], %[[RESULT_TIMEPOINT_5:.+]] = stream.async.execute on(#hal.device.affinity<@device_1>)
+  // CHECK-SAME: await(%[[T1]]) => with(
+  // CHECK-SAME: %[[RESULTS_2]]#0 as %{{.+}}: !stream.resource<transient>{%[[C1]]},
+  // CHECK-SAME: %[[RESULTS_0]]#1 as %{{.+}}: !stream.resource<transient>{%[[C1]]})
+  // CHECK: stream.async.dispatch @ex::@e21
+
+  // CHECK: %[[R4:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT_5]] => %[[RESULTS_4]] : !stream.resource<external>{%[[C1]]}
+  // CHECK: %[[R21:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT_3]] => %[[RESULTS_2]]#1 : !stream.resource<external>{%[[C1]]}
+  // CHECK: util.return %[[R21]], %[[R4]]
+  util.return %4, %5 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
 // Tests that ops in multiple blocks are partitioned independently and that
 // timepoints are chained between the partitions. Note that the dispatches
 // happen in-place on the splat and we expect the execution regions to be tied.

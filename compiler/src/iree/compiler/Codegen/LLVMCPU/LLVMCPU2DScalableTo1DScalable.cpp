@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -15,6 +14,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPU2DSCALABLETO1DSCALABLEPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -74,11 +76,11 @@ namespace {
 /// This can now be vectorized and lowered successfully, which produces a
 /// dispatch that mixes SME and SVE.
 class LLVMCPU2DScalableTo1DScalablePass
-    : public LLVMCPU2DScalableTo1DScalableBase<
+    : public impl::LLVMCPU2DScalableTo1DScalablePassBase<
           LLVMCPU2DScalableTo1DScalablePass> {
 public:
-  using LLVMCPU2DScalableTo1DScalableBase::LLVMCPU2DScalableTo1DScalableBase;
-
+  using impl::LLVMCPU2DScalableTo1DScalablePassBase<
+      LLVMCPU2DScalableTo1DScalablePass>::LLVMCPU2DScalableTo1DScalablePassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect>();
@@ -171,10 +173,4 @@ void LLVMCPU2DScalableTo1DScalablePass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPU2DScalableTo1DScalablePass() {
-  return std::make_unique<LLVMCPU2DScalableTo1DScalablePass>();
-}
-
 } // namespace mlir::iree_compiler

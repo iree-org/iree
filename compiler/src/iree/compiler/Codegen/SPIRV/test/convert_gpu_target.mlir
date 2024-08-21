@@ -3,8 +3,9 @@
 hal.executable @dispatch {
 hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     iree.gpu.target = #iree_gpu.target<arch = "rdna3", features = "spirv:v1.6,cap:Shader",
-      wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [<WMMA_F16_16x16x16_F32>, <WMMA_F16_16x16x16_F16>],
-      subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>}>) {
+      wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [<WMMA_F32_16x16x16_F16>, <WMMA_F16_16x16x16_F16>],
+      subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>) {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device):
     %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -30,7 +31,7 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 // CHECK-SAME:   AMD,
 // CHECK-SAME:   #spirv.resource_limits<max_compute_shared_memory_size = 65536,
 // CHECK-SAME:     max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024 : i32, 1024 : i32, 1024 : i32],
-// CHECK-SAME:     subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64,
+// CHECK-SAME:     min_subgroup_size = 32, max_subgroup_size = 64,
 // CHECK-SAME:     cooperative_matrix_properties_khr = [
 // CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>,
 // CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>

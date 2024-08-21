@@ -4,9 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
-
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -18,7 +15,12 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-codegen-expand-strided-metadata"
+
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_IREEEXPANDSTRIDEDMETADATAPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 /// Helper struct to return the offset, sizes and strides
@@ -154,7 +156,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     // `hal.interface.binding.subspan` is
     //
     // ```mlir
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%offset)
+    //  hal.interface.binding.subspan layout(#pipeline_layout) set(0)
+    //  binding(1) offset(%offset)
     //      : memref<?x?xf32, strided<[?, 1], offset: 64]>>{%s0, %s1}
     // ```
     //
@@ -164,7 +167,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     //  #map = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
     //  %linearSize = affine.apply #map()[%offset, %s0, %s1]
     //  %c0 = arith.constant 0 : index
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%c0)
+    //  hal.interface.binding.subspan layout(#pipeline_layout) set(0)
+    //  binding(1) offset(%c0)
     //      : memref<?xf32>{%linearSize}
     // ```
     //
@@ -193,8 +197,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto linearInterfaceBinding =
         rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, newBufferType, binding.getSetAttr(), binding.getBindingAttr(),
-            binding.getDescriptorTypeAttr(), zero, dynamicLinearShape,
+            loc, newBufferType, binding.getLayoutAttr(), binding.getSetAttr(),
+            binding.getBindingAttr(), zero, dynamicLinearShape,
             binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
 
     SmallVector<Value> results;
@@ -240,8 +244,11 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
   }
 };
 
-struct IREEExpandStridedMetadataPass
-    : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
+struct IREEExpandStridedMetadataPass final
+    : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
+  using impl::IREEExpandStridedMetadataPassBase<
+      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
                     IREE::Codegen::IREECodegenDialect, memref::MemRefDialect>();
@@ -287,9 +294,4 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
     }
   }
 }
-
-std::unique_ptr<Pass> createIREEExpandStridedMetadataPass() {
-  return std::make_unique<IREEExpandStridedMetadataPass>();
-}
-
 } // namespace mlir::iree_compiler

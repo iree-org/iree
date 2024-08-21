@@ -14,7 +14,7 @@
 ]>
 hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
@@ -25,10 +25,10 @@ hal.executable @mma_fused_fp16 {
       %cst = arith.constant 0.000000e+00 : f16
       %c2048 = arith.constant 2048 : index
       %c512 = arith.constant 512 : index
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x1024xf16>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf16>>
-      %di = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x512xf16>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<2048x1024xf16>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf16>>
+      %di = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<readonly:tensor<2048x512xf16>>
       %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:tensor<2048x1024xf16>> -> tensor<2048x1024xf16>
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1]
@@ -96,7 +96,7 @@ hal.executable @mma_fused_fp16 {
 ]>
 hal.executable @mma_fused_f32 {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#pipeline_layout) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
@@ -107,10 +107,10 @@ hal.executable @mma_fused_f32 {
       %cst = arith.constant 0.000000e+00 : f32
       %c2048 = arith.constant 2048 : index
       %c512 = arith.constant 512 : index
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x512xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
-      %di = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2048x512xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1024x512xf32>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
+      %di = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<readonly:tensor<2048x512xf32>>
       %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>> -> tensor<2048x1024xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1]

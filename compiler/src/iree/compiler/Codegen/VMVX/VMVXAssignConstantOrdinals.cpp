@@ -4,18 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_VMVXASSIGNCONSTANTORDINALSPASS
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
+
 namespace {
 
 struct VMVXAssignConstantOrdinalsPass
-    : public VMVXAssignConstantOrdinalsBase<VMVXAssignConstantOrdinalsPass> {
-  VMVXAssignConstantOrdinalsPass() = default;
+    : public impl::VMVXAssignConstantOrdinalsPassBase<
+          VMVXAssignConstantOrdinalsPass> {
   void runOnOperation() override {
     auto variantOp = getOperation();
 
@@ -56,10 +58,4 @@ struct VMVXAssignConstantOrdinalsPass
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createVMVXAssignConstantOrdinalsPass() {
-  return std::make_unique<VMVXAssignConstantOrdinalsPass>();
-}
-
 } // namespace mlir::iree_compiler
