@@ -44,13 +44,13 @@ SmallVector<flatbuffers_ref_t>
 createExportDefs(int debugLevel,
                  ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
                  FlatbufferBuilder &fbb) {
-  if (debugLevel < 1) {
-    // No debug information.
-    return {};
-  }
-
   SmallVector<flatbuffers_ref_t> exportDefs;
   exportDefs.resize(exportOps.size(), 0);
+
+  if (debugLevel < 1) {
+    // No debug information.
+    return exportDefs;
+  }
 
   for (auto exportOp : exportOps) {
     auto ordinalAttr = exportOp.getOrdinalAttr();

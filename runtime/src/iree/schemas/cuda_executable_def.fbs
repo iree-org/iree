@@ -20,13 +20,8 @@ struct BlockDims {
 }
 
 // Describes the behavior of each binding.
-// Roughly maps to iree_hal_descriptor_flags_t but is not required to match
-// exactly; if there's additional binding information we want to pass through
-// to HIP we can encode that here.
 enum BindingBits:uint64 (bit_flags) {
-  // IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY
   READ_ONLY = 0,  // 1u << 0
-  // IREE_HAL_DESCRIPTOR_FLAG_INDIRECT
   INDIRECT = 1,  // 1u << 1
 }
 

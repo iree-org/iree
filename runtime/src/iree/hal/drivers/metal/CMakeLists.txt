@@ -27,8 +27,6 @@ iree_cc_library(
     "metal_driver.m"
     "nop_executable_cache.h"
     "nop_executable_cache.m"
-    "pipeline_layout.h"
-    "pipeline_layout.m"
     "shared_event.h"
     "shared_event.m"
     "staging_buffer.h"
