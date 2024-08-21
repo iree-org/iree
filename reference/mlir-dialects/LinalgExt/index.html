@@ -4290,7 +4290,7 @@ for example, if V has indexing_map of (m, k1, k2, n) -&gt; (n, k2) instead
 of (m, k1, k2, n) -&gt; (k2, n), then we'd know that V is transposed (V.T),
 and we can expect computation to look like:</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T</p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
