@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -40,22 +41,33 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-/// Returns the corresponding native vector sizes defined by the `mma`
+
+static llvm::cl::opt<std::string> clUnrollingFactor(
+    "iree-data-tiling-unrolling-factor",
+    llvm::cl::desc(
+        "custom unrolling factor for data tiling"),
+    llvm::cl::value_desc("unrolling factor"));
+
+using namespace IREE::GPU;
+using SmallVectorType = SmallVector<int64_t>;
+// array component:
+// {intrinsicVectorSize(roleIdx == 0 | 1),
+//  intrinsicVectorSize(roleIdx == 2),
+//  encodingTransposePerm(roleIdx == 1),
+//  encodingTransposePerm(roleIdx == 2)}
+static const std::unordered_map<MMAIntrinsic, std::array<SmallVectorType, 4>>
+    mmaIntrinsicSizes = {
+        {MMAIntrinsic::MFMA_F32_16x16x4_F32,
+         {SmallVectorType{1, 1}, {4, 1}, {3, 0, 1, 4, 2}, {0, 3, 1, 2, 4}}},
+};
+
+/// Returns the corresponding native tensor sizes defined by the `mma`
 /// intrinsic.
 static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma,
                                                    int64_t roleIdx) {
-  if (mma == IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
-    // TODO: Query the value from GPU attributes.
-    if (roleIdx == 0 || roleIdx == 1) {
-      return {1, 1};
-    }
-    if (roleIdx == 0 || roleIdx == 1) {
-      return {1, 1};
-    }
-    if (roleIdx == 2) {
-      return {4, 1};
-    }
-  }
+  auto it = mmaIntrinsicSizes.find(mma);
+  if (it == mmaIntrinsicSizes.end()) return {};
+  return roleIdx == 0 || roleIdx == 1 ? it->second[0] : it->second[1];
   return {};
 }
 
@@ -63,25 +75,9 @@ static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma,
 // permutation used in GPU materialization.
 static SmallVector<int64_t>
 getEncodingTransposePerm(IREE::GPU::MMAIntrinsic mma, int64_t roleIdx) {
-  // TODO: Support other intrinsics.
-  if (mma != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
-    return {};
-  }
-
-  switch (roleIdx) {
-  case 0: // A
-  case 1: // B
-    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
-    // -> OuterTileY x OuterTileX x InnerTileY x InnerTileX
-    return {2, 0, 3, 1};
-  case 2: // C
-    // ACC:
-    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
-    // -> OuterTileX x OuterTileY x InnerTileX x InnerTileY
-    return {0, 2, 1, 3};
-  default:
-    return {};
-  }
+  auto it = mmaIntrinsicSizes.find(mma);
+  if (it == mmaIntrinsicSizes.end()) return {};
+  return roleIdx == 0 || roleIdx == 1 ? it->second[2] : it->second[3];
 }
 
 static std::optional<IREE::GPU::DataTiledMMAAttr>
@@ -153,10 +149,13 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   auto roleIdx = encoding.getOperandIndex().getInt();
   auto intrinsicVectorSizes =
       getIntrinsicVectorSize(mma->getIntrinsic().getValue(), roleIdx);
+  assert(intrinsicVectorSizes.empty());
   auto permutation =
       getEncodingTransposePerm(mma->getIntrinsic().getValue(), roleIdx);
+  assert(!permutation.empty());
+
   encodingInfo.innerTileShapes = intrinsicVectorSizes;
-  std::tuple<int64_t, int64_t, int64_t> mnkShape = mma->getMNKShape();
+  auto mnkShape = mma->getMNKShape();
   encodingInfo.intrinsicSize = {std::get<0>(mnkShape), std::get<1>(mnkShape),
                                 std::get<2>(mnkShape)};
   encodingInfo.permutation = permutation;
@@ -250,13 +249,10 @@ struct GPUSetEncodingOpLoweringConversion
     // Create expand_shape op to tile the innermost two dimensions.
     auto sourceShape = packOp->getDestType().getShape();
     assert(intrinsicVectorShape.size() == 2); // TODO: relax this
-    auto iT1 = intrinsicVectorShape[0];
-    auto iT2 = intrinsicVectorShape[1];
-    auto oT1 = sourceShape[2] / iT1;
-    auto oT2 = sourceShape[3] / iT2;
-    SmallVector<int64_t> expandShapeShape = {
-        sourceShape[0], sourceShape[1], oT1, iT1, oT2, iT2};
-    assert(expandShapeShape.size() == 6);
+    SmallVector<int64_t> expandShapeShape =
+        getDataTilingTransposeDimensions<int64_t>(
+            sourceShape, maybeEncodingInfo->innerTileSizes,
+            intrinsicVectorShape);
     auto expandShapeType = RankedTensorType::get(
         expandShapeShape, encodingOp.getSourceType().getElementType());
 
@@ -323,13 +319,10 @@ struct GPUUnsetEncodingOpLoweringConversion
     auto unpackSrcType = RankedTensorType::get(
         unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
 
-    auto iT1 = intrinsicVectorShape[0];
-    auto iT2 = intrinsicVectorShape[1];
-    auto oT1 = unpackSrcShape[2] / iT1;
-    auto oT2 = unpackSrcShape[3] / iT2;
-    SmallVector<int64_t> transposeSourceDims = {
-        unpackSrcShape[0], unpackSrcShape[1], oT1, iT1, oT2, iT2};
-    assert(transposeSourceDims.size() == 6);
+    SmallVector<int64_t> transposeSourceDims =
+        getDataTilingTransposeDimensions<int64_t>(
+            unpackSrcShape, maybeEncodingInfo->innerTileSizes,
+            intrinsicVectorShape);
 
     size_t targetRank = unsetEncodingOp.getResultType().getRank();
 

@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
 
 #include <numeric>
 
@@ -113,19 +115,11 @@ resolveTileSwizzlingType(RankedTensorType packedType,
     perm.push_back(i + srcRank);
   }
 
-  // TODO(lialan): Support unrolling and K-interleaving.
   SmallVector<int64_t> intrinsicVectorShape = encodingInfo.innerTileShapes;
-  auto iT1 = intrinsicVectorShape[0];
-  auto iT2 = intrinsicVectorShape[1];
-  auto oT1 = encodingInfo.innerTileSizes[0] / iT1;
-  auto oT2 = encodingInfo.innerTileSizes[1] / iT2;
-  SmallVector<int64_t> newShape(packedType.getShape().take_front(srcRank));
-  newShape.push_back(oT1);
-  newShape.push_back(iT1);
-  newShape.push_back(oT2);
-  newShape.push_back(iT2);
-  applyPermutationToVector(newShape, perm);
+  SmallVector<int64_t> newShape = getDataTilingTransposeDimensions<int64_t>(
+      packedType.getShape(), encodingInfo.innerTileSizes, intrinsicVectorShape);
 
+  applyPermutationToVector(newShape, perm);
   return RankedTensorType::get(newShape, packedType.getElementType());
 }
 
@@ -135,6 +129,7 @@ resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
   if (packedShape.empty() || encodingInfo.innerTileShapes.empty()) {
     return SmallVector<OpFoldResult>(packedShape);
   }
+  Builder b(packedShape[0].getContext());
 
   int64_t srcRank = encodingInfo.srcRank;
   SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
@@ -142,19 +137,10 @@ resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
     perm.push_back(i + srcRank);
   }
 
-  // TODO(lialan): Support unrolling and K-interleaving.
-  SmallVector<int64_t> intrinsicVectorShape = encodingInfo.innerTileShapes;
-  auto iT1 = intrinsicVectorShape[0];
-  auto iT2 = intrinsicVectorShape[1];
-  auto oT1 = encodingInfo.innerTileSizes[0] / iT1;
-  auto oT2 = encodingInfo.innerTileSizes[1] / iT2;
-  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
-  MLIRContext *ctx = packedShape[0].getContext();
-  Builder b(ctx);
-  newShape.push_back(b.getIndexAttr(oT1));
-  newShape.push_back(b.getIndexAttr(iT1));
-  newShape.push_back(b.getIndexAttr(oT2));
-  newShape.push_back(b.getIndexAttr(iT2));
+  SmallVector<OpFoldResult> newShape =
+      getDataTilingTransposeDimensions<OpFoldResult>(
+          packedShape, encodingInfo.innerTileSizes,
+          encodingInfo.innerTileShapes, &b);
   applyPermutationToVector(newShape, perm);
 
   return newShape;

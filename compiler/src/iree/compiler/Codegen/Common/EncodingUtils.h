@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -154,5 +155,39 @@ void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler
+
+template <typename T>
+llvm::SmallVector<T>
+getDataTilingTransposeDimensions(llvm::ArrayRef<T> sourceShape,
+                                 llvm::ArrayRef<int64_t> innerTileSizes,
+                                 llvm::ArrayRef<int64_t> intrinsicVectorShape,
+                                 mlir::Builder *builder = nullptr) {
+  auto dividerFn = [](T val, int64_t divisor) -> T {
+    if constexpr (std::is_same_v<T, mlir::OpFoldResult>) {
+      if (auto attr = llvm::dyn_cast<mlir::Attribute>(val)) {
+        mlir::Builder builder(attr.getContext());
+        return builder.getIndexAttr(
+            llvm::cast<mlir::IntegerAttr>(attr).getInt() / divisor);
+      }
+      assert(false && "must be constant values");
+    } else {
+      return val / divisor;
+    }
+  };
+  auto wrapperFn = [&](int64_t val) -> T {
+    if constexpr (std::is_same_v<T, mlir::OpFoldResult>) {
+      assert(builder && "expected builder");
+      return builder->getIndexAttr(val);
+    } else {
+      return val;
+    }
+  };
+  auto ab1 = dividerFn(sourceShape[2], innerTileSizes[0]);
+  auto abUnroll = wrapperFn(innerTileSizes[0] / intrinsicVectorShape[0]);
+  auto ab2 = wrapperFn(intrinsicVectorShape[0]);
+  auto acc1 = dividerFn(sourceShape[3], intrinsicVectorShape[1]);
+  auto acc2 = wrapperFn(intrinsicVectorShape[1]);
+  return {sourceShape[0], sourceShape[1], ab1, abUnroll, ab2, acc1, acc2};
+};
 
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
