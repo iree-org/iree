@@ -117,8 +117,11 @@ private:
 
 class EnforceLayout : public DataFlowAnalysis {
 public:
-  explicit EnforceLayout(DataFlowSolver &solver, MLIRContext *ctx)
-      : DataFlowAnalysis(solver), ctx(ctx) {}
+  explicit EnforceLayout(
+      DataFlowSolver &solver,
+      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
+      MLIRContext *ctx)
+      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
 
@@ -136,6 +139,8 @@ private:
                              MutableArrayRef<OpOperand> operands);
 
   DistributionLayout *getLatticeElement(Value val);
+
+  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
 
   MLIRContext *ctx;
 };
@@ -776,7 +781,7 @@ void enforcementTransferFunction(
 /// ==========================================================================
 
 LogicalResult PropagateLayout::initialize(Operation *root) {
-  // Set layout for anchor ops.
+  // Set layout for anchor ops or resolve if need be.
   for (auto [val, layout] : anchors) {
     DistributionLayout *latticeEl = getLatticeElement(val);
     ChangeResult changed = latticeEl->resolve(layout);
@@ -905,6 +910,13 @@ DistributionLayout *PropagateLayout::getLatticeElement(Value val) {
 /// ==========================================================================
 
 LogicalResult EnforceLayout::initialize(Operation *root) {
+  // Set layout for anchor ops or resolve if need be.
+  for (auto [val, layout] : anchors) {
+    DistributionLayout *latticeEl = getLatticeElement(val);
+    ChangeResult changed = latticeEl->resolve(layout);
+    propagateIfChanged(latticeEl, changed);
+  }
+
   root->walk([&](Operation *traversed) { visitOperation(traversed); });
   return success();
 }
@@ -1036,7 +1048,7 @@ LogicalResult VectorLayoutAnalysis::run() {
   // initialization which needs the lattice to know both enforcement and
   // propagation.
   solver.load<PropagateLayout>(anchors, root->getContext());
-  solver.load<EnforceLayout>(root->getContext());
+  solver.load<EnforceLayout>(anchors, root->getContext());
   return solver.initializeAndRun(root);
 }
 
