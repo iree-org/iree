@@ -208,7 +208,8 @@ LogicalResult MultiMmaOp::verify() {
   int64_t expectedNumRhsElem = n * k;
   int64_t expectedNumAccElem = m * n;
 
-  if (auto dataTiledMmaAttr = dyn_cast<IREE::GPU::DataTiledMMAAttr>(getKind())) {
+  if (auto dataTiledMmaAttr =
+          dyn_cast<IREE::GPU::DataTiledMMAAttr>(getKind())) {
     auto [mUnrollFactor, nUnrollFactor, kUnrollFactor] =
         dataTiledMmaAttr.getUnrollingFactor(
             getLhsInnerShape(), getRhsInnerShape(), getAccInnerShape());

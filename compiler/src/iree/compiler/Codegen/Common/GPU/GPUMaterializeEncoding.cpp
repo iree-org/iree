@@ -42,8 +42,8 @@ namespace mlir::iree_compiler {
 
 /// Returns the corresponding native vector sizes defined by the `mma`
 /// intrinsic.
-static SmallVector<int64_t>
-getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma, int64_t roleIdx) {
+static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma,
+                                                   int64_t roleIdx) {
   if (mma == IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
     // TODO: Query the value from GPU attributes.
     if (roleIdx == 0 || roleIdx == 1) {

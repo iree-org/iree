@@ -254,8 +254,8 @@ def IREEGPU_DataTiledMMAAttr :
 
   let extraClassDeclaration = [{
     /// Infers the unrolling factor for (M, N, K) dimensions from the inner
-    /// tile shapes after tile swizzling. If the provided shapes are not
-    /// invalid, returns {0, 0, 0}.
+    /// tile shapes after tile swizzling. If the provided shapes are not valid,
+    /// returns {0, 0, 0}.
     std::tuple<int64_t, int64_t, int64_t> getUnrollingFactor(ArrayRef<int64_t>
         lhsShape, ArrayRef<int64_t> rhsShape, ArrayRef<int64_t> accShape);
   }];
