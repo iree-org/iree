@@ -371,10 +371,16 @@ runner-env: [testing|prod]
 Copy/paste any of these at the bottom of a PR description to change what the CI
 runs.
 
-* Also run GPU tests (opt-in due to low availability):
+* Also run ONNX tests:
 
     ``` text
-    ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
+    ci-extra: test_onnx
+    ```
+
+* Also run model tests:
+
+    ``` text
+    ci-extra: test_models
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:
