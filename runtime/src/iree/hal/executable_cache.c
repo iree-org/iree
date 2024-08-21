@@ -56,8 +56,6 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_cache);
   IREE_ASSERT_ARGUMENT(executable_params);
-  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
-                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);

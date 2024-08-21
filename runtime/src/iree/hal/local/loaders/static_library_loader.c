@@ -30,8 +30,6 @@ typedef struct iree_hal_static_executable_t {
     const iree_hal_executable_library_header_t** header;
     const iree_hal_executable_library_v0_t* v0;
   } library;
-
-  iree_hal_pipeline_layout_t* layouts[];
 } iree_hal_static_executable_t;
 
 static const iree_hal_local_executable_vtable_t
@@ -49,8 +47,6 @@ static iree_status_t iree_hal_static_executable_create(
     const iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
-  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
-                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(!executable_params->constant_count ||
                        executable_params->constants);
   IREE_ASSERT_ARGUMENT(library_header);
@@ -61,16 +57,12 @@ static iree_status_t iree_hal_static_executable_create(
   iree_hal_static_executable_t* executable = NULL;
   iree_host_size_t total_size =
       sizeof(*executable) +
-      executable_params->pipeline_layout_count * sizeof(*executable->layouts) +
       executable_params->constant_count * sizeof(*executable_params->constants);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_initialize(
-        &iree_hal_static_executable_vtable,
-        executable_params->pipeline_layout_count,
-        executable_params->pipeline_layouts, &executable->layouts[0],
-        host_allocator, &executable->base);
+    iree_hal_local_executable_initialize(&iree_hal_static_executable_vtable,
+                                         host_allocator, &executable->base);
     executable->library.header = library_header;
     executable->identifier = iree_make_cstring_view((*library_header)->name);
     executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
@@ -79,9 +71,7 @@ static iree_status_t iree_hal_static_executable_create(
   // Copy executable constants so we own them.
   if (iree_status_is_ok(status) && executable_params->constant_count > 0) {
     uint32_t* target_constants =
-        (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
-                    executable_params->pipeline_layout_count *
-                        sizeof(*executable->layouts));
+        (uint32_t*)((uint8_t*)executable + sizeof(*executable));
     memcpy(target_constants, executable_params->constants,
            executable_params->constant_count *
                sizeof(*executable_params->constants));

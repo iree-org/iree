@@ -84,72 +84,6 @@ public:
   }
 };
 
-class ExecutableCreateOpConversion
-    : public OpConversionPattern<IREE::HAL::ExecutableCreateOp> {
-public:
-  ExecutableCreateOpConversion(MLIRContext *context, SymbolTable &importSymbols,
-                               TypeConverter &typeConverter,
-                               StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-
-  LogicalResult
-  matchAndRewrite(IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Materialize vm.rodata for the binary.
-    auto executableBinaryOp =
-        SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
-            createOp, createOp.getExecutableTarget());
-    auto executableOp = executableBinaryOp.getOperation()
-                            ->getParentOfType<IREE::HAL::ExecutableOp>();
-    std::string rodataName = sanitizeSymbolName(
-        (executableOp.getName() + "_" + executableBinaryOp.getName()).str());
-    auto rodataOp = rewriter.create<IREE::VM::RodataInlineOp>(
-        executableBinaryOp.getLoc(),
-        IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>()),
-        rewriter.getStringAttr(rodataName), executableBinaryOp.getData(),
-        rewriter.getI64IntegerAttr(16), executableBinaryOp.getMimeTypeAttr());
-
-    // Get format string as a rodata blob.
-    auto executableFormatStr = rewriter.create<IREE::VM::RodataInlineOp>(
-        createOp.getLoc(), executableBinaryOp.getFormatAttr());
-
-    // Pack constants, if any.
-    auto constantBuffer = createPackedConstantBuffer(
-        createOp.getLoc(), adaptor.getConstants(), rewriter);
-
-    SmallVector<int16_t, 5> segmentSizes = {
-        /*device=*/-1,
-        /*executable_format=*/-1,
-        /*executable_data=*/-1,
-        /*constants=*/-1,
-        /*pipeline_layouts=*/
-        static_cast<int16_t>(llvm::size(adaptor.getLayouts())),
-    };
-    SmallVector<Value, 8> callOperands = {
-        adaptor.getDevice(),
-        executableFormatStr,
-        rodataOp,
-        constantBuffer,
-    };
-    callOperands.append(adaptor.getLayouts().begin(),
-                        adaptor.getLayouts().end());
-
-    auto importType = importOp.getFunctionType();
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
-        createOp, SymbolRefAttr::get(importOp), importType.getResults(),
-        segmentSizes, importType.getInputs(), callOperands);
-    copyImportAttrs(importOp, callOp);
-
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
 class ExecutableCreate2OpConversion
     : public OpConversionPattern<IREE::HAL::ExecutableCreate2Op> {
 public:
@@ -216,16 +150,8 @@ void populateHALExecutableToVMPatterns(MLIRContext *context,
   // contents during conversion of the ops that use them.
   patterns.insert<RemoveExecutableOpConversion>(context);
 
-  patterns.insert<ExecutableCreateOpConversion>(
-      context, importSymbols, typeConverter, "hal.executable.create");
   patterns.insert<ExecutableCreate2OpConversion>(
       context, importSymbols, typeConverter, "hal.executable.create2");
-
-  patterns.insert<VMImportOpConversion<IREE::HAL::DescriptorSetLayoutCreateOp>>(
-      context, importSymbols, typeConverter,
-      "hal.descriptor_set_layout.create");
-  patterns.insert<VMImportOpConversion<IREE::HAL::PipelineLayoutCreateOp>>(
-      context, importSymbols, typeConverter, "hal.pipeline_layout.create");
 }
 
 } // namespace mlir::iree_compiler

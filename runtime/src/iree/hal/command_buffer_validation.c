@@ -16,7 +16,6 @@
 #include "iree/hal/detail.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 // Returns success iff the queue supports the given command categories.
@@ -550,107 +549,6 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_command_buffer_push_constants_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
-    const void* values, iree_host_size_t values_length) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  if (IREE_UNLIKELY((values_length % 4) != 0)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "invalid alignment %" PRIhsz ", must be 4-byte aligned", values_length);
-  }
-
-  // TODO(benvanik): validate offset and value count with layout.
-
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  // TODO(benvanik): validate set index.
-
-  // TODO(benvanik): use pipeline layout to derive usage and access bits.
-  // For now we conservatively say _any_ access may be performed (read/write).
-  iree_hal_buffer_binding_requirements_t requirements = {
-      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
-      .access = IREE_HAL_MEMORY_ACCESS_ANY,
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-  };
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    // TODO(benvanik): validate binding ordinal against pipeline layout.
-    requirements.max_byte_offset = bindings[i].offset + bindings[i].length;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_command_buffer_validate_buffer_requirements(
-            command_buffer, validation_state, bindings[i], requirements),
-        "set[%u] binding[%u] (arg[%" PRIhsz "])", set, bindings[i].ordinal, i);
-  }
-
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_command_buffer_dispatch_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z,
-    iree_hal_dispatch_flags_t flags) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
-      command_buffer, validation_state, executable, entry_point));
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  if ((workgroups_ref.offset % sizeof(uint32_t)) != 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "workgroup count offset does not match the required natural alignment "
-        "of uint32_t (offset=%" PRIdsz ", min_byte_alignment=%" PRIhsz ")",
-        workgroups_ref.offset, sizeof(uint32_t));
-  } else if (workgroups_ref.length < 3 * sizeof(uint32_t)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "workgroup count buffer does not have the capacity "
-                            "to store the required 3 uint32_t values "
-                            "(length=%" PRIdsz ", min_length=%" PRIhsz ")",
-                            workgroups_ref.length, 3 * sizeof(uint32_t));
-  }
-
-  const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
-      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS,
-      .access = IREE_HAL_MEMORY_ACCESS_READ,
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      .max_byte_offset = workgroups_ref.offset + workgroups_ref.length,
-      .min_byte_alignment = sizeof(uint32_t),
-  };
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
-      command_buffer, validation_state, workgroups_ref, workgroups_reqs));
-
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
-      command_buffer, validation_state, executable, entry_point));
-
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_command_buffer_dispatch2_validation_base(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
@@ -680,7 +578,7 @@ static iree_status_t iree_hal_command_buffer_dispatch2_validation_base(
     IREE_RETURN_IF_ERROR(
         iree_hal_command_buffer_validate_buffer_requirements(
             command_buffer, validation_state, bindings.values[i], requirements),
-        "binding[%u] (arg[%" PRIhsz "])", bindings.values[i].ordinal, i);
+        "binding[%" PRIhsz "]", i);
   }
 
   return iree_ok_status();
