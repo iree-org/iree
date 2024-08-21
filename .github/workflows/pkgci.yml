@@ -68,13 +68,13 @@ jobs:
     uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
 
   test_models:
-    name: Regression Test
+    name: Test Models
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_models')
     uses: ./.github/workflows/pkgci_test_models.yml
 
   test_onnx:
-    name: Regression Test
+    name: Test ONNX
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
