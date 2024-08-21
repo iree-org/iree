@@ -208,6 +208,8 @@ LogicalResult MultiMmaOp::verify() {
   int64_t expectedNumRhsElem = n * k;
   int64_t expectedNumAccElem = m * n;
 
+  // TODO: Revisit if we can move below logic out of the MultiMmaOp before we
+  // land this part to main branch.
   if (auto dataTiledMmaAttr =
           dyn_cast<IREE::GPU::DataTiledMMAAttr>(getKind())) {
     auto [mUnrollFactor, nUnrollFactor, kUnrollFactor] =

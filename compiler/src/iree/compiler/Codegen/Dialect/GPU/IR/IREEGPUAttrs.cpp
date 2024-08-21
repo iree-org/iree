@@ -899,57 +899,7 @@ std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
 
 std::tuple<VectorType, VectorType, VectorType>
 DataTiledMMAAttr::getABCVectorTypes() const {
-  // Check https://github.com/ROCm/amd_matrix_instruction_calculator for
-  // instruction details. Note here we are returning the number elements, while
-  // amd_matrix_instruction_calculator tells us about the number of 32-bit
-  // registers. So need to adjust accordingly. All vectors should be 1-D.
-  auto [aElemType, bElemType, cElemType] = getABCElementTypes();
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
-    auto aType = VectorType::get({1}, aElemType);
-    auto bType = VectorType::get({1}, bElemType);
-    auto cType = VectorType::get({4}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
-    auto aType = VectorType::get({4}, aElemType);
-    auto bType = VectorType::get({4}, bElemType);
-    auto cType = VectorType::get({4}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
-    auto aType = VectorType::get({4}, aElemType);
-    auto bType = VectorType::get({4}, bElemType);
-    auto cType = VectorType::get({16}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
-    auto aType = VectorType::get({8}, aElemType);
-    auto bType = VectorType::get({8}, bElemType);
-    auto cType = VectorType::get({4}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
-    auto aType = VectorType::get({8}, aElemType);
-    auto bType = VectorType::get({8}, bElemType);
-    auto cType = VectorType::get({16}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
-    auto aType = VectorType::get({16}, aElemType);
-    auto bType = VectorType::get({16}, bElemType);
-    auto cType = VectorType::get({8}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    auto aType = VectorType::get({16}, aElemType);
-    auto bType = VectorType::get({16}, bElemType);
-    auto cType = VectorType::get({16}, cElemType);
-    return std::make_tuple(aType, bType, cType);
-  }
-  }
-  // This should not happen but just to make GCC happy.
+  // TODO: Implement the interface method.
   return std::make_tuple(VectorType{}, VectorType{}, VectorType{});
 }
 

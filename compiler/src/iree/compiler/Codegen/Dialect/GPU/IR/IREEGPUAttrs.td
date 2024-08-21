@@ -227,6 +227,9 @@ def IREEGPU_DataTiledMMAAttr :
     AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
+    // TODO: Implement the interface method. The current implementation just
+    // returns {VectorType(), VectorType(), VectorType()} now because the dummy
+    // implementation is required by the MmaInterfaceAttr.
     "getABCVectorTypes",
     "getMNKShape",
     "getSubgroupSize",
@@ -238,7 +241,23 @@ def IREEGPU_DataTiledMMAAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = [{
-    An mma instruction for data tiling :)
+    This mma variant represents MMA ops with data-tiling details. The
+    |intrinsic| field specifies which particular MMA intrinsic is targeted by
+    the data-tiling.
+
+    The tile swizzling already happens, so the attribute does not need to
+    implement materializeOperandConcreteShape interface method. E.g., if the
+    target intrinsic is MFMA_F32_16x16x4_F32:
+      - The inner tile shape of LHS is 4x16.
+      - The inner tile shape of RHS is 4x16.
+      - The inner tile shape of ACC is 4x16x4.
+
+    Furthermore, the unrolling and interleaving can be represented with the
+    attribute. In the concept of data-tiling, we always unroll the parallel
+    dimensions (i.e., M, N dimensions) to be outermost, and interleave the
+    unrolled K dimension. I.e., the unrolled K dimension becomes the innermost
+    dimension. The constraint can be relaxed based on data-tiling needs. The
+    additional information can be added to `parameters`.
   }];
 
   let hasCustomAssemblyFormat = 1;
