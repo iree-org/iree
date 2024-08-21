@@ -2388,8 +2388,6 @@ private:
                                                  /*operand=*/arguments);
     for (size_t i = 0; i < inputTypes.size(); i++) {
       BlockArgument arg = funcOp.getArgument(i + inputOffset);
-      auto argLValue = emitc_builders::asLValue(builder, loc, arg);
-
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
 
@@ -2415,6 +2413,7 @@ private:
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(argType));
 
         // memcpy(uint8Ptr, &arg, size);
+        auto argLValue = emitc_builders::asLValue(builder, loc, arg);
         Value argPtr = emitc_builders::addressOf(builder, loc, argLValue);
         emitc_builders::memcpy(builder, loc, uint8Ptr, argPtr, size);
       }
@@ -2497,7 +2496,7 @@ private:
         Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        builder
+        uint8Ptr = builder
             .create<emitc::AddOp>(
                 /*location=*/loc,
                 /*type=*/bytePtrType,
