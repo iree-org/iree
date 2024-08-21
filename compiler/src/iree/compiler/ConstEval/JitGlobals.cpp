@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/ConstEval/PassDetail.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
@@ -29,6 +28,9 @@
 #define DEBUG_TYPE "iree-const-eval"
 
 namespace mlir::iree_compiler::ConstEval {
+
+#define GEN_PASS_DEF_JITGLOBALSPASS
+#include "iree/compiler/ConstEval/Passes.h.inc"
 
 static llvm::cl::opt<std::string> clJitTargetDevice(
     "iree-consteval-jit-target-device",
@@ -609,8 +611,11 @@ private:
   InitializationAnalysis initializationAnalysis;
 };
 
-struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
-  JitGlobalsPass(const JitGlobalsOptions &options)
+class JitGlobalsPass final : public impl::JitGlobalsPassBase<JitGlobalsPass> {
+public:
+  JitGlobalsPass() : JitGlobalsPass(JitGlobalsPassOptions{}) {}
+
+  JitGlobalsPass(const JitGlobalsPassOptions &options)
       : compileOptions(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     targetRegistry = options.targetRegistry;
@@ -619,10 +624,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     requestedTargetDevice = resolveTargetDevice(*targetRegistry.value);
     hasRequestedTargetDevice =
         targetRegistry->getTargetDevice(requestedTargetDevice) != nullptr;
-    compileOptions->executableOptions.targets.push_back(requestedTargetDevice);
+    compileOptions->executableOptions.legacyTargetBackends.push_back(
+        requestedTargetDevice);
     compileOptions->targetOptions.f32Extension = true;
     compileOptions->targetOptions.f64Extension = true;
     compileOptions->targetOptions.truncateUnsupportedFloats = false;
+    compileOptions->inputOptions.demoteF64ToF32 = false;
     if (requestedTargetDevice == "vmvx" || !hasRequestedTargetDevice) {
       targetDevice = targetRegistry->getTargetDevice("vmvx");
     } else {
@@ -862,6 +869,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     }
   }
 
+private:
   std::shared_ptr<CompileOptions> compileOptions;
   OpPassManager compilePipeline;
   std::string requestedTargetDevice;
@@ -871,14 +879,4 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createJitGlobalsPass(const JitGlobalsOptions &options) {
-  return std::make_unique<JitGlobalsPass>(options);
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass() {
-  return std::make_unique<JitGlobalsPass>(JitGlobalsOptions{});
-}
-
 } // namespace mlir::iree_compiler::ConstEval

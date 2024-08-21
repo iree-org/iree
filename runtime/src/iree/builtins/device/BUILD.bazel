@@ -6,7 +6,7 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library")
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -72,7 +72,7 @@ iree_bitcode_library(
     internal_hdrs = BITCODE_HDRS,
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "libdevice_bitcode",
     srcs = [
         ":libdevice_aarch64_sme.bc",

@@ -20,17 +20,6 @@ struct TorchToIREELoweringPipelineOptions
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
 };
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createBitCastQuantTensorPass();
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertTMTensorToLinalgExtPass();
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSetStrictSymbolicShapesPass();
-
-std::unique_ptr<OperationPass<ModuleOp>> createFuncConversionPass();
-
 // Creates a pipeline that lowers from the torch backend contract to IREE.
 // This is based on the torch-backend-to-linalg-on-tensors-backend-pipeline
 // pipeline in torch-mlir but includes IREE specific lowerings.
@@ -40,6 +29,9 @@ void createTorchToIREEPipeline(
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc" // IWYU pragma: keep
 
 void registerTMTensorConversionPasses();
 

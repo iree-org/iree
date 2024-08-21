@@ -531,7 +531,7 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def c_embed_data(
+    def iree_c_embed_data(
         self,
         name,
         srcs,
@@ -555,6 +555,7 @@ class BuildFileFunctions(object):
             "H_FILE_OUTPUT", h_file_output
         )
         testonly_block = self._convert_option_block("TESTONLY", testonly)
+        strip_prefix_block = self._convert_option_block("STRIP_PREFIX", strip_prefix)
         identifier_block = self._convert_string_arg_block("IDENTIFIER", identifier)
         flatten_block = self._convert_option_block("FLATTEN", flatten)
         deps_block = self._convert_target_list_block("DEPS", deps)
@@ -568,6 +569,7 @@ class BuildFileFunctions(object):
             f"{h_file_output_block}"
             f"{identifier_block}"
             f"{testonly_block}"
+            f"{strip_prefix_block}"
             f"{flatten_block}"
             f"  PUBLIC\n)\n\n"
         )

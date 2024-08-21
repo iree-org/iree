@@ -9,34 +9,28 @@
 #
 # Prerequisites:
 #   * Environment must be configured for Emscripten
-#   * Host tools must be built (default at IREE_SOURCE_DIR/build-host/install).
-#     The build_tools/cmake/build_host_tools.sh script can do this for you.
+#   * Host tools must be available at the $1 arg
 #
-# Usage:
-#   build_sample.sh (optional install path) && serve_sample.sh
+# Sample usage:
+#   python -m venv .venv
+#   source .venv/bin/activate
+#   python -m pip install iree-compiler iree-runtime
+#   build_sample.sh .venv/bin && serve_sample.sh
 #
-# The desired host install directory can be passed as the first argument.
-# Otherwise, it looks for an install directory under path set in the environment
-# variable IREE_HOST_BUILD_DIR (default build-host). The build directory for the
-# emscripten build is taken from the environment variable
-# IREE_EMPSCRIPTEN_BUILD_DIR, defaulting to "build-emscripten". Designed for
-# CI, but can be run manually. It reuses the build directory if it already
-# exists.
-#
-# NOTE: This is different from most of build scripts we use for CI because it is
-# intended to also be runnable by humans with minimal configuration.
+# The build directory for the emscripten build is taken from the environment
+# variable IREE_EMPSCRIPTEN_BUILD_DIR, defaulting to "build-emscripten".
+# Designed for CI, but can be run manually. It reuses the build directory if it
+# already exists.
 
 set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
+HOST_TOOLS_BINARY_DIR="$1"
 BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
-INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
 SOURCE_DIR="${ROOT_DIR}/experimental/web/sample_static"
 BINARY_DIR="${BUILD_DIR}/experimental/web/sample_static/"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
-
 
 ###############################################################################
 # Setup and checking for dependencies                                         #
@@ -56,13 +50,11 @@ mkdir -p "${BINARY_DIR}"
 # Compile from .mlir input to static C source files using host tools          #
 ###############################################################################
 
-COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
-EMBED_DATA_TOOL="${INSTALL_ROOT}/bin/generate_embed_data"
 INPUT_NAME="mnist"
 INPUT_PATH="${ROOT_DIR}/samples/models/mnist.mlir"
 
 echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
-"${COMPILE_TOOL}" "${INPUT_PATH}" \
+"${HOST_TOOLS_BINARY_DIR}/iree-compile" "${INPUT_PATH}" \
   --iree-input-type=stablehlo \
   --iree-hal-target-backends=llvm-cpu \
   --iree-llvmcpu-target-triple=wasm32-unknown-unknown \
@@ -72,7 +64,7 @@ echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
   --o "${BINARY_DIR}/${INPUT_NAME}.vmfb"
 
 echo "=== Embedding bytecode module (.vmfb) into C source files (.h, .c) ==="
-"${EMBED_DATA_TOOL}" "${BINARY_DIR}/${INPUT_NAME}.vmfb" \
+"${HOST_TOOLS_BINARY_DIR}/iree-c-embed-data" "${BINARY_DIR}/${INPUT_NAME}.vmfb" \
   --output_header="${BINARY_DIR}/${INPUT_NAME}_bytecode.h" \
   --output_impl="${BINARY_DIR}/${INPUT_NAME}_bytecode.c" \
   --identifier="iree_static_${INPUT_NAME}" \
@@ -92,7 +84,7 @@ emcmake "${CMAKE_BIN}" \
   -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BIN_DIR="${INSTALL_ROOT}/bin" \
+  -DIREE_HOST_BIN_DIR="${HOST_TOOLS_BINARY_DIR}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \

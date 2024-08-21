@@ -103,7 +103,8 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
     if (llvm::isa<TensorType>(retVal.getType())) {
       auto type = IREE::HAL::BufferViewType::get(context);
       auto exportOp = builder.create<IREE::HAL::TensorExportOp>(
-          loc, type, retVal, TypeAttr::get(retVal.getType()), /*name=*/nullptr);
+          loc, type, retVal, TypeAttr::get(retVal.getType()), /*name=*/nullptr,
+          /*affinity=*/nullptr);
       exports.push_back(exportOp.getResult());
       newTypes.push_back(type);
     } else {

@@ -56,6 +56,7 @@ struct FuncAnalysis {
   // Which args are uniform from all call sites.
   BitVector callerUniformArgs;
   // Values for each arg if they are uniformly constant at all call sites.
+  // May be any constant attribute or an immutable global symbol ref.
   SmallVector<LocAttr> callerUniformArgValues;
   // Uniform call operand index -> deduplicated index.
   // Base/non-duplicated values will be identity.
@@ -69,6 +70,7 @@ struct FuncAnalysis {
   // Which results are uniform from all return sites in the function.
   BitVector calleeUniformResults;
   // Values for each result if they are uniformly constant at all return sites.
+  // May be any constant attribute or an immutable global symbol ref.
   SmallVector<LocAttr> calleeUniformResultValues;
   // Uniform callee return operand index -> deduplicated index.
   // Base/non-duplicated values will be identity.
@@ -94,9 +96,13 @@ struct FuncAnalysis {
         os << "dupe(%arg" << callerUniformArgDupeMap[i] << ") ";
       }
       os << argTypes[i] << " ";
-      if (callerUniformArgValues[i]) {
-        os << "constant = ";
-        callerUniformArgValues[i].attr.print(os);
+      if (auto constant = callerUniformArgValues[i]) {
+        if (isa<SymbolRefAttr>(constant.attr)) {
+          os << "immutable global = ";
+        } else {
+          os << "constant = ";
+        }
+        constant.attr.print(os);
       }
       os << "\n";
     }
@@ -113,9 +119,13 @@ struct FuncAnalysis {
         os << "pass(%arg" << passthroughResultArgs[i] << ") ";
       }
       os << resultTypes[i] << " ";
-      if (calleeUniformResultValues[i]) {
-        os << "constant = ";
-        calleeUniformResultValues[i].attr.print(os);
+      if (auto constant = calleeUniformResultValues[i]) {
+        if (isa<SymbolRefAttr>(constant.attr)) {
+          os << "immutable global = ";
+        } else {
+          os << "constant = ";
+        }
+        constant.attr.print(os);
       }
       os << "\n";
     }
@@ -127,6 +137,17 @@ struct FuncAnalysis {
     }
   }
 };
+
+// Returns a global symbol ref if the value is loaded from an immutable global.
+static SymbolRefAttr matchImmutableGlobalLoad(Value value) {
+  if (auto loadOp = dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
+          value.getDefiningOp())) {
+    if (loadOp.isGlobalImmutable()) {
+      return loadOp.getGlobalAttr();
+    }
+  }
+  return {};
+}
 
 // Note that the analysis results may be incomplete.
 static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
@@ -183,6 +204,12 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
             value.getLoc(),
             value.getType(),
             constantValue,
+        };
+      } else if (auto globalRef = matchImmutableGlobalLoad(value)) {
+        analysis.calleeUniformResultValues[i] = {
+            value.getLoc(),
+            value.getType(),
+            globalRef,
         };
       }
 
@@ -242,6 +269,20 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
               constantValue,
           };
         } else if (seenArgAttrs[i] != constantValue) {
+          // Value constant has changed from prior calls: mark non-uniform.
+          analysis.callerUniformArgs.reset(i);
+        }
+      } else if (auto globalRef = matchImmutableGlobalLoad(value)) {
+        if (!seenArgAttrs[i]) {
+          // First call site with a constant or immutable global: stash so we
+          // can inline it if it's uniform.
+          seenArgAttrs[i] = globalRef;
+          analysis.callerUniformArgValues[i] = {
+              value.getLoc(),
+              value.getType(),
+              globalRef,
+          };
+        } else if (seenArgAttrs[i] != globalRef) {
           // Value constant has changed from prior calls: mark non-uniform.
           analysis.callerUniformArgs.reset(i);
         }
@@ -367,6 +408,14 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
                                      OpBuilder &builder) {
   Operation *op = nullptr;
 
+  // Immutable global loads are represented as constant symbol refs.
+  if (auto globalRef = dyn_cast<SymbolRefAttr>(constantValue.attr)) {
+    op = builder.create<IREE::Util::GlobalLoadOp>(
+        constantValue.loc.value(), constantValue.type,
+        globalRef.getLeafReference().getValue(),
+        /*is_immutable=*/true);
+  }
+
   // Handle special builtin types that for some reason can't materialize
   // themselves.
   if (arith::ConstantOp::isBuildableWith(constantValue.attr,
@@ -488,7 +537,7 @@ static bool applyFuncChanges(FuncAnalysis &analysis,
 
 // Returns true if any changes were made.
 static bool applyCallChanges(FuncAnalysis &analysis,
-                             IREE::Util::CallOp callOp) {
+                             IREE::Util::CallOp &callOp) {
   // Build the new set of call operands.
   SmallVector<Value> oldOperands = callOp.getOperands();
   SmallVector<Value> newOperands;
@@ -573,7 +622,23 @@ static bool applyCallChanges(FuncAnalysis &analysis,
   // Erase old op now that all uses are (or should be) replaced.
   callOp.erase();
 
+  callOp = newCallOp;
   return true;
+}
+
+// Returns true if |funcOp| performs no work (no args/results, no ops).
+// We could make this a little smarter in the future by checking that there's
+// no side-effecting work.
+static bool isFuncEmpty(FunctionOpInterface funcOp) {
+  if (funcOp.isExternal()) {
+    return false;
+  } else if (funcOp.getNumArguments() > 0 || funcOp.getNumResults() > 0) {
+    return false;
+  } else if (funcOp.getBlocks().size() > 1) {
+    return false;
+  } else {
+    return funcOp.front().getOperations().size() == 1;
+  }
 }
 
 class IPOPass : public IPOBase<IPOPass> {
@@ -612,11 +677,21 @@ public:
     // Use analysis results to mutate functions.
     bool anyChanges = false;
     for (auto &analysis : analysisResults) {
-      if (analysis.isIncomplete)
+      if (analysis.isIncomplete) {
         continue;
+      }
       anyChanges = applyFuncChanges(analysis, analysis.funcOp) || anyChanges;
-      for (auto callOp : analysis.callOps) {
+      for (auto &callOp : analysis.callOps) {
         anyChanges = applyCallChanges(analysis, callOp) || anyChanges;
+      }
+      if (isFuncEmpty(analysis.funcOp)) {
+        // If the function is empty after the changes then erase it and all
+        // calls to it.
+        for (auto callOp : analysis.callOps) {
+          callOp.erase();
+        }
+        analysis.funcOp.erase();
+        anyChanges = true;
       }
     }
 

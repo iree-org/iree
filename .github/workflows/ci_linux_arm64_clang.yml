@@ -1,0 +1,62 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Linux arm64 clang
+
+on:
+  schedule:
+    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
+    - cron: "15 9 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  # TODO: Switch to GitHub-hosted arm64 runners when available?
+  # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
+  linux_arm64_clang:
+    needs: setup
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - arm64
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-arm64
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: true
+      - name: "Building IREE"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59" \
+            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
+            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
+            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"

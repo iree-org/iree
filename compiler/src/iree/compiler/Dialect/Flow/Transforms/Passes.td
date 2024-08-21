@@ -64,6 +64,24 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def FuseHorizontalContractionsPass:
+    InterfacePass<"iree-flow-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+  let options = [
+    Option<"fusionLimit", "fusion-limit", "int",
+            /*default=*/"3", "Maximum number of contractions fused into one">
+  ];
+  let statistics = [
+    Statistic<"numFusionGroups", "num-fusion-groups", "Number of fusion groups found">,
+    Statistic<"numSize2FusionGroups", "num-size-2-groups", "Number of fusion groups of size 2">,
+    Statistic<"numSize3FusionGroups", "num-size-3-groups", "Number of fusion groups of size 3">
+  ];
+}
+
 def FuseMultiUseElementwiseProducerPass :
     InterfacePass<"iree-flow-fuse-multi-use-elementwise-producer",
                    "mlir::FunctionOpInterface"> {
@@ -147,6 +165,12 @@ def CloneProducersIntoDispatchRegionsPass :
 def CollapseDimensionsPass :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
+  let options = [
+    Option<"maxIterations", "max-iterations", "int",
+    /*default=*/"10",
+    "Maximum number of iterations to wait for collapse dimensions to converge"
+>,
+  ];
   let description = [{
     Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
     and hoist the reshaping operations out of the dispatch.
@@ -510,6 +534,20 @@ def OutlineDispatchRegionsPass :
   let dependentDialects = [
     "mlir::func::FuncDialect",
     "IREE::Flow::FlowDialect",
+  ];
+}
+
+def SetEncodingPass :
+    InterfacePass<"iree-flow-set-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"32",
+           "provides padding size hints that will be attached to encodings.">,
   ];
 }
 

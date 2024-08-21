@@ -104,9 +104,7 @@ public:
       fn(IntegerAttr::get(IndexType::get(context),
                           APInt(64, bindingAttr.getOrdinal())));
       fn(IREE::HAL::DescriptorTypeAttr::get(context, bindingAttr.getType()));
-      fn(IREE::HAL::DescriptorFlagsAttr::get(
-          context,
-          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None)));
+      fn(IREE::HAL::DescriptorFlagsAttr::get(context, bindingAttr.getFlags()));
       return success();
     }
     if (auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(attr)) {

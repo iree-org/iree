@@ -202,8 +202,8 @@ class CustomModuleState final {
       const vm::ref<iree_hal_fence_t> signal_fence) {
     // TODO(benvanik): better fence helpers when timelines are not needed.
     vm::ref<iree_hal_semaphore_t> semaphore;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_semaphore_create(device_.get(), 0ull, &semaphore));
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+        device_.get(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
     vm::ref<iree_hal_fence_t> alloca_fence;
     IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
         semaphore.get(), 1ull, host_allocator_, &alloca_fence));

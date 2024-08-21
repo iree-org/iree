@@ -4,7 +4,7 @@ module attributes {hal.device.targets = [
   #hal.device.target<"llvm-cpu", [
     #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
     #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-  ]>
+  ]> : !hal.device
 ]} {
 
   // Instrumentation storage buffer allocated at startup (defaults to 64MB + footer):

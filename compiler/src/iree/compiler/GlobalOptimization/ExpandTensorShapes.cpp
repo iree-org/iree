@@ -11,9 +11,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/Utils/IndexSet.h"
+#include "iree/compiler/Utils/IntegerSet.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -29,6 +28,10 @@
 #define DEBUG_TYPE "iree-global-opt-expand-tensor-shapes"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+#define GEN_PASS_DEF_EXPANDTENSORSHAPESPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 namespace {
 
 // TODO(benvanik): factor out into a generic util pass base that lets us share
@@ -624,10 +627,8 @@ static void expandTensorDims(Operation *op, SymbolTable &symbolTable,
 // results are always wrapped in a flow.tensor.tie_shape, with the
 // elision/deduplication/etc left until cleanup.
 class ExpandTensorShapesPass
-    : public ExpandTensorShapesBase<ExpandTensorShapesPass> {
+    : public impl::ExpandTensorShapesPassBase<ExpandTensorShapesPass> {
 public:
-  ExpandTensorShapesPass() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
@@ -661,9 +662,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass() {
-  return std::make_unique<ExpandTensorShapesPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

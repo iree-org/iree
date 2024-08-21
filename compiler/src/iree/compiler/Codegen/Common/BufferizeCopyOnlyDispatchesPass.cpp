@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -30,16 +29,18 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_BUFFERIZECOPYONLYDISPATCHESPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
 /// Pass to bufferize early copy-only dispatches. This allows backends
 /// to use the `linalg.generic` operation generated for lowering the dispatch.
-struct BufferizeCopyOnlyDispatchesPass
-    : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
-  BufferizeCopyOnlyDispatchesPass() = default;
-  BufferizeCopyOnlyDispatchesPass(const BufferizeCopyOnlyDispatchesPass &pass) {
-  }
-
+struct BufferizeCopyOnlyDispatchesPass final
+    : impl::BufferizeCopyOnlyDispatchesPassBase<
+          BufferizeCopyOnlyDispatchesPass> {
+  using impl::BufferizeCopyOnlyDispatchesPassBase<
+      BufferizeCopyOnlyDispatchesPass>::BufferizeCopyOnlyDispatchesPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
@@ -107,11 +108,6 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
         "unexpected allocations while bufferizing copy dispatch");
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createBufferizeCopyOnlyDispatchesPass() {
-  return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }
 
 } // namespace mlir::iree_compiler

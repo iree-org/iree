@@ -2,4 +2,3 @@
 # Ensure a recent cmake
 cmake>=3.18.4
 ninja
-PyYAML>=5.4.1

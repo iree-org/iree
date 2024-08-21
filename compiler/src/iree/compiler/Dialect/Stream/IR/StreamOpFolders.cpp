@@ -1183,7 +1183,7 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
       return failure();
 
     // Definitely empty if here.
-    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
@@ -1219,7 +1219,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
     }
 
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
-    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
@@ -1231,7 +1231,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
         constantOp, constantOp.getResult().getType(), splatOp.getResult(),
         resultSize, resultSize,
         /*source_affinity=*/constantOp.getAffinityAttr(),
-        /*result_affinity=*/nullptr);
+        /*result_affinity=*/constantOp.getAffinityAttr());
     return success();
   }
 };
@@ -1435,6 +1435,7 @@ void AsyncAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
+  results.insert<ElideUnusedOp<AsyncAllocaOp>>(context);
   results.insert<SinkAllocaLikeOpToConsumers<AsyncAllocaOp>>(context);
 }
 
@@ -1451,9 +1452,9 @@ struct ConvertSplatConstantsIntoSplats
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
     auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
-    if (!value || !value.isSplat())
+    if (!value || !value.isSplat()) {
       return failure();
-
+    }
     auto splatElementAttr =
         llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
@@ -3142,8 +3143,14 @@ struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
     Block *commonDominator = nullptr;
     for (auto result : op.getResults()) {
       for (auto &use : result.getUses()) {
-        if (allUsers.insert(use.getOwner())) {
-          auto *userBlock = use.getOwner()->getBlock();
+        // Its possible we are nested in an SCF region. If so the SCF operation
+        // depends on the timepoint as a whole.
+        Operation *owner = use.getOwner();
+        while (owner && owner->getParentOp() != op->getParentOp())
+          owner = owner->getParentOp();
+
+        if (allUsers.insert(owner)) {
+          auto *userBlock = owner->getBlock();
           commonDominator = commonDominator
                                 ? domInfo.findNearestCommonDominator(
                                       commonDominator, userBlock)
@@ -3262,16 +3269,8 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       if (dominanceInfo.dominates(use.getOwner(), op))
         continue;
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
-      if (!awaitOp ||
-          !AffinityAttr::areCompatible(
-              llvm::dyn_cast_if_present<AffinityAttr>(op.getAffinityAttr()),
-              llvm::dyn_cast_if_present<AffinityAttr>(
-                  awaitOp.getAffinityAttr()))) {
-        // Can't combine if the affinities differ as the wait semantics are
-        // load-bearing. Probably. They really shouldn't be.
-        // TODO(benvanik): remove affinity from stream.timepoint.await.
+      if (!awaitOp)
         continue;
-      }
       // Ensure all dependencies of the await op are available.
       if (!areAllOperandsDefinedBy(awaitOp, op, dominanceInfo)) {
         // One or more operands is defined after op so we can't merge.
@@ -3298,9 +3297,6 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
     }
     auto newOp = rewriter.create<TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().has_value()) {
-      newOp.setAffinityAttr(op.getAffinityAttr());
-    }
 
     // Replace covered ops with the new results.
     unsigned resultIdx = 0;
@@ -3348,9 +3344,6 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().has_value()) {
-      newOp.setAffinityAttr(op.getAffinityAttr());
-    }
 
     // Replace all duplicate results with the base results.
     for (auto &replacement : replacements) {

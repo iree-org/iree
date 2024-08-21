@@ -5,9 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <limits>
+
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -21,7 +26,7 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_PADTOINTRINSICS
+#define GEN_PASS_DEF_PADTOINTRINSICSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 namespace {
@@ -141,10 +146,8 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
 }
 
 static SmallVector<GPUMatmulShapeType>
-getIntrinsics(linalg::LinalgOp linalgOp) {
-  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(linalgOp);
-
+getIntrinsics(linalg::LinalgOp linalgOp,
+              ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   IREE::GPU::TargetAttr target;
   if (executableTargets.size() == 1) {
     auto targetAttr = executableTargets.front();
@@ -165,7 +168,9 @@ getIntrinsics(linalg::LinalgOp linalgOp) {
   });
 }
 
-static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
+static void
+padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+          ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
     return;
   }
@@ -174,7 +179,8 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
     return;
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  SmallVector<GPUMatmulShapeType> intrinsics =
+      getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
@@ -214,10 +220,23 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
+  auto inpElemType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType())
+          .getElementType();
+  auto kernelElemType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType())
+          .getElementType();
+
   // TODO: Generalize to other dimensions.
   // Try to search for pad value and check only filter dimension is blocked.
   SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
   for (const GPUMatmulShapeType &intrinsic : intrinsics) {
+
+    if (!(inpElemType == intrinsic.aType &&
+          kernelElemType == intrinsic.bType)) {
+      continue;
+    }
+
     std::optional<int64_t> mPadding, nPadding, kPadding;
     auto getPadding = [](int64_t value, int64_t padTo) {
       return llvm::divideCeil(value, padTo) * padTo - value;
@@ -291,8 +310,9 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   rewriter.replaceOp(linalgOp, extracted);
 }
 
-static void padContractionLikeOp(RewriterBase &rewriter,
-                                 linalg::LinalgOp linalgOp) {
+static void padContractionLikeOp(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
 
@@ -306,7 +326,8 @@ static void padContractionLikeOp(RewriterBase &rewriter,
   }
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  SmallVector<GPUMatmulShapeType> intrinsics =
+      getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
@@ -513,7 +534,7 @@ static void padContractionLikeOp(RewriterBase &rewriter,
 }
 
 struct PadToIntrinsicsPass
-    : public impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
+    : public impl::PadToIntrinsicsPassBase<PadToIntrinsicsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
@@ -523,39 +544,63 @@ struct PadToIntrinsicsPass
 void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  auto funcOp = getOperation();
+
+  auto moduleOp = getOperation();
+  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+  if (failed(affinityAnalysis.run())) {
+    return signalPassFailure();
+  }
+  IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+  if (failed(deviceAnalysis.run())) {
+    return signalPassFailure();
+  }
+
   bool padConvOps = padTargetType == PadTargetType::ConvOp ||
                     padTargetType == PadTargetType::All;
   bool padContractionOps = padTargetType == PadTargetType::ContractionOp ||
                            padTargetType == PadTargetType::All;
   SmallVector<linalg::LinalgOp> targetConvOps;
   SmallVector<linalg::LinalgOp> targetContractOps;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) && padConvOps) {
-      // Add convOps into worklist.
-      targetConvOps.push_back(linalgOp);
-    } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
-                   linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
-               padContractionOps) {
-      // Add named contractionOps into worklist.
-      targetContractOps.push_back(linalgOp);
-    } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
-               linalg::isaContractionOpInterface(linalgOp) &&
-               padContractionOps) {
-      // Add named generic contractionOps into worklist.
-      targetContractOps.push_back(linalgOp);
-    }
-  });
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) &&
+          padConvOps) {
+        targetConvOps.push_back(linalgOp);
+      } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
+                     linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
+                 padContractionOps) {
+        targetContractOps.push_back(linalgOp);
+      } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+                 linalg::isaContractionOpInterface(linalgOp) &&
+                 padContractionOps) {
+        targetContractOps.push_back(linalgOp);
+      }
+    });
+  }
 
   // Iterate through and pad ops in the worklists.
+  auto getRequiredExecutableTargetAttrs = [&](Operation *op) {
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    SmallVector<IREE::Stream::AffinityAttr> affinityAttrs;
+    if (affinityAnalysis.tryInferExecutionAffinity(op, affinityAttrs)) {
+      for (auto affinityAttr : affinityAttrs) {
+        deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, op,
+                                                       executableTargetAttrs);
+      }
+    }
+    return executableTargetAttrs;
+  };
   IRRewriter rewriter(context);
   for (auto convOp : targetConvOps) {
     rewriter.setInsertionPoint(convOp);
-    padConvOp(rewriter, convOp);
+    auto executableTargetAttrs = getRequiredExecutableTargetAttrs(convOp);
+    padConvOp(rewriter, convOp, executableTargetAttrs.getArrayRef());
   }
   for (auto contractOp : targetContractOps) {
     rewriter.setInsertionPoint(contractOp);
-    padContractionLikeOp(rewriter, contractOp);
+    auto executableTargetAttrs = getRequiredExecutableTargetAttrs(contractOp);
+    padContractionLikeOp(rewriter, contractOp,
+                         executableTargetAttrs.getArrayRef());
   }
 }
 

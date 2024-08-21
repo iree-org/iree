@@ -6,9 +6,8 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
-#include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
-#include "iree/compiler/Utils/IndexSet.h"
+#include "iree/compiler/Utils/IntegerSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -22,6 +21,9 @@
 #define DEBUG_TYPE "iree-vmvx-resolve-buffer-descriptor"
 
 namespace mlir::iree_compiler::IREE::VMVX {
+
+#define GEN_PASS_DEF_RESOLVEBUFFERDESCRIPTORSPASS
+#include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
 
 namespace {
 /// Helper struct to return the offset, sizes and strides
@@ -312,8 +314,8 @@ struct FromHalInterfaceBindingSubspan
         op.getBaseBuffer(),
         rewriter
             .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
-                loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
-                binding.getBindingAttr())
+                loc, op.getBaseBuffer().getType(), binding.getLayout(),
+                binding.getSetAttr(), binding.getBindingAttr())
             .getResult());
 
     rewriter.eraseOp(op);
@@ -405,8 +407,9 @@ struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
 // Pass To resovle descriptors.
 //===---------------------------------------------------------------------===//
 
-class ResolveBufferDescriptorsPass
-    : public ResolveBufferDescriptorsBase<ResolveBufferDescriptorsPass> {
+class ResolveBufferDescriptorsPass final
+    : public impl::ResolveBufferDescriptorsPassBase<
+          ResolveBufferDescriptorsPass> {
 public:
   ResolveBufferDescriptorsPass() = default;
   ResolveBufferDescriptorsPass(const ResolveBufferDescriptorsPass &) {}
@@ -451,9 +454,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<>> createResolveBufferDescriptorsPass() {
-  return std::make_unique<ResolveBufferDescriptorsPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::VMVX

@@ -453,12 +453,15 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "Attention operator";
   let description = [{
     Computes the scaled dot product attention function:
@@ -515,6 +518,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
 
     SmallVector<AffineMap> getIndexingMapsArray();
+
+    SmallVector<int64_t, 4> getStaticLoopRanges();
 
     AffineMap getQueryMap() {
       return cast<AffineMap>(getIndexingMapsArray()[0]);

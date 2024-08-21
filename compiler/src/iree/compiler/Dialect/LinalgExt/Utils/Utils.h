@@ -111,5 +111,21 @@ static void permute(SmallVectorImpl<T> &vector) {
   }
 }
 
+/// Returns true if the operation increases bitwidths of tensors.
+/// This function checks that the genericOp:
+/// 1. Has only one output.
+/// 2. Has all parallel loops.
+/// 3. Compared to the element type of the input with highest rank,
+///    the output element type has a higher bitwidth.
+bool isBitExtendOp(Operation *op);
+
+/// Returns true if the operation decreases bitwidths of tensors.
+/// This function checks that the genericOp:
+/// 1. Has only one output.
+/// 2. Has all parallel loops.
+/// 3. Compared to the element type of the input with highest rank,
+///    the output element type has a lower bitwidth.
+bool isBitTruncateOp(Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

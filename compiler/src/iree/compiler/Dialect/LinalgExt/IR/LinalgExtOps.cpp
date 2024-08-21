@@ -1214,6 +1214,9 @@ LogicalResult AttentionOp::verify() {
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+  if (failed(maybeOpInfo)) {
+    return attnOp->emitOpError("failed to verify op's indexing maps");
+  }
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
@@ -1291,6 +1294,44 @@ LogicalResult AttentionOp::reifyResultShapes(
 SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t, 4> bounds(getIterationDomainRank());
+  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
+
+  // batch(s), m, k1
+  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  // batch(s), k2, n
+  ArrayRef<int64_t> valueShape = getValueType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+
+  auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
+    for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
+      int pos = cast<AffineDimExpr>(dim).getPosition();
+      if (dimsFound[pos]) {
+        continue;
+      }
+      bounds[pos] = size;
+      dimsFound[pos] = true;
+    }
+  };
+  fillSizes(queryShape, queryDims);
+  fillSizes(valueShape, valueDims);
+  return bounds;
+}
+
+SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin(),
+                                maps.begin() + getNumDpsInputs() - 1);
+}
+
+SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
+  auto maps = getIndexingMapsArray();
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs() - 1,
+                                maps.end());
 }
 
 //===----------------------------------------------------------------------===//

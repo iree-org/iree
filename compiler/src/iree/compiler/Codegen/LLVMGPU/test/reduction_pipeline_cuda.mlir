@@ -18,8 +18,8 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
       %c0 = arith.constant 0 : index
       %c10240 = arith.constant 10240 : index
       %cst = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
       %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 10240], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<512x10240xf32>
       %8 = tensor.empty() : tensor<512xf32>
@@ -122,8 +122,8 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
       %c10240 = arith.constant 10240 : index
       %cst_0 = arith.constant 3.840000e+02 : f32
       %cst = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512x10240xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<512x10240xf32>>
       %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<512x10240xf32>
       %8 = tensor.empty() : tensor<512xf32>
@@ -215,8 +215,8 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
       %cst = arith.constant -3.40282347E+38 : f32
       %cst_0 = arith.constant 0.000000e+00 : f32
       %cst_1 = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
       %3 = tensor.empty() : tensor<12x128x40960xf32>
       %4 = linalg.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
@@ -232,19 +232,19 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maxnumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maxnumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -253,16 +253,16 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maximumf
-//         CHECK:    arith.maximumf
+//         CHECK:    arith.maxnumf
+//         CHECK:    arith.maxnumf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

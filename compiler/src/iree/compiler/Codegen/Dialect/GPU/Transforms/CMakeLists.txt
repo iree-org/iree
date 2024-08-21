@@ -45,12 +45,14 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "ConcretizeMmaShapes.cpp"
     "DistributeMmaToLanes.cpp"
     "FuseAndHoistParallelLoops.cpp"
     "LowerIREEGPUOps.cpp"
     "PackToIntrinsics.cpp"
     "Passes.cpp"
     "Transforms.cpp"
+    "UnrollToIntrinsics.cpp"
     "VectorizeIREEGPUOps.cpp"
   DEPS
     ::PassesIncGen
@@ -79,6 +81,7 @@ iree_cc_library(
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Transforms
   PUBLIC
 )

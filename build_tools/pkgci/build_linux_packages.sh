@@ -188,7 +188,7 @@ function build_wheel() {
 function build_iree_runtime() {
   # We install the needed build deps below for the tools.
   IREE_RUNTIME_BUILD_TRACY=ON IREE_RUNTIME_BUILD_TRACY_TOOLS=ON \
-  IREE_EXTERNAL_HAL_DRIVERS="rocm" \
+  IREE_HAL_DRIVER_HIP=ON \
   build_wheel runtime/
 }
 

@@ -16,6 +16,6 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
   LABELS
-    "driver=rocm"
+    "driver=hip"
     "hostonly"
 )

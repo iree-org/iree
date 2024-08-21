@@ -63,6 +63,6 @@ iree_lit_test_suite(
     iree-compile
     iree-run-module
   LABELS
-    "driver=rocm"
+    "driver=hip"
     "hostonly"
 )

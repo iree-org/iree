@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/PassManager.h"
@@ -18,11 +18,14 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_MATERIALIZEENCODINGINTONOPPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 using namespace IREE::Encoding;
 
 namespace {
-struct MaterializeEncodingIntoNopPass
-    : public MaterializeEncodingIntoNopBase<MaterializeEncodingIntoNopPass> {
+struct MaterializeEncodingIntoNopPass final
+    : impl::MaterializeEncodingIntoNopPassBase<MaterializeEncodingIntoNopPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
@@ -31,10 +34,9 @@ struct MaterializeEncodingIntoNopPass
     MLIRContext *context = &getContext();
     auto operation = getOperation();
 
-    auto materializeEncodingFn =
-        [](RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-      return failure();
-    };
+    auto materializeEncodingFn = [](RankedTensorType,
+                                    IREE::HAL::ExecutableTargetAttr)
+        -> FailureOr<MaterializeEncodingInfo> { return failure(); };
     auto materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder &,
            Location) -> FailureOr<MaterializeEncodingValueInfo> {
@@ -42,7 +44,8 @@ struct MaterializeEncodingIntoNopPass
     };
 
     RewritePatternSet materializeEncodingPattern(context);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn);
+    MaterializeEncodingTypeConverter typeConverter(
+        materializeEncodingFn, IREE::HAL::ExecutableTargetAttr());
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, target, typeConverter,
@@ -52,18 +55,6 @@ struct MaterializeEncodingIntoNopPass
                                       std::move(materializeEncodingPattern)))) {
       operation.emitOpError("materialization failed");
       return signalPassFailure();
-    }
-
-    {
-      RewritePatternSet patterns(context);
-      populateMaterializeUpperBoundTileSizePatterns(patterns,
-                                                    materializeEncodingFn);
-      if (failed(
-              applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
-        operation.emitOpError(
-            "encoding padding sizes materialization pattern failed");
-        return signalPassFailure();
-      }
     }
 
     // Add patterns to resolve dims ops and cleanups.
@@ -81,11 +72,6 @@ struct MaterializeEncodingIntoNopPass
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createMaterializeEncodingIntoNopPass() {
-  return std::make_unique<MaterializeEncodingIntoNopPass>();
-}
 
 void addEncodingToNopPasses(FunctionLikeNest &passManager) {
   passManager.addPass(createMaterializeEncodingIntoNopPass)

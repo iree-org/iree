@@ -83,6 +83,7 @@ def EncodingAttr :
     OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
     OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
+    OptionalParameter<"AffineMapAttr", "Indexing map that represents the broadcasting dims in the producer">:$bcast_map,
     // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
     OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to
   );
@@ -94,16 +95,21 @@ def EncodingAttr :
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
+        CArg<"std::optional<AffineMap>", "{}">:$bcastMap,
         CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the indexing map used by the operand index in the encoding.
+    /// Returns the bcast_map composed with the user_indexing_map for the
+    /// operand_index. The dimensions of the returned map are those of the
+    /// data-tiled op's iteration space, and the results of the map are in
+    /// the domain of the encoded tensor type.
     AffineMap getMapForOperandIndex();
 
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
-    /// matching index of the given encoding's tensor.
-    unsigned mapDimToOperandIndex(int64_t dimPos);
+    /// matching index of the given encoding's tensor, using getMapForOperandIndex
+    /// bcast_map and user_indexing_map.
+    std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos);
 
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();

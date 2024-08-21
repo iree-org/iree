@@ -1,0 +1,52 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Windows x64 MSVC
+
+on:
+  schedule:
+    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
+    - cron: "15 9 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  windows_x64_msvc:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build-windows
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: true
+      - name: "Setting up Python"
+        uses: actions/setup-python@v5.1.0
+        with:
+          python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
+      - name: "Installing Python packages"
+        run: |
+          python3 -m venv .venv
+          .venv/Scripts/activate.bat
+          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Installing requirements"
+        run: choco install ccache --yes
+      - name: "Configuring MSVC"
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: "Building IREE"
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"

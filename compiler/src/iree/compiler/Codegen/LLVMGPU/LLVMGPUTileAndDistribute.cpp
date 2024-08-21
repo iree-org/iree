@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -15,6 +14,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
@@ -24,6 +24,9 @@
 #define DEBUG_TYPE "iree-llvmgpu-tile-and-distribute"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUTILEANDDISTRIBUTEPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 /// Tiles to workgroup level. Workgroup tiling is done at the flow level but we
 /// may have extra tiling for the reduction dimension. Therefore we tile again
@@ -192,15 +195,19 @@ static LogicalResult tileToInvocation(mlir::FunctionOpInterface funcOp,
 }
 
 namespace {
-struct LLVMGPUTileAndDistributePass
-    : public LLVMGPUTileAndDistributeBase<LLVMGPUTileAndDistributePass> {
+class LLVMGPUTileAndDistributePass final
+    : public impl::LLVMGPUTileAndDistributePassBase<
+          LLVMGPUTileAndDistributePass> {
 private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
 
 public:
+  using impl::LLVMGPUTileAndDistributePassBase<
+      LLVMGPUTileAndDistributePass>::LLVMGPUTileAndDistributePassBase;
   LLVMGPUTileAndDistributePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect>();
   }
@@ -304,7 +311,7 @@ public:
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUTileAndDistribute(bool distributeToWarp) {
+createLLVMGPUTileAndDistributePass(bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }
 

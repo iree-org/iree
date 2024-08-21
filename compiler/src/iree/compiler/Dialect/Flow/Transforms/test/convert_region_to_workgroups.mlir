@@ -1,5 +1,7 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(util.func(iree-flow-convert-dispatch-regions-to-workgroups, iree-flow-canonicalize, cse))" -split-input-file | FileCheck %s
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: util.func public @foo(
 //       CHECK:   %[[argA:.*]]: tensor<?x?xf32>, %[[argB:.*]]: tensor<5x10xf32>, %[[argC:.*]]: tensor<10x11xf32>
 util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10x11xf32>) -> (tensor<?x?xf32>, tensor<5x11xf32>) {
@@ -21,7 +23,7 @@ util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: te
     flow.return %argA : tensor<?x?xf32>
   }
   //      CHECK: %[[r1:.*]] = flow.dispatch.workgroups(%[[argB]], %[[argC]]) : (tensor<5x10xf32>, tensor<10x11xf32>) -> tensor<5x11xf32>
-  // CHECK-SAME:   stream.affinity = #hal.affinity.queue<[0]>
+  // CHECK-SAME:   stream.affinity = #hal.device.affinity<@device>
   // CHECK-NEXT: (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:tensor<5x10xf32>>, %[[arg4:.*]]: !flow.dispatch.tensor<readonly:tensor<10x11xf32>>, %[[arg5:.*]]: !flow.dispatch.tensor<writeonly:tensor<5x11xf32>>)
   //  CHECK-DAG:   %[[loadB:.*]] = flow.dispatch.tensor.load %[[arg3]], offsets = [0, 0], sizes = [5, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5x10xf32>> -> tensor<5x10xf32>
   //  CHECK-DAG:   %[[loadC:.*]] = flow.dispatch.tensor.load %[[arg4]], offsets = [0, 0], sizes = [10, 11], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<10x11xf32>> -> tensor<10x11xf32>
@@ -31,7 +33,9 @@ util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: te
   //      CHECK:   flow.dispatch.tensor.store %[[matmul]], %[[arg5]], offsets = [0, 0], sizes = [5, 11], strides = [1, 1] : tensor<5x11xf32> -> !flow.dispatch.tensor<writeonly:tensor<5x11xf32>>
   //      CHECK:   flow.return
   //      CHECK: }
-  %r1 = flow.dispatch.region -> (tensor<5x11xf32>) attributes {stream.affinity = #hal.affinity.queue<[0]>} {
+  %r1 = flow.dispatch.region -> (tensor<5x11xf32>) attributes {
+    stream.affinity = #hal.device.affinity<@device>
+  } {
     %zero = arith.constant 0.0 : f32
     %0 = tensor.empty() : tensor<5x11xf32>
     %1 = linalg.fill ins(%zero : f32) outs(%0 : tensor<5x11xf32>) -> tensor<5x11xf32>

@@ -21,6 +21,7 @@
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
 #include "iree/hal/pipeline_layout.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -530,8 +531,9 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_descriptor_set_layout_binding_t* bindings,
       iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
-  iree_status_t(IREE_API_PTR* create_event)(iree_hal_device_t* device,
-                                            iree_hal_event_t** out_event);
+  iree_status_t(IREE_API_PTR* create_event)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_event_flags_t flags, iree_hal_event_t** out_event);
 
   iree_status_t(IREE_API_PTR* create_executable_cache)(
       iree_hal_device_t* device, iree_string_view_t identifier,
@@ -550,7 +552,7 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,
-      iree_hal_semaphore_t** out_semaphore);
+      iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore);
 
   iree_hal_semaphore_compatibility_t(
       IREE_API_PTR* query_semaphore_compatibility)(

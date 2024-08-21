@@ -8,7 +8,7 @@ include(CMakeParseArguments)
 
 # iree_c_embed_data()
 #
-# CMake function to imitate Bazel's c_embed_data rule.
+# CMake function matching the iree_c_embed_data rule.
 #
 # Parameters:
 # PACKAGE: Name of the package (overrides actual path)
@@ -96,8 +96,8 @@ function(iree_c_embed_data)
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_C_FILE_OUTPUT}"
-    COMMAND generate_embed_data ${_ARGS} ${_RESOLVED_SRCS}
-    DEPENDS generate_embed_data ${_RESOLVED_SRCS}
+    COMMAND iree-c-embed-data ${_ARGS} ${_RESOLVED_SRCS}
+    DEPENDS iree-c-embed-data ${_RESOLVED_SRCS}
   )
 
   if(_RULE_TESTONLY)

@@ -4,14 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUCHECKIRBEFORELLVMCONVERSIONPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
@@ -26,12 +29,11 @@ static llvm::cl::opt<unsigned> clAssumedVscaleValue(
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
-    : LLVMCPUCheckIRBeforeLLVMConversionBase<
+    : impl::LLVMCPUCheckIRBeforeLLVMConversionPassBase<
           LLVMCPUCheckIRBeforeLLVMConversionPass> {
-  LLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds) {
-    this->failOnOutOfBounds = failOnOutOfBounds;
-  }
-
+  using impl::LLVMCPUCheckIRBeforeLLVMConversionPassBase<
+      LLVMCPUCheckIRBeforeLLVMConversionPass>::
+      LLVMCPUCheckIRBeforeLLVMConversionPassBase;
   void runOnOperation() override;
 };
 } // namespace
@@ -107,11 +109,4 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds) {
-  return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>(
-      failOnOutOfBounds);
-}
-
 } // namespace mlir::iree_compiler

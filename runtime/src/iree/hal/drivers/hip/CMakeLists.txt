@@ -40,8 +40,6 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "pending_queue_actions.c"
-    "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "rccl_channel.c"
@@ -67,9 +65,9 @@ iree_cc_library(
     iree::base::internal::wait_handle
     iree::base::internal::flatcc::parsing
     iree::hal
-    iree::hal::drivers::utils
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
+    iree::hal::utils::deferred_work_queue
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set

@@ -1,5 +1,10 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(iree-codegen-lower-executable-using-transform-dialect)" | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<TransformDialectCodegen, { config_test = "config_test" }>
 module {
@@ -8,7 +13,7 @@ module {
     %c250 = arith.constant 250 : index
     %c8 = arith.constant 8 : index
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xf16>
     memref.assume_alignment %0, 64 : memref<2xf16>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %subview = memref.subview %0[%workgroup_id_x] [1] [1] : memref<2xf16> to memref<1xf16, strided<[1], offset: ?>>

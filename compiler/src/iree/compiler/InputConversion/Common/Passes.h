@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -39,23 +38,7 @@ void buildCommonInputConversionPassPipeline(
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>>
-createAutoInputConversionPipelinePass();
-std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions);
-std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
-std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLinalgQuantizedConvToConvPass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLinalgQuantizedMatmulToMatmulPass();
-std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
-
-// Type conversion.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

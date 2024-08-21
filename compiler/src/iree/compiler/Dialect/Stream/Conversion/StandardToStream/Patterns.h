@@ -10,6 +10,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+namespace mlir::iree_compiler::IREE::Stream {
+class AffinityAnalysis;
+} // namespace mlir::iree_compiler::IREE::Stream
+
 namespace mlir::iree_compiler {
 
 // Populates conversion patterns that perform standard/builtin->stream
@@ -17,7 +21,9 @@ namespace mlir::iree_compiler {
 // provided |typeConverter|.
 void populateStandardToStreamConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, RewritePatternSet &patterns);
+    TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

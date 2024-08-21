@@ -12,25 +12,21 @@ include "mlir/Pass/PassBase.td"
 def BitCastQuantTensorPass :
     InterfacePass<"torch-iree-bitcast-quant-tensor", "mlir::FunctionOpInterface"> {
   let summary = "Bitcasts i8 packed tensors of sub-byte types to the actual bit width";
-  let constructor = "mlir::iree_compiler::TorchInput::createBitCastQuantTensorPass()";
 }
 
-def ConvertTMTensorToLinalgExt :
+def ConvertTMTensorToLinalgExtPass :
     InterfacePass<"torch-iree-tm-tensor-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert from TMTensor ops to LinalgExt ops on tensors";
-  let constructor = "mlir::iree_compiler::TorchInput::createConvertTMTensorToLinalgExtPass()";
 }
 
 def SetStrictSymbolicShapesPass :
     InterfacePass<"torch-iree-set-strict-symbolic-shapes", "mlir::FunctionOpInterface"> {
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
-  let constructor = "mlir::iree_compiler::TorchInput::createSetStrictSymbolicShapesPass()";
 }
 
-def FuncConversion :
+def FuncConversionPass :
     Pass<"torch-iree-func-conversion", "ModuleOp"> {
   let summary = "Finalizes conversion from torch to IREE";
-  let constructor = "mlir::iree_compiler::TorchInput::createFuncConversionPass()";
   let description = [{
     Conversion pass for finalizing functions and ABI. Replaces the generic
     torch-func-backend-type-conversion pass.

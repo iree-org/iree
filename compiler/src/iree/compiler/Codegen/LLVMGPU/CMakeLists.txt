@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -52,7 +51,6 @@ iree_cc_library(
   NAME
     ROCDLPassHeaders
   HDRS
-    "ROCDLPassDetail.h"
     "ROCDLPasses.h"
     "ROCDLPasses.h.inc"
   DEPS
@@ -80,6 +78,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUCastTypeToFitMMA.cpp"
+    "LLVMGPUConfigureVectorLayouts.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUPrefetching.cpp"
@@ -103,7 +102,6 @@ iree_cc_library(
     ::ROCDLPassesIncGen
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAMDGPUToROCDL
@@ -118,6 +116,7 @@ iree_cc_library(
     MLIRArithToLLVM
     MLIRArithTransforms
     MLIRBufferizationDialect
+    MLIRBufferizationTransforms
     MLIRComplexToLLVM
     MLIRComplexToStandard
     MLIRControlFlowToLLVM
@@ -173,7 +172,9 @@ iree_cc_library(
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
@@ -187,6 +188,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

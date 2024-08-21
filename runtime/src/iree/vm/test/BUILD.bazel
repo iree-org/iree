@@ -6,7 +6,7 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
     default_visibility = ["//runtime/src/iree/vm:__subpackages__"],
@@ -23,7 +23,7 @@ endif()
     inline = True,
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "all_bytecode_modules_c",
     srcs = [
         ":arithmetic_ops.vmfb",
@@ -303,7 +303,7 @@ iree_bytecode_module(
     ],
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "async_bytecode_modules_c",
     srcs = [
         ":async_ops.vmfb",

@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -38,6 +37,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVEMULATEI64PASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -59,8 +61,8 @@ struct ConvertHalInterfaceBindingSubspan final
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-            op, newResultTy, adaptor.getSet(), adaptor.getBinding(),
-            adaptor.getDescriptorType(), adaptor.getByteOffset(),
+            op, newResultTy, adaptor.getLayout(), adaptor.getSet(),
+            adaptor.getBinding(), adaptor.getByteOffset(),
             adaptor.getDynamicDims(), adaptor.getAlignmentAttr(),
             adaptor.getDescriptorFlagsAttr());
     LLVM_DEBUG(llvm::dbgs()
@@ -165,7 +167,7 @@ static bool supportsI64(FunctionOpInterface op) {
 //===----------------------------------------------------------------------===//
 
 struct SPIRVEmulateI64Pass final
-    : public SPIRVEmulateI64Base<SPIRVEmulateI64Pass> {
+    : impl::SPIRVEmulateI64PassBase<SPIRVEmulateI64Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -225,14 +227,4 @@ struct SPIRVEmulateI64Pass final
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-// Public interface
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createSPIRVEmulateI64Pass() {
-  return std::make_unique<SPIRVEmulateI64Pass>();
-}
-
 } // namespace mlir::iree_compiler

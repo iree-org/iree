@@ -95,9 +95,7 @@ Value sizeOf(OpBuilder builder, Location loc, Value value) {
       .create<emitc::CallOpaqueOp>(
           /*location=*/loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
+          /*callee=*/"sizeof",
           /*operands=*/ArrayRef<Value>{value})
       .getResult(0);
 }
@@ -108,22 +106,18 @@ Value sizeOf(OpBuilder builder, Location loc, Attribute attr) {
       .create<emitc::CallOpaqueOp>(
           /*location=*/loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/ArrayAttr::get(ctx, {attr}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{})
+          /*callee=*/"sizeof",
+          /*operands=*/ArrayRef<Value>{},
+          /*args=*/ArrayAttr::get(ctx, {attr}))
       .getResult(0);
 }
 
 void memcpy(OpBuilder builder, Location location, Value dest, Value src,
             Value count) {
-  auto ctx = builder.getContext();
   builder.create<emitc::CallOpaqueOp>(
       /*location=*/location,
       /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "memcpy"),
-      /*args=*/ArrayAttr{},
-      /*templateArgs=*/ArrayAttr{},
+      /*callee=*/"memcpy",
       /*operands=*/ArrayRef<Value>{dest, src, count});
 }
 
@@ -133,14 +127,12 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
   builder.create<emitc::CallOpaqueOp>(
       /*location=*/location,
       /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "memset"),
+      /*callee=*/"memset",
+      /*operands=*/ArrayRef<Value>{dest, count},
       /*args=*/
       ArrayAttr::get(ctx,
                      {builder.getIndexAttr(0), builder.getUI32IntegerAttr(ch),
-                      builder.getIndexAttr(1)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/
-      ArrayRef<Value>{dest, count});
+                      builder.getIndexAttr(1)}));
 }
 
 Value arrayElement(OpBuilder builder, Location location, Type type,
@@ -150,12 +142,11 @@ Value arrayElement(OpBuilder builder, Location location, Type type,
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/type,
-          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT"),
+          /*callee=*/"EMITC_ARRAY_ELEMENT",
+          /*operands=*/ArrayRef<Value>{operand},
           /*args=*/
           ArrayAttr::get(
-              ctx, {builder.getIndexAttr(0), builder.getI32IntegerAttr(index)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand})
+              ctx, {builder.getIndexAttr(0), builder.getI32IntegerAttr(index)}))
       .getResult(0);
 }
 
@@ -166,11 +157,10 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/type,
-          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*callee=*/"EMITC_ARRAY_ELEMENT_ADDRESS",
+          /*operands=*/ArrayRef<Value>{operand},
           /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0), index}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand})
+          ArrayAttr::get(ctx, {builder.getIndexAttr(0), index}))
       .getResult(0);
 }
 
@@ -181,12 +171,12 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/type,
-          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*callee=*/"EMITC_ARRAY_ELEMENT_ADDRESS",
+          /*operands=*/ArrayRef<Value>{operand, index},
           /*args=*/
           ArrayAttr::get(ctx,
                          {builder.getIndexAttr(0), builder.getIndexAttr(1)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand, index})
+          /*templateArgs=*/ArrayAttr{})
       .getResult(0);
 }
 
@@ -196,13 +186,12 @@ void arrayElementAssign(OpBuilder builder, Location location, Value array,
   builder.create<emitc::CallOpaqueOp>(
       /*location=*/location,
       /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ASSIGN"),
+      /*callee=*/"EMITC_ARRAY_ELEMENT_ASSIGN",
+      /*operands=*/ArrayRef<Value>{array, value},
       /*args=*/
       ArrayAttr::get(ctx,
                      {builder.getIndexAttr(0), builder.getI32IntegerAttr(index),
-                      builder.getIndexAttr(1)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/ArrayRef<Value>{array, value});
+                      builder.getIndexAttr(1)}));
 }
 
 void structDefinition(OpBuilder builder, Location location,
@@ -222,93 +211,68 @@ void structDefinition(OpBuilder builder, Location location,
 
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, memberName)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand})
-      .getResult(0);
+  Value var = allocateVariable(builder, location, type);
+  Value member =
+      builder.create<emitc::MemberOp>(location, type, memberName, operand);
+  builder.create<emitc::AssignOp>(location, var, member);
+  return var;
+}
+
+Value structMemberAddress(OpBuilder builder, Location location,
+                          emitc::PointerType type, StringRef memberName,
+                          Value operand) {
+  Value member = builder.create<emitc::MemberOp>(location, type.getPointee(),
+                                                 memberName, operand);
+  return addressOf(builder, location, member);
 }
 
 void structMemberAssign(OpBuilder builder, Location location,
                         StringRef memberName, Value operand, Value data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           builder.getIndexAttr(1)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/ArrayRef<Value>{operand, data});
-}
-
-void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName, Value operand, StringRef data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           emitc::OpaqueAttr::get(ctx, data)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/ArrayRef<Value>{operand});
+  Value member = builder.create<emitc::MemberOp>(location, data.getType(),
+                                                 memberName, operand);
+  builder.create<emitc::AssignOp>(location, member, data);
 }
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, memberName)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand})
-      .getResult(0);
+  Value var = allocateVariable(builder, location, type);
+  Value member =
+      builder.create<emitc::MemberOfPtrOp>(location, type, memberName, operand);
+  builder.create<emitc::AssignOp>(location, var, member);
+  return var;
+}
+
+Value structPtrMemberAddress(OpBuilder builder, Location location,
+                             emitc::PointerType type, StringRef memberName,
+                             Value operand) {
+  Value member = builder.create<emitc::MemberOfPtrOp>(
+      location, type.getPointee(), memberName, operand);
+  return addressOf(builder, location, member);
 }
 
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data) {
-  auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-      /*args=*/
-      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, memberName),
-                           builder.getIndexAttr(1)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/ArrayRef<Value>{operand, data});
+  Value member = builder.create<emitc::MemberOfPtrOp>(location, data.getType(),
+                                                      memberName, operand);
+  builder.create<emitc::AssignOp>(location, member, data);
 }
 
 Value ireeMakeCstringView(OpBuilder builder, Location location,
                           std::string str) {
+  std::string escapedStr;
+  llvm::raw_string_ostream os(escapedStr);
+  os.write_escaped(str);
+  auto quotedStr = std::string("\"") + escapedStr + std::string("\"");
+
   auto ctx = builder.getContext();
   return builder
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_make_cstring_view"),
+          /*callee=*/"iree_make_cstring_view",
+          /*operands=*/ArrayRef<Value>{},
           /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, str)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{})
+          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, quotedStr)}))
       .getResult(0);
 }
 
@@ -318,9 +282,7 @@ Value ireeOkStatus(OpBuilder builder, Location location) {
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
+          /*callee=*/"iree_ok_status",
           /*operands=*/ArrayRef<Value>{})
       .getResult(0);
 }
@@ -333,21 +295,16 @@ Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
       .create<emitc::CallOpaqueOp>(
           /*location=*/location,
           /*type=*/refType,
-          /*callee=*/StringAttr::get(ctx, "iree_vm_instance_lookup_type"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
+          /*callee=*/"iree_vm_instance_lookup_type",
           /*operands=*/ArrayRef<Value>{instance, stringView})
       .getResult(0);
 }
 
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
-  auto ctx = builder.getContext();
   builder.create<emitc::CallOpaqueOp>(
       /*location=*/location,
       /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-      /*args=*/ArrayAttr{},
-      /*templateArgs=*/ArrayAttr{},
+      /*callee=*/"iree_vm_ref_release",
       /*operands=*/ArrayRef<Value>{operand});
 }
 

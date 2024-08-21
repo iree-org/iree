@@ -1,0 +1,70 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Linux x64 clang debug
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ci_linux_x64_clang_debug.yml"
+  schedule:
+    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
+    - cron: "15 9 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  # This may run out of memory / disk space on standard GitHub-hosted runners,
+  # so run on self-hosted CPU build runners instead.
+  linux_x64_clang_debug:
+    needs: setup
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    container: gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build-debug
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: true
+      - name: Install Python requirements
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      # Note: Not using ccache here. Debug builds need a lot of cache space
+      # and caching only provides marginal build time improvements.
+      - name: CMake - configure
+        run: |
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON
+      - name: CMake - build
+        run: cmake --build ${BUILD_DIR} -- -k 0
+      # We could build `iree-test-deps` or run some unit tests here, but the
+      # main thing we want coverage for is the build itself and those steps
+      # would add 10+ minutes to the job.

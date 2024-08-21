@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/pipeline_layout.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
 // flatcc schemas:
@@ -242,15 +243,32 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
       if (!iree_status_is_ok(status)) break;
 
+      // TODO(#18189): embed all of this on a single flatbuffer table
+      // per-export.
+      //
       // Package required parameters for kernel launches for each entry point.
       iree_hal_hip_kernel_info_t* kernel_info = &executable->entry_points[i];
       kernel_info->layout = executable_params->pipeline_layouts[i];
       iree_hal_pipeline_layout_retain(kernel_info->layout);
       kernel_info->function = function;
+      iree_hal_hip_dispatch_layout_t dispatch_params =
+          iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info->layout);
+      kernel_info->constant_count = dispatch_params.push_constant_count;
+      kernel_info->binding_count = dispatch_params.total_binding_count;
       kernel_info->block_size[0] = block_sizes_vec[i].x;
       kernel_info->block_size[1] = block_sizes_vec[i].y;
       kernel_info->block_size[2] = block_sizes_vec[i].z;
       kernel_info->shared_memory_size = shared_memory_sizes_vec[i];
+
+      if (kernel_info->binding_count >
+          IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+        status = iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "exceeded available binding slots; requested %u of maximum %d",
+            kernel_info->binding_count,
+            IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+      }
+      if (!iree_status_is_ok(status)) break;
 
       // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({

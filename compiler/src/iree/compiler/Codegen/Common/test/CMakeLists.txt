@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
     "convert_to_destination_passing_style.mlir"
+    "convolution_to_igemm.mlir"
     "convolutions.mlir"
     "decompose_affine_ops.mlir"
     "decompose_conv2d.mlir"
@@ -61,6 +62,7 @@ iree_lit_test_suite(
     "replace_slow_min_max_ops.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
+    "tile_and_distribute_workgroups_using_forall.mlir"
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
     "transform_flatten_forall.mlir"
@@ -73,7 +75,6 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
-    "workgroup_specialization.mlir"
   TOOLS
     FileCheck
     iree-opt

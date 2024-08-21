@@ -211,6 +211,7 @@ function(iree_check_test)
         "--module={{${_MODULE_FILE_NAME}}}"
         ${_RULE_RUNNER_ARGS}
       LABELS
+        "test-type=check-test"
         ${_RULE_LABELS}
       TIMEOUT
         ${_RULE_TIMEOUT}

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -23,6 +22,9 @@
 #define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GENERICVECTORIZATIONPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
@@ -51,7 +53,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     VEC_DBGS() << '\n';
   });
 
-  std::optional<VscaleRange> vscaleRange;
+  std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
     // (which is used to compute sizes for tensor.pack/unpack).
@@ -90,7 +92,8 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     for (auto operandDimPair : operandDimPairs) {
       Value operand = operandDimPair.first;
       unsigned operandDim = operandDimPair.second;
-      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange);
+      maybeDimBound = computeDimUpperBound(operand, operandDim, vscaleRange,
+                                           RoundUpVscaleMultiple::Yes);
       if (succeeded(maybeDimBound)) {
         break;
       }
@@ -309,22 +312,11 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
-class GenericVectorizationPass
-    : public GenericVectorizationBase<GenericVectorizationPass> {
+class GenericVectorizationPass final
+    : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
-  using GenericVectorizationBase::GenericVectorizationBase;
-  GenericVectorizationPass(const GenericVectorizationPassOptions &options) {
-    this->enableVectorMasking.setValue(options.enableVectorMasking);
-    this->useConfiguredVectorSizes.setValue(options.useConfiguredVectorSizes);
-    this->vectorizePadding.setValue(options.vectorizePadding);
-    this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
-    this->enableCleanup.setValue(options.enableCleanup);
-    this->generateContract.setValue(options.generateContract);
-    this->foldCastIntoContract.setValue(options.foldCastIntoContract);
-    this->maxVectorSize.setValue(options.maxVectorSize);
-    this->earlySubsetTransferFolding.setValue(
-        options.earlySubsetTransferFolding);
-  }
+  using impl::GenericVectorizationPassBase<
+      GenericVectorizationPass>::GenericVectorizationPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect,
@@ -386,17 +378,18 @@ void GenericVectorizationPass::runOnOperation() {
   };
 
   {
-    // Canonicalize mask related ops before we lower them. Also run patterns
-    // for vector transfers on tensor subset ops, since they can be folded if
-    // not handled here.
+    // Eliminate (all-true) vector masks as early as possible (to avoid missing
+    // optimizations/folds). This is particularly beneficial for scalable
+    // vectors that use dynamic tensor shapes.
+    auto targetAttr =
+        iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    auto vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+    vector::eliminateVectorMasks(rewriter, funcOp, vscaleRange);
+  }
+
+  {
+    // Canonicalize mask related ops before we lower them.
     RewritePatternSet maskCanonPatterns(funcOp.getContext());
-    if (earlySubsetTransferFolding) {
-      // It is important to add these vector transfer on tensor subset patterns
-      // in the first greedy pattern rewrite, since transfer foldings can remove
-      // vectorized reads and writes by folding them into tensor ops.
-      tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(
-          maskCanonPatterns);
-    }
     vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                       funcOp.getContext());
     vector::ConstantMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
@@ -416,6 +409,7 @@ void GenericVectorizationPass::runOnOperation() {
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+    vector::populateSinkVectorOpsPatterns(vectorizationPatterns);
   }
   if (foldCastIntoContract) {
     vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
@@ -448,14 +442,4 @@ void GenericVectorizationPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGenericVectorizationPass() {
-  return std::make_unique<GenericVectorizationPass>();
-}
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGenericVectorizationPass(const GenericVectorizationPassOptions &options) {
-  return std::make_unique<GenericVectorizationPass>(options);
-}
-
 } // namespace mlir::iree_compiler

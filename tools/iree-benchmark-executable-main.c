@@ -221,8 +221,9 @@ static iree_status_t iree_benchmark_executable_run(
 
   iree_hal_semaphore_t* fence_semaphore = NULL;
   uint64_t fence_value = 0ull;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_semaphore_create(args->device, fence_value, &fence_semaphore));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(args->device, fence_value,
+                                                 IREE_HAL_SEMAPHORE_FLAG_NONE,
+                                                 &fence_semaphore));
   iree_hal_semaphore_list_t wait_semaphore_list =
       iree_hal_semaphore_list_empty();
   iree_hal_semaphore_list_t signal_semaphore_list = {
@@ -277,7 +278,7 @@ static iree_status_t iree_benchmark_executable_run(
       IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
           command_buffer, args->executable, FLAG_entry_point,
           args->workgroup_count[0], args->workgroup_count[1],
-          args->workgroup_count[2]));
+          args->workgroup_count[2], IREE_HAL_DISPATCH_FLAG_NONE));
       IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
           command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
           IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,

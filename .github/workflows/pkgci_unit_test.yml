@@ -1,0 +1,62 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Unit Test
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  linux_x86_64:
+    name: Linux (x86_64)
+    runs-on: ubuntu-20.04
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      VENV_DIR: ${{ github.workspace }}/.venv
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v4.1.7
+        with:
+          submodules: false
+      - uses: actions/setup-python@v5.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: Validate runtime wheel
+        run: |
+          source ${VENV_DIR}/bin/activate
+          echo "Testing default runtime package:"
+          python -m iree.runtime._package_test
+          echo "Testing tracy runtime package:"
+          # GH runners don't expose the TSC but we want to make sure the basic packaging
+          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
+          # if this is left off).
+          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
+            python -m iree.runtime._package_test
+      - name: Validate compiler wheel
+        run: |
+          source ${VENV_DIR}/bin/activate
+          echo "Testing compiler package:"
+          python -m iree.compiler._package_test

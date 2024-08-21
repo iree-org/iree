@@ -45,12 +45,12 @@ void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyLowerShuffleTensorPatternsOp
+// ApplyLowerBarrierRegionPatternsOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
+void transform_dialect::ApplyLowerBarrierRegionPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
-  GPU::populateIREEGPULowerShuffleTensorPatterns(patterns);
+  GPU::populateIREEGPULowerBarrierRegionPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//
@@ -66,64 +66,9 @@ void transform_dialect::ApplyLowerValueBarrierOp::populatePatterns(
 // ApplyUnrollMultiMmaOp
 //===---------------------------------------------------------------------===//
 
-static bool isReductionIterator(Attribute attr) {
-  return cast<IREE::GPU::IteratorTypeAttr>(attr).getValue() ==
-         utils::IteratorType::reduction;
-}
-static bool isParallelIterator(Attribute attr) {
-  return cast<IREE::GPU::IteratorTypeAttr>(attr).getValue() ==
-         utils::IteratorType::parallel;
-}
-
-/// Pick an unrolling order that reuses the LHS register.
-static std::optional<SmallVector<int64_t>>
-gpuMultiMmaUnrollOrder(Operation *op) {
-  IREE::GPU::MultiMmaOp mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
-  if (!mmaOp) {
-    return std::nullopt;
-  }
-  SmallVector<int64_t> order;
-  // First make reduction the outer dimensions.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
-    if (isReductionIterator(iter)) {
-      order.push_back(index);
-    }
-  }
-
-  llvm::SmallDenseSet<int64_t> dims;
-  for (AffineExpr expr : mmaOp.getIndexingMapsArray()[0].getResults()) {
-    dims.insert(cast<AffineDimExpr>(expr).getPosition());
-  }
-  // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
-    if (isParallelIterator(iter) && dims.count(index)) {
-      order.push_back(index);
-    }
-  }
-  // Then the remaining parallel loops.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
-    if (isParallelIterator(iter) && !dims.count(index)) {
-      order.push_back(index);
-    }
-  }
-  return order;
-}
-
-static std::optional<SmallVector<int64_t>> getMultiMmaUnitShape(Operation *op) {
-  IREE::GPU::MultiMmaOp mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
-  if (!mmaOp) {
-    return std::nullopt;
-  }
-  SmallVector<int64_t> targetOuterShape(mmaOp.getIteratorTypes().size(), 1);
-  return targetOuterShape;
-}
-
 void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
     RewritePatternSet &patterns) {
-  GPU::populateIREEGPUVectorUnrollPatterns(
-      patterns, vector::UnrollVectorOptions()
-                    .setNativeShapeFn(getMultiMmaUnitShape)
-                    .setUnrollTraversalOrderFn(gpuMultiMmaUnrollOrder));
+  GPU::populateIREEGPUVectorUnrollPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//

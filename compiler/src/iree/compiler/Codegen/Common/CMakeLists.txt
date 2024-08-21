@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -56,11 +55,11 @@ iree_cc_library(
   SRCS
     "VectorLayoutAnalysis.cpp"
   DEPS
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAnalysis
     MLIRIR
     MLIRVectorDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
   PUBLIC
 )
 
@@ -86,6 +85,7 @@ iree_cc_library(
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
+    "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
@@ -123,23 +123,23 @@ iree_cc_library(
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
-    "RemoveTrivialLoops.cpp"
+    "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
     "SplitFullPartialTransferPass.cpp"
+    "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
+    "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
-    "VectorizePad.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgTransformDialect
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect
@@ -188,6 +188,7 @@ iree_cc_library(
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
@@ -216,7 +217,6 @@ iree_cc_library(
     ::PassesIncGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransformOps
@@ -264,6 +264,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TransformExtensions::IREEGPUExtensions
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies

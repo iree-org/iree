@@ -23,7 +23,8 @@
       compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
       dot = none, mma = [], subgroup_size_choices = [64, 64],
       max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
-      max_workgroup_memory_bytes = 16384>
+      max_workgroup_memory_bytes = 16384,
+      max_workgroup_counts = [65535, 65535, 65535]>
   >
 }>
 
@@ -33,7 +34,7 @@
 // hence we only support vulkan here. It is possible to hand author a custom
 // kernel that supports multiple targets by specifying an object per-target, but
 // that requires authoring the kernel for multiple targets.
-#vulkan_target = #hal.device.target<"vulkan", [#spirv_target]>
+#vulkan_target = #hal.device.target<"vulkan", [#spirv_target]> : !hal.device
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>

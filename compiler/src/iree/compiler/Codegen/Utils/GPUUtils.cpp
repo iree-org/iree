@@ -504,9 +504,8 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
 }
 
 /// Emit identity variable.
-static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
-                                       vector::CombiningKind kind,
-                                       Type identityType) {
+Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
+                                vector::CombiningKind kind, Type identityType) {
   auto vectorType = llvm::dyn_cast<VectorType>(identityType);
   Type elementType = identityType;
   if (vectorType) {
@@ -999,15 +998,14 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   return getCLGPUTarget(op->getContext());
 }
 
-std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func,
-                                      bool pickLargest) {
+std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   // First try to see if there is a subgroup size chosen in the CodeGen pipeline
   // configuration.
   if (std::optional<int64_t> subgroupSize = getSubgroupSize(func))
     return subgroupSize.value();
   // Then try to find the subgroup size from the target description.
   if (IREE::GPU::TargetAttr target = getGPUTargetAttr(func))
-    return target.getPreferredSubgroupSize(pickLargest);
+    return target.getPreferredSubgroupSize();
   return std::nullopt;
 }
 

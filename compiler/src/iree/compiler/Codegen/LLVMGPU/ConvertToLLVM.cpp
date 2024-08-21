@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -24,6 +23,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TESTLLVMGPUSCALARIZEMATHOPPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   SymbolTableCollection symbolTableCollection;
@@ -183,8 +185,9 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
 /// Pass to test in dialect transformation used to legalize the IR before
 /// convertToNVVM/ConvertToROCDL.
-class TestLLVMGPULegalizeOpPass
-    : public TestLLVMGPUScalarizeMathOpBase<TestLLVMGPULegalizeOpPass> {
+class TestLLVMGPULegalizeOpPass final
+    : public impl::TestLLVMGPUScalarizeMathOpPassBase<
+          TestLLVMGPULegalizeOpPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -268,7 +271,7 @@ public:
     uint64_t numConstants = 0;
     funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
       numConstants =
-          std::max(constantOp.getIndex().getZExtValue() + 1, numConstants);
+          std::max(constantOp.getOrdinal().getZExtValue() + 1, numConstants);
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
@@ -474,7 +477,7 @@ public:
     auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping.size() + ireeConstantOp.getIndex().getZExtValue());
+        argMapping.size() + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.
@@ -533,15 +536,13 @@ void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
 }
 
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
-  patterns.insert<HALInterfaceWorkgroupOpsConverter<
-                      IREE::HAL::InterfaceWorkgroupIDOp, gpu::BlockIdOp>,
-                  HALInterfaceWorkgroupOpsConverter<
-                      IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
+  patterns.add<HALInterfaceWorkgroupOpsConverter<
+                   IREE::HAL::InterfaceWorkgroupIDOp, gpu::BlockIdOp>,
+               HALInterfaceWorkgroupOpsConverter<
+                   IREE::HAL::InterfaceWorkgroupSizeOp, gpu::BlockDimOp>,
+               HALInterfaceWorkgroupOpsConverter<
+                   IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
       patterns.getContext());
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
-  return std::make_unique<TestLLVMGPULegalizeOpPass>();
 }
 
 static IntegerAttr wrapNumericMemorySpace(MLIRContext *ctx, unsigned space) {

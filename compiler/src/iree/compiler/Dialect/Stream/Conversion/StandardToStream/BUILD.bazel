@@ -15,8 +15,6 @@ package(
 iree_compiler_cc_library(
     name = "StandardToStream",
     srcs = [
-        "ConvertConstantOps.cpp",
-        "ConvertStructuralOps.cpp",
         "Patterns.cpp",
     ],
     hdrs = [

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -109,6 +110,16 @@ enum iree_hal_memory_type_bits_t {
 };
 typedef uint32_t iree_hal_memory_type_t;
 
+// Parses a memory type bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_memory_type_parse(
+    iree_string_view_t value, iree_hal_memory_type_t* out_value);
+
+// Formats a memory type bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
+    iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp);
+
 // A bitfield specifying how memory will be accessed in a mapped memory region.
 enum iree_hal_memory_access_bits_t {
   // Memory is not mapped.
@@ -153,7 +164,15 @@ enum iree_hal_memory_access_bits_t {
 };
 typedef uint16_t iree_hal_memory_access_t;
 
-typedef uint32_t iree_hal_buffer_compatibility_t;
+// Parses a memory access bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_memory_access_parse(
+    iree_string_view_t value, iree_hal_memory_access_t* out_value);
+
+// Formats a memory access bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
+    iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp);
 
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
@@ -390,6 +409,16 @@ enum iree_hal_buffer_usage_bits_t {
 };
 typedef uint32_t iree_hal_buffer_usage_t;
 
+// Parses a buffer usage bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_usage_parse(
+    iree_string_view_t value, iree_hal_buffer_usage_t* out_value);
+
+// Formats a buffer usage bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
+    iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp);
+
 // Buffer overlap testing results.
 typedef enum iree_hal_buffer_overlap_e {
   // No overlap between the two buffers.
@@ -399,6 +428,8 @@ typedef enum iree_hal_buffer_overlap_e {
   // Complete overlap between the two buffers (they are the same).
   IREE_HAL_BUFFER_OVERLAP_COMPLETE,
 } iree_hal_buffer_overlap_t;
+
+typedef uint32_t iree_hal_buffer_compatibility_t;
 
 // A bitfield specifying buffer transfer behavior.
 enum iree_hal_transfer_buffer_flag_bits_t {
@@ -426,7 +457,98 @@ enum iree_hal_mapping_mode_bits_t {
 };
 typedef uint32_t iree_hal_mapping_mode_t;
 
-// Implementation-specific mapping data.
+//===----------------------------------------------------------------------===//
+// iree_hal_buffer_params_t
+//===----------------------------------------------------------------------===//
+
+// Parameters defining how a buffer should be allocated.
+//
+// Designed to be zero-initialized: any field with a 0 value will be assigned
+// a default as indicated in the field description.
+//
+// For ergonomics when used from C++ w/o named initializers the first field is
+// the most commonly used so that it can be initialized by location:
+//    some_fn(..., {IREE_HAL_BUFFER_USAGE_FOO}, ...)
+typedef struct iree_hal_buffer_params_t {
+  // Specifies the usage allowed by HAL APIs and aids in memory placement.
+  // Devices may have different memory types for different usage and require
+  // the intended usage to be declared upon allocation. It's always best to
+  // limit the allowed usage bits to precisely what the actual usage will be to
+  // avoid additional copies, synchronization, and expensive emulation.
+  //
+  // If 0 then the usage will default to all usage modes.
+  iree_hal_buffer_usage_t usage;
+
+  // Specifies the access allowed to the memory via the HAL APIs.
+  // For example, if the IREE_HAL_MEMORY_ACCESS_WRITE bit is not set then any
+  // API call that would write to the memory will fail (such as
+  // iree_hal_command_buffer_update_buffer). This does not limit any untrusted
+  // dispatch or external use of the buffer and should not be treated as a
+  // memory protection mechanism.
+  //
+  // If 0 then the access will be set as IREE_HAL_MEMORY_ACCESS_ALL.
+  iree_hal_memory_access_t access;
+
+  // Specifies the memory type properties used for selecting a memory space.
+  // This should often be IREE_HAL_MEMORY_TYPE_OPTIMAL to allow the allocator
+  // to place the allocation based on usage bits but can be specified if the
+  // exact memory type must be used for compatibility with external code.
+  //
+  // If 0 then the type will be set as IREE_HAL_MEMORY_TYPE_OPTIMAL.
+  iree_hal_memory_type_t type;
+
+  // Queue affinity bitmap indicating which queues may access this buffer.
+  // For NUMA devices this can be used to more tightly scope the allocation to
+  // particular device memory and provide better pool placement. When a device
+  // supports peering or replication the affinity bitmap will be used to choose
+  // which subdevices require configuration.
+  //
+  // If 0 then the buffer will be available on any queue as if
+  // IREE_HAL_QUEUE_AFFINITY_ANY was specified.
+  iree_hal_queue_affinity_t queue_affinity;
+
+  // Minimum alignment, in bytes, of the resulting allocation.
+  // The actual alignment may be any value greater-than-or-equal-to this value.
+  //
+  // If 0 then the alignment will be decided by the allocator based on optimal
+  // device parameters.
+  iree_device_size_t min_alignment;
+} iree_hal_buffer_params_t;
+
+// Canonicalizes |params| fields when zero initialization is used.
+static inline void iree_hal_buffer_params_canonicalize(
+    iree_hal_buffer_params_t* params) {
+  if (!params->usage) {
+    params->usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+  }
+  if (!params->access) {
+    params->access = IREE_HAL_MEMORY_ACCESS_ALL;
+  }
+  if (!params->type) {
+    params->type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  }
+  if (!params->queue_affinity) {
+    params->queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
+  }
+}
+
+// Returns |params| with the given |usage| bits OR'ed in.
+static inline iree_hal_buffer_params_t iree_hal_buffer_params_with_usage(
+    const iree_hal_buffer_params_t params, iree_hal_buffer_usage_t usage) {
+  iree_hal_buffer_params_t result = params;
+  if (!result.usage) {
+    result.usage =
+        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  }
+  result.usage |= usage;
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_buffer_mapping_t
+//===----------------------------------------------------------------------===//
+
+// Implementation-specific private mapping data.
 typedef struct iree_hal_buffer_mapping_impl_t {
   // Byte offset within the buffer where the mapped data begins.
   iree_device_size_t byte_offset;
@@ -464,35 +586,9 @@ typedef struct iree_hal_buffer_mapping_t {
   iree_hal_buffer_mapping_impl_t impl;
 } iree_hal_buffer_mapping_t;
 
-// Parses a memory type bitfield from a string.
-// See iree_bitfield_parse for usage.
-IREE_API_EXPORT iree_status_t iree_hal_memory_type_parse(
-    iree_string_view_t value, iree_hal_memory_type_t* out_value);
-
-// Formats a memory type bitfield as a string.
-// See iree_bitfield_format for usage.
-IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
-    iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp);
-
-// Parses a memory access bitfield from a string.
-// See iree_bitfield_parse for usage.
-IREE_API_EXPORT iree_status_t iree_hal_memory_access_parse(
-    iree_string_view_t value, iree_hal_memory_access_t* out_value);
-
-// Formats a memory access bitfield as a string.
-// See iree_bitfield_format for usage.
-IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
-    iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp);
-
-// Parses a buffer usage bitfield from a string.
-// See iree_bitfield_parse for usage.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_usage_parse(
-    iree_string_view_t value, iree_hal_buffer_usage_t* out_value);
-
-// Formats a buffer usage bitfield as a string.
-// See iree_bitfield_format for usage.
-IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
-    iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp);
+//===----------------------------------------------------------------------===//
+// iree_hal_buffer_release_callback_t
+//===----------------------------------------------------------------------===//
 
 typedef void(IREE_API_PTR* iree_hal_buffer_release_fn_t)(
     void* user_data, struct iree_hal_buffer_t* buffer);
@@ -734,6 +830,45 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
     iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping);
 
+// Prepares for mapping the buffer to be accessed as a host pointer into
+// |out_buffer_mapping|. The byte offset and byte length may be adjusted for
+// device alignment. The output data pointer will be properly aligned to the
+// start of the data. Fails if the memory could not be mapped (invalid access
+// type, invalid range, or unsupported memory type).
+//
+// Requires that the buffer has the IREE_HAL_BUFFER_USAGE_MAPPING bit set.
+// If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
+// invalidate the byte range they want to access to update the visibility of the
+// mapped memory.
+//
+// This is the first part of a paired operation with
+// iree_hal_buffer_commit_map_range. This allows callers to prepare for mapping
+// (performing all of the validation) without actually resolving the host
+// pointer yet. Once prepared the mapping must be unmapped with
+// iree_hal_buffer_unmap_range even if it is never committed.
+//
+// Callers are allowed to prepare mappings prior to the |buffer| having
+// allocated storage. Committing the mapping requires that storage has been
+// bound for the duration the mapping will be live.
+//
+// Example usage:
+//  iree_hal_buffer_prepare_map_range(..., &mapping);
+//  if (maybe) iree_hal_buffer_commit_map_range(..., &mapping);
+//  iree_hal_buffer_unmap_range(&mapping);
+IREE_API_EXPORT iree_status_t iree_hal_buffer_prepare_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
+    iree_hal_buffer_mapping_t* out_buffer_mapping);
+
+// Commits a mapping operation from iree_hal_buffer_prepare_map_range.
+// May fail for internal reasons but not any of those previously validated
+// during preparation.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_commit_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_hal_buffer_mapping_t* buffer_mapping);
+
 // Unmaps the buffer as was previously mapped to |buffer_mapping|.
 //
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
@@ -807,6 +942,35 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_deferred_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Creates a buffer with the given properties that has no backing storage.
+// The buffer can be passed around/retained/etc with just the reservation and
+// committed/decommitted on demand. All usage of the buffer beyond metadata
+// queries requires that it be committed.
+//
+// WARNING: commit/decommit are thread-compatible. Callers must ensure that no
+// threads try to use the buffer contents before a commit has completed and that
+// no threads still have access to the buffer contents prior to a decommit.
+IREE_API_EXPORT iree_status_t iree_hal_deferred_buffer_create_reserved(
+    iree_hal_allocator_t* device_allocator, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_buffer_params_t params, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer);
+
+// Commits the backing storage of the |buffer| from its device allocator.
+// Ignored if the buffer is already committed.
+IREE_API_EXPORT iree_status_t
+iree_hal_deferred_buffer_commit(iree_hal_buffer_t* buffer);
+
+// Decommits the backing storage of the |buffer| and returns it to a
+// metadata-only state. No other threads must still have access to the buffer
+// contents.
+IREE_API_EXPORT iree_status_t
+iree_hal_deferred_buffer_decommit(iree_hal_buffer_t* buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_buffer_t

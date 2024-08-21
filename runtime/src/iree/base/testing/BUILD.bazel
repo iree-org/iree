@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_binary", "iree_runtime_cc_test")
-load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
     features = ["layering_check"],
@@ -19,7 +19,7 @@ iree_runtime_cc_binary(
     linkshared = True,
 )
 
-c_embed_data(
+iree_c_embed_data(
     name = "dynamic_library_test_library",
     testonly = True,
     srcs = [":dynamic_library_test_library.so"],

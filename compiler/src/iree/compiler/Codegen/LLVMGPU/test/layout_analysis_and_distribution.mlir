@@ -1,15 +1,22 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule -cse -split-input-file --verify-diagnostics | FileCheck %s
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x8x16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
     %cst_0 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %0, 64 : memref<16x16xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
     memref.assume_alignment %1, 64 : memref<8x16xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {permutation_map = affine_map<(d0, d1) -> (d1, d0)>, in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
@@ -25,7 +32,6 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 } // module
 
-
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 1)>
@@ -36,13 +42,13 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:      func.func @matmul_dispatch_0_matmul_16x8x16() {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x16xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<8x16xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
 // CHECK-DAG:    %[[D3:.+]] = gpu.thread_id  x
@@ -130,17 +136,24 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_reduction() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
     %init = arith.constant dense<-1.000000e+04> : vector<16xf16>
     %cst_0 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %0, 64 : memref<16x16xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
     memref.assume_alignment %1, 64 : memref<8x16xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
@@ -170,13 +183,13 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<-1.000000e+04> : vector<1x1x2x2xf16>
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x16xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<8x16xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
 // CHECK-DAG:    %[[D3:.+]] = gpu.thread_id  x
@@ -314,6 +327,14 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0)[s0] -> (d0 + s0)>
@@ -327,13 +348,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c1 = arith.constant 1 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x64xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x64xf16>
     memref.assume_alignment %0, 64 : memref<16x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x64xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x64xf16>
     memref.assume_alignment %1, 64 : memref<8x64xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %3, 64 : memref<16x8xf16>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %4 = affine.apply #map1()[%workgroup_id_x]
@@ -373,16 +394,16 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x64xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x64xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x64xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<8x64xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
-// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16x8xf16>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
@@ -502,6 +523,14 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 #map2 = affine_map<(d0)[s0] -> (d0 + s0)>
@@ -515,13 +544,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c1 = arith.constant 1 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x64xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x64xf16>
     memref.assume_alignment %0, 64 : memref<16x64xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x64xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x64xf16>
     memref.assume_alignment %1, 64 : memref<8x64xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %3, 64 : memref<16x8xf16>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %4 = affine.apply #map1()[%workgroup_id_x]
@@ -561,16 +590,16 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x64xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x64xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x64xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<8x64xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
-// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16x8xf16>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
@@ -681,6 +710,14 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -689,13 +726,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
     %cst_1 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %0, 64 : memref<16x16xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16>
     memref.assume_alignment %1, 64 : memref<8x16xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %3, 64 : memref<16x8xf16>
     %5 = vector.transfer_read %0[%c0, %c0], %cst_1 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     %6 = vector.transfer_read %1[%c0, %c0], %cst_1 {in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
@@ -725,16 +762,16 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:      func.func @matmul_dispatch_0_matmul_16x8x16() {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x16xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<8x16xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
-// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16x8xf16>
 // CHECK-DAG:    %[[D4:.+]] = gpu.thread_id  x
@@ -842,14 +879,21 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
     %cst_0 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16, #gpu.address_space<workgroup>>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16, #gpu.address_space<workgroup>>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16, #gpu.address_space<workgroup>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16, #gpu.address_space<workgroup>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16, #gpu.address_space<workgroup>>, vector<16x16xf16>
     %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {permutation_map = affine_map<(d0, d1) -> (d1, d0)>, in_bounds = [true, true]} : memref<8x16xf16, #gpu.address_space<workgroup>>, vector<8x16xf16>
@@ -914,6 +958,17 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>,
+    #hal.descriptor_set.binding<5, storage_buffer>,
+    #hal.descriptor_set.binding<6, storage_buffer>
+  ]>
+]>
 #map = affine_map<(d0) -> (d0 * 16)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -925,19 +980,19 @@ builtin.module attributes { transform.with_named_sequence } {
     %cst = arith.constant dense<0.000000e+00> : vector<16x16xf16>
     %c0_0 = arith.constant 0 : index
     %cst_1 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %0, 64 : memref<16x16xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %1, 64 : memref<16x16xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
     memref.assume_alignment %2, 64 : memref<16xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
     memref.assume_alignment %3, 64 : memref<16xf16>
-    %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
+    %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(4) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
     memref.assume_alignment %4, 64 : memref<16x8xf16>
-    %5 = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
+    %5 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(5) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
     memref.assume_alignment %5, 64 : memref<16x8xf16>
-    %6 = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) alignment(64) offset(%c0_0) : memref<16x8xf16>
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(6) alignment(64) offset(%c0_0) : memref<16x8xf16>
     memref.assume_alignment %6, 64 : memref<16x8xf16>
     %c1 = arith.constant 1 : index
     %c1_2 = arith.constant 1 : index
@@ -996,25 +1051,25 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant 0.000000e+00 : f16
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<16x16xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16xf16>
-// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16xf16>
 // CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16xf16>
-// CHECK:        %[[D4:.+]] = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64)
+// CHECK:        %[[D4:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(4) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D4]], 64 : memref<16x8xf16>
-// CHECK:        %[[D5:.+]] = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64)
+// CHECK:        %[[D5:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(5) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D5]], 64 : memref<16x8xf16>
-// CHECK:        %[[D6:.+]] = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) alignment(64)
+// CHECK:        %[[D6:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(6) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D6]], 64 : memref<16x8xf16>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
@@ -1066,6 +1121,14 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 #map = affine_map<(d0) -> (d0 * 16)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
@@ -1077,13 +1140,13 @@ builtin.module attributes { transform.with_named_sequence } {
     %cst_0 = arith.constant dense<0.000000e+00> : vector<16x8xf16>
     %c0_1 = arith.constant 0 : index
     %cst_2 = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<16x16xf16>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %0, 64 : memref<16x16xf16>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<16x16xf16>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<16x16xf16>
     memref.assume_alignment %1, 64 : memref<16x16xf16>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<8x16xf16>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0_1) flags(ReadOnly) : memref<8x16xf16>
     memref.assume_alignment %2, 64 : memref<8x16xf16>
-    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0_1) : memref<16x8xf16>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0_1) : memref<16x8xf16>
     memref.assume_alignment %3, 64 : memref<16x8xf16>
     %c1 = arith.constant 1 : index
     %c1_3 = arith.constant 1 : index
@@ -1125,16 +1188,16 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x2x2x2xf16>
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
-// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D1]], 64 : memref<16x16xf16>
-// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<8x16xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<8x16xf16>
-// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16x8xf16>
 // CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index

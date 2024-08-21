@@ -74,6 +74,10 @@ extra_css:
   - assets/stylesheets/extra.css
   - assets/stylesheets/iree.css
 
+exclude_docs: |
+  *.gz
+  assets/images/README.md
+
 copyright: Copyright &copy; 2024 The IREE Authors
 
 markdown_extensions:
@@ -168,6 +172,7 @@ nav:
               - IO/Parameters: "reference/mlir-dialects/IOParameters.md"
               - IREECodegen: "reference/mlir-dialects/IREECodegen.md"
               - IREEGPU: "reference/mlir-dialects/IREEGPU.md"
+              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
               - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"
@@ -176,7 +181,6 @@ nav:
           # Dialects from llvm-external-projects/iree-dialects/
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
-              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
@@ -187,6 +191,7 @@ nav:
           - "developers/general/contributing.md"
           - "developers/general/developer-overview.md"
           - "developers/general/developer-tips.md"
+          - "developers/general/github-actions.md"
           - "developers/general/release-management.md"
           - "developers/general/testing-guide.md"
       - "Building":
@@ -204,7 +209,6 @@ nav:
           - "developers/debugging/sanitizers.md"
       - "Performance":
           - "developers/performance/benchmarking.md"
-          - "developers/performance/benchmark-suites.md"
           - "developers/performance/profiling.md"
           - "developers/performance/profiling-cpu-events.md"
           - "developers/performance/profiling-gpu-vulkan.md"
