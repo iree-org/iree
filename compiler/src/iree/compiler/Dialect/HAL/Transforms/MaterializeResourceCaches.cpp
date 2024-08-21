@@ -32,36 +32,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-// TODO(#18154): switch default to true and then remove.
-static llvm::cl::opt<bool> clExperimentalExecutableCreate2{
-    "iree-hal-experimental-executable-create2",
-    llvm::cl::desc("Whether to emit iree_hal_executable_create2 ops."),
-    llvm::cl::init(false),
-};
-
 //===----------------------------------------------------------------------===//
 // --iree-hal-materialize-resource-caches
 //===----------------------------------------------------------------------===//
-
-struct DescriptorSetLayout {
-  // All locations that use the layout.
-  SetVector<Location> locs;
-  // Value within the initializer once materialized.
-  Value initializerValue;
-};
-using DescriptorSetLayoutKey =
-    std::pair<ArrayAttr, IREE::HAL::DescriptorSetLayoutFlags>;
-
-struct PipelineLayout {
-  // All locations that use the layout.
-  SetVector<Location> locs;
-  // Lookup ops for this layout.
-  SmallVector<IREE::HAL::PipelineLayoutLookupOp> lookupOps;
-  // Global once materialized.
-  IREE::Util::GlobalOpInterface globalOp;
-  // Value within the initializer once materialized.
-  Value initializerValue;
-};
 
 struct Executable {
   // All locations that use the executable.
@@ -92,22 +65,9 @@ struct DeviceResources {
   // These are derived from the transitive set of #hal.device.fallback attrs.
   SetVector<DeviceResources *> fallbackDeviceResources;
 
-  // Descriptor set layouts used on the device, keyed by [bindingAttrs, flags].
-  llvm::MapVector<DescriptorSetLayoutKey, DescriptorSetLayout>
-      descriptorSetLayouts;
-  // Pipeline layouts used on the device, keyed by layout attr.
-  llvm::MapVector<IREE::HAL::PipelineLayoutAttr, PipelineLayout>
-      pipelineLayouts;
   // Executables used on the device, keyed by name.
   llvm::MapVector<StringAttr, Executable> executables;
 };
-
-static bool isExecutableCreate2Compatible(DeviceSet &deviceSet) {
-  if (clExperimentalExecutableCreate2) {
-    return true; // create2 forced enabled
-  }
-  return deviceSet.hasConfigAttrAny("executable_create_2");
-}
 
 static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
   StringRef deviceName = deviceOp.getGlobalName().getValue();
@@ -117,41 +77,6 @@ static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
   }
   auto prefixedName = "__" + deviceName;
   return prefixedName.str();
-}
-
-static void declareDevicePipelineLayout(IREE::Util::GlobalOpInterface deviceOp,
-                                        PipelineLayout &pipelineLayout,
-                                        size_t pipelineLayoutIndex,
-                                        OpBuilder &moduleBuilder) {
-  // Create global in the module.
-  auto symbolName = getDeviceNamePrefix(deviceOp) + "_pipeline_layout_" +
-                    std::to_string(pipelineLayoutIndex);
-  LLVM_DEBUG(DBGS() << "+ creating device `"
-                    << deviceOp.getGlobalName().getValue()
-                    << "` pipeline global `" << symbolName << "`\n");
-  auto layoutType = moduleBuilder.getType<PipelineLayoutType>();
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      moduleBuilder.getFusedLoc(llvm::to_vector(pipelineLayout.locs)),
-      symbolName,
-      /*isMutable=*/false, layoutType);
-  globalOp.setPrivate();
-  pipelineLayout.globalOp = globalOp;
-
-  // Replace lookups with the global.
-  for (auto lookupOp : pipelineLayout.lookupOps) {
-    LLVM_DEBUG({
-      DBGS() << "  - replacing lookup: ";
-      lookupOp.print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    });
-    OpBuilder lookupBuilder(lookupOp);
-    auto loadedValue =
-        pipelineLayout.globalOp.createLoadOp(lookupOp.getLoc(), lookupBuilder)
-            .getLoadedGlobalValue();
-    lookupOp.replaceAllUsesWith(loadedValue);
-    lookupOp.erase();
-  }
-  pipelineLayout.lookupOps.clear();
 }
 
 static void declareDeviceExecutable(IREE::Util::GlobalOpInterface deviceOp,
@@ -188,17 +113,6 @@ static void declareDeviceExecutable(IREE::Util::GlobalOpInterface deviceOp,
     lookupOp.erase();
   }
   executable.lookupOps.clear();
-}
-
-static DescriptorSetLayoutKey
-getDescriptorSetLayoutKey(IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr) {
-  auto bindingAttrs =
-      llvm::to_vector_of<Attribute>(setLayoutAttr.getBindings());
-  return DescriptorSetLayoutKey{
-      ArrayAttr::get(setLayoutAttr.getContext(), bindingAttrs),
-      setLayoutAttr.getFlags().value_or(
-          IREE::HAL::DescriptorSetLayoutFlags::None),
-  };
 }
 
 // Inlines a constant block as a function in |moduleBuilder| and then inserts
@@ -281,31 +195,13 @@ static Value initializeExecutable(DeviceResources &deviceResources,
           blockName, blockOp, moduleBuilder, caseBuilder, initializerDevice));
     }
 
-    Value executableValue;
-    if (isExecutableCreate2Compatible(deviceResources.deviceSet)) {
-      executableValue =
-          caseBuilder.createOrFold<IREE::HAL::ExecutableCreate2Op>(
-              loc, executableType, initializerDevice,
-              SymbolRefAttr::get(
-                  executable.executableOp.getSymNameAttr(),
-                  {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
-              constantValues);
-    } else {
-      // Gather each of the pipeline layouts needed for each entry point in
-      // the executable.
-      SmallVector<Value> pipelineLayoutValues;
-      for (auto exportOp : variantOp.getExportOps()) {
-        auto &pipelineLayout =
-            deviceResources.pipelineLayouts[exportOp.getLayoutAttr()];
-        pipelineLayoutValues.push_back(pipelineLayout.initializerValue);
-      }
-
-      executableValue = caseBuilder.createOrFold<IREE::HAL::ExecutableCreateOp>(
-          loc, executableType, initializerDevice,
-          SymbolRefAttr::get(executable.executableOp.getSymNameAttr(),
-                             {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
-          pipelineLayoutValues, constantValues);
-    }
+    Value executableValue =
+        caseBuilder.createOrFold<IREE::HAL::ExecutableCreate2Op>(
+            loc, executableType, initializerDevice,
+            SymbolRefAttr::get(
+                executable.executableOp.getSymNameAttr(),
+                {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
+            constantValues);
 
     caseBuilder.create<scf::YieldOp>(loc, executableValue);
   }
@@ -340,42 +236,6 @@ static void initializeDeviceResources(DeviceResources &deviceResources,
                                       OpBuilder &moduleBuilder,
                                       Value initializerDevice,
                                       OpBuilder &initializerBuilder) {
-  if (!isExecutableCreate2Compatible(deviceResources.deviceSet)) {
-    // Initialize all descriptor set layouts for use by the pipeline layouts.
-    auto setLayoutType = initializerBuilder.getType<DescriptorSetLayoutType>();
-    for (auto [i, it] : llvm::enumerate(deviceResources.descriptorSetLayouts)) {
-      auto [bindingAttrs, flags] = it.first;
-      auto &descriptorSetLayout = it.second;
-      descriptorSetLayout.initializerValue =
-          initializerBuilder
-              .createOrFold<IREE::HAL::DescriptorSetLayoutCreateOp>(
-                  initializerBuilder.getFusedLoc(
-                      llvm::to_vector(descriptorSetLayout.locs)),
-                  setLayoutType, initializerDevice, flags, bindingAttrs);
-    }
-
-    // Initialize all pipeline layouts required for executable creation.
-    auto pipelineLayoutType = initializerBuilder.getType<PipelineLayoutType>();
-    for (auto [i, it] : llvm::enumerate(deviceResources.pipelineLayouts)) {
-      auto &[layoutAttr, pipelineLayout] = it;
-      SmallVector<Value> setLayoutValues;
-      for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
-        auto key = getDescriptorSetLayoutKey(setLayoutAttr);
-        setLayoutValues.push_back(
-            deviceResources.descriptorSetLayouts[key].initializerValue);
-      }
-      pipelineLayout.initializerValue =
-          initializerBuilder.createOrFold<IREE::HAL::PipelineLayoutCreateOp>(
-              pipelineLayout.globalOp.getLoc(), pipelineLayoutType,
-              initializerDevice,
-              initializerBuilder.getIndexAttr(layoutAttr.getPushConstants()),
-              setLayoutValues);
-      pipelineLayout.globalOp.createStoreOp(pipelineLayout.globalOp.getLoc(),
-                                            pipelineLayout.initializerValue,
-                                            initializerBuilder);
-    }
-  }
-
   // Initialize all executables.
   for (auto [i, it] : llvm::enumerate(deviceResources.executables)) {
     auto &[executableName, executable] = it;
@@ -391,20 +251,6 @@ static void reuseFallbackDeviceResources(DeviceResources &deviceResources,
                                          DeviceResources &fallbackResources,
                                          Value initializerDevice,
                                          OpBuilder &initializerBuilder) {
-  // Load fallback pipeline layouts for all required by this device.
-  for (auto &[layoutAttr, pipelineLayout] : deviceResources.pipelineLayouts) {
-    auto fallbackGlobalOp =
-        fallbackResources.pipelineLayouts[layoutAttr].globalOp;
-    assert(fallbackGlobalOp && "should have created global");
-    Value fallbackPipelineLayout =
-        fallbackGlobalOp
-            .createLoadOp(pipelineLayout.globalOp.getLoc(), initializerBuilder)
-            .getLoadedGlobalValue();
-    pipelineLayout.globalOp.createStoreOp(pipelineLayout.globalOp.getLoc(),
-                                          fallbackPipelineLayout,
-                                          initializerBuilder);
-  }
-
   // Load fallback executables for all required by this device.
   for (auto &[executableName, executable] : deviceResources.executables) {
     auto fallbackGlobalOp =
@@ -554,31 +400,7 @@ static LogicalResult gatherDeviceResources(
     for (auto &block : funcOp.getFunctionBody()) {
       if (block
               .walk([&](Operation *op) -> WalkResult {
-                if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
-                  auto *deviceResources =
-                      tryGetDeviceResources(lookupOp, lookupOp.getDevice());
-                  if (!deviceResources) {
-                    return WalkResult::interrupt();
-                  }
-                  auto layoutAttr = lookupOp.getLayoutAttr();
-                  LLVM_DEBUG(DBGS()
-                             << "+ requiring pipeline layout from lookup: `"
-                             << layoutAttr << "`\n");
-                  auto &pipelineLayout =
-                      deviceResources->pipelineLayouts[layoutAttr];
-                  pipelineLayout.locs.insert(lookupOp.getLoc());
-                  pipelineLayout.lookupOps.push_back(lookupOp);
-                  for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
-                    LLVM_DEBUG(
-                        DBGS()
-                        << "+ requiring descriptor set layout from lookup: `"
-                        << setLayoutAttr << "`\n");
-                    auto key = getDescriptorSetLayoutKey(setLayoutAttr);
-                    auto &setLayout =
-                        deviceResources->descriptorSetLayouts[key];
-                    setLayout.locs.insert(lookupOp.getLoc());
-                  }
-                } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
+                if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
                   auto *deviceResources =
                       tryGetDeviceResources(lookupOp, lookupOp.getDevice());
                   if (!deviceResources) {
@@ -605,24 +427,6 @@ static LogicalResult gatherDeviceResources(
     for (auto &[executableName, executable] : deviceResources.executables) {
       executable.executableOp =
           symbolTable.lookup<IREE::HAL::ExecutableOp>(executableName);
-      for (auto variantOp :
-           executable.executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        for (auto exportOp : variantOp.getExportOps()) {
-          auto layoutAttr = exportOp.getLayoutAttr();
-          LLVM_DEBUG(DBGS() << "+ requiring pipeline layout from export: `"
-                            << layoutAttr << "`\n");
-          auto &pipelineLayout = deviceResources.pipelineLayouts[layoutAttr];
-          pipelineLayout.locs.insert(exportOp.getLoc());
-          for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
-            LLVM_DEBUG(DBGS()
-                       << "+ requiring descriptor set layout from export: `"
-                       << setLayoutAttr << "`\n");
-            auto key = getDescriptorSetLayoutKey(setLayoutAttr);
-            auto &setLayout = deviceResources.descriptorSetLayouts[key];
-            setLayout.locs.insert(exportOp.getLoc());
-          }
-        }
-      }
     }
   }
 
@@ -638,19 +442,6 @@ static LogicalResult gatherDeviceResources(
           DBGS() << "-> requiring fallback resources from device `"
                  << fallbackResources->deviceOp.getGlobalName().getValue()
                  << "`\n");
-      for (auto [setKey, setLayout] : deviceResources.descriptorSetLayouts) {
-        auto &fallbackSetLayout =
-            fallbackResources->descriptorSetLayouts[setKey];
-        fallbackSetLayout.locs.insert(setLayout.locs.begin(),
-                                      setLayout.locs.end());
-      }
-      for (auto [layoutAttr, pipelineLayout] :
-           deviceResources.pipelineLayouts) {
-        auto &fallbackPipelineLayout =
-            fallbackResources->pipelineLayouts[layoutAttr];
-        fallbackPipelineLayout.locs.insert(pipelineLayout.locs.begin(),
-                                           pipelineLayout.locs.end());
-      }
       for (auto [executableName, executable] : deviceResources.executables) {
         auto &fallbackExecutable =
             fallbackResources->executables[executableName];
@@ -692,8 +483,7 @@ struct MaterializeResourceCachesPass
                         << deviceResources.deviceOp.getGlobalName().getValue()
                         << "` resources...\n");
       // Skip devices with no resources.
-      if (deviceResources.pipelineLayouts.empty() &&
-          deviceResources.executables.empty()) {
+      if (deviceResources.executables.empty()) {
         LLVM_DEBUG(DBGS() << "~ skipping device with no resources\n");
         continue;
       }
@@ -712,11 +502,6 @@ struct MaterializeResourceCachesPass
       // lookup ops to reference them.
       OpBuilder moduleBuilder(moduleOp);
       moduleBuilder.setInsertionPointAfter(deviceResources.deviceOp);
-      for (auto [i, it] : llvm::enumerate(deviceResources.pipelineLayouts)) {
-        auto &[layoutAttr, pipelineLayout] = it;
-        declareDevicePipelineLayout(deviceResources.deviceOp, pipelineLayout, i,
-                                    moduleBuilder);
-      }
       for (auto [i, it] : llvm::enumerate(deviceResources.executables)) {
         auto &[executableName, executable] = it;
         declareDeviceExecutable(deviceResources.deviceOp, executable, i,

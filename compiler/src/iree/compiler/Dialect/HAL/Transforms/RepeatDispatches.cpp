@@ -27,9 +27,9 @@ struct RepeatDispatchesPass
       RepeatDispatchesPass>::RepeatDispatchesPassBase;
   void runOnOperation() override {
     // Collect all (nested) command buffer dispatch ops.
-    SmallVector<IREE::HAL::CommandBufferDispatchOp> ops;
+    SmallVector<IREE::HAL::CommandBufferDispatch2Op> ops;
     getOperation()->walk(
-        [&ops](IREE::HAL::CommandBufferDispatchOp op) { ops.push_back(op); });
+        [&ops](IREE::HAL::CommandBufferDispatch2Op op) { ops.push_back(op); });
     for (auto op : ops) {
       OpBuilder builder(op);
       for (unsigned i = 1; i < repeatCount; ++i) {

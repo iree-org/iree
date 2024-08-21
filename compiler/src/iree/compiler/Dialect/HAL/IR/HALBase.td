@@ -77,16 +77,6 @@ def HAL_CommandBuffer : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::CommandBufferType>()";
 }
 
-def HAL_DescriptorSetLayout : DialectType<
-    HAL_Dialect,
-    CPred<"isa<IREE::HAL::DescriptorSetLayoutType>($_self)">,
-    "descriptor_set_layout"> {
-  let description = [{
-    Descriptor set layout.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetLayoutType>()";
-}
-
 def HAL_Device : DialectType<
     HAL_Dialect,
     CPred<"isa<IREE::HAL::DeviceType>($_self)">,
@@ -140,28 +130,16 @@ def HAL_File : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::FileType>()";
 }
 
-def HAL_PipelineLayout : DialectType<
-    HAL_Dialect,
-    CPred<"isa<IREE::HAL::PipelineLayoutType>($_self)">,
-    "pipeline_layout"> {
-  let description = [{
-    A pipeline layout describing the descriptor sets and push constants used.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::PipelineLayoutType>()";
-}
-
 def HAL_ObjectType : AnyTypeOf<[
   HAL_Allocator,
   HAL_Buffer,
   HAL_BufferView,
   HAL_CommandBuffer,
-  HAL_DescriptorSetLayout,
   HAL_Device,
   HAL_Event,
   HAL_Executable,
   HAL_Fence,
   HAL_File,
-  HAL_PipelineLayout,
 ]>;
 
 def HAL_BufferType : AnyTypeOf<[

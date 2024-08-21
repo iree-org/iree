@@ -38,8 +38,6 @@ IREE::HAL::DeviceTargetAttr LocalDevice::getDefaultDeviceTarget(
   Builder b(context);
 
   SmallVector<NamedAttribute> deviceConfigAttrs;
-  deviceConfigAttrs.emplace_back(b.getStringAttr("executable_create_2"),
-                                 b.getUnitAttr());
   auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
   SmallVector<NamedAttribute> executableConfigAttrs;
@@ -68,8 +66,6 @@ LocalDevice::getHostDeviceTarget(MLIRContext *context,
   Builder b(context);
 
   SmallVector<NamedAttribute> deviceConfigAttrs;
-  deviceConfigAttrs.emplace_back(b.getStringAttr("executable_create_2"),
-                                 b.getUnitAttr());
   auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
   SmallVector<NamedAttribute> executableConfigAttrs;

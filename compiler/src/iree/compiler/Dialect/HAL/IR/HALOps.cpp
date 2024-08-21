@@ -1076,40 +1076,6 @@ void CommandBufferUpdateBufferOp::setSubrangeOperand(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.push_descriptor_set
-//===----------------------------------------------------------------------===//
-
-void CommandBufferPushDescriptorSetOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value pipelineLayout, int64_t set,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  build(builder, state, commandBuffer, pipelineLayout,
-        builder.createOrFold<arith::ConstantIndexOp>(state.location, set),
-        bindings);
-}
-
-void CommandBufferPushDescriptorSetOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value pipelineLayout, Value set,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({commandBuffer, pipelineLayout, set});
-  SmallVector<Value> bindingOrdinals;
-  SmallVector<Value> bindingBuffers;
-  SmallVector<Value> bindingOffsets;
-  SmallVector<Value> bindingLengths;
-  for (auto binding : bindings) {
-    bindingOrdinals.push_back(binding.ordinal);
-    bindingBuffers.push_back(binding.buffer);
-    bindingOffsets.push_back(binding.byteOffset);
-    bindingLengths.push_back(binding.byteLength);
-  }
-  state.addOperands(bindingOrdinals);
-  state.addOperands(bindingBuffers);
-  state.addOperands(bindingOffsets);
-  state.addOperands(bindingLengths);
-}
-
-//===----------------------------------------------------------------------===//
 // hal.command_buffer.dispatch2 + .indirect
 //===----------------------------------------------------------------------===//
 
@@ -1209,15 +1175,6 @@ LogicalResult CommandBufferDispatch2IndirectOp::verify() {
   return verifyDispatch2Bindings(op, op.getBindingBuffers(),
                                  op.getBindingOffsets(),
                                  op.getBindingLengths());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.create
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set_layout");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1896,16 +1853,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.create
-//===----------------------------------------------------------------------===//
-
-void ExecutableCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  // TODO(benvanik): name after sanitized symbol.
-  setNameFn(getResult(), StringRef("exe"));
-}
-
-//===----------------------------------------------------------------------===//
 // hal.executable.create2
 //===----------------------------------------------------------------------===//
 
@@ -2105,24 +2052,6 @@ void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", getDimension(),
                                            getResult(), setNameFn);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.pipeline_layout.create
-//===----------------------------------------------------------------------===//
-
-void PipelineLayoutCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "pipeline_layout");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.pipeline_layout.lookup
-//===----------------------------------------------------------------------===//
-
-void PipelineLayoutLookupOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "pipeline_layout");
 }
 
 //===----------------------------------------------------------------------===//

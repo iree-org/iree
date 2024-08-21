@@ -23,8 +23,6 @@ typedef struct iree_hal_metal_kernel_params_t {
   id<MTLFunction> function;
   id<MTLComputePipelineState> pso;
   uint32_t threadgroup_size[3];
-  // TODO(#18154): remove layout in simplified bindings.
-  iree_hal_pipeline_layout_t* layout;
   IREE_TRACE(iree_string_view_t function_name;)
 } iree_hal_metal_kernel_params_t;
 

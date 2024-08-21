@@ -20,7 +20,6 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
-#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
@@ -525,12 +524,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_host_size_t binding_capacity,
       iree_hal_command_buffer_t** out_command_buffer);
 
-  iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
-      iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
-      iree_host_size_t binding_count,
-      const iree_hal_descriptor_set_layout_binding_t* bindings,
-      iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
-
   iree_status_t(IREE_API_PTR* create_event)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       iree_hal_event_flags_t flags, iree_hal_event_t** out_event);
@@ -543,12 +536,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
       iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file);
-
-  iree_status_t(IREE_API_PTR* create_pipeline_layout)(
-      iree_hal_device_t* device, iree_host_size_t push_constants,
-      iree_host_size_t set_layout_count,
-      iree_hal_descriptor_set_layout_t* const* set_layouts,
-      iree_hal_pipeline_layout_t** out_pipeline_layout);
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,

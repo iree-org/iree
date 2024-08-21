@@ -1898,14 +1898,10 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
-    // TODO(#18154): remove descriptor set layout.
-    /*.create_descriptor_set_layout=*/NULL,
     /*.create_event=*/iree_hal_vulkan_device_create_event,
     /*.create_executable_cache=*/
     iree_hal_vulkan_device_create_executable_cache,
     /*.import_file=*/iree_hal_vulkan_device_import_file,
-    // TODO(#18154): remove pipeline layout.
-    /*.create_pipeline_layout=*/NULL,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
     /*.query_semaphore_compatibility=*/
     iree_hal_vulkan_device_query_semaphore_compatibility,

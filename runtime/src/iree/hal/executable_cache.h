@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -92,16 +91,6 @@ typedef struct iree_hal_executable_params_t {
   // to any executable created using it still held by the caller.
   iree_const_byte_span_t executable_data;
 
-  // TODO(#18154): drop pipeline layouts with simplified bindings. Allowed to be
-  // empty for now on targets that support simplified bindings.
-  //
-  // A set of pipeline layouts for each entry point in the executable.
-  // The order matches that produced by the compiler. As multiple entry points
-  // may share the same layout some entries in this list may reference the same
-  // pipeline layout objects.
-  iree_host_size_t pipeline_layout_count;
-  iree_hal_pipeline_layout_t* const* pipeline_layouts;
-
   // Executable-level constants table used to perform runtime specialization
   // when information is not available statically during compilation. The
   // compiler defines the contents of the table, how they are populated, and
@@ -177,10 +166,6 @@ IREE_API_EXPORT bool iree_hal_executable_cache_can_prepare_format(
 // The provided |executable_data| (in a format defined by |executable_format|)
 // will be used to either lookup a previously prepared executable in the cache
 // or prepare a new one.
-//
-// Each entry point in the executable requires a corresponding value in
-// |pipeline_layouts| defining the layout used by the entry point. If multiple
-// entry points use the same layouts they can reuse the same values.
 //
 // Depending on the driver preparation may take a non-trivial amount of time
 // (such as when JITing/etc). As the cache is internally synchronized callers

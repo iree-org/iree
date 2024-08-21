@@ -111,13 +111,6 @@ struct CommandBufferType
   static constexpr StringLiteral name = "hal.command_buffer";
 };
 
-struct DescriptorSetLayoutType
-    : public Type::TypeBase<DescriptorSetLayoutType, Type, TypeStorage> {
-  using Base::Base;
-
-  static constexpr StringLiteral name = "hal.descriptor_set_layout";
-};
-
 struct DeviceType
     : public Type::TypeBase<DeviceType, Type, TypeStorage,
                             mlir::OpTrait::IREE::Util::ImplicitlyCaptured,
@@ -156,13 +149,6 @@ struct FileType : public Type::TypeBase<FileType, Type, TypeStorage> {
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.file";
-};
-
-struct PipelineLayoutType
-    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
-  using Base::Base;
-
-  static constexpr StringLiteral name = "hal.pipeline_layout";
 };
 
 struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {

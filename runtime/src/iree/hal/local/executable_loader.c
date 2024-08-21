@@ -99,8 +99,6 @@ iree_status_t iree_hal_executable_loader_try_load(
     iree_host_size_t worker_capacity, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_loader);
   IREE_ASSERT_ARGUMENT(executable_params);
-  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
-                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(!executable_params->executable_data.data_length ||
                        executable_params->executable_data.data);
   IREE_ASSERT_ARGUMENT(out_executable);
