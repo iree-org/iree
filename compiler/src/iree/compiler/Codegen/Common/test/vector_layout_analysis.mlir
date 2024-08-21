@@ -196,8 +196,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // redundant to_layout ops that convert elemwise ops to the 2nd layout
 // prematurely. Especially useful during chained contraction cases.
 
-#layoutA = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 8]>>
-#layoutB = #iree_vector_ext.layout<<[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 8]>, <[BATCHY, LANEX], [2, 32]>>
+#layoutA = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  LANEY,  VECTORX], [2, 4, 8]>>
+#layoutB = #iree_vector_ext.layout<<[BATCHX,  LANEY,  VECTORX], [2, 4, 8]>, <[BATCHY, LANEX], [2, 32]>>
 #layoutC = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>
 
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
