@@ -107,6 +107,10 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     if (preferCloneToConsumers) {
       // If we are cloning we care only about users that are a part of the
       // candidate partition.
+      // Here we would need to walk further down the users if a user is also
+      // cloned into the partition. This will be useful if we have a block of
+      // cloneable ops. If left like that, other than the inefficiency,
+      // it should not produce invalid partitioning.
       opHazards = &opHazardsInCandidatePartition;
       for (auto user : op.getUsers()) {
         if (builders[partitionOrdinal]->ops.contains(user))
@@ -116,13 +120,14 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       opHazards = &opInfo.hazards;
 
     for (auto opHazardOrdinal : opHazards->set_bits()) {
-      if (partitionOrdinal < opHazardOrdinal)
+      if (partitionOrdinal < opHazardOrdinal) {
         // Reject partition ordering that would require partition sorting.
         // TODO: It is probably more optimal to reorder the partitions after
         // their formation based on their dependency graph instead of rejecting
         // here. Since this is considered not a good partitioning algorithm
         // and will probably get removed, we leave it like that.
         return false;
+      }
       // Check for formation of circular dependency between partitions.
       if (willCreateCircularDependencyBetweenPartitions(opHazardOrdinal,
                                                         partitionOrdinal))
@@ -259,8 +264,13 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     }
 
     // Mark the op as having hazards against all other partitions.
-    // Why are we that conservative?
-    // Why we don't take the hazards for the users?
+    // It is better to be safe than incorrect, especially with our current
+    // minimal test coverage. It's not always safe to reorder things - if
+    // anything we are unlikely to be conservative enough here - for example,
+    // if there's a stream.resource.load of a resource or a global we can't
+    // move anything that may affect that resource or global. This partitioning
+    // was designed to be conservative because debugging such issues is really
+    // difficult.
     if (!builders.empty()) {
       opInfo.hazards.set(0, builders.size() - 1);
     }
