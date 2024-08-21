@@ -599,41 +599,42 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
   // ones coming from the `hoistedOp`.
   auto dispatchReturnOp = cast<IREE::Flow::ReturnOp>(
       dispatchRegionOp.getBody().front().getTerminator());
-  llvm::SmallSetVector<Value, 2> newDispatchReturnOperands;
-  llvm::SmallSetVector<Value, 4> newDispatchResultDynamicDims;
+  SmallVector<Value, 2> newDispatchReturnOperands;
+  SmallVector<Value, 4> newDispatchResultDynamicDims;
   for (OpOperand &operand : dispatchReturnOp->getOpOperands()) {
     if (operand.get().getDefiningOp() == hoistedOp) {
       continue;
     }
     newResultIndsMap.insert({operand.get(), newDispatchReturnOperands.size()});
-    newDispatchReturnOperands.insert(operand.get());
+    newDispatchReturnOperands.push_back(operand.get());
     auto dims =
         dispatchRegionOp.getResultDynamicDims(operand.getOperandNumber());
-    newDispatchResultDynamicDims.insert(dims.begin(), dims.end());
+    newDispatchResultDynamicDims.append(dims.begin(), dims.end());
   }
 
   // Add the operands of the `op` to the new return values of the dispatch, and
   // add their result dynamic dims to the new result dynamic dims.
+  llvm::SmallSetVector<Value, 2> returnOperandSet(
+      newDispatchReturnOperands.begin(), newDispatchReturnOperands.end());
   for (OpOperand &operand : op->getOpOperands()) {
     // Only need to yield operands defined in the dispatch region.
     if (operand.get().getParentRegion() != &dispatchRegionOp.getBody()) {
       continue;
     }
     // Skip already yielded operands.
-    if (newDispatchReturnOperands.contains(operand.get())) {
+    if (returnOperandSet.contains(operand.get())) {
       continue;
     }
     newResultIndsMap.insert({operand.get(), newDispatchReturnOperands.size()});
     // Save operand and dynamic dims to add to the dispatch region.
-    newDispatchReturnOperands.insert(operand.get());
-    rewriter.setInsertionPointAfterValue(operand.get());
+    newDispatchReturnOperands.push_back(operand.get());
     SmallVector<Value> dims;
     if (failed(reifyDynamicResultDims(rewriter, operand.get(), dims))) {
       return op->emitOpError(
           "failed to reify dynamic dims of result to be yielded from "
           "dispatch region");
     }
-    newDispatchResultDynamicDims.insert(dims.begin(), dims.end());
+    newDispatchResultDynamicDims.append(dims.begin(), dims.end());
   }
 
   // Create the new dispatch region op. `newDispatchReturnOperands` now has all
@@ -646,8 +647,7 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
                           [](Value operand) { return operand.getType(); });
   rewriter.setInsertionPoint(dispatchRegionOp);
   auto newDispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      dispatchRegionOp->getLoc(), newResultTypes,
-      newDispatchResultDynamicDims.takeVector(),
+      dispatchRegionOp->getLoc(), newResultTypes, newDispatchResultDynamicDims,
       dispatchRegionOp.getWorkload());
   rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody(),
@@ -664,8 +664,8 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
   auto newDispatchReturnOp = cast<IREE::Flow::ReturnOp>(
       newDispatchRegionOp.getBody().front().getTerminator());
   rewriter.setInsertionPoint(newDispatchReturnOp);
-  rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(
-      newDispatchReturnOp, newDispatchReturnOperands.getArrayRef());
+  rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(newDispatchReturnOp,
+                                                    newDispatchReturnOperands);
 
   // Step 4: Fixup all uses. Still need to replace the operands of the hoisted
   //         op, and replace the remaining uses of the old dispatch region with
