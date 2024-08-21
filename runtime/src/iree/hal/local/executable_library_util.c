@@ -17,19 +17,6 @@ iree_status_t iree_hal_executable_library_verify(
                         IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION);
   if (disable_verification) return iree_ok_status();
 
-  // Check that there's one pipeline layout per export. Multiple exports may
-  // share the same layout but it still needs to be declared.
-  // NOTE: pipeline layouts are optional but if provided must be consistent.
-  if (executable_params->pipeline_layout_count > 0) {
-    if (library->exports.count != executable_params->pipeline_layout_count) {
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "executable provides %u entry points but caller "
-                              "provided %" PRIhsz "; must match",
-                              library->exports.count,
-                              executable_params->pipeline_layout_count);
-    }
-  }
-
   // Check to make sure that the constant table has values for all constants.
   if (library->constants.count != executable_params->constant_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,

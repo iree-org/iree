@@ -252,8 +252,6 @@ public:
       deviceConfigAttrs.emplace_back(b.getStringAttr("legacy_sync"),
                                      b.getUnitAttr());
     }
-    deviceConfigAttrs.emplace_back(b.getStringAttr("executable_create_2"),
-                                   b.getUnitAttr());
     auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
     SmallVector<NamedAttribute> executableConfigAttrs;

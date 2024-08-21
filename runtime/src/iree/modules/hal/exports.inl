@@ -51,19 +51,13 @@ EXPORT_FN("command_buffer.collective", iree_hal_module_command_buffer_collective
 EXPORT_FN("command_buffer.copy_buffer", iree_hal_module_command_buffer_copy_buffer, riirIrII, v)
 EXPORT_FN("command_buffer.create", iree_hal_module_command_buffer_create, riiIi, r)
 // TODO(#18154): replace base dispatch with new `2` versions.
-EXPORT_FN("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rriiiiI, v)
-EXPORT_FN("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dispatch_indirect, rriirII, v)
 EXPORT_FN_CUSTOM("command_buffer.dispatch2", iree_hal_module_command_buffer_dispatch2, rriiiiICiDCiirIID, v)
 EXPORT_FN_CUSTOM("command_buffer.dispatch2.indirect", iree_hal_module_command_buffer_dispatch2_indirect, rriirIICiDCiirIID, v)
 EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_debug_group, r, v)
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riii, v)
 EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rrIIiii, v)
 EXPORT_FN("command_buffer.finalize", iree_hal_module_command_buffer_finalize, r, v)
-EXPORT_FN("command_buffer.push_constants", iree_hal_module_command_buffer_push_constants, rriCiD, v)
-EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_push_descriptor_set, rriCiirIID, v)
 EXPORT_FN("command_buffer.update_buffer", iree_hal_module_command_buffer_update_buffer, rrIrIIi, v)
-
-EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiiD, r)
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
 EXPORT_FN("device.query.i64", iree_hal_module_device_query_i64, rrr, iI)
@@ -81,7 +75,6 @@ EXPORT_FN("devices.get", iree_hal_module_devices_get, i, r)
 EXPORT_FN("ex.file.from_memory", iree_hal_module_ex_file_from_memory, rIirIIi, r)
 
 // TODO(#18154): replace base executable create with new `2` versions.
-EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)
 EXPORT_FN("executable.create2", iree_hal_module_executable_create2, rrrr, r)
 
 EXPORT_FN("fence.await", iree_hal_module_fence_await, iCrD, i)
@@ -90,7 +83,5 @@ EXPORT_FN("fence.fail", iree_hal_module_fence_fail, ri, v)
 EXPORT_FN("fence.join", iree_hal_module_fence_join, CrD, r)
 EXPORT_FN("fence.query", iree_hal_module_fence_query, r, i)
 EXPORT_FN("fence.signal", iree_hal_module_fence_signal, r, v)
-
-EXPORT_FN("pipeline_layout.create", iree_hal_module_pipeline_layout_create, riCrD, r)
 
 // clang-format on

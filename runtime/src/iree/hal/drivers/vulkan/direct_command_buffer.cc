@@ -825,11 +825,6 @@ const iree_hal_command_buffer_vtable_t
         /*.copy_buffer=*/iree_hal_vulkan_direct_command_buffer_copy_buffer,
         /*.collective=*/
         iree_hal_vulkan_direct_command_buffer_collective,
-        // TODO(#18154): drop old binding vtable methods.
-        /*.push_constants=*/NULL,
-        /*.push_descriptor_set=*/NULL,
-        /*.dispatch=*/NULL,
-        /*.dispatch_indirect=*/NULL,
         /*.dispatch2=*/iree_hal_vulkan_direct_command_buffer_dispatch2,
         /*.dispatch2_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch2_indirect,

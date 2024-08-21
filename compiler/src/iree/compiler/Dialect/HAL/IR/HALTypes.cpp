@@ -119,32 +119,27 @@ getInterfaceBindingAttrs(Operation *op, size_t resourceCount) {
 
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, ChannelType,
-           CommandBufferType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, FenceType, FileType, PipelineLayoutType,
-           SemaphoreType>();
+           CommandBufferType, DeviceType, EventType, ExecutableType, FenceType,
+           FileType, SemaphoreType>();
 }
 
 Type HALDialect::parseType(DialectAsmParser &parser) const {
   StringRef typeKind;
   if (parser.parseKeyword(&typeKind))
     return {};
-  auto type =
-      llvm::StringSwitch<Type>(typeKind)
-          .Case("allocator", AllocatorType::get(getContext()))
-          .Case("buffer", BufferType::get(getContext()))
-          .Case("buffer_view", BufferViewType::get(getContext()))
-          .Case("channel", ChannelType::get(getContext()))
-          .Case("command_buffer", CommandBufferType::get(getContext()))
-          .Case("descriptor_set_layout",
-                DescriptorSetLayoutType::get(getContext()))
-          .Case("device", DeviceType::get(getContext()))
-          .Case("event", EventType::get(getContext()))
-          .Case("executable", ExecutableType::get(getContext()))
-          .Case("fence", FenceType::get(getContext()))
-          .Case("file", FileType::get(getContext()))
-          .Case("pipeline_layout", PipelineLayoutType::get(getContext()))
-          .Case("semaphore", SemaphoreType::get(getContext()))
-          .Default(nullptr);
+  auto type = llvm::StringSwitch<Type>(typeKind)
+                  .Case("allocator", AllocatorType::get(getContext()))
+                  .Case("buffer", BufferType::get(getContext()))
+                  .Case("buffer_view", BufferViewType::get(getContext()))
+                  .Case("channel", ChannelType::get(getContext()))
+                  .Case("command_buffer", CommandBufferType::get(getContext()))
+                  .Case("device", DeviceType::get(getContext()))
+                  .Case("event", EventType::get(getContext()))
+                  .Case("executable", ExecutableType::get(getContext()))
+                  .Case("fence", FenceType::get(getContext()))
+                  .Case("file", FileType::get(getContext()))
+                  .Case("semaphore", SemaphoreType::get(getContext()))
+                  .Default(nullptr);
   if (!type) {
     parser.emitError(parser.getCurrentLocation())
         << "unknown HAL type: " << typeKind;
@@ -163,8 +158,6 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "channel";
   } else if (llvm::isa<CommandBufferType>(type)) {
     p << "command_buffer";
-  } else if (llvm::isa<DescriptorSetLayoutType>(type)) {
-    p << "descriptor_set_layout";
   } else if (llvm::isa<DeviceType>(type)) {
     p << "device";
   } else if (llvm::isa<EventType>(type)) {
@@ -175,8 +168,6 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "fence";
   } else if (llvm::isa<FileType>(type)) {
     p << "file";
-  } else if (llvm::isa<PipelineLayoutType>(type)) {
-    p << "pipeline_layout";
   } else if (llvm::isa<SemaphoreType>(type)) {
     p << "semaphore";
   } else {

@@ -54,8 +54,6 @@ iree_cc_library(
     "fence.h"
     "file.c"
     "file.h"
-    "pipeline_layout.c"
-    "pipeline_layout.h"
     "queue.h"
     "resource.h"
     "semaphore.c"

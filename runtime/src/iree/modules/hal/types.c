@@ -16,13 +16,9 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_channel, iree_hal_channel_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_command_buffer,
                              iree_hal_command_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
-                             iree_hal_descriptor_set_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_pipeline_layout,
-                             iree_hal_pipeline_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_file, iree_hal_file_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
@@ -87,10 +83,6 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   IREE_VM_REGISTER_HAL_C_TYPE(
       instance, iree_hal_command_buffer_t, "hal.command_buffer",
       iree_hal_command_buffer_destroy, iree_hal_command_buffer_registration);
-  IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_descriptor_set_layout_t,
-                              "hal.descriptor_set_layout",
-                              iree_hal_descriptor_set_layout_destroy,
-                              iree_hal_descriptor_set_layout_registration);
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_device_t, "hal.device",
                               iree_hal_device_destroy,
                               iree_hal_device_registration);
@@ -103,9 +95,6 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_file_t, "hal.file",
                               iree_hal_file_destroy,
                               iree_hal_file_registration);
-  IREE_VM_REGISTER_HAL_C_TYPE(
-      instance, iree_hal_pipeline_layout_t, "hal.pipeline_layout",
-      iree_hal_pipeline_layout_destroy, iree_hal_pipeline_layout_registration);
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_semaphore_t, "hal.semaphore",
                               iree_hal_semaphore_destroy,
                               iree_hal_semaphore_registration);
@@ -166,9 +155,6 @@ iree_hal_module_resolve_all_types(iree_vm_instance_t* instance) {
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_command_buffer_t,
                              "hal.command_buffer",
                              iree_hal_command_buffer_registration);
-  IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_descriptor_set_layout_t,
-                             "hal.descriptor_set_layout",
-                             iree_hal_descriptor_set_layout_registration);
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_device_t, "hal.device",
                              iree_hal_device_registration);
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_event_t, "hal.event",
@@ -177,9 +163,6 @@ iree_hal_module_resolve_all_types(iree_vm_instance_t* instance) {
                              iree_hal_fence_registration);
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_file_t, "hal.file",
                              iree_hal_file_registration);
-  IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_pipeline_layout_t,
-                             "hal.pipeline_layout",
-                             iree_hal_pipeline_layout_registration);
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_semaphore_t, "hal.semaphore",
                              iree_hal_semaphore_registration);
 

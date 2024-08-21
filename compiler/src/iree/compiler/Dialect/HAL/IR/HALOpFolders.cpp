@@ -340,54 +340,6 @@ void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
   results.insert<FoldCommandBufferCopyBufferSubspans>(context);
 }
 
-namespace {
-
-/// Folds hal.buffer.subspans into push descriptor bindings.
-/// The binding range is always equal to or a subset of the subspan.
-struct FoldCommandBufferPushDescriptorSetBufferSubspan
-    : public OpRewritePattern<CommandBufferPushDescriptorSetOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(CommandBufferPushDescriptorSetOp op,
-                                PatternRewriter &rewriter) const override {
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(op);
-    bool needsUpdate = false;
-    auto bindingBuffers = llvm::to_vector(op.getBindingBuffers());
-    auto bindingOffsets = llvm::to_vector(op.getBindingOffsets());
-    for (size_t i = 0; i < bindingBuffers.size(); ++i) {
-      auto *definingOp = bindingBuffers[i].getDefiningOp();
-      if (!definingOp)
-        continue;
-      if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
-        needsUpdate = true;
-        bindingBuffers[i] = subspanOp.getSourceBuffer();
-        bindingOffsets[i] = rewriter.createOrFold<arith::AddIOp>(
-            subspanOp.getLoc(), subspanOp.getSourceOffset(), bindingOffsets[i]);
-      }
-    }
-    rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
-      return failure();
-    rewriter.modifyOpInPlace(op, [&]() {
-      auto mutableBindingBuffers = op.getBindingBuffersMutable();
-      mutableBindingBuffers.clear();
-      mutableBindingBuffers.append(bindingBuffers);
-      auto mutableBindingOffsets = op.getBindingOffsetsMutable();
-      mutableBindingOffsets.clear();
-      mutableBindingOffsets.append(bindingOffsets);
-    });
-    return success();
-  }
-};
-
-} // namespace
-
-void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<FoldCommandBufferPushDescriptorSetBufferSubspan>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // hal.device.queue.execute
 //===----------------------------------------------------------------------===//

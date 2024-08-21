@@ -166,7 +166,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   }
 
   iree_hal_buffer_ref_t binding;
-  binding.ordinal = 0;
+  binding.reserved = 0;
   binding.buffer = target_buffer;
   binding.offset = 0;
   binding.length = IREE_WHOLE_BUFFER;
