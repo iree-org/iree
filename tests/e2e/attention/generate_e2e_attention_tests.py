@@ -71,15 +71,15 @@ class TestShapeAndScale:
 def get_test_shapes(shapes_id: ShapesId):
     if shapes_id == ShapesId.SMALL:
         return [
-            TestShapeAndScale(batch=2, m=256, k1=64, k2=32, n=16, scale=1.0),
+            TestShapeAndScale(batch=2, m=512, k1=64, k2=128, n=32, scale=1.0),
         ]
     if shapes_id == ShapesId.MEDIUM:
         return [
-            TestShapeAndScale(batch=2, m=512, k1=128, k2=64, n=32, scale=1.0),
+            TestShapeAndScale(batch=2, m=1024, k1=128, k2=256, n=64, scale=1.0),
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1024, k1=256, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=2048, k1=256, k2=512, n=128, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
