@@ -972,6 +972,34 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return 0;
 }
 
+std::tuple<int64_t, int64_t, int64_t>
+DataTiledMMAAttr::getUnrollingFactor(ArrayRef<int64_t> lhsShape,
+                                     ArrayRef<int64_t> rhsShape,
+                                     ArrayRef<int64_t> accShape) {
+  auto multiplyAcc = [](ArrayRef<int64_t> shape) {
+    return std::accumulate(shape.begin(), shape.end(), 1,
+                           std::multiplies<int64_t>());
+  };
+  int64_t lhsInnerElementCount = multiplyAcc(lhsShape);
+  int64_t rhsInnerElementCount = multiplyAcc(rhsShape);
+  int64_t accInnerElementCount = multiplyAcc(accShape);
+
+  auto [m, n, k] = getMNKShape();
+  int64_t M0K0 = lhsInnerElementCount / m / k; // (M0M1K0K1) / M1 / K1 = M0K0
+  int64_t N0K0 = rhsInnerElementCount / n / k; // (N0N1K0K1) / N1 / K1 = N0K0
+  int64_t M0N0 = accInnerElementCount / m / n; // (M0M1N0N1) / M1 / N1 = M0N0
+
+  // Something goes wrong, returns {0, 0, 0} instead;
+  if (!M0K0 || !N0K0 || !M0N0) {
+    return {0, 0, 0};
+  }
+
+  int mUnrollFactor = std::sqrt(M0K0 * M0N0 / N0K0);
+  int nUnrollFactor = std::sqrt(M0N0 * N0K0 / M0K0);
+  int kUnrollFactor = std::sqrt(M0K0 * N0K0 / M0N0);
+  return {mUnrollFactor, nUnrollFactor, kUnrollFactor};
+}
+
 //===----------------------------------------------------------------------===//
 // MMA Schedule Attributes
 //===----------------------------------------------------------------------===//
