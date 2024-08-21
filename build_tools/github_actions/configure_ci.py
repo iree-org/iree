@@ -129,8 +129,12 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 
 NVGPU_PATHS = [
     # Directly related to NVIDIA GPU code generation and execution:
+    "compiler/plugins/target/CUDA/*",
+    "compiler/plugins/target/VulkanSPIRV/*",
     "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "compiler/src/iree/compiler/Codegen/SPIRV/*",
     "runtime/src/iree/hal/drivers/cuda/*",
+    "runtime/src/iree/hal/drivers/vulkan/*",
     # Common code likely enough to affect code paths unique to NVIDIA GPUs:
     "compiler/src/iree/compiler/GlobalOptimization/*",
     # Tests.
@@ -139,8 +143,12 @@ NVGPU_PATHS = [
 
 AMDGPU_PATHS = [
     # Directly related to AMDGPU code generation and execution:
+    "compiler/plugins/target/ROCM/*",
+    "compiler/plugins/target/VulkanSPIRV/*",
     "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
+    "compiler/src/iree/compiler/Codegen/SPIRV/*",
     "runtime/src/iree/hal/drivers/hip/*",
+    "runtime/src/iree/hal/drivers/vulkan/*",
     # Common code likely enough to affect code paths unique to AMDGPU:
     "compiler/src/iree/compiler/GlobalOptimization/*",
     # Tests.
