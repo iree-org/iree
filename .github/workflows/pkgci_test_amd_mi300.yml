@@ -29,7 +29,6 @@ jobs:
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
-      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
       - name: Pre Checkout MI300 Step
         if: contains(matrix.name, 'gfx942')
