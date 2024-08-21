@@ -248,6 +248,8 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::arena
+    iree::base::internal::synchronization
+    iree::hal
   PUBLIC
 )
 
