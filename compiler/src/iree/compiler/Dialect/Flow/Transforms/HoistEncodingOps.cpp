@@ -63,7 +63,7 @@ static AffineMap getBcastMapOrIdentity(RewriterBase &rewriter,
 ///       be well tested.
 static LogicalResult
 bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
-                                    IREE::Encoding::SetEncodingOp encodingOp,
+                                    Encoding::SetEncodingOp encodingOp,
                                     linalg::GenericOp genericOp) {
   if (!genericOp->hasOneUse()) {
     return rewriter.notifyMatchFailure(genericOp,
@@ -111,8 +111,8 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
-    Value encodedInput = rewriter.create<IREE::Encoding::SetEncodingOp>(
-        loc, resType, operand->get());
+    Value encodedInput =
+        rewriter.create<Encoding::SetEncodingOp>(loc, resType, operand->get());
     encodedOperands.push_back(encodedInput);
   }
 
@@ -156,22 +156,27 @@ struct HoistEncodingOpsPass
 /// Pattern to bubble SetEncoding ops upwards through producers. This pattern
 /// runs until bubbling is not possible, or until the SetEncoding op is outside
 /// of a dispatch.
-struct HoistSetEncodingOp
-    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
+struct BubbleUpSetEncodingOp
+    : public OpRewritePattern<Encoding::SetEncodingOp> {
+  using OpRewritePattern<Encoding::SetEncodingOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
+  LogicalResult matchAndRewrite(Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     if (isNonNullAndOutsideDispatch(encodingOp)) {
       return failure();
     }
-    // Try to bubble the SetEncodingOp past its producer op.
-    if (succeeded(bubbleUpSetEncoding(rewriter, encodingOp->getOpOperand(0)))) {
-      return success();
+    // Fail if the encodingOp is not in the same dispatch as its producer.
+    Operation *producer = encodingOp.getSource().getDefiningOp();
+    if (!producer) {
+      return failure();
+    }
+    auto dispatch = producer->getParentOfType<DispatchRegionOp>();
+    if (!dispatch ||
+        dispatch != encodingOp->getParentOfType<DispatchRegionOp>()) {
+      return failure();
     }
 
-    // Otherwise, try to hoist the SetEncodingOp out of the dispatch region.
-    return hoistOutOfDispatch(rewriter, encodingOp);
+    return bubbleUpSetEncoding(rewriter, encodingOp->getOpOperand(0));
   }
 };
 
@@ -180,13 +185,31 @@ struct HoistSetEncodingOp
 /// Create dispatch.region Ops based on a fusion heuristic.
 void HoistEncodingOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  IRRewriter rewriter(ctx);
+  auto funcOp = getOperation();
 
-  RewritePatternSet patterns(ctx);
-  patterns.insert<HoistSetEncodingOp>(ctx);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+  RewritePatternSet bubblingPatterns(ctx);
+  bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
   if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+          applyPatternsAndFoldGreedily(funcOp, std::move(bubblingPatterns)))) {
+    return signalPassFailure();
+  }
+
+  SmallVector<Encoding::SetEncodingOp> candidates;
+  funcOp->walk([&](Encoding::SetEncodingOp setEncodingOp) {
+    if (setEncodingOp->getParentOfType<DispatchRegionOp>()) {
+      candidates.push_back(setEncodingOp);
+    }
+  });
+  IRRewriter rewriter(ctx);
+  for (auto setEncodingOp : candidates) {
+    if (failed(hoistOutOfDispatch(rewriter, setEncodingOp))) {
+      return signalPassFailure();
+    }
+  }
+
+  RewritePatternSet dimPatterns(ctx);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(dimPatterns);
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(dimPatterns)))) {
     return signalPassFailure();
   }
 }
