@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --iree-hal-experimental-dispatch2=true %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true %s | FileCheck %s
 
 #executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
