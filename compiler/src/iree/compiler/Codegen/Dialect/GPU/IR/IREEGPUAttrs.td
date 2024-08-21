@@ -161,6 +161,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
   let parameters = (ins
     mmaintrinsic:$intrinsic,
+    "bool":$dataTiled,
     "int64_t":$mSize,
     "int64_t":$nSize,
     "int64_t":$kSize,
@@ -198,7 +199,10 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
+    AttrBuilder<(ins
+      "MMAIntrinsic":$intrinsic,
+      CArg<"bool", "false">:$isDataTiled
+    )>
   ];
 
   let extraClassDeclaration = [{

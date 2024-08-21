@@ -203,8 +203,26 @@ LogicalResult MultiMmaOp::verify() {
   int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
 
   auto [m, n, k] = getKind().getMNKShape();
-  if (m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
-      m * n != accInnerElementCount) {
+  int64_t expectedNumLhsElem = m * k;
+  int64_t expectedNumRhsElem = n * k;
+  int64_t expectedNumAccElem = m * n;
+
+  // The below variables have zero values when the op is at thread level.
+  int64_t M0K0 = lhsInnerElementCount / m / k; // (M0M1K0K1) / M1 / K1 = M0K0
+  int64_t N0K0 = rhsInnerElementCount / n / k; // (N0N1K0K1) / N1 / K1 = N0K0
+  int64_t M0N0 = accInnerElementCount / m / n; // (M0M1N0N1) / M1 / N1 = M0N0
+  if (hasPureTensorSemantics() && M0K0 && N0K0 && M0N0) {
+    int mUnrollFactor = std::sqrt(M0K0 * M0N0 / N0K0);
+    int nUnrollFactor = std::sqrt(M0N0 * N0K0 / M0K0);
+    int kUnrollFactor = std::sqrt(M0K0 * N0K0 / M0N0);
+    expectedNumLhsElem *= mUnrollFactor * kUnrollFactor;
+    expectedNumRhsElem *= nUnrollFactor * kUnrollFactor;
+    expectedNumAccElem *= mUnrollFactor * nUnrollFactor;
+  }
+
+  if (expectedNumLhsElem != lhsInnerElementCount ||
+      expectedNumRhsElem != rhsInnerElementCount ||
+      expectedNumAccElem != accInnerElementCount) {
     auto [lhsThreadType, rhsThreadType, accThreadType] =
         getKind().getABCVectorTypes();
     int64_t lhsThreadElementCount = multiplyAcc(lhsThreadType.getShape());
