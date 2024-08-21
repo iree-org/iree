@@ -30,6 +30,10 @@ iree_status_t iree_hal_metal_buffer_wrap(
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** out_buffer);
 
+// Returns true if the buffer was wrapped from an external handle instead of
+// allocated by the HAL allocator.
+bool iree_hal_metal_buffer_is_external(const iree_hal_buffer_t* buffer);
+
 // Returns the underlying Metal buffer handle for the given |buffer|.
 id<MTLBuffer> iree_hal_metal_buffer_handle(const iree_hal_buffer_t* buffer);
 

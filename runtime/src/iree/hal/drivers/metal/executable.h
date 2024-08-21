@@ -17,14 +17,67 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Object and launch parameters for a compute kernel.
-typedef struct iree_hal_metal_kernel_params_t {
-  id<MTLLibrary> library;
+//===----------------------------------------------------------------------===//
+// Limitations
+//===----------------------------------------------------------------------===//
+
+// The max number of bindings per descriptor set allowed in the Metal HAL
+// implementation.
+//
+// Note that Metal itself is more permissive:
+// - Argument buffer tier 1 binding limits:
+//   - iOS: 31 buffers (on A11 and later, 96 buffers)
+//   - macOS: 64 buffers
+// - Argument buffer tier 2 binding limits:
+//   - 500,000 buffers or textures
+#define IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT 16
+
+// The max number of descriptor sets allowed in the Metal HAL implementation.
+//
+// This depends on the general descriptor set planning in IREE and should adjust
+// with it.
+#define IREE_HAL_METAL_MAX_DESCRIPTOR_SET_COUNT 4
+
+// The [[buffer(N)]] index for push constants.
+//
+// This depends on the general descriptor set planning in IREE and should adjust
+// with it. Note that it also needs to be consistent with the compiler side when
+// setting up resource location attributes during cross compiling SPIR-V to MSL.
+#define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX \
+  (IREE_HAL_METAL_MAX_DESCRIPTOR_SET_COUNT - 1)
+
+// The max number of push constants supported by the Metal HAL implementation.
+#define IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT 64
+
+//===----------------------------------------------------------------------===//
+// iree_hal_metal_executable_t
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_metal_source_location_t {
+  iree_string_view_t file_name;
+  int line;
+  iree_string_view_t func_name;
+} iree_hal_metal_source_location_t;
+
+// Object and launch parameters for a compute function.
+typedef struct iree_hal_metal_pipeline_t {
   id<MTLFunction> function;
-  id<MTLComputePipelineState> pso;
-  uint32_t threadgroup_size[3];
-  IREE_TRACE(iree_string_view_t function_name;)
-} iree_hal_metal_kernel_params_t;
+
+  // Cached pipeline used to dispatch the function.
+  id<MTLComputePipelineState> pipeline_state;
+
+  // Threadgroup size required during dispatch.
+  MTLSize threadgroup_size;
+
+  // Total number of 32-bit constants.
+  uint32_t constant_count;
+  // Total number of bindings.
+  uint32_t binding_count;
+  // One bit per binding indicating whether it is read-only.
+  uint64_t binding_read_only_bits;
+
+  IREE_TRACE(iree_hal_metal_source_location_t source_location;)
+} iree_hal_metal_pipeline_t;
 
 // Creates a Metal kernel library as an IREE executable. The Metal library may
 // contain several kernel functions that can be extracted along with the
@@ -42,18 +95,10 @@ iree_status_t iree_hal_metal_executable_create(
     id<MTLDevice> device, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
-// Returns the kernel launch parameters for the given |entry_point|.
-iree_status_t iree_hal_metal_executable_entry_point_kernel_params(
-    const iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_metal_kernel_params_t* out_params);
-
-// Compiles the given |entry_point| in Metal |source_code| and writes the
-// |out_library|, |out_function|, and compute pipeline |out_pso| accordingly.
-iree_status_t iree_hal_metal_compile_msl_and_create_pipeline_object(
-    iree_string_view_t source_code, iree_string_view_t entry_point,
-    id<MTLDevice> device, MTLCompileOptions* compile_options,
-    id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
-    id<MTLComputePipelineState>* out_pso);
+// Returns the function launch parameters for the given |entry_point|.
+iree_status_t iree_hal_metal_executable_lookup_pipeline(
+    const iree_hal_executable_t* executable, uint32_t entry_point,
+    const iree_hal_metal_pipeline_t** out_pipeline);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -278,8 +278,7 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   int affinity_desc_length = snprintf(
       affinity_desc, IREE_ARRAYSIZE(affinity_desc), "group=%d, id=%d, smt=%d",
       affinity.group, affinity.id, affinity.smt);
-  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, affinity_desc,
-                                          affinity_desc_length);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, affinity_desc, affinity_desc_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   GROUP_AFFINITY group_affinity;

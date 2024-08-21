@@ -305,9 +305,11 @@ static void iree_hal_metal_allocator_deallocate_buffer(
 
   IREE_TRACE_FREE_NAMED(IREE_HAL_METAL_ALLOCATOR_ID,
                         (void*)iree_hal_metal_buffer_handle(base_buffer));
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
-      iree_hal_buffer_allocation_size(base_buffer)));
+  if (!iree_hal_metal_buffer_is_external(base_buffer)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+        &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
+        iree_hal_buffer_allocation_size(base_buffer)));
+  }
 
   iree_hal_buffer_destroy(base_buffer);  // -1
 }

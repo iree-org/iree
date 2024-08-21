@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/metal/executable.h"
 
+#include <Metal/Metal.h>
 #include <stddef.h>
 
 #include "iree/base/api.h"
@@ -24,8 +25,10 @@ typedef struct iree_hal_metal_executable_t {
 
   iree_allocator_t host_allocator;
 
-  iree_host_size_t entry_point_count;
-  iree_hal_metal_kernel_params_t entry_points[];
+  NSArray<id<MTLLibrary>>* libraries;
+
+  iree_host_size_t pipeline_count;
+  iree_hal_metal_pipeline_t pipelines[];
 } iree_hal_metal_executable_t;
 
 static const iree_hal_executable_vtable_t iree_hal_metal_executable_vtable;
@@ -67,153 +70,219 @@ static iree_status_t iree_hal_metal_executable_flatbuffer_verify(
   iree_hal_metal_ExecutableDef_table_t executable_def =
       iree_hal_metal_ExecutableDef_as_root(flatbuffer_data.data);
 
-  flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_metal_ExecutableDef_entry_points_get(executable_def);
-  size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
-  for (size_t i = 0; i < entry_point_count; ++i) {
-    if (!flatbuffers_string_len(flatbuffers_string_vec_at(entry_points_vec, i))) {
+  iree_hal_metal_LibraryDef_vec_t libraries_vec =
+      iree_hal_metal_ExecutableDef_libraries_get(executable_def);
+  iree_host_size_t library_count = iree_hal_metal_LibraryDef_vec_len(libraries_vec);
+  for (iree_host_size_t i = 0; i < library_count; ++i) {
+    iree_hal_metal_LibraryDef_table_t library_def =
+        iree_hal_metal_LibraryDef_vec_at(libraries_vec, i);
+    if (!library_def) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "libraries[%" PRIhsz "] is NULL", i);
+    }
+
+    // NOTE: the source is optional but if present must be valid.
+    iree_hal_metal_MSLSourceDef_table_t source_def =
+        iree_hal_metal_LibraryDef_source_get(library_def);
+    if (source_def) {
+      // NOTE: the version check just ensures that we don't pass garbage to Metal; the current
+      // platform may not support the version even if the enum is valid and we won't know until we
+      // try compiling it.
+      uint32_t version = iree_hal_metal_MSLSourceDef_version_get(source_def);
+      if (version > MTLLanguageVersion3_0) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "libraries[%" PRIhsz
+                                "] MSL language version %u is unsupported by the compiled runtime",
+                                i, version);
+      }
+      flatbuffers_string_t code = iree_hal_metal_MSLSourceDef_code_get(source_def);
+      if (flatbuffers_string_len(code) == 0) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "libraries[%" PRIhsz "] MSL source is empty", i);
+      }
+    }
+
+    // Require that source is provided if no metallib is.
+    flatbuffers_string_t metallib = iree_hal_metal_LibraryDef_metallib_get(library_def);
+    if (flatbuffers_string_len(metallib) == 0 && !source_def) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "executable entry point %zu has no name", i);
+                              "libraries[%" PRIhsz "] has neither source or binary data", i);
     }
   }
 
-  iree_hal_metal_ThreadgroupSize_vec_t threadgroup_sizes_vec =
-      iree_hal_metal_ExecutableDef_threadgroup_sizes(executable_def);
-  size_t threadgroup_size_count = iree_hal_metal_ThreadgroupSize_vec_len(threadgroup_sizes_vec);
-  if (!threadgroup_size_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "no threadgroup sizes present");
-  }
+  iree_hal_metal_PipelineDef_vec_t pipelines_vec =
+      iree_hal_metal_ExecutableDef_pipelines_get(executable_def);
+  for (iree_host_size_t i = 0; i < iree_hal_metal_PipelineDef_vec_len(pipelines_vec); ++i) {
+    iree_hal_metal_PipelineDef_table_t pipeline_def =
+        iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
+    if (!pipeline_def) continue;
 
-  if (entry_point_count != threadgroup_size_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "entry points (%zu) and thread group sizes (%zu) count mismatch",
-                            entry_point_count, threadgroup_size_count);
-  }
-
-  flatbuffers_string_vec_t shader_libraries_vec =
-      iree_hal_metal_ExecutableDef_shader_libraries_get(executable_def);
-  size_t shader_library_count = flatbuffers_string_vec_len(shader_libraries_vec);
-  for (size_t i = 0; i < shader_library_count; ++i) {
-    if (!flatbuffers_string_len(flatbuffers_string_vec_at(shader_libraries_vec, i))) {
+    uint32_t library_ordinal = iree_hal_metal_PipelineDef_library_ordinal_get(pipeline_def);
+    if (library_ordinal >= library_count) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "executable shader library %zu is empty", i);
+                              "pipelines[%" PRIhsz "] library_ordinal %u is out of bounds %" PRIhsz,
+                              i, library_ordinal, library_count);
     }
-  }
-  if (shader_library_count != 0 && entry_point_count != shader_library_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "entry points (%zu) and source libraries (%zu) count mismatch",
-                            entry_point_count, shader_library_count);
-  }
 
-  flatbuffers_string_vec_t shader_sources_vec =
-      iree_hal_metal_ExecutableDef_shader_sources_get(executable_def);
-  size_t shader_source_count = flatbuffers_string_vec_len(shader_sources_vec);
-  for (size_t i = 0; i < shader_source_count; ++i) {
-    if (!flatbuffers_string_len(flatbuffers_string_vec_at(shader_sources_vec, i))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "executable shader source %zu is empty",
-                              i);
+    if (flatbuffers_string_len(iree_hal_metal_PipelineDef_entry_point_get(pipeline_def)) == 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz "] entry point name is empty", i);
     }
-  }
 
-  if (shader_source_count != 0 && entry_point_count != shader_source_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "entry points (%zu) and source strings (%zu) count mismatch",
-                            entry_point_count, shader_source_count);
-  }
+    if (!iree_hal_metal_PipelineDef_threadgroup_size_is_present(pipeline_def)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz "] threadgroup size is missing", i);
+    }
 
-  if (!shader_library_count && !shader_source_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "missing shader library or source strings");
+    uint32_t constant_count = iree_hal_metal_PipelineDef_constant_count_get(pipeline_def);
+    if (constant_count > IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz "] constant_count %u exceeds maximum of %u", i,
+                              constant_count, IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT);
+    }
+
+    iree_hal_metal_BindingBits_vec_t binding_flags_vec =
+        iree_hal_metal_PipelineDef_binding_flags_get(pipeline_def);
+    if (iree_hal_metal_BindingBits_vec_len(binding_flags_vec) >
+        IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz
+                              "] binding_flags count %zu exceeds maximum of %u",
+                              i, iree_hal_metal_BindingBits_vec_len(binding_flags_vec),
+                              IREE_HAL_METAL_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+    }
+
+    IREE_RETURN_IF_ERROR(
+        iree_hal_debug_verify_export_def(iree_hal_metal_PipelineDef_debug_info_get(pipeline_def)));
   }
 
   return iree_ok_status();
 }
 
-// Returns an invalid argument status with proper Metal NSError annotations during compute pipeline
-// creation.
-static iree_status_t iree_hal_metal_get_invalid_kernel_status(const char* iree_error_template,
-                                                              const char* metal_error_template,
-                                                              NSError* ns_error,
-                                                              iree_string_view_t entry_point,
-                                                              const char* shader_source) {
-  iree_status_t status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, iree_error_template);
-  const char* ns_c_error = [ns_error.localizedDescription
-      cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
-  status = iree_status_annotate_f(status, metal_error_template, ns_c_error);
-  if (shader_source) {
-    return iree_status_annotate_f(status, "for entry point '%.*s' in MSL source:\n%s\n",
-                                  (int)entry_point.size, entry_point.data, shader_source);
-  }
-  return iree_status_annotate_f(status, "for entry point '%.*s' in MTLLibrary\n",
-                                (int)entry_point.size, entry_point.data);
-}
+static iree_status_t iree_hal_metal_compile_source(id<MTLDevice> device,
+                                                   iree_hal_metal_MSLSourceDef_table_t source_def,
+                                                   id<MTLLibrary>* out_library) {
+  *out_library = nil;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-// Compiles the given |entry_point| in the MSL |source_code| into MTLLibrary and writes to
-// |out_library|. The caller should release |out_library| after done.
-iree_status_t iree_hal_metal_compile_msl(iree_string_view_t source_code,
-                                         iree_string_view_t entry_point, id<MTLDevice> device,
-                                         MTLCompileOptions* compile_options,
-                                         id<MTLLibrary>* out_library) {
+  iree_status_t status = iree_ok_status();
+  id<MTLLibrary> library = nil;
   @autoreleasepool {
-    NSError* error = nil;
-    NSString* shader_source =
-        [[[NSString alloc] initWithBytes:source_code.data
-                                  length:source_code.size
+    MTLCompileOptions* compile_options = [[MTLCompileOptions new] autorelease];
+    compile_options.languageVersion = MTLLanguageVersion3_0;
+    if (iree_hal_metal_MSLSourceDef_version_is_present(source_def)) {
+      compile_options.languageVersion =
+          (MTLLanguageVersion)iree_hal_metal_MSLSourceDef_version_get(source_def);
+    }
+
+    flatbuffers_string_t code = iree_hal_metal_MSLSourceDef_code_get(source_def);
+    NSString* code_str =
+        [[[NSString alloc] initWithBytes:code
+                                  length:flatbuffers_string_len(code)
                                 encoding:[NSString defaultCStringEncoding]] autorelease];
-    *out_library = [device newLibraryWithSource:shader_source
-                                        options:compile_options
-                                          error:&error];  // +1
-    if (IREE_UNLIKELY(*out_library == nil)) {
-      return iree_hal_metal_get_invalid_kernel_status(
-          "failed to create MTLLibrary from shader source",
-          "when creating MTLLibrary with NSError: %.*s", error, entry_point, source_code.data);
+
+    NSError* error = nil;
+    library = [device newLibraryWithSource:code_str options:compile_options error:&error];  // +1
+    if (IREE_UNLIKELY(library == nil)) {
+      const char* ns_c_error = [error.localizedDescription
+          cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to create MTLLibrary: %s",
+                                ns_c_error);
     }
   }
 
-  return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    *out_library = library;
+  } else {
+    [library release];
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
-// Compiles the given |entry_point| in the MSL library |source_data| into MTLLibrary and writes to
-// |out_library|. The caller should release |out_library| after done.
-static iree_status_t iree_hal_metal_load_mtllib(iree_const_byte_span_t source_data,
-                                                iree_string_view_t entry_point,
-                                                id<MTLDevice> device, id<MTLLibrary>* out_library) {
+static iree_status_t iree_hal_metal_load_library(id<MTLDevice> device,
+                                                 flatbuffers_string_t metallib,
+                                                 flatbuffers_string_t metallibsym,
+                                                 id<MTLLibrary>* out_library) {
+  *out_library = nil;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_ok_status();
+  id<MTLLibrary> library = nil;
   @autoreleasepool {
-    NSError* error = nil;
-    dispatch_data_t data = dispatch_data_create(source_data.data, source_data.data_length,
+    dispatch_data_t data = dispatch_data_create(metallib, flatbuffers_string_len(metallib),
                                                 /*queue=*/NULL, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-    *out_library = [device newLibraryWithData:data error:&error];  // +1
-    if (IREE_UNLIKELY(*out_library == nil)) {
-      return iree_hal_metal_get_invalid_kernel_status(
-          "failed to create MTLLibrary from shader source",
-          "when creating MTLLibrary with NSError: %s", error, entry_point, NULL);
+    NSError* error = nil;
+    library = [device newLibraryWithData:data error:&error];  // +1
+    if (IREE_UNLIKELY(library == nil)) {
+      const char* ns_c_error = [error.localizedDescription
+          cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to create MTLLibrary: %s",
+                                ns_c_error);
     }
   }
 
-  return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    *out_library = library;
+  } else {
+    [library release];
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
+// Loads all MTLLibrary instances in the executable and returns an array with matching order.
+static iree_status_t iree_hal_metal_load_libraries(id<MTLDevice> device,
+                                                   iree_hal_metal_LibraryDef_vec_t libraries_vec,
+                                                   NSArray<id<MTLLibrary>>** out_libraries) {
+  *out_libraries = nil;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  NSMutableArray<id<MTLLibrary>>* libraries = [[NSMutableArray alloc] init];  // +1
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < iree_hal_metal_LibraryDef_vec_len(libraries_vec); ++i) {
+    iree_hal_metal_LibraryDef_table_t library_def =
+        iree_hal_metal_LibraryDef_vec_at(libraries_vec, i);
+    id<MTLLibrary> library = nil;
+    if (iree_hal_metal_LibraryDef_metallib_is_present(library_def)) {
+      // Load binary MTLLibrary (with optional symbols).
+      flatbuffers_string_t metallib = iree_hal_metal_LibraryDef_metallib_get(library_def);
+      flatbuffers_string_t metallibsym = iree_hal_metal_LibraryDef_metallibsym_get(library_def);
+      status = iree_hal_metal_load_library(device, metallib, metallibsym, &library);
+    } else {
+      // Compile MSL source code into a MTLLibrary.
+      iree_hal_metal_MSLSourceDef_table_t source_def =
+          iree_hal_metal_LibraryDef_source_get(library_def);
+      status = iree_hal_metal_compile_source(device, source_def, &library);
+    }
+    if (!iree_status_is_ok(status)) break;
+    [libraries addObject:library];
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_libraries = libraries;
+  } else {
+    [libraries release];  // -1
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+#if 0
 // Creates MTL compute pipeline objects for the given |entry_point| in |library| and writes to
-// |out_function| and |out_pso|. The caller should release |out_function| and |out_pso| after done.
-static iree_status_t iree_hal_metal_create_pipeline_object(
+// |out_function| and |out_pipeline_state|. The caller should release |out_function| and
+// |out_pipeline_state| after done.
+static iree_status_t iree_hal_metal_create_pipeline_state(
     id<MTLLibrary> library, iree_string_view_t entry_point, const char* source_code,
-    id<MTLDevice> device, id<MTLFunction>* out_function, id<MTLComputePipelineState>* out_pso) {
+    id<MTLDevice> device, id<MTLFunction>* out_function,
+    id<MTLComputePipelineState>* out_pipeline_state) {
   @autoreleasepool {
     NSError* error = nil;
-    NSString* function_name =
-        [[[NSString alloc] initWithBytes:entry_point.data
-                                  length:entry_point.size
-                                encoding:[NSString defaultCStringEncoding]] autorelease];
-    *out_function = [library newFunctionWithName:function_name];  // +1
-    if (IREE_UNLIKELY(*out_function == nil)) {
-      return iree_hal_metal_get_invalid_kernel_status("cannot find entry point in shader source",
-                                                      "when creating MTLFunction with NSError: %s",
-                                                      error, entry_point, source_code);
-    }
 
     // TODO(#14047): Enable async pipeline creation at runtime.
-    *out_pso = [device newComputePipelineStateWithFunction:*out_function error:&error];  // +1
-    if (IREE_UNLIKELY(*out_pso == nil)) {
+    *out_pipeline_state = [device newComputePipelineStateWithFunction:*out_function
+                                                                error:&error];  // +1
+    if (IREE_UNLIKELY(*out_pipeline_state == nil)) {
       [*out_function release];
       return iree_hal_metal_get_invalid_kernel_status(
           "invalid shader source", "when creating MTLComputePipelineState with NSError: %s", error,
@@ -222,26 +291,94 @@ static iree_status_t iree_hal_metal_create_pipeline_object(
   }
   return iree_ok_status();
 }
+#endif  // 0
 
-iree_status_t iree_hal_metal_compile_msl_and_create_pipeline_object(
-    iree_string_view_t source_code, iree_string_view_t entry_point, id<MTLDevice> device,
-    MTLCompileOptions* compile_options, id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
-    id<MTLComputePipelineState>* out_pso) {
-  IREE_RETURN_IF_ERROR(
-      iree_hal_metal_compile_msl(source_code, entry_point, device, compile_options, out_library));
-  return iree_hal_metal_create_pipeline_object(*out_library, entry_point, source_code.data, device,
-                                               out_function, out_pso);
+static iree_status_t iree_hal_metal_create_pipeline(id<MTLDevice> device, id<MTLLibrary> library,
+                                                    iree_hal_metal_PipelineDef_table_t pipeline_def,
+                                                    iree_hal_metal_pipeline_t* out_pipeline) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  flatbuffers_string_t entry_point = iree_hal_metal_PipelineDef_entry_point_get(pipeline_def);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, entry_point);
+
+  iree_status_t status = iree_ok_status();
+  @autoreleasepool {
+    NSString* function_name =
+        [[[NSString alloc] initWithBytes:entry_point
+                                  length:flatbuffers_string_len(entry_point)
+                                encoding:[NSString defaultCStringEncoding]] autorelease];
+    out_pipeline->function = [library newFunctionWithName:function_name];  // +1
+    if (IREE_UNLIKELY(out_pipeline->function == nil)) {
+      status =
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "function `%.*s` not found in MTLLibrary",
+                           (int)flatbuffers_string_len(entry_point), entry_point);
+    }
+
+    if (iree_status_is_ok(status)) {
+      MTLComputePipelineDescriptor* descriptor =
+          [[[MTLComputePipelineDescriptor alloc] init] autorelease];
+      [descriptor setComputeFunction:out_pipeline->function];
+      [descriptor setLabel:function_name];
+      if (iree_hal_metal_PipelineDef_max_threads_per_threadgroup_is_present(pipeline_def)) {
+        [descriptor setMaxTotalThreadsPerThreadgroup:
+                        iree_hal_metal_PipelineDef_max_threads_per_threadgroup_get(pipeline_def)];
+      }
+      if (iree_hal_metal_PipelineDef_threadgroup_size_aligned_is_present(pipeline_def)) {
+        [descriptor setThreadGroupSizeIsMultipleOfThreadExecutionWidth:
+                        iree_hal_metal_PipelineDef_threadgroup_size_aligned_get(pipeline_def)];
+      }
+      [[[descriptor buffers] objectAtIndexedSubscript:0] setMutability:MTLMutabilityImmutable];
+      [[[descriptor buffers] objectAtIndexedSubscript:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX]
+          setMutability:MTLMutabilityImmutable];
+
+      NSError* error = nil;
+      out_pipeline->pipeline_state =
+          [device newComputePipelineStateWithDescriptor:descriptor
+                                                options:MTLPipelineOptionNone
+                                             reflection:nil
+                                                  error:&error];
+      if (IREE_UNLIKELY(out_pipeline->pipeline_state == nil)) {
+        const char* ns_c_error = [error.localizedDescription
+            cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT, "failed to create pipeline with function `%.*s`: %s",
+            (int)flatbuffers_string_len(entry_point), entry_point, ns_c_error);
+      }
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    const iree_hal_metal_ThreadgroupSize_t* threadgroup_size =
+        iree_hal_metal_PipelineDef_threadgroup_size_get(pipeline_def);
+    out_pipeline->threadgroup_size =
+        MTLSizeMake(threadgroup_size->x, threadgroup_size->y, threadgroup_size->z);
+
+    out_pipeline->constant_count = iree_hal_metal_PipelineDef_constant_count_get(pipeline_def);
+    iree_hal_metal_BindingBits_vec_t binding_flags_vec =
+        iree_hal_metal_PipelineDef_binding_flags_get(pipeline_def);
+    out_pipeline->binding_count = iree_hal_metal_BindingBits_vec_len(binding_flags_vec);
+
+    out_pipeline->binding_read_only_bits = 0;
+    for (iree_host_size_t i = 0; i < out_pipeline->binding_count; ++i) {
+      iree_hal_metal_BindingBits_enum_t binding_flags =
+          iree_hal_metal_BindingBits_vec_at(binding_flags_vec, i);
+      if (iree_all_bits_set(binding_flags, iree_hal_metal_BindingBits_IMMUTABLE)) {
+        out_pipeline->binding_read_only_bits |= 1ull << i;
+      }
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_metal_executable_create(
     id<MTLDevice> device, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_metal_executable_t* executable = NULL;
 
   IREE_RETURN_IF_ERROR(
       iree_hal_metal_executable_flatbuffer_verify(executable_params->executable_data));
@@ -249,104 +386,69 @@ iree_status_t iree_hal_metal_executable_create(
   iree_hal_metal_ExecutableDef_table_t executable_def =
       iree_hal_metal_ExecutableDef_as_root(executable_params->executable_data.data);
 
-  flatbuffers_string_vec_t entry_points_vec =
-      iree_hal_metal_ExecutableDef_entry_points_get(executable_def);
-  iree_hal_metal_ThreadgroupSize_vec_t threadgroup_sizes_vec =
-      iree_hal_metal_ExecutableDef_threadgroup_sizes(executable_def);
-  flatbuffers_string_vec_t shader_libraries_vec =
-      iree_hal_metal_ExecutableDef_shader_libraries_get(executable_def);
-  flatbuffers_string_vec_t shader_sources_vec =
-      iree_hal_metal_ExecutableDef_shader_sources_get(executable_def);
-  iree_host_size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
+  iree_hal_metal_PipelineDef_vec_t pipelines_vec =
+      iree_hal_metal_ExecutableDef_pipelines_get(executable_def);
+  iree_host_size_t pipeline_count = flatbuffers_string_vec_len(pipelines_vec);
 
-  // Calculate the total number of characters across all entry point names. This is only required
-  // when tracing so that we can store copies of the names as the flatbuffer storing the strings
-  // may be released while the executable is still live.
-  iree_host_size_t total_entry_point_name_chars = 0;
+  // Calculate the total number of characters across all entry point names. This
+  // is only required when tracing so that we can store copies of the names as
+  // the flatbuffer storing the strings may be released while the executable is
+  // still live.
+  iree_host_size_t total_debug_info_length = 0;
   IREE_TRACE({
-    for (iree_host_size_t i = 0; i < entry_point_count; i++) {
-      const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
-      total_entry_point_name_chars += flatbuffers_string_len(entry_name);
+    for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
+      iree_hal_metal_PipelineDef_table_t pipeline_def =
+          iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
+      total_debug_info_length += iree_hal_debug_calculate_export_info_size(
+          iree_hal_metal_PipelineDef_debug_info_get(pipeline_def));
     }
   });
 
-  // Create the kernel library.
+  // Allocate storage for the executable and its associated data structures.
+  iree_hal_metal_executable_t* executable = NULL;
   iree_host_size_t total_size = sizeof(*executable) +
-                                entry_point_count * sizeof(executable->entry_points[0]) +
-                                total_entry_point_name_chars;
-  iree_status_t status = iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
-  IREE_TRACE(char* string_table_buffer =
-                 (char*)((char*)executable + sizeof(*executable) +
-                         entry_point_count * sizeof(executable->entry_points[0])));
+                                pipeline_count * sizeof(executable->pipelines[0]) +
+                                total_debug_info_length;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
+  executable->host_allocator = host_allocator;
+  executable->pipeline_count = pipeline_count;
+  IREE_TRACE(
+      iree_hal_debug_export_info_t* export_infos =
+          (iree_hal_debug_export_info_t*)((uint8_t*)executable->pipelines +
+                                          pipeline_count * sizeof(executable->pipelines[0])));
+
+  // Publish any embedded source files to the tracing infrastructure.
+  iree_hal_debug_publish_source_files(
+      iree_hal_metal_ExecutableDef_source_files_get(executable_def));
+
+  // Load all libraries that may be referenced by the pipelines.
+  iree_hal_metal_LibraryDef_vec_t libraries_vec =
+      iree_hal_metal_ExecutableDef_libraries_get(executable_def);
+  iree_status_t status =
+      iree_hal_metal_load_libraries(device, libraries_vec, &executable->libraries);
+
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
-    executable->host_allocator = host_allocator;
-    executable->entry_point_count = entry_point_count;
+    for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
+      iree_hal_metal_PipelineDef_table_t pipeline_def =
+          iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
 
-    // Publish any embedded source files to the tracing infrastructure.
-    if (iree_status_is_ok(status)) {
-      iree_hal_debug_publish_source_files(
-          iree_hal_metal_ExecutableDef_source_files_get(executable_def));
-    }
+      uint32_t library_ordinal = iree_hal_metal_PipelineDef_library_ordinal_get(pipeline_def);
+      id<MTLLibrary> library = [executable->libraries objectAtIndex:library_ordinal];  // unretained
 
-    size_t shader_library_count = flatbuffers_string_vec_len(shader_libraries_vec);
-    size_t shader_source_count = flatbuffers_string_vec_len(shader_sources_vec);
-
-    // Try to load as Metal library first. Otherwise, compile each MSL source string into a
-    // MTLLibrary and get the MTLFunction for the entry point to build the pipeline state object.
-    // TODO(#14047): Enable async MSL compilation at runtime.
-
-    MTLCompileOptions* compile_options = [MTLCompileOptions new];  // +1
-    compile_options.languageVersion = MTLLanguageVersion3_0;
-
-    for (size_t i = 0, e = iree_max(shader_library_count, shader_source_count); i < e; ++i) {
-      id<MTLLibrary> library = nil;
-      id<MTLFunction> function = nil;
-      id<MTLComputePipelineState> pso = nil;
-
-      flatbuffers_string_t source_code = NULL;
-      flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
-      iree_string_view_t entry_point_view =
-          iree_make_string_view(entry_point, flatbuffers_string_len(entry_point));
-
-      if (shader_library_count != 0) {
-        flatbuffers_string_t source_library = flatbuffers_string_vec_at(shader_libraries_vec, i);
-        status = iree_hal_metal_load_mtllib(
-            iree_make_const_byte_span(source_library, flatbuffers_string_len(source_library)),
-            entry_point_view, device, &library);
-      } else {
-        source_code = flatbuffers_string_vec_at(shader_sources_vec, i);
-        status = iree_hal_metal_compile_msl(
-            iree_make_string_view(source_code, flatbuffers_string_len(source_code)),
-            entry_point_view, device, compile_options, &library);
-      }
+      iree_hal_metal_pipeline_t* pipeline = &executable->pipelines[i];
+      status = iree_hal_metal_create_pipeline(device, library, pipeline_def, pipeline);
       if (!iree_status_is_ok(status)) break;
 
-      status = iree_hal_metal_create_pipeline_object(library, entry_point_view, source_code, device,
-                                                     &function, &pso);
-      if (!iree_status_is_ok(status)) break;
-
-      // Package required parameters for kernel launches for each entry point.
-      iree_hal_metal_kernel_params_t* params = &executable->entry_points[i];
-      params->library = library;
-      params->function = function;
-      params->pso = pso;
-      params->threadgroup_size[0] = threadgroup_sizes_vec[i].x;
-      params->threadgroup_size[1] = threadgroup_sizes_vec[i].y;
-      params->threadgroup_size[2] = threadgroup_sizes_vec[i].z;
-      params->layout = executable_params->pipeline_layouts[i];
-      iree_hal_pipeline_layout_retain(params->layout);
-
-      // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({
-        iree_host_size_t entry_name_length = flatbuffers_string_len(entry_point);
-        memcpy(string_table_buffer, entry_point, entry_name_length);
-        params->function_name = iree_make_string_view(string_table_buffer, entry_name_length);
-        string_table_buffer += entry_name_length;
+        iree_hal_debug_copy_export_info(iree_hal_metal_PipelineDef_debug_info_get(pipeline_def),
+                                        &export_infos[i]);
+        pipeline->source_location.func_name = export_infos[i].function_name;
+        pipeline->source_location.file_name = export_infos[i].source_filename;
+        pipeline->source_location.line = export_infos[i].source_line;
       });
     }
-
-    [compile_options release];  // -1
   }
 
   if (iree_status_is_ok(status)) {
@@ -363,28 +465,29 @@ static void iree_hal_metal_executable_destroy(iree_hal_executable_t* base_execut
   iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  for (iree_host_size_t i = 0; i < executable->entry_point_count; ++i) {
-    iree_hal_metal_kernel_params_t* entry_point = &executable->entry_points[i];
-    [entry_point->pso release];       // -1
-    [entry_point->function release];  // -1
-    [entry_point->library release];   // -1
-    iree_hal_pipeline_layout_release(entry_point->layout);
+  for (iree_host_size_t i = 0; i < executable->pipeline_count; ++i) {
+    iree_hal_metal_pipeline_t* entry_point = &executable->pipelines[i];
+    [entry_point->pipeline_state release];  // -1
+    [entry_point->function release];        // -1
   }
+
+  [executable->libraries release];  // -1
+
   iree_allocator_free(executable->host_allocator, executable);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_metal_executable_entry_point_kernel_params(
-    const iree_hal_executable_t* base_executable, int32_t entry_point,
-    iree_hal_metal_kernel_params_t* out_params) {
+iree_status_t iree_hal_metal_executable_lookup_pipeline(
+    const iree_hal_executable_t* base_executable, uint32_t entry_point,
+    const iree_hal_metal_pipeline_t** out_pipeline) {
   const iree_hal_metal_executable_t* executable =
       iree_hal_metal_executable_const_cast(base_executable);
-  if (entry_point >= executable->entry_point_count) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %d",
+  if (entry_point >= executable->pipeline_count) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %u",
                             entry_point);
   }
-  memcpy(out_params, &executable->entry_points[entry_point], sizeof(*out_params));
+  *out_pipeline = &executable->pipelines[entry_point];
   return iree_ok_status();
 }
 

@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/metal/direct_allocator.h"
 #include "iree/hal/drivers/metal/direct_command_buffer.h"
 #include "iree/hal/drivers/metal/nop_executable_cache.h"
-#include "iree/hal/drivers/metal/pipeline_layout.h"
 #include "iree/hal/drivers/metal/shared_event.h"
 #include "iree/hal/drivers/metal/staging_buffer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
@@ -268,15 +267,6 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
       out_command_buffer);
 }
 
-static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
-    iree_hal_device_t* base_device, iree_hal_descriptor_set_layout_flags_t flags,
-    iree_host_size_t binding_count, const iree_hal_descriptor_set_layout_binding_t* bindings,
-    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
-  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_descriptor_set_layout_create(
-      flags, binding_count, bindings, device->host_allocator, out_descriptor_set_layout);
-}
-
 static iree_status_t iree_hal_metal_device_create_event(iree_hal_device_t* base_device,
                                                         iree_hal_queue_affinity_t queue_affinity,
                                                         iree_hal_event_flags_t flags,
@@ -305,15 +295,6 @@ static iree_status_t iree_hal_metal_device_import_file(iree_hal_device_t* base_d
   return iree_hal_memory_file_wrap(queue_affinity, access, handle,
                                    iree_hal_device_allocator(base_device),
                                    iree_hal_device_host_allocator(base_device), out_file);
-}
-
-static iree_status_t iree_hal_metal_device_create_pipeline_layout(
-    iree_hal_device_t* base_device, iree_host_size_t push_constants,
-    iree_host_size_t set_layout_count, iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_pipeline_layout_t** out_pipeline_layout) {
-  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  return iree_hal_metal_pipeline_layout_create(set_layout_count, set_layouts, push_constants,
-                                               device->host_allocator, out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_metal_device_create_semaphore(iree_hal_device_t* base_device,
@@ -475,11 +456,13 @@ static iree_status_t iree_hal_metal_device_queue_execute(
         }
       } else {
         // Retain the command buffer until the submission has completed.
+        iree_hal_command_buffer_retain(command_buffer);
         direct_command_buffer = command_buffer;
       }
       if (!iree_status_is_ok(status)) break;
       status = iree_hal_resource_set_insert(resource_set, 1, &direct_command_buffer);
       if (!iree_status_is_ok(status)) break;
+      iree_hal_command_buffer_release(direct_command_buffer);  // retained in resource set
       direct_command_buffers[i] = direct_command_buffer;
     }
   }
@@ -637,11 +620,9 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .query_i64 = iree_hal_metal_device_query_i64,
     .create_channel = iree_hal_metal_device_create_channel,
     .create_command_buffer = iree_hal_metal_device_create_command_buffer,
-    .create_descriptor_set_layout = iree_hal_metal_device_create_descriptor_set_layout,
     .create_event = iree_hal_metal_device_create_event,
     .create_executable_cache = iree_hal_metal_device_create_executable_cache,
     .import_file = iree_hal_metal_device_import_file,
-    .create_pipeline_layout = iree_hal_metal_device_create_pipeline_layout,
     .create_semaphore = iree_hal_metal_device_create_semaphore,
     .query_semaphore_compatibility = iree_hal_metal_device_query_semaphore_compatibility,
     .queue_alloca = iree_hal_metal_device_queue_alloca,
