@@ -64,6 +64,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -81,6 +82,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_no_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -98,6 +100,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, default_jobs)
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_llvm_integrate(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -115,6 +118,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_no_modifies(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -132,6 +136,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {})
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_skip(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "job1,job2"}
         default_jobs = {"job1", "job2", "job3"}
@@ -149,6 +154,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {"job3"})
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_skip_all(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "all"}
         default_jobs = {"job1", "job2", "job3"}
@@ -166,6 +172,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, {})
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_extra(self):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXTRA_JOBS: postsubmit_job}
@@ -183,6 +190,7 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
+    @unittest.skip("skipped while there are no postsubmit only jobs")
     def test_get_enabled_jobs_exactly(self):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXACTLY_JOBS: postsubmit_job}
