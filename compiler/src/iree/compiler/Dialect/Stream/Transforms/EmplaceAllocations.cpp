@@ -61,6 +61,8 @@ replaceUsesAndTransfer(Value oldValue, Value newValue,
 // first we can't then bail and leave them out-of-place.
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
+  if (dispatchOp.getResults().size() != 1)
+    return didChange;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
     // Ignore results with multiple users. We could potentially place these but
     // that makes tracking much more complicated.
