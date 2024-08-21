@@ -408,7 +408,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
 
   // Step 8. Resolve remaining parallel loops.
   funcPassManager.addPass(createGPUVerifyDistributionPass());
-  funcPassManager.addPass(createGPUDistributePass());
+  funcPassManager.addPass(createGPUDistributeForallPass());
 
   // Vectorize copies that came out of bufferization.
   funcPassManager.addPass(createVectorizeMemrefCopyPass());

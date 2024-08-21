@@ -96,6 +96,20 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   return procInfo;
 }
 
+bool isDescendingRelativeMappingIndices(ArrayRef<Attribute> array) {
+  int64_t prev =
+      llvm::cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
+  for (Attribute attr : array.drop_front()) {
+    int64_t relativeIndex =
+        llvm::cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
+    if (relativeIndex != prev - 1) {
+      return false;
+    }
+    prev = relativeIndex;
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
