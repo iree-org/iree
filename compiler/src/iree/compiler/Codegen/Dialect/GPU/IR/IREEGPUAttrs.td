@@ -223,6 +223,36 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   }];
 }
 
+def IREEGPU_DataTiledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getABCElementTypes",
+    "getABCVectorTypes",
+    "getMNKShape",
+    "getSubgroupSize",
+    // TODO: Implement the interface method.
+    // "populateOperandOffsetsSizesStrides",
+  ]>
+]> {
+  let mnemonic = "data_tiled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    An mma instruction for data tiling :)
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
+  ];
+
+  let parameters = (ins
+    IREEGPU_MMAIntrinsicAttr:$intrinsic
+  );
+}
+
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";

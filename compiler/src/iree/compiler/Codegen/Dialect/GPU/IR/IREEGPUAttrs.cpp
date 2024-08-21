@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -849,6 +850,126 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+DataTiledMMAAttr DataTiledMMAAttr::get(MLIRContext *context,
+                                       MMAIntrinsic type) {
+  return Base::get(context, MMAIntrinsicAttr::get(context, type));
+}
+
+Attribute DataTiledMMAAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess()))
+    return {};
+
+  FailureOr<MMAIntrinsicAttr> mmaIntrinsic =
+      FieldParser<MMAIntrinsicAttr>::parse(p);
+  if (failed(mmaIntrinsic)) {
+    p.emitError(p.getCurrentLocation(), "failed to parse mfma type identifier");
+    return {};
+  }
+
+  if (failed(p.parseGreater()))
+    return {};
+
+  return get(p.getContext(), mmaIntrinsic->getValue());
+}
+
+void DataTiledMMAAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  os << stringifyMMAIntrinsic(getIntrinsic().getValue());
+  os << ">";
+}
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize, opaqueLayout.nSize, opaqueLayout.kSize};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+DataTiledMMAAttr::getABCVectorTypes() const {
+  // Check https://github.com/ROCm/amd_matrix_instruction_calculator for
+  // instruction details. Note here we are returning the number elements, while
+  // amd_matrix_instruction_calculator tells us about the number of 32-bit
+  // registers. So need to adjust accordingly. All vectors should be 1-D.
+  auto [aElemType, bElemType, cElemType] = getABCElementTypes();
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
+    auto aType = VectorType::get({1}, aElemType);
+    auto bType = VectorType::get({1}, bElemType);
+    auto cType = VectorType::get({4}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
+    auto aType = VectorType::get({4}, aElemType);
+    auto bType = VectorType::get({4}, bElemType);
+    auto cType = VectorType::get({4}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
+    auto aType = VectorType::get({4}, aElemType);
+    auto bType = VectorType::get({4}, bElemType);
+    auto cType = VectorType::get({16}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
+    auto aType = VectorType::get({8}, aElemType);
+    auto bType = VectorType::get({8}, bElemType);
+    auto cType = VectorType::get({4}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
+    auto aType = VectorType::get({8}, aElemType);
+    auto bType = VectorType::get({8}, bElemType);
+    auto cType = VectorType::get({16}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
+    auto aType = VectorType::get({16}, aElemType);
+    auto bType = VectorType::get({16}, bElemType);
+    auto cType = VectorType::get({8}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    auto aType = VectorType::get({16}, aElemType);
+    auto bType = VectorType::get({16}, bElemType);
+    auto cType = VectorType::get({16}, cElemType);
+    return std::make_tuple(aType, bType, cType);
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return std::make_tuple(VectorType{}, VectorType{}, VectorType{});
+}
+
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+  case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
+    return 64;
+  }
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    return 32;
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return 0;
 }
 
 //===----------------------------------------------------------------------===//
