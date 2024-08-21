@@ -119,57 +119,22 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
-        "test_nvidia_t4",
-        # "test_nvidia_a100",  # Currently disabled
-        "test_amd_mi250",
-        "test_amd_mi300",
-        "test_amd_w7900",
+        "test_models",
+        "test_onnx",
     ]
 )
-
-NVGPU_PATHS = [
-    # Directly related to NVIDIA GPU code generation and execution:
-    "compiler/plugins/target/CUDA/*",
-    "compiler/plugins/target/VulkanSPIRV/*",
-    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
-    "compiler/src/iree/compiler/Codegen/SPIRV/*",
-    "runtime/src/iree/hal/drivers/cuda/*",
-    "runtime/src/iree/hal/drivers/vulkan/*",
-    # Common code likely enough to affect code paths unique to NVIDIA GPUs:
-    "compiler/src/iree/compiler/GlobalOptimization/*",
-    # Tests.
-    "tests/e2e/*",
-]
-
-AMDGPU_PATHS = [
-    # Directly related to AMDGPU code generation and execution:
-    "compiler/plugins/target/ROCM/*",
-    "compiler/plugins/target/VulkanSPIRV/*",
-    "compiler/src/iree/compiler/Codegen/LLVMGPU/*",
-    "compiler/src/iree/compiler/Codegen/SPIRV/*",
-    "runtime/src/iree/hal/drivers/hip/*",
-    "runtime/src/iree/hal/drivers/vulkan/*",
-    # Common code likely enough to affect code paths unique to AMDGPU:
-    "compiler/src/iree/compiler/GlobalOptimization/*",
-    # Tests.
-    "tests/e2e/*",
-]
 
 # Jobs to run in presumbit if files under the corresponding path see changes.
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards.
 # Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
-    # The runners with GPUs for these jobs can be unstable or in short supply,
-    # so limit jobs to only code paths most likely to affect the tests.
-    ("test_nvidia_t4", NVGPU_PATHS),
-    # Due to the outstock of A100, only run this test in postsubmit.
-    # ("test_nvidia_a100", NVGPU_PATHS),
-    ("test_amd_mi250", AMDGPU_PATHS),
-    ("test_amd_mi300", AMDGPU_PATHS),
-    # Due to the instability issues at the current runner,
-    # only run this test in postsubmit.
-    # ("test_amd_w7900", AMDGPU_PATHS),
+    (
+        "test_onnx",
+        [
+            "third_party/torch-mlir",
+        ],
+    ),
 ]
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")

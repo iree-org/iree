@@ -43,12 +43,6 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'unit_test')
     uses: ./.github/workflows/pkgci_unit_test.yml
 
-  regression_test:
-    name: Regression Test
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
-    uses: ./.github/workflows/pkgci_regression_test.yml
-
   test_amd_mi250:
     name: Test AMD MI250
     needs: [setup, build_packages]
@@ -72,6 +66,18 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
     uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
+
+  test_models:
+    name: Regression Test
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_models')
+    uses: ./.github/workflows/pkgci_test_models.yml
+
+  test_onnx:
+    name: Regression Test
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
+    uses: ./.github/workflows/pkgci_test_onnx.yml
 
   test_tensorflow_cpu:
     name: Test TensorFlow CPU
