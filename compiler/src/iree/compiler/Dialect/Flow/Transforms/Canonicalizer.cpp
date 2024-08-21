@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -103,6 +104,11 @@ struct CanonicalizerPass
       CanonicalizerPass>::CanonicalizerPassBase;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect>();
+  }
+
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
     config.useTopDownTraversal = true;
@@ -117,6 +123,7 @@ struct CanonicalizerPass
     // Pull in some borderline/downstream canonicalizations for the Flow
     // compilation phase.
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(owningPatterns);
+    IREE::Flow::populateTensorDialectCastOpPattern(context, owningPatterns);
     owningPatterns.add<FoldConsecutiveConstantPadding>(context);
 
     patterns =
