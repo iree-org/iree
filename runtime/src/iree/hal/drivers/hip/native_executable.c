@@ -215,7 +215,6 @@ iree_status_t iree_hal_hip_native_executable_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_executable = NULL;
-  iree_hal_hip_native_executable_t* executable = NULL;
 
   // TODO: move to the executable cache to avoid repeated queries.
   iree_hal_hip_limits_t limits = {0};
@@ -251,7 +250,8 @@ iree_status_t iree_hal_hip_native_executable_create(
     }
   });
 
-  // Allocate storage for the kernel module.
+  // Allocate storage for the executable and its associated data structures.
+  iree_hal_hip_native_executable_t* executable = NULL;
   const iree_host_size_t total_size =
       sizeof(*executable) + module_count * sizeof(executable->modules[0]) +
       export_count * sizeof(executable->exports[0]) + total_export_info_length;

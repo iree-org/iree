@@ -85,6 +85,11 @@ static void iree_hal_metal_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_hal_metal_buffer_is_external(const iree_hal_buffer_t* base_buffer) {
+  const iree_hal_metal_buffer_t* buffer = iree_hal_metal_buffer_const_cast(base_buffer);
+  return buffer->release_callback.fn != NULL;
+}
+
 id<MTLBuffer> iree_hal_metal_buffer_handle(const iree_hal_buffer_t* base_buffer) {
   const iree_hal_metal_buffer_t* buffer = iree_hal_metal_buffer_const_cast(base_buffer);
   return buffer->buffer;

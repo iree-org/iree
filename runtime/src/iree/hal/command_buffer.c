@@ -543,7 +543,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
     int xyz_string_length =
         snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
                  workgroup_count[0], workgroup_count[1], workgroup_count[2]);
-    IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
