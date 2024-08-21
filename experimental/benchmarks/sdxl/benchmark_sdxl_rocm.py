@@ -46,7 +46,7 @@ def run_iree_command(args: Sequence[str] = ()):
     return 1, proc.stdout
 
 
-def run_sdxl_rocm_benchmark(rocm_chip, gpu_number):
+def run_sdxl_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-compile",
         f"{benchmark_dir}/sdxl_pipeline_bench_f16.mlir",
@@ -67,7 +67,7 @@ def run_sdxl_rocm_benchmark(rocm_chip, gpu_number):
         return 1, stdout
     exec_args = [
         "iree-benchmark-module",
-        f"--device=hip://{gpu_number}",
+        f"--device=hip",
         "--device_allocator=caching",
         f"--module={prompt_encoder_dir}/model.rocm_{rocm_chip}.vmfb",
         f"--parameters=model={prompt_encoder_dir}/real_weights.irpa",
@@ -90,10 +90,10 @@ def run_sdxl_rocm_benchmark(rocm_chip, gpu_number):
     return run_iree_command(exec_args)
 
 
-def run_sdxl_unet_rocm_benchmark(gpu_number, rocm_chip):
+def run_sdxl_unet_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-benchmark-module",
-        f"--device=hip://{gpu_number}",
+        f"--device=hip",
         "--device_allocator=caching",
         f"--module={scheduled_unet_dir}/model.rocm_{rocm_chip}.vmfb",
         f"--parameters=model={scheduled_unet_dir}/real_weights.irpa",
@@ -111,10 +111,10 @@ def run_sdxl_unet_rocm_benchmark(gpu_number, rocm_chip):
     return run_iree_command(exec_args)
 
 
-def run_sdxl_prompt_encoder_rocm_benchmark(gpu_number, rocm_chip):
+def run_sdxl_prompt_encoder_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-benchmark-module",
-        f"--device=hip://{gpu_number}",
+        f"--device=hip",
         "--device_allocator=caching",
         f"--module={prompt_encoder_dir}/model.rocm_{rocm_chip}.vmfb",
         f"--parameters=model={prompt_encoder_dir}/real_weights.irpa",
@@ -130,10 +130,10 @@ def run_sdxl_prompt_encoder_rocm_benchmark(gpu_number, rocm_chip):
     return run_iree_command(exec_args)
 
 
-def run_sdxl_vae_decode_rocm_benchmark(gpu_number, rocm_chip):
+def run_sdxl_vae_decode_rocm_benchmark(rocm_chip):
     exec_args = [
         "iree-benchmark-module",
-        f"--device=hip://{gpu_number}",
+        f"--device=hip",
         "--device_allocator=caching",
         f"--module={vae_decode_dir}/model.rocm_{rocm_chip}.vmfb",
         f"--parameters=model={vae_decode_dir}/real_weights.irpa",
@@ -194,7 +194,6 @@ def test_sdxl_rocm_benchmark(
     goldentime_rocm_unet,
     goldentime_rocm_clip,
     goldentime_rocm_vae,
-    gpu_number,
     rocm_chip,
     goldendispatch_rocm_unet,
     goldendispatch_rocm_clip,
@@ -204,7 +203,7 @@ def test_sdxl_rocm_benchmark(
     goldensize_rocm_vae,
 ):
     # e2e benchmark
-    ret_value, output = run_sdxl_rocm_benchmark(rocm_chip, gpu_number)
+    ret_value, output = run_sdxl_rocm_benchmark(rocm_chip)
     benchmark_e2e_mean_time = job_summary_process(ret_value, output)
     mean_line = (
         f"E2E Benchmark Time: {str(benchmark_e2e_mean_time)} ms"
@@ -213,7 +212,7 @@ def test_sdxl_rocm_benchmark(
     logging.getLogger().info(mean_line)
 
     # unet benchmark
-    ret_value, output = run_sdxl_unet_rocm_benchmark(gpu_number, rocm_chip)
+    ret_value, output = run_sdxl_unet_rocm_benchmark(rocm_chip)
     benchmark_unet_mean_time = job_summary_process(ret_value, output)
     mean_line = (
         f"Scheduled Unet Benchmark Time: {str(benchmark_unet_mean_time)} ms"
@@ -242,7 +241,7 @@ def test_sdxl_rocm_benchmark(
     logging.getLogger().info(compilation_line)
 
     # prompt encoder benchmark
-    ret_value, output = run_sdxl_prompt_encoder_rocm_benchmark(gpu_number, rocm_chip)
+    ret_value, output = run_sdxl_prompt_encoder_rocm_benchmark(rocm_chip)
     benchmark_clip_mean_time = job_summary_process(ret_value, output)
     mean_line = (
         f"Prompt Encoder Benchmark Time: {str(benchmark_clip_mean_time)} ms"
@@ -271,7 +270,7 @@ def test_sdxl_rocm_benchmark(
     logging.getLogger().info(compilation_line)
 
     # vae decode benchmark
-    ret_value, output = run_sdxl_vae_decode_rocm_benchmark(gpu_number, rocm_chip)
+    ret_value, output = run_sdxl_vae_decode_rocm_benchmark(rocm_chip)
     benchmark_vae_mean_time = job_summary_process(ret_value, output)
     mean_line = (
         f"VAE Decode Benchmark Time: {str(benchmark_vae_mean_time)} ms"

@@ -342,7 +342,6 @@ jobs:
             --goldensize-rocm-unet-bytes 2280000  \
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 6 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
             --retries 7
@@ -364,7 +363,6 @@ jobs:
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 0 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
             --retries 7
