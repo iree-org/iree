@@ -20,7 +20,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -402,19 +401,9 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
 // MFMA Attributes
 //===----------------------------------------------------------------------===//
 
-static constexpr StringLiteral kMmaDataTiledStr = "data_tiled";
-
 Attribute MMAAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess()))
     return {};
-
-  bool isDataTiled = false;
-  ParseResult r = p.parseOptionalKeyword(kMmaDataTiledStr);
-  if (llvm::succeeded(r)) {
-    isDataTiled = true;
-    if (failed(p.parseLess()))
-      return {};
-  }
 
   FailureOr<MMAIntrinsicAttr> mmaIntrinsic =
       FieldParser<MMAIntrinsicAttr>::parse(p);
@@ -423,34 +412,24 @@ Attribute MMAAttr::parse(AsmParser &p, Type type) {
     return {};
   }
 
-  if (isDataTiled && failed(p.parseGreater()))
-    return {};
-
   if (failed(p.parseGreater()))
     return {};
 
-  return get(p.getContext(), mmaIntrinsic->getValue(), isDataTiled);
+  return get(p.getContext(), mmaIntrinsic->getValue());
 }
 
 void MMAAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
-  if (getDataTiled()) {
-    os << kMmaDataTiledStr << "<";
-  }
   os << stringifyMMAIntrinsic(getIntrinsic().getValue());
-  if (getDataTiled()) {
-    os << ">";
-  }
   os << ">";
 }
 
-MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type,
-                     bool isDataTiled) {
+MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
   auto layout = getOpaqueMFMALayout(context, type);
-  return Base::get(context, MMAIntrinsicAttr::get(context, type), isDataTiled,
-                   layout.mSize, layout.nSize, layout.kSize, layout.aType,
-                   layout.bType, layout.cType);
+  return Base::get(context, MMAIntrinsicAttr::get(context, type), layout.mSize,
+                   layout.nSize, layout.kSize, layout.aType, layout.bType,
+                   layout.cType);
 }
 
 std::tuple<Type, Type, Type> MMAAttr::getABCElementTypes() const {
@@ -521,22 +500,12 @@ MMAAttr::getABCVectorTypes() const {
 FailureOr<std::tuple<VectorLayoutInterface, VectorLayoutInterface,
                      VectorLayoutInterface>>
 MMAAttr::getContractionLayout(vector::ContractionOp contract) const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return failure();
-  }
-
   ConcreteMmaLayout layout =
       getConcreteMFMALayout(contract->getContext(), getIntrinsic().getValue());
   return IREE::GPU::getContractionLayout(contract, layout);
 }
 
 int64_t MMAAttr::getBlockSize() const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return 0;
-  }
-
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
@@ -554,10 +523,6 @@ int64_t MMAAttr::getBlockSize() const {
 }
 
 int64_t MMAAttr::getSubgroupSize() const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return {};
-  }
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
@@ -577,10 +542,6 @@ int64_t MMAAttr::getSubgroupSize() const {
 }
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return {};
-  }
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
@@ -613,10 +574,6 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
 }
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return {};
-  }
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
@@ -649,10 +606,6 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
 }
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return {};
-  }
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
@@ -683,11 +636,6 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
 FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
                                             Type resultType, Value lhs,
                                             Value rhs, Value acc) const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return failure();
-  }
-
   auto [aType, bType, cType] = getABCVectorTypes();
   if (aType != lhs.getType() || bType != rhs.getType() ||
       cType != acc.getType()) {
@@ -797,10 +745,6 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     Value laneId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  if (getDataTiled()) {
-    assert(false && "not yet implmented for data-tiled layout");
-    return failure();
-  }
 
   MMAAttr::SingleSubgroupLayout subgroupLayout;
   switch (fragment) {
@@ -836,10 +780,6 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
     std::optional<ArrayRef<int64_t>> permutation,
     SmallVector<ReassociationIndices> &reassociations,
     RankedTensorType &resultType) const {
-  if (getDataTiled()) {
-    assert(false && "expected non data-tiled layout, something went wrong?");
-    return failure();
-  }
 
   SmallVector<int64_t, 2> outerSizes;
   SmallVector<int64_t, 2> opaqueSizes;
