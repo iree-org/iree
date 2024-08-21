@@ -15,22 +15,6 @@ include "mlir/Pass/PassBase.td"
 // formation passes are a couple of such groups. For any new pass add it to the
 // relevant group and keep them alphabetical within a group.
 
-def MaterializeDefaultWorkgroupCountRegionPass:
-    InterfacePass<"iree-flow-materialize-default-workgroup-count-region",
-                  "mlir::FunctionOpInterface"> {
-      let summary = "Canonicalize dispatch workgroups ops.";
-      let description = [{
-        Apply dispatch workgroups canonicalization patterns.
-      }];
-      let dependentDialects = [
-        "mlir::affine::AffineDialect",
-        "mlir::arith::ArithDialect",
-        "mlir::linalg::LinalgDialect",
-        "mlir::scf::SCFDialect",
-        "IREE::Flow::FlowDialect",
-      ];
-}
-
 def ConvertDispatchRegionsToWorkgroupsPass :
     InterfacePass<"iree-flow-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Convert dispatch regions to dispatch workgroups.";
@@ -67,6 +51,22 @@ def ConvertTensorToFlowPass :
       Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",
                 "Number of slow copy dispatches (for handling slices) created">
     ];
+}
+
+def MaterializeDefaultWorkgroupCountRegionPass:
+    InterfacePass<"iree-flow-materialize-default-workgroup-count-region",
+                  "mlir::FunctionOpInterface"> {
+      let summary = "Canonicalize dispatch workgroups ops.";
+      let description = [{
+        Apply dispatch workgroups canonicalization patterns.
+      }];
+      let dependentDialects = [
+        "mlir::affine::AffineDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::scf::SCFDialect",
+        "IREE::Flow::FlowDialect",
+      ];
 }
 
 //===---------------------------------------------------------------------===//
