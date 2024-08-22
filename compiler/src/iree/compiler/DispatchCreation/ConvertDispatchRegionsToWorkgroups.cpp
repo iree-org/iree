@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/DispatchCreation/FormDispatchRegions.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -19,20 +19,19 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-#define DEBUG_TYPE "iree-flow-convert-dispatch-regions-to-workgroups"
+#define DEBUG_TYPE                                                             \
+  "iree-dispatch-creation-convert-dispatch-regions-to-workgroups"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_CONVERTDISPATCHREGIONSTOWORKGROUPSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 struct ConvertDispatchRegionsToWorkgroupsPass
-    : public IREE::Flow::impl::ConvertDispatchRegionsToWorkgroupsPassBase<
+    : public impl::ConvertDispatchRegionsToWorkgroupsPassBase<
           ConvertDispatchRegionsToWorkgroupsPass> {
-  using IREE::Flow::impl::ConvertDispatchRegionsToWorkgroupsPassBase<
-      ConvertDispatchRegionsToWorkgroupsPass>::
-      ConvertDispatchRegionsToWorkgroupsPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -43,7 +42,8 @@ void ConvertDispatchRegionsToWorkgroupsPass::runOnOperation() {
   TensorDimTrackingRewriter rewriter(funcOp);
 
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
-  funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });
+  funcOp.walk(
+      [&](IREE::Flow::DispatchRegionOp op) { regionOps.push_back(op); });
 
   numDispatches += regionOps.size();
 
@@ -58,4 +58,4 @@ void ConvertDispatchRegionsToWorkgroupsPass::runOnOperation() {
     }
   }
 }
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

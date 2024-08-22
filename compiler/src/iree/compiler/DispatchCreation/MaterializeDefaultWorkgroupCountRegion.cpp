@@ -7,9 +7,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/DispatchCreation/FormDispatchRegions.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -23,12 +23,13 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
-#define DEBUG_TYPE "iree-flow-materialize-default-workgroup-count-region"
+#define DEBUG_TYPE                                                             \
+  "iree-dispatch-creation-materialize-default-workgroup-count-region"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_MATERIALIZEDEFAULTWORKGROUPCOUNTREGIONPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 /// Creates the workgroup count region where the materialized computation
 /// is derived as a program slice of the body of the dispatch. This method
@@ -99,11 +100,9 @@ static void createDefaultWorkgroupCountRegion(
 
 namespace {
 struct MaterializeDefaultWorkgroupCountRegionPass
-    : public IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionPassBase<
+    : public impl::MaterializeDefaultWorkgroupCountRegionPassBase<
           MaterializeDefaultWorkgroupCountRegionPass> {
-  using IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionPassBase<
-      MaterializeDefaultWorkgroupCountRegionPass>::
-      MaterializeDefaultWorkgroupCountRegionPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -115,9 +114,9 @@ void MaterializeDefaultWorkgroupCountRegionPass::runOnOperation() {
 
   // Populate the workgroup_count region of flow.dispatch.workgroups operation
   // that dont already have a region
-  funcOp.walk([&](Flow::DispatchWorkgroupsOp workgroupsOp) {
+  funcOp.walk([&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
     createDefaultWorkgroupCountRegion(rewriter, workgroupsOp);
   });
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation

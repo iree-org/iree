@@ -9,66 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-// File organization:
-// Groups passes that are related under one banner //===....===//. For example
-// the dispatch region creation preprocessing passes and dispatch region
-// formation passes are a couple of such groups. For any new pass add it to the
-// relevant group and keep them alphabetical within a group.
-
-def ConvertDispatchRegionsToWorkgroupsPass :
-    InterfacePass<"iree-flow-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
-  let summary = "Convert dispatch regions to dispatch workgroups.";
-  let description = [{
-    Pass to convert dispatch regions to dispatch workgroups. This pass is
-    intended to be used after dispatch regions have been formed.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::scf::SCFDialect",
-    "mlir::tensor::TensorDialect",
-    "IREE::Flow::FlowDialect",
-  ];
-  let statistics = [
-    Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
-  ];
-}
-
-def ConvertTensorToFlowPass :
-    InterfacePass<"iree-flow-convert-tensor-to-flow", "mlir::FunctionOpInterface"> {
-    let summary = "Convert tensor operations to flow";
-    let description = [{
-      Pass to convert tensor operations to flow.tensor.* operations.
-    }];
-    let dependentDialects = [
-      "mlir::affine::AffineDialect",
-      "mlir::arith::ArithDialect",
-      "mlir::linalg::LinalgDialect",
-      "mlir::tensor::TensorDialect",
-      "IREE::Flow::FlowDialect",
-    ];
-    let statistics = [
-      Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",
-                "Number of slow copy dispatches (for handling slices) created">
-    ];
-}
-
-def MaterializeDefaultWorkgroupCountRegionPass:
-    InterfacePass<"iree-flow-materialize-default-workgroup-count-region",
-                  "mlir::FunctionOpInterface"> {
-      let summary = "Canonicalize dispatch workgroups ops.";
-      let description = [{
-        Apply dispatch workgroups canonicalization patterns.
-      }];
-      let dependentDialects = [
-        "mlir::affine::AffineDialect",
-        "mlir::arith::ArithDialect",
-        "mlir::linalg::LinalgDialect",
-        "mlir::scf::SCFDialect",
-        "IREE::Flow::FlowDialect",
-      ];
-}
-
 //===---------------------------------------------------------------------===//
 // General Flow passes
 //===---------------------------------------------------------------------===//

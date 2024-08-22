@@ -283,6 +283,28 @@ void buildDispatchCreationPassPipeline(
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
   addDispatchRegionCreationPasses(passManager);
+
+  FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)
+      // Convert tensor operations to flow.tensor ops.
+      // - Convert extract/insert slice to flow update ops when the tensor op
+      // acts as a contiguous view of the tensor
+      // - Apply tensor -> flow patterns
+      .addPass(DispatchCreation::createConvertTensorToFlowPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
+      /// Creates the workgroup count region where the materialized computation
+      /// is derived as a program slice of the body of the dispatch. This method
+      /// - Computes the `workload` to use for the `workgroupsOp`, which are
+      ///   derived from the values captured by the `workgroupsOp`.
+      /// - Populates the workgroup count region for this with the placeholder
+      ///   op `flow.dispatch.workgroups_count_from_body_slice`. This op is
+      ///   resolved in the backends into the actual workgroup count
+      ///   computation.
+      /// - To correlate back to the captured workload,
+      /// `flow.dispatch.workload.ordinal`
+      ///   to map the captured operand to the position in the workload list.
+      .addPass(
+          DispatchCreation::createMaterializeDefaultWorkgroupCountRegionPass);
 }
 
 namespace {

@@ -255,4 +255,59 @@ def SetEncodingPass :
   ];
 }
 
+def ConvertDispatchRegionsToWorkgroupsPass :
+    InterfacePass<"iree-dispatch-creation-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
+  let summary = "Convert dispatch regions to dispatch workgroups.";
+  let description = [{
+    Pass to convert dispatch regions to dispatch workgroups. This pass is
+    intended to be used after dispatch regions have been formed.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::scf::SCFDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Flow::FlowDialect",
+  ];
+  let statistics = [
+    Statistic<"numDispatches", "num-dispatches", "Number of dispatches created">
+  ];
+}
+
+def ConvertTensorToFlowPass :
+    InterfacePass<"iree-dispatch-creation-convert-tensor-to-flow", "mlir::FunctionOpInterface"> {
+    let summary = "Convert tensor operations to flow";
+    let description = [{
+      Pass to convert tensor operations to flow.tensor.* operations.
+    }];
+    let dependentDialects = [
+      "mlir::affine::AffineDialect",
+      "mlir::arith::ArithDialect",
+      "mlir::linalg::LinalgDialect",
+      "mlir::tensor::TensorDialect",
+      "IREE::Flow::FlowDialect",
+    ];
+    let statistics = [
+      Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",
+                "Number of slow copy dispatches (for handling slices) created">
+    ];
+}
+
+def MaterializeDefaultWorkgroupCountRegionPass:
+    InterfacePass<"iree-dispatch-creation-materialize-default-workgroup-count-region",
+                  "mlir::FunctionOpInterface"> {
+      let summary = "Canonicalize dispatch workgroups ops.";
+      let description = [{
+        Apply dispatch workgroups canonicalization patterns.
+      }];
+      let dependentDialects = [
+        "mlir::affine::AffineDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::scf::SCFDialect",
+        "IREE::Flow::FlowDialect",
+      ];
+}
+
+
 #endif // IREE_COMPILER_DISPATCHCREATION_PASSES

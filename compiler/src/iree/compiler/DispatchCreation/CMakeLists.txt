@@ -14,7 +14,6 @@ iree_cc_library(
   NAME
     DispatchCreation
   HDRS
-    "FormDispatchRegions.h"
     "FusionUtils.h"
     "Passes.h"
   SRCS
@@ -22,6 +21,8 @@ iree_cc_library(
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "CollapseReductionDimensions.cpp"
+    "ConvertDispatchRegionsToWorkgroups.cpp"
+    "ConvertTensorToFlow.cpp"
     "DispatchWithTransformDialect.cpp"
     "ElementwiseOpFusion.cpp"
     "FoldUnitExtentDims.cpp"
@@ -31,6 +32,7 @@ iree_cc_library(
     "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
+    "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "SetEncoding.cpp"
     "SinkReshapes.cpp"

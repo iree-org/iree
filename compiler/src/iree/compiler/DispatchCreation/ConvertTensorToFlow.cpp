@@ -9,9 +9,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/DispatchCreation/FormDispatchRegions.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -24,12 +24,12 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-convert-tensor-to-flow"
+#define DEBUG_TYPE "iree-dispatch-creation-convert-tensor-to-flow"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_CONVERTTENSORTOFLOWPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 /// Return `true` if the given op is contained in DispatchWorkgroupsOp or in a
 /// DispatchRegionOp.
@@ -43,8 +43,7 @@ static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
 
   SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-  if (failed(DispatchCreation::simplifyDimOps(rewriter,
-                                              rewriter.getTensorDimOps())))
+  if (failed(IREE::Flow::simplifyDimOps(rewriter, rewriter.getTensorDimOps())))
     return failure();
 
   // Wrap operation.
@@ -91,7 +90,8 @@ static FailureOr<int> convertInsertSliceOps(
   // Rewrite InsertSliceOps to FlowUpdateOps.
   SmallVector<Operation *> remainingInsertSliceOps;
   for (tensor::InsertSliceOp insertSliceOp : insertSliceOps) {
-    if (failed(convertInsertSliceOpToFlowUpdateOp(rewriter, insertSliceOp))) {
+    if (failed(IREE::Flow::convertInsertSliceOpToFlowUpdateOp(rewriter,
+                                                              insertSliceOp))) {
       remainingInsertSliceOps.push_back(insertSliceOp);
     }
   }
@@ -124,7 +124,8 @@ static FailureOr<size_t> convertExtractSliceOps(
   // Rewrite ExtractSliceOps to FlowSliceOps.
   SmallVector<Operation *> remainingExtractSliceOps;
   for (tensor::ExtractSliceOp extractSliceOp : extractSliceOps) {
-    if (failed(convertExtractSliceOpToFlowSliceOp(rewriter, extractSliceOp))) {
+    if (failed(IREE::Flow::convertExtractSliceOpToFlowSliceOp(
+            rewriter, extractSliceOp))) {
       remainingExtractSliceOps.push_back(extractSliceOp);
     }
   }
@@ -144,10 +145,8 @@ static FailureOr<size_t> convertExtractSliceOps(
 
 namespace {
 struct ConvertTensorToFlowPass
-    : public IREE::Flow::impl::ConvertTensorToFlowPassBase<
-          ConvertTensorToFlowPass> {
-  using IREE::Flow::impl::ConvertTensorToFlowPassBase<
-      ConvertTensorToFlowPass>::ConvertTensorToFlowPassBase;
+    : public impl::ConvertTensorToFlowPassBase<ConvertTensorToFlowPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -158,7 +157,7 @@ void ConvertTensorToFlowPass::runOnOperation() {
   mlir::MLIRContext *context = &getContext();
 
   auto workgroupsOps = SmallVector<IREE::Flow::DispatchWorkgroupsOp>();
-  funcOp->walk([&](Flow::DispatchWorkgroupsOp workgroupsOp) {
+  funcOp->walk([&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
     workgroupsOps.push_back(workgroupsOp);
   });
 
@@ -211,4 +210,4 @@ void ConvertTensorToFlowPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation
