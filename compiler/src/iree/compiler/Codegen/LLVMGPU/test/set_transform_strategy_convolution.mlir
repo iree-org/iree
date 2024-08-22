@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: iree-opt %s --split-input-file --iree-codegen-llvmgpu-enable-transform-dialect-jit= --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN:  --iree-gpu-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
