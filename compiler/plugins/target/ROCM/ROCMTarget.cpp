@@ -56,7 +56,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct ROCmOptions {
-  std::string targetChip = "gfx908";
+  std::string target = "gfx908";
   std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
@@ -65,39 +65,51 @@ struct ROCmOptions {
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
-    static cl::OptionCategory category("ROCm HAL Target");
-    binder.opt<std::string>("iree-rocm-target-chip", targetChip,
-                            cl::cat(category), cl::desc("ROCm target chip."));
+    static cl::OptionCategory category("HIP HAL Target");
     binder.opt<std::string>(
-        "iree-rocm-target-features", targetFeatures, cl::cat(category),
-        cl::desc("ROCm target features; e.g., '+sramecc,+xnack'."));
-    binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
+        "iree-hip-target", target, cl::cat(category),
+        cl::desc(
+            // clang-format off
+            "HIP target as expected by LLVM AMDGPU backend; e.g., "
+            "'gfx90a'/'gfx942' for targeting MI250/MI300 GPUs. "
+            "Additionally this also supports architecture code names like "
+            "'cdna3'/'rdna3' or some product names like 'mi300x'/'rtx7900xtx' "
+            "for a better experience. See "
+            "https://iree.dev/guides/deployment-configurations/gpu-rocm/ "
+            "for more details."
+            // clang-format on
+            ));
+    binder.opt<std::string>(
+        "iree-hip-target-features", targetFeatures, cl::cat(category),
+        cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
+                 "e.g., '+sramecc,+xnack'."));
+    binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
                             cl::cat(category),
-                            cl::desc("Directory of ROCm Bitcode."));
-    binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
+                            cl::desc("Directory of HIP Bitcode."));
+    binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
     binder.opt<std::string>(
-        "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
-        cl::desc("Enables microkernels in the rocm compiler backend. May be "
+        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
+        cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<bool>("iree-rocm-legacy-sync", legacySync, cl::cat(category),
+    binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
-    if (GPU::normalizeHIPTarget(targetChip).empty()) {
-      return emitError(builder.getUnknownLoc(), "Unknown ROCm target '")
-             << targetChip << "'";
+    if (GPU::normalizeHIPTarget(target).empty()) {
+      return emitError(builder.getUnknownLoc(), "Unknown HIP target '")
+             << target << "'";
     }
     SmallVector<StringRef> features;
     llvm::SplitString(targetFeatures, features, ",");
     for (StringRef f : features) {
       if (!(f.starts_with("+") || f.starts_with("-"))) {
         return emitError(builder.getUnknownLoc(),
-                         "ROCm target feature must be prefixed with '+' or "
+                         "HIP target feature must be prefixed with '+' or "
                          "'-'; but seen '")
                << f << "'";
       }
@@ -106,7 +118,7 @@ struct ROCmOptions {
         // We only support these two features to be set explicitly. Features
         // like wavefrontsize is controlled and tuned by the compiler.
         return emitError(builder.getUnknownLoc(),
-                         "ROCm target feature can only be 'sramecc' or "
+                         "HIP target feature can only be 'sramecc' or "
                          "'xnack'; but seen '")
                << feature << "'";
       }
@@ -259,7 +271,7 @@ public:
     if (failed(options.verify(b)))
       return nullptr;
 
-    if (auto target = GPU::getHIPTargetDetails(options.targetChip,
+    if (auto target = GPU::getHIPTargetDetails(options.target,
                                                options.targetFeatures, context))
       addConfig("iree.gpu.target", target);
 
@@ -336,7 +348,7 @@ public:
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
-    StringRef targetArch = options.targetChip;
+    StringRef targetArch = options.target;
     StringRef targetFeatures = options.targetFeatures;
     if (auto attr = getGPUTargetAttr(targetAttr)) {
       targetArch = attr.getArch();
@@ -517,7 +529,7 @@ public:
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
-                  "--iree-rocm-bc-dir= to a path on your system.";
+                  "--iree-hip-bc-dir= to a path on your system.";
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
                                         targetArch, bitcodeDirectory))) {

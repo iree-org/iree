@@ -59,12 +59,12 @@ def SD3_VAE_COMMON_RUN_FLAGS(
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
-    f"--iree-rocm-target-chip={rocm_chip}",
+    f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
     "--iree-llvmgpu-enable-prefetch=true",
-    "--iree-rocm-waves-per-eu=2",
+    "--iree-hip-waves-per-eu=2",
     "--iree-flow-enable-aggressive-fusion=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",

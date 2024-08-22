@@ -35,16 +35,23 @@ struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
   // lowest common denominator to guarantee the generated SPIR-V is widely
   // accepted for now. Eventually we want to use a list for multi-targeting.
-  std::string targetTriple = "vp_android_baseline_2022";
+  std::string target = "vp_android_baseline_2022";
   bool indirectBindings = false;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
     binder.opt<std::string>(
-        // TODO: Rename this as target given it's not a triple anymore.
-        "iree-vulkan-target-triple", targetTriple,
+        "iree-vulkan-target", target,
         llvm::cl::desc(
-            "Vulkan target triple controlling the SPIR-V environment."));
+            "Vulkan target controlling the SPIR-V environment. Given the wide "
+            "support of Vulkan, this option supports a few schemes: 1) LLVM "
+            "CodeGen backend style: e.g., 'gfx*' for AMD GPUs and 'sm_*' for "
+            "NVIDIA GPUs; 2) architecture code name style: e.g., "
+            "'rdna3'/'valhall4'/'ampere'/'adreno' for AMD/ARM/NVIDIA/Qualcomm "
+            "GPUs; 3) product name style: 'rx7900xtx'/'rtx4090' for AMD/NVIDIA "
+            "GPUs. See "
+            "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
+            "more details."));
     binder.opt<bool>(
         "iree-vulkan-experimental-indirect-bindings", indirectBindings,
         llvm::cl::desc(
@@ -103,13 +110,11 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    // We only care about the architecture right now.
-    StringRef arch = StringRef(options_.targetTriple).split("-").first;
-    if (auto target = GPU::getVulkanTargetDetails(arch, context)) {
+    if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
       addConfig("iree.gpu.target", target);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
-          << options_.targetTriple << "'";
+          << options_.target << "'";
       return nullptr;
     }
 

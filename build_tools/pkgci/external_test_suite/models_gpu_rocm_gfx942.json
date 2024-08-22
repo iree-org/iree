@@ -2,7 +2,7 @@
   "config_name": "gpu_rocm",
   "iree_compile_flags": [
     "--iree-hal-target-backends=rocm",
-    "--iree-rocm-target-chip=gfx942",
+    "--iree-hip-target=gfx942",
     "--iree-input-demote-f64-to-f32"
   ],
   "iree_run_module_flags": [

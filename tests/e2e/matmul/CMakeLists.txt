@@ -1911,7 +1911,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1937,7 +1937,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1963,7 +1963,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1990,7 +1990,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -2017,7 +2017,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -2044,7 +2044,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -2098,7 +2098,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-vulkan-target=valhall"
   LABELS
     "requires-gpu-nvidia"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2122,7 +2122,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-vulkan-target=valhall"
   LABELS
     "requires-gpu-nvidia"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2146,7 +2146,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-vulkan-target=valhall"
   LABELS
     "requires-gpu-nvidia"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2170,7 +2170,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-vulkan-target=ampere"
   LABELS
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2194,7 +2194,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-vulkan-target=ampere"
   LABELS
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2218,7 +2218,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-vulkan-target=ampere"
   LABELS
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
@@ -2242,7 +2242,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=rdna3-unknown-linux"
+    "--iree-vulkan-target=rdna3"
   RUNNER_ARGS
     "--require_exact_results=false"
   LABELS
@@ -2258,7 +2258,7 @@ if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(
@@ -2442,7 +2442,7 @@ elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(
