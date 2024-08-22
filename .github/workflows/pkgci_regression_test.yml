@@ -160,12 +160,6 @@ jobs:
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -250,12 +244,6 @@ jobs:
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
