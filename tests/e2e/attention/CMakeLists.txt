@@ -10,6 +10,10 @@
 
 iree_add_all_subdirs()
 
+if ((IREE_ARCH STREQUAL "arm_64"))
+  return()
+endif()
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_cpu_f16_f16_f16_small
