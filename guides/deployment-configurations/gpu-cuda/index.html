@@ -3955,40 +3955,68 @@ and convert it using IREE's
 following commands to compile:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-hal-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-cuda-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cuda.vmfb
 </code></pre></div>
-<p>Note that a cuda target architecture (<code>iree-hal-cuda-llvm-target-arch</code>) of
-the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
-architecture. If no architecture is specified then we will default to
-<code>sm_35</code>.</p>
+<p>Canonically a CUDA target (<code>iree-cuda-target</code>) matching the LLVM NVPTX backend
+of the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
+architecture. If no architecture is specified then we will default to <code>sm_60</code>.</p>
 <p>Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>
 <th>CUDA GPU</th>
 <th>Target Architecture</th>
+<th>Architecture Code Name</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Nvidia K80</td>
-<td><code>sm_35</code></td>
-</tr>
-<tr>
-<td>Nvidia P100</td>
+<td>NVIDIA P100</td>
 <td><code>sm_60</code></td>
+<td><code>pascal</code></td>
 </tr>
 <tr>
-<td>Nvidia V100</td>
+<td>NVIDIA V100</td>
 <td><code>sm_70</code></td>
+<td><code>volta</code></td>
 </tr>
 <tr>
-<td>Nvidia A100</td>
+<td>NVIDIA A100</td>
 <td><code>sm_80</code></td>
+<td><code>ampere</code></td>
+</tr>
+<tr>
+<td>NVIDIA H100</td>
+<td><code>sm_90</code></td>
+<td><code>hopper</code></td>
+</tr>
+<tr>
+<td>NVIDIA RTX20 series</td>
+<td><code>sm_75</code></td>
+<td><code>turing</code></td>
+</tr>
+<tr>
+<td>NVIDIA RTX30 series</td>
+<td><code>sm_86</code></td>
+<td><code>ampere</code></td>
+</tr>
+<tr>
+<td>NVIDIA RTX40 series</td>
+<td><code>sm_89</code></td>
+<td><code>ada</code></td>
 </tr>
 </tbody>
 </table>
+<p>In addition to the canonical <code>sm_&lt;arch_number&gt;</code> scheme, <code>iree-cuda-target</code> also
+supports two additonal schemes to make a better developer experience:</p>
+<ul>
+<li>Architecture code names like <code>volta</code> or <code>ampere</code></li>
+<li>GPU product names like <code>a100</code> or <code>rtx3090</code></li>
+</ul>
+<p>These two schemes are translated into the canonical form under the hood.
+We add support for common code/product names without aiming to be exhaustive.
+If the ones you want are missing, please use the canonical form.</p>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>Run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>

@@ -3923,53 +3923,86 @@ and convert it using IREE's
 following commands to compile:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-target-chip<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-hip-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
 </span></code></pre></div>
 <p>Note that IREE comes with bundled bitcode files, which are used for linking
 certain intrinsics on AMD GPUs. These will be used automatically or if the
-<code>--iree-rocm-bc-dir</code> is empty. As additional support may be needed for
+<code>--iree-hip-bc-dir</code> is empty. As additional support may be needed for
 different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 <code>/opt/rocm/amdgcn/bitcode</code>.</p>
-<p>Note that a ROCm target chip (<code>iree-rocm-target-chip</code>) of the form
-<code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU architecture. If
-no architecture is specified then we will default to <code>gfx908</code>.</p>
+<p>Canonically a HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend
+of the form <code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU chip.
+If no target is specified then we will default to <code>gfx908</code>.</p>
 <p>Here is a table of commonly used architectures:</p>
 <table>
 <thead>
 <tr>
 <th>AMD GPU</th>
 <th>Target Chip</th>
+<th>Architecture Code Name</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>AMD MI25</td>
-<td><code>gfx900</code></td>
-</tr>
-<tr>
-<td>AMD MI50</td>
-<td><code>gfx906</code></td>
-</tr>
-<tr>
-<td>AMD MI60</td>
-<td><code>gfx906</code></td>
-</tr>
-<tr>
 <td>AMD MI100</td>
 <td><code>gfx908</code></td>
+<td><code>cdna1</code></td>
+</tr>
+<tr>
+<td>AMD MI210</td>
+<td><code>gfx90a</code></td>
+<td><code>cdna2</code></td>
+</tr>
+<tr>
+<td>AMD MI250</td>
+<td><code>gfx90a</code></td>
+<td><code>cdna2</code></td>
 </tr>
 <tr>
 <td>AMD MI300A</td>
 <td><code>gfx940</code></td>
+<td><code>cdna3</code></td>
 </tr>
 <tr>
-<td>AMD MI300</td>
+<td>AMD MI300X</td>
 <td><code>gfx942</code></td>
+<td><code>cdna3</code></td>
+</tr>
+<tr>
+<td>AMD RX7900XTX</td>
+<td><code>gfx1100</code></td>
+<td><code>rdna3</code></td>
+</tr>
+<tr>
+<td>AMD RX7900XT</td>
+<td><code>gfx1100</code></td>
+<td><code>rdna3</code></td>
+</tr>
+<tr>
+<td>AMD RX7800XT</td>
+<td><code>gfx1101</code></td>
+<td><code>rdna3</code></td>
+</tr>
+<tr>
+<td>AMD RX7700XT</td>
+<td><code>gfx1101</code></td>
+<td><code>rdna3</code></td>
 </tr>
 </tbody>
 </table>
+<p>For a more comprehensive list of prior GPU generations, you can refer to the
+<a href="https://llvm.org/docs/AMDGPUUsage.html#processors">LLVM AMDGPU backend</a>.</p>
+<p>In addition to the canonical <code>gfx&lt;arch_number&gt;</code> scheme, <code>iree-hip-target</code> also
+supports two additonal schemes to make a better developer experience:</p>
+<ul>
+<li>Architecture code names like <code>cdna3</code> or <code>rdna3</code></li>
+<li>GPU product names like <code>mi300x</code> or <code>rx7900xtx</code></li>
+</ul>
+<p>These two schemes are translated into the canonical form under the hood.
+We add support for common code/product names without aiming to be exhaustive.
+If the ones you want are missing, please use the canonical form.</p>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>Run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>

@@ -3939,7 +3939,7 @@ made over time for specific vendors and architectures.</p>
 <tr>
 <td style="text-align: center;">NVIDIA GPU</td>
 <td style="text-align: center;">Desktop/server</td>
-<td style="text-align: center;">Good</td>
+<td style="text-align: center;">Reasonable</td>
 <td style="text-align: center;">Turing+</td>
 </tr>
 </tbody>
@@ -4067,55 +4067,124 @@ and convert it using IREE's
 command to compile with the <code>vulkan-spirv</code> target:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-vulkan-target<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_vulkan.vmfb
 </code></pre></div>
-<div class="admonition note annotate">
-<p class="admonition-title">Note</p>
-<p>Currently a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
-to compile towards a specific GPU architecture.</p>
-<p>We don't support the full spectrum here(1); the following table summarizes
-the currently recognized ones.</p>
-<p>If no triple is specified, then a safe but more limited default will be used.</p>
-<p>This is more of a mechanism to help us develop IREE itself--in the long term
-we want to perform multiple targetting to generate to multiple architectures
-if no target triple is given.</p>
-</div>
-<ol>
-<li>It's also impossible to capture all details of a Vulkan implementation
-   with a target triple, given the allowed variances on extensions, properties,
-   limits, etc. So the target triple is just an approximation for usage.</li>
-</ol>
+<p><code>iree-vulkan-target</code> specifies the GPU architecture to target. It accepts a few
+schemes:</p>
+<ul>
+<li>LLVM CodeGen backend style: this is using LLVM AMDGPU/NVPTX CodeGen targets
+  like <code>gfx1100</code> for AMD RX 7900XTX and <code>sm_86</code> for NVIDIA RTX 3090 GPUs.</li>
+<li>Architecture code name style: e.g., using <code>rdna3</code>/<code>valhall4</code>/<code>ampere</code>/<code>adreno</code>
+  for AMD/ARM/NVIDIA/Qualcomm GPUs.</li>
+<li>Product name style(1): e.g., using <code>rx7900xtx</code>/<code>a100</code> for corresponding GPUs.</li>
+</ul>
+<p>Here are a few examples showing how you can target various recent common GPUs:</p>
 <table>
 <thead>
 <tr>
-<th>GPU Vendor</th>
-<th>Target Triple</th>
+<th>GPU</th>
+<th>Target Architecture</th>
+<th>Architecture Code Name</th>
+<th>Product Name</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ARM Mali GPU</td>
-<td>e.g. <code>valhall-unknown-{android30|android31}</code></td>
+<td>AMD RX7900XTX</td>
+<td><code>gfx1100</code></td>
+<td><code>rdna3</code></td>
+<td><code>rx7900xtx</code></td>
 </tr>
 <tr>
-<td>Qualcomm Adreno GPU</td>
-<td>e.g. <code>adreno-unknown-{android30|android31}</code></td>
+<td>AMD RX7900XT</td>
+<td><code>gfx1100</code></td>
+<td><code>rdna3</code></td>
+<td><code>rx7900xt</code></td>
 </tr>
 <tr>
-<td>AMD GPU</td>
-<td>e.g. <code>{rdna1|rdna2|rdna3}-unknown-unknown</code></td>
+<td>AMD RX7800XT</td>
+<td><code>gfx1101</code></td>
+<td><code>rdna3</code></td>
+<td><code>rx7800xt</code></td>
 </tr>
 <tr>
-<td>NVIDIA GPU</td>
-<td>e.g. <code>{turing|ampere}-unknown-unknown</code></td>
+<td>AMD RX7700XT</td>
+<td><code>gfx1101</code></td>
+<td><code>rdna3</code></td>
+<td><code>rx7700xt</code></td>
 </tr>
 <tr>
-<td>SwiftShader CPU</td>
-<td><code>cpu-swiftshader-unknown</code></td>
+<td>AMD RX6000 series</td>
+<td></td>
+<td><code>rdna2</code></td>
+<td></td>
+</tr>
+<tr>
+<td>AMD RX5000 series</td>
+<td></td>
+<td><code>rdna1</code></td>
+<td></td>
+</tr>
+<tr>
+<td>ARM Mali G715</td>
+<td></td>
+<td><code>valhall4</code></td>
+<td>e.g., <code>mali-g715</code></td>
+</tr>
+<tr>
+<td>ARM Mali G510</td>
+<td></td>
+<td><code>valhall3</code></td>
+<td>e.g., <code>mali-g510</code></td>
+</tr>
+<tr>
+<td>ARM GPUs</td>
+<td></td>
+<td><code>valhall</code></td>
+<td></td>
+</tr>
+<tr>
+<td>NVIDIA RTX40 series</td>
+<td><code>sm_89</code></td>
+<td><code>ada</code></td>
+<td>e.g., <code>rtx4090</code></td>
+</tr>
+<tr>
+<td>NVIDIA RTX30 series</td>
+<td><code>sm_86</code></td>
+<td><code>ampere</code></td>
+<td>e.g., <code>rtx3080ti</code></td>
+</tr>
+<tr>
+<td>NVIDIA RTX20 series</td>
+<td><code>sm_75</code></td>
+<td><code>turing</code></td>
+<td>e.g., <code>rtx2070super</code></td>
+</tr>
+<tr>
+<td>Qualcomm GPUs</td>
+<td></td>
+<td><code>adreno</code></td>
+<td></td>
 </tr>
 </tbody>
 </table>
+<p>If no target is specified, then a safe but more limited default will be used.</p>
+<div class="admonition note annotate">
+<p class="admonition-title">Note</p>
+<p>Note that We don't support the full spectrum of GPUs here(2).
+This is more of a mechanism to help us develop IREE itself--in the long term
+we want to perform multiple targetting to generate to multiple architectures
+if no target is given.</p>
+</div>
+<ol>
+<li>Note that we only support very limited GPUs that we are actively developing
+   against in this category, particularly for desktops.</li>
+<li>It's also impossible to capture all details of a Vulkan implementation
+   with a target triple, given the allowed variances on extensions, properties,
+   limits, etc. So the target triple is just an approximation for usage.</li>
+</ol>
 <h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p>In the build directory, run the following command:</p>
 <div class="highlight"><pre><span></span><code>tools/iree-run-module<span class="w"> </span><span class="se">\</span>
