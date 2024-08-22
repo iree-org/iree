@@ -159,7 +159,7 @@ typedef struct iree_hal_webgpu_pipeline_layout_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   WGPUPipelineLayout handle;
-  iree_host_size_t push_constant_count;
+  iree_host_size_t constant_count;
   iree_hal_webgpu_set_binding_info_t set_binding_info;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
@@ -177,7 +177,7 @@ static iree_hal_webgpu_pipeline_layout_t* iree_hal_webgpu_pipeline_layout_cast(
 iree_status_t iree_hal_webgpu_pipeline_layout_create(
     WGPUDevice device, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_host_size_t push_constant_count,
+    iree_host_size_t constant_count,
     iree_hal_webgpu_staging_buffer_t* staging_buffer,
     iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
@@ -198,8 +198,8 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
 
   // Pad to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX for push constant emulation.
   iree_host_size_t bind_group_layouts_count =
-      push_constant_count > 0 ? IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX + 1
-                              : set_layout_count;
+      constant_count > 0 ? IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX + 1
+                         : set_layout_count;
 
   // Populate a WGPUBindGroupLayout array with the provided set layouts, then
   // set the staging buffer's bind group layout at the right index, padding
@@ -215,7 +215,7 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
     *iree_inline_array_at(bind_group_layouts, i) =
         staging_buffer->empty_bind_group_layout;
   }
-  if (push_constant_count > 0) {
+  if (constant_count > 0) {
     *iree_inline_array_at(bind_group_layouts,
                           IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX) =
         staging_buffer->bind_group_layout;
@@ -247,7 +247,7 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
                                  &pipeline_layout->resource);
     pipeline_layout->host_allocator = host_allocator;
     pipeline_layout->handle = handle;
-    pipeline_layout->push_constant_count = push_constant_count;
+    pipeline_layout->constant_count = constant_count;
 
     pipeline_layout->set_layout_count = set_layout_count;
     pipeline_layout->set_binding_info.set_count = set_layout_count;
@@ -292,10 +292,10 @@ WGPUPipelineLayout iree_hal_webgpu_pipeline_layout_handle(
   return iree_hal_webgpu_pipeline_layout_cast(layout)->handle;
 }
 
-iree_host_size_t iree_hal_webgpu_pipeline_layout_push_constant_count(
+iree_host_size_t iree_hal_webgpu_pipeline_layout_constant_count(
     iree_hal_pipeline_layout_t* layout) {
   IREE_ASSERT_ARGUMENT(layout);
-  return iree_hal_webgpu_pipeline_layout_cast(layout)->push_constant_count;
+  return iree_hal_webgpu_pipeline_layout_cast(layout)->constant_count;
 }
 
 const iree_hal_webgpu_set_binding_info_t*

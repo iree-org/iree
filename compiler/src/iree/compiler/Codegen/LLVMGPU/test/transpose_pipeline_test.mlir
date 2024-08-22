@@ -1,11 +1,9 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_80 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target, fold-memref-alias-ops, canonicalize, cse)))))" %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_dispatch_0 {
@@ -18,8 +16,8 @@ hal.executable @transpose_dispatch_0 {
     builtin.module {
       func.func @transpose_dispatch_0_generic_4096x4096() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4096x4096xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096x4096xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4096x4096xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096x4096xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x4096xf32>> -> tensor<4096x4096xf32>
         %3 = tensor.empty() : tensor<4096x4096xf32>
         %4 = linalg.generic {indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<4096x4096xf32>) outs(%3 : tensor<4096x4096xf32>) {
@@ -40,9 +38,9 @@ hal.executable @transpose_dispatch_0 {
 //   CHECK-DAG:  %[[D1:.*]] = gpu.thread_id  y
 //   CHECK-DAG:  %[[D2:.*]] = gpu.thread_id  z
 //   CHECK-DAG:  %[[D3:.*]] = memref.alloc() : memref<32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:  %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  memref.assume_alignment %[[D4]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  memref.assume_alignment %[[D5]], 64 : memref<4096x4096xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D6:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
@@ -61,12 +59,10 @@ hal.executable @transpose_dispatch_0 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
@@ -79,9 +75,9 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
     builtin.module {
       func.func @transpose_single_operand_dispatch_0_generic_768x2048() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<768x2048xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<768x2048xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<768x2048xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<768x2048xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 768], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x768xf32>> -> tensor<2048x768xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [768, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<768x2048xf32>> -> tensor<768x2048xf32>
         %5 = tensor.empty() : tensor<768x2048xf32>
@@ -104,11 +100,11 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 //       CHECK:  %[[D1:.*]] = gpu.thread_id  y
 //       CHECK:  %[[D2:.*]] = gpu.thread_id  z
 //       CHECK:  %[[D3:.*]] = memref.alloc() : memref<32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:  %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  memref.assume_alignment %[[D4]], 64 : memref<2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  memref.assume_alignment %[[D5]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:  %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:  %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  memref.assume_alignment %[[D6]], 64 : memref<768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:  gpu.barrier
 //       CHECK:  %[[D7:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
@@ -129,12 +125,10 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
@@ -147,9 +141,9 @@ hal.executable @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
     builtin.module {
       func.func @transpose_3d_no_dispatch_0_generic_768x2048x1024() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768x1024xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<768x2048x1024xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<768x2048x1024xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768x1024xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<768x2048x1024xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<768x2048x1024xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2048, 768, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x768x1024xf32>> -> tensor<2048x768x1024xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [768, 2048, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<768x2048x1024xf32>> -> tensor<768x2048x1024xf32>
         %5 = tensor.empty() : tensor<768x2048x1024xf32>
@@ -172,12 +166,10 @@ hal.executable @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
@@ -190,9 +182,9 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
     builtin.module {
       func.func @transpose_3d_yes_dispatch_0_generic_10x768x2048() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x2048x768xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x768x2048xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x2048x768xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x768x2048xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 2048, 768], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x2048x768xf32>> -> tensor<10x2048x768xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>> -> tensor<10x768x2048xf32>
         %5 = tensor.empty() : tensor<10x768x2048xf32>
@@ -215,11 +207,11 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 //       CHECK:   %[[D1:.*]] = gpu.thread_id  y
 //       CHECK:   %[[D2:.*]] = gpu.thread_id  z
 //       CHECK:   %[[D3:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D4]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D5]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D6]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D7:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
@@ -240,12 +232,10 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
@@ -258,9 +248,9 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
     builtin.module {
       func.func @transpose_3d_trans_out_dispatch_0_generic_10x2048x768() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x2048x768xf32>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x2048x768xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>> -> tensor<10x768x2048xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x768x2048xf32>> -> tensor<10x768x2048xf32>
         %5 = tensor.empty() : tensor<10x2048x768xf32>
@@ -284,11 +274,11 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 //       CHECK:   %[[D2:.*]] = gpu.thread_id  z
 //       CHECK:   %[[D3:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   %[[D4:.*]] = memref.alloc() : memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D5]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D6]], 64 : memref<10x768x2048xf32, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   %[[D7:.*]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[D7:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   memref.assume_alignment %[[D7]], 64 : memref<10x2048x768xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[D8:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
@@ -311,12 +301,10 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 hal.executable @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
@@ -333,9 +321,9 @@ hal.executable @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
       %c768 = arith.constant 768 : index
       %c2048 = arith.constant 2048 : index
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x2048x768xf32>>
-      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768x10xf32>>
-      %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x768x2048xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x2048x768xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2048x768x10xf32>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x768x2048xf32>>
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index
       %workgroup_id_y = hal.interface.workgroup.id[1] : index

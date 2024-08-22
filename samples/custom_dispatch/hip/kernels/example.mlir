@@ -66,27 +66,14 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
     // The layout defines the required bindings and push constants and can be
     // thought of as the function signature.
     hal.executable.export public @simple_mul ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer, ReadOnly>,
-              <2, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) attributes {
       // Certain backends (like ROCM) require a workgroup size (aka block
       // size) to be defined ahead of time.
-      workgroup_size = [64 : index, 1 : index, 1 : index],
-      // Bindings are automatically inferred when possible as part of the ABI
-      // but can be overridden if the user wants to use features such as sparse
-      // bindings or multiple descriptor sets. To do so the
-      // `hal.interface.bindings` attribute can be added to a dispatch op as
-      // follows mapping tensor operands/results to the pipeline layout
-      // sets/bindings:
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
+      workgroup_size = [64 : index, 1 : index, 1 : index]
     } {
     ^bb0(%device: !hal.device, %workload: index):
       // This host function is used to compute the XYZ workgroup count
@@ -101,11 +88,9 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
 
     // Similar to the above but in-place by using a read/write binding.
     hal.executable.export public @simple_mul_inplace ordinal(1)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     } {

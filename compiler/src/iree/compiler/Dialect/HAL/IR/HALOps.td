@@ -429,7 +429,6 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
-    OptionalAttr<HAL_InterfaceBindingArrayAttr>:$bindings,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
@@ -451,7 +450,6 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
                                $tied_operands)
     `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     `layout` `(` $layout `)`
-    (`bindings` `(` $bindings^ `)`)?
     `objects` `(` `{` custom<TargetConditionObjects>($targets,
                                                      $target_ordinals,
                                                      $target_objects,
@@ -1532,6 +1530,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
     )>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
@@ -1599,6 +1598,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     )>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
@@ -3059,7 +3059,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 
   let arguments = (ins
     HAL_PipelineLayoutAttr:$layout,
-    IndexAttr:$set,
     IndexAttr:$binding,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
@@ -3072,7 +3071,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 
   let assemblyFormat = [{
     `layout` `(` $layout `)`
-    `set` `(` $set `)`
     `binding` `(` $binding `)`
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
@@ -3084,7 +3082,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     OpBuilder<(ins
       "Type":$resultType,
       "IREE::HAL::PipelineLayoutAttr":$layout,
-      "APInt":$set,
       "APInt":$binding,
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
@@ -3100,15 +3097,10 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
 
     // Returns the descriptor set binding metadata for the given set/binding.
-    IREE::HAL::DescriptorSetBindingAttr getDescriptorSetBindingAttr();
+    IREE::HAL::PipelineBindingAttr getPipelineBindingAttr();
 
     // Returns the type of the descriptor this binding references.
     IREE::HAL::DescriptorType getDescriptorType();
-
-    // Returns the binding index in a flattened list of all sets and bindings.
-    // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
-    // a query for set 1 binding 0 would return 4.
-    int64_t getFlatBindingIndex();
 
     // Returns the alignment of the base buffer pointer (before offset).
     llvm::MaybeAlign getBaseAlignment();

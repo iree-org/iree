@@ -22,7 +22,6 @@ iree_lit_test_suite(
     "channel_ops.mlir"
     "command_buffer_folding.mlir"
     "command_buffer_ops.mlir"
-    "descriptor_set_ops.mlir"
     "device_folding.mlir"
     "device_ops.mlir"
     "devices_ops.mlir"

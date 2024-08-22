@@ -1,51 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-hal-materialize-resource-caches %s | FileCheck %s
 
-// CHECK: util.global private @device = #hal.device.ordinal<0>
-util.global private @device = #hal.device.ordinal<0> : !hal.device
-//      CHECK: util.global private @__device_pipeline_layout_0 : !hal.pipeline_layout
-// CHECK-NEXT: util.initializer {
-//  CHECK-DAG:   %[[DEVICE:.+]] = util.global.load @device
-//  CHECK-DAG:   %[[SET_LAYOUT_0:.+]] = hal.descriptor_set_layout.create
-// CHECK-SAME:       device(%[[DEVICE]] : !hal.device)
-// CHECK-SAME:       flags("None")
-// CHECK-SAME:       bindings([
-// CHECK-SAME:         #hal.descriptor_set.binding<0, storage_buffer>,
-// CHECK-SAME:         #hal.descriptor_set.binding<1, storage_buffer>
-// CHECK-SAME:       ]) : !hal.descriptor_set_layout
-// CHECK-NEXT:   %[[PIPELINE_LAYOUT:.+]] = hal.pipeline_layout.create
-// CHECK-SAME:       device(%[[DEVICE]] : !hal.device)
-// CHECK-SAME:       push_constants(1)
-// CHECK-SAME:       layouts([%[[SET_LAYOUT_0]]]) : !hal.pipeline_layout
-// CHECK-NEXT:   util.global.store %[[PIPELINE_LAYOUT]], @__device_pipeline_layout_0 : !hal.pipeline_layout
-
-// CHECK-LABEL: @exeLayoutLookup
-util.func public @exeLayoutLookup() -> !hal.pipeline_layout {
-  %device = util.global.load @device : !hal.device
-  // CHECK: %[[LOADED_LAYOUT:.+]] = util.global.load @__device_pipeline_layout_0 : !hal.pipeline_layout
-  %0 = hal.pipeline_layout.lookup device(%device : !hal.device) layout(#hal.pipeline.layout<push_constants = 1, sets = [
-    #hal.descriptor_set.layout<0, bindings = [
-      #hal.descriptor_set.binding<0, storage_buffer>,
-      #hal.descriptor_set.binding<1, storage_buffer>
-    ]>
-  ]>) : !hal.pipeline_layout
-  // CHECK-NEXT: util.return %[[LOADED_LAYOUT]]
-  util.return %0 : !hal.pipeline_layout
-}
-
-// -----
-
-#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout_0 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
-#pipeline_layout_1 = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout_1 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // CHECK: hal.executable private @exe
@@ -83,21 +45,11 @@ hal.executable private @exe {
 util.global private @device = #hal.device.ordinal<0> : !hal.device
 
 // Cached resources for the device.
-// CHECK: util.global private @__device_pipeline_layout_0 : !hal.pipeline_layout
-// CHECK: util.global private @__device_pipeline_layout_1 : !hal.pipeline_layout
 // CHECK: util.global private @__device_executable_0_exe : !hal.executable
 
 // Device initializer for all resources used with the device:
 // CHECK: util.initializer
 // CHECK:   %[[DEVICE:.+]] = util.global.load @device
-
-// Create pipeline layouts (and required descriptor set layouts):
-// CHECK:   %[[SET_LAYOUT_0:.+]] = hal.descriptor_set_layout.create device(%[[DEVICE]] : !hal.device)
-// CHECK:   %[[SET_LAYOUT_1:.+]] = hal.descriptor_set_layout.create device(%[[DEVICE]] : !hal.device)
-// CHECK:   %[[PIPELINE_LAYOUT_0:.+]] = hal.pipeline_layout.create device(%[[DEVICE]] : !hal.device) push_constants(0) layouts([%[[SET_LAYOUT_0]]]) : !hal.pipeline_layout
-// CHECK:   util.global.store %[[PIPELINE_LAYOUT_0]], @__device_pipeline_layout_0
-// CHECK:   %[[PIPELINE_LAYOUT_1:.+]] = hal.pipeline_layout.create device(%device : !hal.device) push_constants(0) layouts([%[[SET_LAYOUT_1]]]) : !hal.pipeline_layout
-// CHECK:   util.global.store %[[PIPELINE_LAYOUT_1]], @__device_pipeline_layout_1
 
 // Switch on the supported formats:
 // CHECK:   %{{.+}}, %[[FORMAT_VMVX:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "vmvx-bytecode-fb")
@@ -120,7 +72,6 @@ util.global private @device = #hal.device.ordinal<0> : !hal.device
 // CHECK:     %[[EXE:.+]] = hal.executable.create
 // CHECK-SAME:  device(%[[DEVICE]] : !hal.device)
 // CHECK-SAME:  target(@exe::@vmvx)
-// CHECK-SAME:  layouts([%[[PIPELINE_LAYOUT_0]], %[[PIPELINE_LAYOUT_0]], %[[PIPELINE_LAYOUT_1]]])
 // CHECK-SAME:  constants([%[[CONST_01]]#0, %[[CONST_01]]#1, %[[CONST_2]]])
 // CHECK-SAME:  : !hal.executable
 
@@ -172,11 +123,9 @@ hal.executable private @exe {
       %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
       hal.return %selected : i1
     }
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
     // CHECK-NOT: hal.executable.constant.block
     hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
@@ -189,13 +138,9 @@ hal.executable private @exe {
 
 // CHECK: util.global private @primary_device
 util.global private @primary_device = #hal.device.ordinal<0> : !hal.device
-// CHECK-NEXT: util.global private @__primary_device_pipeline_layout_0
 // CHECK-NEXT: util.global private @__primary_device_executable_0_exe
 // CHECK-NEXT: util.initializer
 //      CHECK:   util.global.load @primary_device
-//      CHECK:   hal.descriptor_set_layout.create
-//      CHECK:   hal.pipeline_layout.create
-//      CHECK:   util.global.store {{.+}}, @__primary_device_pipeline_layout_0
 //      CHECK:   hal.executable.create
 //      CHECK:   util.global.store {{.+}}, @__primary_device_executable_0_exe
 //      CHECK: util.func private @__primary_device_executable_0_exe_constant_block_0
@@ -205,7 +150,6 @@ util.global private @optional_device = #hal.device.select<[
   #hal.device.ordinal<1> : !hal.device,
   #hal.device.fallback<@primary_device> : !hal.device
 ]> : !hal.device
-// CHECK-NEXT: util.global private @__optional_device_pipeline_layout_0
 // CHECK-NEXT: util.global private @__optional_device_executable_0_exe
 // CHECK-NEXT: util.initializer
 //  CHECK-DAG:   %[[OPTIONAL_DEVICE:.+]] = util.global.load @optional_device
@@ -214,14 +158,9 @@ util.global private @optional_device = #hal.device.select<[
 //  CHECK-DAG:   %[[INDEX:.+]] = arith.select %[[DEVICE_EQ]]
 //  CHECK-DAG:   scf.index_switch %[[INDEX]]
 //      CHECK:   case 0
-//      CHECK:     %[[PRIMARY_LAYOUT:.+]] = util.global.load @__primary_device_pipeline_layout_0
-//      CHECK:     util.global.store %[[PRIMARY_LAYOUT]], @__optional_device_pipeline_layout_0
 //      CHECK:     %[[PRIMARY_EXE:.+]] = util.global.load @__primary_device_executable_0_exe
 //      CHECK:     util.global.store %[[PRIMARY_EXE]], @__optional_device_executable_0_exe
 //      CHECK:   default
-//      CHECK:     hal.descriptor_set_layout.create
-//      CHECK:     hal.pipeline_layout.create
-//      CHECK:     util.global.store {{.+}}, @__optional_device_pipeline_layout_0
 //      CHECK:     hal.executable.create
 //      CHECK:     util.global.store {{.+}}, @__optional_device_executable_0_exe
 //      CHECK: util.func private @__optional_device_executable_0_exe_constant_block_0
@@ -248,23 +187,17 @@ util.func public @fallbackLookup() -> (!hal.executable, !hal.executable) {
 
 hal.executable private @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
 
 // CHECK-LABEL: util.global private @primary_device
 util.global private @primary_device = #hal.device.ordinal<0> : !hal.device
-// CHECK-NEXT: util.global private @__primary_device_pipeline_layout_0
 // CHECK-NEXT: util.global private @__primary_device_executable_0_exe
 // CHECK-NEXT: util.initializer
 //      CHECK:   util.global.load @primary_device
-//      CHECK:   hal.descriptor_set_layout.create
-//      CHECK:   hal.pipeline_layout.create
-//      CHECK:   util.global.store {{.+}}, @__primary_device_pipeline_layout_0
 //      CHECK:   hal.executable.create
 //      CHECK:   util.global.store {{.+}}, @__primary_device_executable_0_exe
 
@@ -273,7 +206,6 @@ util.global private @optional_device_0 = #hal.device.select<[
   #hal.device.ordinal<1> : !hal.device,
   #hal.device.fallback<@primary_device> : !hal.device
 ]> : !hal.device
-// CHECK-NEXT: util.global private @__optional_device_0_pipeline_layout_0
 // CHECK-NEXT: util.global private @__optional_device_0_executable_0_exe
 // CHECK-NEXT: util.initializer
 //  CHECK-DAG:   %[[OPTIONAL_DEVICE_0:.+]] = util.global.load @optional_device_0
@@ -281,8 +213,6 @@ util.global private @optional_device_0 = #hal.device.select<[
 //  CHECK-DAG:   %[[DEVICE_EQ:.+]] = util.cmp.eq %[[OPTIONAL_DEVICE_0]], %[[PRIMARY_DEVICE]]
 //  CHECK-DAG:   %[[INDEX:.+]] = arith.select %[[DEVICE_EQ]]
 //  CHECK-DAG:   scf.index_switch %[[INDEX]]
-//      CHECK:     util.global.load @__primary_device_pipeline_layout_0
-//      CHECK:     util.global.store {{.+}}, @__optional_device_0_pipeline_layout_0
 //      CHECK:     util.global.load @__primary_device_executable_0_exe
 //      CHECK:     util.global.store {{.+}}, @__optional_device_0_executable_0_exe
 
@@ -291,7 +221,6 @@ util.global private @optional_device_1 = #hal.device.select<[
   #hal.device.ordinal<2> : !hal.device,
   #hal.device.fallback<@optional_device_0> : !hal.device
 ]> : !hal.device
-// CHECK-NEXT: util.global private @__optional_device_1_pipeline_layout_0
 // CHECK-NEXT: util.global private @__optional_device_1_executable_0_exe
 // CHECK-NEXT: util.initializer
 //  CHECK-DAG:   %[[OPTIONAL_DEVICE_1:.+]] = util.global.load @optional_device_1
@@ -299,8 +228,6 @@ util.global private @optional_device_1 = #hal.device.select<[
 //  CHECK-DAG:   %[[DEVICE_EQ:.+]] = util.cmp.eq %[[OPTIONAL_DEVICE_1]], %[[OPTIONAL_DEVICE_0]]
 //  CHECK-DAG:   %[[INDEX:.+]] = arith.select %[[DEVICE_EQ]]
 //  CHECK-DAG:   scf.index_switch %[[INDEX]]
-//      CHECK:     util.global.load @__optional_device_0_pipeline_layout_0
-//      CHECK:     util.global.store {{.+}}, @__optional_device_1_pipeline_layout_0
 //      CHECK:     util.global.load @__optional_device_0_executable_0_exe
 //      CHECK:     util.global.store {{.+}}, @__optional_device_1_executable_0_exe
 
@@ -322,33 +249,12 @@ util.func public @fallbackOnlyLookup() -> !hal.executable {
 // could rework the pass to support only materializing what's required based on
 // what resources are looked up.
 
-#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout_0 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 util.global private @device : !hal.device
-
-util.global private @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-util.initializer {
-  %c0 = arith.constant 0 : index
-  %device = hal.devices.get %c0 : !hal.device
-  %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) flags("None") bindings([#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]) : !hal.descriptor_set_layout
-  util.global.store %descriptor_set_layout, @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  util.return
-}
-
-util.global private @_pipeline_layout_0 : !hal.pipeline_layout
-util.initializer {
-  %_descriptor_set_layout_0 = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  %c0 = arith.constant 0 : index
-  %device = hal.devices.get %c0 : !hal.device
-  %pipeline_layout = hal.pipeline_layout.create device(%device : !hal.device) push_constants(0) layouts([%_descriptor_set_layout_0]) : !hal.pipeline_layout
-  util.global.store %pipeline_layout, @_pipeline_layout_0 : !hal.pipeline_layout
-  util.return
-}
 
 util.global private @_executable_exe : !hal.executable
 util.initializer {
@@ -359,8 +265,7 @@ util.initializer {
   %variant = arith.select %format_supported, %c0, %c-1 : index
   %selected = scf.index_switch %variant -> !hal.executable
   case 0 {
-    %_pipeline_layout_0 = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
-    %exe = hal.executable.create device(%device : !hal.device) target(@exe0::@vmvx) layouts([%_pipeline_layout_0]) : !hal.executable
+    %exe = hal.executable.create device(%device : !hal.device) target(@exe0::@vmvx) : !hal.executable
     scf.yield %exe : !hal.executable
   }
   default {

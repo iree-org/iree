@@ -47,14 +47,14 @@ static void printDescriptorType(OpAsmPrinter &p, Operation *,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<DescriptorSetBindings>($binding_ordinals,
+// custom<PipelineBindings>($binding_ordinals,
 //                               $binding_buffers,
 //                               type($binding_buffers),
 //                               $binding_offsets,
 //                               $binding_lengths)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseDescriptorSetBindings(
+static ParseResult parsePipelineBindings(
     OpAsmParser &parser,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
@@ -86,11 +86,11 @@ static ParseResult parseDescriptorSetBindings(
   return success();
 }
 
-static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
-                                       ValueRange ordinals, ValueRange buffers,
-                                       TypeRange bufferTypes,
-                                       ValueRange bufferOffsets,
-                                       ValueRange bufferLengths) {
+static void printPipelineBindings(OpAsmPrinter &p, Operation *op,
+                                  ValueRange ordinals, ValueRange buffers,
+                                  TypeRange bufferTypes,
+                                  ValueRange bufferOffsets,
+                                  ValueRange bufferLengths) {
   llvm::interleaveComma(llvm::zip_equal(ordinals, buffers, bufferTypes,
                                         bufferOffsets, bufferLengths),
                         p,
@@ -1887,7 +1887,7 @@ void ExecutableExportOrdinalOp::getAsmResultNames(
 LogicalResult InterfaceConstantLoadOp::verify() {
   InterfaceConstantLoadOp op = *this;
   auto layoutAttr = op.getLayout();
-  if (op.getOrdinal().getZExtValue() >= layoutAttr.getPushConstants()) {
+  if (op.getOrdinal().getZExtValue() >= layoutAttr.getConstants()) {
     return op.emitOpError("push constant ordinal out of bounds");
   }
   return success();
@@ -1897,18 +1897,20 @@ LogicalResult InterfaceConstantLoadOp::verify() {
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-void InterfaceBindingSubspanOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType,
-    IREE::HAL::PipelineLayoutAttr layout, APInt set, APInt binding,
-    Value byte_offset, ValueRange dynamic_dims, IntegerAttr alignment,
-    std::optional<DescriptorFlags> flags) {
+void InterfaceBindingSubspanOp::build(OpBuilder &builder,
+                                      OperationState &result, Type resultType,
+                                      IREE::HAL::PipelineLayoutAttr layout,
+                                      APInt binding, Value byte_offset,
+                                      ValueRange dynamic_dims,
+                                      IntegerAttr alignment,
+                                      std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
                                                          flags.value());
   }
-  build(builder, result, resultType, layout, set, binding, byte_offset,
-        dynamic_dims, alignment, descriptorAttr);
+  build(builder, result, resultType, layout, binding, byte_offset, dynamic_dims,
+        alignment, descriptorAttr);
 }
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
@@ -1921,56 +1923,22 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
              << " associated dimension SSA values";
     }
   }
-  int64_t set = op.getSet().getSExtValue();
-  int64_t binding = op.getBinding().getSExtValue();
-  bool foundSet = false;
-  bool foundBinding = false;
-  for (auto setLayoutAttr : op.getLayout().getSetLayouts()) {
-    if (setLayoutAttr.getOrdinal() == set) {
-      foundSet = true;
-      for (auto bindingAttr : setLayoutAttr.getBindings()) {
-        if (bindingAttr.getOrdinal() == binding) {
-          foundBinding = true;
-          break;
-        }
-      }
-    }
-  }
-  if (!foundSet) {
-    return op.emitOpError("set ordinal ")
-           << set << " not present in pipeline layout";
-  } else if (!foundBinding) {
+  uint64_t binding = op.getBinding().getZExtValue();
+  if (binding >= op.getLayout().getBindings().size()) {
     return op.emitOpError("binding ordinal ")
-           << binding << " not present in descriptor set layout";
+           << binding << " out of bounds in layout " << op.getLayout();
   }
   return success();
 }
 
-IREE::HAL::DescriptorSetBindingAttr
-InterfaceBindingSubspanOp::getDescriptorSetBindingAttr() {
-  int64_t set = getSet().getSExtValue();
-  int64_t binding = getBinding().getSExtValue();
-  for (auto setLayoutAttr : getLayout().getSetLayouts()) {
-    if (setLayoutAttr.getOrdinal() == set) {
-      for (auto bindingAttr : setLayoutAttr.getBindings()) {
-        if (bindingAttr.getOrdinal() == binding) {
-          return bindingAttr;
-        }
-      }
-    }
-  }
-  return {};
+IREE::HAL::PipelineBindingAttr
+InterfaceBindingSubspanOp::getPipelineBindingAttr() {
+  return getLayout().getBinding(getBinding());
 }
 
 IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
-  auto bindingAttr = getDescriptorSetBindingAttr();
+  auto bindingAttr = getPipelineBindingAttr();
   return bindingAttr.getType();
-}
-
-int64_t InterfaceBindingSubspanOp::getFlatBindingIndex() {
-  int64_t set = getSet().getSExtValue();
-  int64_t binding = getBinding().getSExtValue();
-  return getLayout().getFlatBindingIndex(set, binding);
 }
 
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {

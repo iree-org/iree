@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_CTS_COMMAND_BUFFER_PUSH_CONSTANTS_TEST_H_
-#define IREE_HAL_CTS_COMMAND_BUFFER_PUSH_CONSTANTS_TEST_H_
+#ifndef IREE_HAL_CTS_COMMAND_BUFFER_DISPATCH_CONSTANTS_TEST_H_
+#define IREE_HAL_CTS_COMMAND_BUFFER_DISPATCH_CONSTANTS_TEST_H_
 
 #include "iree/base/api.h"
 #include "iree/base/string_view.h"
@@ -18,7 +18,7 @@ namespace iree::hal::cts {
 
 using ::testing::ContainerEq;
 
-class CommandBufferPushConstantsTest : public CTSTestBase<> {
+class CommandBufferDispatchConstantsTest : public CTSTestBase<> {
  protected:
   void PrepareExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -32,7 +32,7 @@ class CommandBufferPushConstantsTest : public CTSTestBase<> {
     executable_params.executable_format =
         iree_make_cstring_view(get_test_executable_format());
     executable_params.executable_data = get_test_executable_data(
-        iree_make_cstring_view("command_buffer_push_constants_test.bin"));
+        iree_make_cstring_view("command_buffer_dispatch_constants_test.bin"));
     // No executable-level "specialization constants" (not to be confused with
     // per-dispatch varying "push constants").
     executable_params.constant_count = 0;
@@ -53,7 +53,7 @@ class CommandBufferPushConstantsTest : public CTSTestBase<> {
   iree_hal_executable_t* executable_ = NULL;
 };
 
-TEST_F(CommandBufferPushConstantsTest, DispatchWithPushConstants) {
+TEST_F(CommandBufferDispatchConstantsTest, DispatchWithDispatchConstants) {
   ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
 
   iree_hal_command_buffer_t* command_buffer = NULL;
@@ -130,4 +130,4 @@ TEST_F(CommandBufferPushConstantsTest, DispatchWithPushConstants) {
 
 }  // namespace iree::hal::cts
 
-#endif  // IREE_HAL_CTS_COMMAND_BUFFER_PUSH_CONSTANTS_TEST_H_
+#endif  // IREE_HAL_CTS_COMMAND_BUFFER_DISPATCH_CONSTANTS_TEST_H_

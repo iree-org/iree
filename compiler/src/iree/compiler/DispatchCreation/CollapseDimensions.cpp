@@ -739,7 +739,7 @@ static bool updateProducersFromConsumers(
       FailureOr<AffineMap> consumerToProducerMap =
           getConsumerLoopToProducerLoopsMap(*operand);
       if (failed(consumerToProducerMap)) {
-        didChange |= producerInfo.getCollapsibleLoops().size();
+        didChange |= !producerInfo.getCollapsibleLoops().empty();
         producerInfo.clear();
         continue;
       }

@@ -263,19 +263,14 @@ static IREE::HAL::PipelineLayoutAttr
 makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
                        IREE::HAL::ExecutableTargetAttr targetAttr,
                        OpBuilder &builder) {
-  SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
-  for (const auto &setLayout : pipelineLayout.setLayouts) {
-    SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
-    for (const auto &binding : setLayout.bindings) {
-      bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
-          builder.getContext(), binding.ordinal, binding.type, binding.flags));
-    }
-    setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
-        builder.getContext(), setLayout.ordinal, bindingAttrs,
-        setLayout.flags));
+  SmallVector<IREE::HAL::PipelineBindingAttr> bindingAttrs;
+  for (const auto &binding : pipelineLayout.bindings) {
+    bindingAttrs.push_back(IREE::HAL::PipelineBindingAttr::get(
+        builder.getContext(), binding.type, binding.flags));
   }
-  return IREE::HAL::PipelineLayoutAttr::get(
-      builder.getContext(), pipelineLayout.pushConstantCount, setLayoutAttrs);
+  return IREE::HAL::PipelineLayoutAttr::get(builder.getContext(), bindingAttrs,
+                                            pipelineLayout.constantCount,
+                                            pipelineLayout.flags);
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
@@ -297,8 +292,8 @@ convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
 static void
 convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
                     IREE::HAL::PipelineLayoutAttr pipelineLayoutAttr,
-                    IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
-                    IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
+                    int64_t bindingOrdinal,
+                    IREE::HAL::PipelineBindingAttr bindingAttr) {
   if (arg.use_empty())
     return; // no-op
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
@@ -309,8 +304,7 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
-        APInt(64, setLayoutAttr.getOrdinal()),
-        APInt(64, bindingAttr.getOrdinal()), oldOp.getByteOffset(),
+        APInt(64, bindingOrdinal), oldOp.getByteOffset(),
         oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
@@ -347,13 +341,10 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
     if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
       continue; // unhandled arg type (primitive/etc)
     }
-    auto setBinding = resourceMap[resourceIdx++];
-    auto setLayoutAttr = layoutAttr.getSetLayout(setBinding.first);
-    assert(setLayoutAttr && "layout must be consistent");
-    auto bindingAttr = setLayoutAttr.getBinding(setBinding.second);
+    auto binding = resourceMap[resourceIdx++];
+    auto bindingAttr = layoutAttr.getBinding(binding);
     assert(bindingAttr && "layout must be consistent");
-    convertBindingUsage(sourceFuncOp, arg, layoutAttr, setLayoutAttr,
-                        bindingAttr);
+    convertBindingUsage(sourceFuncOp, arg, layoutAttr, binding, bindingAttr);
   }
 
   // Remove all arguments now that we've turned them into lookup ops.
@@ -396,7 +387,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
         exportOp->getAttrOfType<IREE::HAL::PipelineLayoutAttr>(
             "hal.interface.layout");
     const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
-    const PipelineResourceMap &resourceMap = pipelineLayout.resourceMap;
+    const auto &resourceMap = pipelineLayout.resourceMap;
 
     // Clone the updated function declaration into each variant.
     ExportExpansions exportExpansions;
@@ -443,17 +434,6 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
           makeExportSymbolRefAttr(targetExecutableOp, variantOp, newExportOp);
       exportExpansions[oldRefAttr].push_back(
           std::make_pair(newRefAttr, variantOp.getTargetAttr()));
-
-      // Annotate the export with the a mapping of the resources to the
-      // interface bindings. This is used during conversion.
-      SmallVector<Attribute> bindingAttrs;
-      for (auto setBinding : resourceMap) {
-        bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
-            newExportOp.getContext(), setBinding.first, setBinding.second));
-      }
-      newExportOp->setAttr(
-          "hal.interface.bindings",
-          ArrayAttr::get(newExportOp.getContext(), bindingAttrs));
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {

@@ -54,7 +54,7 @@ stream.executable private @executable_0 {
 // CHECK: vm.func private @simple_mul
 func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch
+  // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   %ret0 = flow.dispatch @executable_0::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %ret0 : tensor<4xf32>
 }
@@ -101,7 +101,7 @@ stream.executable private @executable_1 {
 // CHECK: vm.func private @simple_mul_inplace
 func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch
+  // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   %ret0 = flow.dispatch @executable_1::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> %arg0
   return %ret0 : tensor<4xf32>
 }
@@ -155,7 +155,7 @@ func.func @simple_mul_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> ten
   %arg0_dim0 = tensor.dim %arg0, %c0 : tensor<?xf32>
   // CHECK: vm.call @hal.buffer_view.dim
   %arg1_dim0 = tensor.dim %arg1, %c0 : tensor<?xf32>
-  // CHECK: vm.call @hal.command_buffer.dispatch
+  // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   %ret0 = flow.dispatch @executable_2::@dispatch[%arg0_dim0](%arg0, %arg0_dim0, %arg1, %arg1_dim0) : (tensor<?xf32>{%arg0_dim0}, index, tensor<?xf32>{%arg1_dim0}, index) -> tensor<?xf32>{%arg0_dim0}
   return %ret0 : tensor<?xf32>
 }

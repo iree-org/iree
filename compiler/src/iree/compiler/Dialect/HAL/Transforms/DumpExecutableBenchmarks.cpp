@@ -41,7 +41,6 @@ static const int64_t kBufferAlignment = 256;
 using Vec3 = std::tuple<unsigned, unsigned, unsigned>;
 
 struct Binding {
-  unsigned set = 0;
   unsigned binding = 0;
   int64_t size = 0;
 };
@@ -119,15 +118,9 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
 
       // Work around needing a mutable key for the set; C++ was a mistake.
       dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
-        auto exportOp =
-            symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-                dispatchOp, entryPointAttr);
-        auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
-            exportOp, dispatchOp.getResources().size());
-
         SmallVector<Binding> bindings;
-        for (auto [bindingAttr, resourceLength] :
-             llvm::zip_equal(bindingAttrs, dispatchOp.getResourceLengths())) {
+        for (auto [i, resourceLength] :
+             llvm::enumerate(dispatchOp.getResourceLengths())) {
           APInt resourceLengthInt;
           if (!matchPattern(resourceLength,
                             m_ConstantInt(&resourceLengthInt))) {
@@ -136,9 +129,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
                                     << "` (non-constant resource length)\n";);
             return;
           }
-          bindings.push_back({(unsigned)bindingAttr.getSet(),
-                              (unsigned)bindingAttr.getBinding(),
-                              resourceLengthInt.getSExtValue()});
+          bindings.push_back({(unsigned)i, resourceLengthInt.getSExtValue()});
         }
 
         auto &dispatchParamsSet = map[entryPointAttr];
@@ -300,7 +291,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   // Constant values.
   auto layoutAttr = exportOp.getLayoutAttr();
   SmallVector<Value> constantValues;
-  if (int64_t pushConstantCount = layoutAttr.getPushConstants()) {
+  if (int64_t pushConstantCount = layoutAttr.getConstants()) {
     constantValues.reserve(pushConstantCount);
     for (int64_t i = 0; i < pushConstantCount; ++i) {
       constantValues.push_back(funcBuilder.create<arith::ConstantOp>(

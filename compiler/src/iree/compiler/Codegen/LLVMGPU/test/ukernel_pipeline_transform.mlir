@@ -1,10 +1,8 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
@@ -21,9 +19,9 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
   %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
   %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>
@@ -49,11 +47,9 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -70,9 +66,9 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16xi64>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16xi64>>
   %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x?xf32>>{%8}
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x?xf32>>{%8}
   %10 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [16, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x?xf32>>{%8} -> tensor<16x?xf32>
   %11 = tensor.empty() : tensor<16xi64>
   %12 = tensor.empty() : tensor<16xf32>
@@ -100,11 +96,9 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0) -> (d0)>
@@ -121,9 +115,9 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #ex
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
   %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
   %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>
@@ -149,11 +143,9 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #ex
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
@@ -170,9 +162,9 @@ func.func @not_neg_inf_init_argmax_1d() attributes {hal.executable.target = #exe
   %4 = arith.shli %3, %c32_i64 : i64
   %5 = arith.ori %2, %4 : i64
   %6 = arith.index_castui %5 : i64 to index
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
   %8 = flow.dispatch.workload.ordinal %6, 0 : index
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8}
   %10 = flow.dispatch.tensor.load %9, offsets = [0], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf16>>{%8} -> tensor<?xf16>
   %11 = tensor.empty() : tensor<i64>
   %12 = tensor.empty() : tensor<f16>

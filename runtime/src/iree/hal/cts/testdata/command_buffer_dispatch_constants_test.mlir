@@ -1,25 +1,23 @@
 // This program writes push constant values into an output buffer.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 hal.executable.source public @executable {
-  hal.executable.export public @write_push_constants ordinal(0) layout(#pipeline_layout) attributes {workgroup_size = [1 : index, 1 : index, 1 : index]} {
+  hal.executable.export public @write_constants ordinal(0) layout(#pipeline_layout) attributes {workgroup_size = [1 : index, 1 : index, 1 : index]} {
   ^bb0(%arg0: !hal.device):
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   }
   builtin.module {
-    func.func @write_push_constants() {
+    func.func @write_constants() {
       %input_0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
       %input_1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
       %input_2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
       %input_3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
 
-      %out = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<4xi32>
+      %out = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4xi32>
 
       %c0 = arith.constant 0 : index
       %c1 = arith.constant 1 : index

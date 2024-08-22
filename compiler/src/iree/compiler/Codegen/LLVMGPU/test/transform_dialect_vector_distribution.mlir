@@ -6,16 +6,14 @@
 // RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @reduce_dispatch_0() attributes {translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32>
   memref.assume_alignment %0, 64 : memref<128xf32>
   %1 = gpu.thread_id  x
   %2 = arith.cmpi ult, %1, %c1 : index

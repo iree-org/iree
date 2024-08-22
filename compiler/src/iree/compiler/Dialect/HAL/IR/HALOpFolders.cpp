@@ -188,7 +188,7 @@ namespace {
 /// the same scope.
 struct SkipCommandBufferDeviceOp
     : public OpRewritePattern<CommandBufferDeviceOp> {
-  using OpRewritePattern<CommandBufferDeviceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
                                 PatternRewriter &rewriter) const override {
@@ -338,6 +338,96 @@ struct FoldCommandBufferCopyBufferSubspans
 void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldCommandBufferCopyBufferSubspans>(context);
+}
+
+namespace {
+
+/// Folds hal.buffer.subspans into dispatch bindings.
+/// The binding range is always equal to or a subset of the subspan.
+template <typename OpT>
+struct FoldCommandBufferDispatchBufferSubspan : public OpRewritePattern<OpT> {
+  using OpRewritePattern<OpT>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpT op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto bindingBuffers = llvm::to_vector(op.getBindingBuffers());
+    auto bindingOffsets = llvm::to_vector(op.getBindingOffsets());
+    for (size_t i = 0; i < bindingBuffers.size(); ++i) {
+      auto *definingOp = bindingBuffers[i].getDefiningOp();
+      if (!definingOp)
+        continue;
+      if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
+        needsUpdate = true;
+        bindingBuffers[i] = subspanOp.getSourceBuffer();
+        bindingOffsets[i] = rewriter.createOrFold<arith::AddIOp>(
+            subspanOp.getLoc(), subspanOp.getSourceOffset(), bindingOffsets[i]);
+      }
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate)
+      return failure();
+    rewriter.modifyOpInPlace(op, [&]() {
+      auto mutableBindingBuffers = op.getBindingBuffersMutable();
+      mutableBindingBuffers.clear();
+      mutableBindingBuffers.append(bindingBuffers);
+      auto mutableBindingOffsets = op.getBindingOffsetsMutable();
+      mutableBindingOffsets.clear();
+      mutableBindingOffsets.append(bindingOffsets);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CommandBufferDispatchOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results
+      .insert<FoldCommandBufferDispatchBufferSubspan<CommandBufferDispatchOp>>(
+          context);
+}
+
+namespace {
+
+/// Folds hal.buffer.subspans into the indirect dispatch workgroup count.
+/// The binding range is always equal to or a subset of the subspan.
+struct FoldCommandBufferDispatchIndirectBufferSubspan
+    : public OpRewritePattern<CommandBufferDispatchIndirectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferDispatchIndirectOp op,
+                                PatternRewriter &rewriter) const override {
+    Value workgroupsBuffer = op.getWorkgroupsBuffer();
+    auto *definingOp = workgroupsBuffer.getDefiningOp();
+    if (!definingOp)
+      return failure();
+    Value workgroupsOffset = op.getWorkgroupsOffset();
+    if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
+      workgroupsBuffer = subspanOp.getSourceBuffer();
+      workgroupsOffset = rewriter.createOrFold<arith::AddIOp>(
+          subspanOp.getLoc(), subspanOp.getSourceOffset(), workgroupsOffset);
+    } else {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getWorkgroupsBufferMutable().set(workgroupsBuffer);
+      op.getWorkgroupsOffsetMutable().set(workgroupsOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CommandBufferDispatchIndirectOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferDispatchIndirectBufferSubspan>(context);
+  results.insert<
+      FoldCommandBufferDispatchBufferSubspan<CommandBufferDispatchIndirectOp>>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//

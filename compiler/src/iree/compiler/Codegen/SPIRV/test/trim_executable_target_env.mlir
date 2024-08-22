@@ -2,14 +2,18 @@
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float64, Float16, Int64, Int16, Int8, GroupNonUniformArithmetic],
-                                      [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class]>,
-                                      api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>}>
-
+                                       [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class]>,
+                                       api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>
+}>
 
 // CHECK-DAG: #[[$TARGET0:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}>
 // CHECK-DAG: #[[$TARGET1:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniformArithmetic], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}>
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
+]>
 
 hal.executable private @predict_dispatch_0 {
   // CHECK-LABEL: hal.executable.variant public @vulkan_spirv_fb0
@@ -22,10 +26,12 @@ hal.executable private @predict_dispatch_0 {
       hal.return %c2, %c1, %c1 : index, index, index
     }
     // CHECK-NOT: spirv.target_env
-    builtin.module attributes {spirv.target_env = #spirv.target_env<
+    builtin.module attributes {
+      spirv.target_env = #spirv.target_env<
         #spirv.vce<v1.6, [Shader, Float64, Float16, Int64, Int16, Int8],
         [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class]>,
-        api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>} {
+        api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>
+    } {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spirv.func @predict_dispatch_0_vecmat_128x784_f32() "None" {
           spirv.Return
@@ -48,10 +54,12 @@ hal.executable private @predict_dispatch_1 {
       hal.return %c10, %c1, %c1 : index, index, index
     }
     // CHECK-NOT: spirv.target_env
-    builtin.module attributes {spirv.target_env = #spirv.target_env<
+    builtin.module attributes {
+      spirv.target_env = #spirv.target_env<
         #spirv.vce<v1.6, [Shader, Float64, Float16, Int64, Int16, Int8],
         [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class]>,
-        api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>} {
+        api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>
+    } {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader, GroupNonUniformArithmetic], [SPV_KHR_storage_buffer_storage_class]> {
         spirv.func @predict_dispatch_1_vecmat_10x128_f32() "None" {
           spirv.Return

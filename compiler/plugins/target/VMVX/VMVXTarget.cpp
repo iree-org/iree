@@ -133,13 +133,13 @@ public:
       // Specify the constant and binding information used to validate
       // dispatches.
       if (auto layoutAttr = exportOp.getLayout()) {
-        int64_t constantCount = layoutAttr.getPushConstants();
+        int64_t constantCount = layoutAttr.getConstants();
         if (constantCount > 0) {
           funcOp.setReflectionAttr("constant_count",
                                    executableBuilder.getI8IntegerAttr(
                                        static_cast<uint8_t>(constantCount)));
         }
-        size_t bindingCount = layoutAttr.getSetLayout(0).getBindings().size();
+        size_t bindingCount = layoutAttr.getBindings().size();
         if (bindingCount > 0) {
           funcOp.setReflectionAttr("binding_count",
                                    executableBuilder.getI8IntegerAttr(

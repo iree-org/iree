@@ -399,9 +399,8 @@ public:
       // Specify the constant and binding information used to validate
       // dispatches.
       if (auto layoutAttr = exportOp.getLayout()) {
-        dispatchAttrs.constantCount = layoutAttr.getPushConstants();
-        dispatchAttrs.bindingCount =
-            layoutAttr.getSetLayout(0).getBindings().size();
+        dispatchAttrs.constantCount = layoutAttr.getConstants();
+        dispatchAttrs.bindingCount = layoutAttr.getBindings().size();
       }
 
       LibraryBuilder::SourceLocation sourceLocation;

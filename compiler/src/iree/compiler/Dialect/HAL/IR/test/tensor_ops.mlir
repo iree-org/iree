@@ -80,19 +80,11 @@ util.func public @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %ar
       hal.return %x_capture, %y_capture, %z : index, index, index
     }
     // Must match the external definition.
-    // CHECK: layout(<push_constants = 1, sets =
-    layout(#hal.pipeline.layout<push_constants = 1, sets = [
-      <0, bindings = [
-          <0, storage_buffer, ReadOnly>,
-          <1, storage_buffer>
-      ]>
+    // CHECK: layout(<constants = 1, bindings =
+    layout(#hal.pipeline.layout<constants = 1, bindings = [
+      #hal.pipeline.binding<storage_buffer, ReadOnly>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
-    // Optional, automatically inferred if omitted.
-    // CHECK: bindings([#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>])
-    bindings([
-      #hal.interface.binding<0, 0>,
-      #hal.interface.binding<0, 1>
-    ])
     // Can have object references for multiple targets or configurations.
     // CHECK: objects({
     objects({

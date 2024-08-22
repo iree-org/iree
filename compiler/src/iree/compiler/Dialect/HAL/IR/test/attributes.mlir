@@ -3,30 +3,26 @@
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
-  // CHECK: dslb0 = #hal.descriptor_set.binding<0, uniform_buffer>
-  dslb0 = #hal.descriptor_set.binding<0, uniform_buffer>,
-  // CHECK: dslb1 = #hal.descriptor_set.binding<1, storage_buffer, "ReadOnly|Indirect">
-  dslb1 = #hal.descriptor_set.binding<1, storage_buffer, "ReadOnly|Indirect">
+  // CHECK: dslb0 = #hal.pipeline.binding<uniform_buffer>
+  dslb0 = #hal.pipeline.binding<uniform_buffer>,
+  // CHECK: dslb1 = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+  dslb1 = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
 } : () -> ()
 
 // -----
 
 // CHECK-LABEL: pipeline_layout.basic
 "pipeline_layout.basic"() {
-  // CHECK: layout0 = #hal.pipeline.layout<push_constants = 4, sets = [
-  // CHECK-SAME: <0, bindings = [
-  // CHECK-SAME:   <0, storage_buffer>
-  // CHECK-SAME:   <1, storage_buffer>
-  // CHECK-SAME: <1, bindings = [
-  // CHECK-SAME:   <0, uniform_buffer>
-  layout0 = #hal.pipeline.layout<push_constants = 4, sets = [
-    #hal.descriptor_set.layout<0, bindings = [
-      #hal.descriptor_set.binding<0, storage_buffer>,
-      #hal.descriptor_set.binding<1, storage_buffer>
-    ]>,
-    #hal.descriptor_set.layout<1, bindings = [
-      #hal.descriptor_set.binding<0, uniform_buffer>
-    ]>
+  // CHECK: layout0 = #hal.pipeline.layout<
+  // CHECK-SAME: constants = 4
+  // CHECK-SAME: bindings = [
+  // CHECK-SAME:   #hal.pipeline.binding<storage_buffer>,
+  // CHECK-SAME:   #hal.pipeline.binding<storage_buffer>,
+  // CHECK-SAME:   #hal.pipeline.binding<uniform_buffer>
+  layout0 = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<uniform_buffer>
   ]>
 } : () -> ()
 

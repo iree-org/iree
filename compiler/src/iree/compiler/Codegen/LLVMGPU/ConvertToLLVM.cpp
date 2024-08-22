@@ -202,8 +202,6 @@ class TestLLVMGPULegalizeOpPass final
   }
 };
 
-using SetBinding = std::pair<APInt, APInt>;
-
 /// Convention with the HAL side to pass kernel arguments.
 /// The bindings are ordered based on binding set and binding index then
 /// compressed and mapped to dense set of arguments.
@@ -211,21 +209,16 @@ using SetBinding = std::pair<APInt, APInt>;
 /// InterfaceBindingOp and kernel argument index.
 /// For instance if the kernel has (set, bindings) A(0, 1), B(1, 5), C(0, 6) it
 /// will return the mapping [A, 0], [C, 1], [B, 2]
-static llvm::SmallDenseMap<SetBinding, size_t>
+static llvm::SmallDenseMap<APInt, size_t>
 getKernelArgMapping(Operation *funcOp) {
-  llvm::SetVector<SetBinding> usedBindingSet;
+  llvm::SetVector<APInt> usedBindingSet;
   funcOp->walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-    usedBindingSet.insert(
-        SetBinding(subspanOp.getSet(), subspanOp.getBinding()));
+    usedBindingSet.insert(subspanOp.getBinding());
   });
   auto sparseBindings = usedBindingSet.takeVector();
   std::sort(sparseBindings.begin(), sparseBindings.end(),
-            [](SetBinding lhs, SetBinding rhs) {
-              if (lhs.first == rhs.first)
-                return lhs.second.ult(rhs.second);
-              return lhs.first.ult(rhs.first);
-            });
-  llvm::SmallDenseMap<SetBinding, size_t> mapBindingArgIndex;
+            [](APInt lhs, APInt rhs) { return lhs.ult(rhs); });
+  llvm::SmallDenseMap<APInt, size_t> mapBindingArgIndex;
   for (auto [index, binding] : llvm::enumerate(sparseBindings)) {
     mapBindingArgIndex[binding] = index;
   }
@@ -263,8 +256,7 @@ public:
       } else {
         llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
       }
-      llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
-                                           subspanOp.getBinding())]] = llvmType;
+      llvmInputTypes[argMapping[subspanOp.getBinding()]] = llvmType;
     });
     // As a convention with HAL, push constants are appended as kernel arguments
     // after all the binding inputs.
@@ -353,8 +345,8 @@ public:
         operands, op->getAttrDictionary());
     MemRefType memrefType =
         llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
-    mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping[SetBinding(subspanOp.getSet(), subspanOp.getBinding())]);
+    mlir::BlockArgument llvmBufferArg =
+        llvmFuncOp.getArgument(argMapping[subspanOp.getBinding()]);
     // As a convention with HAL all the kernel argument pointers are 16Bytes
     // aligned.
     llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),

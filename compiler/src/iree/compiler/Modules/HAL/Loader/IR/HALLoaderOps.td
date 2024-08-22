@@ -144,7 +144,7 @@ def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z,
-    Variadic<I32>:$push_constants,
+    Variadic<I32>:$constants,
     Variadic<Util_BufferType>:$binding_buffers,
     Variadic<HAL_DeviceSize>:$binding_offsets,
     Variadic<HAL_DeviceSize>:$binding_lengths
@@ -158,7 +158,7 @@ def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
         $workgroup_y `,`
         $workgroup_z
     `]` `)`
-    (`constants` `(` `[` $push_constants^ `]` `)`)?
+    (`constants` `(` `[` $constants^ `]` `)`)?
     `bindings` `(` `[`
     custom<DispatchBindings>($binding_buffers,
                              type($binding_buffers),

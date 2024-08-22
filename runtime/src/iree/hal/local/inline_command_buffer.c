@@ -29,7 +29,7 @@ typedef struct iree_hal_inline_command_buffer_t {
   struct {
     // Cached and initialized dispatch state reused for all dispatches.
     // Individual dispatches must populate the dynamically changing fields like
-    // push_constant_count and binding_count.
+    // constant_count and binding_count.
     iree_alignas(64) iree_hal_executable_dispatch_state_v0_t dispatch_state;
     // Persistent storage for binding pointers used by dispatch_state.
     void* binding_ptr_storage[IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT];
@@ -397,8 +397,8 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         (uint32_t)dispatch_attrs.constant_count,
         constants.data_length / sizeof(uint32_t));
   }
-  dispatch_state->push_constant_count = dispatch_attrs.constant_count;
-  dispatch_state->push_constants = (const uint32_t*)constants.data;
+  dispatch_state->constant_count = dispatch_attrs.constant_count;
+  dispatch_state->constants = (const uint32_t*)constants.data;
 
   // Produce the dense binding list based on the declared bindings used.
   //

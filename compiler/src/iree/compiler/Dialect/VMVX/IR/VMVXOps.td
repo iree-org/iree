@@ -73,7 +73,6 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   }];
   let arguments = (ins
     HAL_PipelineLayoutAttr:$layout,
-    IndexAttr:$set,
     IndexAttr:$binding
   );
   let results = (outs
@@ -81,7 +80,6 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   );
   let assemblyFormat = [{
     `layout` `(` $layout `)`
-    `set` `(` $set `)`
     `binding` `(` $binding `)`
     attr-dict
   }];

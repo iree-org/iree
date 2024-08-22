@@ -76,25 +76,11 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
     // The layout defines the required bindings and push constants and can be
     // thought of as the function signature.
     hal.executable.export public @main ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer, ReadOnly>,
-              <2, storage_buffer>
-          ]>
-        ]>) attributes {
-          // Bindings are automatically inferred when possible as part of the
-          // ABI but can be overridden if the user wants to use features such as
-          // sparse bindings or multiple descriptor sets. To do so the
-          // `hal.interface.bindings` attribute can be added to an export op as
-          // follows mapping tensor operands/results to the pipeline layout
-          // sets/bindings:
-          hal.interface.bindings = [
-            #hal.interface.binding<0, 0>,
-            #hal.interface.binding<0, 1>,
-            #hal.interface.binding<0, 2>
-          ]
-        } {
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
+        ]>) {
     ^bb0(%device: !hal.device, %workload: index):
       // This host function is used to compute the XYZ workgroup count
       // dispatched at runtime. It can query the %device for capabilities
@@ -119,11 +105,9 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
   } {
     // Similar to the above but in-place by using a read/write binding.
     hal.executable.export public @main ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) {
     ^bb0(%device: !hal.device, %workload: index):
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]

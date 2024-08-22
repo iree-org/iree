@@ -672,10 +672,9 @@ public:
       }
 
       auto layoutAttr = exportOp.getLayoutAttr();
-      uint32_t constantCount =
-          static_cast<uint32_t>(layoutAttr.getPushConstants());
+      uint32_t constantCount = static_cast<uint32_t>(layoutAttr.getConstants());
       SmallVector<iree_hal_cuda_BindingBits_enum_t> bindingFlags;
-      for (auto bindingAttr : layoutAttr.getSetLayout(0).getBindings()) {
+      for (auto bindingAttr : layoutAttr.getBindings()) {
         iree_hal_cuda_BindingBits_enum_t flags = 0;
         if (allEnumBitsSet(bindingAttr.getFlags(),
                            IREE::HAL::DescriptorFlags::ReadOnly)) {

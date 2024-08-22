@@ -19,12 +19,10 @@
 //    --binding=4xf32=0,0,0,0
 
 // lhs * rhs => dst / s0b0 * s0b1 => s0b2
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // A single executable source definition is allowed per translation in this mode
@@ -47,9 +45,9 @@ hal.executable.source public @ex {
   // exported.
   builtin.module {
     func.func @elementwise_mul() {
-      %lhs = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %rhs = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %dst = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
+      %lhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %rhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index

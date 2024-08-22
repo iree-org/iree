@@ -75,27 +75,14 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
     // The layout defines the required bindings and push constants and can be
     // thought of as the function signature.
     hal.executable.export public @simple_mul ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer, ReadOnly>,
-              <2, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) attributes {
       // Certain backends (like CUDA) require a workgroup size (aka block
       // size) to be defined ahead of time.
-      workgroup_size = [64 : index, 1 : index, 1 : index],
-      // Bindings are automatically inferred when possible as part of the ABI
-      // but can be overridden if the user wants to use features such as sparse
-      // bindings or multiple descriptor sets. To do so the
-      // `hal.interface.bindings` attribute can be added to a dispatch op as
-      // follows mapping tensor operands/results to the pipeline layout
-      // sets/bindings:
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
+      workgroup_size = [64 : index, 1 : index, 1 : index]
     } {
     ^bb0(%device: !hal.device, %workload: index):
       // This host function is used to compute the XYZ workgroup count
@@ -110,11 +97,9 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
 
     // Similar to the above but in-place by using a read/write binding.
     hal.executable.export public @simple_mul_inplace ordinal(1)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     } {
@@ -153,10 +138,6 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
     %1 = arith.addf %0, %arg1 : tensor<?xf32>
 
     // Dispatch an in-place `rhs *= lhs` kernel.
-    //
-    // Note that we don't declare the hal.interface.bindings and let them be
-    // inferred - this only works when either specifying the variant that has
-    // a pipeline layout defined or all variants have the same pipeline layouts.
     %2 = flow.dispatch @executable::@simple_mul_inplace[%dim](%dim_i32, %0, %1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> %1{%dim}
 
     // CHECK: 8xf32=96 96 96 96 96 96 96 96

@@ -7,7 +7,9 @@
 // CHECK: hal.executable private @executable0
 hal.executable private @executable0 {
   hal.executable.variant public @variant target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>]>]>) {
+    hal.executable.export public @dispatch0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
+    ]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       // CHECK: arith.constant 123
       %c1 = arith.constant 1 : index
@@ -34,7 +36,9 @@ hal.executable private @executable1 {
   // CHECK-SAME:   path = "substitute_executables_replacement.obj",
   // CHECK-SAME:   data = dense<[72, 69, 76, 76, 79, 33,
   hal.executable.variant public @variant target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @dispatch1 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>]>]>) {
+    hal.executable.export public @dispatch1 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
+    ]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       // CHECK: arith.constant 100 : index
       %c100 = arith.constant 100 : index

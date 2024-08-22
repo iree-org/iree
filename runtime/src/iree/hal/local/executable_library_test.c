@@ -58,9 +58,9 @@ int main(int argc, char** argv) {
   // to specify (no buffer pointer indirection) and more efficient to access
   // (static struct offset address calculation, all fit in a few cache lines,
   // etc). They are limited in capacity, though, so only <=64(ish) are usable.
-  dispatch_tile_a_push_constants_t push_constants;
-  memset(&push_constants, 0, sizeof(push_constants));
-  push_constants.f0 = 5.0f;
+  dispatch_tile_a_constants_t constants;
+  memset(&constants, 0, sizeof(constants));
+  constants.f0 = 5.0f;
 
   // Setup the two buffer bindings the entry point is expecting.
   // They only need to remain valid for the duration of the invocation and all
@@ -90,8 +90,8 @@ int main(int argc, char** argv) {
       .workgroup_size_y = 1,
       .workgroup_size_z = 1,
       .max_concurrency = 1,
-      .push_constant_count = IREE_ARRAYSIZE(push_constants.values),
-      .push_constants = push_constants.values,
+      .constant_count = IREE_ARRAYSIZE(constants.values),
+      .constants = constants.values,
       .binding_count = IREE_ARRAYSIZE(binding_ptrs),
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,

@@ -2,19 +2,15 @@
 
 hal.executable @exe0 {
   hal.executable.variant @target target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry123 ordinal(123) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>
-      ]>
+    hal.executable.export @entry123 ordinal(123) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
 hal.executable @exe1 {
   hal.executable.variant @target target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export @entry456 ordinal(456) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>
-      ]>
+    hal.executable.export @entry456 ordinal(456) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }

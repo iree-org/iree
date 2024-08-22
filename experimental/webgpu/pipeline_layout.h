@@ -61,7 +61,7 @@ typedef struct iree_hal_webgpu_set_binding_info_t {
 iree_status_t iree_hal_webgpu_pipeline_layout_create(
     WGPUDevice device, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_host_size_t push_constant_count,
+    iree_host_size_t constant_count,
     iree_hal_webgpu_staging_buffer_t* staging_buffer,
     iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout);
@@ -69,7 +69,7 @@ iree_status_t iree_hal_webgpu_pipeline_layout_create(
 WGPUPipelineLayout iree_hal_webgpu_pipeline_layout_handle(
     iree_hal_pipeline_layout_t* layout);
 
-iree_host_size_t iree_hal_webgpu_pipeline_layout_push_constant_count(
+iree_host_size_t iree_hal_webgpu_pipeline_layout_constant_count(
     iree_hal_pipeline_layout_t* layout);
 
 const iree_hal_webgpu_set_binding_info_t*

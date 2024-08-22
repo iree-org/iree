@@ -2,10 +2,8 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 16], [1, 0, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @static_3d_sort  {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -16,7 +14,7 @@ hal.executable private @static_3d_sort  {
     builtin.module {
       func.func @static_3d_sort() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>>
         memref.assume_alignment %0, 64 : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -34,7 +32,7 @@ hal.executable private @static_3d_sort  {
 }
 
 // CHECK-LABEL: func.func @static_3d_sort()
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //       CHECK: %[[WG_OUTPUT:.+]] = memref.subview %[[ARG0]]
 //       CHECK: %[[TID_X:.+]] = gpu.thread_id x
 //       CHECK: %[[DIM_X:.+]] = gpu.block_dim x
