@@ -16,7 +16,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "replace_push_constants.mlir",
         ],
         include = ["*.mlir"],
     ),

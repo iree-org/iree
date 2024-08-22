@@ -47,7 +47,6 @@ iree_compiler_cc_library(
     name = "WGSL",
     srcs = [
         "Passes.cpp",
-        "WGSLReplacePushConstants.cpp",
     ],
     hdrs = [
         "Passes.h",
