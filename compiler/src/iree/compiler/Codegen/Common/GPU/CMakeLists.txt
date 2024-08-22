@@ -50,6 +50,7 @@ iree_cc_library(
     "AMDGPUDistributeContract.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUCheckResourceUsage.cpp"
+    "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeScfFor.cpp"
