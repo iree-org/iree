@@ -711,8 +711,6 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGS:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
   // CHECK-NEXT: %[[ARGSDATA_LVAL:.+]] = "emitc.member"(%[[ARGS]]) <{member = "data"}> : (!emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.lvalue<!emitc.ptr<ui8>>
   // CHECK-NEXT: %[[ARGSDATA:.+]] = emitc.load %[[ARGSDATA_LVAL]] : <!emitc.ptr<ui8>>
-  // CHECK-NEXT: %[[REF_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>
-  // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">> to %[[REF_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>
   // CHECK-NEXT: %[[ARG:.+]] = emitc.cast %[[ARGSDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
   // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_assign"(%arg2, %[[ARG]])
 
