@@ -90,4 +90,3 @@ iree_generated_e2e_runner_test(
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
-
