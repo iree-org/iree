@@ -17,7 +17,6 @@ on:
         type: string
         default: ""
 
-# test
 jobs:
   test:
     runs-on: nodai-amdgpu-mi300-x86-64
