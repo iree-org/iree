@@ -207,9 +207,10 @@ void HoistEncodingOpsPass::runOnOperation() {
     }
   }
 
-  RewritePatternSet dimPatterns(ctx);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(dimPatterns);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(dimPatterns)))) {
+  RewritePatternSet cleanPatterns(ctx);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanPatterns);
+  DispatchRegionOp::getCanonicalizationPatterns(cleanPatterns, ctx);
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(cleanPatterns)))) {
     return signalPassFailure();
   }
 }
