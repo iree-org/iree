@@ -1038,33 +1038,61 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
-    if (loop.getBody()->getOperations().size() != 2) {
-      return rewriter.notifyMatchFailure(
-          loop, "Body of the loop contains more than one op");
+    if (loop.getBody()->getOperations().size() == 1) {
+      return rewriter.notifyMatchFailure(loop,
+                                         "Loop only contains a terminator");
     }
 
-    // TODO(qedawkins): It should be fine to hoist as long as there is a single
-    // forall op such that any operation within the block of the parent scf.for
-    // is independent of the destination of the forall.
-    auto forallOp =
-        dyn_cast<scf::ForallOp>(loop.getBody()->without_terminator().begin());
-    if (!forallOp) {
-      return rewriter.notifyMatchFailure(
-          loop, "Loop single contained op is not scf.forall op");
-    }
-
-    if (forallOp.getNumResults() != 1 || loop.getNumResults() != 1) {
+    if (loop.getNumResults() != 1) {
       return rewriter.notifyMatchFailure(
           loop, "unimplemented: multi-result hoisting");
     }
 
-    if (loop.getBody()->getTerminator()->getOperand(0).getDefiningOp() !=
-        forallOp) {
+    auto forallOp = dyn_cast<scf::ForallOp>(
+        loop.getBody()->getTerminator()->getOperand(0).getDefiningOp());
+    if (!forallOp || forallOp.getNumResults() != loop->getNumResults()) {
       return rewriter.notifyMatchFailure(
-          loop, "Single for loop return is not forall result");
+          loop, "Single for loop return value is not forall result");
     }
 
-    // Step 1. Collect the set of tensor.parallel_insert_slice ops in the
+    // Verify that all other operations within the loop are only used by
+    // implicit capture within the scf.forall.
+    Block *loopBody = loop.getBody();
+    Value iterArg = loop.getRegionIterArg(0);
+    SmallVector<Operation *> operationsToMove;
+    for (Operation &op : loopBody->getOperations()) {
+      if (&op == forallOp || &op == loopBody->getTerminator()) {
+        continue;
+      }
+
+      if (op.getNumRegions() != 0 || isa<TilingInterface>(&op)) {
+        return rewriter.notifyMatchFailure(
+            loop, "unimplemented: hoisting of tilable or region ops.");
+      }
+
+      for (Value operand : op.getOperands()) {
+        if (operand == iterArg) {
+          return rewriter.notifyMatchFailure(
+              loop, "Found non forall op that depends on loop iter arg.");
+        }
+      }
+
+      for (Operation *user : op.getUsers()) {
+        if (user == forallOp) {
+          return rewriter.notifyMatchFailure(
+              loop, "Operation within loop body used by forall op.");
+        }
+      }
+      operationsToMove.push_back(&op);
+    }
+
+    // Step 1. Move all other operations into the body of the scf.forall op.
+    Block *forallBody = forallOp.getBody();
+    for (auto op : llvm::reverse(operationsToMove)) {
+      rewriter.moveOpBefore(op, &forallBody->getOperations().front());
+    }
+
+    // Step 2. Collect the set of tensor.parallel_insert_slice ops in the
     // terminator and their paired extract_slice ops from the for loop iter arg.
     SmallVector<Operation *> sliceOperandProducers;
 
@@ -1161,7 +1189,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
     // would work too because the operations are speculatable.
     slice = mlir::topologicalSort(slice);
 
-    // Step 2. Create the ForallOp.
+    // Step 3. Create the ForallOp.
     Location loc = forallOp.getLoc();
     scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
         loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
@@ -1175,7 +1203,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       for (auto slice : pairedSlices) {
         newInits.push_back(slice.getResult());
       }
-      // Step 3. Create a new for loop with new inits for the result of the
+      // Step 4. Create a new for loop with new inits for the result of the
       // extracted slices.
       auto newLoop = rewriter.create<scf::ForOp>(
           loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(),
@@ -1183,7 +1211,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           [](OpBuilder &, Location, Value, ValueRange) {});
 
       {
-        // Step 4. Inline the body of the original forall into the new for loop.
+        // Step 5. Inline the body of the original forall into the new for loop.
         OpBuilder::InsertionGuard g2(rewriter);
         SmallVector<Value> argReplacements(newForallOp.getInductionVars());
         argReplacements.append(newForallOp.getRegionIterArgs().begin(),
@@ -1232,7 +1260,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       }
     }
 
-    // Step 5. Erase the original terminator and replace the loop with
+    // Step 6. Erase the original terminator and replace the loop with
     // the hoisted loop.
     for (auto parallelSlice : terminators) {
       rewriter.eraseOp(parallelSlice);
