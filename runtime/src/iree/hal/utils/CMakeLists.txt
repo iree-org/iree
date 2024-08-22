@@ -238,6 +238,21 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_library(
+  NAME
+    stream_tracing
+  HDRS
+    "stream_tracing.h"
+  SRCS
+    "stream_tracing.c"
+  DEPS
+    iree::base
+    iree::base::internal::arena
+    iree::base::internal::synchronization
+    iree::hal
+  PUBLIC
+)
+
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
