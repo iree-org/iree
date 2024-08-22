@@ -45,13 +45,25 @@ enum PreprocessorDirective {
   PRAGMA
 };
 
-Value allocateVariable(OpBuilder builder, Location location, Type type,
-                       Attribute initializer);
+TypedValue<emitc::LValueType> allocateVariable(OpBuilder builder,
+                                               Location location, Type type,
+                                               Attribute initializer);
 
-Value allocateVariable(OpBuilder builder, Location location, Type type,
-                       std::optional<StringRef> initializer = std::nullopt);
+TypedValue<emitc::LValueType>
+allocateVariable(OpBuilder builder, Location location, Type type,
+                 std::optional<StringRef> initializer = std::nullopt);
 
-Value addressOf(OpBuilder builder, Location location, Value operand);
+/// Convert a value to an EmitC LValue by allocating a new variable and
+/// assigning the operand to it. Note that the variable declaration and
+/// assignment are split into two separate statements, so that padding bytes for
+/// struct values are not copied.
+TypedValue<emitc::LValueType> asLValue(OpBuilder builder, Location loc,
+                                       Value value);
+Value asRValue(OpBuilder builder, Location loc,
+               TypedValue<emitc::LValueType> value);
+
+TypedValue<emitc::PointerType> addressOf(OpBuilder builder, Location location,
+                                         TypedValue<emitc::LValueType> operand);
 
 Value contentsOf(OpBuilder builder, Location location, Value operand);
 
@@ -66,42 +78,46 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count);
 
 Value arrayElement(OpBuilder builder, Location location, Type type,
-                   size_t index, Value operand);
+                   size_t index, TypedValue<emitc::PointerType> operand);
 
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          IntegerAttr index, Value operand);
+                          IntegerAttr index,
+                          TypedValue<emitc::PointerType> operand);
 
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          Value index, Value operand);
+                          Value index, TypedValue<emitc::PointerType> operand);
 
-void arrayElementAssign(OpBuilder builder, Location location, Value array,
-                        size_t index, Value value);
+void arrayElementAssign(OpBuilder builder, Location location,
+                        TypedValue<emitc::PointerType> array, size_t index,
+                        Value value);
 
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields);
 
 Value structMember(OpBuilder builder, Location location, Type type,
-                   StringRef memberName, Value operand);
+                   StringRef memberName, TypedValue<emitc::LValueType> operand);
 
-Value structMemberAddress(OpBuilder builder, Location location,
-                          emitc::PointerType type, StringRef memberName,
-                          Value operand);
-
-void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName, Value operand, Value data);
+TypedValue<emitc::PointerType>
+structMemberAddress(OpBuilder builder, Location location,
+                    emitc::PointerType type, StringRef memberName,
+                    TypedValue<emitc::LValueType> operand);
 
 void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName, Value operand, StringRef data);
+                        StringRef memberName,
+                        TypedValue<emitc::LValueType> operand, Value data);
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
-                      StringRef memberName, Value operand);
+                      StringRef memberName,
+                      TypedValue<emitc::LValueType> operand);
 
-Value structPtrMemberAddress(OpBuilder builder, Location location,
-                             emitc::PointerType type, StringRef memberName,
-                             Value operand);
+TypedValue<emitc::PointerType>
+structPtrMemberAddress(OpBuilder builder, Location location,
+                       emitc::PointerType type, StringRef memberName,
+                       TypedValue<emitc::LValueType> operand);
 
 void structPtrMemberAssign(OpBuilder builder, Location location,
-                           StringRef memberName, Value operand, Value data);
+                           StringRef memberName,
+                           TypedValue<emitc::LValueType> operand, Value data);
 
 Value ireeMakeCstringView(OpBuilder builder, Location location,
                           std::string str);

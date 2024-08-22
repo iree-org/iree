@@ -558,8 +558,8 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     if (auto gpuReduceKind = combiningKindToAllReduce(kind)) {
       // Simple case -- emit `gpu.subgroup_reduce` directly.
       Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-      return builder.create<gpu::SubgroupReduceOp>(loc, laneVal,
-                                                   *gpuReduceKind);
+      return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, *gpuReduceKind,
+                                                   /*uniform=*/false);
     }
   }
 
