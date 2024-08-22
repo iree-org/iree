@@ -25,6 +25,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
     "Passes.h.inc"
+    "Transforms.h"
   SRCS
     "AggregatedOpInterfaceImpl.cpp"
     "ConvertConv2DToIm2ColOp.cpp"
@@ -35,6 +36,7 @@ iree_cc_library(
     "DecomposeWinogradPass.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
+    "ReshapeFusion.cpp"
     "SplitReduction.cpp"
     "TileAttention.cpp"
     "TilingInterfaceImpl.cpp"

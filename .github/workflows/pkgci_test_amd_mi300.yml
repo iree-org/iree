@@ -29,12 +29,7 @@ jobs:
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
-      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Check out repository
         uses: actions/checkout@v4.1.7
         with:
@@ -54,10 +49,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Install build dependencies
+      - name: Configure build toolchain
         run: |
-          sudo apt update
-          sudo apt install -y cmake clang ninja-build libstdc++-12-dev
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
 

@@ -20,6 +20,14 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
+static std::optional<Value> buildUnrealizedConversionCastOp(OpBuilder &builder,
+                                                            Type toType,
+                                                            ValueRange inputs,
+                                                            Location loc) {
+  return builder.create<UnrealizedConversionCastOp>(loc, toType, inputs)
+      .getResult(0);
+}
+
 class TestConversionPass : public TestConversionBase<TestConversionPass> {
 public:
   TestConversionPass() = default;
@@ -49,6 +57,8 @@ public:
         return type;
       });
     }
+
+    typeConverter.addTargetMaterialization(buildUnrealizedConversionCastOp);
 
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
