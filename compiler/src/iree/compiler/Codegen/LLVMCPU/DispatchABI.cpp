@@ -277,13 +277,13 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
               getMemberOf("workgroup_size_x", getUint32T(), &offsetInBits),
               getMemberOf("workgroup_size_y", getUint32T(), &offsetInBits),
               getMemberOf("workgroup_size_z", getUint16T(), &offsetInBits),
-              getMemberOf("push_constant_count", getUint16T(), &offsetInBits),
+              getMemberOf("constant_count", getUint16T(), &offsetInBits),
               getMemberOf("workgroup_count_x", getUint32T(), &offsetInBits),
               getMemberOf("workgroup_count_y", getUint32T(), &offsetInBits),
               getMemberOf("workgroup_count_z", getUint16T(), &offsetInBits),
               getMemberOf("max_concurrency", getUint8T(), &offsetInBits),
               getMemberOf("binding_count", getUint8T(), &offsetInBits),
-              getMemberOf("push_constants",
+              getMemberOf("constants",
                           getPtrOf(getConstOf(getArrayOf(getUint32T(), 64))),
                           &offsetInBits),
               getMemberOf(
@@ -412,7 +412,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   fieldTypes.push_back(uint32Type);
   fieldTypes.push_back(uint16Type);
 
-  // uint16_t push_constant_count;
+  // uint16_t constant_count;
   fieldTypes.push_back(uint16Type);
 
   // uint32_t workgroup_count_x;
@@ -428,7 +428,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   // uint8_t binding_count;
   fieldTypes.push_back(uint8Type);
 
-  // const uint32_t * push_constants;
+  // const uint32_t * constants;
   // void *const * binding_ptrs;
   // const size_t * binding_lengths;
   fieldTypes.push_back(opaquePtrType);
@@ -698,11 +698,11 @@ Value HALDispatchABI::loadWorkgroupLocalMemoryPtr(Operation *forOp,
 Value HALDispatchABI::loadPushConstantCount(Operation *forOp,
                                             OpBuilder &builder) {
   auto countValue =
-      loadFieldValue(forOp, DispatchStateField::push_constant_count, builder);
+      loadFieldValue(forOp, DispatchStateField::constant_count, builder);
   auto resultValue = castValueToType(
       forOp->getLoc(), countValue,
       typeConverter->convertType(builder.getIndexType()), builder);
-  return buildValueDI(forOp, resultValue, "push_constant_count", di.getSizeT(),
+  return buildValueDI(forOp, resultValue, "constant_count", di.getSizeT(),
                       builder);
 }
 
@@ -710,7 +710,7 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
                                        Type resultType, OpBuilder &builder) {
   auto loc = forOp->getLoc();
   auto constantsPtrValue =
-      loadFieldValue(forOp, DispatchStateField::push_constants, builder);
+      loadFieldValue(forOp, DispatchStateField::constants, builder);
   auto pushConstantType = IntegerType::get(context, 32);
   Value constantPtrValue = builder.create<LLVM::GEPOp>(
       loc, constantsPtrValue.getType(), pushConstantType, constantsPtrValue,
@@ -719,8 +719,7 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
       builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(forOp, resultValue,
-                      StringRef("push_constant[") + std::to_string(offset) +
-                          "]",
+                      StringRef("constant[") + std::to_string(offset) + "]",
                       di.getBasicType(resultType), builder);
 }
 

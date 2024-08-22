@@ -61,12 +61,14 @@ struct VulkanSPIRVTargetOptions {
 };
 } // namespace
 
+using DescriptorSetLayout = std::pair<unsigned, ArrayRef<PipelineBindingAttr>>;
+
 static std::tuple<iree_hal_vulkan_DescriptorSetLayoutDef_vec_ref_t,
                   iree_hal_vulkan_PipelineLayoutDef_vec_ref_t,
                   DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t>>
 createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
                          FlatbufferBuilder &fbb) {
-  DenseMap<IREE::HAL::DescriptorSetLayoutAttr, size_t> descriptorSetLayoutMap;
+  DenseMap<DescriptorSetLayout, size_t> descriptorSetLayoutMap;
   DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t> pipelineLayoutMap;
   SmallVector<iree_hal_vulkan_DescriptorSetLayoutDef_ref_t>
       descriptorSetLayoutRefs;
@@ -77,18 +79,20 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
       continue; // already present
     }
 
+    // Currently only one descriptor set on the compiler side. We could
+    // partition it by binding type (direct vs indirect, etc).
     SmallVector<uint32_t> descriptorSetLayoutOrdinals;
-    for (auto descriptorSetLayoutAttr : pipelineLayoutAttr.getSetLayouts()) {
-      auto it = descriptorSetLayoutMap.find(descriptorSetLayoutAttr);
-      if (it != descriptorSetLayoutMap.end()) {
-        descriptorSetLayoutOrdinals.push_back(it->second);
-        continue;
-      }
-
+    auto descriptorSetLayout =
+        DescriptorSetLayout(0, pipelineLayoutAttr.getBindings());
+    auto it = descriptorSetLayoutMap.find(descriptorSetLayout);
+    if (it != descriptorSetLayoutMap.end()) {
+      descriptorSetLayoutOrdinals.push_back(it->second);
+    } else {
       SmallVector<iree_hal_vulkan_DescriptorSetLayoutBindingDef_ref_t>
           bindingRefs;
-      for (auto bindingAttr : descriptorSetLayoutAttr.getBindings()) {
-        uint32_t ordinal = static_cast<uint32_t>(bindingAttr.getOrdinal());
+      for (auto [i, bindingAttr] :
+           llvm::enumerate(pipelineLayoutAttr.getBindings())) {
+        uint32_t ordinal = static_cast<uint32_t>(i);
         iree_hal_vulkan_VkDescriptorType_enum_t descriptorType = 0;
         switch (bindingAttr.getType()) {
         case IREE::HAL::DescriptorType::UniformBuffer:
@@ -107,7 +111,7 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
       auto bindingsRef = fbb.createOffsetVecDestructive(bindingRefs);
 
       descriptorSetLayoutOrdinals.push_back(descriptorSetLayoutRefs.size());
-      descriptorSetLayoutMap[descriptorSetLayoutAttr] =
+      descriptorSetLayoutMap[descriptorSetLayout] =
           descriptorSetLayoutRefs.size();
       descriptorSetLayoutRefs.push_back(
           iree_hal_vulkan_DescriptorSetLayoutDef_create(fbb, bindingsRef));
@@ -116,7 +120,7 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
         fbb.createInt32Vec(descriptorSetLayoutOrdinals);
 
     iree_hal_vulkan_PushConstantRange_vec_ref_t pushConstantRangesRef = 0;
-    if (int64_t pushConstantCount = pipelineLayoutAttr.getPushConstants()) {
+    if (int64_t pushConstantCount = pipelineLayoutAttr.getConstants()) {
       SmallVector<iree_hal_vulkan_PushConstantRange> pushConstantRanges;
       iree_hal_vulkan_PushConstantRange range0;
       range0.stage_flags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT

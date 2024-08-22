@@ -467,9 +467,9 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
-    %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
-    %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%30, %35}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x16x1xf32>>{%40, %45}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xf32>>{%50, %55}
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -566,11 +566,11 @@ func.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32() {
   %53 = arith.shli %52, %c32_i64 : i64
   %54 = arith.ori %51, %53 : i64
   %55 = arith.index_castui %54 : i64 to index
-  %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?x?x16x1xf32, #hal.descriptor_type<storage_buffer>>{%30, %35}
+  %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?x?x16x1xf32, #hal.descriptor_type<storage_buffer>>{%30, %35}
   memref.assume_alignment %56, 64 : memref<?x?x16x1xf32, #hal.descriptor_type<storage_buffer>>
-  %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%40, %45}
+  %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%40, %45}
   memref.assume_alignment %57, 1 : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
-  %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%50, %55}
+  %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%50, %55}
   memref.assume_alignment %58, 1 : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -657,11 +657,11 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?x?x16x1xf32>{%30, %35}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?x?x16x1xf32>{%30, %35}
     memref.assume_alignment %56, 64 : memref<?x?x16x1xf32>
-    %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>>{%40, %45}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>>{%40, %45}
     memref.assume_alignment %57, 1 : memref<?x?x16x1xf32, strided<[?, 16, 1, 1], offset: ?>>
-    %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>>{%50, %55}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>>{%50, %55}
     memref.assume_alignment %58, 1 : memref<?x?x16x16xf32, strided<[?, 256, 16, 1], offset: ?>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index

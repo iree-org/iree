@@ -36,12 +36,10 @@
 // `ret = lhs * rhs`
 //
 // Conforms to ABI:
-// #hal.pipeline.layout<push_constants = 1, sets = [
-//   <0, bindings = [
-//       <0, storage_buffer, ReadOnly>,
-//       <1, storage_buffer, ReadOnly>,
-//       <2, storage_buffer>
-//   ]>
+// #hal.pipeline.layout<constants = 1, bindings = [
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer>
 // ]>
 // With a workgroup size of 64x1x1.
 void simple_mul_workgroup(
@@ -64,11 +62,9 @@ void simple_mul_workgroup(
 // `rhs *= lhs`
 //
 // Conforms to ABI:
-// #hal.pipeline.layout<push_constants = 1, sets = [
-//   <0, bindings = [
-//       <0, storage_buffer, ReadOnly>,
-//       <1, storage_buffer>
-//   ]>
+// #hal.pipeline.layout<constants = 1, bindings = [
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer>
 // ]>
 // With a workgroup size of 64x1x1.
 void simple_mul_inplace_workgroup(
@@ -89,12 +85,10 @@ void simple_mul_inplace_workgroup(
 // `ret = -|lhs * rhs|`
 //
 // Conforms to ABI:
-// #hal.pipeline.layout<push_constants = 1, sets = [
-//   <0, bindings = [
-//       <0, storage_buffer, ReadOnly>,
-//       <1, storage_buffer, ReadOnly>,
-//       <2, storage_buffer>
-//   ]>
+// #hal.pipeline.layout<constants = 1, bindings = [
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer>
 // ]>
 // With a workgroup size of 64x1x1.
 void simple_mul_abs_negate_workgroup(

@@ -98,13 +98,13 @@ util.func public @fold_buffer_subspan_into_copy_buffer(
 
 // -----
 
-// CHECK-LABEL: @fold_buffer_subspan_into_push_descriptor_set
+// CHECK-LABEL: @fold_buffer_subspan_into_dispatch
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[LAYOUT:.+]]: !hal.pipeline_layout,
+//  CHECK-SAME: %[[EXECUTABLE:.+]]: !hal.executable,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
-util.func public @fold_buffer_subspan_into_push_descriptor_set(
+util.func public @fold_buffer_subspan_into_dispatch(
     %cmd: !hal.command_buffer,
-    %layout: !hal.pipeline_layout,
+    %executable: !hal.executable,
     %buffer: !hal.buffer
   ) {
   %c0 = arith.constant 0 : index
@@ -116,20 +116,52 @@ util.func public @fold_buffer_subspan_into_push_descriptor_set(
   %c262140 = arith.constant 262140 : index
   %c262144 = arith.constant 262144 : index
   %subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
-  //      CHECK: hal.command_buffer.push_descriptor_set
+  //      CHECK: hal.command_buffer.dispatch
   // CHECK-SAME:   bindings([
-  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer>
-      layout(%layout : !hal.pipeline_layout)[%c0]
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%c0]
+      workgroups([%c1, %c1, %c1])
       bindings([
         // 0 + 4096:
-        // CHECK-NEXT: %c0 = (%[[BASE_BUFFER]] : !hal.buffer)[%c4096, %c8000]
-        %c0 = (%subspan : !hal.buffer)[%c0, %c8000],
+        // CHECK-NEXT: (%[[BASE_BUFFER]] : !hal.buffer)[%c4096, %c8000]
+        (%subspan : !hal.buffer)[%c0, %c8000],
         // 4096 + 4:
-        // CHECK-NEXT: %c1 = (%[[BASE_BUFFER]] : !hal.buffer)[%c4100, %c262140]
-        %c1 = (%subspan : !hal.buffer)[%c4, %c262140],
+        // CHECK-NEXT: (%[[BASE_BUFFER]] : !hal.buffer)[%c4100, %c262140]
+        (%subspan : !hal.buffer)[%c4, %c262140],
         // No change:
-        // CHECK-NEXT: %c2 = (%[[BASE_BUFFER]] : !hal.buffer)[%c4096, %c262144]
-        %c2 = (%buffer : !hal.buffer)[%c4096, %c262144]
+        // CHECK-NEXT: (%[[BASE_BUFFER]] : !hal.buffer)[%c4096, %c262144]
+        (%buffer : !hal.buffer)[%c4096, %c262144]
       ])
+      flags("None")
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @fold_buffer_subspan_into_dispatch_indirect
+//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[EXECUTABLE:.+]]: !hal.executable,
+//  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
+util.func public @fold_buffer_subspan_into_dispatch_indirect(
+    %cmd: !hal.command_buffer,
+    %executable: !hal.executable,
+    %buffer: !hal.buffer
+  ) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c262144 = arith.constant 262144 : index
+  %subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
+  // CHECK: hal.command_buffer.dispatch.indirect
+  hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%c0]
+      // 4096 + 4:
+      // CHECK-SAME: workgroups(%[[BASE_BUFFER]] : !hal.buffer)[%c4100]
+      workgroups(%subspan : !hal.buffer)[%c4]
+      bindings([
+        (%buffer : !hal.buffer)[%c0, %c1]
+      ])
+      flags("None")
   util.return
 }

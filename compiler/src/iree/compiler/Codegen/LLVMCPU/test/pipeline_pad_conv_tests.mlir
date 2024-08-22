@@ -1,11 +1,9 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-none-elf"}>
 func.func @pad_conv_2d_nchw_fchw_1x320x64x64x320x3x3() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
@@ -23,12 +21,12 @@ func.func @pad_conv_2d_nchw_fchw_1x320x64x64x320x3x3() attributes {hal.executabl
   %7 = arith.index_castui %2 {stream.alignment = 256 : index, stream.values = [10507520 : index, 21488640 : index]} : i32 to index
   %8 = arith.index_castui %3 {stream.alignment = 256 : index, stream.values = [10508800 : index, 21489920 : index]} : i32 to index
   %9 = arith.index_castui %4 {stream.alignment = 128 : index, stream.values = [10486400 : index, 10487680 : index]} : i32 to index
-  %10 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c5243520) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320x64x64xf32>>
-  %11 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf32>>
-  %12 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%7) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
-  %13 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%8) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
-  %14 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%5) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
-  %15 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%9) : !flow.dispatch.tensor<writeonly:tensor<1x320x64x64xf32>>
+  %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c5243520) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320x64x64xf32>>
+  %11 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf32>>
+  %12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%7) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
+  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%8) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
+  %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%5) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x320xf32>>
+  %15 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%9) : !flow.dispatch.tensor<writeonly:tensor<1x320x64x64xf32>>
   %16 = flow.dispatch.tensor.load %10, offsets = [0, 0, 0, 0], sizes = [1, 320, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x320x64x64xf32>> -> tensor<1x320x64x64xf32>
   %17 = flow.dispatch.tensor.load %11, offsets = [0, 0, 0, 0], sizes = [320, 320, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<320x320x3x3xf32>> -> tensor<320x320x3x3xf32>
   %18 = flow.dispatch.tensor.load %12, offsets = [0, 0], sizes = [1, 320], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x320xf32>> -> tensor<1x320xf32>

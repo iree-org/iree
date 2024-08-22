@@ -5,10 +5,8 @@
 // as part of this pass for consistency (after running no executables/variants/
 // exports that are unused exist).
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // Should be removed as there are no uses.
@@ -57,10 +55,8 @@ util.func private @user() attributes {
 
 // Tests that an export with no references is dropped.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @exe {
   hal.executable.variant public @variant target(<"backend", "format">) {

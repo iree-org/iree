@@ -104,17 +104,14 @@ public:
       // Build dispatch function signature that the stream.cmd.dispatch ops will
       // map to.
       auto layoutAttr = exportOp.getLayout();
-      size_t totalBindingCount = 0;
-      for (auto setLayout : layoutAttr.getSetLayouts()) {
-        totalBindingCount += setLayout.getBindings().size();
-      }
+      size_t bindingCount = layoutAttr.getBindings().size();
       SmallVector<Type> inputTypes;
       inputTypes.append(exportOp.getWorkgroupCountBody()->getNumArguments() - 1,
                         indexType); // workload
-      inputTypes.append(layoutAttr.getPushConstants(), i32Type);
-      inputTypes.append(totalBindingCount, bufferType); // buffers
-      inputTypes.append(totalBindingCount, indexType);  // offsets
-      inputTypes.append(totalBindingCount, indexType);  // lengths
+      inputTypes.append(layoutAttr.getConstants(), i32Type);
+      inputTypes.append(bindingCount, bufferType); // buffers
+      inputTypes.append(bindingCount, indexType);  // offsets
+      inputTypes.append(bindingCount, indexType);  // lengths
       auto dispatchFuncType =
           innerModuleBuilder.getFunctionType(inputTypes, {});
 
@@ -136,13 +133,13 @@ public:
         return exportOp.emitOpError("missing body function");
       }
       if (bodyFuncOp.isPublic()) {
-        if (failed(rewriteWorkgroupSignature(layoutAttr, totalBindingCount,
+        if (failed(rewriteWorkgroupSignature(layoutAttr, bindingCount,
                                              bodyFuncOp))) {
           return failure();
         }
         bodyFuncOp.setPrivate(); // so we only do it once
       }
-      buildDispatchFunc(exportOp, layoutAttr, totalBindingCount, bodyFuncOp,
+      buildDispatchFunc(exportOp, layoutAttr, bindingCount, bodyFuncOp,
                         dispatchFuncOp);
 
       // Map from what the stream.cmd.dispatch ops is using to the new function.
@@ -185,7 +182,7 @@ public:
   // about the function signatures.
   LogicalResult
   rewriteWorkgroupSignature(IREE::HAL::PipelineLayoutAttr layoutAttr,
-                            size_t totalBindingCount,
+                            size_t bindingCount,
                             FunctionOpInterface bodyFuncOp) {
     auto *entryBlock = &bodyFuncOp.front();
     auto builder = OpBuilder::atBlockBegin(entryBlock);
@@ -209,10 +206,10 @@ public:
 
     // Expand push constants by replacing buffer accesses with the flattened
     // args.
-    newArgTypes.append(layoutAttr.getPushConstants(), i32Type);
+    newArgTypes.append(layoutAttr.getConstants(), i32Type);
     auto constantBuffer = entryBlock->getArgument(argOffset++);
     SmallVector<Value> constantArgs;
-    for (unsigned i = 0; i < layoutAttr.getPushConstants(); ++i) {
+    for (unsigned i = 0; i < layoutAttr.getConstants(); ++i) {
       constantArgs.push_back(
           entryBlock->addArgument(i32Type, constantBuffer.getLoc()));
     }
@@ -221,10 +218,10 @@ public:
     }
 
     // Expand buffer list by replacing list accesses with the flattened args.
-    newArgTypes.append(totalBindingCount, bufferType);
+    newArgTypes.append(bindingCount, bufferType);
     auto bindingList = entryBlock->getArgument(argOffset++);
     SmallVector<Value> bindingArgs;
-    for (unsigned i = 0; i < totalBindingCount; ++i) {
+    for (unsigned i = 0; i < bindingCount; ++i) {
       bindingArgs.push_back(
           entryBlock->addArgument(bufferType, bindingList.getLoc()));
     }
@@ -329,7 +326,7 @@ public:
   // Builds a function that calls a workgroup body and marshals arguments.
   //
   // Incoming:
-  //   (workload..., push_constants...,
+  //   (workload..., constants...,
   //    binding_buffers..., binding_offsets..., binding_lengths...)
   // Body (as translated):
   //   (local_memory, [constants], [bindings],
@@ -338,8 +335,7 @@ public:
   //    workgroup_count_x, workgroup_count_y, workgroup_count_z)
   void buildDispatchFunc(IREE::HAL::ExecutableExportOp exportOp,
                          IREE::HAL::PipelineLayoutAttr layoutAttr,
-                         size_t totalBindingCount,
-                         FunctionOpInterface bodyFuncOp,
+                         size_t bindingCount, FunctionOpInterface bodyFuncOp,
                          FunctionOpInterface dispatchFuncOp) {
     auto loc = exportOp.getLoc();
     auto builder = OpBuilder::atBlockBegin(dispatchFuncOp.addEntryBlock());
@@ -369,18 +365,18 @@ public:
     workgroupArgs.push_back(localMemory);
 
     // Pass all constants through.
-    for (int64_t i = 0; i < layoutAttr.getPushConstants(); ++i) {
+    for (int64_t i = 0; i < layoutAttr.getConstants(); ++i) {
       workgroupArgs.push_back(dispatchFuncOp.getArgument(argOffset++));
     }
 
     // Pass all buffers through as subspans with the binding offset and length
     // factored in. IPO can propagate the subspans (hopefully).
-    for (size_t i = 0; i < totalBindingCount; ++i) {
+    for (size_t i = 0; i < bindingCount; ++i) {
       auto bindingBuffer = dispatchFuncOp.getArgument(argOffset + i);
       auto bindingOffset =
-          dispatchFuncOp.getArgument(argOffset + totalBindingCount + i);
-      auto bindingLength = dispatchFuncOp.getArgument(
-          argOffset + totalBindingCount + totalBindingCount + i);
+          dispatchFuncOp.getArgument(argOffset + bindingCount + i);
+      auto bindingLength = dispatchFuncOp.getArgument(argOffset + bindingCount +
+                                                      bindingCount + i);
       Value bufferSize =
           builder.create<IREE::Util::BufferSizeOp>(loc, bindingBuffer);
       Value bindingView = builder.create<IREE::Util::BufferSubspanOp>(

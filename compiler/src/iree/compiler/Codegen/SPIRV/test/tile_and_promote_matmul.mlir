@@ -1,12 +1,10 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-gpu-test-target=pascal@vulkan --pass-pipeline='builtin.module(func.func(iree-spirv-tile-and-promote, cse))' %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 128], [16, 4], [0, 0, 32]]>
 #map = affine_map<()[s0] -> (s0 * 128)>
@@ -19,10 +17,10 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
   %c256 = arith.constant 256 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<256x128xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128x1024xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<256x1024xf32>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : memref<256x1024xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<256x128xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x1024xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<256x1024xf32>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : memref<256x1024xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -58,10 +56,10 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
 //  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<128x32xf32, #gpu.address_space<workgroup>>
 //  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<32x128xf32, #gpu.address_space<workgroup>>
 
-//  CHECK-DAG: %[[BUFFER_A:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) {{.+}} : memref<256x128xf32>
-//  CHECK-DAG: %[[BUFFER_B:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1) {{.+}} : memref<128x1024xf32>
-//  CHECK-DAG: %[[BUFFER_C:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(3) {{.+}} : memref<256x1024xf32>
-//  CHECK-DAG: %[[BUFFER_D:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2) {{.+}} : memref<256x1024xf32>
+//  CHECK-DAG: %[[BUFFER_A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.+}} : memref<256x128xf32>
+//  CHECK-DAG: %[[BUFFER_B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : memref<128x1024xf32>
+//  CHECK-DAG: %[[BUFFER_C:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3) {{.+}} : memref<256x1024xf32>
+//  CHECK-DAG: %[[BUFFER_D:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) {{.+}} : memref<256x1024xf32>
 
 //      CHECK: scf.for
 //      CHECK:   scf.for
@@ -112,12 +110,10 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 256], [1, 8, 8], [0, 0, 0, 16]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
@@ -130,9 +126,9 @@ func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #transl
   %c1024 = arith.constant 1024 : index
   %cst = arith.constant 0.111803398 : f32
   %cst_0 = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<16x1024x80xf16>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<16x80x1024xf16>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x1024x1024xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<16x1024x80xf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<16x80x1024xf16>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<16x1024x1024xf16>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -179,12 +175,10 @@ func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #transl
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
 #map = affine_map<()[s0] -> (s0 * 512)>
@@ -196,9 +190,9 @@ func.func @batch_matmul_f32_16x4096x40x4096() attributes {translation_info = #tr
   %c40 = arith.constant 40 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<16x4096x4096xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<16x4096x40xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<16x4096x40xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<16x4096x4096xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<16x4096x40xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<16x4096x40xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index

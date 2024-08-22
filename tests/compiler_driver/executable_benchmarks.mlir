@@ -18,4 +18,4 @@ func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
 // CHECK: vm.rodata private @abs_dispatch_0_vmvx_bytecode_fb
 // CHECK: vm.func private @abs_dispatch_0_vmvx_bytecode_fb_abs_dispatch_0{{.+}}(%arg0: i32)
 // CHECK-SAME: iree.reflection = {iree.benchmark = "dispatch"}
-// CHECK: vm.call @hal.command_buffer.dispatch
+// CHECK: vm.call.variadic @hal.command_buffer.dispatch

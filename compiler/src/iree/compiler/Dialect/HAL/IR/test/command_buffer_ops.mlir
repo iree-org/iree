@@ -213,44 +213,11 @@ util.func public @command_buffer_collective(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_push_descriptor_set
-//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[LAYOUT:.+]]: !hal.pipeline_layout,
-//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME:  %[[SLOT:.+]]: index)
-util.func public @command_buffer_push_descriptor_set(
-    %cmd: !hal.command_buffer,
-    %layout: !hal.pipeline_layout,
-    %buffer: !hal.buffer,
-    %slot: index) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c4 = arith.constant 4 : index
-  %c4096 = arith.constant 4096 : index
-  %c8000 = arith.constant 8000 : index
-  // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
-  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer>
-      // CHECK-SAME: layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c1]
-      layout(%layout : !hal.pipeline_layout)[%c1]
-      // CHECK-SAME: bindings([
-      bindings([
-        // CHECK-NEXT: %c0 = (%[[BUFFER]] : !hal.buffer)[%c4096, %c8000]
-        %c0 = (%buffer : !hal.buffer)[%c4096, %c8000],
-        // CHECK-NEXT: %c1 = (%[[SLOT]] : index)[%c4, %c4096]
-        %c1 = (%slot : index)[%c4, %c4096]
-      ])
-  util.return
-}
-
-// -----
-
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
@@ -258,18 +225,34 @@ hal.executable @ex {
 // CHECK-LABEL: @command_buffer_dispatch
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
-//  CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index)
+//  CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME:  %[[SLOT:.+]]: index)
 util.func public @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
     %executable: !hal.executable, %ordinal: index,
-    %x: index, %y: index, %z: index) {
-  //      CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
-  // CHECK-SAME:   workgroups([%[[X]], %[[Y]], %[[Z]]])
-  // CHECK-SAME:   flags("None")
+    %x: index, %y: index, %z: index,
+    %buffer: !hal.buffer,
+    %slot: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c8000 = arith.constant 8000 : index
+  // CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
+      // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
       target(%executable: !hal.executable)[%ordinal]
+      // CHECK-SAME: workgroups([%[[X]], %[[Y]], %[[Z]]])
       workgroups([%x, %y, %z])
+      // CHECK-SAME: bindings([
+      bindings([
+        // CHECK-NEXT: (%[[BUFFER]] : !hal.buffer)[%c4096, %c8000]
+        (%buffer : !hal.buffer)[%c4096, %c8000],
+        // CHECK-NEXT: (%[[SLOT]] : index)[%c4, %c4096]
+        (%slot : index)[%c4, %c4096]
+      ])
+      // CHECK-NEXT: flags("None")
       flags("None")
   util.return
 }
@@ -278,30 +261,33 @@ util.func public @command_buffer_dispatch(
 
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:.+]]: index,
-//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer, %[[OFFSET:.+]]: index)
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
 util.func public @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
     %executable: !hal.executable, %ordinal: index,
-    %buffer: !hal.buffer, %offset: index) {
+    %buffer: !hal.buffer, %offset: index, %length: index) {
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]]]
-  // CHECK-SAME:   flags("None")
+  // CHECK-SAME:   bindings([
+  // CHECK-NEXT:     (%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
+  // CHECK-NEXT:   ]) flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer : !hal.buffer)[%offset]
+      bindings([
+        (%buffer : !hal.buffer)[%offset, %length]
+      ])
       flags("None")
   util.return
 }
@@ -310,11 +296,9 @@ util.func public @command_buffer_dispatch_indirect(
 
 hal.executable @ex {
   hal.executable.variant @backend target(<"backend", "format">) {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
   }
 }
@@ -322,18 +306,23 @@ hal.executable @ex {
 // CHECK-LABEL: @command_buffer_dispatch_indirect_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[EXECUTABLE:[a-z0-9]+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
-//  CHECK-SAME:  %[[BUFFER_SLOT:[a-z0-9]+]]: index, %[[OFFSET:[a-z0-9]+]]: index)
+//  CHECK-SAME:  %[[BUFFER_SLOT:[a-z0-9]+]]: index, %[[OFFSET:[a-z0-9]+]]: index, %[[LENGTH:[a-z0-9]+]]: index)
 util.func public @command_buffer_dispatch_indirect_indirect(
     %cmd: !hal.command_buffer,
     %executable: !hal.executable, %ordinal: index,
-    %buffer_slot: index, %offset: index) {
+    %buffer_slot: index, %offset: index, %length: index) {
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER_SLOT]] : index)[%[[OFFSET]]]
-  // CHECK-SAME:   flags("None")
+  // CHECK-SAME:   bindings([
+  // CHECK-NEXT:     (%[[BUFFER_SLOT]] : index)[%[[OFFSET]], %[[LENGTH]]]
+  // CHECK-NEXT:   ]) flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer_slot : index)[%offset]
+      bindings([
+        (%buffer_slot : index)[%offset, %length]
+      ])
       flags("None")
   util.return
 }

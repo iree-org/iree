@@ -51,45 +51,44 @@ IREE_FLAG(int32_t, max_concurrency, 1,
 // Parsed parameters from flags.
 // Used to construct the dispatch parameters for the benchmark invocation.
 struct {
-  int32_t push_constant_count;
+  int32_t constant_count;
   union {
     uint32_t ui32;
-  } push_constants[IREE_HAL_EXECUTABLE_MAX_CONSTANT_COUNT];
+  } constants[IREE_HAL_EXECUTABLE_MAX_CONSTANT_COUNT];
 
   int32_t binding_count;
   iree_string_view_t bindings[IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT];
 } dispatch_params = {
-    .push_constant_count = 0,
+    .constant_count = 0,
     .binding_count = 0,
 };
 
-static iree_status_t parse_push_constant(iree_string_view_t flag_name,
-                                         void* storage,
-                                         iree_string_view_t value) {
-  IREE_ASSERT_LE(dispatch_params.push_constant_count + 1,
-                 IREE_ARRAYSIZE(dispatch_params.push_constants),
+static iree_status_t parse_constant(iree_string_view_t flag_name, void* storage,
+                                    iree_string_view_t value) {
+  IREE_ASSERT_LE(dispatch_params.constant_count + 1,
+                 IREE_ARRAYSIZE(dispatch_params.constants),
                  "too many push constants");
-  dispatch_params.push_constants[dispatch_params.push_constant_count++].ui32 =
+  dispatch_params.constants[dispatch_params.constant_count++].ui32 =
       atoi(value.data);
   return iree_ok_status();
 }
-static void print_push_constant(iree_string_view_t flag_name, void* storage,
-                                FILE* file) {
-  if (dispatch_params.push_constant_count == 0) {
+static void print_constant(iree_string_view_t flag_name, void* storage,
+                           FILE* file) {
+  if (dispatch_params.constant_count == 0) {
     fprintf(file, "# --%.*s=[integer value]\n", (int)flag_name.size,
             flag_name.data);
     return;
   }
-  for (int32_t i = 0; i < dispatch_params.push_constant_count; ++i) {
+  for (int32_t i = 0; i < dispatch_params.constant_count; ++i) {
     fprintf(file, "--%.*s=%u", (int)flag_name.size, flag_name.data,
-            dispatch_params.push_constants[i].ui32);
-    if (i < dispatch_params.push_constant_count - 1) {
+            dispatch_params.constants[i].ui32);
+    if (i < dispatch_params.constant_count - 1) {
       fprintf(file, "\n");
     }
   }
 }
-IREE_FLAG_CALLBACK(parse_push_constant, print_push_constant, &dispatch_params,
-                   push_constant_callback,
+IREE_FLAG_CALLBACK(parse_constant, print_constant, &dispatch_params,
+                   constant_callback,
                    "Appends a uint32_t push constant value.\n");
 
 static iree_status_t parse_binding(iree_string_view_t flag_name, void* storage,
@@ -217,8 +216,8 @@ static iree_status_t iree_hal_executable_library_run(
       .workgroup_size_y = FLAG_workgroup_size_y,
       .workgroup_size_z = FLAG_workgroup_size_z,
       .max_concurrency = FLAG_max_concurrency,
-      .push_constant_count = dispatch_params.push_constant_count,
-      .push_constants = &dispatch_params.push_constants[0].ui32,
+      .constant_count = dispatch_params.constant_count,
+      .constants = &dispatch_params.constants[0].ui32,
       .binding_count = dispatch_params.binding_count,
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,

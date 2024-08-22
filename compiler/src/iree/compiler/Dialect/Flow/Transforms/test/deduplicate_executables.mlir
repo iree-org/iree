@@ -386,11 +386,9 @@ hal.executable private @ex0 {
       hal.return %selected : i1
     }
     hal.executable.export public @dispatch ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 0, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) {
     ^bb0(%device: !hal.device, %workload: index):
       hal.return %workload, %workload, %workload : index, index, index
@@ -405,11 +403,9 @@ hal.executable private @ex1 {
       hal.return %selected : i1
     }
     hal.executable.export public @dispatch ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 0, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) {
     ^bb0(%device: !hal.device, %workload: index):
       hal.return %workload, %workload, %workload : index, index, index

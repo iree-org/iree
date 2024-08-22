@@ -712,8 +712,8 @@ typedef struct iree_hal_task_cmd_dispatch_t {
   iree_hal_local_executable_t* executable;
   int32_t ordinal;
 
-  // Total number of available 4 byte push constant values in |push_constants|.
-  uint16_t push_constant_count;
+  // Total number of available 4 byte push constant values in |constants|.
+  uint16_t constant_count;
 
   // Total number of binding base pointers in |binding_ptrs| and
   // |binding_lengths|. The set is packed densely based on which bindings are
@@ -721,7 +721,7 @@ typedef struct iree_hal_task_cmd_dispatch_t {
   uint16_t binding_count;
 
   // Following this structure in memory there are 3 tables:
-  // - const uint32_t push_constants[push_constant_count];
+  // - const uint32_t constants[constant_count];
   // - void* binding_ptrs[binding_count];
   // - const size_t binding_lengths[binding_count];
 } iree_hal_task_cmd_dispatch_t;
@@ -742,7 +742,7 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
       .workgroup_size_x = tile_context->workgroup_size[0],
       .workgroup_size_y = tile_context->workgroup_size[1],
       .workgroup_size_z = tile_context->workgroup_size[2],
-      .push_constant_count = cmd->push_constant_count,
+      .constant_count = cmd->constant_count,
       .workgroup_count_x = tile_context->workgroup_count[0],
       .workgroup_count_y = tile_context->workgroup_count[1],
       .workgroup_count_z = tile_context->workgroup_count[2],
@@ -751,8 +751,8 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
       .binding_count = cmd->binding_count,
   };
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
-  dispatch_state.push_constants = (uint32_t*)cmd_ptr;
-  cmd_ptr += cmd->push_constant_count * sizeof(*dispatch_state.push_constants);
+  dispatch_state.constants = (uint32_t*)cmd_ptr;
+  cmd_ptr += cmd->constant_count * sizeof(*dispatch_state.constants);
   dispatch_state.binding_ptrs = (void**)cmd_ptr;
   cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_ptrs);
   dispatch_state.binding_lengths = (size_t*)cmd_ptr;
@@ -802,7 +802,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
 
   cmd->executable = local_executable;
   cmd->ordinal = entry_point;
-  cmd->push_constant_count = dispatch_attrs.constant_count;
+  cmd->constant_count = dispatch_attrs.constant_count;
   cmd->binding_count = dispatch_attrs.binding_count;
 
   // TODO(benvanik): expose on API or keep fixed on executable.
@@ -835,10 +835,10 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
         constants.data_length / sizeof(uint32_t));
   }
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
-  uint32_t* push_constants = (uint32_t*)cmd_ptr;
-  memcpy(push_constants, constants.data,
-         dispatch_attrs.constant_count * sizeof(*push_constants));
-  cmd_ptr += dispatch_attrs.constant_count * sizeof(*push_constants);
+  uint32_t* constants_ptr = (uint32_t*)cmd_ptr;
+  memcpy(constants_ptr, constants.data,
+         dispatch_attrs.constant_count * sizeof(*constants_ptr));
+  cmd_ptr += dispatch_attrs.constant_count * sizeof(*constants_ptr);
 
   // Produce the dense binding list based on the declared bindings used.
   //

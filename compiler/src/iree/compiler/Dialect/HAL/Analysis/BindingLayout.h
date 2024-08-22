@@ -16,35 +16,28 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-struct DescriptorSetLayoutBinding {
+struct PipelineLayoutBinding {
   // Ordinal of the descriptor within its parent set layout.
-  unsigned ordinal;
+  unsigned ordinal = 0;
   // Storage type of the descriptor resource.
-  IREE::HAL::DescriptorType type;
+  IREE::HAL::DescriptorType type = IREE::HAL::DescriptorType::StorageBuffer;
   // Flags defining how the descriptor behaves.
-  IREE::HAL::DescriptorFlags flags;
+  IREE::HAL::DescriptorFlags flags = IREE::HAL::DescriptorFlags::None;
 };
 
-struct DescriptorSetLayout {
-  // Ordinal of the set within the parent pipeline layout.
-  unsigned ordinal;
-  // Usage of the descriptor set (such as whether it is persistent or push).
-  IREE::HAL::DescriptorSetLayoutFlags flags;
-  // Bindings within the layout. Ordinals may be sparse.
-  SmallVector<DescriptorSetLayoutBinding> bindings;
-};
-
-using PipelineResourceMap = SmallVector<std::pair<unsigned, unsigned>>;
+using PipelineResourceMap = SmallVector<unsigned>;
 
 struct PipelineLayout {
   // Total number of 32-bit push constants allocated. Not all dispatchable
   // functions using this layout will use all constants.
-  int64_t pushConstantCount;
-  // Sets bound in the layout. Ordinals may be sparse.
-  SmallVector<DescriptorSetLayout> setLayouts;
-  // Mapping of flattened source resource bindings into the descriptor sets.
-  // Matches 1:1 with the IREE::Stream::CmdDispatchOp::resources.
+  int64_t constantCount;
+  // Bindings within the layout. Ordinals may be sparse.
+  SmallVector<PipelineLayoutBinding> bindings;
+  // Mapping of flattened source resource bindings into the descriptor set
+  // bindings. Matches 1:1 with the IREE::Stream::CmdDispatchOp::resources.
   PipelineResourceMap resourceMap;
+  // Flags defining behavior of the pipeline.
+  IREE::HAL::PipelineLayoutFlags flags = IREE::HAL::PipelineLayoutFlags::None;
 
   void print(llvm::raw_ostream &os) const;
 };

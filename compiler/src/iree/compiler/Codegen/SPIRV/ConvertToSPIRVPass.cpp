@@ -117,7 +117,7 @@ createResourceVariable(Location loc, const SubspanResourceInfo &resource,
 /// Returns the (set, binding) pair for the given interface op.
 static std::pair<uint32_t, uint32_t>
 getInterfaceSetAndBinding(IREE::HAL::InterfaceBindingSubspanOp op) {
-  return {op.getSet().getSExtValue(), op.getBinding().getSExtValue()};
+  return {0, op.getBinding().getSExtValue()};
 }
 
 /// Scans all hal.interface.binding.subspan ops in `module`, creates their
@@ -289,7 +289,7 @@ struct HALInterfaceLoadConstantConverter final
     assert(exportOps.size() == 1);
     auto layoutAttr = exportOps.front().getLayout();
 
-    uint64_t elementCount = layoutAttr.getPushConstants();
+    uint64_t elementCount = layoutAttr.getConstants();
     unsigned index = loadOp.getOrdinal().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does

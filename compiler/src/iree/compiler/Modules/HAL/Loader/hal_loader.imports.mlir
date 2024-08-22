@@ -32,7 +32,7 @@ vm.import private @executable.dispatch(
   %workgroup_x : i32,
   %workgroup_y : i32,
   %workgroup_z : i32,
-  %push_constants : i32 ...,
+  %constants : i32 ...,
   // <buffer, offset, length>
   %bindings : tuple<!vm.buffer, i64, i64>...
 )

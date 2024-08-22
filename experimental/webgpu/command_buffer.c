@@ -147,12 +147,12 @@ typedef struct iree_hal_webgpu_command_buffer_t {
     // Currently open pass - NULL if no open pass.
     WGPUComputePassEncoder compute_pass;
 
-    // All available push constants updated each time push_constants is called.
+    // All available push constants updated each time constants is called.
     // Reset only with the command buffer and otherwise will maintain its values
-    // during recording to allow for partial push_constants updates.
-    uint32_t push_constants[IREE_HAL_WEBGPU_MAX_PUSH_CONSTANT_COUNT];
+    // during recording to allow for partial constants updates.
+    uint32_t constants[IREE_HAL_WEBGPU_MAX_PUSH_CONSTANT_COUNT];
 
-    // TODO(benvanik): add a push_constants dirty bit so we know if we need to
+    // TODO(benvanik): add a constants dirty bit so we know if we need to
     // upload more. Today we'll stage the same values for each dispatch.
 
     // Snapshot of descriptor sets as populated by push_descriptor_set.
@@ -750,7 +750,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
+static iree_status_t iree_hal_webgpu_command_buffer_constants(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
@@ -758,7 +758,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   if (IREE_UNLIKELY(offset + values_length >=
-                    sizeof(command_buffer->state.push_constants))) {
+                    sizeof(command_buffer->state.constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "push constant range %" PRIhsz " (length=%" PRIhsz
                             ") out of range",
@@ -766,7 +766,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
   }
 
   // NOTE: command buffer state change only; enqueues no tasks.
-  memcpy((uint8_t*)&command_buffer->state.push_constants + offset, values,
+  memcpy((uint8_t*)&command_buffer->state.constants + offset, values,
          values_length);
 
   return iree_ok_status();
@@ -819,14 +819,14 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
 
   // Upload push constant data - this may incur a segment flush if the staging
   // buffer is exhausted.
-  iree_host_size_t push_constant_count =
-      iree_hal_webgpu_pipeline_layout_push_constant_count(entry_point->layout);
-  iree_const_byte_span_t push_constant_data = iree_make_const_byte_span(
-      command_buffer->state.push_constants,
-      push_constant_count * sizeof(command_buffer->state.push_constants[0]));
+  iree_host_size_t constant_count =
+      iree_hal_webgpu_pipeline_layout_constant_count(entry_point->layout);
+  iree_const_byte_span_t constant_data = iree_make_const_byte_span(
+      command_buffer->state.constants,
+      constant_count * sizeof(command_buffer->state.constants[0]));
   uint32_t params_offset = 0;
   IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_append_parameters(
-      command_buffer, push_constant_data, &params_offset));
+      command_buffer, constant_data, &params_offset));
 
   // Acquire the compute pass we'll encode the dispatch into - this may be
   // fresh or reused from prior commands.
@@ -835,7 +835,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
       command_buffer, &compute_pass));
   wgpuComputePassEncoderSetPipeline(compute_pass, entry_point->pipeline);
 
-  if (push_constant_count > 0) {
+  if (constant_count > 0) {
     // Bind the push constant emulation bind group at the staging buffer
     // relative offset for this dispatch.
     wgpuComputePassEncoderSetBindGroup(
@@ -872,7 +872,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
     command_buffer->state.bind_groups_empty &= ~(1ull << i);
   }
 
-  if (push_constant_count > 0) {
+  if (constant_count > 0) {
     // Pad up to IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX with empty bind groups.
     WGPUBindGroup empty_handle =
         command_buffer->staging_buffer->empty_bind_group;
@@ -1045,7 +1045,7 @@ const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .fill_buffer = iree_hal_webgpu_command_buffer_fill_buffer,
     .update_buffer = iree_hal_webgpu_command_buffer_update_buffer,
     .copy_buffer = iree_hal_webgpu_command_buffer_copy_buffer,
-    .push_constants = iree_hal_webgpu_command_buffer_push_constants,
+    .constants = iree_hal_webgpu_command_buffer_constants,
     .push_descriptor_set = iree_hal_webgpu_command_buffer_push_descriptor_set,
     .dispatch = iree_hal_webgpu_command_buffer_dispatch,
     .dispatch_indirect = iree_hal_webgpu_command_buffer_dispatch_indirect,

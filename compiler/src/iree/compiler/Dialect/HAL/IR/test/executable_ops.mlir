@@ -13,11 +13,9 @@ hal.executable @ex {
   ]) {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>) attributes {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
@@ -42,11 +40,9 @@ hal.executable @ex_with_workgroup_count_region {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     subgroup_size = 64 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>) attributes {
       subgroup_size = 64 : index,
       workgroup_size = [4 : index, 1 : index, 1 : index]
@@ -83,11 +79,9 @@ hal.executable @ex_with_condition {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     subgroup_size = 64 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>) attributes {
       subgroup_size = 64 : index,
       workgroup_size = [4 : index, 1 : index, 1 : index]
@@ -141,26 +135,6 @@ hal.executable @ex_with_constants {
 // -----
 
 // CHECK-LABEL: @executable_create
-// CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
-// CHECK-SAME: %[[LAYOUT0:.+]]: !hal.pipeline_layout,
-// CHECK-SAME: %[[LAYOUT1:.+]]: !hal.pipeline_layout
-util.func public @executable_create(
-    %device: !hal.device,
-    %layout0: !hal.pipeline_layout,
-    %layout1: !hal.pipeline_layout) {
-  //      CHECK: = hal.executable.create
-  // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
-  // CHECK-SAME:     target(@exe::@binary1)
-  // CHECK-SAME:    layouts([%[[LAYOUT0]], %[[LAYOUT1]]]) : !hal.executable
-  %0 = hal.executable.create device(%device : !hal.device)
-                             target(@exe::@binary1)
-                            layouts([%layout0, %layout1]) : !hal.executable
-  util.return
-}
-
-// -----
-
-// CHECK-LABEL: @executable_create
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
 util.func public @executable_create(%device: !hal.device) {
   //      CHECK: = hal.executable.create
@@ -173,36 +147,14 @@ util.func public @executable_create(%device: !hal.device) {
 
 // -----
 
-// CHECK-LABEL: @pipeline_layout_create
-// CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
-// CHECK-SAME: %[[LAYOUT0:.+]]: !hal.descriptor_set_layout,
-// CHECK-SAME: %[[LAYOUT1:.+]]: !hal.descriptor_set_layout
-util.func public @pipeline_layout_create(
-    %device: !hal.device,
-    %layout0: !hal.descriptor_set_layout,
-    %layout1: !hal.descriptor_set_layout) {
-  // CHECK: hal.pipeline_layout.create
-  // CHECK-SAME:          device(%[[DEVICE]] : !hal.device)
-  // CHECK-SAME:  push_constants(1)
-  // CHECK-SAME:         layouts([%[[LAYOUT0]], %[[LAYOUT1]]]) : !hal.pipeline_layout
-  %0 = hal.pipeline_layout.create device(%device : !hal.device)
-                          push_constants(1)
-                                 layouts([%layout0, %layout1]) : !hal.pipeline_layout
-  util.return
-}
-
-// -----
-
 // CHECK-LABEL: @unresolved_workload_ex
 hal.executable @unresolved_workload_ex {
   // CHECK: hal.executable.variant public @backend
   hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.export public @entry0
-    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>,
-        #hal.descriptor_set.binding<1, storage_buffer>
-      ]>
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>,
+      #hal.pipeline.binding<storage_buffer>
     ]>) {
     ^bb0(%device: !hal.device, %arg0: index):
       hal.return %arg0, %arg0, %arg0 : index, index, index

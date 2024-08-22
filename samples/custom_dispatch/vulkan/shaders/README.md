@@ -75,12 +75,10 @@ glslc -fshader-stage=compute simple_mul.glsl -o simple_mul.spv
       ]
     }>
     hal.executable.export public @simple_mul ordinal(0)
-        layout(#hal.pipeline.layout<push_constants = 1, sets = [
-          <0, bindings = [
-              <0, storage_buffer, ReadOnly>,
-              <1, storage_buffer, ReadOnly>,
-              <2, storage_buffer>
-          ]>
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
         ]>) {
     ^bb0(%device: !hal.device, %workload: index):
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]

@@ -279,8 +279,8 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
   uint32_t workgroup_size_y;
   uint16_t workgroup_size_z;
 
-  // Total number of available 4 byte push constant values in |push_constants|.
-  uint16_t push_constant_count;
+  // Total number of available 4 byte push constant values in |constants|.
+  uint16_t constant_count;
 
   // Total workgroup count for the dispatch. This is sourced from either the
   // original dispatch call (for iree_hal_command_buffer_dispatch) or the
@@ -299,8 +299,8 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
   // used (known at compile-time).
   uint8_t binding_count;
 
-  // |push_constant_count| values.
-  const uint32_t* push_constants;
+  // |constant_count| values.
+  const uint32_t* constants;
   // Base pointers to each binding buffer.
   void* const* binding_ptrs;
   // The length of each binding in bytes, 1:1 with |binding_ptrs|.

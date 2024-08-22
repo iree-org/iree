@@ -41,12 +41,12 @@
 
 // RUN: iree-compile --compile-to=vm --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | FileCheck %s --check-prefix=VM-PHASE
 // VM-PHASE: vm.rodata private @abs_dispatch_0
-// VM-PHASE: vm.call @hal.command_buffer.dispatch
+// VM-PHASE: vm.call.variadic @hal.command_buffer.dispatch
 
 // RUN: iree-compile --output-format=vm-asm --compile-to=end --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | FileCheck %s --check-prefix=END-PHASE
 // RUN: iree-compile --output-format=vm-asm --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | FileCheck %s --check-prefix=END-PHASE
 // END-PHASE: vm.rodata private @abs_dispatch_0
-// END-PHASE: vm.call @hal.command_buffer.dispatch
+// END-PHASE: vm.call.variadic @hal.command_buffer.dispatch
 
 func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.absf %input : tensor<f32>

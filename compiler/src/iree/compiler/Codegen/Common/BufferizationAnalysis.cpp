@@ -137,8 +137,7 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
   if (!v1InterfaceBinding || !v2InterfaceBinding) {
     return true;
   }
-  if (v1InterfaceBinding.getSet() != v2InterfaceBinding.getSet() ||
-      v1InterfaceBinding.getBinding() != v2InterfaceBinding.getBinding() ||
+  if (v1InterfaceBinding.getBinding() != v2InterfaceBinding.getBinding() ||
       v1InterfaceBinding.getByteOffset() !=
           v2InterfaceBinding.getByteOffset()) {
     // If the set, binding or offsets are different, map these to different

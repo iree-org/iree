@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true %s | FileCheck %s
 
 // Today all memory control operations are ignored and we're just left with
 // the normal sequential execution barriers.
@@ -32,7 +32,7 @@ util.func public @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
+  %0 = stream.cmd.execute once on(#hal.device.affinity<@device>) with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
     // CHECK-NEXT: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: target(%arg0 : !hal.buffer)[%c0, %c128]
     // CHECK-SAME: pattern(%c255_i32 : i32)
@@ -52,7 +52,7 @@ util.func public @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<staging>{%arg3}) {
+  %0 = stream.cmd.execute once on(#hal.device.affinity<@device>) with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<staging>{%arg3}) {
     // CHECK-NEXT: hal.command_buffer.copy_buffer<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: source(%arg0 : !hal.buffer)[%c0]
     // CHECK-SAME: target(%arg2 : !hal.buffer)[%c0]
@@ -73,7 +73,7 @@ util.func public @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<transient>{%arg3}) {
+  %0 = stream.cmd.execute once on(#hal.device.affinity<@device>) with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<transient>{%arg3}) {
 
     // Out-of-place all-reduce:
     // CHECK-NEXT: hal.command_buffer.collective
@@ -142,7 +142,7 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
+  %0 = stream.cmd.execute once on(#hal.device.affinity<@device>) await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
     stream.cmd.concurrent {
       // CHECK-NEXT: hal.command_buffer.copy_buffer<%[[CMD]]
       stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
@@ -176,11 +176,9 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
 
 #executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer, Indirect>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer, Indirect>
 ]>
 hal.executable private @ex {
   hal.executable.variant public @aarch64 target(#executable_target_aarch64) {
@@ -328,7 +326,7 @@ util.func public @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device, [0, 1]>) await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
+  %0 = stream.cmd.execute once on(#hal.device.affinity<@device, [0, 1]>) await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
     stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
   } => !stream.timepoint
   // CHECK: hal.device.queue.execute

@@ -8,14 +8,11 @@
 hal.executable private @ex {
   hal.executable.variant public @vmvx_ir target(<"vmvx-inline", "vmvx-ir">) {
     hal.executable.export public @dispatch_0 ordinal(0) layout(
-         #hal.pipeline.layout<push_constants = 2,
-                                sets = [
-                                  <0, bindings = [
-                                    <0, storage_buffer>,
-                                    <1, storage_buffer>,
-                                    <2, storage_buffer>
-                                  ]>
-                                ]>) {
+      #hal.pipeline.layout<constants = 2, bindings = [
+        #hal.pipeline.binding<storage_buffer>,
+        #hal.pipeline.binding<storage_buffer>,
+        #hal.pipeline.binding<storage_buffer>
+      ]>) {
     ^bb0(%arg0: !hal.device, %workload_x: index, %workload_y: index):
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_x]
       %count_y = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_y]

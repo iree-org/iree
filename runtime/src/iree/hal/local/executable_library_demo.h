@@ -26,14 +26,14 @@ typedef union {
   struct {
     float f0;
   };
-} dispatch_tile_a_push_constants_t;
+} dispatch_tile_a_constants_t;
 
 // Returns a simple demo library with the following structure:
 //
 // Name: 'demo_library'
 //
 // [0] 'dispatch_tile_a': matmul+div
-//       push constants: 1 (dispatch_tile_a_push_constants_t)
+//       push constants: 1 (dispatch_tile_a_constants_t)
 //       bindings: 2
 //         [0] = R
 //         [1] = W

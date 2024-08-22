@@ -205,7 +205,7 @@ good candidates for this tool.
 5. Look up in the IR to see the values of push constants, if required:
 
 ```mlir
-  hal.command_buffer.push_constants<%cmd : !hal.command_buffer>
+  hal.command_buffer.constants<%cmd : !hal.command_buffer>
       layout(%0 : !hal.pipeline_layout)
       offset(0)
       values(%c1, %c2, %c3, %c4) : i32, i32, i32, i32
@@ -216,8 +216,8 @@ non-constant. This microbenchmarking approach is not generally suited for
 things like this but in cases where you know the meaning you can provide values:
 
 ```
---push_constant=1
---push_constant=2
---push_constant=3
---push_constant=4
+--constant=1
+--constant=2
+--constant=3
+--constant=4
 ```

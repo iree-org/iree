@@ -2,12 +2,10 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv{index-bits=64}))))' \
 // RUN:   %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb-ptr">) {
@@ -21,9 +19,9 @@ hal.executable private @interface_binding {
     } {
       func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<4x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
 
         %3 = memref.load %0[%c0, %c0] : memref<8x5xf32, #spirv.storage_class<PhysicalStorageBuffer>>
         %4 = memref.load %1[%c0] : memref<5xf32, #spirv.storage_class<PhysicalStorageBuffer>>

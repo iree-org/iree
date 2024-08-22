@@ -164,7 +164,7 @@ struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 // A tuple containing runtime values for a descriptor set binding.
 // The buffer specified may be either a !hal.buffer or an index of a binding
 // table slot to source the buffer from.
-struct DescriptorSetBindingValue {
+struct PipelineBindingValue {
   Value ordinal;
   Value buffer;
   Value byteOffset;
@@ -220,14 +220,14 @@ operator<<(AsmPrinter &printer,
 
 template <>
 struct FieldParser<
-    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>> {
-  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
+    std::optional<mlir::iree_compiler::IREE::HAL::PipelineLayoutFlags>> {
+  static FailureOr<mlir::iree_compiler::IREE::HAL::PipelineLayoutFlags>
   parse(AsmParser &parser) {
     std::string value;
     if (parser.parseKeywordOrString(&value))
       return failure();
     auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
-        mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>(value);
+        mlir::iree_compiler::IREE::HAL::PipelineLayoutFlags>(value);
     if (!result.has_value())
       return failure();
     return result.value();
@@ -235,8 +235,7 @@ struct FieldParser<
 };
 static inline AsmPrinter &operator<<(
     AsmPrinter &printer,
-    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
-        param) {
+    std::optional<mlir::iree_compiler::IREE::HAL::PipelineLayoutFlags> param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
                   : StringRef{""});
@@ -286,11 +285,6 @@ operator<<(AsmPrinter &printer,
 //===----------------------------------------------------------------------===//
 
 namespace mlir::iree_compiler::IREE::HAL {
-
-// Returns the assigned bindings via the `hal.interface.bindings` attribute
-// on the operation or default bindings in set 0 with bindings [0, count).
-SmallVector<IREE::HAL::InterfaceBindingAttr>
-getInterfaceBindingAttrs(Operation *op, size_t resourceCount);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

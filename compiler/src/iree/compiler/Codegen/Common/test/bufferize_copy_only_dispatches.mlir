@@ -1,10 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-bufferize-copy-only-dispatches))" --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 13, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 13, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @tensor_insert_slice() {
   %slice_size = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
@@ -20,9 +18,9 @@ func.func @tensor_insert_slice() {
   %dest_binding_size_x = hal.interface.constant.load layout(#pipeline_layout) ordinal(10) : index
   %source_binding_size_y = hal.interface.constant.load layout(#pipeline_layout) ordinal(11) : index
   %source_binding_size_x = hal.interface.constant.load layout(#pipeline_layout) ordinal(12) : index
-  %source = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0)
+  %source = hal.interface.binding.subspan layout(#pipeline_layout) binding(0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%source_binding_size_y, %source_binding_size_x}
-  %dest = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1)
+  %dest = hal.interface.binding.subspan layout(#pipeline_layout) binding(1)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>{%dest_binding_size_y, %dest_binding_size_x}
   %source_load = flow.dispatch.tensor.load %source, offsets = [%source_offset_y, %source_offset_x],
       sizes = [1, %slice_size], strides = [%source_stride_y, %source_stride_x]
@@ -43,8 +41,8 @@ func.func @tensor_insert_slice() {
 //  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(6)
 //  CHECK-DAG:   %[[SOURCE_STRIDE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(7)
 //  CHECK-DAG:   %[[SOURCE_STRIDE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(8)
-//  CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
-//  CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//  CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]] [1, %[[SLICE_SIZE]]] [%[[SOURCE_STRIDE_Y]], %[[SOURCE_STRIDE_X]]]
 //  CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][%[[DEST_OFFSET_Y]], %[[DEST_OFFSET_X]]] [%[[SLICE_SIZE]], 1] [%[[DEST_STRIDE_Y]], %[[DEST_STRIDE_X]]]
 //      CHECK:   linalg.generic
@@ -53,24 +51,22 @@ func.func @tensor_insert_slice() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, uniform_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<uniform_buffer>
 ]>
 func.func @UpSampling1D() {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>>
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>> -> tensor<2x3xf32>
   flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : tensor<2x3xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
   return
 }
 
 // CHECK-LABEL: func.func @UpSampling1D()
-//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
-//   CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][0, 0, 0] [2, 1, 3]
 //   CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][0, 0, 0] [2, 1, 3]
 //       CHECK:   linalg.generic
@@ -79,15 +75,13 @@ func.func @UpSampling1D() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @concatenate_cst() {
   %cst = arith.constant dense<0> : tensor<2x3xi32>
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
   flow.dispatch.tensor.store %cst, %0, offsets = [0, 2], sizes = [2, 3], strides = [1, 1] : tensor<2x3xi32> -> !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
   return
 }
@@ -103,15 +97,13 @@ func.func @concatenate_cst() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @already_bufferized() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
   memref.assume_alignment %0, 64 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
   %alloc = memref.alloc() : memref<1001xf32>
   linalg.fill ins(%cst : f32) outs(%alloc : memref<1001xf32>)

@@ -48,24 +48,24 @@ namespace mlir {
 
 template <>
 struct FieldParser<
-    std::optional<mlir::iree_compiler::IREE::Input::DescriptorSetLayoutFlags>> {
-  static FailureOr<mlir::iree_compiler::IREE::Input::DescriptorSetLayoutFlags>
+    std::optional<mlir::iree_compiler::IREE::Input::PipelineLayoutFlags>> {
+  static FailureOr<mlir::iree_compiler::IREE::Input::PipelineLayoutFlags>
   parse(AsmParser &parser) {
     std::string value;
     if (parser.parseKeywordOrString(&value))
       return failure();
     auto result = mlir::iree_compiler::IREE::Input::symbolizeEnum<
-        mlir::iree_compiler::IREE::Input::DescriptorSetLayoutFlags>(value);
+        mlir::iree_compiler::IREE::Input::PipelineLayoutFlags>(value);
     if (!result.has_value())
       return failure();
     return result.value();
   }
 };
 
-static inline AsmPrinter &operator<<(
-    AsmPrinter &printer,
-    std::optional<mlir::iree_compiler::IREE::Input::DescriptorSetLayoutFlags>
-        param) {
+static inline AsmPrinter &
+operator<<(AsmPrinter &printer,
+           std::optional<mlir::iree_compiler::IREE::Input::PipelineLayoutFlags>
+               param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::Input::stringifyEnum(
                         param.value())

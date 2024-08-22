@@ -50,7 +50,7 @@ bool is1DStaticShapedStorageBuffer(
 /// e.g.,
 ///
 /// ```mlir
-///  hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0)
+///  hal.interface.binding.subspan layout(#pipeline_layout) binding(0)
 ///  offset(%offset)
 ///      : memref<16xf32>
 /// ```
@@ -58,7 +58,7 @@ bool is1DStaticShapedStorageBuffer(
 /// is re-written to
 ///
 /// ```mlir
-///  hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0)
+///  hal.interface.binding.subspan layout(#pipeline_layout) binding(0)
 ///  offset(%offset)
 ///      : memref<?xf32>{%c16}
 /// ```
@@ -87,9 +87,8 @@ rewriteStorageBufferSubspanOp(RewriterBase &rewriter,
 
   auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
       subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
-      subspanOp.getSetAttr(), subspanOp.getBindingAttr(),
-      subspanOp.getByteOffset(), dynamicDims, subspanOp.getAlignmentAttr(),
-      subspanOp.getDescriptorFlagsAttr());
+      subspanOp.getBindingAttr(), subspanOp.getByteOffset(), dynamicDims,
+      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
   LLVM_DEBUG({
     llvm::dbgs() << "Rewritten to: ";

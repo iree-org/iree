@@ -3,13 +3,9 @@
 // NOTE: all other stream.cmd.* ops are handled by the hal_inline conversions.
 
 // Executables are required to translate the dispatch calls.
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<5, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @ex {
   hal.executable.variant public @variant target(#hal.executable.target<"llvm", "embedded-elf-x86_64">) {

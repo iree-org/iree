@@ -762,15 +762,10 @@ struct CmdDispatchOpPattern
     Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
         loc, builder.getIndexType(), entryPointAttr);
 
-    // TODO(#18154): simplify bindings by removing descriptor sets.
     auto layoutAttr = exportOp.getLayout();
-    auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
-        exportOp, dispatchOp.getResources().size());
     SmallVector<IREE::HAL::BindingValue> bindings;
-    for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
-      auto descriptorFlags = layoutAttr.getSetLayout(bindingAttr.getSet())
-                                 .getBinding(bindingAttr.getBinding())
-                                 .getFlags();
+    for (auto [i, bindingAttr] : llvm::enumerate(layoutAttr.getBindings())) {
+      auto descriptorFlags = bindingAttr.getFlags();
       IREE::HAL::BindingValue binding;
       if (bitEnumContainsAll(descriptorFlags,
                              IREE::HAL::DescriptorFlags::Indirect)) {

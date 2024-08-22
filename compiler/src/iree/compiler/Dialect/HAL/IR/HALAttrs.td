@@ -178,12 +178,12 @@ def HAL_DescriptorFlagsAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_DescriptorSetLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
-def HAL_DescriptorSetLayoutFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0001>;
-def HAL_DescriptorSetLayoutFlagsAttr :
-    I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
-      HAL_DescriptorSetLayoutFlags_None,
-      HAL_DescriptorSetLayoutFlags_Indirect,
+def HAL_PipelineLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_PipelineLayoutFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0001>;
+def HAL_PipelineLayoutFlagsAttr :
+    I32BitEnumAttr<"PipelineLayoutFlags", "valid PipelineLayout flags", [
+      HAL_PipelineLayoutFlags_None,
+      HAL_PipelineLayoutFlags_Indirect,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -376,57 +376,22 @@ def HAL_CollectiveAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set.binding<*>
+// hal.pipeline.binding<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DescriptorSetBindingAttr :
-    AttrDef<HAL_Dialect, "DescriptorSetBinding", []> {
-  let mnemonic = "descriptor_set.binding";
-  let summary = [{descriptor set binding specification}];
+def HAL_PipelineBindingAttr :
+    AttrDef<HAL_Dialect, "PipelineBinding", []> {
+  let mnemonic = "pipeline.binding";
+  let summary = [{pipeline binding specification}];
   let description = [{
-    Specifies a single binding within a descriptor set layout.
+    Specifies a single binding within a pipeline layout.
   }];
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$ordinal,
     AttrParameter<"DescriptorType", "">:$type,
     OptionalParameter<"DescriptorFlags", "DescriptorFlags::None">:$flags
   );
   let assemblyFormat = [{
-    `<` $ordinal `,` $type (`,` $flags^)? `>`
-  }];
-}
-
-def HAL_DescriptorSetLayoutBindingArrayAttr :
-    TypedArrayAttrBase<HAL_DescriptorSetBindingAttr,
-                       "HAL descriptor set layout binding array attribute">;
-
-//===----------------------------------------------------------------------===//
-// hal.descriptor_set.layout<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_DescriptorSetLayoutAttr :
-    AttrDef<HAL_Dialect, "DescriptorSetLayout", []> {
-  let mnemonic = "descriptor_set.layout";
-  let summary = [{descriptor set layout specification}];
-  let description = [{
-    Specifies the layout information of a single set of descriptors used within
-    an pipeline layout. Multiple of these sets may be used by a single entry
-    point to allow for bindings with similar update frequencies to be grouped.
-  }];
-  let parameters = (ins
-    AttrParameter<"int64_t", "">:$ordinal,
-    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings,
-    OptionalParameter<"std::optional<DescriptorSetLayoutFlags>">:$flags
-  );
-  let assemblyFormat = [{
-    `<`
-    $ordinal `,`
-    `bindings` `=` `[` $bindings `]`
-    (`,` `flags` `=` $flags^)?
-    `>`
-  }];
-  let extraClassDeclaration = [{
-    DescriptorSetBindingAttr getBinding(int64_t ordinal) const;
+    `<` $type (`,` $flags^)? `>`
   }];
 }
 
@@ -444,54 +409,24 @@ def HAL_PipelineLayoutAttr :
     lower-level target-specific argument passing behavior.
   }];
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$pushConstants,
-    ArrayRefParameter<"DescriptorSetLayoutAttr", "">:$setLayouts
+    ArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
+    OptionalParameter<"int64_t", "0">:$constants,
+    OptionalParameter<"std::optional<PipelineLayoutFlags>">:$flags
   );
   let assemblyFormat = [{
     `<`
-    `push_constants` `=` $pushConstants `,`
-    `sets` `=` `[` $setLayouts `]`
+    (`constants` `=` $constants^ `,` ` `)?
+    `bindings` `=` `[` qualified($bindings) `]`
+    (`,` `flags` `=` $flags^)?
     `>`
   }];
   let extraClassDeclaration = [{
-    DescriptorSetLayoutAttr getSetLayout(int64_t ordinal) const;
-
-    // Returns the binding index in a flattened list of all sets and bindings.
-    // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
-    // a query for set 1 binding 0 would return 4.
-    int64_t getFlatBindingIndex(int64_t set, int64_t binding) const;
+    IREE::HAL::PipelineBindingAttr getBinding(int64_t ordinal) const;
+    IREE::HAL::PipelineBindingAttr getBinding(APInt ordinal) const {
+      return getBinding(ordinal.getSExtValue());
+    }
   }];
 }
-
-//===----------------------------------------------------------------------===//
-// hal.interface.binding<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_InterfaceBindingAttr :
-    AttrDef<HAL_Dialect, "InterfaceBinding", []> {
-  let mnemonic = "interface.binding";
-  let summary = [{interface binding specification}];
-  let description = [{
-    Specifies the descriptor set and binding ordinal of a particular layout
-    binding.
-
-    Example:
-    ```mlir
-    #hal.interface.binding<0, 1>
-    ```
-  }];
-  let parameters = (ins
-    AttrParameter<"int64_t", "">:$set,
-    AttrParameter<"int64_t", "">:$binding
-  );
-  let assemblyFormat = [{
-    `<` $set `,` $binding `>`
-  }];
-}
-
-def HAL_InterfaceBindingArrayAttr :
-    TypedArrayAttrBase<HAL_InterfaceBindingAttr,
-                       "HAL binding array attribute">;
 
 //===----------------------------------------------------------------------===//
 // #hal.executable.target<*>
