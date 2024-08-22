@@ -223,6 +223,63 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   }];
 }
 
+def IREEGPU_DataTiledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getABCElementTypes",
+    // TODO: Implement the interface method. The current implementation just
+    // returns {VectorType(), VectorType(), VectorType()} now because the dummy
+    // implementation is required by the MmaInterfaceAttr.
+    "getABCVectorTypes",
+    "getMNKShape",
+    "getSubgroupSize",
+    // TODO: Implement the interface method.
+    // "populateOperandOffsetsSizesStrides",
+  ]>
+]> {
+  let mnemonic = "data_tiled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This mma variant represents MMA ops with data-tiling details. The
+    |intrinsic| field specifies which particular MMA intrinsic is targeted by
+    the data-tiling.
+
+    The tile swizzling already happens, so the attribute does not need to
+    implement materializeOperandConcreteShape interface method. E.g., if the
+    target intrinsic is MFMA_F32_16x16x4_F32:
+      - The inner tile shape of LHS is 4x16.
+      - The inner tile shape of RHS is 4x16.
+      - The inner tile shape of ACC is 4x16x4.
+
+    Furthermore, the unrolling and interleaving can be represented with the
+    attribute. In the concept of data-tiling, we always unroll the parallel
+    dimensions (i.e., M, N dimensions) to be outermost, and interleave the
+    unrolled K dimension. I.e., the unrolled K dimension becomes the innermost
+    dimension. The constraint can be relaxed based on data-tiling needs. The
+    additional information can be added to `parameters`.
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
+  ];
+
+  let parameters = (ins
+    IREEGPU_MMAIntrinsicAttr:$intrinsic
+  );
+
+  let extraClassDeclaration = [{
+    /// Infers the unrolling factor for (M, N, K) dimensions from the inner
+    /// tile shapes after tile swizzling. If the provided shapes are not valid,
+    /// returns {0, 0, 0}.
+    std::tuple<int64_t, int64_t, int64_t> getUnrollingFactor(ArrayRef<int64_t>
+        lhsShape, ArrayRef<int64_t> rhsShape, ArrayRef<int64_t> accShape);
+  }];
+}
+
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";

@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -849,6 +850,104 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+DataTiledMMAAttr DataTiledMMAAttr::get(MLIRContext *context,
+                                       MMAIntrinsic type) {
+  return Base::get(context, MMAIntrinsicAttr::get(context, type));
+}
+
+Attribute DataTiledMMAAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess()))
+    return {};
+
+  FailureOr<MMAIntrinsicAttr> mmaIntrinsic =
+      FieldParser<MMAIntrinsicAttr>::parse(p);
+  if (failed(mmaIntrinsic)) {
+    p.emitError(p.getCurrentLocation(), "failed to parse mfma type identifier");
+    return {};
+  }
+
+  if (failed(p.parseGreater()))
+    return {};
+
+  return get(p.getContext(), mmaIntrinsic->getValue());
+}
+
+void DataTiledMMAAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  os << stringifyMMAIntrinsic(getIntrinsic().getValue());
+  os << ">";
+}
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize, opaqueLayout.nSize, opaqueLayout.kSize};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+DataTiledMMAAttr::getABCVectorTypes() const {
+  // TODO: Implement the interface method.
+  return std::make_tuple(VectorType{}, VectorType{}, VectorType{});
+}
+
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+  case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
+    return 64;
+  }
+  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
+    return 32;
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return 0;
+}
+
+std::tuple<int64_t, int64_t, int64_t>
+DataTiledMMAAttr::getUnrollingFactor(ArrayRef<int64_t> lhsShape,
+                                     ArrayRef<int64_t> rhsShape,
+                                     ArrayRef<int64_t> accShape) {
+  auto multiplyAcc = [](ArrayRef<int64_t> shape) {
+    return std::accumulate(shape.begin(), shape.end(), 1,
+                           std::multiplies<int64_t>());
+  };
+  int64_t lhsInnerElementCount = multiplyAcc(lhsShape);
+  int64_t rhsInnerElementCount = multiplyAcc(rhsShape);
+  int64_t accInnerElementCount = multiplyAcc(accShape);
+
+  auto [m, n, k] = getMNKShape();
+  int64_t M0K0 = lhsInnerElementCount / m / k; // (M0M1K0K1) / M1 / K1 = M0K0
+  int64_t N0K0 = rhsInnerElementCount / n / k; // (N0N1K0K1) / N1 / K1 = N0K0
+  int64_t M0N0 = accInnerElementCount / m / n; // (M0M1N0N1) / M1 / N1 = M0N0
+
+  // Something goes wrong, returns {0, 0, 0} instead;
+  if (!M0K0 || !N0K0 || !M0N0) {
+    return {0, 0, 0};
+  }
+
+  int mUnrollFactor = std::sqrt(M0K0 * M0N0 / N0K0);
+  int nUnrollFactor = std::sqrt(M0N0 * N0K0 / M0K0);
+  int kUnrollFactor = std::sqrt(M0K0 * N0K0 / M0N0);
+  return {mUnrollFactor, nUnrollFactor, kUnrollFactor};
 }
 
 //===----------------------------------------------------------------------===//

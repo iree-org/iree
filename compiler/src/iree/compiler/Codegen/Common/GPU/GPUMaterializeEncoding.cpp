@@ -6,15 +6,23 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/LogicalResult.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
@@ -22,6 +30,7 @@
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-materialize-encoding"
@@ -33,10 +42,9 @@ namespace mlir::iree_compiler {
 
 /// Returns the corresponding native vector sizes defined by the `mma`
 /// intrinsic.
-static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAAttr mma,
+static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma,
                                                    int64_t roleIdx) {
-  if (mma.getIntrinsic().getValue() ==
-      IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
+  if (mma == IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
     // TODO: Query the value from GPU attributes.
     if (roleIdx == 0 || roleIdx == 1) {
       return {1, 1};
@@ -53,11 +61,10 @@ static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAAttr mma,
 
 // Given encoding's role index and element types, return the transpose
 // permutation used in GPU materialization.
-static SmallVector<int64_t> getEncodingTransposePerm(IREE::GPU::MMAAttr mma,
-                                                     int64_t roleIdx) {
+static SmallVector<int64_t>
+getEncodingTransposePerm(IREE::GPU::MMAIntrinsic mma, int64_t roleIdx) {
   // TODO: Support other intrinsics.
-  if (mma.getIntrinsic().getValue() !=
-      IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
+  if (mma != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
     return {};
   }
 
@@ -77,9 +84,10 @@ static SmallVector<int64_t> getEncodingTransposePerm(IREE::GPU::MMAAttr mma,
   }
 }
 
-static std::optional<IREE::GPU::MMAAttr>
+static std::optional<IREE::GPU::DataTiledMMAAttr>
 enumerateMmaIntrinsic(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   assert(elementTypes.size() == 3);
+  MLIRContext *ctx = target.getContext();
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
@@ -94,7 +102,7 @@ enumerateMmaIntrinsic(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
     if (lhs != aType || rhs != bType || out != cType) {
       continue;
     }
-    return mma;
+    return IREE::GPU::DataTiledMMAAttr::get(ctx, mma.getIntrinsic().getValue());
   }
 
   // Fallback - no architecture-optimized tile size for this case.
@@ -127,7 +135,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
         return cast<TypeAttr>(a).getValue();
       }));
-  std::optional<IREE::GPU::MMAAttr> mma =
+  std::optional<IREE::GPU::DataTiledMMAAttr> mma =
       enumerateMmaIntrinsic(elementTypes, gpuTargetAttr);
   if (!mma) {
     return failure();
@@ -143,11 +151,14 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // insert inner tile shapes and permutation info
   auto roleIdx = encoding.getOperandIndex().getInt();
-  auto intrinsicVectorSizes = getIntrinsicVectorSize(*mma, roleIdx);
-  auto permutation = getEncodingTransposePerm(*mma, roleIdx);
+  auto intrinsicVectorSizes =
+      getIntrinsicVectorSize(mma->getIntrinsic().getValue(), roleIdx);
+  auto permutation =
+      getEncodingTransposePerm(mma->getIntrinsic().getValue(), roleIdx);
   encodingInfo.innerTileShapes = intrinsicVectorSizes;
-  encodingInfo.intrinsicSize = {mma->getMSize(), mma->getNSize(),
-                                mma->getKSize()};
+  std::tuple<int64_t, int64_t, int64_t> mnkShape = mma->getMNKShape();
+  encodingInfo.intrinsicSize = {std::get<0>(mnkShape), std::get<1>(mnkShape),
+                                std::get<2>(mnkShape)};
   encodingInfo.permutation = permutation;
   return encodingInfo;
 }
@@ -365,6 +376,101 @@ struct GPUUnsetEncodingOpLoweringConversion
   }
 };
 
+class GPUConvertToMultiMma final
+    : public OpInterfaceConversionPattern<linalg::ContractionOpInterface> {
+public:
+  using OpInterfaceConversionPattern<
+      linalg::ContractionOpInterface>::OpInterfaceConversionPattern;
+
+  GPUConvertToMultiMma(
+      MLIRContext *context,
+      const MaterializeEncodingTypeConverter &typeConverter,
+      MaterializeEncodingValueFn materializeEncodingValueFn = {},
+      PatternBenefit benefit = 1)
+      : OpInterfaceConversionPattern<mlir::linalg::ContractionOpInterface>(
+            typeConverter, context, benefit),
+        materializeEncodingValueFn(materializeEncodingValueFn) {}
+
+  LogicalResult
+  matchAndRewrite(linalg::ContractionOpInterface op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+    auto inputs = linalgOp.getDpsInputOperands();
+    auto outputs = linalgOp.getDpsInits();
+    auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
+    auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
+    auto resultType = cast<RankedTensorType>(outputs[0].getType());
+    auto lhsEncoding = IREE::Encoding::getEncodingAttr(lhsType);
+    auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
+    auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
+    if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
+      LLVM_DEBUG(llvm::dbgs() << "expect encodings on operand types\n");
+      return failure();
+    }
+
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
+
+    // TODO(hanchung): Perhaps the MaterializedEncodingInfo should carry the
+    // target intrinsic attribute, so we don't need to query it again.
+    IREE::HAL::ExecutableTargetAttr targetAttr = converter->getTargetAttr();
+    IREE::GPU::TargetAttr gpuTargetAttr;
+    if (targetAttr) {
+      gpuTargetAttr = getGPUTargetAttr(targetAttr);
+    } else {
+      gpuTargetAttr = getCLGPUTarget(op.getContext());
+    }
+    auto elementTypes = llvm::to_vector(llvm::map_range(
+        resultEncoding.getElementTypes().getValue(),
+        [](Attribute a) { return cast<TypeAttr>(a).getValue(); }));
+    std::optional<IREE::GPU::DataTiledMMAAttr> mma =
+        enumerateMmaIntrinsic(elementTypes, gpuTargetAttr);
+    if (!mma) {
+      LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
+      return failure();
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma.value() << "\n");
+
+    FailureOr<linalg::ContractionDimensions> contractionDims =
+        linalg::inferContractionDims(linalgOp);
+    assert(
+        succeeded(contractionDims) &&
+        "should always be able to infer contraction dims for contraction ops");
+    // TODO(hanchung): Support batch gemms.
+    if (!contractionDims->batch.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "batch gemm is not yet implemented\n");
+      return failure();
+    }
+
+    // TODO(hanchung): Support unrolling cases. We likely need to teach
+    // multi_mma op about interleaving K dimension.
+    MLIRContext *ctx = rewriter.getContext();
+    AffineExpr mExpr = rewriter.getAffineDimExpr(0);
+    AffineExpr nExpr = rewriter.getAffineDimExpr(1);
+    AffineExpr kExpr = rewriter.getAffineDimExpr(2);
+
+    // The outer dims are all in row-major fasion after relayout.
+    auto lhsMap = AffineMap::get(3, 0, {mExpr, kExpr}, ctx);
+    auto rhsMap = AffineMap::get(3, 0, {nExpr, kExpr}, ctx);
+    auto accMap = AffineMap::get(3, 0, {mExpr, nExpr}, ctx);
+
+    SmallVector<utils::IteratorType> iteratorTypes =
+        linalgOp.getIteratorTypesArray();
+
+    // TODO(hanchung): Support batch gemms.
+    Location loc = op.getLoc();
+    auto mmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
+        loc, operands[0], operands[1], operands[2],
+        ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
+        mma.value());
+    rewriter.replaceOp(op, mmaOp);
+    return success();
+  }
+
+protected:
+  const MaterializeEncodingValueFn materializeEncodingValueFn;
+};
+
 } // namespace
 
 void GPUMaterializeDeviceEncodingPass::runOnOperation() {
@@ -383,7 +489,7 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
         patterns, target, typeConverter, materializeEncodingValueFn);
 
     patterns.insert<GPUSetEncodingOpLoweringConversion,
-                    GPUUnsetEncodingOpLoweringConversion>(
+                    GPUUnsetEncodingOpLoweringConversion, GPUConvertToMultiMma>(
         ctx, typeConverter, materializeEncodingValueFn);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
