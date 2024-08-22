@@ -160,13 +160,13 @@ util.func public @executable_create(
 
 // -----
 
-// CHECK-LABEL: @executable_create2
+// CHECK-LABEL: @executable_create
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
-util.func public @executable_create2(%device: !hal.device) {
+util.func public @executable_create(%device: !hal.device) {
   //      CHECK: = hal.executable.create
   // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:     target(@exe::@binary1) : !hal.executable
-  %0 = hal.executable.create2 device(%device : !hal.device)
+  %0 = hal.executable.create device(%device : !hal.device)
                               target(@exe::@binary1) : !hal.executable
   util.return
 }

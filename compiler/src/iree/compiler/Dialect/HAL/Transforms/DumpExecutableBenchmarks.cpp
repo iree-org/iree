@@ -353,7 +353,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
-        forBuilder.create<IREE::HAL::CommandBufferDispatch2Op>(
+        forBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
             loc, commandBuffer, executable, ordinal,
             workgroupCountOp.getResults(), constantValues, bindingValues,
             IREE::HAL::DispatchFlags::None);

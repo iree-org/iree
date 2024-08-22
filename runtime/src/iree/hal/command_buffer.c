@@ -512,7 +512,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -549,12 +549,12 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
 
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_dispatch2_validation(
+        z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
                 entry_point, workgroup_count, constants, bindings, flags));
   });
 
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch2)(
+  iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
       command_buffer, executable, entry_point, workgroup_count, constants,
       bindings, flags);
 
@@ -562,7 +562,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2_indirect(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -572,11 +572,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2_indirect(
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_dispatch2_indirect_validation(
+        z0, iree_hal_command_buffer_dispatch_indirect_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
                 entry_point, workgroups_ref, constants, bindings, flags));
   });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch2_indirect)(
+  iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch_indirect)(
       command_buffer, executable, entry_point, workgroups_ref, constants,
       bindings, flags);
   IREE_TRACE_ZONE_END(z0);

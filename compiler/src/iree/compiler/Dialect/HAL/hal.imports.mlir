@@ -286,10 +286,8 @@ vm.import private @command_buffer.collective(
   %element_count : i64
 )
 
-// TODO(#18154): replace @command_buffer.dispatch.
-//
 // Dispatches an execution request.
-vm.import private @command_buffer.dispatch2(
+vm.import private @command_buffer.dispatch(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable : !vm.ref<!hal.executable>,
   %entry_point : i32,
@@ -305,11 +303,9 @@ attributes {
   minimum_version = 4 : i32
 }
 
-// TODO(#18154): replace @command_buffer.dispatch.indirect.
-//
 // Dispatches an execution request with the dispatch parameters loaded from the
 // given buffer.
-vm.import private @command_buffer.dispatch2.indirect(
+vm.import private @command_buffer.dispatch.indirect(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable : !vm.ref<!hal.executable>,
   %entry_point : i32,
@@ -444,9 +440,8 @@ attributes {nosideeffects}
 // iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
-// TODO(#18154): replace @executable.create.
 // Creates an executable for use with the specified device.
-vm.import private @executable.create2(
+vm.import private @executable.create(
   %device : !vm.ref<!hal.device>,
   %executable_format : !vm.buffer,
   %executable_data : !vm.buffer,

@@ -84,20 +84,19 @@ public:
   }
 };
 
-class ExecutableCreate2OpConversion
-    : public OpConversionPattern<IREE::HAL::ExecutableCreate2Op> {
+class ExecutableCreateOpConversion
+    : public OpConversionPattern<IREE::HAL::ExecutableCreateOp> {
 public:
-  ExecutableCreate2OpConversion(MLIRContext *context,
-                                SymbolTable &importSymbols,
-                                TypeConverter &typeConverter,
-                                StringRef importName)
+  ExecutableCreateOpConversion(MLIRContext *context, SymbolTable &importSymbols,
+                               TypeConverter &typeConverter,
+                               StringRef importName)
       : OpConversionPattern(context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::ExecutableCreate2Op createOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
@@ -150,8 +149,8 @@ void populateHALExecutableToVMPatterns(MLIRContext *context,
   // contents during conversion of the ops that use them.
   patterns.insert<RemoveExecutableOpConversion>(context);
 
-  patterns.insert<ExecutableCreate2OpConversion>(
-      context, importSymbols, typeConverter, "hal.executable.create2");
+  patterns.insert<ExecutableCreateOpConversion>(
+      context, importSymbols, typeConverter, "hal.executable.create");
 }
 
 } // namespace mlir::iree_compiler

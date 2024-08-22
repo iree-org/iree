@@ -1076,15 +1076,15 @@ void CommandBufferUpdateBufferOp::setSubrangeOperand(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch2 + .indirect
+// hal.command_buffer.dispatch + .indirect
 //===----------------------------------------------------------------------===//
 
-void CommandBufferDispatch2Op::build(OpBuilder &builder, OperationState &state,
-                                     Value commandBuffer, Value executable,
-                                     Value entryPoint, ValueRange workgroups,
-                                     ValueRange constants,
-                                     ArrayRef<BindingValue> bindings,
-                                     IREE::HAL::DispatchFlags flags) {
+void CommandBufferDispatchOp::build(OpBuilder &builder, OperationState &state,
+                                    Value commandBuffer, Value executable,
+                                    Value entryPoint, ValueRange workgroups,
+                                    ValueRange constants,
+                                    ArrayRef<BindingValue> bindings,
+                                    IREE::HAL::DispatchFlags flags) {
   state.addOperands({commandBuffer, executable, entryPoint});
   state.addOperands(workgroups);
   state.addOperands(constants);
@@ -1116,7 +1116,7 @@ void CommandBufferDispatch2Op::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-void CommandBufferDispatch2IndirectOp::build(
+void CommandBufferDispatchIndirectOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
     Value executable, Value entryPoint, Value workgroupsBuffer,
     Value workgroupsOffset, ValueRange constants,
@@ -1151,10 +1151,10 @@ void CommandBufferDispatch2IndirectOp::build(
                      }));
 }
 
-static LogicalResult verifyDispatch2Bindings(Operation *op,
-                                             ValueRange bindingBuffers,
-                                             ValueRange bindingOffsets,
-                                             ValueRange bindingLengths) {
+static LogicalResult verifyDispatchBindings(Operation *op,
+                                            ValueRange bindingBuffers,
+                                            ValueRange bindingOffsets,
+                                            ValueRange bindingLengths) {
   if (bindingBuffers.size() != bindingOffsets.size() ||
       bindingBuffers.size() != bindingLengths.size()) {
     return op->emitOpError() << "requires that binding fields all have the "
@@ -1163,18 +1163,16 @@ static LogicalResult verifyDispatch2Bindings(Operation *op,
   return success();
 }
 
-LogicalResult CommandBufferDispatch2Op::verify() {
-  CommandBufferDispatch2Op op = *this;
-  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
-                                 op.getBindingOffsets(),
-                                 op.getBindingLengths());
+LogicalResult CommandBufferDispatchOp::verify() {
+  CommandBufferDispatchOp op = *this;
+  return verifyDispatchBindings(op, op.getBindingBuffers(),
+                                op.getBindingOffsets(), op.getBindingLengths());
 }
 
-LogicalResult CommandBufferDispatch2IndirectOp::verify() {
-  CommandBufferDispatch2IndirectOp op = *this;
-  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
-                                 op.getBindingOffsets(),
-                                 op.getBindingLengths());
+LogicalResult CommandBufferDispatchIndirectOp::verify() {
+  CommandBufferDispatchIndirectOp op = *this;
+  return verifyDispatchBindings(op, op.getBindingBuffers(),
+                                op.getBindingOffsets(), op.getBindingLengths());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1853,10 +1851,10 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.create2
+// hal.executable.create
 //===----------------------------------------------------------------------===//
 
-void ExecutableCreate2Op::getAsmResultNames(
+void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), StringRef("executable"));

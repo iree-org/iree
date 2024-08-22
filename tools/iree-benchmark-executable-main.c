@@ -227,7 +227,7 @@ static iree_status_t iree_benchmark_executable_run(
       .values = args->bindings,
   };
   for (int32_t i = 0; i < FLAG_batch_size; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch2(
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
         command_buffer, args->executable, FLAG_entry_point,
         args->workgroup_count, constants, bindings,
         IREE_HAL_DISPATCH_FLAG_NONE));

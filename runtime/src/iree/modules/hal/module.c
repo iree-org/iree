@@ -870,11 +870,11 @@ typedef struct {
   const uint32_t* constants;
   iree_vm_size_t binding_count;
   const iree_vm_abi_iirII_t* bindings;
-} iree_hal_module_command_buffer_dispatch2_args_t;
-static iree_status_t iree_hal_module_command_buffer_dispatch2(
+} iree_hal_module_command_buffer_dispatch_args_t;
+static iree_status_t iree_hal_module_command_buffer_dispatch(
     iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,
     iree_hal_module_state_t* IREE_RESTRICT state,
-    const iree_hal_module_command_buffer_dispatch2_args_t* IREE_RESTRICT args) {
+    const iree_hal_module_command_buffer_dispatch_args_t* IREE_RESTRICT args) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_check_deref(args->command_buffer,
                                                            &command_buffer));
@@ -905,13 +905,13 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2(
     binding->length = iree_hal_cast_device_size(args->bindings[i].i4);
   }
 
-  return iree_hal_command_buffer_dispatch2(
+  return iree_hal_command_buffer_dispatch(
       command_buffer, executable, args->entry_point, args->workgroup_count,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
 }
-static iree_status_t iree_hal_module_command_buffer_dispatch2_shim(
+static iree_status_t iree_hal_module_command_buffer_dispatch_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
@@ -925,7 +925,7 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2_shim(
     // Can't fit even with zero lengths.
     args_ok = false;
   }
-  iree_hal_module_command_buffer_dispatch2_args_t args = {
+  iree_hal_module_command_buffer_dispatch_args_t args = {
       .params = *(const iree_vm_abi_rriiiiI_t*)args_storage.data,
   };
   if (args_ok) {
@@ -948,9 +948,9 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2_shim(
                             "argument/result signature mismatch");
   }
   IREE_ASSERT(target_fn == (iree_vm_native_function_target2_t)
-                               iree_hal_module_command_buffer_dispatch2);
-  return iree_hal_module_command_buffer_dispatch2(stack, module, module_state,
-                                                  &args);
+                               iree_hal_module_command_buffer_dispatch);
+  return iree_hal_module_command_buffer_dispatch(stack, module, module_state,
+                                                 &args);
 }
 
 // Argument signature: rriirIICiDCiirIID
@@ -971,12 +971,12 @@ typedef struct {
   const uint32_t* constants;
   iree_vm_size_t binding_count;
   const iree_vm_abi_iirII_t* bindings;
-} iree_hal_module_command_buffer_dispatch2_indirect_args_t;
-static iree_status_t iree_hal_module_command_buffer_dispatch2_indirect(
+} iree_hal_module_command_buffer_dispatch_indirect_args_t;
+static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
     iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,
     iree_hal_module_state_t* IREE_RESTRICT state,
-    const iree_hal_module_command_buffer_dispatch2_indirect_args_t*
-        IREE_RESTRICT args) {
+    const iree_hal_module_command_buffer_dispatch_indirect_args_t* IREE_RESTRICT
+        args) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_check_deref(args->command_buffer,
                                                            &command_buffer));
@@ -1011,13 +1011,13 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2_indirect(
     binding->length = iree_hal_cast_device_size(args->bindings[i].i4);
   }
 
-  return iree_hal_command_buffer_dispatch2_indirect(
+  return iree_hal_command_buffer_dispatch_indirect(
       command_buffer, executable, args->entry_point, workgroups_ref,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
 }
-static iree_status_t iree_hal_module_command_buffer_dispatch2_indirect_shim(
+static iree_status_t iree_hal_module_command_buffer_dispatch_indirect_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
@@ -1031,7 +1031,7 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2_indirect_shim(
     // Can't fit even with zero lengths.
     args_ok = false;
   }
-  iree_hal_module_command_buffer_dispatch2_indirect_args_t args = {
+  iree_hal_module_command_buffer_dispatch_indirect_args_t args = {
       .params = *(const iree_vm_abi_rriirII_t*)args_storage.data,
   };
   if (args_ok) {
@@ -1055,9 +1055,9 @@ static iree_status_t iree_hal_module_command_buffer_dispatch2_indirect_shim(
   }
   IREE_ASSERT(target_fn ==
               (iree_vm_native_function_target2_t)
-                  iree_hal_module_command_buffer_dispatch2_indirect);
-  return iree_hal_module_command_buffer_dispatch2_indirect(stack, module,
-                                                           module_state, &args);
+                  iree_hal_module_command_buffer_dispatch_indirect);
+  return iree_hal_module_command_buffer_dispatch_indirect(stack, module,
+                                                          module_state, &args);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1300,8 +1300,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_devices_get,  //
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
 
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_create2,  //
-                   iree_hal_module_state_t,             //
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
+                   iree_hal_module_state_t,            //
                    rrrr, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
