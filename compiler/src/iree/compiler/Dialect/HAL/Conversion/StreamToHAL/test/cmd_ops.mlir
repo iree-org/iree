@@ -178,10 +178,8 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<5, storage_buffer>
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer, Indirect>
   ]>
 ]>
 hal.executable private @ex {
@@ -191,10 +189,6 @@ hal.executable private @ex {
       hal.return %selected : i1
     }
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 4>,
-        #hal.interface.binding<1, 5>
-      ],
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -208,10 +202,6 @@ hal.executable private @ex {
   }
   hal.executable.variant public @x86_64 target(#executable_target_x86_64) {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 4>,
-        #hal.interface.binding<1, 5>
-      ],
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -226,9 +216,12 @@ hal.executable private @ex {
 }
 
 util.global private @device : !hal.device
+util.global private @constant_resource : !stream.resource<constant>
+util.global private @constant_size : index
 
 // CHECK-LABEL: @cmdDispatch
-util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<external>, %arg3: index) -> !stream.timepoint {
+//  CHECK-SAME: (%[[ARG_RESOURCE:.+]]: !hal.buffer, %[[ARG_SIZE:.+]]: index)
+util.func public @cmdDispatch(%arg_resource: !stream.resource<external>, %arg_size: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -236,46 +229,33 @@ util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, 
   %c4_i32 = arith.constant 4 : i32
   %c5_i32 = arith.constant 5 : i32
   %c128 = arith.constant 128 : index
+  // CHECK-DAG: %[[CONSTANT_RESOURCE:.+]] = util.global.load immutable @constant_resource
+  %constant_resource = util.global.load immutable @constant_resource : !stream.resource<constant>
+  %constant_size = util.global.load immutable @constant_size : index
+  // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
+  // CHECK: %[[MEMOIZED_CMD:.+]] = hal.device.memoize
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<external>{%arg3}) {
+  %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%constant_resource as %constant_capture: !stream.resource<constant>{%constant_size}, %arg_resource as %arg_capture: !stream.resource<external>{%arg_size}) {
     // Switch for each executable variant by checking conditions and ranking:
-    // CHECK: %[[DEVICE:.+]] = hal.command_buffer.device<%[[CMD]] : !hal.command_buffer>
-    //  CHECK-DAG: %{{.+}}, %[[AARCH64_FORMAT:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-aarch64")
+    // CHECK: %[[CMD_DEVICE:.+]] = hal.command_buffer.device<%[[CMD]] : !hal.command_buffer>
+    //  CHECK-DAG: %{{.+}}, %[[AARCH64_FORMAT:.+]] = hal.device.query<%[[CMD_DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-aarch64")
     //  CHECK-DAG: %[[AARCH64_FEATURE:.+]] = scf.execute_region -> i1 {
-    // CHECK-NEXT:   %{{.+}}, %[[FEATURE:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("some" :: "feature")
+    // CHECK-NEXT:   %{{.+}}, %[[FEATURE:.+]] = hal.device.query<%[[CMD_DEVICE]] : !hal.device> key("some" :: "feature")
     // CHECK-NEXT:   scf.yield %[[FEATURE]]
     // CHECK-NEXT: }
     //  CHECK-DAG: %[[AARCH64_SELECTED:.+]] = arith.andi %[[AARCH64_FORMAT]], %[[AARCH64_FEATURE]]
-    //  CHECK-DAG: %{{.+}}, %[[X86_64_SELECTED:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-x86_64")
+    //  CHECK-DAG: %{{.+}}, %[[X86_64_SELECTED:.+]] = hal.device.query<%[[CMD_DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-x86_64")
     // CHECK: %[[VARIANT1:.+]] = arith.select %[[X86_64_SELECTED]], %c1
-    // CHECK: %[[VARIANT0:.+]] = arith.select %[[AARCH64_SELECTED]], %c0{{.+}}, %[[VARIANT1]]
+    // CHECK: %[[VARIANT0:.+]] = arith.select %[[AARCH64_SELECTED]], %c0, %[[VARIANT1]]
     // CHECK: scf.index_switch %[[VARIANT0]]
     // CHECK-NEXT: case 0 {
 
-    // Cache queries:
-    //  CHECK-DAG:   %[[LAYOUT:.+]] = hal.pipeline_layout.lookup {{.+}} layout(#pipeline_layout)
-
-    // Push constants:
-    //  CHECK-DAG:   hal.command_buffer.push_constants<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)
-    // CHECK-SAME:       offset(0)
-    // CHECK-SAME:       values([%c4_i32, %c5_i32]) : i32, i32
-
-    // Descriptor sets:
-    //  CHECK-DAG:   hal.command_buffer.push_descriptor_set<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c0
-    // CHECK-NEXT:     %c4 = (%arg0 : !hal.buffer)[%c0, %c128]
-    //  CHECK-DAG:   hal.command_buffer.push_descriptor_set<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c1
-    // CHECK-NEXT:     %c5 = (%arg2 : !hal.buffer)[%c0, %c128]
-
     // Inlined workgroup count calculation:
-    // CHECK: %[[YZ:.+]] = arith.constant 1 : index
-    // CHECK-NEXT: %[[X:.+]] = affine.apply #map()[%c1]
+    // CHECK: %[[X:.+]] = affine.apply #map()[%c1]
 
     // Target executable/export:
     //  CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup
-    // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+    // CHECK-SAME:     device(%[[CMD_DEVICE]] : !hal.device)
     // CHECK-SAME:     executable(@ex) : !hal.executable
     //  CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal
     // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
@@ -283,7 +263,11 @@ util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, 
     // Dispatch:
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
     // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
-    // CHECK-SAME: workgroups([%[[X]], %[[YZ]], %[[YZ]]])
+    // CHECK-SAME: workgroups([%[[X]], %c1, %c1])
+    // CHECK-SAME: constants([%c4_i32, %c5_i32])
+    // CHECK-SAME: bindings([
+    // CHECK-NEXT:   (%[[CONSTANT_RESOURCE]] : !hal.buffer)[%c0, %c128],
+    // CHECK-NEXT:   (%c0 : index)[%c0, %c128]
 
     // Other variant, when selected:
     // CHECK: case 1 {
@@ -291,12 +275,15 @@ util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, 
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
     // CHECK-SAME: target({{.+}})[%[[ORDINAL_1]]]
     stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
-      ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
-      wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
+      ro %constant_capture[%c0 for %c128] : !stream.resource<constant>{%constant_size},
+      wo %arg_capture[%c0 for %c128] : !stream.resource<external>{%arg_size}
     }
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
+  //      CHECK: hal.device.queue.execute.indirect<%[[DEVICE]] : !hal.device> {{.+}} commands(%[[MEMOIZED_CMD]]) bindings([
+  // CHECK-NEXT:   (%[[ARG_RESOURCE]] : !hal.buffer)[%c0, %[[ARG_SIZE]]]
+  // CHECK-NEXT: ])
   util.return %0 : !stream.timepoint
 }
 

@@ -1469,7 +1469,7 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
   }];
 }
 
-def HAL_CommandBufferDispatch2Op : HAL_Op<"command_buffer.dispatch2", [
+def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
   AttrSizedOperandSegments,
 ]> {
   let summary = [{command buffer dispatch recording operation}];
@@ -1535,7 +1535,7 @@ def HAL_CommandBufferDispatch2Op : HAL_Op<"command_buffer.dispatch2", [
   let hasVerifier = 1;
 }
 
-def HAL_CommandBufferDispatch2IndirectOp : HAL_Op<"command_buffer.dispatch2.indirect", [
+def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect", [
   AttrSizedOperandSegments,
 ]> {
   let summary = [{command buffer indirect dispatch recording operation}];
@@ -2623,7 +2623,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   ];
 }
 
-def HAL_ExecutableCreate2Op : HAL_PureOp<"executable.create2", [
+def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{creates an executable}];

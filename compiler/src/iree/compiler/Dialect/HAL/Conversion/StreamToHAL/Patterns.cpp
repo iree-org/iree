@@ -663,7 +663,7 @@ struct CmdCollectiveOpPattern
   }
 };
 
-struct CmdDispatch2OpPattern
+struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
@@ -796,7 +796,7 @@ struct CmdDispatch2OpPattern
 
     auto flags = IREE::HAL::DispatchFlags::None;
 
-    return builder.create<IREE::HAL::CommandBufferDispatch2Op>(
+    return builder.create<IREE::HAL::CommandBufferDispatchOp>(
         loc, commandBufferMapping.getHandle(), executable, ordinal,
         workgroupCount, adaptor.getUniformOperands(), bindings, flags);
   }
@@ -1365,7 +1365,7 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
               CmdFillOpPattern, CmdCopyOpPattern, CmdCollectiveOpPattern,
-              CmdDispatch2OpPattern, CmdFuncOpPattern, CmdCallOpPattern,
+              CmdDispatchOpPattern, CmdFuncOpPattern, CmdCallOpPattern,
               CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
           mapping, typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,

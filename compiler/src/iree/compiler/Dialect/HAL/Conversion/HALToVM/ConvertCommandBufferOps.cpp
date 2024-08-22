@@ -320,20 +320,20 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-class CommandBufferDispatch2OpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2Op> {
+class CommandBufferDispatchOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchOp> {
 public:
-  CommandBufferDispatch2OpConversion(MLIRContext *context,
-                                     SymbolTable &importSymbols,
-                                     TypeConverter &typeConverter,
-                                     StringRef importName)
+  CommandBufferDispatchOpConversion(MLIRContext *context,
+                                    SymbolTable &importSymbols,
+                                    TypeConverter &typeConverter,
+                                    StringRef importName)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferDispatch2Op op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::HAL::CommandBufferDispatchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
@@ -396,20 +396,20 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-class CommandBufferDispatch2IndirectOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2IndirectOp> {
+class CommandBufferDispatchIndirectOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchIndirectOp> {
 public:
-  CommandBufferDispatch2IndirectOpConversion(MLIRContext *context,
-                                             SymbolTable &importSymbols,
-                                             TypeConverter &typeConverter,
-                                             StringRef importName)
+  CommandBufferDispatchIndirectOpConversion(MLIRContext *context,
+                                            SymbolTable &importSymbols,
+                                            TypeConverter &typeConverter,
+                                            StringRef importName)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferDispatch2IndirectOp op,
+  matchAndRewrite(IREE::HAL::CommandBufferDispatchIndirectOp op,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
@@ -507,11 +507,11 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
   patterns.insert<CommandBufferCollectiveOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.collective");
-  patterns.insert<CommandBufferDispatch2OpConversion>(
-      context, importSymbols, typeConverter, "hal.command_buffer.dispatch2");
-  patterns.insert<CommandBufferDispatch2IndirectOpConversion>(
+  patterns.insert<CommandBufferDispatchOpConversion>(
+      context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
+  patterns.insert<CommandBufferDispatchIndirectOpConversion>(
       context, importSymbols, typeConverter,
-      "hal.command_buffer.dispatch2.indirect");
+      "hal.command_buffer.dispatch.indirect");
 }
 
 } // namespace mlir::iree_compiler

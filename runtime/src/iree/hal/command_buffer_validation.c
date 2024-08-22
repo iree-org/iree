@@ -549,7 +549,7 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_command_buffer_dispatch2_validation_base(
+static iree_status_t iree_hal_command_buffer_dispatch_validation_base(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -584,18 +584,18 @@ static iree_status_t iree_hal_command_buffer_dispatch2_validation_base(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_command_buffer_dispatch2_validation(
+iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  return iree_hal_command_buffer_dispatch2_validation_base(
+  return iree_hal_command_buffer_dispatch_validation_base(
       command_buffer, validation_state, executable, entry_point, constants,
       bindings, flags);
 }
 
-iree_status_t iree_hal_command_buffer_dispatch2_indirect_validation(
+iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -626,7 +626,7 @@ iree_status_t iree_hal_command_buffer_dispatch2_indirect_validation(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
       command_buffer, validation_state, workgroups_ref, workgroups_reqs));
 
-  return iree_hal_command_buffer_dispatch2_validation_base(
+  return iree_hal_command_buffer_dispatch_validation_base(
       command_buffer, validation_state, executable, entry_point, constants,
       bindings, flags);
 }

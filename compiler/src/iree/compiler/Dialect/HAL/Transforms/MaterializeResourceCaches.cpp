@@ -196,7 +196,7 @@ static Value initializeExecutable(DeviceResources &deviceResources,
     }
 
     Value executableValue =
-        caseBuilder.createOrFold<IREE::HAL::ExecutableCreate2Op>(
+        caseBuilder.createOrFold<IREE::HAL::ExecutableCreateOp>(
             loc, executableType, initializerDevice,
             SymbolRefAttr::get(
                 executable.executableOp.getSymNameAttr(),

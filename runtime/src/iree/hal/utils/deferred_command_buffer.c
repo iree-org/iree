@@ -667,7 +667,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_collective(
 // IREE_HAL_CMD_DISPATCH2
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_cmd_dispatch2_t {
+typedef struct iree_hal_cmd_dispatch_t {
   iree_hal_cmd_header_t header;
   iree_hal_executable_t* executable;
   int32_t entry_point;
@@ -675,9 +675,9 @@ typedef struct iree_hal_cmd_dispatch2_t {
   iree_const_byte_span_t constants;
   iree_hal_buffer_ref_list_t bindings;
   iree_hal_dispatch_flags_t flags;
-} iree_hal_cmd_dispatch2_t;
+} iree_hal_cmd_dispatch_t;
 
-static iree_status_t iree_hal_deferred_command_buffer_dispatch2(
+static iree_status_t iree_hal_deferred_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -687,7 +687,7 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch2(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
 
-  iree_hal_cmd_dispatch2_t* cmd = NULL;
+  iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_size =
       sizeof(*cmd) + iree_host_align(constants.data_length, iree_max_align_t) +
       bindings.count * sizeof(bindings.values[0]);
@@ -717,10 +717,10 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch2(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch2(
+static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
-    const iree_hal_cmd_dispatch2_t* cmd) {
+    const iree_hal_cmd_dispatch_t* cmd) {
   iree_hal_buffer_ref_t* binding_refs = (iree_hal_buffer_ref_t*)iree_alloca(
       cmd->bindings.count * sizeof(iree_hal_buffer_ref_t));
   for (iree_host_size_t i = 0; i < cmd->bindings.count; ++i) {
@@ -731,7 +731,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch2(
       .count = cmd->bindings.count,
       .values = binding_refs,
   };
-  return iree_hal_command_buffer_dispatch2(
+  return iree_hal_command_buffer_dispatch(
       target_command_buffer, cmd->executable, cmd->entry_point,
       cmd->workgroup_count, cmd->constants, binding_ref_list, cmd->flags);
 }
@@ -740,7 +740,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch2(
 // IREE_HAL_CMD_DISPATCH2_INDIRECT
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_cmd_dispatch2_indirect_t {
+typedef struct iree_hal_cmd_dispatch_indirect_t {
   iree_hal_cmd_header_t header;
   iree_hal_executable_t* executable;
   int32_t entry_point;
@@ -748,9 +748,9 @@ typedef struct iree_hal_cmd_dispatch2_indirect_t {
   iree_const_byte_span_t constants;
   iree_hal_buffer_ref_list_t bindings;
   iree_hal_dispatch_flags_t flags;
-} iree_hal_cmd_dispatch2_indirect_t;
+} iree_hal_cmd_dispatch_indirect_t;
 
-static iree_status_t iree_hal_deferred_command_buffer_dispatch2_indirect(
+static iree_status_t iree_hal_deferred_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -767,7 +767,7 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch2_indirect(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, resource_count, resources));
 
-  iree_hal_cmd_dispatch2_indirect_t* cmd = NULL;
+  iree_hal_cmd_dispatch_indirect_t* cmd = NULL;
   iree_host_size_t total_size =
       sizeof(*cmd) + iree_host_align(constants.data_length, iree_max_align_t) +
       bindings.count * sizeof(bindings.values[0]);
@@ -797,10 +797,10 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch2_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch2_indirect(
+static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch_indirect(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
-    const iree_hal_cmd_dispatch2_indirect_t* cmd) {
+    const iree_hal_cmd_dispatch_indirect_t* cmd) {
   iree_hal_buffer_ref_t workgroups_ref;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->workgroups_ref, &workgroups_ref));
@@ -814,7 +814,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch2_indirect(
       .count = cmd->bindings.count,
       .values = binding_refs,
   };
-  return iree_hal_command_buffer_dispatch2_indirect(
+  return iree_hal_command_buffer_dispatch_indirect(
       target_command_buffer, cmd->executable, cmd->entry_point, workgroups_ref,
       cmd->constants, binding_ref_list, cmd->flags);
 }
@@ -843,9 +843,9 @@ static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
     [IREE_HAL_CMD_COLLECTIVE] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_collective,
     [IREE_HAL_CMD_DISPATCH2] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_deferred_command_buffer_apply_dispatch2,
+        iree_hal_deferred_command_buffer_apply_dispatch,
     [IREE_HAL_CMD_DISPATCH2_INDIRECT] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_deferred_command_buffer_apply_dispatch2_indirect,
+        iree_hal_deferred_command_buffer_apply_dispatch_indirect,
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
@@ -899,7 +899,6 @@ static const iree_hal_command_buffer_vtable_t
         .update_buffer = iree_hal_deferred_command_buffer_update_buffer,
         .copy_buffer = iree_hal_deferred_command_buffer_copy_buffer,
         .collective = iree_hal_deferred_command_buffer_collective,
-        .dispatch2 = iree_hal_deferred_command_buffer_dispatch2,
-        .dispatch2_indirect =
-            iree_hal_deferred_command_buffer_dispatch2_indirect,
+        .dispatch = iree_hal_deferred_command_buffer_dispatch,
+        .dispatch_indirect = iree_hal_deferred_command_buffer_dispatch_indirect,
 };

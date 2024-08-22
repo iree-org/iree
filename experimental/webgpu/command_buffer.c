@@ -926,7 +926,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch2(
+static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
     iree_hal_webgpu_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, uint32_t ordinal,
     iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
@@ -994,7 +994,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch2(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_dispatch2(
+static iree_status_t iree_hal_webgpu_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -1003,7 +1003,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch2(
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUComputePassEncoder compute_pass = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_prepare_dispatch2(
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_prepare_dispatch(
       command_buffer, executable, entry_point, constants, bindings, flags,
       &compute_pass));
   wgpuComputePassEncoderDispatchWorkgroups(
@@ -1012,7 +1012,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch2(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_dispatch2_indirect(
+static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -1021,7 +1021,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch2_indirect(
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUComputePassEncoder compute_pass = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_prepare_dispatch2(
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_prepare_dispatch(
       command_buffer, executable, entry_point, constants, bindings, flags,
       &compute_pass));
   wgpuComputePassEncoderDispatchWorkgroupsIndirect(
@@ -1049,6 +1049,6 @@ const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .push_descriptor_set = iree_hal_webgpu_command_buffer_push_descriptor_set,
     .dispatch = iree_hal_webgpu_command_buffer_dispatch,
     .dispatch_indirect = iree_hal_webgpu_command_buffer_dispatch_indirect,
-    .dispatch2 = iree_hal_webgpu_command_buffer_dispatch2,
-    .dispatch2_indirect = iree_hal_webgpu_command_buffer_dispatch2_indirect,
+    .dispatch = iree_hal_webgpu_command_buffer_dispatch,
+    .dispatch_indirect = iree_hal_webgpu_command_buffer_dispatch_indirect,
 };

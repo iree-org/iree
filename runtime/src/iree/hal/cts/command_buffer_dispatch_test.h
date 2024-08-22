@@ -126,7 +126,7 @@ TEST_P(CommandBufferDispatchTest, DispatchAbs) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
 
   uint32_t workgroup_count[3] = {1, 1, 1};
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch2(
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
       command_buffer, executable_, /*entry_point=*/0, workgroup_count,
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
 

@@ -126,14 +126,14 @@ iree_status_t iree_hal_command_buffer_collective_validation(
     iree_hal_buffer_ref_t send_ref, iree_hal_buffer_ref_t recv_ref,
     iree_device_size_t element_count);
 
-iree_status_t iree_hal_command_buffer_dispatch2_validation(
+iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
-iree_status_t iree_hal_command_buffer_dispatch2_indirect_validation(
+iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
