@@ -2410,12 +2410,12 @@ private:
             /*callee=*/"iree_vm_ref_assign",
             /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
+        auto argLValue = emitc_builders::asLValue(builder, loc, arg);
         assert(!isa<emitc::PointerType>(argType));
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(argType));
 
         // memcpy(uint8Ptr, &arg, size);
-        auto argLValue = emitc_builders::asLValue(builder, loc, arg);
         Value argPtr = emitc_builders::addressOf(builder, loc, argLValue);
         emitc_builders::memcpy(builder, loc, uint8Ptr, argPtr, size);
       }
