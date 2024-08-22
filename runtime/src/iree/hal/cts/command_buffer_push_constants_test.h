@@ -96,7 +96,7 @@ TEST_F(CommandBufferPushConstantsTest, DispatchWithPushConstants) {
       constant_data.data(), constant_data.size() * sizeof(constant_data[0]));
 
   uint32_t workgroup_count[3] = {1, 1, 1};
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch2(
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
       command_buffer, executable_, /*entry_point=*/0, workgroup_count,
       constants, bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(

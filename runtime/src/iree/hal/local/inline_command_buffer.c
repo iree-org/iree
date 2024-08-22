@@ -344,7 +344,7 @@ static iree_status_t iree_hal_inline_command_buffer_collective(
                           "collectives not yet implemented on CPU");
 }
 
-static iree_status_t iree_hal_inline_command_buffer_dispatch2(
+static iree_status_t iree_hal_inline_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -470,7 +470,7 @@ typedef union iree_hal_vec3_t {
   uint32_t value[3];
 } iree_hal_vec3_t;
 
-static iree_status_t iree_hal_inline_command_buffer_dispatch2_indirect(
+static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -483,7 +483,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch2_indirect(
       &buffer_mapping));
   iree_hal_vec3_t workgroup_count =
       *(const iree_hal_vec3_t*)buffer_mapping.contents.data;
-  return iree_hal_inline_command_buffer_dispatch2(
+  return iree_hal_inline_command_buffer_dispatch(
       base_command_buffer, executable, entry_point, workgroup_count.value,
       constants, bindings, flags);
 }
@@ -508,6 +508,6 @@ static const iree_hal_command_buffer_vtable_t
         .update_buffer = iree_hal_inline_command_buffer_update_buffer,
         .copy_buffer = iree_hal_inline_command_buffer_copy_buffer,
         .collective = iree_hal_inline_command_buffer_collective,
-        .dispatch2 = iree_hal_inline_command_buffer_dispatch2,
-        .dispatch2_indirect = iree_hal_inline_command_buffer_dispatch2_indirect,
+        .dispatch = iree_hal_inline_command_buffer_dispatch,
+        .dispatch_indirect = iree_hal_inline_command_buffer_dispatch_indirect,
 };

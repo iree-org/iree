@@ -730,7 +730,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 //
 // Fails if the queue does not support dispatch operations or
 // IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -747,7 +747,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2(
 // The buffer must have been allocated with
 // IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS and be of
 // IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch2_indirect(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -895,13 +895,13 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_buffer_ref_t send_ref, iree_hal_buffer_ref_t recv_ref,
       iree_device_size_t element_count);
 
-  iree_status_t(IREE_API_PTR* dispatch2)(
+  iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
       const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
       iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
-  iree_status_t(IREE_API_PTR* dispatch2_indirect)(
+  iree_status_t(IREE_API_PTR* dispatch_indirect)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
       iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,

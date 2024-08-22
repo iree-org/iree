@@ -704,10 +704,10 @@ static iree_status_t iree_hal_task_command_buffer_collective(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_dispatch2
+// iree_hal_command_buffer_dispatch
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_task_cmd_dispatch2_t {
+typedef struct iree_hal_task_cmd_dispatch_t {
   iree_task_dispatch_t task;
   iree_hal_local_executable_t* executable;
   int32_t ordinal;
@@ -724,13 +724,13 @@ typedef struct iree_hal_task_cmd_dispatch2_t {
   // - const uint32_t push_constants[push_constant_count];
   // - void* binding_ptrs[binding_count];
   // - const size_t binding_lengths[binding_count];
-} iree_hal_task_cmd_dispatch2_t;
+} iree_hal_task_cmd_dispatch_t;
 
-static iree_status_t iree_hal_task_cmd_dispatch2_tile(
+static iree_status_t iree_hal_task_cmd_dispatch_tile(
     void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
-  const iree_hal_task_cmd_dispatch2_t* cmd =
-      (const iree_hal_task_cmd_dispatch2_t*)user_context;
+  const iree_hal_task_cmd_dispatch_t* cmd =
+      (const iree_hal_task_cmd_dispatch_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // We could share this across all workgroups in a dispatch and reduce cache
@@ -776,12 +776,12 @@ static iree_status_t iree_hal_task_cmd_dispatch2_tile(
   return status;
 }
 
-static iree_status_t iree_hal_task_command_buffer_build_dispatch2(
+static iree_status_t iree_hal_task_command_buffer_build_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings,
-    iree_hal_task_cmd_dispatch2_t** out_cmd) {
+    iree_hal_task_cmd_dispatch_t** out_cmd) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
@@ -792,7 +792,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch2(
     dispatch_attrs = local_executable->dispatch_attrs[entry_point];
   }
 
-  iree_hal_task_cmd_dispatch2_t* cmd = NULL;
+  iree_hal_task_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_cmd_size =
       sizeof(*cmd) + dispatch_attrs.constant_count * sizeof(uint32_t) +
       dispatch_attrs.binding_count * sizeof(void*) +
@@ -809,7 +809,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch2(
   const uint32_t workgroup_size[3] = {1, 1, 1};
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_task_cmd_dispatch2_tile,
+      iree_task_make_dispatch_closure(iree_hal_task_cmd_dispatch_tile,
                                       (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
 
@@ -885,7 +885,7 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch2(
                                                           &cmd->task.header);
 }
 
-static iree_status_t iree_hal_task_command_buffer_dispatch2(
+static iree_status_t iree_hal_task_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
@@ -896,13 +896,13 @@ static iree_status_t iree_hal_task_command_buffer_dispatch2(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
 
-  iree_hal_task_cmd_dispatch2_t* cmd = NULL;
-  return iree_hal_task_command_buffer_build_dispatch2(
+  iree_hal_task_cmd_dispatch_t* cmd = NULL;
+  return iree_hal_task_command_buffer_build_dispatch(
       base_command_buffer, executable, entry_point, workgroup_count, constants,
       bindings, &cmd);
 }
 
-static iree_status_t iree_hal_task_command_buffer_dispatch2_indirect(
+static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
@@ -922,8 +922,8 @@ static iree_status_t iree_hal_task_command_buffer_dispatch2_indirect(
       &buffer_mapping));
 
   uint32_t workgroup_count[3] = {0};  // unused with the indirect flag
-  iree_hal_task_cmd_dispatch2_t* cmd = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_task_command_buffer_build_dispatch2(
+  iree_hal_task_cmd_dispatch_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_command_buffer_build_dispatch(
       base_command_buffer, executable, entry_point, workgroup_count, constants,
       bindings, &cmd));
   cmd->task.workgroup_count.ptr = (const uint32_t*)buffer_mapping.contents.data;
@@ -951,6 +951,6 @@ static const iree_hal_command_buffer_vtable_t
         .update_buffer = iree_hal_task_command_buffer_update_buffer,
         .copy_buffer = iree_hal_task_command_buffer_copy_buffer,
         .collective = iree_hal_task_command_buffer_collective,
-        .dispatch2 = iree_hal_task_command_buffer_dispatch2,
-        .dispatch2_indirect = iree_hal_task_command_buffer_dispatch2_indirect,
+        .dispatch = iree_hal_task_command_buffer_dispatch,
+        .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
 };

@@ -105,8 +105,8 @@ struct ElideRedundantCommandsPass
                     IREE::HAL::CommandBufferEndDebugGroupOp,
                     IREE::HAL::CommandBufferFillBufferOp,
                     IREE::HAL::CommandBufferCopyBufferOp,
-                    IREE::HAL::CommandBufferDispatch2Op,
-                    IREE::HAL::CommandBufferDispatch2IndirectOp>(
+                    IREE::HAL::CommandBufferDispatchOp,
+                    IREE::HAL::CommandBufferDispatchIndirectOp>(
                   [&](Operation *op) {
                     // Ok - don't impact state.
                     resetCommandBufferBarrierBit(op);
