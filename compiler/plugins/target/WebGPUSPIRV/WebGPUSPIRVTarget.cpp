@@ -119,13 +119,6 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    // WebGPU does not support push constants (yet?), so replace loads from
-    // push constants with loads from uniform buffers.
-    // The corresponding runtime code must perform similar emulation, based
-    // on the push constant count listed in the executable layout.
-    passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
-        createWGSLReplacePushConstantsPass());
-
     buildSPIRVCodegenPassPipeline(passManager);
 
     // Prepare SPIR-V for WebGPU by expanding or removing unsupported ops.

@@ -13,11 +13,4 @@ include "mlir/Pass/PassBase.td"
 // WGSL passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def WGSLReplacePushConstantsPass :
-    InterfacePass<"iree-wgsl-replace-push-constants", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Replaces push constant loads with binding loads for when using "
-      "WGSL without push constant support";
-}
-
 #endif // IREE_CODEGEN_WGSL_PASSES
