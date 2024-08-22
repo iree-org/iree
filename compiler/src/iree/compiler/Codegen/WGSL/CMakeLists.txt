@@ -44,7 +44,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Passes.cpp"
-    "WGSLReplacePushConstants.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

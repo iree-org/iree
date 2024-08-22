@@ -13,8 +13,6 @@ iree_add_all_subdirs()
 iree_lit_test_suite(
   NAME
     lit
-  SRCS
-    "replace_push_constants.mlir"
   TOOLS
     FileCheck
     iree-opt

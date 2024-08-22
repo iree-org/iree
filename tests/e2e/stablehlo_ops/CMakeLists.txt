@@ -657,7 +657,7 @@ iree_check_single_backend_test_suite(
     "divide.mlir"
     "dot.mlir"
     "dot_general.mlir"
-    "dynamic_slice.mlir"
+    # "dynamic_slice.mlir"  # TODO(#13702): update WebGPU to simplified bindings.
     "dynamic_update_slice.mlir"
     "exponential.mlir"
     "exponential_fp16.mlir"
