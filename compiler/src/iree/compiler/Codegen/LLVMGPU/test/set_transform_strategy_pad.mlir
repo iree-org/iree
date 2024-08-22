@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file \
+// RUN: iree-opt %s --split-input-file --iree-codegen-llvmgpu-enable-transform-dialect-jit=true \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
@@ -6,7 +6,7 @@
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
-// RUN: iree-opt %s --split-input-file \
+// RUN: iree-opt %s --split-input-file --iree-codegen-llvmgpu-enable-transform-dialect-jit=true \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \

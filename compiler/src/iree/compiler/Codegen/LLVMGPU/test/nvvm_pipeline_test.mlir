@@ -811,7 +811,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
-// CHECK-COUNT-3:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-2:     nvvm.shfl.sync  bfly
 
 // -----
 
@@ -873,7 +873,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
-// CHECK-COUNT-3:     nvvm.shfl.sync  bfly
+// CHECK-COUNT-2:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
 

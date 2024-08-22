@@ -82,7 +82,7 @@ def SD3_MMDIT_COMMON_RUN_FLAGS(
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
-    f"--iree-rocm-target-chip={rocm_chip}",
+    f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-global-opt-propagate-transposes=true",
@@ -95,7 +95,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-data-tiling=false",
     "--iree-codegen-gpu-native-math-precision=true",
     "--iree-codegen-llvmgpu-use-vector-distribution",
-    "--iree-rocm-waves-per-eu=2",
+    "--iree-hip-waves-per-eu=2",
     "--iree-execution-model=async-external",
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
 ]

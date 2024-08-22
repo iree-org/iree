@@ -48,8 +48,6 @@ iree_cc_library(
     "stream_command_buffer.h"
     "timepoint_pool.c"
     "timepoint_pool.h"
-    "tracing.c"
-    "tracing.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -72,6 +70,7 @@ iree_cc_library(
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
+    iree::hal::utils::stream_tracing
     iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )

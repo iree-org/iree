@@ -275,10 +275,6 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
         "-DIREE_BUILD_TESTS=OFF",
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
-        get_env_cmake_option(
-            "IREE_HAL_DRIVER_VULKAN",
-            "OFF" if platform.system() == "Darwin" else "ON",
-        ),
         get_env_cmake_list("IREE_EXTERNAL_HAL_DRIVERS", ""),
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ] + list(extra_cmake_args)

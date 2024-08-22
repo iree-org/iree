@@ -77,4 +77,24 @@ iree_cc_binary(
     iree::vm::cc
 )
 
+iree_cc_binary(
+  NAME
+    iree-e2e-attention-test
+  SRCS
+    "iree-e2e-attention-test.cc"
+  DEPS
+    ::e2e_test_util
+    iree::base
+    iree::base::internal
+    iree::base::internal::cpu
+    iree::base::internal::flags
+    iree::base::internal::path
+    iree::hal
+    iree::modules::hal
+    iree::tooling::context_util
+    iree::tooling::device_util
+    iree::vm
+    iree::vm::cc
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

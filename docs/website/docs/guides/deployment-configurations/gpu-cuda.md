@@ -107,23 +107,35 @@ following commands to compile:
 ```shell hl_lines="2-3"
 iree-compile \
     --iree-hal-target-backends=cuda \
-    --iree-hal-cuda-llvm-target-arch=<...> \
+    --iree-cuda-target=<...> \
     mobilenet_iree_input.mlir -o mobilenet_cuda.vmfb
 ```
 
-Note that a cuda target architecture (`iree-hal-cuda-llvm-target-arch`) of
-the form `sm_<arch_number>` is needed to compile towards each GPU
-architecture. If no architecture is specified then we will default to
-`sm_35`.
+Canonically a CUDA target (`iree-cuda-target`) matching the LLVM NVPTX backend
+of the form `sm_<arch_number>` is needed to compile towards each GPU
+architecture. If no architecture is specified then we will default to `sm_60`.
 
 Here is a table of commonly used architectures:
 
-| CUDA GPU    | Target Architecture |
-| ----------- | ------------------- |
-| Nvidia K80  | `sm_35`             |
-| Nvidia P100 | `sm_60`             |
-| Nvidia V100 | `sm_70`             |
-| Nvidia A100 | `sm_80`             |
+| CUDA GPU            | Target Architecture | Architecture Code Name
+| ------------------- | ------------------- | ----------------------
+| NVIDIA P100         | `sm_60`             | `pascal`
+| NVIDIA V100         | `sm_70`             | `volta`
+| NVIDIA A100         | `sm_80`             | `ampere`
+| NVIDIA H100         | `sm_90`             | `hopper`
+| NVIDIA RTX20 series | `sm_75`             | `turing`
+| NVIDIA RTX30 series | `sm_86`             | `ampere`
+| NVIDIA RTX40 series | `sm_89`             | `ada`
+
+In addition to the canonical `sm_<arch_number>` scheme, `iree-cuda-target` also
+supports two additonal schemes to make a better developer experience:
+
+* Architecture code names like `volta` or `ampere`
+* GPU product names like `a100` or `rtx3090`
+
+These two schemes are translated into the canonical form under the hood.
+We add support for common code/product names without aiming to be exhaustive.
+If the ones you want are missing, please use the canonical form.
 
 ### :octicons-terminal-16: Run a compiled program
 

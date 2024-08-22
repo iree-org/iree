@@ -72,9 +72,7 @@ function run() {
 }
 
 function build_iree_runtime() {
-  # TODO(antiagainst): remove Vulkan once IREE_HAL_DRIVER_METAL is stable
   export IREE_RUNTIME_BUILD_TRACY=ON
-  IREE_HAL_DRIVER_VULKAN=ON \
   python3 -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 
