@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if ((IREE_ARCH STREQUAL "arm_64"))
+if(IREE_ARCH STREQUAL "arm_64")
   return()
 endif()
 
