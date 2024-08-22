@@ -24,64 +24,36 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Move the given backward slice before the given operation.
-static LogicalResult
-moveBackwardSliceBeforeOp(RewriterBase &rewriter,
-                          llvm::SetVector<Operation *> &slice,
-                          Operation *insertionPoint) {
-  SetVector<Operation *> toMove;
-  // First remove all operations that are already before the insertion point.
-  for (Operation *op : slice) {
-    if (op == insertionPoint) {
-      // A slice containing the insertion point itself cannot be moved
-      // behind the insertion point.
-      return failure();
-    }
-
-    if (insertionPoint->isBeforeInBlock(op)) {
-      toMove.insert(op);
-    }
-  }
-
+/// Move the given backward slice before the given barrier.
+/// The backward slice should not have any operations which are before the
+/// barrier or the barrier itself.
+static void moveBackwardSliceBeforeBarrier(RewriterBase &rewriter,
+                                           llvm::SetVector<Operation *> &slice,
+                                           Operation *leadingBarrier) {
   // Sort operations to be moved topologically.
-  toMove = topologicalSort(toMove);
+  slice = topologicalSort(slice);
 
   // It is always valid (w.r.t. dominance) to move topologically sorted
   // operations in a backward slice which come after the insertion point, to
   // before the insertion point. This is because:
   //  - Since we are operating on a backward slice, producers to every operation
-  //  in the slice already in the slice, and will be moved behind the insertion
-  //  point.
+  //  in the slice are already in the slice, and will be moved behind the
+  //  insertion point.
   //  - Any consumers will still remain after the operation, as we are only
   //  moving the operation before.
-  for (Operation *sliceOp : toMove) {
-    rewriter.moveOpBefore(sliceOp, insertionPoint);
+  for (Operation *sliceOp : slice) {
+    rewriter.moveOpBefore(sliceOp, leadingBarrier);
   }
-
-  return success();
 }
 
-/// Move the slice after the given operation.
-static LogicalResult
-moveForwardSliceAfterOp(RewriterBase &rewriter,
-                        llvm::SetVector<Operation *> &slice,
-                        Operation *insertionPoint) {
-  SetVector<Operation *> toMove;
-  // First remove all operations that are already after the insertion point.
-  for (Operation *op : slice) {
-    if (op == insertionPoint) {
-      // A slice containing the insertion point itself cannot be moved
-      // behind the insertion point.
-      return failure();
-    }
-
-    if (op->isBeforeInBlock(insertionPoint)) {
-      toMove.insert(op);
-    }
-  }
-
+/// Move the slice after the given barrier.
+/// The forward slice should not have any operations which are after the
+/// barrier or the barrier itself.
+static void moveForwardSliceAfterBarrier(RewriterBase &rewriter,
+                                         llvm::SetVector<Operation *> &slice,
+                                         Operation *trailingBarrier) {
   // Sort operations to be moved topologically.
-  toMove = topologicalSort(toMove);
+  slice = topologicalSort(slice);
 
   // It is always valid (w.r.t. dominance) to move topologically sorted
   // operations in a forward slice which come before the insertion point, to
@@ -91,11 +63,9 @@ moveForwardSliceAfterOp(RewriterBase &rewriter,
   //  insertion point,
   //  - Any producers will still remain before the operation, as we are only
   //  moving the operation after.
-  for (Operation *sliceOp : llvm::reverse(toMove)) {
-    rewriter.moveOpAfter(sliceOp, insertionPoint);
+  for (Operation *sliceOp : llvm::reverse(slice)) {
+    rewriter.moveOpAfter(sliceOp, trailingBarrier);
   }
-
-  return success();
 }
 
 /// Combine all value barriers into a single value barrier.
@@ -144,14 +114,18 @@ combineValueBarrierPair(RewriterBase &rewriter,
   }
 
   // barrierA and barrierB are in the same block.
+  assert(barrierA->getBlock() == barrierB->getBlock());
   Block *block = barrierA->getBlock();
 
-  auto sliceFilter = [&block](Operation *candidate) -> bool {
+  auto sliceFilterBackward = [&block, &barrierA](Operation *candidate) -> bool {
     if (candidate->getBlock() != block) {
       return false;
     }
     if (candidate == block->getTerminator()) {
       // Do not move the terminator.
+      return false;
+    }
+    if (candidate->isBeforeInBlock(barrierA)) {
       return false;
     }
     return true;
@@ -160,33 +134,54 @@ combineValueBarrierPair(RewriterBase &rewriter,
   // Find the combined backward slice of barrierA and barrierB and try
   // to move it before barrierA (before both the barriers).
   BackwardSliceOptions bOptions;
-  bOptions.filter = sliceFilter;
+  bOptions.filter = sliceFilterBackward;
   SetVector<Operation *> backwardSliceA;
   SetVector<Operation *> backwardSliceB;
   getBackwardSlice(barrierA, &backwardSliceA, bOptions);
   getBackwardSlice(barrierB, &backwardSliceB, bOptions);
   backwardSliceA.insert(backwardSliceB.begin(), backwardSliceB.end());
-  // Move the backward slice before barrierA.
-  if (failed(moveBackwardSliceBeforeOp(rewriter, backwardSliceA, barrierA))) {
+  // If the first barrier is contained in the combined backward slice of both
+  // barriers, the barriers form a chain and cannot be combined.
+  if (backwardSliceA.contains(barrierA)) {
     return failure();
   }
+  // Move the backward slice before barrierA.
+  moveBackwardSliceBeforeBarrier(rewriter, backwardSliceA, barrierA);
+
+  auto sliceFilterForward = [&block, &barrierB](Operation *candidate) -> bool {
+    if (candidate->getBlock() != block) {
+      return false;
+    }
+    if (candidate == block->getTerminator()) {
+      // Do not move the terminator.
+      return false;
+    }
+    if (barrierB->isBeforeInBlock(candidate)) {
+      return false;
+    }
+    return true;
+  };
 
   // Find the combined forward slice of barrierA and barrierB and try to
   // move it after barrierB (after both the barriers).
   ForwardSliceOptions fOptions;
-  fOptions.filter = sliceFilter;
+  fOptions.filter = sliceFilterForward;
   SetVector<Operation *> forwardSliceA;
   SetVector<Operation *> forwardSliceB;
   getForwardSlice(barrierA, &forwardSliceA, fOptions);
   getForwardSlice(barrierB, &forwardSliceB, fOptions);
   forwardSliceA.insert(forwardSliceB.begin(), forwardSliceB.end());
-  // Move the forward slice after barrierB.
-  if (failed(moveForwardSliceAfterOp(rewriter, forwardSliceA, barrierB))) {
+  // If the second barrier is contained in the combined forward slice of both
+  // barriers, the barriers form a chain and cannot be combined.
+  if (forwardSliceA.contains(barrierA)) {
     return failure();
   }
+  // Move the forward slice after barrierB.
+  moveForwardSliceAfterBarrier(rewriter, forwardSliceA, barrierB);
 
   // We add the new barrier after both the barriers (it is always better
   // to sink barriers).
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(barrierB);
 
   SmallVector<Value> barrierOperands;
