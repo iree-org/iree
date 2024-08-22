@@ -48,6 +48,7 @@ class InputType(Enum):
     TOSA = "tosa"
     TM_TENSOR = "tm_tensor"
     TORCH = "torch"
+    ONNX = "onnx"
 
     @staticmethod
     def parse(spec: Union[str, InputType]) -> InputType:

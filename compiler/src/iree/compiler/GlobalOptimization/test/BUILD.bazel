@@ -28,6 +28,8 @@ iree_lit_test_suite(
             "global_loop_invariant_code_motion.mlir",
             "hoist_into_globals.mlir",
             "infer_numeric_narrowing.mlir",
+            "linalg_quantized_conv_to_conv.mlir",
+            "linalg_quantized_matmul_to_matmul.mlir",
             "optimize_numerics.mlir",
             "propagate_linalg_transpose.mlir",
             "raise_special_ops.mlir",

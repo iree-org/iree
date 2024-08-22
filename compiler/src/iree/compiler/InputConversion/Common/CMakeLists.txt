@@ -38,16 +38,12 @@ iree_cc_library(
     Common
   HDRS
     "Passes.h"
-    "Utils.h"
   SRCS
     "ConvertPrimitiveType.cpp"
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
     "Passes.cpp"
-    "QuantizedConvToConv.cpp"
-    "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
-    "Utils.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
@@ -85,7 +81,6 @@ iree_cc_library(
     AutoInputConversionPipeline
   HDRS
     "Passes.h"
-    "Utils.h"
   SRCS
     "AutoInputConversionPipeline.cpp"
   DEPS

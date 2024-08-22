@@ -177,7 +177,7 @@ def test_run_unet_rocm(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
             f"--module={VmfbManager.sdxl_unet_rocm_pipeline_vmfb.path}",
-            "--expected_f16_threshold=0.7f",
+            "--expected_f16_threshold=0.705f",
         ]
         + SDXL_UNET_COMMON_RUN_FLAGS,
     )

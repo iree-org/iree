@@ -23,7 +23,7 @@ Python 3.10.4
 # Option A: Build like a normal dev setup (i.e. if allergic to Python
 # packaging and to triage issues that do not implicate that).
 [root@c8f6d0041d79 ]# cd /work/iree
-[root@c8f6d0041d79 iree]# pip install wheel cmake ninja pybind11 PyYAML numpy
+[root@c8f6d0041d79 iree]# pip install wheel cmake ninja pybind11 numpy
 [root@c8f6d0041d79 iree]# cmake -GNinja -B ../iree-build/ -S . -DCMAKE_BUILD_TYPE=Release -DIREE_BUILD_PYTHON_BINDINGS=ON
 [root@c8f6d0041d79 iree]# cd ../iree-build/
 [root@c8f6d0041d79 iree-build]# ninja

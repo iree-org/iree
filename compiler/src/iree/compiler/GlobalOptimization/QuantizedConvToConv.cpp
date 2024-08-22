@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/InputConversion/Common/Passes.h"
-#include "iree/compiler/InputConversion/Common/Utils.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -21,10 +21,10 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::InputConversion {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 #define GEN_PASS_DEF_LINALGQUANTIZEDCONVTOCONVPASS
-#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 namespace {
 
@@ -357,4 +357,4 @@ public:
 };
 
 } // namespace
-} // namespace mlir::iree_compiler::InputConversion
+} // namespace mlir::iree_compiler::GlobalOptimization

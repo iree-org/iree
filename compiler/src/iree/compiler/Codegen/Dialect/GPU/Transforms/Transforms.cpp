@@ -12,6 +12,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -22,6 +23,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -40,29 +42,14 @@ namespace mlir::iree_compiler::IREE::GPU {
 // Forall Fusion
 //===---------------------------------------------------------------------===//
 
-static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
-  ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
-  ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
-  ArrayRef<int64_t> steps = loop.getStaticStep();
-
-  if (ShapedType::isDynamicShape(lbs) || ShapedType::isDynamicShape(ubs) ||
-      ShapedType::isDynamicShape(steps)) {
-    return failure();
-  }
-
-  int64_t tripCount = 1;
-  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
-    tripCount *= llvm::divideCeil((ub - lb), step);
-  }
-  return tripCount;
-}
-
 static FailureOr<SmallVector<scf::ForallOp>>
 getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
                                      scf::ForallOp consumer) {
-  auto checkMappingTypes = [&](ArrayRef<Attribute> array) {
-    return llvm::all_of(array, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
-           llvm::all_of(array, llvm::IsaPred<gpu::GPUWarpMappingAttr>);
+  auto compareMappingTypes = [&](ArrayRef<Attribute> l, ArrayRef<Attribute> r) {
+    return (llvm::all_of(l, llvm::IsaPred<gpu::GPUThreadMappingAttr>) &&
+            llvm::all_of(r, llvm::IsaPred<gpu::GPUThreadMappingAttr>)) ||
+           (llvm::all_of(l, llvm::IsaPred<gpu::GPUWarpMappingAttr>) &&
+            llvm::all_of(r, llvm::IsaPred<gpu::GPUWarpMappingAttr>));
   };
 
   ArrayRef<Attribute> producerMapping = producer.getMappingAttr().getValue();
@@ -72,12 +59,34 @@ getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
     return failure();
   }
 
-  if (producerMapping.front() == consumerMapping.front() &&
-      checkMappingTypes(producerMapping) &&
-      checkMappingTypes(consumerMapping)) {
+  auto isDescendingRelativeIndices = [&](ArrayRef<Attribute> array) {
+    int64_t prev =
+        llvm::cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
+    for (Attribute attr : array.drop_front()) {
+      int64_t relativeIndex =
+          llvm::cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
+      if (relativeIndex != prev - 1) {
+        return false;
+      }
+      prev = relativeIndex;
+    }
+    return true;
+  };
+
+  // Require descending relative indices so that the linearization and
+  // delinearization done in subsequent steps are valid.
+  if (!isDescendingRelativeIndices(producerMapping) ||
+      !isDescendingRelativeIndices(consumerMapping)) {
+    return failure();
+  }
+
+  // If both loops share the same kind of mapping, return the sole consumer.
+  if (compareMappingTypes(producerMapping, consumerMapping)) {
     return SmallVector<scf::ForallOp>({consumer});
   }
 
+  // The only other supported case is fusing a thread mapped loop into a nest
+  // of a warp and lane forall.
   if (!llvm::all_of(producerMapping,
                     llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
       !llvm::all_of(consumerMapping, llvm::IsaPred<IREE::GPU::LaneIdAttr>)) {
@@ -91,63 +100,49 @@ getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
   return SmallVector<scf::ForallOp>({outerWarpLoop, consumer});
 }
 
-static LogicalResult compareWorkerCounts(scf::ForallOp producer,
-                                         ArrayRef<scf::ForallOp> consumers) {
-  FailureOr<int64_t> producerTripCount = getTripCount(producer);
-  if (failed(producerTripCount)) {
+static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
+                                                     scf::ForallOp forallOp) {
+  if (forallOp->getNumResults() != 1) {
     return failure();
   }
-  int64_t consumerTotal = 1;
-  for (auto consumer : consumers) {
-    FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
-    if (failed(consumerTripCount)) {
-      return failure();
-    }
-    consumerTotal *= *consumerTripCount;
-  }
-  if (*producerTripCount != consumerTotal) {
-    return failure();
-  }
-  return success();
-}
 
-static LogicalResult
-replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
-                     tensor::ParallelInsertSliceOp parallelInsert,
-                     SmallVector<Operation *> consumerChain) {
-  auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
-  OpBuilder::InsertionGuard g(rewriter);
-  Value shuffleDest = parallelInsert.getDest();
-  auto empty = shuffleDest.getDefiningOp<tensor::EmptyOp>();
+  auto empty = forallOp.getDpsInits()[0].getDefiningOp<tensor::EmptyOp>();
+  // Fail if the destination is not a `tensor.empty` op and cannot be trivially
+  // converted to a `bufferization.alloc_tensor`.
   if (!empty) {
     return failure();
   }
 
-  {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(empty);
-    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
-        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-    auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-        empty->getLoc(), empty->getResultTypes()[0], empty.getDynamicSizes());
-    allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
-    shuffleDest = allocTensor.getResult();
-  }
-  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
-      loc, extractSlice.getType(), parallelInsert.getSource(), shuffleDest,
-      parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
-      parallelInsert.getMixedStrides());
-  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+  // Create a `bufferization.alloc_tensor` op with memory space
+  // `#gpu.address_space<workgroup>`.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(empty);
+  Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
+      rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
+      empty->getLoc(), empty->getResultTypes()[0], empty.getDynamicSizes());
+  allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+  return allocTensor.getResult();
+}
+
+static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
+                                 Value source, Value replacement,
+                                 SmallVector<Operation *> consumerChain) {
+  auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
+  OpBuilder::InsertionGuard g(rewriter);
+
+  auto barrierRegionOp = rewriter.create<IREE::GPU::BarrierRegionOp>(
+      loc, extractSlice.getType(), replacement);
+  rewriter.setInsertionPointToStart(barrierRegionOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
   for (auto consumer : consumerChain) {
     rewriter.moveOpBefore(consumer, terminator);
   }
   (*consumerChain.begin())
-      ->replaceUsesOfWith(source, shuffleOp.getBody()->getArgument(0));
-  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+      ->replaceUsesOfWith(source, barrierRegionOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), barrierRegionOp,
                                 terminator);
-  return success();
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
@@ -179,6 +174,7 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
     });
   };
 
+  // Verify that both loops are normalized.
   if (!isAll(producer.getMixedStep(), 1) ||
       !isAll(producer.getMixedLowerBound(), 0)) {
     return failure();
@@ -193,54 +189,132 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
 
   rewriter.setInsertionPoint(slice);
 
-  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+  // Step 1. Get the destination of the producer loop as a shared memory
+  // allocation.
+  FailureOr<Value> sharedDest =
+      createSharedAllocDestination(rewriter, producer);
+  if (failed(sharedDest)) {
+    return failure();
+  }
+
+  // Step 2. Compute the producer IDs in terms of the consumer IDs.
+  // The producer IDs are computed as follows:
+  //
+  // producer = [p0, ..., pn] ∈ [0, ..., 0] to [P0, ..., Pn]
+  // consumer = [c0, ..., cn] ∈ [0, ..., 0] to [C0, ..., Cn]
+  //
+  //                   Not a real op
+  //                         |
+  // %ub = P0 * ... * Pn     |
+  // %step = C0 * ... * Cn   v
+  // %flatc = affine.linearize_index %c0, ..., %cn
+  // scf.for %id = %flatc to %ub step %step {
+  //   %p:n = affine.delinearize_index %id into [%P0, ..., %Pn]
+  //   ...
+  // }
+  //
+  // Note: We use 0 as the loop lower bound instead of the linearized consumer
+  // loop ID if possible to make later loop promotion patterns easier.
 
   MLIRContext *context = rewriter.getContext();
   Location loc = producer.getLoc();
 
+  // Compute the linearize consumer loop ID and total consumer loop worker
+  // count (C0 * ... * Cn).
   AffineExpr d0, d1, d2;
   bindDims(context, d0, d1, d2);
   AffineExpr mulAdd = d0 * d1 + d2;
   OpFoldResult linearId = rewriter.getIndexAttr(0);
+  OpFoldResult consumerWorkerCount = rewriter.getIndexAttr(1);
   for (auto loop : *consumerLoopNest) {
     for (auto [inductionVar, workerCount] :
          llvm::zip_equal(getAsOpFoldResult(loop.getInductionVars()),
                          loop.getMixedUpperBound())) {
       linearId = affine::makeComposedFoldedAffineApply(
           rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+      consumerWorkerCount = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, d0 * d1, {consumerWorkerCount, workerCount});
     }
   }
 
-  Value linearThreadIdVal =
+  // Compute the total producer loop worker count (P0 * ... * Pn).
+  Value linearConsumerIdVal =
       getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
-  SmallVector<Value> ranges;
-  for (auto workerCount : producer.getStaticUpperBound()) {
-    ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
+  SmallVector<Value> producerRanges;
+  OpFoldResult producerWorkerCount = rewriter.getIndexAttr(1);
+  for (auto workerCount : producer.getMixedUpperBound()) {
+    producerRanges.push_back(
+        getValueOrCreateConstantIndexOp(rewriter, loc, workerCount));
+    producerWorkerCount = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, d0 * d1, {producerWorkerCount, workerCount});
   }
-  ValueRange newIds = rewriter
-                          .create<affine::AffineDelinearizeIndexOp>(
-                              loc, linearThreadIdVal, ranges)
-                          .getResults();
 
-  // Step 2. Inline the region of the producer.
-  SmallVector<Value> bbArgReplacements(newIds);
-  bbArgReplacements.append(producer.getOutputs().begin(),
-                           producer.getOutputs().end());
+  std::optional<int64_t> staticProducerCount =
+      getConstantIntValue(producerWorkerCount);
+  std::optional<int64_t> staticConsumerCount =
+      getConstantIntValue(consumerWorkerCount);
+  bool perfectlyDivides =
+      staticConsumerCount && staticProducerCount &&
+      staticProducerCount.value() % staticConsumerCount.value() == 0;
 
+  // Step 3. Create the `scf.for` loop for the producer.
+  // If the consumer worker count perfectly divides the producer worker count,
+  // then we can use a lower bound of 0 and keep the loop bounds static.
+  Value lb = perfectlyDivides ? rewriter.create<arith::ConstantIndexOp>(loc, 0)
+                              : linearConsumerIdVal;
+  Value ub =
+      getValueOrCreateConstantIndexOp(rewriter, loc, producerWorkerCount);
+  Value step =
+      getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
+  auto newProducer =
+      rewriter.create<scf::ForOp>(loc, lb, ub, step, *sharedDest);
+  Block *loopBody = newProducer.getBody();
+
+  // Get the replacement IDs for the producer loop.
+  rewriter.setInsertionPointToStart(loopBody);
+  Value newFlatProducerId =
+      perfectlyDivides
+          ? affine::makeComposedAffineApply(
+                rewriter, loc, d0 + d1,
+                {newProducer.getInductionVar(), linearConsumerIdVal})
+          : newProducer.getInductionVar();
+
+  // We require a descending relative mapping, so delinearize in reverse order.
+  auto delinearize = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, newFlatProducerId, llvm::to_vector(llvm::reverse(producerRanges)));
+
+  SmallVector<Value> newBlockArgs =
+      llvm::map_to_vector(llvm::reverse(delinearize.getResults()),
+                          [](OpResult r) -> Value { return r; });
+  newBlockArgs.append(newProducer.getRegionIterArgs().begin(),
+                      newProducer.getRegionIterArgs().end());
+
+  // Step 4. Inline the region of the producer and replace the terminator.
   scf::InParallelOp terminator = producer.getTerminator();
-  rewriter.inlineBlockBefore(producer.getBody(), slice, bbArgReplacements);
+  rewriter.mergeBlocks(producer.getBody(), loopBody, newBlockArgs);
 
   rewriter.setInsertionPointAfter(terminator);
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  if (failed(replaceConsumerChain(rewriter, loc, producer.getResult(0),
-                                  parallelInsert, consumerChain))) {
-    return failure();
-  }
-
+  // Create an insert_slice to yield from the loop body.
+  SmallVector<OpFoldResult, 4> sourceOffsets = parallelInsert.getMixedOffsets();
+  SmallVector<OpFoldResult, 4> sourceSizes = parallelInsert.getMixedSizes();
+  SmallVector<OpFoldResult, 4> sourceStrides = parallelInsert.getMixedStrides();
+  Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
+      loc, parallelInsert.getSource(), parallelInsert.getDest(),
+      parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
+      parallelInsert.getMixedStrides());
+  rewriter.create<scf::YieldOp>(loc, insertedSlice);
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
+
+  // Step 5. Replace the extract slice with a `barrier_region` op to indicate
+  // synchronization of the shared tensor.
+  rewriter.setInsertionPointAfter(newProducer);
+  replaceConsumerChain(rewriter, loc, producer.getResult(0),
+                       newProducer.getResult(0), consumerChain);
+
   rewriter.eraseOp(producer);
   return success();
 }
@@ -912,69 +986,41 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 }
 
 //===---------------------------------------------------------------------===//
-// ShuffleTensor Lowering
+// BarrierRegion Lowering
 //===---------------------------------------------------------------------===//
 
 namespace {
-struct LowerShuffleTensor
-    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
-  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffleOp,
+struct LowerBarrierRegion
+    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+  using OpRewritePattern<IREE::GPU::BarrierRegionOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
-    Location loc = shuffleOp.getLoc();
+    Location loc = barrierRegionOp.getLoc();
 
-    Value dest = shuffleOp.getDest();
-    Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
-        rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+    // Step 1. Synchronize the workers on the shared dest.
+    auto writeBarrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
+        loc, barrierRegionOp.getDest());
 
-    // If the destination is a tensor.empty, replace it with an alloc_tensor.
-    if (auto emptyDest = shuffleOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
-      auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-          emptyDest->getLoc(), emptyDest->getResultTypes()[0],
-          emptyDest.getDynamicSizes());
-      allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
-      dest = allocTensor.getResult();
-    } else {
-      // Otherwise, verify that the destination is already shared memory.
-      auto allocTensor = dest.getDefiningOp<bufferization::AllocTensorOp>();
-      if (!allocTensor || !allocTensor.getMemorySpace().has_value() ||
-          allocTensor.getMemorySpaceAttr() != sharedMemoryAddrSpace) {
-        return rewriter.notifyMatchFailure(
-            shuffleOp, "shuffle tensor op destination does not have shared "
-                       "memory address space.");
-      }
-    }
-
-    // Step 1. Insert the source slice into the intermediate tensor.
-    SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
-    Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), dest, sourceOffsets, sourceSizes,
-        sourceStrides);
-
-    // Step 2. Synchronize the workers.
-    Value writeBarrier =
-        rewriter.create<IREE::GPU::ValueBarrierOp>(loc, insertedSlice)
-            .getResult(0);
-
-    auto terminator = shuffleOp.getBody()->getTerminator();
+    // Step 2. Inline the barrier op region.
+    auto terminator = barrierRegionOp.getBody()->getTerminator();
     Value replacement = terminator->getOperand(0);
-    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {writeBarrier});
+    rewriter.inlineBlockBefore(barrierRegionOp.getBody(), barrierRegionOp,
+                               {writeBarrier.getResult(0)});
     rewriter.setInsertionPointAfterValue(replacement);
     Value barrier;
-    // Step 3. Synchronize the read value.
+
+    // Step 3. Synchronize the result value.
     barrier = rewriter.create<IREE::GPU::ValueBarrierOp>(loc, replacement)
                   .getResult(0);
-    rewriter.replaceAllUsesWith(shuffleOp.getResult(), barrier);
+    rewriter.replaceAllUsesWith(barrierRegionOp.getResult(), barrier);
     rewriter.eraseOp(terminator);
     return success();
   }
 };
 } // namespace
 
-void populateIREEGPULowerShuffleTensorPatterns(RewritePatternSet &patterns) {
-  patterns.add<LowerShuffleTensor>(patterns.getContext());
+void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerBarrierRegion>(patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//
@@ -1044,10 +1090,10 @@ struct VectorizeStaticMultiMmaOpPattern final
 } // namespace
 
 static LogicalResult
-vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
-                                   IREE::GPU::ShuffleTensorOp shuffle) {
+vectorizeStaticBarrierRegionResult(RewriterBase &rewriter,
+                                   IREE::GPU::BarrierRegionOp barrier) {
   auto tensorResultType =
-      dyn_cast<RankedTensorType>(shuffle.getResult().getType());
+      dyn_cast<RankedTensorType>(barrier.getResult().getType());
   if (!tensorResultType || !tensorResultType.hasStaticShape()) {
     return failure();
   }
@@ -1056,18 +1102,16 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
                                              tensorResultType.getElementType());
 
   auto paddingValue = rewriter.create<arith::ConstantOp>(
-      shuffle.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
+      barrier.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
 
-  auto newShuffle = rewriter.create<IREE::GPU::ShuffleTensorOp>(
-      shuffle.getLoc(), newResultType, shuffle.getSource(), shuffle.getDest(),
-      shuffle.getMixedOffsets(), shuffle.getMixedSizes(),
-      shuffle.getMixedStrides());
+  auto newBarrier = rewriter.create<IREE::GPU::BarrierRegionOp>(
+      barrier.getLoc(), newResultType, barrier.getDest());
 
   auto currentTerminator =
-      cast<IREE::GPU::YieldOp>(shuffle.getBody()->getTerminator());
-  rewriter.mergeBlocks(shuffle.getBody(), newShuffle.getBody(),
-                       newShuffle.getBody()->getArguments());
-  rewriter.setInsertionPointToEnd(newShuffle.getBody());
+      cast<IREE::GPU::YieldOp>(barrier.getBody()->getTerminator());
+  rewriter.mergeBlocks(barrier.getBody(), newBarrier.getBody(),
+                       newBarrier.getBody()->getArguments());
+  rewriter.setInsertionPointToEnd(newBarrier.getBody());
 
   auto innerRead = vector::createReadOrMaskedRead(
       rewriter, currentTerminator.getLoc(), currentTerminator->getOperand(0),
@@ -1076,17 +1120,17 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
   rewriter.create<IREE::GPU::YieldOp>(currentTerminator->getLoc(), innerRead);
   rewriter.eraseOp(currentTerminator);
 
-  rewriter.setInsertionPointAfter(newShuffle);
+  rewriter.setInsertionPointAfter(newBarrier);
 
   // Create the write back to a tensor.
   auto empty = rewriter.create<tensor::EmptyOp>(
-      shuffle.getLoc(), tensorResultType.getShape(),
+      barrier.getLoc(), tensorResultType.getShape(),
       tensorResultType.getElementType());
   int64_t rank = tensorResultType.getRank();
-  auto zero = rewriter.create<arith::ConstantIndexOp>(shuffle.getLoc(), 0);
+  auto zero = rewriter.create<arith::ConstantIndexOp>(barrier.getLoc(), 0);
   rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      shuffle,
-      /*vector=*/newShuffle,
+      barrier,
+      /*vector=*/newBarrier,
       /*source=*/empty,
       /*indices=*/SmallVector<Value>(rank, zero),
       /*inBounds=*/SmallVector<bool>(rank, true));
@@ -1094,19 +1138,19 @@ vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
 }
 
 namespace {
-struct VectorizeStaticShuffleTensorResultPattern
-    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
-  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffle,
+struct VectorizeStaticBarrierRegionResultPattern
+    : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
+  using OpRewritePattern<IREE::GPU::BarrierRegionOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp shuffle,
                                 PatternRewriter &rewriter) const override {
-    return vectorizeStaticShuffleTensorResult(rewriter, shuffle);
+    return vectorizeStaticBarrierRegionResult(rewriter, shuffle);
   }
 };
 } // namespace
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeStaticMultiMmaOpPattern>(patterns.getContext());
-  patterns.add<VectorizeStaticShuffleTensorResultPattern>(
+  patterns.add<VectorizeStaticBarrierRegionResultPattern>(
       patterns.getContext());
 }
 

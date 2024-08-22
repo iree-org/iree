@@ -19,6 +19,12 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineValueBarriersPass :
+    Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
+  let summary = "Combines `iree_gpu.value_barrier` ops";
+  let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
+}
+
 def GPUCreateFastSlowPathPass :
     InterfacePass<"iree-codegen-gpu-create-fast-slow-path", "mlir::FunctionOpInterface"> {
   let summary = "Create separate fast and slow paths to handle padding";
@@ -57,6 +63,14 @@ def GPUDistributeScfForPass :
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
+}
+
+def GPUInferMemorySpacePass :
+    InterfacePass<"iree-codegen-gpu-infer-memory-space", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to infer and set the memory space for all alloc_tensor ops.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect"
+  ];
 }
 
 def GPULowerToUKernelsPass :

@@ -133,21 +133,21 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
-            iree-tests-cache: ~/iree_tests_cache
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
-            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             models-config-file: models_gpu_rocm_gfx942.json
-            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
-            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -160,18 +160,10 @@ jobs:
           # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
-      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -240,33 +232,26 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
             backend: cpu
-            iree-tests-cache: ~/iree_tests_cache
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
-            iree-tests-cache: /groups/aig_sharks/iree-tests-cache
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
-            iree-tests-cache: ~/iree_tests_cache
             runs-on: nodai-amdgpu-mi300-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREE_TEST_FILES: ${{ matrix.iree-tests-cache }}
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       VENV_DIR: ${{ github.workspace }}/venv
-      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
-      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
-      # directory to be able to clean after every PR
-      - name: Pre Checkout MI300 Step
-        if: contains(matrix.name, 'gfx942')
-        run: |
-          sudo chmod -R 777 ~/actions-runner/_work
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -332,17 +317,16 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1450.0 \
-            --goldentime-rocm-unet-ms 370.0 \
+            --goldentime-rocm-e2e-ms 1616.0 \
+            --goldentime-rocm-unet-ms 419.0 \
             --goldentime-rocm-clip-ms 18.5 \
-            --goldentime-rocm-vae-ms 315.0 \
-            --goldendispatch-rocm-unet 1691 \
+            --goldentime-rocm-vae-ms 337.0 \
+            --goldendispatch-rocm-unet 1551 \
             --goldendispatch-rocm-clip 1225 \
-            --goldendispatch-rocm-vae 248 \
+            --goldendispatch-rocm-vae 247 \
             --goldensize-rocm-unet-bytes 2280000  \
             --goldensize-rocm-clip-bytes 860000 \
             --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 6 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
             --retries 7
@@ -354,17 +338,16 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 325.0 \
-            --goldentime-rocm-unet-ms 77.0 \
+            --goldentime-rocm-e2e-ms 372.0 \
+            --goldentime-rocm-unet-ms 95.0 \
             --goldentime-rocm-clip-ms 15.5 \
-            --goldentime-rocm-vae-ms 74.0 \
-            --goldendispatch-rocm-unet 1691 \
+            --goldentime-rocm-vae-ms 80.0 \
+            --goldendispatch-rocm-unet 1551 \
             --goldendispatch-rocm-clip 1225 \
-            --goldendispatch-rocm-vae 248 \
+            --goldendispatch-rocm-vae 247 \
             --goldensize-rocm-unet-bytes 2270000 \
             --goldensize-rocm-clip-bytes 860000  \
             --goldensize-rocm-vae-bytes 840000 \
-            --gpu-number 0 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
             --retries 7
