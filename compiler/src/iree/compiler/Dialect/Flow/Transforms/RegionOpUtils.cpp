@@ -508,6 +508,16 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 FailureOr<IREE::Flow::DispatchRegionOp>
 moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
                                   IREE::Flow::DispatchRegionOp regionOp) {
+  // Fail if any of the `target` operands do not dominate the dispatch region.
+  mlir::DominanceInfo dominanceInfo(regionOp);
+  for (Value operand : target->getOperands()) {
+    Operation *definingOp = operand.getDefiningOp();
+    if (definingOp && !dominanceInfo.dominates(definingOp, regionOp)) {
+      return rewriter.notifyMatchFailure(
+          target, "target operands do not dominate the dispatch region op.");
+    }
+  }
+
   // Values replaced by moving the `target` into the dispatch region.
   SmallVector<Value> replacedValues;
 

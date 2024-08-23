@@ -7,10 +7,10 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -26,6 +26,12 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
+// Return true if the op is fusable with a SetEncodingOp consumer.
+// For now, just check if it is a LinalgOp.
+static bool isFusableWithSetEncoding(Operation *op) {
+  return isa<linalg::LinalgOp>(op);
+}
+
 struct FuseEncodingOpsIntoDispatchRegionsPass
     : public IREE::Flow::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
           FuseEncodingOpsIntoDispatchRegionsPass> {
@@ -34,8 +40,12 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
-    FormDispatchRegionsPassOptions options;
+    SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
+      encodingOps.push_back(encodingOp);
+    });
+
+    for (IREE::Encoding::SetEncodingOp encodingOp : encodingOps) {
       OpOperand &operand = encodingOp.getSourceMutable();
       auto producerDispatch = operand.get().getDefiningOp<DispatchRegionOp>();
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
@@ -43,7 +53,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
         if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
-        return;
+        continue;
       }
 
       // Find producer operation inside of the dispatch region to determine if
@@ -57,31 +67,25 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
         if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
-        return;
+        continue;
       }
-      // The indexing map of the producer needs to be identity along all
-      // outerParallelLoops. Ideally, this should be taken from the fusion
-      // group root, but just set to the outer parallel loops of the producer
-      // op for now.
-      auto outerParallelLoops =
-          getOuterParallelLoops(producerInRegion.getOwner());
+
       // Place the op in its own dispatch region if fusion is not possible.
-      // The real producer of the operand is the DispatchRegionOp, so override
-      // with the producer op inside of the dispatch region.
-      if (!isFusableWithProducer(operand, outerParallelLoops, options,
-                                 /*overrideProducerResult=*/producerInRegion)) {
+      if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
         if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
-        return;
+        continue;
       }
       // Fuse the `encodingOp` into the producer dispatch region.
       if (failed(moveFollowingOpIntoDispatchRegion(rewriter, encodingOp,
                                                    producerDispatch))) {
         return signalPassFailure();
       }
-    });
+    }
 
+    // Dynamic dims may have dominance issues after pulling encoding ops into
+    // producer dispatch regions, so we need to resolve tensor.dim ops.
     RewritePatternSet patterns(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
