@@ -79,7 +79,7 @@ module {
 #map4 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], original_type = tensor<2x11008x128xf32>, user_indexing_maps = [#map1, #map2, #map3], round_dims_to = array<i64: 32, 32, 32>>
 module {
-  util.func public @transpose_no_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
+  util.func public @transpose_fusion(%arg0: tensor<2x128x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %0 = tensor.empty() : tensor<2x11008x128xf32>
     %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
       %5 = linalg.generic {
@@ -97,16 +97,13 @@ module {
   }
 }
 
-// CHECK-LABEL: @transpose_no_fusion
-// CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
+// CHECK-LABEL: @transpose_fusion
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #iree_encoding.encoding
 // CHECK:         %[[TRANSPOSE:.+]] = linalg.generic
-// CHECK:         flow.return %[[TRANSPOSE]]
-// CHECK:       }
-// CHECK:       %[[DISPATCH1:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32, #iree_encoding.encoding
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH0]]
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[TRANSPOSE]]
 // CHECK:         flow.return %[[SET_ENCODING]]
 // CHECK:       }
-// CHECK:       util.return %[[DISPATCH1]] : tensor<2x11008x128xf32, #iree_encoding.encoding
+// CHECK:       util.return %[[DISPATCH]] : tensor<2x11008x128xf32, #iree_encoding.encoding
 
 // -----
 
