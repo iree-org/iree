@@ -35,6 +35,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -132,6 +133,24 @@ private:
   }
 };
 
+// Extracts the amdgpu GfxIp version from the chip architecture in the
+// executable target attribute. For example, returns 0x942 for 'gfx942'.
+static FailureOr<unsigned> getGfxIpVersion(ExecutableTargetAttr targetAttr) {
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(targetAttr);
+  if (!gpuTarget)
+    return failure();
+
+  StringRef arch = gpuTarget.getArch();
+  if (!arch.consume_front("gfx"))
+    return failure();
+
+  unsigned gfxVersion = 0;
+  if (!llvm::to_integer(arch, gfxVersion, 16))
+    return failure();
+
+  return gfxVersion;
+}
+
 // Set attributes on `funcOp` in order to use upstream's translation of
 // ROCDL dialect attributes to LLVM. Primarily this is `rocdl.kernel`
 // (sets the calling convention and workgroup size uniformity) but this will
@@ -168,10 +187,17 @@ static void annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
     rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, *attr);
   }
 
+  // Kernel argument preloading is only supported on gfx940 and newer targets
+  // from the CDNA family. This is enabled using the `inreg` function argument
+  // attribute.
+  FailureOr<unsigned> gfxIpVersion = getGfxIpVersion(targetAttr);
+  if (failed(gfxIpVersion))
+    return;
+  if (*gfxIpVersion < 0x940)
+    return;
+
   auto inRegAttrName =
       builder.getStringAttr(LLVM::LLVMDialect::getInRegAttrName());
-  // Currently, `inreg` only enables argument preloading on gfx9,
-  // but it is harmless on other targets.
   for (unsigned i = 0, e = funcOp.getNumArguments(); i < e; ++i)
     funcOp.setArgAttr(i, inRegAttrName, unitAttr);
 }
