@@ -37,7 +37,6 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["transform_dialect_dispatch_spec.mlir"],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

@@ -46,9 +46,13 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
+    MLIRDestinationStyleOpInterface
+    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -57,6 +61,8 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
@@ -64,14 +70,20 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTensorUtils
+    MLIRTilingInterface
+    MLIRTransformDialect
+    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::DFX

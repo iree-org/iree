@@ -34,8 +34,6 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
-  DATA
-    transform_dialect_dispatch_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

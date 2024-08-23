@@ -6,9 +6,11 @@
 
 #include "iree/compiler/DispatchCreation/Passes.h"
 
-#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -95,6 +97,8 @@ namespace mlir::iree_compiler::DispatchCreation {
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 static void addCleanupPatterns(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
@@ -117,9 +121,6 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   // iteration to do that).
   passManager.addPass(IREE::Util::createIPOPass());
 }
-
-using FunctionLikeNest =
-    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 //===----------------------------------------------------------------------===//
 // Pipelines

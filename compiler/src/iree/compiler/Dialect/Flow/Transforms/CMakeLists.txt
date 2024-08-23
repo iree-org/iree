@@ -73,8 +73,6 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRMeshDialect
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRSCFDialect
@@ -85,8 +83,6 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTosaDialect
-    MLIRTransformDialect
-    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
