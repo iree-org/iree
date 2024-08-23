@@ -18,7 +18,7 @@
   iterator_types = ["parallel", "parallel", "reduction"]
 }
 
-func.func @matmul_96x64x16(%lhs: tensor<96x16xf16>,
+func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
                            %rhs: tensor<64x16xf16>,
                            %init: tensor<96x64xf32>)
                            -> tensor<96x64xf32>
@@ -40,7 +40,58 @@ func.func @matmul_96x64x16(%lhs: tensor<96x16xf16>,
 // CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4], subgroup_strides = [0, 0], thread_strides = [1, 32]>
 // CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1], subgroup_strides = [0, 0], thread_strides = [32, 1]>
 
-// CHECK-LABEL: func.func @matmul_96x64x16
+// CHECK-LABEL: func.func @matmul_96x64x16_mfma
+
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED2]]
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME: outs(%[[ACC]]
+
+// -----
+
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64,
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
+                                             subgroup_m_count = 1,
+                                             subgroup_n_count = 1>}>
+
+#maps = [
+  affine_map<(m, n, k) -> (m, k)>,
+  affine_map<(m, n, k) -> (n, k)>,
+  affine_map<(m, n, k) -> (m, n)>
+]
+
+#traits = {
+  indexing_maps = #maps,
+  iterator_types = ["parallel", "parallel", "reduction"]
+}
+
+func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
+                           %rhs: tensor<64x16xf16>,
+                           %init: tensor<96x64xf32>)
+                           -> tensor<96x64xf32>
+                           attributes { translation_info = #translation } {
+  %out = linalg.generic #traits
+                        ins(%lhs, %rhs: tensor<96x16xf16>, tensor<64x16xf16>)
+                        outs(%init: tensor<96x64xf32>) {
+    ^bb0(%in: f16, %in_1: f16, %out: f32):
+      %ex   = arith.extf %in   : f16 to f32
+      %ex_1 = arith.extf %in_1 : f16 to f32
+      %mul  = arith.mulf %ex, %ex_1 : f32
+      %sum  = arith.addf %out, %mul : f32
+      linalg.yield %sum : f32
+  } -> tensor<96x64xf32>
+  return %out : tensor<96x64xf32>
+}
+
+// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [6, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16], subgroup_strides = [0, 0], thread_strides = [1, 0]>
+// CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16], subgroup_strides = [0, 0], thread_strides = [1, 0]>
+// CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [6, 4], outers_per_batch = [8, 1], threads_per_outer = [2, 16], elements_per_thread = [1, 1], subgroup_strides = [0, 0], thread_strides = [16, 1]>
+
+// CHECK-LABEL: func.func @matmul_96x64x16_wmma
 
 // CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
 // CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}

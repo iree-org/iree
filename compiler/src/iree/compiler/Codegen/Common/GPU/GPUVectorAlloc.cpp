@@ -103,7 +103,7 @@ struct GPUVectorAllocPass final
 
     SmallVector<IREE::VectorExt::ToLayoutOp> opsToPromote;
     funcOp.walk([&](IREE::VectorExt::ToLayoutOp op) {
-      if (op->hasAttr("shared_memory_conversion")) {
+      if (op.getSharedMemoryConversion()) {
         opsToPromote.push_back(op);
       }
     });
@@ -139,7 +139,7 @@ struct GPUVectorAllocPass final
 
       // Remove the shared_memory_conversion attribute from the to_layout
       // operation.
-      op->removeAttr("shared_memory_conversion");
+      op.setSharedMemoryConversion(false);
     }
   }
 };

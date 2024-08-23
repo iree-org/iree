@@ -225,7 +225,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
   Location loc = transfer.getLoc();
   rewriter.setInsertionPointAfter(transfer);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, transfer.getResult().getType(), transfer.getResult(), layout);
+      loc, transfer.getResult(), layout);
   rewriter.replaceAllUsesExcept(transfer, toLayout.getResult(), toLayout);
 
   return success();

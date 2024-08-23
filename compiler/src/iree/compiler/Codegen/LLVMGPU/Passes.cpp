@@ -824,7 +824,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // this point.
   funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
   if (!usePadToModelSharedMemcpy) {
-    // Folding unit dims gets confused with padding.
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));

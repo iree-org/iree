@@ -214,8 +214,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   Value input = opOperand.get();
   // Create a resolution operation. This conflict should be handeled later by
   // someone else, not this analysis.
-  Operation *resolveOp = builder.create<IREE::VectorExt::ToLayoutOp>(
-      input.getLoc(), input.getType(), input, rhs);
+  Operation *resolveOp =
+      builder.create<IREE::VectorExt::ToLayoutOp>(input.getLoc(), input, rhs);
   Value resolvedValue = resolveOp->getResult(0);
   opOperand.set(resolvedValue);
 

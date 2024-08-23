@@ -33,14 +33,29 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let description = [{
     The layout conversion operator takes a shaped value and a layout and
     transforms the value to have that layout.
+
+    If the "shared_memory_conversion" attribute is set, then this layout
+    change has to be materialized through shared memory.
   }];
   let arguments = (ins
     AnyShaped:$input,
-    VectorLayoutInterface:$layout
+    VectorLayoutInterface:$layout,
+    DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion
   );
   let results = (outs
     AnyShaped:$output
   );
+  let builders = [
+    OpBuilder<(ins "Value":$input,
+                   "VectorLayoutInterface":$layout,
+                   CArg<"bool", "false">:$shared_memory_conversion), [{
+      if (shared_memory_conversion) {
+        build($_builder, $_state, input.getType(), input, layout, UnitAttr::get(input.getContext()));
+      } else{
+        build($_builder, $_state, input.getType(), input, layout);
+      }
+    }]>
+  ];
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {
       return isa<RankedTensorType>(getOutput().getType());
