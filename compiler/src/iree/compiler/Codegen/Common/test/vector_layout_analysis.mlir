@@ -4,7 +4,7 @@
 
 // Propagate the layout from transfer_read to everyone.
 builtin.module attributes { transform.with_named_sequence } {
-  func.func @propagate_simple(%arr: memref<16x16xf16>, %a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
+  func.func @propagate_simple(%arr: memref<16x16xf16>, %a: vector<16x16xf16>, %b: vector<16x16xf16>, %cond: i1) -> vector<16x16xf16> {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
     %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
@@ -14,7 +14,9 @@ builtin.module attributes { transform.with_named_sequence } {
     // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
     %d = arith.addf %c, %a : vector<16x16xf16>
     // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
-    func.return %d : vector<16x16xf16>
+    %e = arith.select %cond, %c, %d : vector<16x16xf16>
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    func.return %e : vector<16x16xf16>
   }
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
@@ -177,6 +179,45 @@ builtin.module attributes { transform.with_named_sequence } {
         } %b, %a, %c : vector<128x64xf16>, vector<32x64xf16> into vector<128x32xf32>
 
     func.return %D : vector<128x32xf32>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// This test checks that we can resolve layouts through arith.select
+// properly and that our layout analysis is not emitting redundant
+// to_layout conversions in between anchor ops.
+
+// Useful proxy for ensuring that layout conversions on attention
+// happens where we intend it to happen.
+
+#layoutA = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>
+#layoutB = #iree_vector_ext.layout<<[BATCHY, LANEX], [2, 32]>, <[BATCHX,  LANEY,  VECTORX], [2, 4, 8]>>
+
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @resolve_select(%A : vector<64x64xf16>, %B : vector<64x64xf16>, %condition : i1) -> vector<64x64xf16> {
+    %a = iree_vector_ext.to_layout %A to #layoutA : vector<64x64xf16>
+    %b = iree_vector_ext.to_layout %B to #layoutB : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %offset_0 = arith.constant dense<2.0> : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %offset_1 = arith.constant dense<4.0> : vector<64x64xf16>
+
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %sel = arith.select %condition, %offset_0, %offset_1 : vector<64x64xf16>
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  VECTORY,  LANEY,  VECTORX], [2, 4, 2, 4]>>}}
+    %add = arith.addf %a, %sel : vector<64x64xf16>
+    %add_layout = iree_vector_ext.to_layout %add to #layoutB : vector<64x64xf16>
+    // CHECK-COUNT-3: iree_vector_ext.to_layout
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHY,  LANEX], [2, 32]>, <[ BATCHX,  LANEY,  VECTORX], [2, 4, 8]>>}}
+    %add_1 = arith.addf %add_layout, %b : vector<64x64xf16>
+    func.return %add_1 : vector<64x64xf16>
   }
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {

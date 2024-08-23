@@ -142,11 +142,8 @@ private:
 
 class PropagateLayout : public DataFlowAnalysis {
 public:
-  explicit PropagateLayout(
-      DataFlowSolver &solver,
-      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
-      MLIRContext *ctx)
-      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
+  explicit PropagateLayout(DataFlowSolver &solver, MLIRContext *ctx)
+      : DataFlowAnalysis(solver), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
 
@@ -167,8 +164,6 @@ private:
                              OperandRange operands);
 
   DistributionLayout *getLatticeElement(Value val);
-
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
 
   MLIRContext *ctx;
 };
@@ -345,19 +340,25 @@ static OpOperand &getOpOperand(Operation *op, unsigned operandLatticeIndex) {
   llvm::report_fatal_error("No vector operand found");
 }
 
-/// Get a layout if all the given layouts are same. If all layouts are not same,
-/// return nullptr.
+/// Get a layout if all the given initialized layouts are same.
+/// If any initialized layouts are not same, return nullptr.
 static const DistributionLayout *
 getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
-  if (layouts.empty())
+  SmallVector<const DistributionLayout *> initializedLayouts;
+  for (auto layout : layouts) {
+    if (layout->isUninitialized())
+      continue;
+    initializedLayouts.push_back(layout);
+  }
+
+  if (initializedLayouts.empty())
     return nullptr;
 
   // Check if all layouts are same.
-  if (!llvm::all_equal(llvm::make_pointee_range(layouts))) {
+  if (!llvm::all_equal(llvm::make_pointee_range(initializedLayouts)))
     return nullptr;
-  }
 
-  return layouts[0];
+  return initializedLayouts[0];
 }
 
 /// Hueristic to use to choose the best layout when enforcing the same layout
@@ -770,12 +771,14 @@ void enforcementTransferFunction(
 /// ==========================================================================
 
 LogicalResult PropagateLayout::initialize(Operation *root) {
-  // Set layout for anchor ops.
-  for (auto [val, layout] : anchors) {
-    DistributionLayout *latticeEl = getLatticeElement(val);
-    ChangeResult changed = latticeEl->resolve(layout);
+  // Initialize/set anchor layouts.
+  root->walk([&](IREE::VectorExt::ToLayoutOp toLayout) {
+    Value anchorVal = toLayout.getResult();
+    DistributionLayout *latticeEl = getLatticeElement(anchorVal);
+    ChangeResult changed =
+        latticeEl->resolve(toLayout.getLayout(), /*force=*/true);
     propagateIfChanged(latticeEl, changed);
-  }
+  });
 
   root->walk([&](Operation *traversed) { visitOperation(traversed); });
 
@@ -1029,8 +1032,8 @@ LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
   // propagation.
+  solver.load<PropagateLayout>(root->getContext());
   solver.load<EnforceLayout>(root->getContext());
-  solver.load<PropagateLayout>(anchors, root->getContext());
   return solver.initializeAndRun(root);
 }
 
