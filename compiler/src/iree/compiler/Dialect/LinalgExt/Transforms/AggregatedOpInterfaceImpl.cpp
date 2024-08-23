@@ -175,6 +175,37 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
+  static Value computeAdd(OpBuilder &builder, Location loc, AffineMap lhsMap,
+                          AffineMap rhsMap, AffineMap accMap, Value lhs,
+                          Value rhs, Value acc) {
+
+    SmallVector<AffineMap> compressedMaps =
+        compressUnusedDims(SmallVector<AffineMap>{lhsMap, rhsMap, accMap});
+    lhsMap = compressedMaps[0];
+    rhsMap = compressedMaps[1];
+    accMap = compressedMaps[2];
+
+    // Since this is an addition, all dimensions are parallel (no reduction).
+    SmallVector<utils::IteratorType> iteratorTypes(
+        accMap.getNumDims(), utils::IteratorType::parallel);
+
+    auto genericOp = builder.create<linalg::GenericOp>(
+        loc, acc.getType(), SmallVector<Value>{lhs, rhs}, acc,
+        SmallVector<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          // Cast inputs to match output datatype.
+          Value lhs = convertScalarToDtype(b, loc, args[0], args[2].getType(),
+                                          /*isUnsignedCast=*/false);
+          Value rhs = convertScalarToDtype(b, loc, args[1], args[2].getType(),
+                                          /*isUnsignedCast=*/false);
+          Value add = b.create<arith::AddFOp>(loc, lhs, rhs);
+          b.create<linalg::YieldOp>(loc, add);
+        });
+
+    return genericOp.getResult(0);
+  }
+
+
 // Compute output = exp2(output - input)
 static Value computeSubAndExp2(OpBuilder &builder, Location loc,
                                AffineMap inputMap, AffineMap outputMap,
@@ -230,16 +261,29 @@ static OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
+void printAffineMap(AffineMap map) {
+  if (!map) {
+    llvm::outs() << "AffineMap is null.\n";
+    return;
+  }
+  
+  llvm::outs() << "AffineMap: ";
+  map.print(llvm::outs());
+  llvm::outs() << "\n";
+}
+
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
+  llvm::outs() << "beginning decomposition\n";
   Location loc = getLoc();
   Value query = getQuery();
   Value key = getKey();
   Value value = getValue();
+  std::optional<Value> mask = getMask();
   Value oldAcc = getOutput();
   Value oldMax = getMax();
   Value oldSum = getSum();
@@ -324,6 +368,58 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
                                                offset);
   }
+
+  if (*mask) {
+      // // // Convert the mask to the element type of `s`.
+      // auto maskElementType = getElementTypeOrSelf(s.getType());
+      // auto maskETy = getElementTypeOrSelf(mask.value().getType());
+
+      // if (maskETy != maskElementType && isa<FloatType>(maskElementType)) {
+llvm::outs() << "query type: " << query.getType() << ", map is ";
+printAffineMap(getQueryMap());
+llvm::outs() << "key type: " << key.getType() << ", map is ";
+printAffineMap(getKeyMap());
+llvm::outs() << "s type: " << s.getType() << ", map is ";
+printAffineMap(sMap);
+llvm::outs() << "mask type: " << mask.value().getType() << ", map is ";
+printAffineMap(*getMaskMap());
+      //     // Handle cases where mask and `s` have different bit-widths.
+
+      //     if (maskETy.getIntOrFloatBitWidth() <= 8) {
+      //         // Handling low-precision types (e.g., fp8).
+
+      //         // Compute sizes based on the indexing map of `s`.
+      //         SmallVector<OpFoldResult> mSizes(
+      //             llvm::map_range(sMap.getResults(), [&](AffineExpr dimExpr) {
+      //                 return sizes[cast<AffineDimExpr>(dimExpr).getPosition()];
+      //             }));
+
+      //         auto fpTy = cast<FloatType>(maskElementType);
+      //         double largestDbl =
+      //             APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+      //                 .convertToDouble();
+
+      //         // Normalize the mask to the correct range.
+      //         Value maskScale = b.create<arith::ConstantOp>(
+      //             loc, b.getFloatAttr(maskElementType, clAttentionSoftmaxMax / largestDbl));
+
+      //         // Scale the mask.
+      //         AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
+      //                                             /*symbolCount=*/0, getContext());
+      //         mask.value() = scaleValueInPlace(b, loc, sMap, scaleMap, mask.value(), maskScale);
+      //     }
+
+      //     // Truncate the mask if necessary.
+      //     Value convertedMask = b.create<tensor::EmptyOp>(loc, sSizes, maskElementType);
+      //     mask.value() = truncateFloat(b, loc, getMaskMap(), getMaskMap(), mask, convertedMask);
+      // }
+
+      // // Now perform the addition of the mask to `s`.
+      // s = computeAdd(b, loc, sMap, *getMaskMap(), sMap, s, *mask, s);
+  }
+
+  llvm::outs() << "asdih\n";
+
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
