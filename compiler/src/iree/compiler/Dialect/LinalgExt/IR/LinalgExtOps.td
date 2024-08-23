@@ -738,23 +738,18 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     SmallVector<AffineMap> getIndexingMapsArray();
 
     AffineMap getQueryMap() {
-    // llvm::outs() << "Hey I got q map"<<"\n";
       return getIndexingMapsArray()[0];
     }
     AffineMap getKeyMap() {
-    // llvm::outs() << "Hey I got k map"<<"\n";
       return getIndexingMapsArray()[1];
     }
     AffineMap getValueMap() {
-    // llvm::outs() << "Hey I got value map"<<"\n";
       return getIndexingMapsArray()[2];
     }
     std::optional<AffineMap> getMaskMap() {
-      // llvm::outs() << "Hey I got here do i get a prize"<<"\n";
       if (getMask()) {
         return cast<AffineMap>(getIndexingMapsArray()[3]);
       }
-      // llvm::outs() << "Hey I got here do i get a prize?"<<"\n";
       return std::nullopt;
     }
     AffineMap getOutputMap() {

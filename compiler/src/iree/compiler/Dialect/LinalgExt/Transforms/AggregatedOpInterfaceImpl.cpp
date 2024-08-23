@@ -261,24 +261,12 @@ static OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
-void printAffineMap(AffineMap map) {
-  if (!map) {
-    llvm::outs() << "AffineMap is null.\n";
-    return;
-  }
-  
-  llvm::outs() << "AffineMap: ";
-  map.print(llvm::outs());
-  llvm::outs() << "\n";
-}
-
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
-  llvm::outs() << "beginning decomposition\n";
   Location loc = getLoc();
   Value query = getQuery();
   Value key = getKey();
@@ -367,56 +355,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   }
 
   if (*mask) {
-      // // // Convert the mask to the element type of `s`.
-      // auto maskElementType = getElementTypeOrSelf(s.getType());
-      // auto maskETy = getElementTypeOrSelf(mask.value().getType());
-
-      // if (maskETy != maskElementType && isa<FloatType>(maskElementType)) {
-llvm::outs() << "query type: " << query.getType() << ", map is ";
-printAffineMap(getQueryMap());
-llvm::outs() << "key type: " << key.getType() << ", map is ";
-printAffineMap(getKeyMap());
-llvm::outs() << "s type: " << s.getType() << ", map is ";
-printAffineMap(sMap);
-llvm::outs() << "mask type: " << mask.value().getType() << ", map is ";
-printAffineMap(*getMaskMap());
-      //     // Handle cases where mask and `s` have different bit-widths.
-
-      //     if (maskETy.getIntOrFloatBitWidth() <= 8) {
-      //         // Handling low-precision types (e.g., fp8).
-
-      //         // Compute sizes based on the indexing map of `s`.
-      //         SmallVector<OpFoldResult> mSizes(
-      //             llvm::map_range(sMap.getResults(), [&](AffineExpr dimExpr) {
-      //                 return sizes[cast<AffineDimExpr>(dimExpr).getPosition()];
-      //             }));
-
-      //         auto fpTy = cast<FloatType>(maskElementType);
-      //         double largestDbl =
-      //             APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-      //                 .convertToDouble();
-
-      //         // Normalize the mask to the correct range.
-      //         Value maskScale = b.create<arith::ConstantOp>(
-      //             loc, b.getFloatAttr(maskElementType, clAttentionSoftmaxMax / largestDbl));
-
-      //         // Scale the mask.
-      //         AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
-      //                                             /*symbolCount=*/0, getContext());
-      //         mask.value() = scaleValueInPlace(b, loc, sMap, scaleMap, mask.value(), maskScale);
-      //     }
-
-      //     // Truncate the mask if necessary.
-      //     Value convertedMask = b.create<tensor::EmptyOp>(loc, sSizes, maskElementType);
-      //     mask.value() = truncateFloat(b, loc, getMaskMap(), getMaskMap(), mask, convertedMask);
-      // }
-
-      // // Now perform the addition of the mask to `s`.
-      // s = computeAdd(b, loc, sMap, *getMaskMap(), sMap, s, *mask, s);
+      s = computeAdd(b, loc, sMap, *getMaskMap(), sMap, s, *mask, s);
   }
-
-  llvm::outs() << "asdih\n";
-
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -468,7 +408,6 @@ printAffineMap(*getMaskMap());
                                         /*symbolCount=*/0, getContext());
     newAcc = scaleValueInPlace(b, loc, accMap, scaleMap, newAcc, pScale);
   }
-  llvm::outs() << "enddddd\n";
 
   return SmallVector<Value>{newAcc, newMax, newSum};
 }
