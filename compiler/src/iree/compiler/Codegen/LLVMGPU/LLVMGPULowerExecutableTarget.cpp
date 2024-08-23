@@ -160,7 +160,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     addGPUPackUnPackPasses(pipeline);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse:
-    addGPUTileAndFusePassPipeline(pipeline);
+    addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
     break;
   // no pipeline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:

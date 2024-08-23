@@ -48,7 +48,8 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager);
 
 /// Lowering config driven pipeline that uses greedy tile + fuse to distribute
 /// to threads.
-void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager);
+void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
+                                   const GPUPipelineOptions &pipelineOptions);
 
 /// Transform dialect-based path.
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
