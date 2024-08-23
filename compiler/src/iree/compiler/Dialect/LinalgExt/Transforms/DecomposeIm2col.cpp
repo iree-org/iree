@@ -7,12 +7,12 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -20,49 +20,42 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 #define GEN_PASS_DEF_DECOMPOSEIM2COLPASS
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
-namespace {
+static LogicalResult decomposeAndUnrollIm2col(Im2colOp im2colOp,
+                                              RewriterBase &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(im2colOp);
+  FailureOr<SmallVector<Value>> decomposedIm2col =
+      im2colOp.decomposeOperation(rewriter);
+  if (failed(decomposedIm2col)) {
+    return failure();
+  }
+  rewriter.replaceOp(im2colOp, decomposedIm2col.value().front());
 
-/// Pattern to decompose the tiled im2col op.
-struct DecomposeIm2col : public OpRewritePattern<Im2colOp> {
-  using OpRewritePattern<Im2colOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(Im2colOp im2colOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<SmallVector<Value>> decomposedIm2col =
-        im2colOp.decomposeOperation(rewriter);
-    if (failed(decomposedIm2col)) {
+  // Unroll the loop nest created by the im2col op decomposition.
+  auto outerLoop = decomposedIm2col.value().front().getDefiningOp<scf::ForOp>();
+  SmallVector<scf::ForOp> loopNest({outerLoop});
+  while (auto innerLoop =
+             outerLoop.getYieldedValues()[0].getDefiningOp<scf::ForOp>()) {
+    loopNest.push_back(innerLoop);
+    outerLoop = innerLoop;
+  }
+  for (auto loop : llvm::reverse(loopNest)) {
+    std::optional<int64_t> ub = getConstantIntValue(loop.getUpperBound());
+    if (!ub.has_value()) {
+      loop.emitOpError("upper bound should be a constant");
       return failure();
     }
-    rewriter.replaceOp(im2colOp, decomposedIm2col.value().front());
-
-    // Unroll the loop nest created by the im2col op decomposition.
-    auto outerLoop =
-        decomposedIm2col.value().front().getDefiningOp<scf::ForOp>();
-    SmallVector<scf::ForOp> loopNest({outerLoop});
-    while (auto innerLoop =
-               outerLoop.getYieldedValues()[0].getDefiningOp<scf::ForOp>()) {
-      loopNest.push_back(innerLoop);
-      outerLoop = innerLoop;
+    if (ub.value() == 1) {
+      continue;
     }
-    for (auto loop : llvm::reverse(loopNest)) {
-      IntegerAttr ub;
-      if (!matchPattern(loop.getUpperBound(), m_Constant(&ub))) {
-        loop.emitOpError("upper bound should be a constant");
-        return failure();
-      }
-      if (ub.getInt() == 1) {
-        continue;
-      }
-      if (failed(mlir::loopUnrollByFactor(loop, ub.getInt()))) {
-        loop.emitOpError("failed unrolling by factor 1");
-        return failure();
-      }
+    rewriter.setInsertionPoint(loop);
+    if (failed(mlir::loopUnrollByFactor(loop, ub.value()))) {
+      loop.emitOpError("failed unrolling by factor 1");
+      return failure();
     }
-    return success();
   }
-};
-
-} // namespace
+  return success();
+}
 
 namespace {
 struct DecomposeIm2colPass final
@@ -79,8 +72,19 @@ struct DecomposeIm2colPass final
 
 void DecomposeIm2colPass::runOnOperation() {
   MLIRContext *context = &getContext();
+  auto funcOp = getOperation();
+
+  SmallVector<Im2colOp> candidates;
+  funcOp->walk([&](Im2colOp op) { candidates.push_back(op); });
+  IRRewriter rewriter(context);
+  for (auto im2colOp : candidates) {
+    if (failed(decomposeAndUnrollIm2col(im2colOp, rewriter))) {
+      return signalPassFailure();
+    }
+  }
+
   RewritePatternSet patterns(context);
-  patterns.add<DecomposeIm2col>(context);
+  // patterns.add<DecomposeIm2col>(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
