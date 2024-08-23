@@ -20,8 +20,8 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 #define GEN_PASS_DEF_DECOMPOSEIM2COLPASS
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
-static LogicalResult decomposeAndUnrollIm2col(Im2colOp im2colOp,
-                                              RewriterBase &rewriter) {
+static LogicalResult decomposeIm2col(Im2colOp im2colOp, RewriterBase &rewriter,
+                                     bool unroll) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(im2colOp);
   FailureOr<SmallVector<Value>> decomposedIm2col =
@@ -30,6 +30,9 @@ static LogicalResult decomposeAndUnrollIm2col(Im2colOp im2colOp,
     return failure();
   }
   rewriter.replaceOp(im2colOp, decomposedIm2col.value().front());
+  if (!unroll) {
+    return success();
+  }
 
   // Unroll the loop nest created by the im2col op decomposition.
   auto outerLoop = decomposedIm2col.value().front().getDefiningOp<scf::ForOp>();
@@ -41,16 +44,12 @@ static LogicalResult decomposeAndUnrollIm2col(Im2colOp im2colOp,
   }
   for (auto loop : llvm::reverse(loopNest)) {
     std::optional<int64_t> ub = getConstantIntValue(loop.getUpperBound());
-    if (!ub.has_value()) {
-      loop.emitOpError("upper bound should be a constant");
-      return failure();
-    }
-    if (ub.value() == 1) {
+    if (!ub.has_value() || ub.value() == 1) {
       continue;
     }
     rewriter.setInsertionPoint(loop);
     if (failed(mlir::loopUnrollByFactor(loop, ub.value()))) {
-      loop.emitOpError("failed unrolling by factor 1");
+      loop.emitOpError("failed to unroll loop");
       return failure();
     }
   }
@@ -60,6 +59,9 @@ static LogicalResult decomposeAndUnrollIm2col(Im2colOp im2colOp,
 namespace {
 struct DecomposeIm2colPass final
     : impl::DecomposeIm2colPassBase<DecomposeIm2colPass> {
+  using impl::DecomposeIm2colPassBase<
+      DecomposeIm2colPass>::DecomposeIm2colPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
@@ -78,13 +80,12 @@ void DecomposeIm2colPass::runOnOperation() {
   funcOp->walk([&](Im2colOp op) { candidates.push_back(op); });
   IRRewriter rewriter(context);
   for (auto im2colOp : candidates) {
-    if (failed(decomposeAndUnrollIm2col(im2colOp, rewriter))) {
+    if (failed(decomposeIm2col(im2colOp, rewriter, unroll))) {
       return signalPassFailure();
     }
   }
 
   RewritePatternSet patterns(context);
-  // patterns.add<DecomposeIm2col>(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
