@@ -279,12 +279,24 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
-      .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
-      .addPredicatedPass(clEnableDataTiling,
-                         [&]() {
-                           return createSetEncodingPass(
-                               SetEncodingPassOptions{clPadFactor});
-                         })
+      .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass);
+  // Experimental data tiling path. The intent of this path is to set encodings
+  // after fusion decisions have already been made, so encodings can be
+  // separated from compiler fusion decisions.
+  if (clEnableDataTiling) {
+    SetEncodingPassOptions options{clPadFactor};
+    FunctionLikeNest(passManager)
+        // Set encodings on all eligible ops. All ops should be in compiler
+        // formed dispatch regions, so encodings will be placed inside of the
+        // dispatch regions with the data-tiled op.
+        .addPass([&]() { return createSetEncodingPass(options); })
+        // SetEncodingOps should not be in the same dispatch as the data-tiled
+        // op, so hoist them out of their current dispatch regions. Also, bubble
+        // SetEncodingOps through special operations like bit-extending ops and
+        // broadcasting ops.
+        .addPass(IREE::Flow::createHoistEncodingOpsPass);
+  }
+  FunctionLikeNest(passManager)
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values
