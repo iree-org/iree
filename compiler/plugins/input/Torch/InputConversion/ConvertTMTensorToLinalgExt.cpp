@@ -84,10 +84,12 @@ getStandardAttentionIndexingMaps(MLIRContext *ctx) {
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   AffineMap vMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
+  AffineMap mMap =
+      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
 
-  return {qMap, kMap, vMap, rMap};
+  return {qMap, kMap, vMap, mMap, rMap};
 }
 
 struct AttentionOpConversion
@@ -100,8 +102,7 @@ struct AttentionOpConversion
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
-    auto optionalMask = op.getAttnMask();
-    Value mask = optionalMask ? *optionalMask : Value();
+    std::optional<Value> optionalMask = op.getAttnMask();
 
     ShapedType outputType = op.getOutputType();
     Value result = rewriter.create<tensor::EmptyOp>(
@@ -137,6 +138,9 @@ struct AttentionOpConversion
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(ctx);
+    if (!optionalMask) {
+      indexingMaps.erase(indexingMaps.begin() + 3);
+    }
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
@@ -147,7 +151,7 @@ struct AttentionOpConversion
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
         loc, result.getType(), query, key, value, scale, result,
-        rewriter.getAffineMapArrayAttr(indexingMaps));
+        rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     rewriter.replaceOp(op, attention.getResult(0));
     return success();
