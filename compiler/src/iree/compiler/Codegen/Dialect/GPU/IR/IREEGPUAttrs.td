@@ -172,6 +172,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
 //===----------------------------------------------------------------------===//
 // MMA intrinsic
+//===----------------------------------------------------------------------===//
 
 class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
@@ -186,12 +187,8 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   let description = !strconcat(baseDescription, [{
     This mma variant describes configurations for MMA ops. The |intrinsic|
     field specifies which particular MMA intrinsic this refers to, with each
-    intrinsic implicating a specific MNK shape and operand types. The intrinsic
-    enum name describes these fields as
-
-    <InputType>_MxNxK_<CType>
-
-    Where the element type for the `A` and `B` matrices are both `InputType`.
+    intrinsic implicating a specific MNK shape and operand types.
+    See IREEGPUEnums.td for the definition of the intrinsics.
   }]);
 
   let hasCustomAssemblyFormat = 1;
@@ -230,6 +227,7 @@ def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
 
 //===----------------------------------------------------------------------===//
 // MMA schedule
+//===----------------------------------------------------------------------===//
 
 def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   let mnemonic = "mma_schedule";
@@ -259,6 +257,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 
 //===----------------------------------------------------------------------===//
 // Workgroup processor level description
+//===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
   let summary = "Workgroup processor level target description";
