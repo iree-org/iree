@@ -1280,6 +1280,7 @@ LogicalResult AttentionOp::verify() {
   }
 
   if (isTiled) {
+    llvm::outs() << "tilesl\n";
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
     Type sumElementType = getSumType()->getElementType();
@@ -1367,6 +1368,7 @@ void OnlineAttentionOp::build(::mlir::OpBuilder &odsBuilder,
 }
 
 LogicalResult OnlineAttentionOp::verify() {
+  llvm::outs() <<"online verify\n";
   OnlineAttentionOp attnOp = *this;
 
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
@@ -1423,12 +1425,6 @@ LogicalResult OnlineAttentionOp::verify() {
 MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
   return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
                              /*numInits=*/3);
-}
-
-LogicalResult OnlineAttentionOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
 }
 
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
