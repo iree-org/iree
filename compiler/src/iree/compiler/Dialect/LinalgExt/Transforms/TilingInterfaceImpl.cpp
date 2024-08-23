@@ -1775,14 +1775,27 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
 
   return loopBounds;
 }
-
+void printIndexingMaps(llvm::ArrayRef<mlir::AffineMap> indexingMaps) {
+  llvm::outs() << "Indexing Maps:\n";
+  for (size_t i = 0; i < indexingMaps.size(); ++i) {
+    llvm::outs() << "Map " << i << ": ";
+    indexingMaps[i].print(llvm::outs());
+    llvm::outs() << "\n";
+  }
+}
 static SmallVector<utils::IteratorType>
 getAttentionIteratorTypes(int64_t domainRank,
                           ArrayRef<AffineMap> indexingMaps) {
+  printIndexingMaps(indexingMaps);
+
+  llvm::outs() << "HERE?\n";
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+  llvm::outs() << "HERE?!\n";
   assert(succeeded(maybeOpInfo) && "Failed to infer attention op details");
+  llvm::outs() << "HERE?!!\n";
   AttentionOpDetail opInfo = maybeOpInfo.value();
+  llvm::outs() << "HERE?!!!\n";
 
   // All dimensions other than k1 and k2 are parallel.
   SmallVector<utils::IteratorType> iteratorTypes(domainRank,
@@ -1799,12 +1812,21 @@ getAttentionIteratorTypes(int64_t domainRank,
 static SmallVector<Range> getPermutedSlice(AffineMap permutation,
                                            ArrayRef<OpFoldResult> offsets,
                                            ArrayRef<OpFoldResult> sizes) {
+  llvm::outs() << "um\n";
+  if (!permutation) {
+    llvm::outs() << "nulls\n";
+  }
+  llvm::outs() << permutation.getNumDims() << " fNsadfdf\n";
+  llvm::outs() << permutation.getNumResults() << " fNsadfdf\n";
   auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
   assert(permutation.isProjectedPermutation() &&
          "Indexing map should be a projected permutation");
   SmallVector<Range> output;
   for (AffineExpr dimExpr : permutation.getResults()) {
+    llvm::outs() << "We have ";
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    llvm::outs() << dim << " dim\n";
+
     Range dimRange;
     dimRange.offset = offsets[dim];
     dimRange.size = sizes[dim];
@@ -1836,18 +1858,24 @@ FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
+  llvm::outs() << "asserts good\n";
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
+  llvm::outs() << offsets.size() << " " << sizes.size() << " " <<getIterationDomainRank() << "\n";
+  llvm::outs() << "asserts good!\n";
 
   Location loc = getLoc();
 
-  SmallVector<Range> querySlice =
-      getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Value> tiledOperands;
+
+  SmallVector<Range> querySlice = getPermutedSlice(getQueryMap(), offsets, sizes);
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
+
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
-  SmallVector<Range> valueSlice =
-      getPermutedSlice(getValueMap(), offsets, sizes);
-  SmallVector<Range> outputSlice =
-      getPermutedSlice(getOutputMap(), offsets, sizes);
+   tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
+
+  SmallVector<Range> valueSlice = getPermutedSlice(getValueMap(), offsets, sizes);
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
 
   Value scale = getScale();
 
@@ -1897,6 +1925,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(outputSliceOp);
   }
 
+  llvm::outs() << "Nope.\n";
   std::optional<Value> max = getMax();
   if (max) {
     SmallVector<Range> maxSlice =
@@ -1908,6 +1937,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(maxSliceOp->getResult(0));
     slices.push_back(maxSliceOp);
   }
+  llvm::outs() << "Nope2.\n";
 
   std::optional<Value> sum = getMax();
   if (sum) {
@@ -1920,17 +1950,25 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(sumSliceOp->getResult(0));
     slices.push_back(sumSliceOp);
   }
+  llvm::outs() << "Nope3.\n";
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[4].getType());
+      llvm::outs() << tiledOperands.size();
+
+    llvm::outs() << hasMask << " is hasMask\n";
+    resultTypes.push_back(tiledOperands[4 + hasMask].getType());
     if (max) {
-      resultTypes.push_back(tiledOperands[5].getType());
+      llvm::outs() << "max!";
+      resultTypes.push_back(tiledOperands[5 + hasMask].getType());
     }
     if (sum) {
-      resultTypes.push_back(tiledOperands[6].getType());
+            llvm::outs() << "sum!";
+
+      resultTypes.push_back(tiledOperands[6 + hasMask].getType());
     }
   }
+  llvm::outs() << "Nope4.\n";
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
@@ -2006,6 +2044,7 @@ SmallVector<Range> OnlineAttentionOp::getIterationDomain(OpBuilder &b) {
 }
 
 SmallVector<utils::IteratorType> OnlineAttentionOp::getLoopIteratorTypes() {
+  llvm::outs() << "HERE?\n";
   return getAttentionIteratorTypes(getIterationDomainRank(),
                                    getIndexingMapsArray());
 }
@@ -2014,6 +2053,7 @@ FailureOr<TilingResult>
 OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
                                           ArrayRef<OpFoldResult> offsets,
                                           ArrayRef<OpFoldResult> sizes) {
+  llvm::outs() << "hello!\n";
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
 
@@ -2024,6 +2064,9 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
       getPermutedSlice(getValueMap(), offsets, sizes);
+  std::optional<SmallVector<Range>> maskSlice = 
+      getMaskMap() ? std::optional<SmallVector<Range>>(getPermutedSlice(*getMaskMap(), offsets, sizes))
+                  : std::nullopt;
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
   SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
@@ -2096,9 +2139,12 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[4].getType());
-  resultTypes.push_back(tiledOperands[5].getType());
-  resultTypes.push_back(tiledOperands[6].getType());
+  if (maskSlice) {
+    llvm::outs() << "yes for you\n";
+  }
+  resultTypes.push_back(tiledOperands[maskSlice ? 5 : 4].getType());
+  resultTypes.push_back(tiledOperands[maskSlice ? 6 : 5].getType());
+  resultTypes.push_back(tiledOperands[maskSlice ? 7 : 6].getType());
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);

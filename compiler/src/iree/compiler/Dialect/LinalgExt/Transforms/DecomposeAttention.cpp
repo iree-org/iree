@@ -161,6 +161,12 @@ static Value computeQKTranspose(Value query, Value key, Value output,
   return matmulOp.getResult(0);
 }
 
+static Value maskQKTranspose(Value qkResult, Value mask, Location loc, OpBuilder &builder, SmallVectorImpl<Operation *> &ops) {
+  auto addOp = builder.create<linalg::AddOp>(loc, qkResult, mask);
+  ops.push_back(addOp);
+  return addOp.getResult(0);
+}
+
 static Value truncateToF16(Value input, Value output,
                            SmallVectorImpl<Operation *> &ops,
                            OpBuilder &builder, Location loc) {
@@ -180,7 +186,7 @@ static Value truncateToF16(Value input, Value output,
 }
 
 static std::tuple<Value, Value, Value>
-createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
+createAttentionBody(Value keySlice, Value valueSlice, Value querySlice, Value maskSlice,
                     Value outputSlice, Value maxSlice, Value sumSlice,
                     OpFoldResult sequenceTileLength,
                     OpFoldResult keyValueTileLength, OpFoldResult headDimension,
@@ -196,6 +202,11 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
+  llvm::outs() << "HOOP\n";
+  if (maskSlice) {
+    llvm::outs() << "1\n";
+    qkTranspose = maskQKTranspose(qkTranspose, maskSlice, loc, builder, ops);
+  }
 
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaximumFOp>(
@@ -294,10 +305,13 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
                              RewriterBase &rewriter,
                              std::optional<uint64_t> tileSize) {
+  llvm::outs() << "q\n";
+
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();
   Value querySlice = tiledAttnOp.getQuery();
+  Value maskSlice = tiledAttnOp.getMask();
   Value tiledResult = tiledAttnOp.getOutput();
   Value max = *tiledAttnOp.getMax();
   Value sum = *tiledAttnOp.getSum();
@@ -331,10 +345,10 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   ops.push_back(querySlice.getDefiningOp());
 
   auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, tiledResult, max, sum,
+      keySlice, valueSlice, querySlice, maskSlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
       tiledAttnOp.isTransposeV(), loc, rewriter);
-
+  
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
 
