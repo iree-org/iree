@@ -281,74 +281,76 @@ jobs:
       #       -rA -s -m "plat_host_cpu and presubmit" \
       #       experimental/regression_suite
 
-      - name: "Running SDXL special model tests"
-        if: "!cancelled()"
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
-            -k ${{ matrix.backend }} \
-            -rpfE \
-            --capture=no \
-            --log-cli-level=info \
-            --timeout=1200 \
-            --durations=0
-        env:
-          ROCM_CHIP: ${{ matrix.rocm-chip }}
+      # TODO(#18336): re-enable once tests are hermetic / use cache correctly
 
-      - name: "Running SD3 special model tests"
-        if: "!cancelled()"
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
-            -k ${{ matrix.backend }} \
-            -rpfE \
-            --capture=no \
-            --log-cli-level=info \
-            --timeout=1200 \
-            --durations=0
-        env:
-          ROCM_CHIP: ${{ matrix.rocm-chip }}
+      # - name: "Running SDXL special model tests"
+      #   if: "!cancelled()"
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
+      #       -k ${{ matrix.backend }} \
+      #       -rpfE \
+      #       --capture=no \
+      #       --log-cli-level=info \
+      #       --timeout=1200 \
+      #       --durations=0
+      #   env:
+      #     ROCM_CHIP: ${{ matrix.rocm-chip }}
 
-      # Note: mi250 benchmark times are more lenient than mi300 (allowing about
-      # 10% deviation from observed averages), since the mi250 runners we use
-      # are more unstable and we care most about peak performance on mi300.
-      - name: "Running SDXL rocm pipeline benchmark (mi250)"
-        if: contains(matrix.name, 'rocm_mi250_gfx90a')
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1616.0 \
-            --goldentime-rocm-unet-ms 419.0 \
-            --goldentime-rocm-clip-ms 18.5 \
-            --goldentime-rocm-vae-ms 337.0 \
-            --goldendispatch-rocm-unet 1551 \
-            --goldendispatch-rocm-clip 1225 \
-            --goldendispatch-rocm-vae 247 \
-            --goldensize-rocm-unet-bytes 2280000  \
-            --goldensize-rocm-clip-bytes 860000 \
-            --goldensize-rocm-vae-bytes 840000 \
-            --rocm-chip gfx90a \
-            --log-cli-level=info \
-            --retries 7
-          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
-          rm job_summary.md
+      # - name: "Running SD3 special model tests"
+      #   if: "!cancelled()"
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
+      #       -k ${{ matrix.backend }} \
+      #       -rpfE \
+      #       --capture=no \
+      #       --log-cli-level=info \
+      #       --timeout=1200 \
+      #       --durations=0
+      #   env:
+      #     ROCM_CHIP: ${{ matrix.rocm-chip }}
 
-      - name: "Running SDXL rocm pipeline benchmark (mi300)"
-        if: contains(matrix.name, 'rocm_mi300_gfx942')
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 372.0 \
-            --goldentime-rocm-unet-ms 95.0 \
-            --goldentime-rocm-clip-ms 15.5 \
-            --goldentime-rocm-vae-ms 80.0 \
-            --goldendispatch-rocm-unet 1551 \
-            --goldendispatch-rocm-clip 1225 \
-            --goldendispatch-rocm-vae 247 \
-            --goldensize-rocm-unet-bytes 2270000 \
-            --goldensize-rocm-clip-bytes 860000  \
-            --goldensize-rocm-vae-bytes 840000 \
-            --rocm-chip gfx942 \
-            --log-cli-level=info \
-            --retries 7
-          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+      # # Note: mi250 benchmark times are more lenient than mi300 (allowing about
+      # # 10% deviation from observed averages), since the mi250 runners we use
+      # # are more unstable and we care most about peak performance on mi300.
+      # - name: "Running SDXL rocm pipeline benchmark (mi250)"
+      #   if: contains(matrix.name, 'rocm_mi250_gfx90a')
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
+      #       --goldentime-rocm-e2e-ms 1616.0 \
+      #       --goldentime-rocm-unet-ms 419.0 \
+      #       --goldentime-rocm-clip-ms 18.5 \
+      #       --goldentime-rocm-vae-ms 337.0 \
+      #       --goldendispatch-rocm-unet 1551 \
+      #       --goldendispatch-rocm-clip 1225 \
+      #       --goldendispatch-rocm-vae 247 \
+      #       --goldensize-rocm-unet-bytes 2280000  \
+      #       --goldensize-rocm-clip-bytes 860000 \
+      #       --goldensize-rocm-vae-bytes 840000 \
+      #       --rocm-chip gfx90a \
+      #       --log-cli-level=info \
+      #       --retries 7
+      #     echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+      #     rm job_summary.md
+
+      # - name: "Running SDXL rocm pipeline benchmark (mi300)"
+      #   if: contains(matrix.name, 'rocm_mi300_gfx942')
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     pytest ./experimental/benchmarks/sdxl/benchmark_sdxl_rocm.py \
+      #       --goldentime-rocm-e2e-ms 372.0 \
+      #       --goldentime-rocm-unet-ms 95.0 \
+      #       --goldentime-rocm-clip-ms 15.5 \
+      #       --goldentime-rocm-vae-ms 80.0 \
+      #       --goldendispatch-rocm-unet 1551 \
+      #       --goldendispatch-rocm-clip 1225 \
+      #       --goldendispatch-rocm-vae 247 \
+      #       --goldensize-rocm-unet-bytes 2270000 \
+      #       --goldensize-rocm-clip-bytes 860000  \
+      #       --goldensize-rocm-vae-bytes 840000 \
+      #       --rocm-chip gfx942 \
+      #       --log-cli-level=info \
+      #       --retries 7
+      #     echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
