@@ -11,28 +11,41 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/TypeUtilities.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
 static constexpr int64_t kPreferredCopyNumBits = 128;
 
-SmallVector<int64_t>
+// Helper to construct a list of tile sizes that simply uses the given vector
+// size or the innerDimSize as the inner most tile size, whichever is smaller.
+// All other dims are tiled to 1.
+static SmallVector<int64_t>
+getVectorSizeTileSizes(int64_t rank, int64_t innerDimSize, int64_t vectorSize) {
+  SmallVector<int64_t> tileSizes(rank, 1);
+  if (ShapedType::isDynamic(innerDimSize) || innerDimSize >= vectorSize) {
+    tileSizes.back() = vectorSize;
+  } else {
+    tileSizes.back() = innerDimSize;
+  }
+  return tileSizes;
+}
+
+static SmallVector<int64_t>
 getThreadTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
                                  int64_t numThreads, int64_t vectorSize) {
-  // TODO: We shouldn't need this check, however loop fusion currently requires
-  // loop trip counts to be identical, meaning we need to use a num_threads
-  // variant of tiling. Remove this and simply return the preferred vector size
-  // once loop fusion can resolve the forall properly.
   if (llvm::any_of(loopRanges,
                    [](int64_t s) { return ShapedType::isDynamic(s); })) {
-    return {};
+    return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
+                                  vectorSize);
   }
 
   int64_t flatNumTrips = std::accumulate(loopRanges.begin(), loopRanges.end(),
                                          1, std::multiplies<int64_t>());
   if (flatNumTrips % numThreads != 0) {
-    return {};
+    return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
+                                  vectorSize);
   }
   int64_t maxVectorSize = flatNumTrips / numThreads;
 
