@@ -1280,7 +1280,6 @@ LogicalResult AttentionOp::verify() {
   }
 
   if (isTiled) {
-    llvm::outs() << "tilesl\n";
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
     Type sumElementType = getSumType()->getElementType();
@@ -1368,7 +1367,6 @@ void OnlineAttentionOp::build(::mlir::OpBuilder &odsBuilder,
 }
 
 LogicalResult OnlineAttentionOp::verify() {
-  llvm::outs() <<"online verify\n";
   OnlineAttentionOp attnOp = *this;
 
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();

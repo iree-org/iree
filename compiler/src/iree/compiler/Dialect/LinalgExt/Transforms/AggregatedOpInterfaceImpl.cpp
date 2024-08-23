@@ -267,24 +267,12 @@ static OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
-void printAffineMap(AffineMap map) {
-  if (!map) {
-    llvm::outs() << "AffineMap is null.\n";
-    return;
-  }
-  
-  llvm::outs() << "AffineMap: ";
-  map.print(llvm::outs());
-  llvm::outs() << "\n";
-}
-
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
-  llvm::outs() << "beginning decomposition\n";
   Location loc = getLoc();
   Value query = getQuery();
   Value key = getKey();
