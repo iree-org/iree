@@ -145,6 +145,7 @@ struct AMDGPUPrepareForChainedMatmulPass final
         contractOp.getLoc(), rhs, lhs, acc,
         rewriter.getAffineMapArrayAttr({rhsMap, lhsMap, accMap}),
         contractOp.getIteratorTypesAttr());
+    swappedOp->setDiscardableAttrs(contractOp->getDiscardableAttrDictionary());
 
     acc = cast<VectorValue>(swappedOp.getResult());
     acc = swapDims(rewriter, acc, accN, accM);

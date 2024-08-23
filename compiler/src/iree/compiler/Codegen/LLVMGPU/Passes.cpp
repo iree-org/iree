@@ -833,7 +833,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     funcPassManager.addPass(
-        IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
+        IREE::VectorExt::createVectorExtFoldUnitExtentDimsPass());
     funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
