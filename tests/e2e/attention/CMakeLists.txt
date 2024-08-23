@@ -89,7 +89,7 @@ list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_gpu_f16_f16_f16_small
+    e2e_attention_gpu_cdna3_f16_f16_f16_small
   TEST_TYPE
     attention
   GENERATOR
@@ -117,7 +117,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_gpu_f16_f16_f16_medium
+    e2e_attention_gpu_cdna3_f16_f16_f16_medium
   TEST_TYPE
     attention
   GENERATOR
@@ -145,7 +145,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_attention_gpu_f16_f16_f16_large
+    e2e_attention_gpu_cdna3_f16_f16_f16_large
   TEST_TYPE
     attention
   GENERATOR
