@@ -54,12 +54,7 @@ def iree_compile(source: Artifact, flags: Sequence[str], vmfb_path: Path):
     )
     print("Exec:", " ".join(exec_args))
     start_time = time.time()
-    subprocess.run(
-        exec_args,
-        check=True,
-        capture_output=True,
-        cwd=vmfb_path.parent
-    )
+    subprocess.run(exec_args, check=True, capture_output=True, cwd=vmfb_path.parent)
     run_time = time.time() - start_time
     print(f"Compilation succeeded in {run_time}s")
     print("**************************************************************")
