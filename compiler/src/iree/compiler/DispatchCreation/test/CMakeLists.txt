@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "fuse_horizontal_contractions.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
     "fusion_preprocessing.mlir"
+    "hoist_encoding_ops.mlir"
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "set_encoding.mlir"

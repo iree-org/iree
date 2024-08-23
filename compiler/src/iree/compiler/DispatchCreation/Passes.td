@@ -309,5 +309,14 @@ def MaterializeDefaultWorkgroupCountRegionPass:
       ];
 }
 
+def HoistEncodingOpsPass :
+    InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
 
 #endif // IREE_COMPILER_DISPATCHCREATION_PASSES

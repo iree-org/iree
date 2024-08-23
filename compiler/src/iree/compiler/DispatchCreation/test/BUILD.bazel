@@ -29,6 +29,7 @@ iree_lit_test_suite(
             "convert_region_to_workgroups.mlir",
             "form_dispatch_workgroups.mlir",
             "dispatch_linalg_ext_fusion.mlir",
+            "hoist_encoding_ops.mlir",
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
             "form_scalar_dispatches.mlir",

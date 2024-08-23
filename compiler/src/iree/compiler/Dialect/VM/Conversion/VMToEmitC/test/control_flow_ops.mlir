@@ -71,8 +71,9 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = emitc.literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = emitc.subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
     // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<i32>
@@ -99,8 +100,9 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = emitc.literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = emitc.subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
     // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<i32>
@@ -158,8 +160,9 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = emitc.literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = emitc.subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
     // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() <{value = 2 : i32}> : () -> i32
@@ -193,8 +196,9 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = emitc.literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = emitc.subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
     // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() <{value = 0 : i32}> : () -> i32
@@ -834,8 +838,9 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
-    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = emitc.literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = emitc.subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: emitc.assign %[[IMPORT]] : !emitc.ptr<!emitc.opaque<"iree_vm_function_t">> to %[[IMPORT_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
     // CHECK-NEXT: %[[MODULE_LVAL:.+]] = "emitc.member_of_ptr"(%[[IMPORT_LVAL]]) <{member = "module"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>>

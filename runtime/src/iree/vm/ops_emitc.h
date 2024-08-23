@@ -19,13 +19,4 @@
 // Call a function pointer with the given arguments
 #define EMITC_CALL_INDIRECT(func, ...) (func)(__VA_ARGS__)
 
-// Get an array element
-#define EMITC_ARRAY_ELEMENT(array, index) (array)[index]
-
-// Get the address of an array element
-#define EMITC_ARRAY_ELEMENT_ADDRESS(array, index) &(array)[index]
-
-// Assign a value to an array at a given index
-#define EMITC_ARRAY_ELEMENT_ASSIGN(array, index, value) (array)[index] = (value)
-
 #endif  // IREE_VM_OPS_EMITC_H_

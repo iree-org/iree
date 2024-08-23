@@ -32,6 +32,7 @@ iree_cc_library(
     "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
+    "HoistEncodingOps.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "SetEncoding.cpp"

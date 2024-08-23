@@ -157,65 +157,46 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
                       builder.getIndexAttr(1)}));
 }
 
-Value arrayElement(OpBuilder builder, Location location, Type type,
-                   size_t index, TypedValue<emitc::PointerType> operand) {
+Value arrayElement(OpBuilder builder, Location location, size_t index,
+                   TypedValue<emitc::PointerType> operand) {
   auto ctx = builder.getContext();
+  Type type = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value indexValue =
+      builder.create<emitc::LiteralOp>(location, type, std::to_string(index));
+  TypedValue<emitc::LValueType> subscript =
+      builder.create<emitc::SubscriptOp>(location, operand, indexValue);
   return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/"EMITC_ARRAY_ELEMENT",
-          /*operands=*/ArrayRef<Value>{operand},
-          /*args=*/
-          ArrayAttr::get(
-              ctx, {builder.getIndexAttr(0), builder.getI32IntegerAttr(index)}))
-      .getResult(0);
+      .create<emitc::LoadOp>(location, subscript.getType().getValueType(),
+                             subscript)
+      .getResult();
 }
 
-Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          IntegerAttr index,
+Value arrayElementAddress(OpBuilder builder, Location location, size_t index,
                           TypedValue<emitc::PointerType> operand) {
   auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/"EMITC_ARRAY_ELEMENT_ADDRESS",
-          /*operands=*/ArrayRef<Value>{operand},
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0), index}))
-      .getResult(0);
+  Type type = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value indexValue =
+      builder.create<emitc::LiteralOp>(location, type, std::to_string(index));
+  return arrayElementAddress(builder, location, indexValue, operand);
 }
 
-Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          Value index, TypedValue<emitc::PointerType> operand) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/type,
-          /*callee=*/"EMITC_ARRAY_ELEMENT_ADDRESS",
-          /*operands=*/ArrayRef<Value>{operand, index},
-          /*args=*/
-          ArrayAttr::get(ctx,
-                         {builder.getIndexAttr(0), builder.getIndexAttr(1)}),
-          /*templateArgs=*/ArrayAttr{})
-      .getResult(0);
+Value arrayElementAddress(OpBuilder builder, Location location, Value index,
+                          TypedValue<emitc::PointerType> operand) {
+  TypedValue<emitc::LValueType> subscript =
+      builder.create<emitc::SubscriptOp>(location, operand, index);
+  return addressOf(builder, location, subscript);
 }
 
 void arrayElementAssign(OpBuilder builder, Location location,
                         TypedValue<emitc::PointerType> array, size_t index,
                         Value value) {
   auto ctx = builder.getContext();
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location,
-      /*type=*/TypeRange{},
-      /*callee=*/"EMITC_ARRAY_ELEMENT_ASSIGN",
-      /*operands=*/ArrayRef<Value>{array, value},
-      /*args=*/
-      ArrayAttr::get(ctx,
-                     {builder.getIndexAttr(0), builder.getI32IntegerAttr(index),
-                      builder.getIndexAttr(1)}));
+  Type type = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value indexValue =
+      builder.create<emitc::LiteralOp>(location, type, std::to_string(index));
+  TypedValue<emitc::LValueType> subscript =
+      builder.create<emitc::SubscriptOp>(location, array, indexValue);
+  builder.create<emitc::AssignOp>(location, subscript, value);
 }
 
 void structDefinition(OpBuilder builder, Location location,

@@ -69,16 +69,6 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
-    "iree-flow-enable-fuse-padding-into-linalg-producer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
-    "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
