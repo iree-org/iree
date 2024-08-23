@@ -77,15 +77,14 @@ void memcpy(OpBuilder builder, Location location, Value dest, Value src,
 void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count);
 
-Value arrayElement(OpBuilder builder, Location location, Type type,
-                   size_t index, TypedValue<emitc::PointerType> operand);
+Value arrayElement(OpBuilder builder, Location location, size_t index,
+                   TypedValue<emitc::PointerType> operand);
 
-Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          IntegerAttr index,
+Value arrayElementAddress(OpBuilder builder, Location location, size_t index,
                           TypedValue<emitc::PointerType> operand);
 
-Value arrayElementAddress(OpBuilder builder, Location location, Type type,
-                          Value index, TypedValue<emitc::PointerType> operand);
+Value arrayElementAddress(OpBuilder builder, Location location, Value index,
+                          TypedValue<emitc::PointerType> operand);
 
 void arrayElementAssign(OpBuilder builder, Location location,
                         TypedValue<emitc::PointerType> array, size_t index,
