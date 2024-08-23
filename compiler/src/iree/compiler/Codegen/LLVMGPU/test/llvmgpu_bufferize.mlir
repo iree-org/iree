@@ -39,3 +39,48 @@ func.func @bufferize_with_thread_private_memory(%arg0: index) {
 //  CHECK-SAME:       memref<1x1x4x4xf16, strided<[1310720, 4096, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //  CHECK-SAME:       to memref<1x1x4x4xf16, #gpu.address_space<private>>
 //       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+module {
+  func.func @no_copy_on_equal_subviews(%arg0: index) {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x2x32xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x2x32xf32>>
+    %2 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0, %c0], sizes = [1, 2, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x2x32xf32>> -> tensor<1x2x32xf32>
+    %3 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0, %c0], sizes = [1, 2, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x2x32xf32>> -> tensor<1x2x32xf32>
+    %4 = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<1x2x32xf32>
+    %5 = scf.forall (%arg1, %arg2) in (2, 16) shared_outs(%arg3 = %2) -> (tensor<1x2x32xf32>) {
+      %6 = affine.apply #map(%arg2)
+      %extracted_slice = tensor.extract_slice %4[0, %arg1, %6] [1, 1, 2] [1, 1, 1] : tensor<1x2x32xf32> to tensor<1x1x2xf32>
+      %7 = vector.transfer_read %3[%c0, %arg1, %6], %cst {in_bounds = [true]} : tensor<1x2x32xf32>, vector<2xf32>
+      %8 = vector.transfer_write %7, %extracted_slice[%c0, %arg1, %6] {in_bounds = [true]} : vector<2xf32>, tensor<1x1x2xf32>
+      %inserted_slice = tensor.insert_slice %8 into %4[0, %arg1, %6] [1, 1, 2] [1, 1, 1] : tensor<1x1x2xf32> into tensor<1x2x32xf32>
+      %extracted_slice_0 = tensor.extract_slice %inserted_slice[%c0, %arg1, %6] [1, 1, 2] [1, 1, 1] {in_bounds = [true]} : tensor<1x2x32xf32> to tensor<1x1x2xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %extracted_slice_0 into %arg3[0, %arg1, %6] [1, 1, 2] [1, 1, 1] : tensor<1x1x2xf32> into tensor<1x2x32xf32>
+      }
+    } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+    flow.dispatch.tensor.store %5, %1, offsets = [%c0, %c0, %c0], sizes = [1, 2, 32], strides = [1, 1, 1] : tensor<1x2x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x2x32xf32>>
+    return
+  }
+}
+
+// CHECK-LABEL: func.func @no_copy_on_equal_subviews
+//       CHECK:   scf.forall {{.*}} in (2, 16) {
+//       CHECK:     vector.transfer_read
+//       CHECK:     vector.transfer_write
+//   CHECK-NOT:     gpu.barrier
+//       CHECK:     memref.subview
+//       CHECK:     gpu.barrier
+//       CHECK:     memref.copy
+//       CHECK:     gpu.barrier
+//       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
