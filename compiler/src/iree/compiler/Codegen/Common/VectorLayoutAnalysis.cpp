@@ -117,11 +117,8 @@ private:
 
 class EnforceLayout : public DataFlowAnalysis {
 public:
-  explicit EnforceLayout(
-      DataFlowSolver &solver,
-      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
-      MLIRContext *ctx)
-      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
+  explicit EnforceLayout(DataFlowSolver &solver, MLIRContext *ctx)
+      : DataFlowAnalysis(solver), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
 
@@ -140,18 +137,13 @@ private:
 
   DistributionLayout *getLatticeElement(Value val);
 
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
-
   MLIRContext *ctx;
 };
 
 class PropagateLayout : public DataFlowAnalysis {
 public:
-  explicit PropagateLayout(
-      DataFlowSolver &solver,
-      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
-      MLIRContext *ctx)
-      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
+  explicit PropagateLayout(DataFlowSolver &solver, MLIRContext *ctx)
+      : DataFlowAnalysis(solver), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
 
@@ -172,8 +164,6 @@ private:
                              OperandRange operands);
 
   DistributionLayout *getLatticeElement(Value val);
-
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
 
   MLIRContext *ctx;
 };
@@ -781,12 +771,14 @@ void enforcementTransferFunction(
 /// ==========================================================================
 
 LogicalResult PropagateLayout::initialize(Operation *root) {
-  // Set layout for anchor ops or resolve if need be.
-  for (auto [val, layout] : anchors) {
-    DistributionLayout *latticeEl = getLatticeElement(val);
-    ChangeResult changed = latticeEl->resolve(layout);
+  // Initialize/set anchor layouts.
+  root->walk([&](IREE::VectorExt::ToLayoutOp toLayout) {
+    Value anchorVal = toLayout.getResult();
+    DistributionLayout *latticeEl = getLatticeElement(anchorVal);
+    ChangeResult changed =
+        latticeEl->resolve(toLayout.getLayout(), /*force=*/true);
     propagateIfChanged(latticeEl, changed);
-  }
+  });
 
   root->walk([&](Operation *traversed) { visitOperation(traversed); });
 
@@ -910,13 +902,6 @@ DistributionLayout *PropagateLayout::getLatticeElement(Value val) {
 /// ==========================================================================
 
 LogicalResult EnforceLayout::initialize(Operation *root) {
-  // Set layout for anchor ops or resolve if need be.
-  for (auto [val, layout] : anchors) {
-    DistributionLayout *latticeEl = getLatticeElement(val);
-    ChangeResult changed = latticeEl->resolve(layout);
-    propagateIfChanged(latticeEl, changed);
-  }
-
   root->walk([&](Operation *traversed) { visitOperation(traversed); });
   return success();
 }
@@ -1047,8 +1032,8 @@ LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
   // propagation.
-  solver.load<PropagateLayout>(anchors, root->getContext());
-  solver.load<EnforceLayout>(anchors, root->getContext());
+  solver.load<PropagateLayout>(root->getContext());
+  solver.load<EnforceLayout>(root->getContext());
   return solver.initializeAndRun(root);
 }
 
