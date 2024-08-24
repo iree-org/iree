@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
-class BitCastViewDtypeMatmul
+class BitCastViewDtype
     : public OpRewritePattern<torch::Torch::AtenViewDtypeOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
@@ -159,7 +159,7 @@ class BitCastQuantTensorPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<BitCastQuantizedMatmul, BitCastViewDtypeMatmul>(context);
+    patterns.add<BitCastQuantizedMatmul, BitCastViewDtype>(context);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
