@@ -508,6 +508,11 @@ def SerializeExecutablesPass :
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
     >,
+    ListOption<
+      "passPlugins", "pass-plugins",
+      "std::string",
+      "List of plugins to be passed to the executable serialization optimization pipeline"
+    >
   ];
 }
 
@@ -545,6 +550,11 @@ def SerializeTargetExecutablesPass :
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
     >,
+    ListOption<
+      "passPlugins", "pass-plugins",
+      "std::string", 
+      "List of plugins to be passed to the executable serialization optimization pipeline"
+    >
   ];
 }
 

@@ -68,6 +68,7 @@ struct SerializeTargetExecutablesPass
     serializationOptions.debugLevel = debugLevel;
     serializationOptions.dumpIntermediatesPath = dumpIntermediatesPath;
     serializationOptions.dumpBinariesPath = dumpBinariesPath;
+    serializationOptions.passPlugins = passPlugins;
     if (!dumpIntermediatesPath.empty()) {
       llvm::sys::fs::create_directories(dumpIntermediatesPath);
     }
@@ -110,7 +111,7 @@ struct SerializeExecutablesPass
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addPass(IREE::HAL::createSerializeTargetExecutablesPass(
           {targetRegistry, targetName, debugLevel, dumpIntermediatesPath,
-           dumpBinariesPath}));
+           dumpBinariesPath, passPlugins}));
     }
 
     IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());

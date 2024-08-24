@@ -33,6 +33,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -272,7 +273,8 @@ public:
   // ones). Inspired by code section in
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
-                             llvm::TargetMachine &targetMachine) {
+                             llvm::TargetMachine &targetMachine,
+                             const std::vector<std::string> &passPlugins) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -301,6 +303,16 @@ public:
     mpm.addPass(llvm::VerifierPass());
     mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
     mpm.addPass(llvm::VerifierPass());
+    // Attempt to load pass plugins and register their callbacks with PB.
+    for (auto &PluginFN : passPlugins) {
+      auto PP = llvm::PassPlugin::Load(PluginFN);
+      if (PP) {
+        // PP->registerPassBuilderCallbacks(pb);
+      } else {
+        llvm::errs() << "unable to load plugin " << PluginFN << ":"
+                     << toString(PP.takeError());
+      }
+    }
 
     mpm.run(module, mam);
   }
@@ -522,7 +534,7 @@ public:
       }
 
       // Run LLVM optimization passes.
-      optimizeModule(*llvmModule, *targetMachine);
+      optimizeModule(*llvmModule, *targetMachine, serOptions.passPlugins);
       if (!serOptions.dumpIntermediatesPath.empty()) {
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),
