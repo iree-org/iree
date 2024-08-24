@@ -76,6 +76,9 @@ struct TargetOptions {
   // A path to write translated and serialized executable binaries into.
   std::string executableBinariesPath;
 
+  // A list of paths to plugins to be added to the optimization pipeline.
+  std::vector<std::string> targetPassPlugins;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<TargetOptions>;
 };
