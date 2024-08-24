@@ -10,6 +10,7 @@ from typing import Dict, Sequence, Union
 from pathlib import Path
 import subprocess
 import time
+import os
 
 from .artifacts import (
     Artifact,
@@ -35,60 +36,52 @@ def fetch_source_fixture(url: str, *, group: str):
     return fetcher
 
 
-def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
-    name = Path(source.name).with_suffix(f".{compiled_variant}.vmfb")
-
-    def callback(vmfb_artifact: ProducedArtifact):
-        sep = "\n  "
-        print("**************************************************************")
-        print(f"Compiling {source} -> {vmfb_artifact} with flags:")
-        print(f"  {sep.join(flags)}")
-        exec_args = (
-            [
-                "iree-compile",
-                "-o",
-                str(vmfb_artifact.path),
-                str(source.path),
-            ]
-            + IREE_COMPILE_QOL_FLAGS
-            + flags
-        )
-        start_time = time.time()
-        subprocess.run(
-            exec_args, check=True, capture_output=True, cwd=source.group.directory
-        )
-        run_time = time.time() - start_time
-        print(f"Compilation succeeded in {run_time}s")
-        print("**************************************************************")
-
-    return ProducedArtifact(source.group, name, callback, depends=[source]).start()
+def iree_compile(source: Artifact, flags: Sequence[str], vmfb_path: Path):
+    if not os.path.exists(vmfb_path.parent):
+        os.makedirs(vmfb_path.parent)
+    sep = "\n  "
+    print("**************************************************************")
+    print(f"  {sep.join(flags)}")
+    exec_args = (
+        [
+            "iree-compile",
+            "-o",
+            str(vmfb_path),
+            str(source.path),
+        ]
+        + IREE_COMPILE_QOL_FLAGS
+        + flags
+    )
+    print("Exec:", " ".join(exec_args))
+    start_time = time.time()
+    subprocess.run(exec_args, check=True, capture_output=True, cwd=vmfb_path.parent)
+    run_time = time.time() - start_time
+    print(f"Compilation succeeded in {run_time}s")
+    print("**************************************************************")
+    return vmfb_path
 
 
-def iree_run_module(vmfb: Artifact, *, device, function, args: Sequence[str] = ()):
-    vmfb.join()
+def iree_run_module(vmfb: Path, *, device, function, args: Sequence[str] = ()):
     exec_args = [
         "iree-run-module",
         f"--device={device}",
-        f"--module={vmfb.path}",
+        f"--module={vmfb}",
         f"--function={function}",
     ]
     exec_args.extend(args)
     print("**************************************************************")
     print("Exec:", " ".join(exec_args))
-    subprocess.run(exec_args, check=True, capture_output=True, cwd=vmfb.group.directory)
+    subprocess.run(exec_args, check=True, capture_output=True, cwd=vmfb.parent)
 
 
-def iree_benchmark_module(
-    vmfb: Artifact, *, device, function, args: Sequence[str] = ()
-):
-    vmfb.join()
+def iree_benchmark_module(vmfb: Path, *, device, function, args: Sequence[str] = ()):
     exec_args = [
         "iree-benchmark-module",
         f"--device={device}",
-        f"--module={vmfb.path}",
+        f"--module={vmfb}",
         f"--function={function}",
     ]
     exec_args.extend(args)
     print("**************************************************************")
     print("Exec:", " ".join(exec_args))
-    subprocess.check_call(exec_args, cwd=vmfb.group.directory)
+    subprocess.check_call(exec_args, cwd=vmfb.parent)

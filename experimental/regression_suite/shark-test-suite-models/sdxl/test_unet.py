@@ -12,6 +12,7 @@ from conftest import VmfbManager
 from pathlib import Path
 
 iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
+vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 ###############################################################################
@@ -123,14 +124,20 @@ ROCM_PIPELINE_COMPILE_FLAGS = [
 def test_compile_unet_pipeline_cpu(sdxl_unet_pipeline_mlir):
     VmfbManager.sdxl_unet_cpu_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
-        "cpu",
         CPU_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_unet_vmfbs")
+        / Path(sdxl_unet_pipeline_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
 def test_compile_unet_cpu(sdxl_unet_mlir):
     VmfbManager.sdxl_unet_cpu_vmfb = iree_compile(
-        sdxl_unet_mlir, "cpu", CPU_COMPILE_FLAGS
+        sdxl_unet_mlir,
+        CPU_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_unet_vmfbs")
+        / Path(sdxl_unet_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
@@ -142,7 +149,7 @@ def test_run_unet_cpu(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.sdxl_unet_cpu_pipeline_vmfb.path}",
+            f"--module={VmfbManager.sdxl_unet_cpu_pipeline_vmfb}",
             "--expected_f16_threshold=0.8f",
         ]
         + SDXL_UNET_COMMON_RUN_FLAGS,
@@ -157,14 +164,22 @@ def test_run_unet_cpu(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
 def test_compile_unet_pipeline_rocm(sdxl_unet_pipeline_mlir):
     VmfbManager.sdxl_unet_rocm_pipeline_vmfb = iree_compile(
         sdxl_unet_pipeline_mlir,
-        f"rocm_{rocm_chip}",
         ROCM_PIPELINE_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_unet_vmfbs")
+        / Path(sdxl_unet_pipeline_mlir.path.name).with_suffix(
+            f".rocm_{rocm_chip}.vmfb"
+        ),
     )
 
 
 def test_compile_unet_rocm(sdxl_unet_mlir):
     VmfbManager.sdxl_unet_rocm_vmfb = iree_compile(
-        sdxl_unet_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+        sdxl_unet_mlir,
+        ROCM_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_unet_vmfbs")
+        / Path(sdxl_unet_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
     )
 
 
@@ -176,7 +191,7 @@ def test_run_unet_rocm(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
         function="produce_image_latents",
         args=[
             f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.sdxl_unet_rocm_pipeline_vmfb.path}",
+            f"--module={VmfbManager.sdxl_unet_rocm_pipeline_vmfb}",
             "--expected_f16_threshold=0.705f",
         ]
         + SDXL_UNET_COMMON_RUN_FLAGS,
