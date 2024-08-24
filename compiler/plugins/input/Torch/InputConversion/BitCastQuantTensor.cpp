@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
@@ -19,6 +20,47 @@ namespace mlir::iree_compiler::TorchInput {
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 namespace {
+
+class BitCastViewDtypeMatmul
+    : public OpRewritePattern<torch::Torch::AtenViewDtypeOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(torch::Torch::AtenViewDtypeOp op,
+                                PatternRewriter &rewriter) const override {
+
+    Value in = op.getSelf();
+    auto loc = op.getLoc();
+    auto inType = cast<torch::Torch::ValueTensorType>(in.getType());
+    auto resultType = cast<torch::Torch::ValueTensorType>(op.getType());
+
+    auto bType = inType.toBuiltinTensor();
+
+    if (auto dtype = dyn_cast<IntegerType>(bType.getElementType())) {
+      bType = bType.clone(
+          rewriter.getType<IntegerType>(dtype.getIntOrFloatBitWidth()));
+    }
+
+    // Cast to the builtin tensor type.
+    Value builtinCast =
+        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, bType,
+                                                                   in);
+
+    auto rType = resultType.toBuiltinTensor();
+    if (auto dtype = dyn_cast<IntegerType>(rType.getElementType())) {
+      rType = rType.clone(
+          rewriter.getType<IntegerType>(dtype.getIntOrFloatBitWidth()));
+    }
+
+    Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+        loc, rType, builtinCast, ValueRange(), ValueRange());
+
+    auto torchCast =
+        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
+            loc, resultType, flowBitcast);
+    rewriter.replaceOp(op, torchCast);
+    return success();
+  }
+};
 
 class BitCastQuantizedMatmul
     : public OpRewritePattern<torch::Torch::OperatorOp> {
@@ -117,7 +159,7 @@ class BitCastQuantTensorPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<BitCastQuantizedMatmul>(context);
+    patterns.add<BitCastQuantizedMatmul, BitCastViewDtypeMatmul>(context);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
