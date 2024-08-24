@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
@@ -85,6 +86,36 @@ struct HoistableTensorTypeInterface
   }
 };
 
+struct HoistableIndexTypeInterface
+    : public IREE::Util::HoistableTypeInterface::ExternalModel<
+          HoistableIndexTypeInterface, IndexType> {
+  bool isHoistableType(Type type) const { return true; }
+  bool isHoistableLeafType(Type type) const { return true; }
+  Type getPreferredStorageType(Type type) const {
+    // Conservatively enforce 64 bit indices for
+    // (potentially constant evaluated) hoisted globals.
+    return IntegerType::get(type.getContext(), 64);
+  }
+  static Value encodeStorageType(OpBuilder &builder, Location loc,
+                                 Type storageType, Value init) {
+    auto storageIndexType = dyn_cast<IntegerType>(storageType);
+    if (!storageIndexType || init.getType() == storageIndexType ||
+        !isa<IndexType>(init.getType())) {
+      return init;
+    }
+    return builder.create<arith::IndexCastOp>(loc, storageType, init);
+  }
+  static Value decodeStorageType(OpBuilder &builder, Location loc,
+                                 Type originalType, Value loadedGlobal) {
+    auto originalIndexType = dyn_cast<IndexType>(originalType);
+    if (!originalIndexType || loadedGlobal.getType() == originalIndexType ||
+        !isa<IntegerType>(loadedGlobal.getType())) {
+      return loadedGlobal;
+    }
+    return builder.create<arith::IndexCastOp>(loc, originalType, loadedGlobal);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -93,6 +124,7 @@ void registerHoistableTypeInterfaces(DialectRegistry &registry) {
   // Register hoistable type interfaces for builtin types.
   registry.addExtension(+[](MLIRContext *ctx) {
     RankedTensorType::attachInterface<HoistableTensorTypeInterface>(*ctx);
+    IndexType::attachInterface<HoistableIndexTypeInterface>(*ctx);
   });
 }
 
