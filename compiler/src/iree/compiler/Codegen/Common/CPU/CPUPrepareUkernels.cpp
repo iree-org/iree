@@ -140,7 +140,13 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
   options.controlFn = [](Operation *op) -> SmallVector<unsigned> {
     return {0};
   };
-  return linalg::dropUnitDims(rewriter, producer, options);
+  FailureOr<linalg::DropUnitDimsResult> result =
+      linalg::dropUnitDims(rewriter, producer, options);
+  if (failed(result)) {
+    return failure();
+  }
+  rewriter.replaceOp(producer, result->replacements);
+  return success();
 }
 
 /// Drops the first element from all the tile sizes list. The first element is
