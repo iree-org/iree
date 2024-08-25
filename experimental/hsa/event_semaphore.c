@@ -529,8 +529,6 @@ iree_status_t iree_hal_hsa_event_semaphore_acquire_timepoint_device_wait(
     wait_timepoint->timepoint.device_wait = wait_event;
   }
 
-  // *out_event =
-  // iree_hal_hsa_event_handle(wait_timepoint->timepoint.device_wait);
   *out_signal =
       iree_hal_hsa_signal_handle(wait_timepoint->timepoint.device_wait);
 

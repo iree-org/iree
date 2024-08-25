@@ -49,8 +49,8 @@ static iree_hal_hsa_allocator_t* iree_hal_hsa_allocator_cast(
   return (iree_hal_hsa_allocator_t*)base_value;
 }
 
-hsa_status_t get_kernarg_memory_region(hsa_region_t region,
-                                       void* allocator_untyped) {
+static hsa_status_t get_kernarg_memory_region(hsa_region_t region,
+                                              void* allocator_untyped) {
   iree_hal_hsa_allocator_t* allocator =
       (iree_hal_hsa_allocator_t*)(allocator_untyped);
 
@@ -73,8 +73,8 @@ hsa_status_t get_kernarg_memory_region(hsa_region_t region,
   return HSA_STATUS_SUCCESS;
 }
 
-hsa_status_t get_fine_grained_memory_pool(hsa_amd_memory_pool_t pool,
-                                          void* allocator_untyped) {
+static hsa_status_t get_fine_grained_memory_pool(hsa_amd_memory_pool_t pool,
+                                                 void* allocator_untyped) {
   iree_hal_hsa_allocator_t* allocator =
       (iree_hal_hsa_allocator_t*)(allocator_untyped);
 
@@ -388,18 +388,12 @@ static void iree_hal_hsa_buffer_free(
   switch (buffer_type) {
     case IREE_HAL_HSA_BUFFER_TYPE_DEVICE: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hsa_amd_memory_pool_free");
-      iree_status_t status = IREE_HSA_RESULT_TO_STATUS(
-          hsa_symbols, hsa_amd_memory_pool_free(device_ptr));
-      (void)status;
-      assert(status == IREE_STATUS_OK);
+      hsa_symbols->hsa_amd_memory_pool_free(device_ptr);
       break;
     }
     case IREE_HAL_HSA_BUFFER_TYPE_HOST: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hsa_amd_memory_pool_free");
-      iree_status_t status = IREE_HSA_RESULT_TO_STATUS(
-          hsa_symbols, hsa_amd_memory_pool_free(device_ptr));
-      (void)status;
-      assert(status == IREE_STATUS_OK);
+      hsa_symbols, hsa_amd_memory_pool_free(device_ptr);
       break;
     }
     case IREE_HAL_HSA_BUFFER_TYPE_HOST_REGISTERED: {

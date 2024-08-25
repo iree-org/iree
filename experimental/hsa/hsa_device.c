@@ -233,7 +233,6 @@ const iree_hal_hsa_dynamic_symbols_t* iree_hal_hsa_device_dynamic_symbols(
 static void iree_hal_hsa_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_hsa_device_t* device = iree_hal_hsa_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
-  // const iree_hal_hsa_dynamic_symbols_t* symbols = device->hsa_symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Destroy the pending workload queue.
@@ -242,11 +241,6 @@ static void iree_hal_hsa_device_destroy(iree_hal_device_t* base_device) {
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
-
-  // Destroy memory pools that hold on to reserved memory.
-  // iree_hal_hsa_memory_pools_deinitialize(&device->memory_pools);
-
-  // iree_hal_hsa_tracing_context_free(device->tracing_context);
 
   // Destroy various pools for synchronization.
   if (device->timepoint_pool) {
