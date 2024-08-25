@@ -1,4 +1,5 @@
 # Copyright 2019 The IREE Authors
+# Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -584,6 +585,22 @@ iree_register_external_hal_driver(
     iree::experimental::webgpu::registration
   REGISTER_FN
     iree_hal_webgpu_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
+# Experimental HSA HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hsa
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    hsa
+  SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hsa"
+  DRIVER_TARGET
+    iree::experimental::hsa::registration
+  REGISTER_FN
+    iree_hal_hsa_driver_module_register
 )
 
 #-------------------------------------------------------------------------------
