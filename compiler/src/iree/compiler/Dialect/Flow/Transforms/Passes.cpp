@@ -83,7 +83,7 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
 static llvm::cl::opt<bool> clCollapseReductionDims(
     "iree-flow-collapse-reduction-dims",
     llvm::cl::desc("Enable collapsing of reduction dims"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
     clEnableFuseMultiUse("iree-flow-fuse-multi-use",
