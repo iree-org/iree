@@ -3948,6 +3948,8 @@ beyond what is currently available in the Vector Dialect.</p>
 </code></pre></div>
 <p>The layout conversion operator takes a shaped value and a layout and
 transforms the value to have that layout.</p>
+<p>If the "shared_memory_conversion" attribute is set, then this layout
+change has to be materialized through shared memory.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -3955,6 +3957,7 @@ transforms the value to have that layout.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface</td><td>VectorLayoutInterface instance</td></tr>
+<tr><td><code>shared_memory_conversion</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
