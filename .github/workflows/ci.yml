@@ -136,11 +136,11 @@ jobs:
         env:
           JOB_NAME: ${{matrix.name}}
         run: |
-          if [[ "$JOB_NAME" == "ubuntu"* ]]; then
+          if [[ "$JOB_NAME" == *"ubuntu"* ]]; then
             DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
-          elif [[ "$JOB_NAME" == "macos"* ]]; then
+          elif [[ "$JOB_NAME" == *"macos"* ]]; then
             DRIVER_OPTIONS="-DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF"
-          elif [[ "$JOB_NAME" == "windows"* ]]; then
+          elif [[ "$JOB_NAME" == *"windows"* ]]; then
             DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
           else
           # Disable CUDA and HIP on an unknow platform
