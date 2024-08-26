@@ -227,7 +227,14 @@ static LogicalResult
 serializeResourceRawData(Location loc,
                          DenseResourceElementsAttr resourceElementsAttr,
                          llvm::raw_ostream &os) {
-  auto rawData = resourceElementsAttr.getRawHandle().getBlob()->getData();
+  auto *blob = resourceElementsAttr.getRawHandle().getBlob();
+  if (!blob) {
+    return mlir::emitError(loc)
+           << "resource data missing in input IR (removed by user?); "
+              "cannot serialize resource: "
+           << resourceElementsAttr << "\n";
+  }
+  auto rawData = blob->getData();
   os.write(rawData.data(), rawData.size());
   return success();
 }
