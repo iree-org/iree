@@ -61,7 +61,8 @@ struct DropToLayoutUnitDims final
 
     Value rankReducedValue = rankReducingExtract.value();
     auto newToLayoutOp = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-        loc, rankReducedValue.getType(), rankReducedValue, newLayout);
+        loc, rankReducedValue.getType(), rankReducedValue, newLayout,
+        toLayoutOp.getSharedMemoryConversion());
     newToLayoutOp->setDiscardableAttrs(
         toLayoutOp->getDiscardableAttrDictionary());
 
