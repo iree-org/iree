@@ -53,11 +53,11 @@ fi
 if (( IREE_METAL_DISABLE == 1 )); then
   cmake_config_options+=("-DIREE_HAL_DRIVER_METAL=OFF")
 fi
-if (( IREE_CUDA_DISABLE == 1 )); then
-  cmake_config_options+=("-DIREE_HAL_DRIVER_CUDA=OFF")
+if (( IREE_CUDA_DISABLE == 0 )); then
+  cmake_config_options+=("-DIREE_HAL_DRIVER_CUDA=ON")
 fi
-if (( IREE_HIP_DISABLE == 1 )); then
-  cmake_config_options+=("-DIREE_HAL_DRIVER_HIP=OFF")
+if (( IREE_HIP_DISABLE == 0 )); then
+  cmake_config_options+=("-DIREE_HAL_DRIVER_HIP=ON")
 fi
 if [[ -n "${IREE_HIP_TEST_TARGET_CHIP}" ]]; then
   cmake_config_options+=("-DIREE_HIP_TEST_TARGET_CHIP=${IREE_HIP_TEST_TARGET_CHIP}")
