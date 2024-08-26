@@ -186,6 +186,8 @@ jobs:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
+        env:
+          JOB_NAME: ${{matrix.name}}
         run: |
           if [[ "$JOB_NAME" == *"ubuntu"* ]]; then
             DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
@@ -243,7 +245,11 @@ jobs:
           key: ${{ github.job }}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
+        env:
+          JOB_NAME: ${{matrix.name}}
         run: |
+          echo $JOB_NAME
+          
           if [[ "$JOB_NAME" == *"ubuntu"* ]]; then
             DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
           elif [[ "$JOB_NAME" == *"macos"* ]]; then
