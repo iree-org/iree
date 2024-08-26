@@ -88,21 +88,6 @@ struct LLVMGPUConfigureTensorLayoutsPass final
   void runOnOperation() override {
     auto func = getOperation();
 
-    std::array<int64_t, 3> workgroupSize;
-    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
-        getWorkgroupSize(func);
-    if (!maybeWorkgroupSize) {
-      func->emitOpError()
-          << "unable to query workgroup_size information from entry point";
-      return signalPassFailure();
-    }
-    for (auto [index, value] : llvm::enumerate(maybeWorkgroupSize.value())) {
-      workgroupSize[index] = value;
-    }
-    for (auto index : llvm::seq<size_t>(maybeWorkgroupSize->size(), 3)) {
-      workgroupSize[index] = 1;
-    }
-
     llvm::StringLiteral scheduleAttrName =
         IREE::GPU::MMAScheduleAttr::getMnemonic();
     DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
