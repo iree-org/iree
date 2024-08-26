@@ -60,7 +60,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
-    "lowering_config.mlir"
     "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
     "scalar_computation.mlir"
@@ -75,7 +74,7 @@ iree_check_single_backend_test_suite(
     "stablehlo"
 )
 
-# This test has a numeric mismatch on these backends
+# This test has a numeric mismatch on ARM and RISCV
 # https://github.com/llvm/llvm-project/issues/105869
 if(NOT IREE_ARCH STREQUAL "arm_64"
   AND NOT IREE_ARCH STREQUAL "riscv_64" )
@@ -94,6 +93,24 @@ iree_check_single_backend_test_suite(
 )
 
 endif()  # NOT IREE_ARCH STREQUAL "arm_64" AND NOT IREE_ARCH STREQUAL "riscv_64"
+
+# This test had issue on RISCV after change in https://github.com/iree-org/iree/pull/18351
+if(NOT IREE_ARCH STREQUAL "riscv_64" )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu-2
+  SRCS
+    "lowering_config.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+)
+
+endif()  # NOT IREE_ARCH STREQUAL "riscv_64"
 
 iree_check_single_backend_test_suite(
   NAME
