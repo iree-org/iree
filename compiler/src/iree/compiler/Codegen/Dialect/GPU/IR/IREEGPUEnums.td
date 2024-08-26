@@ -168,4 +168,35 @@ def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
       Lane
     ]>;
 
+//===----------------------------------------------------------------------===//
+// Pipeline options
+//===----------------------------------------------------------------------===//
+
+class IREEGPU_I32PipelineEnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, summary, cases> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU::PipelineOptions";
+  let genSpecializedAttr = 0;
+}
+
+def ReorderWorkgroups_None : I32EnumAttrCase<"None", 0>;
+def ReorderWorkgroups_Swizzle : I32EnumAttrCase<"Swizzle", 1>;
+def ReorderWorkgroups_Transpose : I32EnumAttrCase<"Transpose", 2>;
+
+def IREEGPU_ReorderWorkgroupsStrategy : IREEGPU_I32PipelineEnumAttr<"ReorderWorkgroupsStrategy",
+    "Strategy for workgroup reordering", [
+      ReorderWorkgroups_None,
+      ReorderWorkgroups_Swizzle,
+      ReorderWorkgroups_Transpose
+    ]> {
+}
+
+def NoReduceSharedMemoryBankConflicts : I32EnumAttrCase<"NoReduceSharedMemoryBankConflicts", 0>;
+def PrefetchSharedMemory : I32EnumAttrCase<"PrefetchSharedMemory", 1>;
+
+def IREEGPU_UnitPipelineOption : IREEGPU_I32PipelineEnumAttr<"UnitPipelineOption",
+    "Pipeline options", [
+      NoReduceSharedMemoryBankConflicts,
+      PrefetchSharedMemory,
+    ]>;
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS

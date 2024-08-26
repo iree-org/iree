@@ -473,4 +473,98 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       workgroupSize, subgroupSize, DictionaryAttr());
 }
 
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
+    "no_reduce_shared_memory_bank_conflicts";
+constexpr StringLiteral kPrefetchSharedMemory = "prefetch_shared_memory";
+constexpr StringLiteral kReorderWorkgroupsStrategy =
+    "reorder_workgroups_strategy";
+
+StringRef getPipelineOptionName(UnitPipelineOption option) {
+  switch (option) {
+  case UnitPipelineOption::NoReduceSharedMemoryBankConflicts:
+    return kNoReduceSharedMemoryBankConflicts;
+  case UnitPipelineOption::PrefetchSharedMemory:
+    return kPrefetchSharedMemory;
+  }
+  assert(false && "Unknown pipeline option");
+  return StringRef();
+}
+
+StringRef getPipelineOptionName(ReorderWorkgroupsStrategy option) {
+  switch (option) {
+  case ReorderWorkgroupsStrategy::None:
+  case ReorderWorkgroupsStrategy::Swizzle:
+  case ReorderWorkgroupsStrategy::Transpose:
+    return kReorderWorkgroupsStrategy;
+  }
+  assert(false && "Unknown pipeline option");
+  return StringRef();
+}
+
+GPUPipelineOptions
+getPipelineOptions(FunctionOpInterface funcOp,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
+  GPUPipelineOptions pipelineOptions = {};
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+
+  LLVM_DEBUG(llvm::dbgs() << "Translation Info: " << translationInfo << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Target Attr: " << targetAttr << "\n");
+
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    if (config.contains(getPipelineOptionName(
+            UnitPipelineOption::NoReduceSharedMemoryBankConflicts))) {
+      pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
+    }
+    if (config.contains(
+            getPipelineOptionName(UnitPipelineOption::PrefetchSharedMemory))) {
+      pipelineOptions.prefetchSharedMemory = true;
+    }
+    if (config.contains(
+            getPipelineOptionName(ReorderWorkgroupsStrategy::None))) {
+      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::None;
+    }
+    if (config.contains(
+            getPipelineOptionName(ReorderWorkgroupsStrategy::Transpose))) {
+      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Transpose;
+    }
+    if (config.contains(
+            getPipelineOptionName(ReorderWorkgroupsStrategy::Swizzle))) {
+      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Swizzle;
+    }
+  }
+
+  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+
+  LLVM_DEBUG(llvm::dbgs() << "GPU Pipeline Options: " << pipelineOptions
+                          << "\n");
+  return pipelineOptions;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GPUPipelineOptions &options) {
+  StringRef reorderStr = "<not set>";
+  if (options.reorderStrategy) {
+    if (options.reorderStrategy == ReorderWorkgroupsStrategy::Transpose) {
+      reorderStr = "transpose";
+    } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
+      reorderStr = "swizzle";
+    } else {
+      assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
+             "Unhandled reorder option");
+      reorderStr = "none";
+    }
+  }
+
+  return os << "{"
+            << "enableReduceSharedMemoryBankConflicts = "
+            << options.enableReduceSharedMemoryBankConflicts << ", "
+            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", reorderWorkgroupsStrategy = " << reorderStr
+            << ", enableUkernels = " << options.enableUkernels << "}";
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

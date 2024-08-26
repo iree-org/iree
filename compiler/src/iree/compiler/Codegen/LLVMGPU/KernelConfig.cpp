@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -381,7 +382,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     attrs.emplace_back(
-        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        StringAttr::get(context, IREE::GPU::getPipelineOptionName(
+                                     UnitPipelineOption::PrefetchSharedMemory)),
         UnitAttr::get(context));
   }
 
@@ -611,7 +613,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     attrs.emplace_back(
-        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        StringAttr::get(context, IREE::GPU::getPipelineOptionName(
+                                     UnitPipelineOption::PrefetchSharedMemory)),
         UnitAttr::get(context));
   }
 

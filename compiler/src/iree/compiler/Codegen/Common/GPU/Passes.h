@@ -101,7 +101,9 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true);
 
-enum class ReorderWorkgroupsStrategy { None, Swizzle, Transpose };
+using IREE::GPU::PipelineOptions::ReorderWorkgroupsStrategy;
+using IREE::GPU::PipelineOptions::UnitPipelineOption;
+// enum class ReorderWorkgroupsStrategy { None, Swizzle, Transpose };
 
 /// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

@@ -75,28 +75,6 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(false));
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const LLVMGPUPipelineOptions &options) {
-  StringRef reorderStr = "<not set>";
-  if (options.reorderStrategy) {
-    if (options.reorderStrategy == ReorderWorkgroupsStrategy::Transpose) {
-      reorderStr = "transpose";
-    } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
-      reorderStr = "swizzle";
-    } else {
-      assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
-             "Unhandled reorder option");
-      reorderStr = "none";
-    }
-  }
-
-  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
-            << options.enableReduceSharedMemoryBankConflicts << ", "
-            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
-            << ", reorderWorkgroupsStrategy = " << reorderStr
-            << ", enableUkernels = " << options.enableUkernels << "}";
-}
-
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -488,7 +466,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
 //===---------------------------------------------------------------------===//
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
-                                  const LLVMGPUPipelineOptions &options) {
+                                  const GPUPipelineOptions &options) {
   tileAndDistributeToWorkgroup(funcPassManager);
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -549,7 +527,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
 //===---------------------------------------------------------------------===//
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
-                                        const LLVMGPUPipelineOptions &options,
+                                        const GPUPipelineOptions &options,
                                         unsigned pipelineDepth) {
   tileAndBufferize(funcPassManager);
 
@@ -619,7 +597,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
 //===---------------------------------------------------------------------===//
 
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(
-    OpPassManager &funcPassManager, const LLVMGPUPipelineOptions &options,
+    OpPassManager &funcPassManager, const GPUPipelineOptions &options,
     unsigned pipelineDepth) {
   tileAndBufferize(funcPassManager);
 
@@ -686,7 +664,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
 //===---------------------------------------------------------------------===//
 
 void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const LLVMGPUPipelineOptions &options) {
+                                 const GPUPipelineOptions &options) {
   tileAndDistributeToWorkgroup(funcPassManager);
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -790,7 +768,7 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 }
 
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
-                                        const LLVMGPUPipelineOptions &options,
+                                        const GPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
   tileAndDistributeToWorkgroup(funcPassManager);
 
@@ -965,7 +943,7 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
 }
 
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               const LLVMGPUPipelineOptions &options) {
+                               const GPUPipelineOptions &options) {
   ConvertToDestinationPassingStylePassOptions dpsOptions;
   dpsOptions.useWARForCooperativeMatrixCodegen = true;
   tileAndDistributeToWorkgroup(funcPassManager, dpsOptions);
