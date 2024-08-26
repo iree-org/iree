@@ -11,9 +11,9 @@ set(IREE_PACKAGE_ROOT_PREFIX "iree/experimental/hsa")
 
 iree_add_all_subdirs()
 
-set(IREE_ROCM_TARGET_CHIP_DEFAULT "gfx1103")
-set(IREE_ROCM_TARGET_CHIP "${IREE_ROCM_TARGET_CHIP_DEFAULT}" CACHE STRING
-  "Target chip for ROCm. This influences conformance tests that need to compile device code. Defaults to \"${IREE_ROCM_TARGET_CHIP_DEFAULT}\".")
+set(IREE_HIP_TEST_TARGET_CHIP "gfx1103")
+set(IREE_HIP_TARGET_CHIP "${IREE_HIP_TEST_TARGET_CHIP}" CACHE STRING
+  "Target chip for HIP. This influences conformance tests that need to compile device code. Defaults to \"${IREE_HIP_TEST_TARGET_CHIP}\".")
 
 if(NOT DEFINED HSA_API_HEADERS_ROOT)
   set(HSA_API_HEADERS_ROOT "${IREE_SOURCE_DIR}/third_party/hsa-build-deps/runtime/hsa-runtime/inc")

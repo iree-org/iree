@@ -8,7 +8,7 @@
 
 unset(IREE_HSA_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HSA_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}")
+  "--iree-hip-target=${IREE_HIP_TARGET_CHIP}")
 
 iree_check_single_backend_test_suite(
   NAME
