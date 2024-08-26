@@ -40,6 +40,7 @@ iree_cc_library(
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TransposeGenericOps.cpp"
+    "VerifyDispatches.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

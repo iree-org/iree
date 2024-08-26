@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "SplitReduction.cpp",
         "TensorPadToTensorInsertSlice.cpp",
         "TransposeGenericOps.cpp",
+        "VerifyDispatches.cpp",
     ],
     hdrs = [
         "FusionUtils.h",

@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "tensor_pad_to_tensor_insert_slice.mlir"
     "transform_dispatch_region_formation.mlir"
     "transpose_generic_ops.mlir"
+    "verify_dispatches.mlir"
   TOOLS
     FileCheck
     iree-opt
