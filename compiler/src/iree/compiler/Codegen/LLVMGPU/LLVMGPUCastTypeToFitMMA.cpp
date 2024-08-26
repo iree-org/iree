@@ -30,7 +30,12 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
-    VectorContractOpInfo opInfo(contractOp);
+    auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+        contractOp.getIndexingMapsArray());
+    if (failed(maybeOpInfo)) {
+      return rewriter.notifyMatchFailure(contractOp, "not a contraction");
+    }
+    VectorContractOpInfo opInfo = maybeOpInfo.value();
 
     auto srcCType = dyn_cast<VectorType>(contractOp.getAccType());
     if (!srcCType) {
@@ -68,6 +73,8 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     auto newContractOp = rewriter.create<vector::ContractionOp>(
         loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
         contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
+    newContractOp->setDiscardableAttrs(
+        contractOp->getDiscardableAttrDictionary());
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(contractOp, srcCType,
                                                  newContractOp);
     return success();

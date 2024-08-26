@@ -77,6 +77,11 @@ def LLVMGPUCastTypeToFitMMAPass : InterfacePass<"iree-llvmgpu-cast-type-to-fit-m
                 "to target GPU MMA intrinsics";
 }
 
+def LLVMGPUConfigureTensorLayoutsPass :
+    InterfacePass<"iree-llvmgpu-configure-tensor-layouts", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to set layouts on tensors for later vector distribution";
+}
+
 def LLVMGPUConfigureVectorLayoutsPass :
     InterfacePass<"iree-llvmgpu-configure-vector-layouts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to set layouts for vector distribution";

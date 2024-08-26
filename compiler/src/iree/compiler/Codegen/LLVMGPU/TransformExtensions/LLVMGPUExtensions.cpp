@@ -1656,20 +1656,20 @@ transform_dialect::SetContractionLayoutAttributes::apply(
         Operation *parentOp = operand.getDefiningOp();
         if (!parentOp || (parentOp->getNumResults() != 1))
           continue;
-        Value resolvedOperand = rewriter.create<VectorExt::ToLayoutOp>(
-            loc, operand.getType(), operand, readLayout);
+        Value resolvedOperand =
+            rewriter.create<VectorExt::ToLayoutOp>(loc, operand, readLayout);
         contract.setOperand(operandIndices[i], resolvedOperand);
       }
     }
 
     // Set layout anchors.
     rewriter.setInsertionPoint(contract);
-    Value newLhs = rewriter.create<VectorExt::ToLayoutOp>(
-        loc, contract.getLhsType(), contract.getLhs(), aLayout);
-    Value newRhs = rewriter.create<VectorExt::ToLayoutOp>(
-        loc, contract.getRhsType(), contract.getRhs(), bLayout);
-    Value newAcc = rewriter.create<VectorExt::ToLayoutOp>(
-        loc, contract.getAccType(), contract.getAcc(), cLayout);
+    Value newLhs =
+        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getLhs(), aLayout);
+    Value newRhs =
+        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getRhs(), bLayout);
+    Value newAcc =
+        rewriter.create<VectorExt::ToLayoutOp>(loc, contract.getAcc(), cLayout);
     contract.setOperand(0, newLhs);
     contract.setOperand(1, newRhs);
     contract.setOperand(2, newAcc);
