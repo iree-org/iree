@@ -59,6 +59,8 @@ static const std::unordered_map<MMAIntrinsic, std::array<SmallVectorType, 4>>
     mmaIntrinsicSizes = {
         {MMAIntrinsic::MFMA_F32_16x16x4_F32,
          {SmallVectorType{1, 1}, {4, 1}, {3, 0, 1, 4, 2}, {0, 3, 1, 2, 4}}},
+        {MMAIntrinsic::MFMA_I32_32x32x16_I8,
+         {SmallVectorType{1, 1}, {4, 1}, {3, 0, 1, 4, 2}, {0, 3, 1, 2, 4}}},
 };
 
 /// Returns the corresponding native tensor sizes defined by the `mma`
@@ -84,18 +86,19 @@ static std::optional<IREE::GPU::DataTiledMMAAttr>
 enumerateMmaIntrinsic(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   assert(elementTypes.size() == 3);
   MLIRContext *ctx = target.getContext();
-  Type lhs = elementTypes[0];
-  Type rhs = elementTypes[1];
-  Type out = elementTypes[2];
+
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     IREE::GPU::MMAIntrinsic type = mma.getIntrinsic().getValue();
+    
     // TODO: Drop this once all intrinsics are supported.
-    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
+    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32 &&
+        type != IREE::GPU::MMAIntrinsic::MFMA_I32_32x32x16_I8) {
       continue;
     }
 
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    if (lhs != aType || rhs != bType || out != cType) {
+    // make sure element types can match
+    if (mma.getABCElementTypes() != std::tuple<Type, Type, Type>(
+      elementTypes[0], elementTypes[1], elementTypes[2])) {
       continue;
     }
     return IREE::GPU::DataTiledMMAAttr::get(ctx, mma.getIntrinsic().getValue());
@@ -149,7 +152,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   auto roleIdx = encoding.getOperandIndex().getInt();
   auto intrinsicVectorSizes =
       getIntrinsicVectorSize(mma->getIntrinsic().getValue(), roleIdx);
-  assert(intrinsicVectorSizes.empty());
+  assert(!intrinsicVectorSizes.empty());
   auto permutation =
       getEncodingTransposePerm(mma->getIntrinsic().getValue(), roleIdx);
   assert(!permutation.empty());
@@ -267,8 +270,7 @@ struct GPUSetEncodingOpLoweringConversion
     size_t origRank = encodingOp.getSourceType().getRank();
 
     SmallVector<int64_t> transposePerm;
-    transposePerm.push_back(0);
-    transposePerm.push_back(1);
+    transposePerm.append({0, 1});
     for (auto perm : maybeEncodingInfo->permutation) {
       transposePerm.push_back(origRank + perm);
     }
@@ -327,8 +329,7 @@ struct GPUUnsetEncodingOpLoweringConversion
     size_t targetRank = unsetEncodingOp.getResultType().getRank();
 
     SmallVector<int64_t> transposePerm;
-    transposePerm.push_back(0);
-    transposePerm.push_back(1);
+    transposePerm.append({0, 1});
     for (auto perm : maybeEncodingInfo->permutation) {
       transposePerm.push_back(targetRank + perm);
     }
