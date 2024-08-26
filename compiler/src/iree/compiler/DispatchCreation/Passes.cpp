@@ -142,6 +142,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
       .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
+      .addPass(DispatchCreation::createBubbleUpExtractSlicesPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
