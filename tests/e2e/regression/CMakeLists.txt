@@ -48,7 +48,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_llvm-cpu
+    check_regression_llvm-cpu-1
   SRCS
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
@@ -59,9 +59,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
-    "layernorm.mlir"
     "linalg_ops.mlir"
-    "lowering_config.mlir"
     "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
     "scalar_computation.mlir"
@@ -75,6 +73,44 @@ iree_check_single_backend_test_suite(
   INPUT_TYPE
     "stablehlo"
 )
+
+# This test has a numeric mismatch on ARM and RISCV
+# https://github.com/llvm/llvm-project/issues/105869
+if(NOT IREE_ARCH STREQUAL "arm_64"
+  AND NOT IREE_ARCH STREQUAL "riscv_64" )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu-2
+  SRCS
+    "layernorm.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+)
+
+endif()  # NOT IREE_ARCH STREQUAL "arm_64" AND NOT IREE_ARCH STREQUAL "riscv_64"
+
+# This test had issue on RISCV after change in https://github.com/iree-org/iree/pull/18351
+if(NOT IREE_ARCH STREQUAL "riscv_64" )
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu-3
+  SRCS
+    "lowering_config.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+)
+
+endif()  # NOT IREE_ARCH STREQUAL "riscv_64"
 
 iree_check_single_backend_test_suite(
   NAME
@@ -190,7 +226,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-flow-fuse-multi-use"
+    "--iree-dispatch-creation-fuse-multi-use"
   LABELS
     "noasan"
     "nomsan"
@@ -222,7 +258,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-fuse-multi-use"
+    "--iree-dispatch-creation-fuse-multi-use"
 )
 
 iree_check_single_backend_test_suite(

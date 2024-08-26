@@ -62,3 +62,13 @@ module @eval_i4_tensor {
     util.return
   }
 }
+
+// -----
+
+// expected-error @+2 {{resource data missing in input IR}}
+// expected-error @+1 {{serializeToBuffer failed}}
+util.global private @resource = dense_resource<missing> : tensor<f32>
+util.initializer attributes {iree.compiler.consteval} {
+  %0 = util.global.load @resource : tensor<f32>
+  util.return
+}

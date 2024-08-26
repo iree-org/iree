@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -127,7 +128,7 @@ void buildGlobalOptimizationPassPipeline(
       // specialized raising and the op names are no longer useful.
       .addPass(createGeneralizeLinalgNamedOpsPass);
 
-  mainPassManager.addPass(IREE::Flow::createFoldUnitExtentDimsPass());
+  mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
@@ -157,8 +158,8 @@ void buildGlobalOptimizationPassPipeline(
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
     FunctionLikeNest(mainPassManager).addPass([&]() {
-      return IREE::Flow::createSetEncodingPass(
-          IREE::Flow::SetEncodingPassOptions{clPadFactor});
+      return DispatchCreation::createSetEncodingPass(
+          DispatchCreation::SetEncodingPassOptions{clPadFactor});
     });
     // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
     // we can use `FunctionLikNest` here.

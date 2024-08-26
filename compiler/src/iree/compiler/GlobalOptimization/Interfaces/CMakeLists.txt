@@ -32,6 +32,7 @@ iree_cc_library(
     "HoistableTypeInterface.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR

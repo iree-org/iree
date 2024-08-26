@@ -14,3 +14,13 @@ func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8]
   %output = torch.operator "quant.matmul_rhs_group_quant"(%arg0, %q_rhs, %scales, %zps, %bit_width, %group_size) : (!torch.vtensor<[1,1,8],f16>, !torch.vtensor<[8,4],ui8>, !torch.vtensor<[8,4,1],f16>, !torch.vtensor<[8,4,1],f16>, !torch.int, !torch.int) -> !torch.vtensor<[1,1,8],f16>
   return %output : !torch.vtensor<[1,1,8],f16>
 }
+
+// -----
+
+// CHECK-LABEL: @view_type
+func.func @view_type(%arg0 : !torch.vtensor<[295501824],ui8>) -> !torch.vtensor<[147750912],si16> {
+    %int4 = torch.constant.int 4
+    // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<295501824xi8> -> tensor<147750912xi16>
+    %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[295501824],ui8>, !torch.int -> !torch.vtensor<[147750912],si16>
+    return %0 : !torch.vtensor<[147750912],si16>
+}

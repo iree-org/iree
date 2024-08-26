@@ -1,5 +1,15 @@
 # IREE Docker Configuration
 
+**⚠️ DEPRECATED ⚠️**
+
+These files are moving to https://github.com/iree-org/base-docker-images.
+
+Existing documentation is included here to ease the transition.
+
+---
+---
+---
+
 This directory contains the Dockerfiles that specify the container images used
 for IREE. Images are uploaded to
 [Google Container Registry (GCR)](https://cloud.google.com/container-registry).

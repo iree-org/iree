@@ -16,31 +16,12 @@ iree_lit_test_suite(
   SRCS
     "annotate_dispatches.mlir"
     "attention_fuse_by_expansion.mlir"
-    "bubble_up_extract_slice.mlir"
     "capture_dispatch_dynamic_dims.mlir"
     "capture_scf_for_dynamic_dims.mlir"
     "cleanup_tensor_shapes.mlir"
-    "clone_producers_into_dispatch_regions.mlir"
-    "collapse_dimensions.mlir"
-    "collapse_linalg_generic_on_tensors.mlir"
-    "collapse_reduction.mlir"
-    "convert_region_to_workgroups.mlir"
     "deduplicate_executables.mlir"
-    "dispatch_linalg_ext_fusion.mlir"
-    "dispatch_linalg_on_tensors.mlir"
-    "dispatch_linalg_on_tensors_default.mlir"
-    "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
-    "dispatch_linalg_transform_dialect.mlir"
-    "dispatch_region_formation_preprocessing.mlir"
     "export_benchmark_funcs.mlir"
     "flow_canonicalize.mlir"
-    "fold_unit_dims.mlir"
-    "form_dispatch_regions.mlir"
-    "form_dispatch_workgroups.mlir"
-    "form_scalar_dispatches.mlir"
-    "fuse_horizontal_contractions.mlir"
-    "fuse_multiuse_elementwise_producer.mlir"
-    "fusion_preprocessing.mlir"
     "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"
     "inject_tensor_tracing.mlir"
@@ -48,22 +29,12 @@ iree_lit_test_suite(
     "outline_constants.mlir"
     "outline_dispatch_externs.mlir"
     "outline_dispatch_regions.mlir"
-    "pad_fusion_with_consumer.mlir"
-    "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
-    "set_encoding.mlir"
-    "sink_reshapes.mlir"
-    "split_reduction.mlir"
-    "tensor_pad_to_tensor_insert_slice.mlir"
     "top_level_scf_to_cfg.mlir"
-    "transform_dispatch_region_formation.mlir"
-    "transpose_generic_ops.mlir"
     "verify_input_ir.mlir"
   TOOLS
     FileCheck
     iree-opt
-  DATA
-    transform_dialect_dispatch_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

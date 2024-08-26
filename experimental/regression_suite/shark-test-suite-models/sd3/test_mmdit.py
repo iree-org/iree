@@ -12,6 +12,7 @@ from conftest import VmfbManager
 
 iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 
 ###############################################################################
 # Fixtures
@@ -86,8 +87,8 @@ ROCM_COMPILE_FLAGS = [
     "--iree-opt-const-eval=false",
     f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-global-opt-propagate-transposes=true",
-    "--iree-flow-enable-fuse-horizontal-contractions=true",
-    "--iree-flow-enable-aggressive-fusion=true",
+    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
+    "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
     "--iree-vm-target-truncate-unsupported-floats",
@@ -107,7 +108,11 @@ ROCM_COMPILE_FLAGS = [
 
 def test_compile_mmdit_cpu(sd3_mmdit_mlir):
     VmfbManager.sd3_mmdit_cpu_vmfb = iree_compile(
-        sd3_mmdit_mlir, "cpu", CPU_COMPILE_FLAGS
+        sd3_mmdit_mlir,
+        CPU_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sd3_mmdit_vmfbs")
+        / Path(sd3_mmdit_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
@@ -137,7 +142,11 @@ def test_run_mmdit_cpu(SD3_MMDIT_COMMON_RUN_FLAGS, sd3_mmdit_real_weights):
 )
 def test_compile_mmdit_rocm(sd3_mmdit_mlir):
     VmfbManager.sd3_mmdit_rocm_vmfb = iree_compile(
-        sd3_mmdit_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+        sd3_mmdit_mlir,
+        ROCM_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sd3_mmdit_vmfbs")
+        / Path(sd3_mmdit_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
     )
 
 

@@ -208,7 +208,10 @@ def GPUVectorAllocPass :
   let summary = "Pass to create allocations for contraction inputs to copy "
                 "to GPU shared memory";
   let dependentDialects = [
-    "::mlir::gpu::GPUDialect", "::mlir::bufferization::BufferizationDialect"
+    "::mlir::gpu::GPUDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
   ];
 }
 

@@ -131,7 +131,6 @@ private:
   VectorLayoutInterface getLayout(Value val);
 
   Operation *root;
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
   DataFlowSolver solver;
 };
 

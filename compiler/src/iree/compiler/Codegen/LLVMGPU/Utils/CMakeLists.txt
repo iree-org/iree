@@ -17,7 +17,6 @@ iree_cc_library(
     "LLVMGPUUtils.h"
   SRCS
     "AMDGPUDistributionPatterns.cpp"
-    "LLVMGPULayoutAnalysisAndDistribution.cpp"
     "LLVMGPUUtils.cpp"
     "PrefetchSharedMemoryCopy.cpp"
   DEPS

@@ -1,5 +1,5 @@
 // TODO(hanchung): Split the transformation pipeline tests into two mlir files.
-// RUN: iree-opt --iree-global-optimization-transformation-pipeline --iree-flow-transformation-pipeline --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-global-optimization-transformation-pipeline --iree-dispatch-creation-pipeline --iree-flow-transformation-pipeline --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>

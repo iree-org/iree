@@ -250,12 +250,6 @@ jobs:
   #     matrix:
   #       target:
   #         - platform: linux
-  #           arch: riscv_64
-  #           abi: lp64d
-  #           docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
-  #           build_script: "./build_tools/cmake/build_riscv.sh"
-  #           test_script: "./build_tools/cmake/test_riscv.sh"
-  #         - platform: linux
   #           arch: riscv_32
   #           abi: ilp32d
   #           docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"

@@ -298,5 +298,4 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
   let genVerifyDecl = 1;
 }
 
-
 #endif // IREE_DIALECT_VECTOREXT_ATTRS

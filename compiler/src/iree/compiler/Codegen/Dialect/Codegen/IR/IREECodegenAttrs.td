@@ -190,6 +190,15 @@ def WorkgroupMappingAttr :
     static LogicalResult verifyAttrList(::mlir::MLIRContext *context,
       ::llvm::function_ref<::mlir::InFlightDiagnostic ()> emitError,
       ArrayRef<Attribute> attrs);
+
+    // Convert from mapping ID to attribute.
+    static ::mlir::iree_compiler::IREE::Codegen::WorkgroupMappingAttr
+    getAttributeFromMappingId(MLIRContext *context, int64_t mappingId);
+
+    // Less than operator for easy comparison.
+    bool operator<(
+        const ::mlir::iree_compiler::IREE::Codegen::WorkgroupMappingAttr &rhs)
+        const;
   }];
 
   let genVerifyDecl = 1;

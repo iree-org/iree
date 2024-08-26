@@ -592,7 +592,7 @@ iree_generated_e2e_runner_test(
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_cuda_%s_large_splitk" % lhs_rhs_type,
     compiler_flags = [
-        "--iree-flow-split-matmul-reduction=4",
+        "--iree-dispatch-creation-split-matmul-reduction=4",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

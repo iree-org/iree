@@ -31,56 +31,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Sets an anchoring layout for the given contraction op. Looks for a
-// supported mma type from the cached list of mma types and populates the
-// necessary distribution pattern for those contractions.
-LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                                   RewriterBase &rewriter,
-                                   vector::ContractionOp contract) {
-  // TODO: Add SIMT fallback.
-  if (!schedule) {
-    return contract->emitError("missing mma schedule for contraction");
-  }
-
-  auto layouts = schedule.getContractionLayout(contract);
-  if (failed(layouts)) {
-    return contract->emitError("cannot get concrete layout for contraction");
-  }
-
-  auto [aLayout, bLayout, cLayout] = *layouts;
-  Location loc = contract.getLoc();
-
-  // Set layouts for lhs, rhs and acc.
-  rewriter.setInsertionPoint(contract);
-  Value layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract.getLhsType(), contract.getLhs(), aLayout);
-  Value layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract.getRhsType(), contract.getRhs(), bLayout);
-  Value layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract.getAccType(), contract.getAcc(), cLayout);
-  contract->setOperand(0, layoutedLhs);
-  contract->setOperand(1, layoutedRhs);
-  contract->setOperand(2, layoutedAcc);
-
-  // Set layout for result.
-  rewriter.setInsertionPointAfter(contract);
-  auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract.getResultType(), contract.getResult(), cLayout);
-  rewriter.replaceAllUsesExcept(contract, toLayout.getResult(), toLayout);
-
-  // Set intrinsic kind.
-  contract->setAttr("iree.amdgpu.mma", schedule.getIntrinsic());
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "chosen a layout: " << aLayout << "\n";
-    llvm::dbgs() << "chosen b layout: " << bLayout << "\n";
-    llvm::dbgs() << "chosen c layout: " << cLayout << "\n";
-    llvm::dbgs() << "anchor set on contract: " << contract << "\n";
-  });
-
-  return success();
-}
-
 // Sets a layout anchor for reads from global memory.
 // The layout this generates is approximately the following:
 //
@@ -275,7 +225,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
   Location loc = transfer.getLoc();
   rewriter.setInsertionPointAfter(transfer);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, transfer.getResult().getType(), transfer.getResult(), layout);
+      loc, transfer.getResult(), layout);
   rewriter.replaceAllUsesExcept(transfer, toLayout.getResult(), toLayout);
 
   return success();
@@ -333,28 +283,16 @@ struct LLVMGPUConfigureVectorLayoutsPass final
     // should receive layouts. Layout setting for other problems like reductions
     // is TODO.
     SmallVector<vector::TransferReadOp> reads;
-    SmallVector<vector::ContractionOp> contracts;
 
     func->walk([&](Operation *op) {
-      llvm::TypeSwitch<Operation *>(op)
-          .Case([&](vector::TransferReadOp transfer) {
-            reads.push_back(transfer);
-          })
-          .Case([&](vector::ContractionOp contract) {
-            contracts.push_back(contract);
-          });
+      llvm::TypeSwitch<Operation *>(op).Case(
+          [&](vector::TransferReadOp transfer) { reads.push_back(transfer); });
     });
 
     IRRewriter rewriter(func);
 
     for (vector::TransferReadOp read : reads) {
       if (failed(setTransferReadAnchor(workgroupSize, rewriter, read))) {
-        return signalPassFailure();
-      }
-    }
-
-    for (vector::ContractionOp contract : contracts) {
-      if (failed(setContractionAnchor(scheduleAttr, rewriter, contract))) {
         return signalPassFailure();
       }
     }

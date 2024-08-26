@@ -455,7 +455,7 @@ builtin.module attributes { transform.with_named_sequence } {
   elements_per_thread     = [1, 4],
 
   subgroup_strides        = [1, 1],
-  thread_strides          = [32, 1]
+  thread_strides          = [1, 32]
 >
 
 // C: shape = 32x64, layout = layoutC

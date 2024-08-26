@@ -57,14 +57,6 @@ runtime_ctest_args=(
 echo "******** Running runtime CTest ********"
 ctest ${runtime_ctest_args[@]}
 
-tools_ctest_args=(
-  "--test-dir ${BUILD_DIR}/tools/test"
-  ${ctest_args[@]}
-  "--label-exclude ${runtime_label_exclude_regex}"
-)
-echo "******** Running tools CTest ********"
-ctest ${tools_ctest_args[@]}
-
 if [[ "${RISCV_PLATFORM}-${RISCV_ARCH}" == "linux-riscv_32" ]]; then
   # stablehlo.power is also disabled because musl math library is not compiled for
   # 32-bit.
