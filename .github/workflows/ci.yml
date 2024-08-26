@@ -187,6 +187,17 @@ jobs:
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
         run: |
+          if [[ "$JOB_NAME" == *"ubuntu"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
+          elif [[ "$JOB_NAME" == *"macos"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF"
+          elif [[ "$JOB_NAME" == *"windows"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
+          else
+          # Disable CUDA and HIP on an unknow platform
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=OFF -DIREE_HAL_DRIVER_HIP=OFF"
+          fi
+
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
@@ -195,7 +206,8 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DIREE_BUILD_COMPILER=OFF \
             -DIREE_RUNTIME_OPTIMIZATION_PROFILE=size \
-            -DIREE_ENABLE_LLD=ON
+            -DIREE_ENABLE_LLD=ON \
+            ${DRIVER_OPTIONS}
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
       - name: CTest
@@ -232,6 +244,17 @@ jobs:
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
         run: |
+          if [[ "$JOB_NAME" == *"ubuntu"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
+          elif [[ "$JOB_NAME" == *"macos"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF"
+          elif [[ "$JOB_NAME" == *"windows"* ]]; then
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON"
+          else
+          # Disable CUDA and HIP on an unknow platform
+            DRIVER_OPTIONS="-DIREE_HAL_DRIVER_CUDA=OFF -DIREE_HAL_DRIVER_HIP=OFF"
+          fi
+
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
@@ -241,7 +264,8 @@ jobs:
             -DIREE_BUILD_COMPILER=OFF \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_RUNTIME_TRACING=ON \
-            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER}
+            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER} \
+            ${DRIVER_OPTIONS}
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
 
