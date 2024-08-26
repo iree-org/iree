@@ -185,7 +185,7 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isaContractionOpInterface(linalgOp)) {
         contracts.push_back(linalgOp);
-      } else if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      } else if (succeeded(linalg::inferConvolutionDims(linalgOp))) {
         convs.push_back(linalgOp);
       }
     });
