@@ -16,6 +16,10 @@ namespace mlir::iree_compiler::IREE::Flow {
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns);
 
+// Add pattern to convert tensor.cast -> flow.tensor.reshape.
+void populateTensorDialectCastOpPattern(MLIRContext *context,
+                                        RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_PATTERNS_H_
