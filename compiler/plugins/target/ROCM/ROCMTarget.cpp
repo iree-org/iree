@@ -40,6 +40,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/IR/Attributes.h"
@@ -133,22 +134,15 @@ private:
   }
 };
 
-// Extracts the amdgpu GfxIp version from the chip architecture in the
-// executable target attribute. For example, returns 0x942 for 'gfx942'.
-static FailureOr<unsigned> getGfxIpVersion(ExecutableTargetAttr targetAttr) {
+// Extracts the amdgpu chipset version from the chip architecture in the
+// executable target attribute.
+static FailureOr<amdgpu::Chipset>
+getChipsetVersion(ExecutableTargetAttr targetAttr) {
   IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(targetAttr);
   if (!gpuTarget)
     return failure();
 
-  StringRef arch = gpuTarget.getArch();
-  if (!arch.consume_front("gfx"))
-    return failure();
-
-  unsigned gfxVersion = 0;
-  if (!llvm::to_integer(arch, gfxVersion, 16))
-    return failure();
-
-  return gfxVersion;
+  return amdgpu::Chipset::parse(gpuTarget.getArch());
 }
 
 // Set attributes on `funcOp` in order to use upstream's translation of
@@ -190,10 +184,10 @@ static void annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   // Kernel argument preloading is only supported on gfx940 and newer targets
   // from the CDNA family. This is enabled using the `inreg` function argument
   // attribute.
-  FailureOr<unsigned> gfxIpVersion = getGfxIpVersion(targetAttr);
-  if (failed(gfxIpVersion))
+  FailureOr<amdgpu::Chipset> chipset = getChipsetVersion(targetAttr);
+  if (failed(chipset))
     return;
-  if (*gfxIpVersion < 0x940)
+  if (chipset->majorVersion != 9 && chipset->minorVersion < 0x40)
     return;
 
   auto inRegAttrName =
