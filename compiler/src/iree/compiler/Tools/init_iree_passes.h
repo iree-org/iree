@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
@@ -51,7 +52,9 @@ inline void registerAllIreePasses() {
   InputConversion::registerCommonInputConversionPasses();
   ConstEval::registerConstEvalPasses();
   GlobalOptimization::registerGlobalOptimizationPipeline();
+  DispatchCreation::registerDispatchCreationPipelines();
   Preprocessing::registerPreprocessingPasses();
+  DispatchCreation::registerDispatchCreationPasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();
