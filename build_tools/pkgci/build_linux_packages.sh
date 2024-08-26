@@ -64,7 +64,7 @@ function find_git_dir_parent() {
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
-manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/nod-ai/manylinux_x86_64:main" }')}"
+manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399" }')}"
 python_versions="${override_python_versions:-cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 cache_dir="${cache_dir:-}"

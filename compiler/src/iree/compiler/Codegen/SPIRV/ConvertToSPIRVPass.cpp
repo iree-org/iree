@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <tuple>
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -63,6 +62,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_CONVERTTOSPIRVPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
 
@@ -288,7 +290,7 @@ struct HALInterfaceLoadConstantConverter final
     auto layoutAttr = exportOps.front().getLayout();
 
     uint64_t elementCount = layoutAttr.getPushConstants();
-    unsigned index = loadOp.getIndex().getZExtValue();
+    unsigned index = loadOp.getOrdinal().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly. This is expected to be
@@ -302,10 +304,10 @@ struct HALInterfaceLoadConstantConverter final
   }
 };
 
-/// A pattern to convert hal.interface.workgroup.id/count into corresponding
-/// SPIR-V Builtin ops.
+/// A pattern to convert hal.interface.workgroup.id/count/size into
+/// corresponding SPIR-V Builtin ops.
 template <typename InterfaceOpTy, spirv::BuiltIn builtin>
-struct HALInterfaceWorkgroupIdAndCountConverter final
+struct HALInterfaceWorkgroupOpsConverter final
     : OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
@@ -470,13 +472,16 @@ struct RemoveIdentityConversionCast final
 /// Converts remaining interface ops into SPIR-V global variables, GPU processor
 /// ID ops into SPIR-V global variables, loop/standard ops into corresponding
 /// SPIR-V ops.
-class ConvertToSPIRVPass final : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
+class ConvertToSPIRVPass final
+    : public impl::ConvertToSPIRVPassBase<ConvertToSPIRVPass> {
 public:
+  using impl::ConvertToSPIRVPassBase<
+      ConvertToSPIRVPass>::ConvertToSPIRVPassBase;
+  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
-
-  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   LogicalResult initializeOptions(
       StringRef options,
@@ -502,10 +507,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   if (moduleOp.getBody()->empty())
     return;
 
-  bool useIndirectBindings = false;
-  if (UnitAttr indirectBindingsAttr = getIndirectBindingsAttr(moduleOp)) {
-    useIndirectBindings = true;
-  };
+  bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = getEntryPoint(funcOp);
@@ -529,16 +531,6 @@ void ConvertToSPIRVPass::runOnOperation() {
     std::optional<int> subgroupSize32;
     if (subgroupSize && subgroupSize->isNonNegative()) {
       subgroupSize32 = subgroupSize->getZExtValue();
-    }
-
-    for (IREE::HAL::DescriptorSetLayoutAttr setLayout :
-         exportOp->getLayout().getSetLayouts()) {
-      bool isIndirect =
-          setLayout.getFlags() == IREE::HAL::DescriptorSetLayoutFlags::Indirect;
-      if (isIndirect != useIndirectBindings) {
-        exportOp->emitOpError("is incompatible with the target configuration");
-        return signalPassFailure();
-      }
     }
 
     funcOp->setAttr(
@@ -669,10 +661,12 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Add IREE HAL interface op conversions.
   patterns.add<
       HALInterfaceLoadConstantConverter,
-      HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
-      HALInterfaceWorkgroupIdAndCountConverter<
-          IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupIDOp,
+                                        spirv::BuiltIn::WorkgroupId>,
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupSizeOp,
+                                        spirv::BuiltIn::WorkgroupSize>,
+      HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupCountOp,
+                                        spirv::BuiltIn::NumWorkgroups>>(
       typeConverter, context);
 
   // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops

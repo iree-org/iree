@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
@@ -30,6 +29,9 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVFINALVECTORLOWERINGPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 
 void debugPrint(mlir::FunctionOpInterface funcOp, const char *message) {
@@ -40,8 +42,9 @@ void debugPrint(mlir::FunctionOpInterface funcOp, const char *message) {
   });
 }
 
-class SPIRVFinalVectorLoweringPass
-    : public SPIRVFinalVectorLoweringBase<SPIRVFinalVectorLoweringPass> {
+class SPIRVFinalVectorLoweringPass final
+    : public impl::SPIRVFinalVectorLoweringPassBase<
+          SPIRVFinalVectorLoweringPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
@@ -107,10 +110,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVFinalVectorLoweringPass() {
-  return std::make_unique<SPIRVFinalVectorLoweringPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -1100,10 +1100,6 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
-
-  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    return success();
-  }
 };
 
 DiagnosedSilenceableFailure

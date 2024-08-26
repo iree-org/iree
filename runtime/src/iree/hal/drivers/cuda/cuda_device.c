@@ -23,14 +23,14 @@
 #include "iree/hal/drivers/cuda/nccl_channel.h"
 #include "iree/hal/drivers/cuda/nccl_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/nop_executable_cache.h"
-#include "iree/hal/drivers/cuda/pending_queue_actions.h"
 #include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 #include "iree/hal/drivers/cuda/timepoint_pool.h"
-#include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/deferred_work_queue.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
+#include "iree/hal/utils/stream_tracing.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_device_t
@@ -61,10 +61,8 @@ typedef struct iree_hal_cuda_device_t {
   // TODO: Support multiple device streams.
   // The CUstream used to issue device kernels and allocations.
   CUstream dispatch_cu_stream;
-  // The CUstream used to issue host callback functions.
-  CUstream callback_cu_stream;
 
-  iree_hal_cuda_tracing_context_t* tracing_context;
+  iree_hal_stream_tracing_context_t* tracing_context;
 
   iree_allocator_t host_allocator;
 
@@ -78,7 +76,7 @@ typedef struct iree_hal_cuda_device_t {
   // are met. It buffers submissions and allocations internally before they
   // are ready. This queue couples with HAL semaphores backed by iree_event_t
   // and CUevent objects.
-  iree_hal_cuda_pending_queue_actions_t* pending_queue_actions;
+  iree_hal_deferred_work_queue_t* work_queue;
 
   // Device memory pools and allocators.
   bool supports_memory_pools;
@@ -90,6 +88,278 @@ typedef struct iree_hal_cuda_device_t {
 } iree_hal_cuda_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable;
+static const iree_hal_deferred_work_queue_device_interface_vtable_t
+    iree_hal_cuda_deferred_work_queue_device_interface_vtable;
+
+// We put a CUEvent into a iree_hal_deferred_work_queue_native_event_t.
+static_assert(sizeof(CUevent) <=
+                  sizeof(iree_hal_deferred_work_queue_native_event_t),
+              "Unexpected event size");
+typedef struct iree_hal_cuda_deferred_work_queue_device_interface_t {
+  iree_hal_deferred_work_queue_device_interface_t base;
+  iree_hal_device_t* device;
+  CUdevice cu_device;
+  CUcontext cu_context;
+  CUstream dispatch_cu_stream;
+  iree_allocator_t host_allocator;
+  const iree_hal_cuda_dynamic_symbols_t* cuda_symbols;
+} iree_hal_cuda_deferred_work_queue_device_interface_t;
+
+static void iree_hal_cuda_deferred_work_queue_device_interface_destroy(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  iree_allocator_free(device_interface->host_allocator, device_interface);
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_bind_to_thread(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuCtxSetCurrent(device_interface->cu_context),
+                                 "cuCtxSetCurrent");
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_wait_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuStreamWaitEvent(device_interface->dispatch_cu_stream, (CUevent)event,
+                        CU_EVENT_WAIT_DEFAULT),
+      "cuStreamWaitEvent");
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_create_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuEventCreate((CUevent*)out_event, CU_EVENT_WAIT_DEFAULT),
+      "cuEventCreate");
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_record_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuEventRecord((CUevent)event, device_interface->dispatch_cu_stream),
+      "cuEventCreate");
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_synchronize_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventSynchronize((CUevent)event));
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_destroy_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_native_event_t event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventDestroy((CUevent)event));
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_native_event_t* out_event) {
+  return iree_hal_cuda_event_semaphore_acquire_timepoint_device_signal(
+      semaphore, value, (CUevent*)out_event);
+}
+
+static bool
+iree_hal_cuda_deferred_work_queue_device_interface_acquire_host_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    struct iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_deferred_work_queue_host_device_event_t* out_event) {
+  return iree_hal_cuda_semaphore_acquire_event_host_wait(
+      semaphore, value, (iree_hal_cuda_event_t**)out_event);
+}
+
+static void
+iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
+  iree_hal_cuda_event_release(wait_event);
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_device_wait_on_host_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t wait_event) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuStreamWaitEvent(
+          device_interface->dispatch_cu_stream,
+          iree_hal_cuda_event_handle((iree_hal_cuda_event_t*)wait_event), 0),
+      "cuStreamWaitEvent");
+}
+
+static void*
+iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_deferred_work_queue_host_device_event_t event) {
+  return iree_hal_cuda_event_handle((iree_hal_cuda_event_t*)event);
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t categories,
+    iree_hal_command_buffer_t** out) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  return iree_hal_cuda_device_create_stream_command_buffer(
+      device_interface->device, mode, categories, 0, out);
+}
+
+static iree_status_t
+iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer(
+    iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
+    iree_hal_command_buffer_t* command_buffer) {
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
+      (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
+  iree_status_t status = iree_ok_status();
+  if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+    // Stream command buffer so nothing to do but notify it was submitted.
+    iree_hal_cuda_stream_notify_submitted_commands(command_buffer);
+  } else {
+    CUgraphExec exec =
+        iree_hal_cuda_graph_command_buffer_handle(command_buffer);
+    status = IREE_CURESULT_TO_STATUS(
+        device_interface->cuda_symbols,
+        cuGraphLaunch(exec, device_interface->dispatch_cu_stream));
+    if (IREE_LIKELY(iree_status_is_ok(status))) {
+      iree_hal_cuda_graph_tracing_notify_submitted_commands(command_buffer);
+    }
+  }
+  return status;
+}
+
+typedef struct iree_hal_cuda_tracing_device_interface_t {
+  iree_hal_stream_tracing_device_interface_t base;
+  CUdevice cu_device;
+  CUcontext cu_context;
+  CUstream dispatch_cu_stream;
+  iree_allocator_t host_allocator;
+  const iree_hal_cuda_dynamic_symbols_t* cuda_symbols;
+} iree_hal_cuda_tracing_device_interface_t;
+static const iree_hal_stream_tracing_device_interface_vtable_t
+    iree_hal_cuda_tracing_device_interface_vtable_t;
+
+void iree_hal_cuda_tracing_device_interface_destroy(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  iree_allocator_free(device_interface->host_allocator, device_interface);
+}
+
+iree_status_t iree_hal_cuda_tracing_device_interface_synchronize_native_event(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_event_t base_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventSynchronize((CUevent)base_event));
+}
+
+iree_status_t iree_hal_cuda_tracing_device_interface_create_native_event(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_event_t* base_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuEventCreate((CUevent*)base_event, CU_EVENT_DEFAULT));
+}
+
+iree_status_t iree_hal_cuda_tracing_device_interface_query_native_event(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_event_t base_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_CURESULT_TO_STATUS(device_interface->cuda_symbols,
+                                 cuEventQuery((CUevent)base_event));
+}
+
+void iree_hal_cuda_tracing_device_interface_event_elapsed_time(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    float* relative_millis, iree_hal_stream_tracing_native_event_t start_event,
+    iree_hal_stream_tracing_native_event_t end_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  IREE_CUDA_IGNORE_ERROR(
+      device_interface->cuda_symbols,
+      cuEventElapsedTime(relative_millis, (CUevent)start_event,
+                         (CUevent)end_event));
+}
+
+void iree_hal_cuda_tracing_device_interface_destroy_native_event(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_event_t base_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  IREE_CUDA_IGNORE_ERROR(device_interface->cuda_symbols,
+                         cuEventDestroy((CUevent)base_event));
+}
+
+iree_status_t iree_hal_cuda_tracing_device_interface_record_native_event(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_event_t base_event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuEventRecord((CUevent)base_event, device_interface->dispatch_cu_stream));
+}
+
+iree_status_t
+iree_hal_cuda_tracing_device_interface_add_graph_event_record_node(
+    iree_hal_stream_tracing_device_interface_t* base_device_interface,
+    iree_hal_stream_tracing_native_graph_node_t* out_node,
+    iree_hal_stream_tracing_native_graph_t graph,
+    iree_hal_stream_tracing_native_graph_node_t* dependency_nodes,
+    size_t dependency_nodes_count,
+    iree_hal_stream_tracing_native_event_t event) {
+  iree_hal_cuda_tracing_device_interface_t* device_interface =
+      (iree_hal_cuda_tracing_device_interface_t*)base_device_interface;
+
+  return IREE_CURESULT_TO_STATUS(
+      device_interface->cuda_symbols,
+      cuGraphAddEventRecordNode((CUgraphNode*)out_node, (CUgraph)graph,
+                                (CUgraphNode*)dependency_nodes,
+                                dependency_nodes_count, (CUevent)event));
+}
 
 static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
     iree_hal_device_t* base_value) {
@@ -109,7 +379,7 @@ IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
   out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
   out_params->command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
-  out_params->stream_tracing = false;
+  out_params->stream_tracing = 0;
   out_params->async_allocations = true;
 }
 
@@ -129,7 +399,7 @@ static iree_status_t iree_hal_cuda_device_check_params(
 static iree_status_t iree_hal_cuda_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* params, CUdevice cu_device,
-    CUstream dispatch_stream, CUstream callback_stream, CUcontext context,
+    CUstream dispatch_stream, CUcontext context,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
@@ -152,18 +422,62 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->cu_context = context;
   device->cu_device = cu_device;
   device->dispatch_cu_stream = dispatch_stream;
-  device->callback_cu_stream = callback_stream;
   device->host_allocator = host_allocator;
 
-  iree_status_t status = iree_hal_cuda_pending_queue_actions_create(
-      cuda_symbols, &device->block_pool, host_allocator,
-      &device->pending_queue_actions);
+  iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface;
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator,
+      sizeof(iree_hal_cuda_deferred_work_queue_device_interface_t),
+      (void**)&device_interface);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_hal_device_release((iree_hal_device_t*)device);
+    return status;
+  }
+  device_interface->base.vtable =
+      &iree_hal_cuda_deferred_work_queue_device_interface_vtable;
+  device_interface->cu_context = context;
+  device_interface->cuda_symbols = cuda_symbols;
+  device_interface->cu_device = cu_device;
+  device_interface->device = (iree_hal_device_t*)device;
+  device_interface->dispatch_cu_stream = dispatch_stream;
+  device_interface->host_allocator = host_allocator;
+
+  status = iree_hal_deferred_work_queue_create(
+      (iree_hal_deferred_work_queue_device_interface_t*)device_interface,
+      &device->block_pool, host_allocator, &device->work_queue);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
-    status = iree_hal_cuda_tracing_context_allocate(
-        device->cuda_symbols, device->identifier, dispatch_stream,
-        &device->block_pool, host_allocator, &device->tracing_context);
+    if (device->params.stream_tracing >= IREE_HAL_TRACING_VERBOSITY_MAX ||
+        device->params.stream_tracing < IREE_HAL_TRACING_VERBOSITY_OFF) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "invalid stream_tracing argument: expected to be between %d and %d",
+          IREE_HAL_TRACING_VERBOSITY_OFF, IREE_HAL_TRACING_VERBOSITY_MAX);
+    }
+
+    iree_hal_cuda_tracing_device_interface_t* tracing_device_interface = NULL;
+    status = iree_allocator_malloc(
+        host_allocator, sizeof(iree_hal_cuda_tracing_device_interface_t),
+        (void**)&tracing_device_interface);
+
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      iree_hal_device_release((iree_hal_device_t*)device);
+      return status;
+    }
+
+    tracing_device_interface->base.vtable =
+        &iree_hal_cuda_tracing_device_interface_vtable_t;
+    tracing_device_interface->cu_context = context;
+    tracing_device_interface->cu_device = cu_device;
+    tracing_device_interface->dispatch_cu_stream = dispatch_stream;
+    tracing_device_interface->host_allocator = host_allocator;
+    tracing_device_interface->cuda_symbols = cuda_symbols;
+
+    status = iree_hal_stream_tracing_context_allocate(
+        (iree_hal_stream_tracing_device_interface_t*)tracing_device_interface,
+        device->identifier, device->params.stream_tracing, &device->block_pool,
+        host_allocator, &device->tracing_context);
   }
 
   // Memory pool support is conditional.
@@ -230,20 +544,13 @@ iree_status_t iree_hal_cuda_device_create(
     status = IREE_CURESULT_TO_STATUS(
         cuda_symbols, cuStreamCreate(&dispatch_stream, CU_STREAM_NON_BLOCKING));
   }
-  // Create the default callback stream for the device.
-  CUstream callback_stream = NULL;
-  if (iree_status_is_ok(status)) {
-    status = IREE_CURESULT_TO_STATUS(
-        cuda_symbols, cuStreamCreate(&callback_stream, CU_STREAM_NON_BLOCKING));
-  }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_device_create_internal(
-        driver, identifier, params, device, dispatch_stream, callback_stream,
-        context, cuda_symbols, nccl_symbols, host_allocator, out_device);
+        driver, identifier, params, device, dispatch_stream, context,
+        cuda_symbols, nccl_symbols, host_allocator, out_device);
   } else {
     // Release resources we have accquired thus far.
-    if (callback_stream) cuda_symbols->cuStreamDestroy(callback_stream);
     if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
     if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
   }
@@ -307,8 +614,7 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Destroy the pending workload queue.
-  iree_hal_cuda_pending_queue_actions_destroy(
-      (iree_hal_resource_t*)device->pending_queue_actions);
+  iree_hal_deferred_work_queue_destroy(device->work_queue);
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
@@ -319,7 +625,7 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   // Destroy memory pools that hold on to reserved memory.
   iree_hal_cuda_memory_pools_deinitialize(&device->memory_pools);
 
-  iree_hal_cuda_tracing_context_free(device->tracing_context);
+  iree_hal_stream_tracing_context_free(device->tracing_context);
 
   // Destroy various pools for synchronization.
   if (device->timepoint_pool) {
@@ -331,7 +637,6 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->dispatch_cu_stream));
-  IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->callback_cu_stream));
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuDevicePrimaryCtxRelease(device->cu_device));
 
@@ -584,7 +889,8 @@ static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
 }
 
 static iree_status_t iree_hal_cuda_device_create_event(
-    iree_hal_device_t* base_device, iree_hal_event_t** out_event) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "event not yet implmeneted");
 }
@@ -626,11 +932,11 @@ static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_event_semaphore_create(
       initial_value, device->cuda_symbols, device->timepoint_pool,
-      device->pending_queue_actions, device->host_allocator, out_semaphore);
+      device->work_queue, device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -761,8 +1067,8 @@ static iree_status_t iree_hal_cuda_device_queue_write(
 }
 
 static void iree_hal_cuda_device_collect_tracing_context(void* user_data) {
-  iree_hal_cuda_tracing_context_collect(
-      (iree_hal_cuda_tracing_context_t*)user_data);
+  iree_hal_stream_tracing_context_collect(
+      (iree_hal_stream_tracing_context_t*)user_data);
 }
 
 static iree_status_t iree_hal_cuda_device_queue_execute(
@@ -775,16 +1081,13 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_hal_cuda_pending_queue_actions_enqueue_execution(
-      base_device, device->dispatch_cu_stream, device->callback_cu_stream,
-      device->pending_queue_actions,
-      iree_hal_cuda_device_collect_tracing_context, device->tracing_context,
-      wait_semaphore_list, signal_semaphore_list, command_buffer_count,
-      command_buffers, binding_tables);
+  iree_status_t status = iree_hal_deferred_work_queue_enqueue(
+      device->work_queue, iree_hal_cuda_device_collect_tracing_context,
+      device->tracing_context, wait_semaphore_list, signal_semaphore_list,
+      command_buffer_count, command_buffers, binding_tables);
   if (iree_status_is_ok(status)) {
-    // Try to advance the pending workload queue.
-    status = iree_hal_cuda_pending_queue_actions_issue(
-        device->pending_queue_actions);
+    // Try to advance the deferred work queue.
+    status = iree_hal_deferred_work_queue_issue(device->work_queue);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -795,9 +1098,8 @@ static iree_status_t iree_hal_cuda_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
-  // Try to advance the pending workload queue.
-  iree_status_t status =
-      iree_hal_cuda_pending_queue_actions_issue(device->pending_queue_actions);
+  // Try to advance the deferred work queue.
+  iree_status_t status = iree_hal_deferred_work_queue_issue(device->work_queue);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -860,4 +1162,54 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .profiling_begin = iree_hal_cuda_device_profiling_begin,
     .profiling_flush = iree_hal_cuda_device_profiling_flush,
     .profiling_end = iree_hal_cuda_device_profiling_end,
+};
+
+static const iree_hal_deferred_work_queue_device_interface_vtable_t
+    iree_hal_cuda_deferred_work_queue_device_interface_vtable = {
+        .destroy = iree_hal_cuda_deferred_work_queue_device_interface_destroy,
+        .bind_to_thread =
+            iree_hal_cuda_deferred_work_queue_device_interface_bind_to_thread,
+        .wait_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_wait_native_event,
+        .create_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_create_native_event,
+        .record_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_record_native_event,
+        .synchronize_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_synchronize_native_event,
+        .destroy_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_destroy_native_event,
+        .semaphore_acquire_timepoint_device_signal_native_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_semaphore_acquire_timepoint_device_signal_native_event,
+        .acquire_host_wait_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_acquire_host_wait_event,
+        .device_wait_on_host_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_device_wait_on_host_event,
+        .release_wait_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_release_wait_event,
+        .native_event_from_wait_event =
+            iree_hal_cuda_deferred_work_queue_device_interface_native_event_from_wait_event,
+        .create_stream_command_buffer =
+            iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer,
+        .submit_command_buffer =
+            iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer,
+};
+
+static const iree_hal_stream_tracing_device_interface_vtable_t
+    iree_hal_cuda_tracing_device_interface_vtable_t = {
+        .destroy = iree_hal_cuda_tracing_device_interface_destroy,
+        .synchronize_native_event =
+            iree_hal_cuda_tracing_device_interface_synchronize_native_event,
+        .create_native_event =
+            iree_hal_cuda_tracing_device_interface_create_native_event,
+        .query_native_event =
+            iree_hal_cuda_tracing_device_interface_query_native_event,
+        .event_elapsed_time =
+            iree_hal_cuda_tracing_device_interface_event_elapsed_time,
+        .destroy_native_event =
+            iree_hal_cuda_tracing_device_interface_destroy_native_event,
+        .record_native_event =
+            iree_hal_cuda_tracing_device_interface_record_native_event,
+        .add_graph_event_record_node =
+            iree_hal_cuda_tracing_device_interface_add_graph_event_record_node,
 };

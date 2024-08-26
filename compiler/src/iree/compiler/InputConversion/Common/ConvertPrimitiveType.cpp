@@ -9,7 +9,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
 #include "llvm/ADT/APFloat.h"
@@ -29,6 +28,14 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::InputConversion {
+
+#define GEN_PASS_DEF_DEMOTEF32TOF16PASS
+#define GEN_PASS_DEF_DEMOTEF64TOF32PASS
+#define GEN_PASS_DEF_DEMOTEI64TOI32PASS
+#define GEN_PASS_DEF_PROMOTEBF16TOF32PASS
+#define GEN_PASS_DEF_PROMOTEF16TOF32PASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+
 namespace {
 
 Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
@@ -295,14 +302,10 @@ struct DemoteI64ToI32Converter
     return IntegerType::get(type.getContext(), 32, type.getSignedness());
   }
 };
-struct DemoteI64ToI32Pass
-    : public ConvertTypesPass<DemoteI64ToI32Base<DemoteI64ToI32Pass>,
+class DemoteI64ToI32Pass final
+    : public ConvertTypesPass<impl::DemoteI64ToI32PassBase<DemoteI64ToI32Pass>,
                               DemoteI64ToI32Converter> {};
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass() {
-  return std::make_unique<DemoteI64ToI32Pass>();
-}
 
 namespace {
 struct DemoteF32ToF16Converter
@@ -311,14 +314,10 @@ struct DemoteF32ToF16Converter
     return Float16Type::get(type.getContext());
   }
 };
-struct DemoteF32ToF16Pass
-    : public ConvertTypesPass<DemoteF32ToF16Base<DemoteF32ToF16Pass>,
+class DemoteF32ToF16Pass final
+    : public ConvertTypesPass<impl::DemoteF32ToF16PassBase<DemoteF32ToF16Pass>,
                               DemoteF32ToF16Converter> {};
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass() {
-  return std::make_unique<DemoteF32ToF16Pass>();
-}
 
 namespace {
 struct PromoteF16ToF32Converter
@@ -327,14 +326,11 @@ struct PromoteF16ToF32Converter
     return Float32Type::get(type.getContext());
   }
 };
-struct PromoteF16ToF32Pass
-    : public ConvertTypesPass<PromoteF16ToF32Base<PromoteF16ToF32Pass>,
-                              PromoteF16ToF32Converter> {};
+class PromoteF16ToF32Pass final
+    : public ConvertTypesPass<
+          impl::PromoteF16ToF32PassBase<PromoteF16ToF32Pass>,
+          PromoteF16ToF32Converter> {};
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
-  return std::make_unique<PromoteF16ToF32Pass>();
-}
 
 namespace {
 struct PromoteBF16ToF32Converter
@@ -343,14 +339,11 @@ struct PromoteBF16ToF32Converter
     return Float32Type::get(type.getContext());
   }
 };
-struct PromoteBF16ToF32Pass
-    : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
-                              PromoteBF16ToF32Converter> {};
+class PromoteBF16ToF32Pass final
+    : public ConvertTypesPass<
+          impl::PromoteBF16ToF32PassBase<PromoteBF16ToF32Pass>,
+          PromoteBF16ToF32Converter> {};
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
-  return std::make_unique<PromoteBF16ToF32Pass>();
-}
 
 namespace {
 struct DemoteF64ToF32Converter
@@ -359,13 +352,8 @@ struct DemoteF64ToF32Converter
     return Float32Type::get(type.getContext());
   }
 };
-struct DemoteF64ToF32Pass
-    : public ConvertTypesPass<DemoteF64ToF32Base<DemoteF64ToF32Pass>,
+class DemoteF64ToF32Pass final
+    : public ConvertTypesPass<impl::DemoteF64ToF32PassBase<DemoteF64ToF32Pass>,
                               DemoteF64ToF32Converter> {};
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
-  return std::make_unique<DemoteF64ToF32Pass>();
-}
-
 } // namespace mlir::iree_compiler::InputConversion

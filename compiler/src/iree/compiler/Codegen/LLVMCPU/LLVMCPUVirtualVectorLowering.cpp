@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmNeon/Transforms.h"
@@ -17,18 +16,17 @@
 #define DEBUG_TYPE "iree-llvmcpu-virtual-vector-lowering"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUVIRTUALVECTORLOWERINGPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 class LLVMCPUVirtualVectorLoweringPass
-    : public LLVMCPUVirtualVectorLoweringBase<
+    : public impl::LLVMCPUVirtualVectorLoweringPassBase<
           LLVMCPUVirtualVectorLoweringPass> {
 public:
-  using LLVMCPUVirtualVectorLoweringBase::LLVMCPUVirtualVectorLoweringBase;
-  LLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
-                                   bool enableArmI8mm) {
-    this->splitVectorTransfersTo = splitVectorTransfersTo;
-    this->enableArmI8mm = enableArmI8mm;
-  }
-
+  using impl::LLVMCPUVirtualVectorLoweringPassBase<
+      LLVMCPUVirtualVectorLoweringPass>::LLVMCPUVirtualVectorLoweringPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, vector::VectorDialect,
                     arm_neon::ArmNeonDialect>();
@@ -88,12 +86,4 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   }
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
-                                       bool enableArmI8mm) {
-  return std::make_unique<LLVMCPUVirtualVectorLoweringPass>(
-      splitVectorTransfersTo, enableArmI8mm);
-}
-
 } // namespace mlir::iree_compiler

@@ -23,6 +23,8 @@ iree_lit_test_suite(
     "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
     "config_winograd.mlir"
+    "configure_tensor_layout.mlir"
+    "configure_vector_layout.mlir"
     "conv_pipeline_test_cuda.mlir"
     "conv_pipeline_test_rocm.mlir"
     "convert_to_nvvm.mlir"
@@ -35,7 +37,6 @@ iree_lit_test_suite(
     "gpu_pipeline_generalize_named_ops.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
-    "layout_analysis_and_distribution.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
     "llvmgpu_bufferize.mlir"
@@ -69,12 +70,9 @@ iree_lit_test_suite(
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
     "ukernel_pipeline_transform.mlir"
-    "vector_distribute_conversion.mlir"
-    "vector_distribute_layout.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
-    "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck
     iree-opt

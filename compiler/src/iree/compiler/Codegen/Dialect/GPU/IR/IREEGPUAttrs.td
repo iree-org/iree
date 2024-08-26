@@ -131,6 +131,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getSubgroupSize",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
+    "materializeOperandConcreteShape",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
@@ -171,6 +172,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
 //===----------------------------------------------------------------------===//
 // MMA intrinsic
+//===----------------------------------------------------------------------===//
 
 class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
@@ -185,12 +187,8 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   let description = !strconcat(baseDescription, [{
     This mma variant describes configurations for MMA ops. The |intrinsic|
     field specifies which particular MMA intrinsic this refers to, with each
-    intrinsic implicating a specific MNK shape and operand types. The intrinsic
-    enum name describes these fields as
-
-    <InputType>_MxNxK_<CType>
-
-    Where the element type for the `A` and `B` matrices are both `InputType`.
+    intrinsic implicating a specific MNK shape and operand types.
+    See IREEGPUEnums.td for the definition of the intrinsics.
   }]);
 
   let hasCustomAssemblyFormat = 1;
@@ -229,6 +227,7 @@ def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
 
 //===----------------------------------------------------------------------===//
 // MMA schedule
+//===----------------------------------------------------------------------===//
 
 def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   let mnemonic = "mma_schedule";
@@ -252,12 +251,13 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
     ::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface>>
-      getContractionLayout(::mlir::vector::ContractionOp contractOp) const;
+      getContractionLayout(::mlir::linalg::LinalgOp contractOp) const;
   }];
 }
 
 //===----------------------------------------------------------------------===//
 // Workgroup processor level description
+//===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
   let summary = "Workgroup processor level target description";
@@ -289,6 +289,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "uint32_t":$max_thread_count_per_workgroup,
     // The maximal number of shared memory bytes we can allocate per workgroup.
     "uint32_t":$max_workgroup_memory_bytes,
+    // Tthe maximum number of workgroups per X/Y/Z dimension in a dispatch.
+    "DenseI32ArrayAttr":$max_workgroup_counts,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
@@ -371,17 +373,14 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
       return *llvm::max_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
     // Returns the preferred subgroup size. If the target supports multiple
-    // subgroup sizes, pickLargest controls whether to return the largest one.
+    // subgroup sizes, pick the smallest one.
     //
     // AMD RDNA GPUs supports multiple subgroup sizes and the preferred one
     // differ given the API--HIP prefers 32 while Vulkan prefers 64.
-    // TODO: We should be able to force Vulkan side to use 32 consistently
-    // too with subgroup size control; it might have perf implications though.
-    int getPreferredSubgroupSize(bool pickLargest=false) const {
-      if (pickLargest) {
-        return getMaxSubgroupSize();
-      }
-      return getMinSubgroupSize();
+    // We force Vulkan side to use 32 to be consistent with the HIP backend;
+    // might have implications on perf.
+    int getPreferredSubgroupSize() const {
+      return *llvm::min_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
 
     // Hardware feature related APIs

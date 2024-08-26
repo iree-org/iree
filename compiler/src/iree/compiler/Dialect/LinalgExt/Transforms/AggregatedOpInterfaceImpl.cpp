@@ -28,9 +28,10 @@ static llvm::cl::opt<float> clAttentionSoftmaxMax(
     llvm::cl::desc("maximum expected value from attention softmax"),
     llvm::cl::init(1.0));
 
-static Value scaleValueInPlace(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap scaleMap,
-                               Value value, Value scale) {
+template <typename T>
+static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
+                                     AffineMap inputMap, AffineMap scaleMap,
+                                     Value value, Value scale) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
   inputMap = compressedMaps[0];
@@ -46,7 +47,7 @@ static Value scaleValueInPlace(OpBuilder &builder, Location loc,
         // Convert scale to the same datatype as input.
         Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                            /*isUnsignedCast=*/false);
-        Value result = b.create<arith::MulFOp>(loc, scale, args[1]);
+        Value result = b.create<T>(loc, scale, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
   return genericOp.getResult(0);
@@ -94,15 +95,15 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
             APFloat::getLargest(dstTy.getFloatSemantics(), /*Negative=*/false)
                 .convertToDouble();
 
-        // Truncate to the `fp8` range so avoid nan values.
+        // Clamp input to dstTy(usually `fp8`) MAX value to prevent NaNs.
+        // We do not clamp for `-MAX` because this function meant to only be
+        // used by attention's exp2 who's value is always > 0.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value gt = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
-                                           args[0], mx);
-        Value sel0 = b.create<arith::SelectOp>(loc, gt, mx, args[0]);
+        Value clamped = b.create<arith::MinimumFOp>(loc, mx, args[0]);
 
         // Convert scale to the same datatype as input.
-        Value trunc = convertScalarToDtype(b, loc, sel0, dstTy,
+        Value trunc = convertScalarToDtype(b, loc, clamped, dstTy,
                                            /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, trunc);
       });
@@ -276,7 +277,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap qMap = getQueryMap();
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
+    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
+                                                   query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -293,18 +295,31 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // SMap = QMap @ KMap
   Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
   Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
-
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
 
-  // For low bit-depth types we perform post Q @ K scaling. This is to avoid
-  // losing numerical precision due to the low dynamic range of fp8 types when
-  // pre applying the sclaing.
   if (qETy.getIntOrFloatBitWidth() <= 8) {
+    // For low bit-depth types we perform post Q @ K scaling. This is to avoid
+    // losing numerical precision due to the low dynamic range of fp8 types when
+    // pre applying the sclaing.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
-    s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
+    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
+                                               scale);
+
+    // If we need to truncate to fp8 post softmax we apply a scaling to use the
+    // full fp8 range. We can do this with a offset as post `exp2` this equates
+    // to multiplying by a static value. We are able to do this as `max` and
+    // `sum` are scaled by the same value so the end result is the same.
+    auto fpTy = cast<FloatType>(qETy);
+    double mx =
+        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+            .convertToDouble();
+    Value offset = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(elementType, clAttentionSoftmaxMax / mx));
+    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
+                                               offset);
   }
 
   // TODO: This decomposition should be in a seperate op called
@@ -322,28 +337,13 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
-  Value normSum = scaleValueInPlace(b, loc, sumMap, normMap, oldSum, norm);
+  Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap,
+                                                         normMap, oldSum, norm);
 
   // P = exp2(S - newMax)
   // PMap = SMap
   AffineMap pMap = sMap;
   Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
-
-  // If we need to truncate to fp8 post softmax we apply a scaling to use the
-  // full fp8 range. We can do this with a offset as post `exp2` this equates
-  // to multiplying by a static value. We are able to do this as `max` and `sum`
-  // are scaled by the same value so the end result is the same.
-  if (isa<FloatType>(qETy) && qETy.getIntOrFloatBitWidth() == 8) {
-    auto fpTy = cast<FloatType>(qETy);
-    double mx =
-        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-            .convertToDouble();
-    Value offset =
-        b.create<arith::ConstantOp>(loc, b.getFloatAttr(elementType, mx));
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    p = scaleValueInPlace(b, loc, pMap, scaleMap, p, offset);
-  }
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
@@ -358,7 +358,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     p = truncateFloat(b, loc, pMap, pMap, p, convertP);
   }
 
-  Value newAcc = scaleValueInPlace(b, loc, accMap, normMap, oldAcc, norm);
+  Value newAcc = elementwiseValueInPlace<arith::MulFOp>(b, loc, accMap, normMap,
+                                                        oldAcc, norm);
 
   // ---- Matmul 2 ----
 

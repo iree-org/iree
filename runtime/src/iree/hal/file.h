@@ -10,8 +10,8 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/io/file_handle.h"
 

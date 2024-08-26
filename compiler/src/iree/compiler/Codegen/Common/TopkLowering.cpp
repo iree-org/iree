@@ -521,9 +521,9 @@ insertElemInOutput(Location loc, OpBuilder b, Value elemToInsertIfNeeded,
 }
 
 /// Vectorize a `topKOp` with (1) static result and input types
-static LogicalResult lowerAsLinalgExtTopkUsingSCF(
+static FailureOr<SmallVector<Value>> lowerAsLinalgExtTopkUsingSCF(
     RewriterBase &rewriter, IREE::LinalgExt::TopkOp topkOp,
-    ArrayRef<int64_t> inputVectorSizes, SmallVectorImpl<Value> &newResults) {
+    ArrayRef<int64_t> inputVectorSizes) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(topkOp);
   Location loc = topkOp.getLoc();
@@ -843,6 +843,7 @@ static LogicalResult lowerAsLinalgExtTopkUsingSCF(
     rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
     rewriter.eraseOp(yieldOp);
   }
+  SmallVector<Value> newResults;
   newResults.push_back(topkOp.outputValues());
   newResults.push_back(topkOp.outputIndices());
   return success();
@@ -876,9 +877,10 @@ void TopkLoweringPass::runOnOperation() {
         VEC_LDBG("Vectorization TopK pre-conditions failed\n");
         return; // falied.
       }
-      SmallVector<Value> results;
-      if (failed(lowerAsLinalgExtTopkUsingSCF(rewriter, topkOp, vectorSizes,
-                                              results))) {
+
+      auto results = lowerAsLinalgExtTopkUsingSCF(rewriter, topkOp,
+                                                  vectorSizes)
+      if (failed(results)) {
         VEC_LDBG("TopK Vectorization failed\n");
         return;
       }

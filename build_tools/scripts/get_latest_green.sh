@@ -20,6 +20,10 @@ set -euo pipefail
 
 commitish="${1:-HEAD}"
 
+# TODO(scotttodd): update from ci.yml to new list
+#   * linux x64 clang
+#   * linux x64 clang asan
+#   * pkgci.yml?
 declare -r REQUIRED_WORKFLOWS=(ci.yml)
 declare -ar QUERY_PARAMS=(
   branch=main

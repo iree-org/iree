@@ -32,6 +32,13 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
+// TODO(#18154): switch default to true and then remove.
+static llvm::cl::opt<bool> clExperimentalExecutableCreate2{
+    "iree-hal-experimental-executable-create2",
+    llvm::cl::desc("Whether to emit iree_hal_executable_create2 ops."),
+    llvm::cl::init(false),
+};
+
 //===----------------------------------------------------------------------===//
 // --iree-hal-materialize-resource-caches
 //===----------------------------------------------------------------------===//
@@ -248,15 +255,6 @@ static Value initializeExecutable(DeviceResources &deviceResources,
     auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
     auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
-    // Gather each of the pipeline layouts needed for each entry point in
-    // the executable.
-    SmallVector<Value> pipelineLayoutValues;
-    for (auto exportOp : variantOp.getExportOps()) {
-      auto &pipelineLayout =
-          deviceResources.pipelineLayouts[exportOp.getLayoutAttr()];
-      pipelineLayoutValues.push_back(pipelineLayout.initializerValue);
-    }
-
     // Inline constant initializer from the variant.
     // We want these to all happen inside of this device switch case; they'll
     // get deduplicated/hoisted if possible in future canonicalization passes.
@@ -270,13 +268,31 @@ static Value initializeExecutable(DeviceResources &deviceResources,
           blockName, blockOp, moduleBuilder, caseBuilder, initializerDevice));
     }
 
-    Value executableValue =
-        caseBuilder.createOrFold<IREE::HAL::ExecutableCreateOp>(
-            loc, executableType, initializerDevice,
-            SymbolRefAttr::get(
-                executable.executableOp.getSymNameAttr(),
-                {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
-            pipelineLayoutValues, constantValues);
+    Value executableValue;
+    if (clExperimentalExecutableCreate2) {
+      executableValue =
+          caseBuilder.createOrFold<IREE::HAL::ExecutableCreate2Op>(
+              loc, executableType, initializerDevice,
+              SymbolRefAttr::get(
+                  executable.executableOp.getSymNameAttr(),
+                  {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
+              constantValues);
+    } else {
+      // Gather each of the pipeline layouts needed for each entry point in
+      // the executable.
+      SmallVector<Value> pipelineLayoutValues;
+      for (auto exportOp : variantOp.getExportOps()) {
+        auto &pipelineLayout =
+            deviceResources.pipelineLayouts[exportOp.getLayoutAttr()];
+        pipelineLayoutValues.push_back(pipelineLayout.initializerValue);
+      }
+
+      executableValue = caseBuilder.createOrFold<IREE::HAL::ExecutableCreateOp>(
+          loc, executableType, initializerDevice,
+          SymbolRefAttr::get(executable.executableOp.getSymNameAttr(),
+                             {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
+          pipelineLayoutValues, constantValues);
+    }
 
     caseBuilder.create<scf::YieldOp>(loc, executableValue);
   }

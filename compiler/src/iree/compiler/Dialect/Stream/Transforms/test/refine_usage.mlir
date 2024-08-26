@@ -85,11 +85,11 @@ util.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource
   // CHECK-SAME:               ^bb2
   cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
-// CHECK: ^bb2(%[[BB2_ARG_FILL0:.+]]: !stream.resource<{{.*}}>, %[[BB2_ARG_SELECT:.+]]: !stream.resource<{{.*}}>)
+// CHECK: ^bb2
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   // CHECK-NOT: stream.async.transfer
   %external_transfer = stream.async.transfer %bb2_1 : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
-  // CHECK: util.return %[[BB2_ARG_FILL0]], %[[BB2_ARG_SELECT]] : !stream.resource<transient>, !stream.resource<external>
+  // CHECK: util.return %[[FILL0]], %[[SELECT]] : !stream.resource<transient>, !stream.resource<external>
   util.return %bb2_0, %external_transfer : !stream.resource<*>, !stream.resource<external>
 }
 

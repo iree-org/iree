@@ -293,20 +293,8 @@ IREE supports building from source with both Bazel and CMake.
 
 ### :octicons-server-16: Continuous integration (CI)
 
-IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. The
-primary CI is configured in the
-[ci.yml workflow file](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml).
-
-#### Self-hosted runners
-
-In addition to the default runners GitHub provides, IREE uses
-[self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)
-to run many of its workflow jobs. These enable access to additional compute and
-custom configurations such as accelerators.
-
-* Configuration for GCP runners is stored at
-[`build_tools/github_actions/runner/`](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/)
-* Configuration for other runners is done manually as needed
+IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. See
+our [GitHub Actions documentation](./github-actions.md) for full details.
 
 #### CI behavior manipulation
 
@@ -329,8 +317,6 @@ ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
 skip-ci: free form reason
-skip-llvm-integrate-benchmark: free form reason
-benchmark-extra: extra,benchmarks,to,run
 runner-env: [testing|prod]
 ```
 
@@ -365,27 +351,9 @@ runner-env: [testing|prod]
     mutually exclusive with both "skip" and "extra".
 
     In all these cases, the setup does not make any effort to ensure that job
-    dependencies are satisfied. Thus, if you request skipping the `build_all`
-    job, all the jobs that depend on it will fail, not be skipped.
-
-??? info - "Using `benchmark-extra`, `skip-llvm-integrate-benchmark`"
-
-    ``` text
-    benchmark-extra: extra,benchmarks,to,run
-    skip-llvm-integrate-benchmark: free form reason
-    ```
-
-    Benchmarks don't run by default on PRs, and must be specifically requested.
-
-    The `benchmark-extra` option allows specifying additional benchmark presets
-    to run as part of benchmarking. It accepts a comma-separated list of
-    benchmark presets. This combines with labels added to the PR (which are a
-    more limited set of options). See the
-    [benchmark suites documentation](../performance/benchmark-suites.md).
-
-    Benchmarks *do* run by default on PRs detected to be an integration of LLVM
-    into IREE, but this behavior can be disabled with
-    `skip-llvm-integrate-benchmark`.
+    dependencies are satisfied. Thus, if you request skipping the
+    `build_packages` job, all the jobs that depend on it will fail, not be
+    skipped.
 
 ??? info - "Using `runner-env`"
 
@@ -403,16 +371,10 @@ runner-env: [testing|prod]
 Copy/paste any of these at the bottom of a PR description to change what the CI
 runs.
 
-* Also run Windows and macOS builds that are normally post-merge only:
+* Also run GPU tests (opt-in due to low availability):
 
     ``` text
-    ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
-    ```
-
-* Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
-
-    ``` text
-    ci-extra: test_nvidia_a100
+    ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:

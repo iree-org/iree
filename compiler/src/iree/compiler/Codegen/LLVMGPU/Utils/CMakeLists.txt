@@ -17,11 +17,9 @@ iree_cc_library(
     "LLVMGPUUtils.h"
   SRCS
     "AMDGPUDistributionPatterns.cpp"
-    "LLVMGPULayoutAnalysisAndDistribution.cpp"
     "LLVMGPUUtils.cpp"
     "PrefetchSharedMemoryCopy.cpp"
   DEPS
-    IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect
@@ -42,6 +40,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils

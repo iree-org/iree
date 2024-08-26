@@ -16,11 +16,14 @@ vm.module @global_ops {
   vm.export @test_global_load_i32
   // CHECK: static iree_status_t global_ops_test_global_load_i32([[ARGS:[^)]*]]) {
   vm.func @test_global_load_i32() -> i32 {
-    // CHECK-NEXT: uint8_t* v5;
-    // CHECK-NEXT: int32_t v6;
-    // CHECK-NEXT: iree_status_t v7;
-    // CHECK-NEXT: v5 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
-    // CHECK-NEXT: v6 = vm_global_load_i32(v5, 0);
+    // CHECK-NEXT: struct global_ops_state_t* v5;
+    // CHECK-NEXT: uint8_t* v6;
+    // CHECK-NEXT: int32_t v7;
+    // CHECK-NEXT: iree_status_t v8;
+    // CHECK-NEXT: ;
+    // CHECK-NEXT: v5 = v3;
+    // CHECK-NEXT: v6 = v5->rwdata;
+    // CHECK-NEXT: v7 = vm_global_load_i32(v6, 0);
     %value = vm.global.load.i32 @c42 : i32
     vm.return %value : i32
   }
@@ -29,17 +32,23 @@ vm.module @global_ops {
   // CHECK: static iree_status_t global_ops_test_global_store_i32([[ARGS:[^)]*]]) {
   vm.func @test_global_store_i32() -> i32 {
     // CHECK-NEXT: int32_t v5;
-// CHECK-NEXT: uint8_t* v6;
+    // CHECK-NEXT: struct global_ops_state_t* v6;
     // CHECK-NEXT: uint8_t* v7;
-    // CHECK-NEXT: int32_t v8;
-    // CHECK-NEXT: iree_status_t v9;
+    // CHECK-NEXT: struct global_ops_state_t* v8;
+    // CHECK-NEXT: uint8_t* v9;
+    // CHECK-NEXT: int32_t v10;
+    // CHECK-NEXT: iree_status_t v11;
     // CHECK-NEXT: v5 = 17;
     %c17 = vm.const.i32 17
-    // CHECK-NEXT: v6 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
-    // CHECK-NEXT: vm_global_store_i32(v6, 4, v5);
+    // CHECK-NEXT: ;
+    // CHECK-NEXT: v6 = v3;
+    // CHECK-NEXT: v7 = v6->rwdata;
+    // CHECK-NEXT: vm_global_store_i32(v7, 4, v5);
     vm.global.store.i32 %c17, @c107_mut : i32
-    // CHECK-NEXT: v7 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
-    // CHECK-NEXT: v8 = vm_global_load_i32(v7, 4);
+    // CHECK-NEXT: ;
+    // CHECK-NEXT: v8 = v3;
+    // CHECK-NEXT: v9 = v8->rwdata;
+    // CHECK-NEXT: v10 = vm_global_load_i32(v9, 4);
     %value = vm.global.load.i32 @c107_mut : i32
     vm.return %value : i32
   }

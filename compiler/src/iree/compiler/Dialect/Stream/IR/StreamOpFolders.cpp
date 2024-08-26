@@ -3143,8 +3143,14 @@ struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
     Block *commonDominator = nullptr;
     for (auto result : op.getResults()) {
       for (auto &use : result.getUses()) {
-        if (allUsers.insert(use.getOwner())) {
-          auto *userBlock = use.getOwner()->getBlock();
+        // Its possible we are nested in an SCF region. If so the SCF operation
+        // depends on the timepoint as a whole.
+        Operation *owner = use.getOwner();
+        while (owner && owner->getParentOp() != op->getParentOp())
+          owner = owner->getParentOp();
+
+        if (allUsers.insert(owner)) {
+          auto *userBlock = owner->getBlock();
           commonDominator = commonDominator
                                 ? domInfo.findNearestCommonDominator(
                                       commonDominator, userBlock)

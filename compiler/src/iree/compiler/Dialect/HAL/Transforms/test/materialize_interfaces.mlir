@@ -13,9 +13,9 @@ util.global private @default_device = #hal.device.target<"cpu", [
 // CHECK-SAME: push_constants = 1
 // CHECK-SAME: sets = [
 // CHECK-SAME:   <0, bindings = [
-// CHECK-SAME:     <0, storage_buffer, ReadOnly>
-// CHECK-SAME:     <1, storage_buffer, ReadOnly>
-// CHECK-SAME:     <2, storage_buffer>
+// CHECK-SAME:     <0, storage_buffer, "ReadOnly|Indirect">
+// CHECK-SAME:     <1, storage_buffer, "ReadOnly|Indirect">
+// CHECK-SAME:     <2, storage_buffer, Indirect>
 
 // CHECK: hal.executable private @ex
 // CHECK:   hal.executable.variant public @arm_64 target(#executable_target_arm_64

@@ -181,20 +181,13 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Math dialect elementry functions -> polynomial form.
       .addPass(createPolynomialApproximationPass)
 
-      .addPass(createPadDynamicAlloc);
+      .addPass(createPadDynamicAllocPass);
 
-  // Check to make sure we are not exceeding shared memory usage limit.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface fn) {
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(fn);
-    return target.getWgp().getMaxWorkgroupMemoryBytes();
-  };
   // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
   funcPassManager
-      .addPass([&]() {
-        return createGPUCheckResourceUsagePass(getSharedMemoryLimit,
-                                               getIndexBitwidth);
-      })
+      .addPass(
+          [&]() { return createGPUCheckResourceUsagePass(getIndexBitwidth); })
 
       // Fold load/store from/to subview ops into the original memref when
       // possible. In SPIR-V we don't use memref descriptor so it's not possible
@@ -208,7 +201,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // Turn scalar load/store from memrefs into vectorized ones if possible.
       // This gives better memory access patterns, which is very important for
       // perf.
-      .addPass(createSPIRVVectorizeLoadStore)
+      .addPass(createSPIRVVectorizeLoadStorePass)
       // Perform optimizations that need to across the scf.for region boundary.
       .addPass(createForOpCanonicalizationPass)
       // Perform various vector-level cross-op optimizations like load-store
@@ -392,8 +385,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
 
   // Tile to GPU workgroups and promote.
-  funcPassManager.addPass(createSPIRVTileAndPromotePass(
-      /*promoteCMatrix=*/true, /*skipThreadLevel=*/true));
+  funcPassManager.addPass(
+      createSPIRVTileAndPromotePass(SPIRVTileAndPromotePassOptions{
+          /*promoteCMatrix=*/true, /*skipThreadLevel=*/true}));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   // Run canonicalization patterns to propagate constant shape sizes after
   // removing trip-one loops.
@@ -450,7 +444,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createSPIRVVectorToGPUSubgroupMMAOpsPass());
+  funcPassManager.addPass(createSPIRVVectorToGPUSubgroupMMAPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   addSPIRVVectorLoweringPasses(funcPassManager);
@@ -600,7 +594,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
 
   // Handle vector reduction operations specifically.
   funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/false, /*pickLargestSubgroupSize=*/true));
+      /*expandSubgroupReduction=*/false));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(funcPassManager);

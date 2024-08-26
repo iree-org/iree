@@ -126,7 +126,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-flow-topk-split-reduction=2"
+    "--iree-dispatch-creation-topk-split-reduction=2"
   LABELS
     "noasan"
     "nomsan"
@@ -146,7 +146,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-flow-topk-split-reduction=3,2"
+    "--iree-dispatch-creation-topk-split-reduction=3,2"
   LABELS
     "noasan"
     "nomsan"

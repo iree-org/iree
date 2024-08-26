@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Pass/Pass.h"
@@ -13,9 +12,15 @@
 
 namespace mlir::iree_compiler {
 
-struct VerifyCompilerTOSAInputLegalityPass
-    : public VerifyCompilerTOSAInputLegalityBase<
+#define GEN_PASS_DEF_VERIFYCOMPILERTOSAINPUTLEGALITYPASS
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc"
+
+namespace {
+
+class VerifyCompilerTOSAInputLegalityPass final
+    : public impl::VerifyCompilerTOSAInputLegalityPassBase<
           VerifyCompilerTOSAInputLegalityPass> {
+public:
   void runOnOperation() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
@@ -63,9 +68,5 @@ struct VerifyCompilerTOSAInputLegalityPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createVerifyCompilerTOSAInputLegality() {
-  return std::make_unique<VerifyCompilerTOSAInputLegalityPass>();
-}
-
+} // namespace
 } // namespace mlir::iree_compiler

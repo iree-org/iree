@@ -26,6 +26,7 @@
 #include "iree/hal/fence.h"             // IWYU pragma: export
 #include "iree/hal/file.h"              // IWYU pragma: export
 #include "iree/hal/pipeline_layout.h"   // IWYU pragma: export
+#include "iree/hal/queue.h"             // IWYU pragma: export
 #include "iree/hal/resource.h"          // IWYU pragma: export
 #include "iree/hal/semaphore.h"         // IWYU pragma: export
 #include "iree/hal/string_util.h"       // IWYU pragma: export

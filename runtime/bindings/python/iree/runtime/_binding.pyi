@@ -4,7 +4,11 @@ from typing import overload
 
 import asyncio
 
-def create_hal_module(instance: VmInstance, device: HalDevice) -> VmModule: ...
+def create_hal_module(
+    instance: VmInstance,
+    device: Optional[HalDevice] = None,
+    devices: Optional[List[HalDevice]] = None,
+) -> VmModule: ...
 def create_io_parameters_module(
     instance: VmInstance, *providers: ParameterProvider
 ) -> VmModule: ...

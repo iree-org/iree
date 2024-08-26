@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -14,9 +13,13 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+#define GEN_PASS_DEF_ERASEUNUSEDLINALGOPERANDSPASS
+#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+
 namespace {
 struct EraseUnusedLinalgOperandsPass
-    : public EraseUnusedLinalgOperandsBase<EraseUnusedLinalgOperandsPass> {
+    : public impl::EraseUnusedLinalgOperandsPassBase<
+          EraseUnusedLinalgOperandsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -28,10 +31,4 @@ struct EraseUnusedLinalgOperandsPass
   }
 };
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createEraseUnusedLinalgOperands() {
-  return std::make_unique<EraseUnusedLinalgOperandsPass>();
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

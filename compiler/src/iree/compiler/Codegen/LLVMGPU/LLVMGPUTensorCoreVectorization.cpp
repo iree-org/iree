@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -25,6 +24,9 @@
 #define DEBUG_TYPE "iree-codegen-gpu-tensorcore-vectorization"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMGPUTENSORCOREVECTORIZATIONPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
@@ -66,11 +68,16 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 }
 
 namespace {
-struct LLVMGPUTensorCoreVectorizationPass
-    : public LLVMGPUTensorCoreVectorizationBase<
+class LLVMGPUTensorCoreVectorizationPass final
+    : public impl::LLVMGPUTensorCoreVectorizationPassBase<
           LLVMGPUTensorCoreVectorizationPass> {
-  LLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType)
+public:
+  using impl::LLVMGPUTensorCoreVectorizationPassBase<
+      LLVMGPUTensorCoreVectorizationPass>::
+      LLVMGPUTensorCoreVectorizationPassBase;
+  explicit LLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -89,6 +96,7 @@ struct LLVMGPUTensorCoreVectorizationPass
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractionPatterns);
       vector::populateVectorReductionToContractPatterns(contractionPatterns);
+      vector::populateSinkVectorOpsPatterns(contractionPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(contractionPatterns)))) {
         return signalPassFailure();

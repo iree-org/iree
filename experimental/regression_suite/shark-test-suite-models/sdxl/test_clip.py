@@ -8,8 +8,10 @@ import pytest
 from ireers_tools import *
 import os
 from conftest import VmfbManager
+from pathlib import Path
 
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 
 ###############################################################################
 # Fixtures
@@ -87,15 +89,15 @@ def SDXL_CLIP_COMMON_RUN_FLAGS(
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
-    f"--iree-rocm-target-chip={rocm_chip}",
+    f"--iree-hip-target={rocm_chip}",
     "--iree-input-type=torch",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
-    "--iree-rocm-waves-per-eu=2",
+    "--iree-hip-waves-per-eu=2",
     "--iree-llvmgpu-enable-prefetch",
-    "--iree-flow-enable-aggressive-fusion",
-    "--iree-global-opt-enable-fuse-horizontal-contractions=true",
+    "--iree-dispatch-creation-enable-aggressive-fusion",
+    "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-opt-aggressively-propagate-transposes=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
@@ -111,7 +113,11 @@ ROCM_COMPILE_FLAGS = [
 
 def test_compile_clip_cpu(sdxl_clip_mlir):
     VmfbManager.sdxl_clip_cpu_vmfb = iree_compile(
-        sdxl_clip_mlir, "cpu", CPU_COMPILE_FLAGS
+        sdxl_clip_mlir,
+        CPU_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_clip_vmfbs")
+        / Path(sdxl_clip_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
@@ -136,7 +142,11 @@ def test_run_clip_cpu(SDXL_CLIP_COMMON_RUN_FLAGS, sdxl_clip_real_weights):
 
 def test_compile_clip_rocm(sdxl_clip_mlir):
     VmfbManager.sdxl_clip_rocm_vmfb = iree_compile(
-        sdxl_clip_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+        sdxl_clip_mlir,
+        ROCM_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sdxl_clip_vmfbs")
+        / Path(sdxl_clip_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
     )
 
 

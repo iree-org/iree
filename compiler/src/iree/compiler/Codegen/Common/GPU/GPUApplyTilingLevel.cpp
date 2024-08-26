@@ -15,6 +15,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
@@ -107,7 +108,7 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
 
       // TODO: Add some helpers to construct this based on the enum type rather
       // than doing it here.
-      SmallVector<DeviceMappingAttrInterface> mapping;
+      SmallVector<Attribute> mapping;
       int idx = 0;
       for (auto size : tileSizes) {
         if (!isConstantIntValue(size, 0)) {
@@ -123,7 +124,7 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
           }
         }
       }
-      tilingOptions.setMapping(mapping);
+      tilingOptions.setMapping(llvm::to_vector(llvm::reverse(mapping)));
     }
 
     scf::SCFTileAndFuseOptions tileAndFuseOptions;

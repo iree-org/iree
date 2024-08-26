@@ -1,0 +1,92 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Workflow for RISCV64 cross-compilation and test jobs.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: PkgCI Test RISCV64
+
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+      write-caches:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+      write-caches:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cross_compile:
+    runs-on: ubuntu-20.04
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      VENV_DIR: ${{ github.workspace }}/.venv
+      BOOTSTRAP_WORK_DIR: ${{ github.workspace }}/.bootstrap
+      RISCV_RV64_LINUX_TOOLCHAIN_ROOT: ${{ github.workspace }}/riscv/toolchain
+      QEMU_PATH_PREFIX: ${{ github.workspace }}/riscv/qemu
+    steps:
+      # General setup.
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@v5.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}
+          save: ${{ inputs.write-caches == 1 }}
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y ninja-build
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: Bootstrap
+        env:
+          IREE_ARTIFACT_URL: "https://storage.googleapis.com/iree-shared-files"
+          RISCV_CLANG_TOOLCHAIN_FILE_NAME: "toolchain_iree_manylinux_2_28_20231012.tar.gz"
+          QEMU_FILE_NAME: "qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
+        run: |
+          mkdir -p ${{ env.BOOTSTRAP_WORK_DIR }}
+          mkdir -p ${{ env.RISCV_RV64_LINUX_TOOLCHAIN_ROOT }}
+          mkdir -p ${{ env.QEMU_PATH_PREFIX }}
+          wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}"
+          tar -C "${{ env.RISCV_RV64_LINUX_TOOLCHAIN_ROOT }}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
+          wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${QEMU_FILE_NAME}"
+          tar -C "${{ env.QEMU_PATH_PREFIX }}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
+      - name: Build riscv64
+        env:
+          IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
+        run: ./build_tools/cmake/build_riscv.sh
+      - name: Test riscv64
+        env:
+          QEMU_RV64_BIN: ${{ env.QEMU_PATH_PREFIX }}/qemu-riscv64
+        run: ./build_tools/cmake/test_riscv.sh

@@ -12,9 +12,9 @@
 #include "iree/hal/drivers/hip/pipeline_layout.h"
 #include "iree/hal/drivers/hip/rccl_channel.h"
 #include "iree/hal/drivers/hip/status_util.h"
-#include "iree/hal/drivers/hip/tracing.h"
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
+#include "iree/hal/utils/stream_tracing.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_hal_command_buffer_t base;
@@ -24,8 +24,8 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols;
 
   // Per-stream HIP tracing context.
-  iree_hal_hip_tracing_context_t* tracing_context;
-  iree_hal_hip_tracing_context_event_list_t tracing_event_list;
+  iree_hal_stream_tracing_context_t* tracing_context;
+  iree_hal_stream_tracing_context_event_list_t tracing_event_list;
 
   hipStream_t hip_stream;
 
@@ -41,9 +41,8 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
 
+  // TODO(#18189): drop state used by legacy bindings mechanism.
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
-
-  // The current bound descriptor sets.
   struct {
     hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
   } descriptor_sets[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_COUNT];
@@ -62,7 +61,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
-    iree_hal_hip_tracing_context_t* tracing_context,
+    iree_hal_stream_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,
@@ -125,8 +124,8 @@ static void iree_hal_hip_stream_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_hip_tracing_free(command_buffer->tracing_context,
-                            &command_buffer->tracing_event_list);
+  iree_hal_stream_tracing_free(command_buffer->tracing_context,
+                               &command_buffer->tracing_event_list);
 
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -150,8 +149,8 @@ void iree_hal_hip_stream_notify_submitted_commands(
     return;
   }
 
-  iree_hal_hip_tracing_notify_submitted(command_buffer->tracing_context,
-                                        &command_buffer->tracing_event_list);
+  iree_hal_stream_tracing_notify_submitted(command_buffer->tracing_context,
+                                           &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
@@ -182,9 +181,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_begin(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_HAL_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream,
+      IREE_HAL_TRACING_VERBOSITY_COARSE,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_stream_command_buffer",
       strlen("iree_hal_hip_stream_command_buffer"),
       /*name=*/NULL, 0);
@@ -213,9 +212,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
       z0, iree_hal_resource_set_allocate(command_buffer->arena.block_pool,
                                          &command_buffer->resource_set));
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+  IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 IREE_HAL_TRACING_VERBOSITY_COARSE);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -229,9 +228,9 @@ static void iree_hal_hip_stream_command_buffer_begin_debug_group(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_HAL_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, location ? location->file.data : NULL,
+      IREE_HAL_TRACING_VERBOSITY_COARSE, location ? location->file.data : NULL,
       location ? location->file.size : 0, location ? location->line : 0,
       /*func_name=*/NULL, 0, label.data, label.size);
 }
@@ -242,9 +241,9 @@ static void iree_hal_hip_stream_command_buffer_end_debug_group(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+  IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 IREE_HAL_TRACING_VERBOSITY_COARSE);
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
@@ -541,9 +540,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       z0, iree_hal_hip_native_executable_entry_point_kernel_info(
               executable, entry_point, &kernel_info));
 
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_HAL_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
-      command_buffer->hip_stream, kernel_info.source_filename.data,
+      IREE_HAL_TRACING_VERBOSITY_FINE, kernel_info.source_filename.data,
       kernel_info.source_filename.size, kernel_info.source_line,
       kernel_info.function_name.data, kernel_info.function_name.size,
       /*name=*/NULL, 0);
@@ -616,9 +615,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
           command_buffer->hip_stream, params_ptr, NULL),
       "hipModuleLaunchKernel");
 
-  IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+  IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
-                                 command_buffer->hip_stream);
+                                 IREE_HAL_TRACING_VERBOSITY_FINE);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -630,6 +629,110 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch_indirect(
     iree_hal_buffer_ref_t workgroups_ref, iree_hal_dispatch_flags_t flags) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "need hip implementation of dispatch indirect");
+}
+
+static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
+
+  // Lookup kernel parameters used for side-channeling additional launch
+  // information from the compiler.
+  iree_hal_hip_kernel_info_t kernel_info;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_native_executable_entry_point_kernel_info(
+              executable, entry_point, &kernel_info));
+
+  IREE_HAL_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      IREE_HAL_TRACING_VERBOSITY_FINE, kernel_info.source_filename.data,
+      kernel_info.source_filename.size, kernel_info.source_line,
+      kernel_info.function_name.data, kernel_info.function_name.size,
+      /*name=*/NULL, 0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                       &executable));
+
+  // We append push constants to the end of descriptors to form a linear chain
+  // of kernel arguments.
+  iree_host_size_t kernel_params_count =
+      kernel_info.binding_count + kernel_info.constant_count;
+  iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
+
+  // TODO: use packed parameters instead of the indirection mechanism - this
+  // would avoid additional driver overhead to reflect and repack them all.
+  //
+  // Each kernel_params[i] is itself a pointer to the corresponding
+  // element at the *second* inline allocation at the end of the current
+  // segment.
+  iree_host_size_t total_size = kernel_params_length * 2;
+  uint8_t* storage_base = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(&command_buffer->arena, total_size,
+                              (void**)&storage_base));
+  void** params_ptr = (void**)storage_base;
+  hipDeviceptr_t* payload_ptr =
+      (hipDeviceptr_t*)((uint8_t*)params_ptr + kernel_params_length);
+  for (size_t i = 0; i < kernel_params_count; i++) {
+    params_ptr[i] = &payload_ptr[i];
+  }
+  for (iree_host_size_t i = 0; i < bindings.count; i++) {
+    const iree_hal_buffer_ref_t* binding = &bindings.values[i];
+    hipDeviceptr_t device_ptr = NULL;
+    if (binding->buffer) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                           &binding->buffer));
+      hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+          iree_hal_buffer_allocated_buffer(binding->buffer));
+      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
+      device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
+    }
+    payload_ptr[i] = device_ptr;
+  }
+
+  // As commented in the above, what each kernel parameter points to is a
+  // hipDeviceptr_t, which as the size of a pointer on the target machine. we
+  // are just storing a 32-bit value for the push constant here instead. So we
+  // must process one element each type, for 64-bit machines.
+  for (iree_host_size_t i = 0; i < kernel_info.constant_count; i++) {
+    *((uint32_t*)params_ptr[kernel_info.binding_count + i]) =
+        ((const uint32_t*)constants.data)[i];
+  }
+
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      command_buffer->hip_symbols,
+      hipModuleLaunchKernel(
+          kernel_info.function, workgroup_count[0], workgroup_count[1],
+          workgroup_count[2], kernel_info.block_size[0],
+          kernel_info.block_size[1], kernel_info.block_size[2],
+          kernel_info.shared_memory_size, command_buffer->hip_stream,
+          params_ptr, NULL),
+      "hipModuleLaunchKernel");
+
+  IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                                 &command_buffer->tracing_event_list,
+                                 IREE_HAL_TRACING_VERBOSITY_FINE);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_hip_stream_command_buffer_dispatch2_indirect(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "indirect dispatch not yet implemented");
 }
 
 static const iree_hal_command_buffer_vtable_t
@@ -656,4 +759,7 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_hip_stream_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_hip_stream_command_buffer_dispatch_indirect,
+        .dispatch2 = iree_hal_hip_stream_command_buffer_dispatch2,
+        .dispatch2_indirect =
+            iree_hal_hip_stream_command_buffer_dispatch2_indirect,
 };

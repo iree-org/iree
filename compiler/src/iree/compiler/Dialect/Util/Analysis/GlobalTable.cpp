@@ -6,10 +6,57 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 
+#include "mlir/Analysis/CallGraph.h"
+
 namespace mlir::iree_compiler::IREE::Util {
 
+// Returns a set of all top-level callable ops that are externally reachable.
+// Callables only reachable from initializers are excluded.
+static DenseSet<Operation *>
+calculateExternallyReachableOps(ModuleOp moduleOp) {
+  DenseSet<Operation *> externallyReachableOps;
+
+  // Expensive; we want to avoid this unless the call graph changes.
+  CallGraph callGraph(moduleOp);
+
+  SetVector<CallGraphNode *> worklist;
+  worklist.insert(callGraph.begin(), callGraph.end());
+  while (!worklist.empty()) {
+    auto *node = worklist.pop_back_val();
+    if (node->isExternal()) {
+      // Skip declarations.
+      continue;
+    }
+    auto *callableOp = node->getCallableRegion()->getParentOp();
+    if (isa<IREE::Util::InitializerOpInterface>(callableOp)) {
+      // Initializers are never externally reachable.
+      continue;
+    }
+    bool isExternallyReachable = externallyReachableOps.contains(callableOp);
+    if (auto funcOp = dyn_cast<FunctionOpInterface>(callableOp)) {
+      // Public functions exported on the module are externally reachable.
+      isExternallyReachable |= funcOp.isPublic();
+    }
+    if (isExternallyReachable) {
+      // Insert into the set of reachable ops and also any outgoing calls.
+      // Queue up the edges in the worklist for further processing.
+      externallyReachableOps.insert(callableOp);
+      for (auto outgoingEdge : *node) {
+        auto *calleeNode = outgoingEdge.getTarget();
+        if (!calleeNode->isExternal()) {
+          externallyReachableOps.insert(
+              calleeNode->getCallableRegion()->getParentOp());
+          worklist.insert(outgoingEdge.getTarget());
+        }
+      }
+    }
+  }
+
+  return externallyReachableOps;
+}
+
 GlobalTable::GlobalTable(mlir::ModuleOp moduleOp) : moduleOp(moduleOp) {
-  rebuild();
+  externallyReachableOps = calculateExternallyReachableOps(moduleOp);
 }
 
 void GlobalTable::rebuild() {
@@ -45,6 +92,18 @@ void GlobalTable::rebuild() {
         }
       }
     }
+  }
+
+  for (auto &[globalName, global] : globalMap) {
+    bool anyNonInitializerStores = false;
+    for (auto storeOp : global.storeOps) {
+      auto callableOp = storeOp->getParentOfType<CallableOpInterface>();
+      if (externallyReachableOps.contains(callableOp)) {
+        anyNonInitializerStores = true;
+        break;
+      }
+    }
+    global.onlyInitialized = !anyNonInitializerStores;
   }
 }
 

@@ -41,12 +41,10 @@ DictionaryAttr getTargetConfigAttr(Operation *op) {
   return targetAttr.getConfiguration();
 }
 
-UnitAttr getIndirectBindingsAttr(Operation *op) {
-  DictionaryAttr config = getTargetConfigAttr(op);
-  if (!config)
-    return nullptr;
-
-  return config.getAs<UnitAttr>("hal.bindings.indirect");
+bool usesIndirectBindingsAttr(Operation *op) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  return targetAttr ? targetAttr.getFormat().getValue().ends_with("-ptr")
+                    : false;
 }
 
 FailureOr<SmallVector<int64_t>>

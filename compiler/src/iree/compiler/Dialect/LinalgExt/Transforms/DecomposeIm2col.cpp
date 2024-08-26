@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,6 +15,10 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+#define GEN_PASS_DEF_DECOMPOSEIM2COLPASS
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
+
 namespace {
 
 /// Pattern to decompose the tiled im2col op.
@@ -37,7 +40,8 @@ struct DecomposeIm2col : public OpRewritePattern<Im2colOp> {
 } // namespace
 
 namespace {
-struct DecomposeIm2colPass : public DecomposeIm2colBase<DecomposeIm2colPass> {
+struct DecomposeIm2colPass final
+    : impl::DecomposeIm2colPassBase<DecomposeIm2colPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
@@ -58,10 +62,4 @@ void DecomposeIm2colPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeIm2colPass() {
-  return std::make_unique<DecomposeIm2colPass>();
-}
-
 } // namespace mlir::iree_compiler::IREE::LinalgExt

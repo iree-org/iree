@@ -9,13 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgExtToLoops :
+def LinalgExtToLoopsPass :
     InterfacePass<"iree-linalg-ext-to-loops", "mlir::FunctionOpInterface"> {
   let summary = "Convert LinalgExt ops to loops and Linalg ops.";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
 
-def PadContractionToBlockSize :
+def PadContractionToBlockSizePass :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";
   let description = [{
@@ -29,7 +28,6 @@ def PadContractionToBlockSize :
     of the dynamic case, applying this pass multiple times can result in
     mutation on each run.
   }];
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createPadContractionToBlockSizePass()";
   let options = [
     Option<"rowAlignment", "rowAlignment", "int", /*default=*/"16",
            "The row-wise output block size">,
@@ -38,7 +36,7 @@ def PadContractionToBlockSize :
   ];
 }
 
-def TopkSplitReduction:
+def TopkSplitReductionPass:
     InterfacePass<"iree-linalg-ext-topk-split-reduction", "mlir::FunctionOpInterface"> {
   let summary = "Topk split reduction pass.";
   let description = [{
@@ -46,40 +44,33 @@ def TopkSplitReduction:
     into two, on containing reducitons in parallel and the other contianing the
     combination of the parallel reductions into a final result.
   }];
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass()";
   let options = [
     ListOption<"splitRatios", "split-ratios", "int",
            "List of split reduction ratios">,
   ];
 }
 
-def DecomposeIm2col :
+def DecomposeIm2colPass :
     InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes im2col ops into insert and extract slice ops";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createDecomposeIm2colPass()";
 }
 
-def DecomposeWinogradTransform :
+def DecomposeWinogradTransformPass :
     InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes winograd transform ops into linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createDecomposeWinogradTransformPass()";
 }
 
-def ConvertConv2DToIm2ColOp :
+def ConvertConv2DToIm2ColOpPass :
     InterfacePass<"iree-linalg-ext-convert-conv2d-to-im2col-op", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to im2col gemm based implementation.";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToIm2ColOpPass()";
 }
 
-def ConvertConv2DToWinograd :
+def ConvertConv2DToWinogradPass :
     InterfacePass<"iree-linalg-ext-convert-conv2d-to-winograd", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to winograd based implementation. By default, "
                 "only convs annotated with a `__winograd_conv` attribute will be rewritten.";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
   let options = [
     Option<"replaceAllConvs", "replace-all-convs", "bool",
            /*default=*/"false",
@@ -88,36 +79,30 @@ def ConvertConv2DToWinograd :
   ];
 }
 
-def TileAttention :
+def TileAttentionPass :
     InterfacePass<"iree-linalg-ext-tile-attention", "mlir::FunctionOpInterface"> {
   let summary =
       "Tile the attention op along the reduction dimension";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createTileAttentionPass()";
   let options = [
     Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
            "Tile size for sequential for loop in attention">,
   ];
 }
 
-def DecomposeAttention :
+def DecomposeAttentionPass :
     InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes attention op into a sequence of linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createDecomposeAttentionPass()";
   let options = [
     Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
            "Tile size for sequential for loop in attention">,
   ];
 }
 
-def ConvertAttentionToOnlineAttention :
+def ConvertAttentionToOnlineAttentionPass :
     InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
     "mlir::FunctionOpInterface"> {
-  let summary = "";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createConvertAttentionToOnlineAttentionPass()";
+  let summary = "Converts attention op to online_attention op";
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

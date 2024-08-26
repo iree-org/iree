@@ -19,7 +19,7 @@ func.func @convert_to_mfma_16x16x16(%lhs: tensor<2x2x16x16xf16>, %rhs: tensor<2x
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %root : (!transform.any_op) -> !transform.any_op
-    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>) : (!transform.any_op) -> !transform.any_op
+    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>) : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -35,7 +35,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
 //  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
 
 // -----
@@ -59,7 +59,7 @@ func.func @convert_to_single_mfma_16x16x16(%lhs: tensor<16x16xf16>, %rhs: tensor
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %root : (!transform.any_op) -> !transform.any_op
-    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>) : (!transform.any_op) -> !transform.any_op
+    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>) : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -73,7 +73,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]],
 //  CHECK-SAME:     iterator_types = [],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x16xf32>
 
 // -----
@@ -97,7 +97,7 @@ func.func @convert_to_mfma_16x16x16_transpose_b(%lhs: tensor<2x16x16xf16>, %rhs:
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["linalg.generic"]} in %root : (!transform.any_op) -> !transform.any_op
-    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>) : (!transform.any_op) -> !transform.any_op
+    %1 = transform.iree.convert_to_multi_mma %0, kind(#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>) : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -112,6 +112,6 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP1]]],
 //  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<reduction>],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 //  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>
 //  CHECK-SAME:     : tensor<2x16x16xf16>, tensor<2x16x16xf16> into tensor<16x16xf32>

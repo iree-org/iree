@@ -59,6 +59,7 @@ public:
     auto moduleOp = getOperation();
 
     GlobalTable globalTable(moduleOp);
+    globalTable.rebuild();
 
     // Build a map of global symbol to a bitvector indicating which globals are
     // stored with the same values in all instances.

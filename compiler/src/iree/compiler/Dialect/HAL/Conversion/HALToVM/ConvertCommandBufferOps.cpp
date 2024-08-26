@@ -425,6 +425,162 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+class CommandBufferDispatch2OpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2Op> {
+public:
+  CommandBufferDispatch2OpConversion(MLIRContext *context,
+                                     SymbolTable &importSymbols,
+                                     TypeConverter &typeConverter,
+                                     StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferDispatch2Op op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+
+    auto i32Type = rewriter.getI32Type();
+    auto i64Type = rewriter.getI64Type();
+    Value zeroI32 = rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc());
+
+    auto flags = adaptor.getFlagsAttr()
+                     ? rewriter
+                           .create<IREE::VM::ConstI64Op>(
+                               op.getLoc(), adaptor.getFlagsAttr().getInt())
+                           .getResult()
+                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
+                           .getResult();
+    SmallVector<Value, 8> callOperands = {
+        adaptor.getCommandBuffer(),
+        adaptor.getExecutable(),
+        castToImportType(adaptor.getEntryPoint(), i32Type, rewriter),
+        castToImportType(adaptor.getWorkgroupX(), i32Type, rewriter),
+        castToImportType(adaptor.getWorkgroupY(), i32Type, rewriter),
+        castToImportType(adaptor.getWorkgroupZ(), i32Type, rewriter),
+        flags,
+    };
+    SmallVector<int16_t, 5> segmentSizes = {
+        /*command_buffer=*/-1,
+        /*executable=*/-1,
+        /*entry_point=*/-1,
+        /*workgroup_x=*/-1,
+        /*workgroup_y=*/-1,
+        /*workgroup_z=*/-1,
+        /*flags=*/-1,
+        /*constants=*/static_cast<int16_t>(adaptor.getConstants().size()),
+        /*bindings=*/
+        static_cast<int16_t>(adaptor.getBindingBuffers().size()),
+    };
+    llvm::append_range(callOperands, adaptor.getConstants());
+    for (auto [bindingBufferOrSlot, bindingOffset, bindingLength] :
+         llvm::zip_equal(adaptor.getBindingBuffers(),
+                         adaptor.getBindingOffsets(),
+                         adaptor.getBindingLengths())) {
+      callOperands.push_back(zeroI32);
+      auto [bindingBufferSlot, bindingBuffer] =
+          splitBufferSlot(op.getLoc(), bindingBufferOrSlot, rewriter);
+      callOperands.push_back(bindingBufferSlot);
+      callOperands.push_back(bindingBuffer);
+      callOperands.push_back(
+          castToImportType(bindingOffset, i64Type, rewriter));
+      callOperands.push_back(
+          castToImportType(bindingLength, i64Type, rewriter));
+    }
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
+        importType.getInputs(), callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
+class CommandBufferDispatch2IndirectOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2IndirectOp> {
+public:
+  CommandBufferDispatch2IndirectOpConversion(MLIRContext *context,
+                                             SymbolTable &importSymbols,
+                                             TypeConverter &typeConverter,
+                                             StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferDispatch2IndirectOp op,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    auto importType = importOp.getFunctionType();
+
+    auto i32Type = rewriter.getI32Type();
+    auto i64Type = rewriter.getI64Type();
+    Value zeroI32 = rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc());
+
+    auto [workgroupsBufferSlot, workgroupsBuffer] =
+        splitBufferSlot(op.getLoc(), adaptor.getWorkgroupsBuffer(), rewriter);
+    auto flags = adaptor.getFlagsAttr()
+                     ? rewriter
+                           .create<IREE::VM::ConstI64Op>(
+                               op.getLoc(), adaptor.getFlagsAttr().getInt())
+                           .getResult()
+                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
+                           .getResult();
+    SmallVector<Value, 8> callOperands = {
+        adaptor.getCommandBuffer(),
+        adaptor.getExecutable(),
+        castToImportType(adaptor.getEntryPoint(), i32Type, rewriter),
+        workgroupsBufferSlot,
+        workgroupsBuffer,
+        castToImportType(adaptor.getWorkgroupsOffset(), i64Type, rewriter),
+        flags,
+    };
+    SmallVector<int16_t, 5> segmentSizes = {
+        /*command_buffer=*/-1,
+        /*executable=*/-1,
+        /*entry_point=*/-1,
+        /*workgroups_buffer_slot=*/-1,
+        /*workgroups_buffer=*/-1,
+        /*workgroups_offset=*/-1,
+        /*flags=*/-1,
+        /*constants=*/static_cast<int16_t>(adaptor.getConstants().size()),
+        /*bindings=*/
+        static_cast<int16_t>(adaptor.getBindingBuffers().size()),
+    };
+    llvm::append_range(callOperands, adaptor.getConstants());
+    for (auto [bindingBufferOrSlot, bindingOffset, bindingLength] :
+         llvm::zip_equal(adaptor.getBindingBuffers(),
+                         adaptor.getBindingOffsets(),
+                         adaptor.getBindingLengths())) {
+      callOperands.push_back(zeroI32);
+      auto [bindingBufferSlot, bindingBuffer] =
+          splitBufferSlot(op.getLoc(), bindingBufferOrSlot, rewriter);
+      callOperands.push_back(bindingBufferSlot);
+      callOperands.push_back(bindingBuffer);
+      callOperands.push_back(
+          castToImportType(bindingOffset, i64Type, rewriter));
+      callOperands.push_back(
+          castToImportType(bindingLength, i64Type, rewriter));
+    }
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
+        importType.getInputs(), callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 } // namespace
 
 void populateHALCommandBufferToVMPatterns(MLIRContext *context,
@@ -468,6 +624,11 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
   patterns.insert<CommandBufferDispatchIndirectOpConversion>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.dispatch.indirect");
+  patterns.insert<CommandBufferDispatch2OpConversion>(
+      context, importSymbols, typeConverter, "hal.command_buffer.dispatch2");
+  patterns.insert<CommandBufferDispatch2IndirectOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal.command_buffer.dispatch2.indirect");
 }
 
 } // namespace mlir::iree_compiler

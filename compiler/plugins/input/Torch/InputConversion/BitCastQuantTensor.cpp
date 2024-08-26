@@ -4,10 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
-
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
@@ -17,7 +16,51 @@
 
 namespace mlir::iree_compiler::TorchInput {
 
+#define GEN_PASS_DEF_BITCASTQUANTTENSORPASS
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
+
 namespace {
+
+class BitCastViewDtype
+    : public OpRewritePattern<torch::Torch::AtenViewDtypeOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(torch::Torch::AtenViewDtypeOp op,
+                                PatternRewriter &rewriter) const override {
+
+    Value in = op.getSelf();
+    auto loc = op.getLoc();
+    auto inType = cast<torch::Torch::ValueTensorType>(in.getType());
+    auto resultType = cast<torch::Torch::ValueTensorType>(op.getType());
+
+    auto bType = inType.toBuiltinTensor();
+
+    if (auto dtype = dyn_cast<IntegerType>(bType.getElementType())) {
+      bType = bType.clone(
+          rewriter.getType<IntegerType>(dtype.getIntOrFloatBitWidth()));
+    }
+
+    // Cast to the builtin tensor type.
+    Value builtinCast =
+        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, bType,
+                                                                   in);
+
+    auto rType = resultType.toBuiltinTensor();
+    if (auto dtype = dyn_cast<IntegerType>(rType.getElementType())) {
+      rType = rType.clone(
+          rewriter.getType<IntegerType>(dtype.getIntOrFloatBitWidth()));
+    }
+
+    Value flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
+        loc, rType, builtinCast, ValueRange(), ValueRange());
+
+    auto torchCast =
+        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
+            loc, resultType, flowBitcast);
+    rewriter.replaceOp(op, torchCast);
+    return success();
+  }
+};
 
 class BitCastQuantizedMatmul
     : public OpRewritePattern<torch::Torch::OperatorOp> {
@@ -105,8 +148,8 @@ public:
 } // namespace
 
 namespace {
-class BitCastQuantTensorPass
-    : public BitCastQuantTensorPassBase<BitCastQuantTensorPass> {
+class BitCastQuantTensorPass final
+    : public impl::BitCastQuantTensorPassBase<BitCastQuantTensorPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<torch::Torch::TorchDialect>();
@@ -116,17 +159,12 @@ class BitCastQuantTensorPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<BitCastQuantizedMatmul>(context);
+    patterns.add<BitCastQuantizedMatmul, BitCastViewDtype>(context);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createBitCastQuantTensorPass() {
-  return std::make_unique<BitCastQuantTensorPass>();
-}
 
 } // namespace mlir::iree_compiler::TorchInput

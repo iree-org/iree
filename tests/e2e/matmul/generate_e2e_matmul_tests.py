@@ -266,39 +266,39 @@ def get_rocm_test_compilation_infos(
             MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 2, 1),
             MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 2, 1, 1),
             MMASchedule("MFMA_F32_16x16x4_F32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
-            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
-            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
-            MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
-            MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
-            MMASchedule("MFMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
-            MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
-            MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
-            MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
-            MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
-            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 1, 4, 1, 1),
-            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 2, 4, 2, 1),
-            MMASchedule("MFMA_I8_16x16x32_I32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_I8_16x16x32_I32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_I8_16x16x32_I32", 4, 1, 4, 1, 1),
-            MMASchedule("MFMA_I8_16x16x32_I32", 4, 2, 4, 2, 1),
-            MMASchedule("MFMA_I8_32x32x16_I32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_I8_32x32x16_I32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_I8_32x32x16_I32", 4, 1, 1, 2, 2),
-            MMASchedule("MFMA_I8_32x32x16_I32", 4, 2, 2, 2, 2),
+            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("MFMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("MFMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("MFMA_F32_32x32x8_F16", 1, 1, 1, 2, 2),
+            MMASchedule("MFMA_F32_32x32x8_F16", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_F32_32x32x8_F16", 1, 4, 2, 1, 2),
+            MMASchedule("MFMA_F32_32x32x8_F16", 4, 2, 1, 2, 4),
+            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 4, 2, 4, 2, 1),
+            MMASchedule("MFMA_I32_16x16x32_I8", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I32_16x16x32_I8", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I32_16x16x32_I8", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_I32_16x16x32_I8", 4, 2, 4, 2, 1),
+            MMASchedule("MFMA_I32_32x32x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I32_32x32x16_I8", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I32_32x32x16_I8", 4, 1, 1, 2, 2),
+            MMASchedule("MFMA_I32_32x32x16_I8", 4, 2, 2, 2, 2),
         ]
     elif intrinsic == "WMMA":
         schedules = [
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
-            MMASchedule("WMMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
-            MMASchedule("WMMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
         ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
@@ -309,36 +309,36 @@ def get_rocm_test_compilation_infos(
     for schedule in schedules:
         # Skip schedules with an intrinsic which element type does not
         # match the requested one.
-        # Extracts the input type from strings containing either 'MFMA' or 'WMMA'
-        # followed by an underscore.
-        extract_input_type = lambda s: re.search(r"(?:MFMA|WMMA)_([^_]+)_", s).group(1)
-        if lhs_rhs_type.value.upper() != extract_input_type(schedule.intrinsic):
+        # Extracts the input type from strings. The naming convention is
+        # [output_type]_MxNxK_[input_type].
+        input_type = schedule.intrinsic.split("_")[-1]
+        if lhs_rhs_type.value.upper() != input_type:
             continue
 
         if schedule.intrinsic == "MFMA_F32_16x16x4_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 4
-        elif schedule.intrinsic == "MFMA_F16_16x16x16_F32":
+        elif schedule.intrinsic == "MFMA_F32_16x16x16_F16":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "MFMA_F16_32x32x8_F32":
+        elif schedule.intrinsic == "MFMA_F32_32x32x8_F16":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
         elif (
-            schedule.intrinsic == "MFMA_I8_16x16x32_I32"
-            or schedule.intrinsic == "MFMA_F8E4M3FNUZ_16x16x32_F32"
+            schedule.intrinsic == "MFMA_I32_16x16x32_I8"
+            or schedule.intrinsic == "MFMA_F32_16x16x32_F8E4M3FNUZ"
         ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
-        elif schedule.intrinsic == "MFMA_I8_32x32x16_I32":
+        elif schedule.intrinsic == "MFMA_I32_32x32x16_I8":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "WMMA_F16_16x16x16_F32":
+        elif schedule.intrinsic == "WMMA_F32_16x16x16_F16":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
@@ -388,7 +388,7 @@ def get_test_compilation_infos(
     elif compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
         tile_workgroup_size_pairs = [
             TileWorkgroupSizePair(
-                [[64, 64], [16, 64], [0, 0, 16], [16, 16, 16]], [64, 4, 1]
+                [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]], [64, 2, 1]
             )
         ]
     elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:

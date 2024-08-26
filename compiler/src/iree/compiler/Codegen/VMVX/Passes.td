@@ -13,39 +13,32 @@ include "mlir/Pass/PassBase.td"
 // VMVX passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def VMVXAssignConstantOrdinals :
+def VMVXAssignConstantOrdinalsPass :
     Pass<"iree-vmvx-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Assigns executable constant ordinals across all VMVX variants.";
-  let constructor = "mlir::iree_compiler::createVMVXAssignConstantOrdinalsPass()";
 }
 
-def VMVXSelectLoweringStrategy :
+def VMVXSelectLoweringStrategyPass :
     Pass<"iree-vmvx-select-lowering-strategy", "ModuleOp"> {
   let summary =
       "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
-  let constructor =
-      "mlir::iree_compiler::createVMVXSelectLoweringStrategyPass()";
 }
 
-def VMVXLinkExecutables :
+def VMVXLinkExecutablesPass :
     Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
   let summary = "Links VMVX HAL executables within the top-level program module.";
-  let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
 }
 
-def VMVXLowerExecutableTarget :
+def VMVXLowerExecutableTargetPass :
     InterfacePass<"iree-vmvx-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
-  let constructor =
-      "mlir::iree_compiler::createVMVXLowerExecutableTargetPass()";
 }
 
-def VMVXLowerLinalgMicrokernels :
+def VMVXLowerLinalgMicrokernelsPass :
     Pass<"iree-vmvx-lower-linalg-microkernels", ""> {
   let summary =
       "Lowers linalg ops to the VMVX microkernel library";
-  let constructor = "mlir::iree_compiler::createVMVXLowerLinalgMicrokernelsPass()";
   let options = [
     Option<"warnOnUnconverted", "warn-on-unconverted", "bool",
            /*default=*/"false",

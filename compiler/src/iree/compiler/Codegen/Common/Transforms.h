@@ -60,7 +60,7 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
 /// Populate patterns related to clean up the IR after tile and distribute
 /// to workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
+    RewritePatternSet &patterns);
 
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.

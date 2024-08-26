@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
@@ -40,8 +39,11 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_CONVERTTOROCDLPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
+
 static llvm::cl::opt<int>
-    clROCMIndexingBits("iree-rocm-index-bits",
+    clROCMIndexingBits("iree-hip-index-bits",
                        llvm::cl::desc("Set the bit width of indices in ROCm."),
                        llvm::cl::init(64));
 
@@ -75,7 +77,11 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 ///
 /// This pass only handles device code and is not meant to be run on GPU host
 /// code.
-struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
+struct ConvertToROCDLPass final
+    : impl::ConvertToROCDLPassBase<ConvertToROCDLPass> {
+  using impl::ConvertToROCDLPassBase<
+      ConvertToROCDLPass>::ConvertToROCDLPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
@@ -203,9 +209,4 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     LDBG("After converting to dynamic shared memory\n" << m);
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass() {
-  return std::make_unique<ConvertToROCDLPass>();
-}
-
 } // namespace mlir::iree_compiler

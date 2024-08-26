@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -45,6 +46,17 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 namespace mlir::iree_compiler {
 
+llvm::cl::opt<bool> clGPUTestTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-matmul",
+    llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
+    llvm::cl::init(false));
+
+llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
+    "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for all supported operations"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -53,7 +65,7 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -1940,6 +1952,20 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
+  if (clGPUTestTileAndFuseMatmul) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     computeOp))) {
+      LDBG("Tile and fuse matmul config");
+      return success();
+    }
+  }
+  if (clGPUTestTileAndFuseVectorize) {
+    if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(target, entryPointFn,
+                                                          computeOp))) {
+      LDBG("Tile and fuse default config");
+      return success();
+    }
+  }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
     return success();
   }
@@ -2046,14 +2072,20 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   }
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  if (getTranslationInfo(funcOp)) {
-    // Currently LLVMGPU requires propagation of user lowering configs.
-    for (auto op : computeOps) {
-      if (getLoweringConfig(op)) {
-        propagateLoweringConfig(op, computeOps);
-        break;
+  if (IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(funcOp)) {
+    // Currently ROCDL requires propagation of user lowering configs for
+    // all pipelines except TileAndFuse.
+    if (translationInfo.getDispatchLoweringPassPipeline() !=
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+      for (auto op : computeOps) {
+        if (getLoweringConfig(op)) {
+          propagateLoweringConfig(op, computeOps);
+          break;
+        }
       }
     }
+    // Translation info (lowering pipeline) is already set.
     return success();
   }
 
@@ -2096,6 +2128,16 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   if (failed(setRootConfig(target, funcOp, rootOperation)))
     return funcOp.emitOpError("failed to set root config");
+
+  if (IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(funcOp)) {
+    // Currently ROCDL requires propagation of user lowering configs for
+    // all pipelines except TileAndFuse.
+    if (translationInfo.getDispatchLoweringPassPipeline() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+      return success();
+    }
+  }
 
   propagateLoweringConfig(rootOperation, computeOps);
   return success();

@@ -22,7 +22,7 @@ public:
   // This is the same as convertType, but returns `iree_vm_ref_t` rather than a
   // pointer to it for `vm.ref` types.
   Type convertTypeAsNonPointer(Type type) const;
-  Type convertTypeAsPointer(Type type) const;
+  emitc::PointerType convertTypeAsPointer(Type type) const;
   emitc::OpaqueType convertTypeAsCType(Type type) const;
 
   SetVector<Operation *> sourceMaterializations;
