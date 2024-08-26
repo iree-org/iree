@@ -173,7 +173,7 @@ iree_status_t iree_hal_hsa_allocator_create(
   // all device-local + host-visible memory into host-local + device-visible
   // page-locked memory. The compiler tries to avoid this for high-traffic
   // buffers except for readback staging buffers.
-  int supports_concurrent_managed_access = 0;
+  int supports_concurrent_managed_access = 1;
 
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, supports_concurrent_managed_access
@@ -388,12 +388,12 @@ static void iree_hal_hsa_buffer_free(
   switch (buffer_type) {
     case IREE_HAL_HSA_BUFFER_TYPE_DEVICE: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hsa_amd_memory_pool_free");
-      hsa_symbols->hsa_amd_memory_pool_free(device_ptr);
+      IREE_HSA_IGNORE_ERROR(hsa_symbols, hsa_amd_memory_pool_free(device_ptr));
       break;
     }
     case IREE_HAL_HSA_BUFFER_TYPE_HOST: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hsa_amd_memory_pool_free");
-      hsa_symbols, hsa_amd_memory_pool_free(device_ptr);
+      IREE_HSA_IGNORE_ERROR(hsa_symbols, hsa_amd_memory_pool_free(device_ptr));
       break;
     }
     case IREE_HAL_HSA_BUFFER_TYPE_HOST_REGISTERED: {
