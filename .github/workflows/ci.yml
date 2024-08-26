@@ -158,7 +158,7 @@ jobs:
             -DIREE_BUILD_SAMPLES=ON \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
-            ${EXTRA_OPTIONS}
+            ${DRIVER_OPTIONS}
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
       - name: CTest
