@@ -49,10 +49,6 @@ module attributes { transform.with_named_sequence } {
     transform.iree.map_nested_forall_to_gpu_threads %func_7
         workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
 
-    // Step 7. Do layout analysis and lower to mma
-    // ===========================================================================
-    %func_10 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
     transform.print {name = "Ran custom_transform_strategy"}
     transform.yield
   }
