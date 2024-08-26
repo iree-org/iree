@@ -67,6 +67,7 @@
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst @kuhar
+/compiler/src/iree/compiler/DispatchCreation/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/GlobalOptimization/ @hanhanW
 /compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
 /compiler/src/iree/compiler/Preprocessing/ @qedawkins @MaheshRavishankar
