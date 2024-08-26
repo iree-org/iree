@@ -28,7 +28,7 @@ concurrency:
 jobs:
   linux_x64_clang_byollvm:
     runs-on: ubuntu-20.04
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:4dbd22649c8ca91188ae5b914d0b725e07617726b1631d6908ad35d721e63858
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
     defaults:
       run:
         shell: bash
