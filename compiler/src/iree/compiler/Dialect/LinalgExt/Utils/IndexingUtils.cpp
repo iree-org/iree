@@ -72,6 +72,13 @@ void AttentionOpDetail::inferFromIndexingMaps(
   k1 = SmallVector<int64_t>(k1Set.begin(), k1Set.end());
   k2 = SmallVector<int64_t>(k2Set.begin(), k2Set.end());
   n = SmallVector<int64_t>(nSet.begin(), nSet.end());
+
+  // Sort to ensure that dims are in outermost to innermost order.
+  llvm::sort(batch);
+  llvm::sort(m);
+  llvm::sort(k1);
+  llvm::sort(k2);
+  llvm::sort(n);
 }
 
 FailureOr<AttentionOpDetail>
