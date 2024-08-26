@@ -99,7 +99,7 @@ if(NOT IREE_ARCH STREQUAL "riscv_64" )
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_llvm-cpu-2
+    check_regression_llvm-cpu-3
   SRCS
     "lowering_config.mlir"
   TARGET_BACKEND
