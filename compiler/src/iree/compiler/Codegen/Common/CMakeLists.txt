@@ -133,7 +133,7 @@ iree_cc_library(
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
-    "TopkLowering.cpp"
+    "TopkLoweringPass.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"

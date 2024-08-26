@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -28,10 +27,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_TOPKLOWERINGPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
-class TopkLoweringPass : public TopkLoweringBase<TopkLoweringPass> {
+class TopkLoweringPass : public impl::TopkLoweringPassBase<TopkLoweringPass> {
 public:
-  using TopkLoweringBase::TopkLoweringBase;
+  using TopkLoweringPassBase::TopkLoweringPassBase;
   TopkLoweringPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -846,7 +848,7 @@ static FailureOr<SmallVector<Value>> lowerAsLinalgExtTopkUsingSCF(
   SmallVector<Value> newResults;
   newResults.push_back(topkOp.outputValues());
   newResults.push_back(topkOp.outputIndices());
-  return success();
+  return newResults;
 }
 
 void TopkLoweringPass::runOnOperation() {
@@ -879,13 +881,13 @@ void TopkLoweringPass::runOnOperation() {
       }
 
       auto results = lowerAsLinalgExtTopkUsingSCF(rewriter, topkOp,
-                                                  vectorSizes)
+                                                  vectorSizes);
       if (failed(results)) {
         VEC_LDBG("TopK Vectorization failed\n");
         return;
       }
-      if (!results.empty())
-        rewriter.replaceOp(op, results);
+      if (!results->empty())
+        rewriter.replaceOp(op, *results);
       else
         rewriter.eraseOp(op);
     }
@@ -910,7 +912,7 @@ void TopkLoweringPass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTopkLoweringPass() {
+createTopkLowering() {
   return std::make_unique<TopkLoweringPass>();
 }
 

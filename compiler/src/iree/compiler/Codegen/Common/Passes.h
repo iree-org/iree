@@ -62,49 +62,7 @@ createConvertToDestinationPassingStylePass(
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne);
 
-<<<<<<< HEAD
-/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createFuseTensorPadWithConsumerPass();
-
-struct GenericVectorizationPassOptions {
-  bool enableVectorMasking = false;
-  // Controls whether the op lowering configuration (if present) should be used
-  // to specify the masked vector sizes.
-  bool useConfiguredVectorSizes = true;
-  bool vectorizePadding = false;
-  bool vectorizeGatherAccesses = false;
-  // The flag controls whether it touches the structure generated from tiling,
-  // which affects later steps like bufferization and vector hoisting.
-  bool enableCleanup = true;
-  // Enable conversion for reduction ops to contraction ops.
-  bool generateContract = true;
-  // Enable folding casting ops into contraction ops. Note that the resulting
-  // mixed-type contraction ops are only handled by certain backends.
-  bool foldCastIntoContract = false;
-  // Max vector size allowed to avoid creating large vectors.
-  int64_t maxVectorSize = std::numeric_limits<int64_t>::max();
-};
-/// Creates a pass to perform vectorization on LinAlg and tensor ops.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createGenericVectorizationPass();
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
-
-/// Creates a pass to perform scf lowering of LinAlg TopkOp.
-std::unique_ptr<InterfacePass<FunctionOpInterface>> createTopkLoweringPass();
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createOptimizeTensorInsertExtractSlicesPass();
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createHoistStaticallyBoundAllocationsPass();
-
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createHoistUnrolledVectorExtractInsertSlicePass();
-=======
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
->>>>>>> upstream
 
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
