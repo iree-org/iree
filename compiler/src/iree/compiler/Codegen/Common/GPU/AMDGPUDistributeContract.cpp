@@ -21,6 +21,57 @@ namespace {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
+static LogicalResult isSubgroupLayoutCompatible(
+    IREE::GPU::MMAAttr::SingleSubgroupLayout subgroupLayout,
+    NestedLayoutAttr layout, int64_t dim1, int64_t dim2) {
+  SmallVector<int64_t> element = {layout.getElementsPerThread()[dim1],
+                                  layout.getElementsPerThread()[dim2]};
+  SmallVector<int64_t> thread = {layout.getThreadsPerOuter()[dim1],
+                                 layout.getThreadsPerOuter()[dim2]};
+  SmallVector<int64_t> tstrides = {layout.getThreadStrides()[dim1],
+                                   layout.getThreadStrides()[dim2]};
+  SmallVector<int64_t> outer = {layout.getOutersPerBatch()[dim1],
+                                layout.getOutersPerBatch()[dim2]};
+
+  if (subgroupLayout.element != element) {
+    return failure();
+  }
+  if (subgroupLayout.thread != thread) {
+    return failure();
+  }
+  if (subgroupLayout.tstrides != tstrides) {
+    return failure();
+  }
+  if (subgroupLayout.outer != outer) {
+    return failure();
+  }
+
+  return success();
+}
+
+static LogicalResult isIntrinsicLayoutCompatible(VectorContractOpInfo &opInfo,
+                                                 IREE::GPU::MMAAttr intrinsic,
+                                                 NestedLayoutAttr lhsLayout,
+                                                 NestedLayoutAttr rhsLayout,
+                                                 NestedLayoutAttr accLayout) {
+  auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
+  auto [lhsK, rhsK] = opInfo.getOperandKIndex();
+  auto [accM, accN] = opInfo.getResultMNIndex();
+  if (failed(isSubgroupLayoutCompatible(intrinsic.getASingleSubgroupLayout(),
+                                        lhsLayout, lhsM, lhsK))) {
+    return failure();
+  }
+  if (failed(isSubgroupLayoutCompatible(intrinsic.getBSingleSubgroupLayout(),
+                                        rhsLayout, rhsK, rhsN))) {
+    return failure();
+  }
+  if (failed(isSubgroupLayoutCompatible(intrinsic.getCSingleSubgroupLayout(),
+                                        accLayout, accM, accN))) {
+    return failure();
+  }
+  return success();
+}
+
 /// Distributes `vector.contract` ops with nested layouts.
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -63,6 +114,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing nested layout for contraction rhs");
     }
+    NestedLayoutAttr accLayout =
+        dyn_cast<NestedLayoutAttr>(signature[resultValue]);
+    if (!accLayout) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "missing nested layout for contraction acc");
+    }
 
     // We assume there is an decision made before regarding which mfma intrinsic
     // to use and it is attached as an attribute to this contract op.
@@ -71,6 +128,14 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     if (!mmaAttr) {
       return rewriter.notifyMatchFailure(
           contractOp, "missing iree.amdgpu.mma intrinsic attribute");
+    }
+
+    // Check if the given intrinsic can be distributed with the given
+    // layouts.
+    if (failed(isIntrinsicLayoutCompatible(opDetail, mmaAttr, lhsLayout,
+                                           rhsLayout, accLayout))) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "the intrinsic does not match the expected layouts");
     }
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();

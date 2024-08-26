@@ -566,7 +566,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
   }
   case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 16},
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 0},
             /*element=*/{1, 16}};
   }
   }
@@ -598,7 +598,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
   }
   case MMAIntrinsic::WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*strides=*/{16, 1},
+    return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*strides=*/{0, 1},
             /*element=*/{16, 1}};
   }
   }
@@ -624,7 +624,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
             /*element=*/{1, 1}};
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*strides=*/{16, 1},
+    return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*strides=*/{0, 1},
             /*element=*/{1, 1}};
   }
   }
