@@ -75,6 +75,7 @@ IREE_HAL_HSA_REQUIRED_PFN_DECL(hsa_amd_memory_pool_get_info,
                                hsa_amd_memory_pool_info_t, void *)
 IREE_HAL_HSA_REQUIRED_PFN_DECL(hsa_memory_allocate, hsa_region_t, size_t,
                                void **)
+IREE_HAL_HSA_REQUIRED_PFN_DECL(hsa_memory_free, void *)
 IREE_HAL_HSA_REQUIRED_PFN_DECL(hsa_amd_memory_pool_allocate,
                                hsa_amd_memory_pool_t, size_t, uint32_t, void **)
 IREE_HAL_HSA_REQUIRED_PFN_DECL(hsa_amd_memory_pool_free, void *)

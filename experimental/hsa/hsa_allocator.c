@@ -409,7 +409,7 @@ static void iree_hal_hsa_buffer_free(
       break;
     }
     case IREE_HAL_HSA_BUFFER_TYPE_KERNEL_ARG: {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; external)");
+      IREE_HSA_IGNORE_ERROR(hsa_symbols, hsa_memory_free(device_ptr));
       break;
     }
   }
