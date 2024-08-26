@@ -7,7 +7,7 @@
 # Ignore 'experimental' folders. These builds are not regularly maintained.
 # If you wish to build/run a target under experimental/, you must remove this
 # line from this file.
-# experimental
+experimental
 
 # Ignore third_party directories which contain BUILD files so that recursive
 # from root works.
