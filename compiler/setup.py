@@ -459,6 +459,7 @@ setup(
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
+            "iree-opt = iree.compiler.tools.scripts.iree_opt.__main__:main",
         ],
     },
     install_requires=[

@@ -31,6 +31,7 @@ __all__ = [
 _BUILTIN_TOOLS = [
     "iree-compile",
     "iree-lld",
+    "iree-opt",
 ]
 
 # In normal distribution circumstances, each named tool is associated with
