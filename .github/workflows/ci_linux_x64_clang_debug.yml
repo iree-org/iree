@@ -59,7 +59,7 @@ jobs:
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
-            -DPython3_EXECUTABLE="$(which python)" \
+            -DPython3_EXECUTABLE="$(which python3)" \
             -DCMAKE_BUILD_TYPE=Debug \
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
