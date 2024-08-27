@@ -765,10 +765,9 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     // Do not fuse operations if they are already an operand of the
     // owner and have an index return type as that means its a shape
     // computation that needs to happen on the host.
-    if (auto op = v.getDefiningOp()) {
-      if (user == dispatchOp && v.getType().isIndex()) {
-        return true;
-      }
+    auto op = v.getDefiningOp();
+    if (op && user == dispatchOp && v.getType().isIndex()) {
+      return true;
     }
 
     Operation *ownerWorkgroupsOp =
