@@ -243,3 +243,34 @@ func.func @concretize_WMMA_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tenso
 // CHECK-RESULT-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x1x16xf16>
 // CHECK-RESULT:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0, 1], [2]]
 // CHECK-RESULT:        return %[[COLLAPSED]]
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @concretize_WMMA_I32_16x16x16_I8(%lhs: tensor<16x16xi8>, %rhs: tensor<16x16xi8>, %acc: tensor<16x16xi32>) -> tensor<16x16xi32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_I32_16x16x16_I8>
+  } : tensor<16x16xi8>, tensor<16x16xi8> into tensor<16x16xi32>
+  return %0 : tensor<16x16xi32>
+}
+
+// CHECK-LABEL:       func @concretize_WMMA_I32_16x16x16_I8
+// CHECK-SAME:          %[[LHS:[A-Za-z0-9]+]]: tensor<16x16xi8>
+// CHECK-SAME:          %[[RHS:[A-Za-z0-9]+]]: tensor<16x16xi8>
+// CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<16x16xi32>
+
+// CHECK-INPUTS-NOT:    tensor.expand_shape
+// CHECK-INPUTS:        %[[MMA:.+]] = iree_gpu.multi_mma
+// CHECK-INPUTS:        return %[[MMA]]
+
+// CHECK-RESULT:        %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0, 1], [2]] output_shape [8, 2, 16]
+// CHECK-RESULT:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[EXPANDED_ACC]]
+// CHECK-RESULT-SAME:     : tensor<16x16xi8>, tensor<16x16xi8> into tensor<8x2x16xi32>
+// CHECK-RESULT:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0, 1], [2]]
+// CHECK-RESULT:        return %[[COLLAPSED]]

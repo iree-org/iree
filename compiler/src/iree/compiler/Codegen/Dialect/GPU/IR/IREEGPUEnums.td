@@ -109,6 +109,10 @@ def MFMA_I32_32x32x16_I8  : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 5>;
 def WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"WMMA_F32_16x16x16_F16", 6>;
 def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 7>;
 
+// TODO: The actual I8 instruction allows specifying (mixed) signedness.
+// This will need to become its own class of MMA attribute.
+def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 8>;
+
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [
       MFMA_F32_16x16x4_F32,
@@ -118,7 +122,8 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_I32_16x16x32_I8,
       MFMA_I32_32x32x16_I8,
       WMMA_F32_16x16x16_F16,
-      WMMA_F16_16x16x16_F16
+      WMMA_F16_16x16x16_F16,
+      WMMA_I32_16x16x16_I8
     ]>;
 
 def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
