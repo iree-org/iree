@@ -162,11 +162,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
     srcs = [
         "top-k.mlir",
-        "top-k-scf-lowering.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "top-k-scf-lowering.mlir",
+        # Falis on CUDA... "top-k-scf-lowering.mlir",
     ],
     compiler_flags = ["--iree-dispatch-creation-topk-split-reduction=2"],
     driver = "cuda",
@@ -185,11 +181,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction-double",
     srcs = [
         "top-k.mlir",
-        "top-k-scf-lowering.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "top-k-scf-lowering.mlir",
+        # Fails on CUDA... "top-k-scf-lowering.mlir",
     ],
     compiler_flags = ["--iree-dispatch-creation-topk-split-reduction=3,2"],
     driver = "cuda",
