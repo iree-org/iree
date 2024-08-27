@@ -1,12 +1,10 @@
 // RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --split-input-file %s | FileCheck %s
 // RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --iree-llvmcpu-force-arm-streaming --split-input-file %s | FileCheck %s -check-prefixes=FORCE-ARM-STREAMING
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 module {
 module {
@@ -16,7 +14,7 @@ module {
     %c1 = arith.constant 1 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
     %2 = tensor.empty() : tensor<1xf32>
     %3 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>}
         ins(%cst : f32) outs(%2 : tensor<1xf32>) -> tensor<1xf32>
@@ -39,12 +37,10 @@ module {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 module {
 module {
@@ -54,7 +50,7 @@ module {
     %c1 = arith.constant 1 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<1xf32>>
     %2 = tensor.empty() : tensor<1xf32>
     %3 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [[1]], [0], [0]]>}
         ins(%cst : f32) outs(%2 : tensor<1xf32>) -> tensor<1xf32>
@@ -78,12 +74,10 @@ module {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 module {
 module {
@@ -93,7 +87,7 @@ module {
     %c1 = arith.constant 1 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<100x100xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<100x100xf32>>
     %2 = tensor.empty() : tensor<100x100xf32>
     %3 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [[4], [4]], [0, 0], [0, 0]]>}
         ins(%cst : f32) outs(%2 : tensor<100x100xf32>) -> tensor<100x100xf32>

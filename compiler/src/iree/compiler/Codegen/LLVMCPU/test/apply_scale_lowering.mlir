@@ -1,10 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-llvm))))' %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c",
@@ -27,8 +25,8 @@ hal.executable private @apply_scale_no_vector_feature {
         %cst = arith.constant dense<19689> : vector<2xi32>
         %cst_0 = arith.constant dense<15> : vector<2xi8>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<2xi32>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
         %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
@@ -48,11 +46,9 @@ hal.executable private @apply_scale_no_vector_feature {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+v",
@@ -75,8 +71,8 @@ hal.executable private @apply_scale_v {
         %cst = arith.constant dense<19689> : vector<2xi32>
         %cst_0 = arith.constant dense<15> : vector<2xi8>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<2xi32>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
         %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
@@ -94,11 +90,9 @@ hal.executable private @apply_scale_v {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve64x",
@@ -121,8 +115,8 @@ hal.executable private @apply_scale_zve64x {
         %cst = arith.constant dense<19689> : vector<2xi32>
         %cst_0 = arith.constant dense<15> : vector<2xi8>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<2xi32>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
         %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
@@ -140,11 +134,9 @@ hal.executable private @apply_scale_zve64x {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32x",
@@ -167,8 +159,8 @@ hal.executable private @apply_scale_zve32x {
         %cst = arith.constant dense<19689> : vector<2xi32>
         %cst_0 = arith.constant dense<15> : vector<2xi8>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<2xi32>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
         %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
@@ -193,11 +185,9 @@ hal.executable private @apply_scale_zve32x {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32f",
@@ -220,8 +210,8 @@ hal.executable private @apply_scale_zve32f {
         %cst = arith.constant dense<19689> : vector<2xi32>
         %cst_0 = arith.constant dense<15> : vector<2xi8>
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<2xi32>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<2xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
         %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>

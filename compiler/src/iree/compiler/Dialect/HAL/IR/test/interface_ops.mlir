@@ -13,8 +13,8 @@ func.func @interface_workgroup_info() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
-  <0, bindings = [<0, storage_buffer>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // CHECK-LABEL: @interface_io_constant
@@ -26,9 +26,11 @@ func.func @interface_io_constant() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  <0, bindings = [<0, storage_buffer, ReadOnly>]>,
-  <1, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // CHECK-LABEL: @interface_io_subspan
@@ -36,26 +38,26 @@ func.func @interface_io_constant() {
 func.func @interface_io_subspan(%dim0: index, %dim2: index) {
   %c8 = arith.constant 8 : index
 
-  // CHECK: = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim0, %dim2}
+  // CHECK: = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim0, %dim2}
 
-  // CHECK: = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) alignment(16) : memref<16xi8>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) alignment(16) : memref<16xi8>
+  // CHECK: = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(16) : memref<16xi8>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(16) : memref<16xi8>
 
   return
 }
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  <0, bindings = [<0, storage_buffer, ReadOnly>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>
 ]>
 
 func.func @interface_io_subspan_wrong_dynamic_dim(%dim: index) {
   %c8 = arith.constant 8 : index
 
   // expected-error @+1{{result type 'memref<?x4x?x16xi8>' has 2 dynamic dimensions but 1 associated dimension SSA values}}
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim}
 
   return
 }

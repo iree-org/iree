@@ -121,8 +121,7 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     if (!bufferMemrefType)
       continue;
 
-    if (bufferSubspanOp.getSet() != subspanOp.getSet() ||
-        bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
+    if (bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
         bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
         bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
         !llvm::equal(bufferSubspanOp.getDynamicDims(),
@@ -139,7 +138,7 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
   // Just change the result type of the InterfaceBindingSubspanOp.
   Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
       subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
-      subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+      subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
   rewriter.create<memref::AssumeAlignmentOp>(

@@ -429,7 +429,6 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
-    OptionalAttr<HAL_InterfaceBindingArrayAttr>:$bindings,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
@@ -451,7 +450,6 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
                                $tied_operands)
     `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     `layout` `(` $layout `)`
-    (`bindings` `(` $bindings^ `)`)?
     `objects` `(` `{` custom<TargetConditionObjects>($targets,
                                                      $target_ordinals,
                                                      $target_objects,
@@ -1469,140 +1467,7 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
   }];
 }
 
-// TODO(#18154): deprecated and will be replaced with simplified bindings.
-def HAL_CommandBufferPushConstantsOp : HAL_Op<"command_buffer.push_constants"> {
-  let summary = [{command buffer push constants operation}];
-  let description = [{
-    Pushes an inline set of constants that can be accessed by subsequent
-    dispatches using a compatible pipeline layout.
-
-    Push constants are always 4-byte values and treated as opaque, meaning that
-    they may be bit-casted floats, bit-packed booleans, etc.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    HAL_PipelineLayout:$pipeline_layout,
-    IndexAttr:$offset,
-    Variadic<I32>:$values
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `layout` `(` $pipeline_layout `:` type($pipeline_layout) `)`
-    `offset` `(` $offset `)`
-    `values` `(` `[` $values `]` `)`
-    `:` type($values)
-    attr-dict-with-keyword
-  }];
-}
-
-// TODO(#18154): deprecated and will be replaced with simplified bindings.
-def HAL_CommandBufferPushDescriptorSetOp : HAL_Op<"command_buffer.push_descriptor_set", [
-  SameVariadicOperandSize,
-]> {
-  let summary = [{command buffer descriptor set push binding operation}];
-  let description = [{
-    Pushes an inline-defined descriptor set to the command buffer.
-    The provided buffers may either be HAL buffers or indirect references into
-    the command buffer binding table.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    HAL_PipelineLayout:$pipeline_layout,
-    Index:$set,
-    Variadic<Index>:$binding_ordinals,
-    Variadic<AnyTypeOf<[Index, HAL_BufferType]>>:$binding_buffers,
-    Variadic<HAL_DeviceSize>:$binding_offsets,
-    Variadic<HAL_DeviceSize>:$binding_lengths
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `layout` `(` $pipeline_layout `:` type($pipeline_layout) `)`
-    `` `[` $set `]`
-    `bindings` `(` `[`
-    custom<DescriptorSetBindings>($binding_ordinals,
-                                  $binding_buffers,
-                                  type($binding_buffers),
-                                  $binding_offsets,
-                                  $binding_lengths)
-    `]` `)`
-    attr-dict-with-keyword
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$commandBuffer, "Value":$pipelineLayout,
-      "int64_t":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
-    OpBuilder<(ins "Value":$commandBuffer, "Value":$pipelineLayout,
-      "Value":$set, "ArrayRef<DescriptorSetBindingValue>":$bindings)>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
-
-// TODO(#18154): deprecated and will be replaced with simplified bindings.
-def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
-  let summary = [{command buffer dispatch recording operation}];
-  let description = [{
-    Dispatches an execution request.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    HAL_Executable:$executable,
-    HAL_Ordinal:$entry_point,
-    HAL_Dim:$workgroup_x,
-    HAL_Dim:$workgroup_y,
-    HAL_Dim:$workgroup_z,
-    HAL_DispatchFlagsAttr:$flags
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `target` `(` $executable `:` type($executable) `)`
-    `` `[` $entry_point `]`
-    `workgroups` `(` `[`
-        $workgroup_x `,`
-        $workgroup_y `,`
-        $workgroup_z
-    `]` `)`
-    `flags` `(` $flags `)`
-    attr-dict-with-keyword
-  }];
-}
-
-// TODO(#18154): deprecated and will be replaced with simplified bindings.
-def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
-  let summary = [{command buffer indirect dispatch recording operation}];
-  let description = [{
-    Dispatches an execution request with the dispatch parameters loaded from the
-    given buffer.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    HAL_Executable:$executable,
-    HAL_Ordinal:$entry_point,
-    AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
-    HAL_DeviceSize:$workgroups_offset,
-    HAL_DispatchFlagsAttr:$flags
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `target` `(` $executable `:` type($executable) `)`
-    `` `[` $entry_point `]`
-    `workgroups` `(` $workgroups_buffer `:` type($workgroups_buffer) `)`
-    `` `[` $workgroups_offset `]`
-    `flags` `(` $flags `)`
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_CommandBufferDispatch2Op : HAL_Op<"command_buffer.dispatch2", [
+def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
   AttrSizedOperandSegments,
 ]> {
   let summary = [{command buffer dispatch recording operation}];
@@ -1665,10 +1530,11 @@ def HAL_CommandBufferDispatch2Op : HAL_Op<"command_buffer.dispatch2", [
     )>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
-def HAL_CommandBufferDispatch2IndirectOp : HAL_Op<"command_buffer.dispatch2.indirect", [
+def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect", [
   AttrSizedOperandSegments,
 ]> {
   let summary = [{command buffer indirect dispatch recording operation}];
@@ -1732,54 +1598,11 @@ def HAL_CommandBufferDispatch2IndirectOp : HAL_Op<"command_buffer.dispatch2.indi
     )>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
 } // OpGroupCommandBufferOps
-
-//===----------------------------------------------------------------------===//
-// !hal.descriptor_set_layout / iree_hal_descriptor_set_layout_t
-//===----------------------------------------------------------------------===//
-
-def OpGroupDescriptorSetLayoutOps : OpDocGroup {
-  let summary = "Descriptor set layout ops";
-  let description = [{
-    Ops for `!hal.descriptor_set_layout` / `iree_hal_descriptor_set_layout_t`.
-  }];
-}
-
-let opDocGroup = OpGroupDescriptorSetLayoutOps in {
-
-def HAL_DescriptorSetLayoutCreateOp : HAL_PureOp<"descriptor_set_layout.create", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{creates a descriptor set layout}];
-  let description = [{
-    Creates a descriptor set layout that defines the bindings used within a set.
-    The same descriptor set layout may be shared with many different executable
-    layouts and by doing so some runtime binding overhead when switching between
-    executables that use the same set layouts can be reduced.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_DescriptorSetLayoutFlagsAttr:$flags,
-    HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
-  );
-  let results = (outs
-    HAL_DescriptorSetLayout:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `flags` `(` $flags `)`
-    `bindings` `(` $bindings `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-} // OpGroupDescriptorSetLayoutOps
 
 //===----------------------------------------------------------------------===//
 // !hal.device / iree_hal_device_t
@@ -2800,47 +2623,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   ];
 }
 
-// TODO(#18154): deprecated and will be replaced with simplified bindings.
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  AttrSizedOperandSegments,
-]> {
-  let summary = [{creates an executable}];
-  let description = [{
-    Creates a target-dependent executable cached on the provided device. Entry
-    points contained within the executable can be dispatched using the resulting
-    executable handle.
-
-    Depending on the driver creation may take a non-trivial amount of time
-    (such as when JITing/etc). As the cache is internally synchronized callers
-    can issue preparation requests from multiple threads - even for the same
-    executables - and calls will block until preparation completes.
-
-    Optional constants provide for specialization of the executable based on
-    runtime-derived parameters.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    SymbolRefAttr:$executable_target,
-    Variadic<HAL_PipelineLayout>:$layouts,
-    Variadic<I32>:$constants
-  );
-  let results = (outs
-    HAL_Executable:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `target` `(` $executable_target `)`
-    `layouts` `(` `[` $layouts `]` `)`
-    (`constants` `(` `[` $constants^ `]` `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_ExecutableCreate2Op : HAL_PureOp<"executable.create2", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{creates an executable}];
@@ -3276,7 +3059,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 
   let arguments = (ins
     HAL_PipelineLayoutAttr:$layout,
-    IndexAttr:$set,
     IndexAttr:$binding,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
@@ -3289,7 +3071,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 
   let assemblyFormat = [{
     `layout` `(` $layout `)`
-    `set` `(` $set `)`
     `binding` `(` $binding `)`
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
@@ -3301,7 +3082,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     OpBuilder<(ins
       "Type":$resultType,
       "IREE::HAL::PipelineLayoutAttr":$layout,
-      "APInt":$set,
       "APInt":$binding,
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
@@ -3317,15 +3097,10 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
 
     // Returns the descriptor set binding metadata for the given set/binding.
-    IREE::HAL::DescriptorSetBindingAttr getDescriptorSetBindingAttr();
+    IREE::HAL::PipelineBindingAttr getPipelineBindingAttr();
 
     // Returns the type of the descriptor this binding references.
     IREE::HAL::DescriptorType getDescriptorType();
-
-    // Returns the binding index in a flattened list of all sets and bindings.
-    // For example, if the layout is [set(bindings[4]), set(bindings[2])] then
-    // a query for set 1 binding 0 would return 4.
-    int64_t getFlatBindingIndex();
 
     // Returns the alignment of the base buffer pointer (before offset).
     llvm::MaybeAlign getBaseAlignment();
@@ -3339,79 +3114,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 }
 
 } // OpGroupInterfaceOps
-
-//===----------------------------------------------------------------------===//
-// !hal.pipeline_layout / iree_hal_pipeline_layout_t
-//===----------------------------------------------------------------------===//
-
-def OpGroupPipelineLayoutOps : OpDocGroup {
-  let summary = "Pipeline layout ops";
-  let description = [{
-    Ops for `!hal.pipeline_layout` / `iree_hal_pipeline_layout_t`.
-  }];
-}
-
-let opDocGroup = OpGroupPipelineLayoutOps in {
-
-def HAL_PipelineLayoutCreateOp : HAL_PureOp<"pipeline_layout.create", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{creates an pipeline layout}];
-  let description = [{
-    Creates an pipeline layout from the given descriptor sets and push
-    constant required size. Pipeline layouts can be shared across any
-    executable that uses the same layout and push constant information. Sharing
-    the layout between executables will reduce runtime binding overhead and it
-    is often worth the cost to allow a small number of unused bindings in one
-    executable such that it can share layouts with others that will be scheduled
-    adjacent to it.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    IndexAttr:$push_constants,
-    Variadic<HAL_DescriptorSetLayout>:$set_layouts
-  );
-  let results = (outs
-    HAL_PipelineLayout:$result
-  );
-
-  // TODO(benvanik): include descriptor set layout types.
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `push_constants` `(` $push_constants `)`
-    `layouts` `(` `[` $set_layouts `]` `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_PipelineLayoutLookupOp : HAL_PureOp<"pipeline_layout.lookup", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{pipeline layout cache lookup pseudo-op}];
-  let description = [{
-    Used during conversion to provide a placeholder for a globally cached and
-    possibly lazy-initialized pipeline layout.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_PipelineLayoutAttr:$layout
-  );
-  let results = (outs
-    HAL_PipelineLayout:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `layout` `(` $layout `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-} // OpGroupPipelineLayoutOps
 
 //===----------------------------------------------------------------------===//
 // !hal.fence / iree_hal_fence_t

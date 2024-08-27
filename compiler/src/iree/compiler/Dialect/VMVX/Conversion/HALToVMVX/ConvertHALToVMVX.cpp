@@ -224,9 +224,7 @@ struct ConvertGetRawInterfaceBindingBufferOp
         .replaceOpWithNewOp<IREE::Util::ListGetOp>(
             op, bindingType, bindingsArg,
             rewriter.createOrFold<arith::ConstantIndexOp>(
-                op.getLoc(), op.getLayout().getFlatBindingIndex(
-                                 op.getSet().getSExtValue(),
-                                 op.getBinding().getSExtValue())))
+                op.getLoc(), op.getBinding().getSExtValue()))
         .getResult();
     return success();
   }
@@ -249,12 +247,13 @@ struct ConvertHALInterfaceBindingSubspanOp
     IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
                            .getElementType();
-    auto sourceBuffer = rewriter
-                            .create<IREE::Util::ListGetOp>(
-                                op.getLoc(), bindingType, bindingsArg,
-                                rewriter.createOrFold<arith::ConstantIndexOp>(
-                                    op.getLoc(), op.getFlatBindingIndex()))
-                            .getResult();
+    auto sourceBuffer =
+        rewriter
+            .create<IREE::Util::ListGetOp>(
+                op.getLoc(), bindingType, bindingsArg,
+                rewriter.createOrFold<arith::ConstantIndexOp>(
+                    op.getLoc(), op.getBinding().getSExtValue()))
+            .getResult();
 
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
       // Offsetted binding: replace with a BufferSubspanOp.

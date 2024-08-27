@@ -6,22 +6,18 @@
 // Ensure devices are copied and made available:
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 // CHECK: util.global private @device
-util.global private @device = #hal.device.target<"llvm-cpu", [
+util.global private @device = #hal.device.target<"local", [
   #executable_target_embedded_elf_x86_64
 ]> : !hal.device
 
-#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout_0 = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
-#pipeline_layout_1 = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout_1 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // Executable should be dumped:
@@ -74,14 +70,7 @@ hal.executable private @ex0 {
 // Create command buffer:
 // CHECK: %[[CMD:.+]] = hal.command_buffer.create
 
-// Setup dispatch constants and bindings:
-// CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout) offset(0) values([%c100_i32, %c200_i32]) : i32, i32
 // CHECK: %[[BUFFER:.+]] = util.global.load @ex0_embedded_elf_x86_64_dispatch0_512_buffer
-// CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout)[%c0] bindings([
-// CHECK-NEXT:    %c0 = (%[[BUFFER]] : !hal.buffer)[%c0, %c32],
-// CHECK-NEXT:    %c1 = (%[[BUFFER]] : !hal.buffer)[%c256, %c32],
-// CHECK-NEXT:    %c2 = (%[[BUFFER]] : !hal.buffer)[%c512, %c32]
-// CHECK-NEXT:  ])
 
 // Calculate the workgroup count, which we leave symbolic until after
 // translation:
@@ -96,7 +85,15 @@ hal.executable private @ex0 {
 
 // Dispatch up to batch size dispatches:
 // CHECK: scf.for %{{.+}} = %c0 to %[[BATCH_SIZE]] step %c1 {
-// CHECK-NEXT: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer> target(%[[EXECUTABLE:.+]] : !hal.executable)[%[[ORDINAL_0]]] workgroups([%[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]])
+// CHECK-NEXT: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
+// CHECK-SAME:   target(%[[EXECUTABLE:.+]] : !hal.executable)[%[[ORDINAL_0]]]
+// CHECK-SAME:   workgroups([%[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]])
+// CHECK-SAME:   constants([%c100_i32, %c200_i32])
+// CHECK-SAME:   bindings([
+// CHECK-NEXT:     (%[[BUFFER]] : !hal.buffer)[%c0, %c32],
+// CHECK-NEXT:     (%[[BUFFER]] : !hal.buffer)[%c256, %c32],
+// CHECK-NEXT:     (%[[BUFFER]] : !hal.buffer)[%c512, %c32]
+// CHECK-NEXT:   ])
 // CHECK-NEXT: hal.command_buffer.execution_barrier
 // CHECK-NEXT: }
 
@@ -174,17 +171,15 @@ util.func public @main(%dynamic_arg: i32) -> !stream.timepoint attributes {
 
 #executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-util.global private @device_a = #hal.device.target<"llvm-cpu", [
+util.global private @device_a = #hal.device.target<"local", [
   #executable_target_embedded_elf_aarch64
 ]> : !hal.device
-util.global private @device_b = #hal.device.target<"llvm-cpu", [
+util.global private @device_b = #hal.device.target<"local", [
   #executable_target_embedded_elf_x86_64
 ]> : !hal.device
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 hal.executable private @ex_0 {

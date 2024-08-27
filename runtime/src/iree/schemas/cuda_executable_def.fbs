@@ -4,47 +4,68 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include "iree/schemas/executable_debug_info.fbs";
+
 namespace iree.hal.cuda;
 
-// 'CUDA Executable'.
-file_identifier "CUDA";
-file_extension "cuda";
+// 'CUDA v1 Executable'.
+file_identifier "CDA1";
+file_extension "cda1";
 
-// A struct for the kernel block size along each dimensions.
-struct BlockSizeDef {
+// A struct for the kernel block size along each dimension.
+struct BlockDims {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
-// Source code location denoted by a file name and line within that file.
-table FileLineLocDef {
-  filename:string;
-  line:int32;
+// Describes the behavior of each binding.
+enum BindingBits:uint64 (bit_flags) {
+  READ_ONLY = 0,  // 1u << 0
+  INDIRECT = 1,  // 1u << 1
+}
+
+// Information about an exported function on the executable.
+table ExportDef {
+  // Ordinal of the shader library containing the entry point in the executable
+  // libraries list.
+  module_ordinal:uint32;
+
+  // String name of the exported kernel function in the module.
+  kernel_name:string;
+
+  // Grid block dimensions for the export.
+  block_dims:BlockDims;
+
+  // Size of dynamic shared memory per block.
+  block_shared_memory_size:uint32;
+
+  // Total number of 32-bit push constants used by the export.
+  constant_count:uint32;
+
+  // Binding count and flags for each binding.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// A library containing one or more exported functions.
+table ModuleDef {
+  // PTX image.
+  ptx_image:string;
 }
 
 table ExecutableDef {
-  // A map of entry point ordinals to string names as used in the shader
-  // library.
-  entry_points:[string];
+  // Exported functions in canonical executable entry point order.
+  exports:[ExportDef];
 
-  // Block sizes for each entry point.
-  //
-  // Currently the thread group size/block size is decided during code gen but
-  // in CUDA it is set by the runtime.
-  block_sizes:[BlockSizeDef];
-  // Size of dynamic shared memory.
-  shared_memory_size:[uint32];
+  // A list of all kernel modules used by the executable.
+  // Exports index into this list and multiple exports may use the same library.
+  modules:[ModuleDef];
 
-  // PTX string of the module.
-  ptx_image:string;
-
-  // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
-
-  // A map of entry point ordinals to source locations.
-  // This information is optional and may be used by debuggers and profilers to
-  // associate executable entry points with the source that generated them.
-  source_locations:[FileLineLocDef];
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;

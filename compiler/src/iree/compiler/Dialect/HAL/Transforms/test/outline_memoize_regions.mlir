@@ -194,6 +194,9 @@ util.global private @buffer : !hal.buffer
 //       CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
 //  CHECK-SAME:   target(%[[APPLY_EXECUTABLE]] : !hal.executable)
 //  CHECK-SAME:   workgroups(%[[APPLY_BUFFER]] : !hal.buffer)
+//  CHECK-SAME:   bindings([
+//  CHECK-NEXT:     (%[[APPLY_BUFFER]] : !hal.buffer)[%c0, %c1]
+//  CHECK-NEXT:   ])
 //       CHECK: hal.command_buffer.execution_barrier
 //       CHECK: hal.command_buffer.finalize
 //       CHECK: util.return %[[CMD]]
@@ -216,6 +219,8 @@ util.func public @memoize_command_buffer() -> !hal.command_buffer {
   %affinity = arith.constant 2 : i64
   %executable = util.global.load immutable @executable : !hal.executable
   %buffer = util.global.load immutable @buffer : !hal.buffer
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   // CHECK-NOT: hal.device.memoize
   // CHECK: %[[CMD:.+]] = util.call @__memoize_command_buffer_memoize_lookup
   %result = hal.device.memoize<%device : !hal.device> affinity(%affinity) -> !hal.command_buffer {
@@ -225,6 +230,9 @@ util.func public @memoize_command_buffer() -> !hal.command_buffer {
     hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
         target(%executable : !hal.executable)[%dispatch_ordinal]
         workgroups(%buffer : !hal.buffer)[%offset]
+        bindings([
+          (%buffer : !hal.buffer)[%c0, %c1]
+        ])
         flags(None)
     hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer>
         source(CommandIssue) target(CommandProcess) flags(None)

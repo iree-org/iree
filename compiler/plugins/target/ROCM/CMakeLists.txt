@@ -60,10 +60,12 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Utils::ExecutableDebugInfoUtils
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
-    iree::schemas::rocm_executable_def_c_fbs
+    iree::schemas::executable_debug_info_c_fbs
+    iree::schemas::hip_executable_def_c_fbs
   PUBLIC
 )
 

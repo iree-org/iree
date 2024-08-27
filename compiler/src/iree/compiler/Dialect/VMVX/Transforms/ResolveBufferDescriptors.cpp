@@ -315,7 +315,7 @@ struct FromHalInterfaceBindingSubspan
         rewriter
             .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
                 loc, op.getBaseBuffer().getType(), binding.getLayout(),
-                binding.getSetAttr(), binding.getBindingAttr())
+                binding.getBindingAttr())
             .getResult());
 
     rewriter.eraseOp(op);

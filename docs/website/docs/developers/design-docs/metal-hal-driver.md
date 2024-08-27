@@ -70,8 +70,6 @@ IREE HAL Class                                                  | Metal Protocol
 [`iree_hal_buffer_t`][hal-buffer]                               | [`MTLBuffer`][mtl-buffer]
 [`iree_hal_executable_t`][hal-executable]                       | [`MTLLibrary`][mtl-library]
 [`iree_hal_executable_cache_t`][hal-executable-cache]           | N/A
-[`iree_hal_descriptor_set_layout_t`][hal-descriptor-set-layout] | N/A
-[`iree_hal_pipeline_layout_t`][hal-pipeline-layout]             | N/A
 
 In the following subsections, we go over each pair to provide more details.
 
@@ -195,7 +193,7 @@ IREE [`iree_hal_buffer_t`][hal-buffer] maps Metal `MTLBuffer`. See
 IREE [`iree_hal_executable_t`][hal-executable] represents a GPU program archive with
 a driver-defined format. It maps naturally to Metal [`MTLLibrary`][mtl-library].
 An entry point in a `MTLLibrary` is a [`MTLFunction`][mtl-function]. We define
-[`iree_hal_metal_kernel_params_t`][metal-kernel-library] to wrap around a
+[`iree_hal_metal_executable_t`][metal-executable] to wrap around a
 `MTLLibrary`, its `MTLFunction`s, and also `MTLComputePipelineState` objects
 constructed from `MTLFunction`s.
 
@@ -268,33 +266,6 @@ information extracted from the SPIR-V code. We encode an additional 3-D vector
 for each entry point and use it as the threadgroup size when later dispatching
 the `MTLFunction` corresponding to the entry point.
 
-### Resource descriptors
-
-A descriptor is an opaque handle pointing to a resource that is accessed in
-the compute kernel. IREE's HAL models several concepts related to GPU resource
-management explicitly:
-
-* [`iree_hal_descriptor_set_layout_t`][hal-descriptor-set-layout]: a schema for
-  describing an array of descriptor bindings. Each descriptor binding specifies
-  the resource type, access mode and other information.
-* [`iree_hal_pipeline_layout_t`][hal-pipeline-layout]: a schema for describing all
-  the resources accessed by a compute pipeline. It includes zero or more
-  `DescriptorSetLayout`s and (optional) push constants.
-
-However, this isn't totally matching Metal's paradigm.
-In the Metal framework, the closest concept to descriptor sets would be [argument
-buffer][mtl-argument-buffer]. There is no direct correspondence to
-descriptor set layout and pipeline layout. Rather, the layout is implicitly
-encoded in Metal shaders as MSL structs. The APIs for creating argument buffers
-do not encourage early creation without pipelines: one typically creates them
-for each `MTLFunction`.
-
-All of this means it's better to defer the creation of the argument buffer
-until the point of compute pipeline creation and dispatch. Therefore, the Metal
-HAL driver's `iree_hal_metal_descriptor_set_layout_t` and
-`iree_hal_metal_pipeline_layout_t` are just containers holding the information
-up for recording [command buffer dispatch](#command-buffer-dispatch).
-
 ### Command buffer dispatch
 
 Metal HAL driver command buffer dispatch recording performs the following steps
@@ -319,8 +290,6 @@ with the current active `MTLComputeCommandEncoder`:
 [hal-allocator]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/allocator.h
 [hal-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/buffer.h
 [hal-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/command_buffer.h
-[hal-descriptor-set-layout]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
-[hal-pipeline-layout]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
 [hal-device]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h
 [hal-driver]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/driver.h
 [hal-executable]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable.h
@@ -328,11 +297,10 @@ with the current active `MTLComputeCommandEncoder`:
 [hal-semaphore]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/semaphore.h
 [metal-device]: https://github.com/iree-org/iree/tree/main/experimental/metal/metal_device.h
 [metal-driver]: https://github.com/iree-org/iree/tree/main/experimental/metal/metal_driver.h
-[metal-kernel-library]: https://github.com/iree-org/iree/tree/main/experimental/metal/kernel_library.h
+[metal-executable]: https://github.com/iree-org/iree/tree/main/experimental/metal/executable.h
 [metal-shared-event]: https://github.com/iree-org/iree/tree/main/experimental/metal/shared_event.h
 [metal-spirv-target]: https://github.com/iree-org/iree/tree/main/compiler/plugins/target/MetalSPIRV
 [metal-builtin-kernels]: https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/drivers/metal/builtin/
-[mtl-argument-buffer]: https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc
 [mtl-argument-encoder]: https://developer.apple.com/documentation/metal/mtlargumentencoder?language=objc
 [mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
 [mtl-command-buffer]: https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc

@@ -10,11 +10,14 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
+#include "iree/hal/utils/executable_debug_info.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
-#include "iree/schemas/wgsl_executable_def_reader.h"
-#include "iree/schemas/wgsl_executable_def_verifier.h"
+#include "iree/schemas/executable_debug_info_reader.h"
+#include "iree/schemas/executable_debug_info_verifier.h"
+#include "iree/schemas/webgpu_executable_def_reader.h"
+#include "iree/schemas/webgpu_executable_def_verifier.h"
 
 typedef struct iree_hal_webgpu_executable_t {
   iree_hal_resource_t resource;
@@ -46,7 +49,7 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
   // the flatbuffer meet our expectations.
-  int verify_ret = iree_hal_wgsl_ExecutableDef_verify_as_root(
+  int verify_ret = iree_hal_webgpu_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -54,18 +57,18 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
                             flatcc_verify_error_string(verify_ret));
   }
 
-  iree_hal_wgsl_ExecutableDef_table_t executable_def =
-      iree_hal_wgsl_ExecutableDef_as_root(flatbuffer_data.data);
+  iree_hal_webgpu_ExecutableDef_table_t executable_def =
+      iree_hal_webgpu_ExecutableDef_as_root(flatbuffer_data.data);
 
-  iree_hal_wgsl_ShaderModuleDef_vec_t shader_modules_vec =
-      iree_hal_wgsl_ExecutableDef_shader_modules_get(executable_def);
+  iree_hal_webgpu_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_webgpu_ExecutableDef_shader_modules_get(executable_def);
   size_t shader_module_count =
-      iree_hal_wgsl_ShaderModuleDef_vec_len(shader_modules_vec);
+      iree_hal_webgpu_ShaderModuleDef_vec_len(shader_modules_vec);
   for (size_t i = 0; i < shader_module_count; ++i) {
-    iree_hal_wgsl_ShaderModuleDef_table_t shader_module_def =
-        iree_hal_wgsl_ShaderModuleDef_vec_at(shader_modules_vec, i);
-    if (flatbuffers_string_len(
-            iree_hal_wgsl_ShaderModuleDef_code_get(shader_module_def)) == 0) {
+    iree_hal_webgpu_ShaderModuleDef_table_t shader_module_def =
+        iree_hal_webgpu_ShaderModuleDef_vec_at(shader_modules_vec, i);
+    if (flatbuffers_string_len(iree_hal_webgpu_ShaderModuleDef_wgsl_source_get(
+            shader_module_def)) == 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "shader module %zu WGSL code is missing/empty",
                               i);
@@ -73,7 +76,7 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
   }
 
   flatbuffers_uint32_vec_t entry_points_vec =
-      iree_hal_wgsl_ExecutableDef_entry_points_get(executable_def);
+      iree_hal_webgpu_ExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_uint32_vec_len(entry_points_vec);
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -96,14 +99,16 @@ static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
 }
 
 static iree_status_t iree_hal_webgpu_create_wgsl_shader_module(
-    WGPUDevice device, iree_hal_wgsl_ShaderModuleDef_table_t shader_module_def,
+    WGPUDevice device,
+    iree_hal_webgpu_ShaderModuleDef_table_t shader_module_def,
     WGPUShaderModule* out_shader_module) {
   IREE_ASSERT_ARGUMENT(shader_module_def);
   IREE_ASSERT_ARGUMENT(out_shader_module);
   *out_shader_module = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const char* code = iree_hal_wgsl_ShaderModuleDef_code_get(shader_module_def);
+  const char* code =
+      iree_hal_webgpu_ShaderModuleDef_wgsl_source_get(shader_module_def);
 
   const WGPUShaderModuleWGSLDescriptor descriptor = {
       .chain =
@@ -229,17 +234,17 @@ iree_status_t iree_hal_webgpu_executable_create(
       z0, iree_hal_webgpu_executable_flatbuffer_verify(
               executable_params->executable_data,
               executable_params->pipeline_layout_count));
-  iree_hal_wgsl_ExecutableDef_table_t executable_def =
-      iree_hal_wgsl_ExecutableDef_as_root(
+  iree_hal_webgpu_ExecutableDef_table_t executable_def =
+      iree_hal_webgpu_ExecutableDef_as_root(
           executable_params->executable_data.data);
 
   // Create shader modules. This will be cheap on some implementations like
   // Metal that need pipeline information in order to be JIT'ed from WGSL while
   // on others it can be more expensive.
-  iree_hal_wgsl_ShaderModuleDef_vec_t shader_modules_vec =
-      iree_hal_wgsl_ExecutableDef_shader_modules_get(executable_def);
+  iree_hal_webgpu_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_webgpu_ExecutableDef_shader_modules_get(executable_def);
   size_t shader_module_count =
-      iree_hal_wgsl_ShaderModuleDef_vec_len(shader_modules_vec);
+      iree_hal_webgpu_ShaderModuleDef_vec_len(shader_modules_vec);
   iree_inline_array(WGPUShaderModule, shader_modules, shader_module_count,
                     host_allocator);
   memset(iree_inline_array_data(shader_modules), 0,
@@ -247,7 +252,7 @@ iree_status_t iree_hal_webgpu_executable_create(
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < shader_module_count; ++i) {
     status = iree_hal_webgpu_create_wgsl_shader_module(
-        device, iree_hal_wgsl_ShaderModuleDef_vec_at(shader_modules_vec, i),
+        device, iree_hal_webgpu_ShaderModuleDef_vec_at(shader_modules_vec, i),
         iree_inline_array_at(shader_modules, i));
     if (!iree_status_is_ok(status)) break;
   }
@@ -268,9 +273,13 @@ iree_status_t iree_hal_webgpu_executable_create(
     executable->host_allocator = host_allocator;
     executable->entry_point_count = executable_params->pipeline_layout_count;
 
+    // Publish any embedded source files to the tracing infrastructure.
+    iree_hal_debug_publish_source_files(
+        iree_hal_hip_ExecutableDef_source_files_get(executable_def));
+
     // Create one pipeline per entry point.
     flatbuffers_uint32_vec_t entry_points_vec =
-        iree_hal_wgsl_ExecutableDef_entry_points_get(executable_def);
+        iree_hal_webgpu_ExecutableDef_entry_points_get(executable_def);
     for (iree_host_size_t i = 0; i < executable->entry_point_count; i++) {
       uint32_t module_ordinal = flatbuffers_uint32_vec_at(entry_points_vec, i);
       status = iree_hal_webgpu_create_pipeline(

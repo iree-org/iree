@@ -320,125 +320,20 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-class CommandBufferPushDescriptorSetOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
+class CommandBufferDispatchOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchOp> {
 public:
-  CommandBufferPushDescriptorSetOpConversion(MLIRContext *context,
-                                             SymbolTable &importSymbols,
-                                             TypeConverter &typeConverter,
-                                             StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-
-  LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferPushDescriptorSetOp op,
-                  OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getFunctionType();
-
-    auto i32Type = rewriter.getI32Type();
-    auto i64Type = rewriter.getI64Type();
-
-    SmallVector<Value, 8> callOperands = {
-        adaptor.getCommandBuffer(),
-        adaptor.getPipelineLayout(),
-        castToImportType(adaptor.getSet(), i32Type, rewriter),
-    };
-    SmallVector<int16_t, 5> segmentSizes = {
-        /*command_buffer=*/-1,
-        /*pipeline_layout=*/-1,
-        /*set=*/-1,
-        /*bindings=*/
-        static_cast<int16_t>(adaptor.getBindingOrdinals().size()),
-    };
-    for (size_t i = 0; i < adaptor.getBindingOrdinals().size(); ++i) {
-      callOperands.push_back(
-          castToImportType(adaptor.getBindingOrdinals()[i], i32Type, rewriter));
-      auto [bindingBufferSlot, bindingBuffer] = splitBufferSlot(
-          op.getLoc(), adaptor.getBindingBuffers()[i], rewriter);
-      callOperands.push_back(bindingBufferSlot);
-      callOperands.push_back(bindingBuffer);
-      callOperands.push_back(
-          castToImportType(adaptor.getBindingOffsets()[i], i64Type, rewriter));
-      callOperands.push_back(
-          castToImportType(adaptor.getBindingLengths()[i], i64Type, rewriter));
-    }
-
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
-        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
-        importType.getInputs(), callOperands);
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
-class CommandBufferDispatchIndirectOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchIndirectOp> {
-public:
-  CommandBufferDispatchIndirectOpConversion(MLIRContext *context,
-                                            SymbolTable &importSymbols,
-                                            TypeConverter &typeConverter,
-                                            StringRef importName)
+  CommandBufferDispatchOpConversion(MLIRContext *context,
+                                    SymbolTable &importSymbols,
+                                    TypeConverter &typeConverter,
+                                    StringRef importName)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferDispatchIndirectOp op,
-                  OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getFunctionType();
-    auto [workgroupsBufferSlot, workgroupsBuffer] =
-        splitBufferSlot(op.getLoc(), adaptor.getWorkgroupsBuffer(), rewriter);
-    auto flags = adaptor.getFlagsAttr()
-                     ? rewriter
-                           .create<IREE::VM::ConstI64Op>(
-                               op.getLoc(), adaptor.getFlagsAttr().getInt())
-                           .getResult()
-                     : rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc())
-                           .getResult();
-    SmallVector<Value, 8> callOperands = {
-        adaptor.getCommandBuffer(),
-        adaptor.getExecutable(),
-        castToImportType(adaptor.getEntryPoint(), rewriter.getI32Type(),
-                         rewriter),
-        workgroupsBufferSlot,
-        workgroupsBuffer,
-        castToImportType(adaptor.getWorkgroupsOffset(), rewriter.getI64Type(),
-                         rewriter),
-        flags,
-    };
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        op, SymbolRefAttr::get(importOp), importType.getResults(),
-        callOperands);
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
-class CommandBufferDispatch2OpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2Op> {
-public:
-  CommandBufferDispatch2OpConversion(MLIRContext *context,
-                                     SymbolTable &importSymbols,
-                                     TypeConverter &typeConverter,
-                                     StringRef importName)
-      : OpConversionPattern(typeConverter, context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-
-  LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferDispatch2Op op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::HAL::CommandBufferDispatchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
@@ -501,20 +396,20 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-class CommandBufferDispatch2IndirectOpConversion
-    : public OpConversionPattern<IREE::HAL::CommandBufferDispatch2IndirectOp> {
+class CommandBufferDispatchIndirectOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchIndirectOp> {
 public:
-  CommandBufferDispatch2IndirectOpConversion(MLIRContext *context,
-                                             SymbolTable &importSymbols,
-                                             TypeConverter &typeConverter,
-                                             StringRef importName)
+  CommandBufferDispatchIndirectOpConversion(MLIRContext *context,
+                                            SymbolTable &importSymbols,
+                                            TypeConverter &typeConverter,
+                                            StringRef importName)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::CommandBufferDispatch2IndirectOp op,
+  matchAndRewrite(IREE::HAL::CommandBufferDispatchIndirectOp op,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
@@ -612,23 +507,11 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
   patterns.insert<CommandBufferCollectiveOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.collective");
-  patterns
-      .insert<VMImportOpConversion<IREE::HAL::CommandBufferPushConstantsOp>>(
-          context, importSymbols, typeConverter,
-          "hal.command_buffer.push_constants");
-  patterns.insert<CommandBufferPushDescriptorSetOpConversion>(
-      context, importSymbols, typeConverter,
-      "hal.command_buffer.push_descriptor_set");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOp>>(
+  patterns.insert<CommandBufferDispatchOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
   patterns.insert<CommandBufferDispatchIndirectOpConversion>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.dispatch.indirect");
-  patterns.insert<CommandBufferDispatch2OpConversion>(
-      context, importSymbols, typeConverter, "hal.command_buffer.dispatch2");
-  patterns.insert<CommandBufferDispatch2IndirectOpConversion>(
-      context, importSymbols, typeConverter,
-      "hal.command_buffer.dispatch2.indirect");
 }
 
 } // namespace mlir::iree_compiler

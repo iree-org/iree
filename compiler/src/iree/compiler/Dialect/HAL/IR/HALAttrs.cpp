@@ -86,45 +86,13 @@ uint32_t CollectiveAttr::getEncodedValue() const {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set.layout<*>
+// #hal.pipeline.layout<*>
 //===----------------------------------------------------------------------===//
 
-DescriptorSetBindingAttr
-DescriptorSetLayoutAttr::getBinding(int64_t ordinal) const {
-  for (auto binding : getBindings()) {
-    if (binding.getOrdinal() == ordinal) {
-      return binding;
-    }
-  }
-  return {};
-}
-
-//===----------------------------------------------------------------------===//
-// hal.pipeline.layout<*>
-//===----------------------------------------------------------------------===//
-
-DescriptorSetLayoutAttr
-PipelineLayoutAttr::getSetLayout(int64_t ordinal) const {
-  for (auto setLayout : getSetLayouts()) {
-    if (setLayout.getOrdinal() == ordinal) {
-      return setLayout;
-    }
-  }
-  return {};
-}
-
-int64_t PipelineLayoutAttr::getFlatBindingIndex(int64_t set,
-                                                int64_t binding) const {
-  int64_t flatIndex = 0;
-  for (auto setLayoutAttr : getSetLayouts()) {
-    if (setLayoutAttr.getOrdinal() == set) {
-      flatIndex += binding;
-      break;
-    } else {
-      flatIndex += setLayoutAttr.getBindings().size();
-    }
-  }
-  return flatIndex;
+PipelineBindingAttr PipelineLayoutAttr::getBinding(int64_t ordinal) const {
+  assert(ordinal >= 0 && ordinal < getBindings().size() &&
+         "binding ordinal out of bounds");
+  return getBindings()[ordinal];
 }
 
 //===----------------------------------------------------------------------===//

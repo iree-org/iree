@@ -18,12 +18,13 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
-#include "iree/schemas/rocm_executable_def_builder.h"
+#include "iree/schemas/hip_executable_def_builder.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -243,23 +244,28 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    SmallVector<NamedAttribute> configAttrItems;
+
+    SmallVector<NamedAttribute> deviceConfigAttrs;
     if (options.legacySync) {
       // Indicates that the runtime HAL driver operates only in the legacy
       // synchronous mode.
-      configAttrItems.emplace_back(b.getStringAttr("legacy_sync"),
-                                   b.getUnitAttr());
+      deviceConfigAttrs.emplace_back(b.getStringAttr("legacy_sync"),
+                                     b.getUnitAttr());
     }
-    DictionaryAttr configAttr = b.getDictionaryAttr(configAttrItems);
+    auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
+
+    SmallVector<NamedAttribute> executableConfigAttrs;
+    auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
     SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
     targetRegistry.getTargetBackend("rocm")->getDefaultExecutableTargets(
-        context, "rocm", configAttr, executableTargetAttrs);
+        context, "rocm", executableConfigAttr, executableTargetAttrs);
 
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("hip"),
-                                            configAttr, executableTargetAttrs);
+                                            deviceConfigAttr,
+                                            executableTargetAttrs);
   }
 
 private:
@@ -386,35 +392,27 @@ public:
     auto exportOps = llvm::to_vector_of<IREE::HAL::ExecutableExportOp>(
         variantOp.getExportOps());
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
-    std::vector<std::array<int32_t, 3>> workgroupSizes;
-    SmallVector<uint32_t> workgroupLocalMemories;
-    uint32_t subgroupSize = 64;
+    std::optional<uint32_t> subgroupSize;
     for (IREE::HAL::ExecutableExportOp exportOp : exportOps) {
       exportOpMap[exportOp.getSymName()] = exportOp;
 
-      std::array<int32_t, 3> workgroupSize = {1, 1, 1};
-      if (std::optional<ArrayAttr> workgroupSizeAttr =
-              exportOp.getWorkgroupSize()) {
-        for (auto [value, sizeAttr] :
-             llvm::zip_equal(workgroupSize, *workgroupSizeAttr))
-          value = cast<IntegerAttr>(sizeAttr).getInt();
-      }
-      workgroupSizes.push_back(workgroupSize);
-
+      // TODO: put this either on the variant or propagate as a function
+      // attribute instead - today this *must* be consistent across all exports
+      // and it shouldn't need to be.
       if (auto setSubgroupSize = exportOp.getSubgroupSizeAsUInt()) {
         if (setSubgroupSize.value() != 32 && setSubgroupSize.value() != 64) {
           return variantOp.emitError()
                  << "invalid subgroup size " << setSubgroupSize.value();
         }
+        if (subgroupSize.has_value() &&
+            setSubgroupSize.value() != subgroupSize.value()) {
+          return variantOp.emitError()
+                 << "multiple exports with different subgroup sizes; this is a "
+                    "limitation of the IREE compilation process and should be "
+                    "fixed";
+        }
         subgroupSize = setSubgroupSize.value();
       }
-
-      uint32_t workgroupLocalMemory = 0;
-      if (std::optional<APInt> workgroupLocalMemoryAttr =
-              exportOp.getWorkgroupLocalMemory()) {
-        workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
-      }
-      workgroupLocalMemories.push_back(workgroupLocalMemory);
     }
 
     std::string targetHSACO;
@@ -499,10 +497,15 @@ public:
         std::string features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11")) {
-          if (subgroupSize == 32)
+          switch (subgroupSize.value_or(64)) {
+          case 32:
             features = "+wavefrontsize32";
-          if (subgroupSize == 64)
+            break;
+          default:
+          case 64:
             features = "+wavefrontsize64";
+            break;
+          }
         }
         if (!targetFeatures.empty()) {
           features += (features.empty() ? "" : ",") + targetFeatures.str();
@@ -604,30 +607,29 @@ public:
     }
 
     iree_compiler::FlatbufferBuilder builder;
-    iree_hal_rocm_ExecutableDef_start_as_root(builder);
+    iree_hal_hip_ExecutableDef_start_as_root(builder);
 
     // Attach embedded source file contents.
-    SmallVector<iree_hal_rocm_SourceFileDef_ref_t> sourceFileRefs;
-    if (auto sourcesAttr = variantOp.getSourcesAttr()) {
-      for (auto sourceAttr : llvm::reverse(sourcesAttr.getValue())) {
-        if (auto resourceAttr = dyn_cast_if_present<DenseResourceElementsAttr>(
-                sourceAttr.getValue())) {
-          auto filenameRef = builder.createString(sourceAttr.getName());
-          auto contentRef = builder.streamUint8Vec([&](llvm::raw_ostream &os) {
-            auto blobData = resourceAttr.getRawHandle().getBlob()->getData();
-            os.write(blobData.data(), blobData.size());
-            return true;
-          });
-          sourceFileRefs.push_back(iree_hal_rocm_SourceFileDef_create(
-              builder, filenameRef, contentRef));
-        }
-      }
-      std::reverse(sourceFileRefs.begin(), sourceFileRefs.end());
-    }
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
 
-    SmallVector<StringRef> entryPointNames;
-    SmallVector<iree_hal_rocm_FileLineLocDef_ref_t> sourceLocationRefs;
-    entryPointNames.resize(exportOps.size());
+    // Only a single module today.
+    SmallVector<iree_hal_hip_ModuleDef_ref_t> moduleRefs;
+    {
+      auto hsacoImageRef = flatbuffers_string_create(
+          builder, targetHSACO.c_str(), targetHSACO.size());
+      moduleRefs.push_back(
+          iree_hal_hip_ModuleDef_create(builder, hsacoImageRef));
+    }
+    auto modulesRef = builder.createOffsetVecDestructive(moduleRefs);
+
+    // Generate optional per-export debug information.
+    // May be empty if no debug information was requested.
+    auto exportDebugInfos =
+        createExportDefs(serOptions.debugLevel, exportOps, builder);
+
+    SmallVector<iree_hal_hip_ExportDef_ref_t> exportRefs;
+    exportRefs.resize(exportOps.size(), 0);
     for (auto exportOp : exportOps) {
       auto ordinalAttr = exportOp.getOrdinalAttr();
       if (!ordinalAttr) {
@@ -635,86 +637,58 @@ public:
                << "could not compile rocm binary: export op is missing ordinal";
       }
       int64_t ordinal = ordinalAttr.getInt();
-      entryPointNames[ordinal] = exportOp.getName();
 
-      // Optional source location information for debugging/profiling.
-      if (serOptions.debugLevel >= 1) {
-        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-          // We only ever resize to the maximum -- so all previous data will
-          // be kept as-is.
-          sourceLocationRefs.resize(exportOps.size());
-          auto filenameRef = builder.createString(loc->getFilename());
-          sourceLocationRefs[ordinal] = iree_hal_rocm_FileLineLocDef_create(
-              builder, filenameRef, loc->getLine());
-        }
+      auto kernelNameRef = builder.createString(exportOp.getName());
+
+      iree_hal_hip_BlockDims_t blockDims = {0};
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSize = workgroupSizeAttr->getValue();
+        blockDims.x = cast<IntegerAttr>(workgroupSize[0]).getInt();
+        blockDims.y = cast<IntegerAttr>(workgroupSize[1]).getInt();
+        blockDims.z = cast<IntegerAttr>(workgroupSize[2]).getInt();
       }
-    }
 
-    // Optional compilation stage source files.
-    SmallVector<iree_hal_rocm_StageLocationsDef_ref_t> stageLocationsRefs;
-    if (serOptions.debugLevel >= 3) {
-      for (auto exportOp : exportOps) {
-        SmallVector<iree_hal_rocm_StageLocationDef_ref_t> stageLocationRefs;
-        if (auto locsAttr = exportOp.getSourceLocsAttr()) {
-          for (auto locAttr : locsAttr.getValue()) {
-            if (auto loc =
-                    findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
-              auto stageNameRef = builder.createString(locAttr.getName());
-              auto filenameRef = builder.createString(loc->getFilename());
-              stageLocationRefs.push_back(iree_hal_rocm_StageLocationDef_create(
-                  builder, stageNameRef,
-                  iree_hal_rocm_FileLineLocDef_create(builder, filenameRef,
-                                                      loc->getLine())));
-            }
-          }
-        }
-        if (!stageLocationRefs.empty()) {
-          // We only ever resize to the maximum -- so all previous data will
-          // be kept as-is.
-          stageLocationsRefs.resize(exportOps.size());
-          int64_t ordinal = exportOp.getOrdinalAttr().getInt();
-          stageLocationsRefs[ordinal] = iree_hal_rocm_StageLocationsDef_create(
-              builder, builder.createOffsetVecDestructive(stageLocationRefs));
-        }
+      uint32_t blockSharedMemorySize = 0;
+      if (std::optional<APInt> workgroupLocalMemoryAttr =
+              exportOp.getWorkgroupLocalMemory()) {
+        blockSharedMemorySize = workgroupLocalMemoryAttr->getSExtValue();
       }
-    }
 
-    auto hsacoRef = flatbuffers_string_create(builder, targetHSACO.c_str(),
-                                              targetHSACO.size());
+      auto layoutAttr = exportOp.getLayoutAttr();
+      uint32_t constantCount = static_cast<uint32_t>(layoutAttr.getConstants());
+      SmallVector<iree_hal_hip_BindingBits_enum_t> bindingFlags;
+      for (auto bindingAttr : layoutAttr.getBindings()) {
+        iree_hal_hip_BindingBits_enum_t flags = 0;
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::ReadOnly)) {
+          flags |= iree_hal_hip_BindingBits_READ_ONLY;
+        }
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::Indirect)) {
+          flags |= iree_hal_hip_BindingBits_INDIRECT;
+        }
+        bindingFlags.push_back(flags);
+      }
+      auto bindingFlagsRef = iree_hal_hip_BindingBits_vec_create(
+          builder, bindingFlags.data(), bindingFlags.size());
 
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
-    iree_hal_rocm_BlockSizeDef_vec_start(builder);
-    auto blockSizes = workgroupSizes.begin();
-    for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
-      iree_hal_rocm_BlockSizeDef_vec_push_create(
-          builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
-      ++blockSizes;
+      iree_hal_hip_ExportDef_start(builder);
+      iree_hal_hip_ExportDef_module_ordinal_add(builder, 0); // always 0 today
+      iree_hal_hip_ExportDef_kernel_name_add(builder, kernelNameRef);
+      iree_hal_hip_ExportDef_block_dims_add(builder, &blockDims);
+      iree_hal_hip_ExportDef_block_shared_memory_size_add(
+          builder, blockSharedMemorySize);
+      iree_hal_hip_ExportDef_constant_count_add(builder, constantCount);
+      iree_hal_hip_ExportDef_binding_flags_add(builder, bindingFlagsRef);
+      iree_hal_hip_ExportDef_debug_info_add(builder, exportDebugInfos[ordinal]);
+      exportRefs[ordinal] = iree_hal_hip_ExportDef_end(builder);
     }
-    auto workgroupLocalMemoriesRef =
-        builder.createInt32Vec(workgroupLocalMemories);
-    auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
-    iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
-        builder, workgroupLocalMemoriesRef);
-    iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
-    if (!sourceLocationRefs.empty()) {
-      auto sourceLocationsRef =
-          builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_rocm_ExecutableDef_source_locations_add(builder,
-                                                       sourceLocationsRef);
-    }
-    if (!stageLocationsRefs.empty()) {
-      auto stageLocationsRef =
-          builder.createOffsetVecDestructive(stageLocationsRefs);
-      iree_hal_rocm_ExecutableDef_stage_locations_add(builder,
-                                                      stageLocationsRef);
-    }
-    if (!sourceFileRefs.empty()) {
-      auto sourceFilesRef = builder.createOffsetVecDestructive(sourceFileRefs);
-      iree_hal_rocm_ExecutableDef_source_files_add(builder, sourceFilesRef);
-    }
-    iree_hal_rocm_ExecutableDef_end_as_root(builder);
+    auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
+
+    iree_hal_hip_ExecutableDef_exports_add(builder, exportsRef);
+    iree_hal_hip_ExecutableDef_modules_add(builder, modulesRef);
+    iree_hal_hip_ExecutableDef_source_files_add(builder, sourceFilesRef);
+    iree_hal_hip_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(

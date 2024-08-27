@@ -110,9 +110,6 @@ outlineDispatchExternOp(std::string name,
         dispatchExternOp.getSubgroupSizeAttr(),
         dispatchExternOp.getWorkgroupLocalMemoryAttr());
     exportOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
-    if (auto bindingsAttr = dispatchExternOp.getBindingsAttr()) {
-      exportOp->setAttr("hal.interface.bindings", bindingsAttr);
-    }
     if (!dispatchExternOp.getWorkgroupCount().empty()) {
       IRMapping mapper;
       dispatchExternOp.getWorkgroupCount().cloneInto(

@@ -3,7 +3,7 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"llvm-cpu", [
+    #hal.device.target<"local", [
       #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
         native_vector_size = 16 : index
       }>

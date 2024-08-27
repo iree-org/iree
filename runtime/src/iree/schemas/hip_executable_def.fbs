@@ -1,0 +1,71 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+include "iree/schemas/executable_debug_info.fbs";
+
+namespace iree.hal.hip;
+
+// 'HIP v1 Executable'.
+file_identifier "HIP1";
+file_extension "hip1";
+
+// A struct for the kernel block size along each dimension.
+struct BlockDims {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+// Describes the behavior of each binding.
+enum BindingBits:uint64 (bit_flags) {
+  READ_ONLY = 0,  // 1u << 0
+  INDIRECT = 1,  // 1u << 1
+}
+
+// Information about an exported function on the executable.
+table ExportDef {
+  // Ordinal of the shader library containing the entry point in the executable
+  // libraries list.
+  module_ordinal:uint32;
+
+  // String name of the exported kernel function in the module.
+  kernel_name:string;
+
+  // Grid block dimensions for the export.
+  block_dims:BlockDims;
+
+  // Size of dynamic shared memory per block.
+  block_shared_memory_size:uint32;
+
+  // Total number of 32-bit push constants used by the export.
+  constant_count:uint32;
+
+  // Binding count and flags for each binding.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// A library containing one or more exported functions.
+table ModuleDef {
+  // HSACO image.
+  hsaco_image:string;
+}
+
+table ExecutableDef {
+  // Exported functions in canonical executable entry point order.
+  exports:[ExportDef];
+
+  // A list of all kernel modules used by the executable.
+  // Exports index into this list and multiple exports may use the same library.
+  modules:[ModuleDef];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
+}
+
+root_type ExecutableDef;

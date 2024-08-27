@@ -1,9 +1,7 @@
 // RUN: iree-opt --iree-convert-to-llvm --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // CHECK-LABEL: llvm.func @constant_values

@@ -1,0 +1,109 @@
+// Copyright 2019 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+include "iree/schemas/executable_debug_info.fbs";
+
+namespace iree.hal.vulkan;
+
+// 'Vulkan v1 Executable'.
+file_identifier "VKE1";
+file_extension "vk1";
+
+// Direct overlay of the VkPushConstantRange struct.
+struct PushConstantRange {
+  stage_flags:uint32;  // VkShaderStageFlags
+  offset:uint32;
+  size:uint32;
+}
+
+// Direct overlay of the VkDescriptorType enum.
+enum VkDescriptorType:uint32 {
+  SAMPLER = 0,                              // VK_DESCRIPTOR_TYPE_SAMPLER
+  UNIFORM_BUFFER = 6,                       // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+  STORAGE_BUFFER = 7,                       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+}
+
+// Subset of VkDescriptorSetLayoutBinding.
+table DescriptorSetLayoutBindingDef {
+  binding:uint32;
+  descriptor_type:VkDescriptorType;
+  descriptor_count:uint32;
+  stage_flags:uint32;  // VkShaderStageFlags
+}
+
+// Used to create an VkDescriptorSetLayout.
+// This is the minimum required information. Additional flags and values are
+// provided by the runtime as they may vary based on available extensions or
+// implementation options.
+table DescriptorSetLayoutDef {
+  bindings:[DescriptorSetLayoutBindingDef];
+}
+
+// Used to create an VkPipelineLayout.
+// This is the minimum required information. Additional flags and values are
+// provided by the runtime as they may vary based on available extensions or
+// implementation options. We may have fields only used by the implementation
+// in order to convey semantics instead of concrete values.
+table PipelineLayoutDef {
+  descriptor_set_layout_ordinals:[uint32];
+  push_constant_ranges:[PushConstantRange];
+}
+
+// Used to create a VkShaderModule.
+table ShaderModuleDef {
+  // SPIR-V code blob.
+  spirv_code:[uint32];
+}
+
+// Information about an exported function on the executable represented as a
+// VkPipeline in Vulkan.
+table PipelineDef {
+  // Ordinal of the shader module containing the entry point in the executable
+  // shader module list.
+  shader_module_ordinal:uint32;
+
+  // String name of the entry point function in the shader module.
+  entry_point:string;
+
+  // Ordinal of the pipeline layout used by the entry point in the executable
+  // pipeline layouts list.
+  pipeline_layout_ordinal:uint32;
+
+  // Required subgroup size as used for VK_EXT_subgroup_size_control, if any.
+  // Omitting or setting to zero indicates no size is specified.
+  subgroup_size:uint32;
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// A SPIR-V shader module and runtime pipeline layout description.
+// This information is used to create the VkShaderModule, VkPipelineLayout, and
+// any required VkDescriptorSetLayouts.
+table ExecutableDef {
+  // Exported functions in canonical executable entry point order.
+  // Each creates a single VkPipeline.
+  pipelines:[PipelineDef];
+
+  // A list of descriptor set layouts used by the pipeline_layouts in this def.
+  // Pipeline layouts reference into the list.
+  descriptor_set_layouts:[DescriptorSetLayoutDef];
+
+  // A list of pipeline layouts. Exports reference layouts in this list and
+  // multiple exports present in mutliple shader modules may share layouts.
+  // This list may not have the same size as the pipelines list.
+  pipeline_layouts:[PipelineLayoutDef];
+
+  // A list of shader modules hosting various entry points. Each shader module
+  // contains at least one entry point.
+  // This list may not have the same size as the pipelines list.
+  shader_modules:[ShaderModuleDef];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
+}
+
+root_type ExecutableDef;

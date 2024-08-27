@@ -36,11 +36,12 @@ LocalDevice::LocalDevice(const LocalDevice::Options options)
 IREE::HAL::DeviceTargetAttr LocalDevice::getDefaultDeviceTarget(
     MLIRContext *context, const TargetRegistry &targetRegistry) const {
   Builder b(context);
-  SmallVector<NamedAttribute> configItems;
 
-  // TODO(benvanik): flags for common queries.
+  SmallVector<NamedAttribute> deviceConfigAttrs;
+  auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
-  auto configAttr = b.getDictionaryAttr(configItems);
+  SmallVector<NamedAttribute> executableConfigAttrs;
+  auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
 
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
   for (auto backendName : options.defaultTargetBackends) {
@@ -50,23 +51,25 @@ IREE::HAL::DeviceTargetAttr LocalDevice::getDefaultDeviceTarget(
                    << "\n";
       return {};
     }
-    targetBackend->getDefaultExecutableTargets(context, "local", configAttr,
-                                               executableTargetAttrs);
+    targetBackend->getDefaultExecutableTargets(
+        context, "local", executableConfigAttr, executableTargetAttrs);
   }
 
   return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("local"),
-                                          configAttr, executableTargetAttrs);
+                                          deviceConfigAttr,
+                                          executableTargetAttrs);
 }
 
 std::optional<IREE::HAL::DeviceTargetAttr>
 LocalDevice::getHostDeviceTarget(MLIRContext *context,
                                  const TargetRegistry &targetRegistry) const {
   Builder b(context);
-  SmallVector<NamedAttribute> configItems;
 
-  // TODO(benvanik): flags for overrides or ask LLVM for info about the host.
+  SmallVector<NamedAttribute> deviceConfigAttrs;
+  auto deviceConfigAttr = b.getDictionaryAttr(deviceConfigAttrs);
 
-  auto configAttr = b.getDictionaryAttr(configItems);
+  SmallVector<NamedAttribute> executableConfigAttrs;
+  auto executableConfigAttr = b.getDictionaryAttr(executableConfigAttrs);
 
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
   for (auto backendName : options.defaultHostBackends) {
@@ -76,12 +79,13 @@ LocalDevice::getHostDeviceTarget(MLIRContext *context,
                    << "\n";
       return std::nullopt;
     }
-    targetBackend->getHostExecutableTargets(context, "local", configAttr,
-                                            executableTargetAttrs);
+    targetBackend->getHostExecutableTargets(
+        context, "local", executableConfigAttr, executableTargetAttrs);
   }
 
   return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("local"),
-                                          configAttr, executableTargetAttrs);
+                                          deviceConfigAttr,
+                                          executableTargetAttrs);
 }
 
 Value LocalDevice::buildDeviceTargetMatch(

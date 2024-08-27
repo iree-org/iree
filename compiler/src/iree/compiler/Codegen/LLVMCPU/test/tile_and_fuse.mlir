@@ -101,12 +101,10 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @shared_out_operand() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -117,10 +115,10 @@ func.func @shared_out_operand() {
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %2 = arith.index_castui %0 {stream.alignment = 1024 : index, stream.values = [205824 : index, 795648 : index, 1385472 : index, 1975296 : index, 2565120 : index, 3154944 : index, 3744768 : index]} : i32 to index
   %3 = arith.index_castui %1 {stream.alignment = 1024 : index, stream.values = [0 : index, 3072 : index, 6144 : index, 9216 : index, 12288 : index, 15360 : index, 18432 : index]} : i32 to index
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<391x384xf32>>
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%2) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384x384xf32>>
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384xf32>>
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c600576) : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<391x384xf32>>
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%2) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384x384xf32>>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<384xf32>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c600576) : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
   %8 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<391x384xf32>> -> tensor<391x384xf32>
   %9 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [384, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<384x384xf32>
   %10 = flow.dispatch.tensor.load %6, offsets = [0], sizes = [384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>

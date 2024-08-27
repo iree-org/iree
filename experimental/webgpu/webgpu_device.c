@@ -295,13 +295,13 @@ static iree_status_t iree_hal_webgpu_device_import_file(
 }
 
 static iree_status_t iree_hal_webgpu_device_create_pipeline_layout(
-    iree_hal_device_t* base_device, iree_host_size_t push_constants,
+    iree_hal_device_t* base_device, iree_host_size_t constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_pipeline_layout_t** out_pipeline_layout) {
   iree_hal_webgpu_device_t* device = iree_hal_webgpu_device_cast(base_device);
   return iree_hal_webgpu_pipeline_layout_create(
-      device->handle, set_layout_count, set_layouts, push_constants,
+      device->handle, set_layout_count, set_layouts, constants,
       &device->staging_buffer, device->host_allocator, out_pipeline_layout);
 }
 

@@ -5,11 +5,9 @@
 //   return %result : tensor<2xf32>
 // }
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 hal.executable.source public @executable {
@@ -22,8 +20,8 @@ hal.executable.source public @executable {
     func.func @abs() {
       %c0 = arith.constant 0 : index
 
-      %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(4) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2xf32>>
-      %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(4) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(4) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2xf32>>
+      %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(4) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
 
       %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [2], strides = [1] : !flow.dispatch.tensor<readonly:tensor<2xf32>> -> tensor<2xf32>
       %3 = tensor.empty() : tensor<2xf32>

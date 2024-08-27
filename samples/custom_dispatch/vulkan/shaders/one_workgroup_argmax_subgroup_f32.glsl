@@ -7,11 +7,9 @@
 // `ret = argmax(in)`
 //
 // Conforms to ABI:
-// #hal.pipeline.layout<push_constants = 1, sets = [
-//   <0, bindings = [
-//       <0, storage_buffer, ReadOnly>,
-//       <1, storage_buffer>
-//   ]>
+// #hal.pipeline.layout<constants = 1, bindings = [
+//   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+//   #hal.pipeline.binding<storage_buffer>
 // ]>
 
 #version 450 core

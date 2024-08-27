@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
 #include "iree/hal/drivers/vulkan/native_executable.h"
+#include "iree/hal/drivers/vulkan/pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/util/arena.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 
@@ -34,10 +35,10 @@ class DescriptorSetArena final {
   // Allocates and binds a descriptor set from the arena.
   // The command buffer will have the descriptor set containing |bindings| bound
   // to it.
-  iree_status_t BindDescriptorSet(VkCommandBuffer command_buffer,
-                                  iree_hal_pipeline_layout_t* pipeline_layout,
-                                  uint32_t set, iree_host_size_t binding_count,
-                                  const iree_hal_buffer_ref_t* bindings);
+  iree_status_t BindDescriptorSet(
+      VkCommandBuffer command_buffer,
+      iree_hal_vulkan_pipeline_layout_t* pipeline_layout, uint32_t set,
+      iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings);
 
   // Flushes all pending writes to descriptor sets allocated from the arena and
   // returns a group that - when dropped - will release the descriptor sets
@@ -49,7 +50,7 @@ class DescriptorSetArena final {
 
   // Pushes the descriptor set to the command buffer, if supported.
   void PushDescriptorSet(VkCommandBuffer command_buffer,
-                         iree_hal_pipeline_layout_t* pipeline_layout,
+                         iree_hal_vulkan_pipeline_layout_t* pipeline_layout,
                          uint32_t set, iree_host_size_t binding_count,
                          const iree_hal_buffer_ref_t* bindings);
 

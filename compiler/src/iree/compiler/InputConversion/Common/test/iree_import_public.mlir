@@ -385,11 +385,11 @@ func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
 // -----
 // CHECK: #[[PTX:.*]] = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 
-// CHECK: #[[LAYOUT:.*]] = #hal.pipeline.layout<push_constants = 1,
-// CHECK-SAME: sets = [<0, bindings = [
-// CHECK-SAME:             <0, storage_buffer, ReadOnly>,
-// CHECK-SAME:             <1, storage_buffer>
-// CHECK-SAME: ]>]>
+// CHECK: #[[LAYOUT:.*]] = #hal.pipeline.layout<constants = 1,
+// CHECK-SAME: bindings = [
+// CHECK-SAME:   #hal.pipeline.binding<storage_buffer, ReadOnly>,
+// CHECK-SAME:   #hal.pipeline.binding<storage_buffer>
+// CHECK-SAME: ]>
 
 // CHECK: hal.executable.source private @executable
 // CHECK-SAME: {objects = #hal.executable.objects<{
@@ -409,11 +409,9 @@ builtin.module @executable_source {
     }>
   } {
     iree_input.executable.export public @add ordinal(0)
-      layout(#iree_input.pipeline.layout<push_constants = 1, sets = [
-        <0, bindings = [
-            <0, storage_buffer, ReadOnly>,
-            <1, storage_buffer>
-        ]>
+      layout(#iree_input.pipeline.layout<constants = 1, bindings = [
+        #iree_input.pipeline.binding<storage_buffer, ReadOnly>,
+        #iree_input.pipeline.binding<storage_buffer>
       ]>) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }

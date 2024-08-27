@@ -551,7 +551,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-        subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
 
@@ -623,7 +623,7 @@ struct FoldExpandShapeIntoInterfaceTensorStore
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
           subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getBinding(), subspanOp.getByteOffset(),
           subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
     }
@@ -759,7 +759,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
       rewriter.setInsertionPointAfter(subspanOp);
       newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
           subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-          subspanOp.getSet(), subspanOp.getBinding(), subspanOp.getByteOffset(),
+          subspanOp.getBinding(), subspanOp.getByteOffset(),
           subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
     }

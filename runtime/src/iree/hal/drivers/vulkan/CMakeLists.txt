@@ -45,12 +45,12 @@ iree_cc_library(
     "native_event.h"
     "native_executable.cc"
     "native_executable.h"
-    "native_pipeline_layout.cc"
-    "native_pipeline_layout.h"
     "native_semaphore.cc"
     "native_semaphore.h"
     "nop_executable_cache.cc"
     "nop_executable_cache.h"
+    "pipeline_layout.cc"
+    "pipeline_layout.h"
     "sparse_buffer.cc"
     "sparse_buffer.h"
     "status_util.c"
@@ -74,11 +74,13 @@ iree_cc_library(
     iree::hal::drivers::vulkan::util::intrusive_list
     iree::hal::drivers::vulkan::util::ref_ptr
     iree::hal::utils::deferred_command_buffer
+    iree::hal::utils::executable_debug_info
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
-    iree::schemas::spirv_executable_def_c_fbs
+    iree::schemas::executable_debug_info_c_fbs
+    iree::schemas::vulkan_executable_def_c_fbs
   PUBLIC
 )
 

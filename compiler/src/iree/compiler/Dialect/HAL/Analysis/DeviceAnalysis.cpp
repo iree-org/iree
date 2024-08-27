@@ -110,6 +110,18 @@ DeviceAnalysis::lookupDeviceGlobals(Value deviceValue) {
   return globalOps;
 }
 
+std::optional<DeviceSet> DeviceAnalysis::lookupDeviceTargets(
+    IREE::Util::GlobalOpInterface deviceGlobalOp) {
+  return lookupDeviceTargets(FlatSymbolRefAttr::get(deviceGlobalOp));
+}
+
+std::optional<DeviceSet>
+DeviceAnalysis::lookupDeviceTargets(SymbolRefAttr deviceGlobalAttr) {
+  SetVector<IREE::HAL::DeviceTargetAttr> resultSet;
+  gatherDeviceTargets(deviceGlobalAttr, explorer.getRootOp(), resultSet);
+  return DeviceSet(resultSet.getArrayRef());
+}
+
 std::optional<DeviceSet>
 DeviceAnalysis::lookupDeviceTargets(Value deviceValue) {
   auto valuePVS = solver.lookupElementFor<DeviceTargetValuePVS>(

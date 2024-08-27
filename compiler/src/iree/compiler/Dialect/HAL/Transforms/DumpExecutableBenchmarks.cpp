@@ -41,7 +41,6 @@ static const int64_t kBufferAlignment = 256;
 using Vec3 = std::tuple<unsigned, unsigned, unsigned>;
 
 struct Binding {
-  unsigned set = 0;
   unsigned binding = 0;
   int64_t size = 0;
 };
@@ -119,15 +118,9 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
 
       // Work around needing a mutable key for the set; C++ was a mistake.
       dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
-        auto exportOp =
-            symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-                dispatchOp, entryPointAttr);
-        auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
-            exportOp, dispatchOp.getResources().size());
-
         SmallVector<Binding> bindings;
-        for (auto [bindingAttr, resourceLength] :
-             llvm::zip_equal(bindingAttrs, dispatchOp.getResourceLengths())) {
+        for (auto [i, resourceLength] :
+             llvm::enumerate(dispatchOp.getResourceLengths())) {
           APInt resourceLengthInt;
           if (!matchPattern(resourceLength,
                             m_ConstantInt(&resourceLengthInt))) {
@@ -136,9 +129,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
                                     << "` (non-constant resource length)\n";);
             return;
           }
-          bindings.push_back({(unsigned)bindingAttr.getSet(),
-                              (unsigned)bindingAttr.getBinding(),
-                              resourceLengthInt.getSExtValue()});
+          bindings.push_back({(unsigned)i, resourceLengthInt.getSExtValue()});
         }
 
         auto &dispatchParamsSet = map[entryPointAttr];
@@ -297,47 +288,24 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
               /*binding_capacity=*/Value{})
           .getResult();
 
-  // Get the layout required to set up the dispatches.
+  // Constant values.
   auto layoutAttr = exportOp.getLayoutAttr();
-  auto pipelineLayout =
-      funcBuilder
-          .create<IREE::HAL::PipelineLayoutLookupOp>(
-              loc, IREE::HAL::PipelineLayoutType::get(loc.getContext()), device,
-              layoutAttr)
-          .getResult();
-
-  // Push constant values.
-  if (int64_t pushConstantCount = layoutAttr.getPushConstants()) {
-    int pushConstantBase = 0; // always 0 today
-    SmallVector<Value> pushConstants;
-    pushConstants.reserve(pushConstantCount);
+  SmallVector<Value> constantValues;
+  if (int64_t pushConstantCount = layoutAttr.getConstants()) {
+    constantValues.reserve(pushConstantCount);
     for (int64_t i = 0; i < pushConstantCount; ++i) {
-      pushConstants.push_back(funcBuilder.create<arith::ConstantOp>(
+      constantValues.push_back(funcBuilder.create<arith::ConstantOp>(
           loc, dispatchParams.uniformOperands[i]));
     }
-    funcBuilder.create<IREE::HAL::CommandBufferPushConstantsOp>(
-        loc, commandBuffer, pipelineLayout,
-        funcBuilder.getIndexAttr(pushConstantBase), pushConstants);
   }
 
-  // Push descriptor sets.
+  // Binding values.
   Value buffer =
       bufferGlobalOp.createLoadOp(loc, funcBuilder).getLoadedGlobalValue();
-  int64_t currentSet = -1;
-  SmallVector<IREE::HAL::DescriptorSetBindingValue> bindingValues;
-  auto flushSet = [&]() {
-    funcBuilder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-        loc, commandBuffer, pipelineLayout, currentSet, bindingValues);
-    bindingValues.clear();
-  };
+  SmallVector<BindingValue> bindingValues;
   int64_t bufferOffset = 0;
   for (auto binding : dispatchParams.bindings) {
-    if (currentSet != -1 && currentSet != binding.set)
-      flushSet();
-    currentSet = binding.set;
-    IREE::HAL::DescriptorSetBindingValue bindingValue;
-    bindingValue.ordinal =
-        funcBuilder.create<arith::ConstantIndexOp>(loc, binding.binding);
+    BindingValue bindingValue;
     bindingValue.buffer = buffer;
     bindingValue.byteOffset = indexSet.get(bufferOffset);
     bindingValue.byteLength = indexSet.get(binding.size);
@@ -345,8 +313,6 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
     bufferOffset =
         IREE::Util::align(bufferOffset + binding.size, kBufferAlignment);
   }
-  if (currentSet != -1)
-    flushSet();
 
   // @executable::@variant::@export
   auto exportRefAttr =
@@ -378,12 +344,10 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
-        auto flags = forBuilder.getAttr<IREE::HAL::DispatchFlagsAttr>(
-            IREE::HAL::DispatchFlags::None);
         forBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
             loc, commandBuffer, executable, ordinal,
-            workgroupCountOp.getWorkgroupX(), workgroupCountOp.getWorkgroupY(),
-            workgroupCountOp.getWorkgroupZ(), flags);
+            workgroupCountOp.getResults(), constantValues, bindingValues,
+            IREE::HAL::DispatchFlags::None);
 
         // Barrier following the dispatch to block the next dispatch.
         auto sourceStage = IREE::HAL::ExecutionStageBitfield::CommandRetire |

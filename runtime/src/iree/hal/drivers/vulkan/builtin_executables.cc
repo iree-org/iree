@@ -9,7 +9,7 @@
 #include <cstddef>
 
 #include "iree/hal/drivers/vulkan/builtin/builtin_shaders_spv.h"
-#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
+#include "iree/hal/drivers/vulkan/pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 namespace iree {
@@ -26,7 +26,7 @@ typedef struct iree_hal_vulkan_builtin_fill_unaligned_constants_t {
 } iree_hal_vulkan_builtin_fill_unaligned_constants_t;
 
 static_assert(sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t) ==
-                  IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT,
+                  IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANTS_SIZE,
               "push constant count must match struct size");
 
 }  // namespace
@@ -41,11 +41,11 @@ BuiltinExecutables::~BuiltinExecutables() {
   }
 
   if (pipeline_layout_) {
-    iree_hal_pipeline_layout_destroy(pipeline_layout_);
+    iree_hal_vulkan_pipeline_layout_release(pipeline_layout_);
   }
 
   for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
-    iree_hal_descriptor_set_layout_release(descriptor_set_layouts_[i]);
+    iree_hal_vulkan_descriptor_set_layout_release(descriptor_set_layouts_[i]);
   }
 }
 
@@ -56,18 +56,20 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
   // Even though we're just using one set, we still need to create dummy set
   // layout (without any bindings) for those preceding this set.
   for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
-    iree_hal_descriptor_set_layout_t* layout = NULL;
+    iree_hal_vulkan_descriptor_set_layout_t* layout = NULL;
     if (i == IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET) {
-      iree_hal_descriptor_set_layout_binding_t layout_binding;
+      VkDescriptorSetLayoutBinding layout_binding;
       layout_binding.binding = 0;
-      layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      layout_binding.flags = IREE_HAL_DESCRIPTOR_FLAG_NONE;
-      IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
-          logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
+      layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      layout_binding.descriptorCount = 1;
+      layout_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+      layout_binding.pImmutableSamplers = NULL;
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_descriptor_set_layout_create(
+          logical_device_, /*flags=*/0,
           /*binding_count=*/1, &layout_binding, &layout));
     } else {
-      IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
-          logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_descriptor_set_layout_create(
+          logical_device_, /*flags=*/0,
           /*binding_count=*/0, /*bindings=*/nullptr, &layout));
     }
     descriptor_set_layouts_[i] = layout;
@@ -92,10 +94,14 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
 
   // Create pipeline layout.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_native_pipeline_layout_create(
-        logical_device_, IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT / 4,
-        IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT, descriptor_set_layouts_,
-        &pipeline_layout_);
+    VkPushConstantRange push_constant_ranges[1];
+    push_constant_ranges[0].offset = 0;
+    push_constant_ranges[0].size = IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANTS_SIZE;
+    push_constant_ranges[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    status = iree_hal_vulkan_pipeline_layout_create(
+        logical_device_, IREE_ARRAYSIZE(push_constant_ranges),
+        push_constant_ranges, IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT,
+        descriptor_set_layouts_, &pipeline_layout_);
   }
 
   // Create pipeline.
@@ -105,7 +111,7 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
     pipeline_create_info.pNext = NULL;
     pipeline_create_info.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
     pipeline_create_info.layout =
-        iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_);
+        iree_hal_vulkan_pipeline_layout_handle(pipeline_layout_);
     pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_create_info.basePipelineIndex = 0;
     VkPipelineShaderStageCreateInfo* stage_create_info =
@@ -138,7 +144,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
     VkCommandBuffer command_buffer, DescriptorSetArena* descriptor_set_arena,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void* pattern,
-    iree_host_size_t pattern_length, const void* push_constants_to_restore) {
+    iree_host_size_t pattern_length) {
   IREE_TRACE_SCOPE();
 
   iree_hal_vulkan_builtin_fill_unaligned_constants_t constants;
@@ -160,7 +166,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   }
 
   iree_hal_buffer_ref_t binding;
-  binding.ordinal = 0;
+  binding.reserved = 0;
   binding.buffer = target_buffer;
   binding.offset = 0;
   binding.length = IREE_WHOLE_BUFFER;
@@ -175,8 +181,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   constants.fill_offset_bytes = target_offset;
   constants.fill_length_bytes = length;
   logical_device_->syms()->vkCmdPushConstants(
-      command_buffer,
-      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_),
+      command_buffer, iree_hal_vulkan_pipeline_layout_handle(pipeline_layout_),
       VK_SHADER_STAGE_COMPUTE_BIT, /*offset=*/0,
       sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t), &constants);
 
@@ -185,14 +190,6 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   //   transfer<->dispatch.
 
   logical_device_->syms()->vkCmdDispatch(command_buffer, 1, 1, 1);
-
-  // Restore push constants.
-  logical_device_->syms()->vkCmdPushConstants(
-      command_buffer,
-      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_),
-      VK_SHADER_STAGE_COMPUTE_BIT, /*offset=*/0,
-      sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t),
-      push_constants_to_restore);
 
   return iree_ok_status();
 }

@@ -309,9 +309,10 @@ struct ConvertHALInterfaceBindingSubspanOp
           subspanOp,
           "failed to convert interface.binding.subspan result to memref type");
     }
-    auto memRefDesc = abi.loadBinding(
-        subspanOp, subspanOp.getFlatBindingIndex(), operands.getByteOffset(),
-        memRefType, operands.getDynamicDims(), rewriter);
+    auto memRefDesc =
+        abi.loadBinding(subspanOp, subspanOp.getBinding().getSExtValue(),
+                        operands.getByteOffset(), memRefType,
+                        operands.getDynamicDims(), rewriter);
     rewriter.replaceOp(subspanOp, {memRefDesc});
     return success();
   }

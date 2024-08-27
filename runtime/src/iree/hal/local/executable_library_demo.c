@@ -22,17 +22,17 @@
 // communication between invocations must use the buffer bindings for I/O.
 //
 // This is a simple scalar addition:
-//    binding[1] = binding[0] + push_constant[0]
+//    binding[1] = binding[0] + constant[0]
 static int dispatch_tile_a(
     const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
     const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
-  const dispatch_tile_a_push_constants_t* push_constants =
-      (const dispatch_tile_a_push_constants_t*)dispatch_state->push_constants;
+  const dispatch_tile_a_constants_t* constants =
+      (const dispatch_tile_a_constants_t*)dispatch_state->constants;
   const float* src = ((const float*)dispatch_state->binding_ptrs[0]);
   float* dst = ((float*)dispatch_state->binding_ptrs[1]);
   const uint32_t x = workgroup_state->workgroup_id_x;
-  dst[x] = src[x] + push_constants->f0;
+  dst[x] = src[x] + constants->f0;
   return 0;
 }
 

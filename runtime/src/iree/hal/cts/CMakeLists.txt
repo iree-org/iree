@@ -10,15 +10,13 @@ set(IREE_ALL_CTS_TESTS
   "command_buffer"
   "command_buffer_copy_buffer"
   "command_buffer_dispatch"
+  "command_buffer_dispatch_constants"
   "command_buffer_fill_buffer"
-  "command_buffer_push_constants"
   "command_buffer_update_buffer"
-  "descriptor_set_layout"
   "driver"
   "event"
   "executable_cache"
   "file"
-  "pipeline_layout"
   "semaphore"
   "semaphore_submission"
   PARENT_SCOPE
@@ -29,7 +27,7 @@ set(IREE_ALL_CTS_TESTS
 # connected to a functional compiler target, these tests can be skipped.
 set(IREE_EXECUTABLE_CTS_TESTS
   "command_buffer_dispatch"
-  "command_buffer_push_constants"
+  "command_buffer_dispatch_constants"
   "executable_cache"
   PARENT_SCOPE
 )
@@ -37,7 +35,7 @@ set(IREE_EXECUTABLE_CTS_TESTS
 # List of testdata/{name}.mlir source files.
 set(IREE_ALL_CTS_EXECUTABLE_SOURCES
   "command_buffer_dispatch_test"
-  "command_buffer_push_constants_test"
+  "command_buffer_dispatch_constants_test"
   "executable_cache_test"
   PARENT_SCOPE
 )
@@ -122,6 +120,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    command_buffer_dispatch_constants_test_library
+  HDRS
+    "command_buffer_dispatch_constants_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     command_buffer_fill_buffer_test_library
   HDRS
     "command_buffer_fill_buffer_test.h"
@@ -135,35 +146,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    command_buffer_push_constants_test_library
-  HDRS
-    "command_buffer_push_constants_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
     command_buffer_update_buffer_test_library
   HDRS
     "command_buffer_update_buffer_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
-    descriptor_set_layout_test_library
-  HDRS
-    "descriptor_set_layout_test.h"
   DEPS
     ::cts_test_base
     iree::base
@@ -216,19 +201,6 @@ iree_cc_library(
     file_test_library
   HDRS
     "file_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
-    pipeline_layout_test_library
-  HDRS
-    "pipeline_layout_test.h"
   DEPS
     ::cts_test_base
     iree::base

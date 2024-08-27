@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
@@ -131,6 +132,18 @@ public:
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
+
+    // TODO: rework this to compile all modules into the same metallib and
+    // source the entry points from them. Or use a linking tool (metal-ar) to
+    // link the compiled metallibs together. If we were not using spirv-cross
+    // we'd never do it like this with one module per function.
+    //
+    // Currently this is _really_ bad because it doesn't support linking like
+    // the Vulkan SPIR-V target: that allows multiple spirv::ModuleOps so we
+    // at least only have a single HAL executable; this should all be reworked
+    // to have multiple SPIR-V modules in a single executable and then even if
+    // passing through spirv-cross independently should link the resulting
+    // metallibs together.
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
     if (!serOptions.dumpIntermediatesPath.empty()) {
       std::string assembly;
@@ -139,14 +152,6 @@ public:
       dumpDataToPath(serOptions.dumpIntermediatesPath, serOptions.dumpBaseName,
                      variantOp.getName(), ".mlir", assembly);
     }
-
-    // The runtime use ordinals instead of names but Metal requires function
-    // names for constructing pipeline states. Get an ordered list of the entry
-    // point names.
-    SmallVector<StringRef, 8> spirvEntryPointNames;
-    spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      spirvEntryPointNames.push_back(exportOp.getFn());
-    });
 
     // 1. Serialize the spirv::ModuleOp into binary format.
     SmallVector<uint32_t, 0> spvBinary;
@@ -158,6 +163,14 @@ public:
                                serOptions.dumpBaseName, variantOp.getName(),
                                ".spv", spvBinary);
     }
+
+    // The runtime use ordinals instead of names but Metal requires function
+    // names for constructing pipeline states. Get an ordered list of the entry
+    // point names.
+    SmallVector<StringRef, 8> spirvEntryPointNames;
+    spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
+      spirvEntryPointNames.push_back(exportOp.getFn());
+    });
 
     // 2. Cross compile SPIR-V to MSL source code.
     SmallVector<MetalShader, 2> mslShaders;
@@ -187,15 +200,17 @@ public:
     }
 
     // 3. Compile MSL to MTLLibrary.
-    SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metalLibs;
+    SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metallibs;
+    metallibs.resize(mslShaders.size());
     if (options.compileToMetalLib) {
       // We need to use offline Metal shader compilers.
       // TODO(#14048): The toolchain can also exist on other platforms. Probe
       // the PATH instead.
       auto hostTriple = llvm::Triple(llvm::sys::getProcessTriple());
       if (hostTriple.isMacOSX()) {
-        for (auto [shader, entryPoint] :
-             llvm::zip(mslShaders, mslEntryPointNames)) {
+        for (auto [i, shader, entryPoint] :
+             llvm::zip_equal(llvm::seq(mslShaders.size()), mslShaders,
+                             mslEntryPointNames)) {
           std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
               options.targetPlatform, shader.source, entryPoint);
           if (!lib) {
@@ -203,7 +218,7 @@ public:
                    << "failed to compile to MTLLibrary from MSL:\n\n"
                    << shader.source << "\n\n";
           }
-          metalLibs.push_back(std::move(lib));
+          metallibs[i] = std::move(lib);
         }
       }
     }
@@ -212,36 +227,88 @@ public:
     FlatbufferBuilder builder;
     iree_hal_metal_ExecutableDef_start_as_root(builder);
 
-    auto entryPointNamesRef = builder.createStringVec(mslEntryPointNames);
-    iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
+    // Attach embedded source file contents.
+    auto sourceFilesRef = createSourceFilesVec(
+        serOptions.debugLevel, variantOp.getSourcesAttr(), builder);
 
-    iree_hal_metal_ThreadgroupSize_vec_start(builder);
-    for (auto &shader : mslShaders) {
-      iree_hal_metal_ThreadgroupSize_vec_push_create(
-          builder, shader.threadgroupSize.x, shader.threadgroupSize.y,
-          shader.threadgroupSize.z);
+    // Each library may provide multiple functions so we encode them
+    // independently.
+    SmallVector<iree_hal_metal_LibraryDef_ref_t> libraryRefs;
+    for (auto [shader, metallib] : llvm::zip_equal(mslShaders, metallibs)) {
+      const bool embedSource = !metallib || serOptions.debugLevel > 1;
+      iree_hal_metal_MSLSourceDef_ref_t sourceRef = 0;
+      if (embedSource) {
+        // TODO: pull this from an attribute?
+        // https://developer.apple.com/documentation/metal/mtllanguageversion
+        unsigned version = 196608; // MTLLanguageVersion3_0
+        auto sourceStrRef = builder.createString(shader.source);
+        sourceRef =
+            iree_hal_metal_MSLSourceDef_create(builder, version, sourceStrRef);
+      }
+      flatbuffers_string_ref_t metallibRef = 0;
+      if (metallib) {
+        metallibRef = flatbuffers_string_create(
+            builder, metallib->getBufferStart(), metallib->getBufferSize());
+      }
+      iree_hal_metal_LibraryDef_start(builder);
+      iree_hal_metal_LibraryDef_source_add(builder, sourceRef);
+      iree_hal_metal_LibraryDef_metallib_add(builder, metallibRef);
+      libraryRefs.push_back(iree_hal_metal_LibraryDef_end(builder));
     }
-    auto threadgroupSizesRef = iree_hal_metal_ThreadgroupSize_vec_end(builder);
-    iree_hal_metal_ExecutableDef_threadgroup_sizes_add(builder,
-                                                       threadgroupSizesRef);
+    auto librariesRef = builder.createOffsetVecDestructive(libraryRefs);
 
-    if (metalLibs.empty()) {
-      auto shaderSourcesRef = builder.createStringVec(
-          llvm::map_range(mslShaders, [&](const MetalShader &shader) {
-            return shader.source;
-          }));
-      iree_hal_metal_ExecutableDef_shader_sources_add(builder,
-                                                      shaderSourcesRef);
-    } else {
-      auto refs = llvm::to_vector<8>(llvm::map_range(
-          metalLibs, [&](const std::unique_ptr<llvm::MemoryBuffer> &buffer) {
-            return flatbuffers_string_create(builder, buffer->getBufferStart(),
-                                             buffer->getBufferSize());
-          }));
-      auto libsRef =
-          flatbuffers_string_vec_create(builder, refs.data(), refs.size());
-      iree_hal_metal_ExecutableDef_shader_libraries_add(builder, libsRef);
+    // Generate optional per-export debug information.
+    // May be empty if no debug information was requested.
+    auto exportOps = llvm::to_vector_of<IREE::HAL::ExecutableExportOp>(
+        variantOp.getExportOps());
+    auto exportDebugInfos =
+        createExportDefs(serOptions.debugLevel, exportOps, builder);
+
+    SmallVector<iree_hal_metal_PipelineDef_ref_t> pipelineRefs;
+    for (auto [i, shader, entryPoint, exportOp] :
+         llvm::zip_equal(llvm::seq(mslShaders.size()), mslShaders,
+                         mslEntryPointNames, exportOps)) {
+      auto entryPointRef = builder.createString(entryPoint);
+
+      iree_hal_metal_ThreadgroupSize_t threadgroupSize = {
+          shader.threadgroupSize.x,
+          shader.threadgroupSize.y,
+          shader.threadgroupSize.z,
+      };
+
+      auto layoutAttr = exportOp.getLayoutAttr();
+      uint32_t constantCount = static_cast<uint32_t>(layoutAttr.getConstants());
+      SmallVector<iree_hal_metal_BindingBits_enum_t> bindingFlags;
+      for (auto bindingAttr : layoutAttr.getBindings()) {
+        iree_hal_metal_BindingBits_enum_t flags = 0;
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::ReadOnly)) {
+          flags |= iree_hal_metal_BindingBits_IMMUTABLE;
+        }
+        bindingFlags.push_back(flags);
+      }
+      auto bindingFlagsRef = iree_hal_metal_BindingBits_vec_create(
+          builder, bindingFlags.data(), bindingFlags.size());
+
+      iree_hal_metal_PipelineDef_start(builder);
+      iree_hal_metal_PipelineDef_library_ordinal_add(builder, i);
+      iree_hal_metal_PipelineDef_entry_point_add(builder, entryPointRef);
+      iree_hal_metal_PipelineDef_threadgroup_size_add(builder,
+                                                      &threadgroupSize);
+      // TODO: embed additional metadata on threadgroup info if available.
+      // iree_hal_metal_PipelineDef_max_threads_per_threadgroup_add(builder, 0);
+      // iree_hal_metal_PipelineDef_threadgroup_size_aligned_add(builder,
+      // false);
+      iree_hal_metal_PipelineDef_constant_count_add(builder, constantCount);
+      iree_hal_metal_PipelineDef_binding_flags_add(builder, bindingFlagsRef);
+      iree_hal_metal_PipelineDef_debug_info_add(builder, exportDebugInfos[i]);
+      pipelineRefs.push_back(iree_hal_metal_PipelineDef_end(builder));
     }
+    auto pipelinesRef = builder.createOffsetVecDestructive(pipelineRefs);
+
+    iree_hal_metal_ExecutableDef_pipelines_add(builder, pipelinesRef);
+    iree_hal_metal_ExecutableDef_libraries_add(builder, librariesRef);
+    iree_hal_metal_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
     iree_hal_metal_ExecutableDef_end_as_root(builder);
 

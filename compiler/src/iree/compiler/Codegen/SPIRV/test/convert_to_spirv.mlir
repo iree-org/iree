@@ -1,11 +1,9 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv))))' %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv{index-bits=64}))))' %s | FileCheck %s --check-prefix=INDEX64
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @push_constant {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -38,14 +36,10 @@ hal.executable private @push_constant {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<3, bindings = [
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @resource_bindings_in_same_func {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -54,10 +48,10 @@ hal.executable private @resource_bindings_in_same_func {
     }
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
-      // CHECK: spirv.GlobalVariable @[[ARG0:.+]] bind(1, 2) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[ARG1_0:.+]] bind(1, 3) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[ARG1_1:.+]] bind(1, 3) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG0:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG1_0:.+]] bind(0, 1) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG1_1:.+]] bind(0, 1) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[RET0:.+]] bind(0, 2) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spirv.func @resource_bindings_in_same_entry_func()
       func.func @resource_bindings_in_same_entry_func() -> f32 {
         %c0 = arith.constant 0 : index
@@ -65,17 +59,17 @@ hal.executable private @resource_bindings_in_same_func {
         // Same type
         // CHECK: spirv.mlir.addressof @[[ARG0]]
         // CHECK: spirv.mlir.addressof @[[ARG0]]
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
 
         // Different type
         // CHECK: spirv.mlir.addressof @[[ARG1_0]]
         // CHECK: spirv.mlir.addressof @[[ARG1_1]]
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(3) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
-        %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(3) : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
+        %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
 
         // CHECK: spirv.mlir.addressof @[[RET0]]
-        %4 = hal.interface.binding.subspan layout(#pipeline_layout) set(3) binding(4) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
+        %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
 
         %5 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %6 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
@@ -99,13 +93,9 @@ hal.executable private @resource_bindings_in_same_func {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<3, bindings = [
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @resource_bindings_in_multi_entry_func {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -117,18 +107,18 @@ hal.executable private @resource_bindings_in_multi_entry_func {
     }
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
-      // CHECK: spirv.GlobalVariable @[[FUNC1_ARG:.+]] bind(1, 2) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[FUNC1_ARG:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[FUNC1_RET:.+]] bind(0, 1) : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[FUNC2_ARG:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[FUNC2_RET:.+]] bind(0, 1) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
 
       // CHECK: spirv.func @resource_bindings_in_entry_func1()
       func.func @resource_bindings_in_entry_func1() -> f32 {
         // CHECK: spirv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spirv.mlir.addressof @[[FUNC1_RET]]
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(3) binding(4) : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
 
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0] : memref<4xvector<4xf32>, #spirv.storage_class<StorageBuffer>>
@@ -144,8 +134,8 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         // CHECK: spirv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spirv.mlir.addressof @[[FUNC2_RET]]
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Same type as previous function
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(3) binding(4) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Different type as previous function
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Same type as previous function
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Different type as previous function
 
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
@@ -160,12 +150,10 @@ hal.executable private @resource_bindings_in_multi_entry_func {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -175,9 +163,9 @@ hal.executable private @interface_binding {
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<5xf32, #spirv.storage_class<StorageBuffer>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<5xf32, #spirv.storage_class<StorageBuffer>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
 
         %3 = memref.load %0[%c0, %c0] : memref<8x5xf32, #spirv.storage_class<StorageBuffer>>
         %4 = memref.load %1[%c0] : memref<5xf32, #spirv.storage_class<StorageBuffer>>
@@ -205,12 +193,10 @@ hal.executable private @interface_binding {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_wg_id {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -240,12 +226,10 @@ hal.executable private @interface_wg_id {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
@@ -257,7 +241,7 @@ hal.executable private @interface_wg_size {
         %c0 = arith.constant 0.0 : f32
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<64x64xf32, #spirv.storage_class<StorageBuffer>>
+        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x64xf32, #spirv.storage_class<StorageBuffer>>
         memref.store %c0, %subspan[%workgroup_size_x, %workgroup_size_y] : memref<64x64xf32, #spirv.storage_class<StorageBuffer>>
         return
       }
@@ -278,12 +262,10 @@ hal.executable private @interface_wg_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {

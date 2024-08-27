@@ -7,12 +7,10 @@
 // push constants available and the descriptor sets and their bindings.
 // Push constants are dense (0..N) while the sets/bindings are sparse and may
 // contain unused or omitted entries.
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // A single executable source definition is allowed per translation in this mode
@@ -39,9 +37,9 @@ hal.executable.source public @executable {
       // Bindings are dereferenced by their set/binding ordinal and may have a
       // byte offset from the base of the descriptor. Alignment information when
       // available can help code generation emit better loads/stores.
-      %s0b0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %s0b1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) offset(%offset) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %s0b2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
+      %s0b0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) offset(%offset) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
 
       // Workgroup information can be queried from the interface.
       %workgroup_id_x = hal.interface.workgroup.id[0] : index

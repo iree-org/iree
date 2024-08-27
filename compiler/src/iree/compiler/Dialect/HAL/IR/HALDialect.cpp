@@ -100,9 +100,7 @@ public:
     MLIRContext *context = attr.getContext();
     // TODO(benvanik): remove this interface or make it an attr interface.
     if (auto bindingAttr =
-            llvm::dyn_cast<IREE::HAL::DescriptorSetBindingAttr>(attr)) {
-      fn(IntegerAttr::get(IndexType::get(context),
-                          APInt(64, bindingAttr.getOrdinal())));
+            llvm::dyn_cast<IREE::HAL::PipelineBindingAttr>(attr)) {
       fn(IREE::HAL::DescriptorTypeAttr::get(context, bindingAttr.getType()));
       fn(IREE::HAL::DescriptorFlagsAttr::get(context, bindingAttr.getFlags()));
       return success();

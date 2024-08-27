@@ -1,10 +1,8 @@
 // RUN: iree-opt -split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tile))" %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @innermost_reduction() {
   %c1 = arith.constant 1 : index
@@ -16,9 +14,9 @@ func.func @innermost_reduction() {
   %3 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 394752 : index, 984064 : index]} : i32 to index
   %4 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [0 : index, 196608 : index, 197120 : index]} : i32 to index
   %5 = arith.index_cast %2 {stream.alignment = 512 : index, stream.values = [512 : index, 197120 : index, 197632 : index]} : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%3) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%4) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %9 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
@@ -61,11 +59,9 @@ func.func @innermost_reduction() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @has_scf_if() {
   %c49152 = arith.constant 49152 : index
@@ -74,8 +70,8 @@ func.func @has_scf_if() {
   %c1023_i32 = arith.constant 1023 : i32
   %c2_i32 = arith.constant 2 : i32
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<49152xi32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<49152xi32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<49152xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<49152xi32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %2 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_id_x]

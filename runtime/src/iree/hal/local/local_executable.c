@@ -10,20 +10,10 @@
 
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
-    iree_host_size_t pipeline_layout_count,
-    iree_hal_pipeline_layout_t* const* source_pipeline_layouts,
-    iree_hal_pipeline_layout_t** target_pipeline_layouts,
     iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable) {
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
   out_base_executable->host_allocator = host_allocator;
-
-  out_base_executable->pipeline_layout_count = pipeline_layout_count;
-  out_base_executable->pipeline_layouts = target_pipeline_layouts;
-  for (iree_host_size_t i = 0; i < pipeline_layout_count; ++i) {
-    target_pipeline_layouts[i] = source_pipeline_layouts[i];
-    iree_hal_pipeline_layout_retain(source_pipeline_layouts[i]);
-  }
 
   // Function attributes are optional and populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
@@ -34,12 +24,7 @@ void iree_hal_local_executable_initialize(
 }
 
 void iree_hal_local_executable_deinitialize(
-    iree_hal_local_executable_t* base_executable) {
-  for (iree_host_size_t i = 0; i < base_executable->pipeline_layout_count;
-       ++i) {
-    iree_hal_pipeline_layout_release(base_executable->pipeline_layouts[i]);
-  }
-}
+    iree_hal_local_executable_t* base_executable) {}
 
 iree_hal_local_executable_t* iree_hal_local_executable_cast(
     iree_hal_executable_t* base_value) {
@@ -78,7 +63,7 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
     int xyz_string_length =
         snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
                  workgroup_count_x, workgroup_count_y, workgroup_count_z);
-    IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 

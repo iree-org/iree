@@ -1,0 +1,41 @@
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree.hal.debug;
+
+// Source code location denoted by a file name and line within that file.
+table FileLineLocDef {
+  filename:string;
+  line:int32;
+}
+
+// Source location keyed by a string compilation stage name.
+table StageLocationDef {
+  stage:string;
+  location:FileLineLocDef;
+}
+
+// Debug information for an exported function.
+// Empty/omitted if the compilation debug level is 0.
+table ExportDef {
+  // Original export name from the producer tool.
+  name:string;
+
+  // Source location in the canonical form to be presented in most tooling.
+  // Generally included with compilation debug level >= 1.
+  location:FileLineLocDef;
+
+  // Table of source locations keyed by compilation stage name.
+  // Sorted ascending by stage name.
+  // Generally included with compilation debug level >= 3.
+  stage_locations:[StageLocationDef];
+}
+
+// An embedded source file referenced by locations in the file.
+table SourceFileDef {
+  path:string;
+  content:[uint8];
+}

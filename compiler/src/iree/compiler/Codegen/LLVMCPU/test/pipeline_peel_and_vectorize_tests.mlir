@@ -1,20 +1,18 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmcpu-lower-executable-target))' -split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @no_peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x64xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<64x512xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x64xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<64x512xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x64xf32>> -> tensor<128x64xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [64, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x512xf32>> -> tensor<64x512xf32>
   %5 = tensor.empty() : tensor<128x512xf32>
@@ -34,21 +32,19 @@ func.func @no_peel_static_matmul() attributes {hal.executable.target = #executab
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x49xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<49x512xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x49xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<49x512xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x49xf32>> -> tensor<128x49xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [49, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x512xf32>
   %5 = tensor.empty() : tensor<128x512xf32>
@@ -80,12 +76,10 @@ func.func @peel_static_matmul() attributes {hal.executable.target = #executable_
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
@@ -98,9 +92,9 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
   %3 = arith.index_cast %0 : i32 to index
   %4 = arith.index_cast %1 : i32 to index
   %5 = arith.index_cast %2 : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
   %9 = flow.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%4, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3} -> tensor<?x?xf32>
   %10 = flow.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%3, %5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5} -> tensor<?x?xf32>
   %11 = tensor.empty(%4, %5) : tensor<?x?xf32>
@@ -140,12 +134,10 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [8, [32], 0], [0, 0, 1], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
@@ -159,9 +151,9 @@ module {
     %3 = arith.index_cast %0 : i32 to index
     %4 = arith.index_cast %1 : i32 to index
     %5 = arith.index_cast %2 : i32 to index
-    %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
-    %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
-    %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3}
+    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5}
+    %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%4, %5}
     %9 = flow.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%4, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %3} -> tensor<?x?xf32>
     %10 = flow.dispatch.tensor.load %7, offsets = [0, 0], sizes = [%3, %5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%3, %5} -> tensor<?x?xf32>
     %11 = tensor.empty(%4, %5) : tensor<?x?xf32>

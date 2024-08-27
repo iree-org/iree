@@ -30,39 +30,53 @@ iree_flatbuffer_c_library(
     name = "cuda_executable_def_c_fbs",
     srcs = ["cuda_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
 )
 
 iree_flatbuffer_c_library(
-    name = "rocm_executable_def_c_fbs",
-    srcs = ["rocm_executable_def.fbs"],
+    name = "executable_debug_info_c_fbs",
+    srcs = ["executable_debug_info.fbs"],
     flatcc_args = FLATCC_ARGS,
+)
+
+iree_flatbuffer_c_library(
+    name = "hip_executable_def_c_fbs",
+    srcs = ["hip_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
 )
 
 iree_flatbuffer_c_library(
     name = "metal_executable_def_c_fbs",
     srcs = ["metal_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
 )
 
 iree_flatbuffer_c_library(
-    name = "spirv_executable_def_c_fbs",
-    srcs = ["spirv_executable_def.fbs"],
+    name = "vulkan_executable_def_c_fbs",
+    srcs = ["vulkan_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
 )
 
 iree_flatbuffer_c_library(
-    name = "wgsl_executable_def_c_fbs",
-    srcs = ["wgsl_executable_def.fbs"],
+    name = "webgpu_executable_def_c_fbs",
+    srcs = ["webgpu_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
 )
 
 iree_build_test(
     name = "schema_build_test",
     targets = [
         ":bytecode_module_def_c_fbs",
+        ":cuda_executable_def_c_fbs",
+        ":executable_debug_info_c_fbs",
+        ":hip_executable_def_c_fbs",
         ":metal_executable_def_c_fbs",
-        ":spirv_executable_def_c_fbs",
-        ":wgsl_executable_def_c_fbs",
+        ":vulkan_executable_def_c_fbs",
+        ":webgpu_executable_def_c_fbs",
     ],
 )
 

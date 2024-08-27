@@ -24,36 +24,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-struct DescriptorState {
-  Value buffer;
-  Value offset;
-  Value length;
-};
-
-struct DescriptorSetState {
-  Value pipelineLayout;
-  SmallVector<DescriptorState, 32> descriptors;
-
-  DescriptorState &getDescriptor(int64_t index) {
-    if (index >= descriptors.size()) {
-      descriptors.resize(index + 1);
-    }
-    return descriptors[index];
-  }
-
-  void clear() {
-    pipelineLayout = {};
-    descriptors.clear();
-  }
-};
-
 struct CommandBufferState {
-  // Push constants can only be reused with compatible layouts.
-  Value pushConstantLayout;
-  SmallVector<Value, 32> pushConstants;
-
-  SmallVector<DescriptorSetState, 4> descriptorSets;
-
   // Set after we know a full barrier has been issued; any subsequent barrier
   // until a real operation is redundant. We could track more fine-grained state
   // here such as which stages are being waited on.
@@ -61,26 +32,6 @@ struct CommandBufferState {
   // been passed as a function/branch argument and we don't have visibility.
   // We need to use IPO to track that.
   IREE::HAL::CommandBufferExecutionBarrierOp previousFullBarrier;
-
-  Value &getPushConstant(int64_t index) {
-    if (index >= pushConstants.size()) {
-      pushConstants.resize(index + 1);
-    }
-    return pushConstants[index];
-  }
-
-  DescriptorSetState *getDescriptorSet(Value set) {
-    APInt setInt;
-    if (!matchPattern(set, m_ConstantInt(&setInt))) {
-      // Dynamic set value; not analyzable with this approach.
-      return nullptr;
-    }
-    int64_t index = setInt.getSExtValue();
-    if (index >= descriptorSets.size()) {
-      descriptorSets.resize(index + 1);
-    }
-    return &descriptorSets[index];
-  }
 };
 
 using CommandBufferStateMap = DenseMap<Value, CommandBufferState>;
@@ -108,98 +59,6 @@ static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
   } else {
     state.previousFullBarrier = {};
   }
-}
-
-static LogicalResult processOp(IREE::HAL::CommandBufferPushConstantsOp op,
-                               CommandBufferState &state) {
-  // Push constant state is only shared with the same layout.
-  if (state.pushConstantLayout != op.getPipelineLayout()) {
-    state.pushConstantLayout = op.getPipelineLayout();
-    state.pushConstants.clear();
-  }
-
-  // Today we only eat constants from the beginning or end of the range
-  // (hopefully removing the entire op). Sparse constant sets aren't worth it.
-  int64_t baseIndex = op.getOffset().getSExtValue();
-  llvm::BitVector redundantIndices(op.getValues().size());
-  for (auto value : llvm::enumerate(op.getValues())) {
-    auto &stateValue = state.getPushConstant(baseIndex + value.index());
-    if (value.value() == stateValue) {
-      // Redundant value.
-      redundantIndices.set(value.index());
-    } else {
-      stateValue = value.value();
-    }
-  }
-  if (redundantIndices.none())
-    return success(); // no-op
-
-  // If all bits are set we can just kill the op.
-  if (redundantIndices.all()) {
-    op.erase();
-    return success();
-  }
-
-  int lastRedundant = redundantIndices.find_last();
-  int lastNonRedundant = redundantIndices.find_last_unset();
-  if (lastRedundant != -1 && lastRedundant > lastNonRedundant) {
-    // Eat the last few constants.
-    int redundantCount = redundantIndices.size() - lastRedundant;
-    op.getValuesMutable().erase(lastRedundant, redundantCount);
-  }
-
-  int firstRedundant = redundantIndices.find_first();
-  int firstNonRedundant = redundantIndices.find_first_unset();
-  if (firstRedundant != -1 && firstRedundant < firstNonRedundant) {
-    // Eat the first few constants by adjusting the offset and slicing out the
-    // values.
-    op.setOffsetAttr(Builder(op).getIndexAttr(baseIndex + firstRedundant + 1));
-    op.getValuesMutable().erase(0, firstRedundant + 1);
-  }
-
-  assert(op.getValues().size() > 0 && "should not have removed all");
-  return success();
-}
-
-static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
-                               CommandBufferState &state) {
-  auto *setState = state.getDescriptorSet(op.getSet());
-  if (!setState)
-    return failure();
-
-  bool isLayoutEqual = setState->pipelineLayout == op.getPipelineLayout();
-  setState->pipelineLayout = op.getPipelineLayout();
-
-  int64_t descriptorCount = op.getBindingBuffers().size();
-  llvm::BitVector redundantIndices(descriptorCount);
-  for (int64_t index = 0; index < descriptorCount; ++index) {
-    auto &descriptor = setState->getDescriptor(index);
-    auto buffer = op.getBindingBuffers()[index];
-    auto offset = op.getBindingOffsets()[index];
-    auto length = op.getBindingLengths()[index];
-    if (descriptor.buffer == buffer && descriptor.offset == offset &&
-        descriptor.length == length) {
-      // Redundant descriptor.
-      redundantIndices.set(index);
-    } else {
-      descriptor.buffer = buffer;
-      descriptor.offset = offset;
-      descriptor.length = length;
-    }
-  }
-
-  // Bail early if no redundant bindings.
-  if (isLayoutEqual && redundantIndices.none()) {
-    return success(); // no-op
-  }
-
-  // If all bits are set we can just kill the op.
-  if (isLayoutEqual && redundantIndices.all()) {
-    op.erase();
-    return success();
-  }
-
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -240,18 +99,6 @@ struct ElideRedundantCommandsPass
               })
               .Case([&](IREE::HAL::CommandBufferExecutionBarrierOp op) {
                 processOp(op, stateMap[op.getCommandBuffer()]);
-              })
-              .Case([&](IREE::HAL::CommandBufferPushConstantsOp op) {
-                resetCommandBufferBarrierBit(op);
-                if (failed(processOp(op, stateMap[op.getCommandBuffer()]))) {
-                  invalidateState(op.getCommandBuffer());
-                }
-              })
-              .Case([&](IREE::HAL::CommandBufferPushDescriptorSetOp op) {
-                resetCommandBufferBarrierBit(op);
-                if (failed(processOp(op, stateMap[op.getCommandBuffer()]))) {
-                  invalidateState(op.getCommandBuffer());
-                }
               })
               .Case<IREE::HAL::CommandBufferDeviceOp,
                     IREE::HAL::CommandBufferBeginDebugGroupOp,

@@ -4,44 +4,105 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include "iree/schemas/executable_debug_info.fbs";
+
 namespace iree.hal.metal;
 
-// 'Metal Executable'.
-file_identifier "MTLE";
-file_extension "mtle";
+// 'Metal v1 Executable'.
+file_identifier "MTL1";
+file_extension "mtl1";
 
-// A struct for Metal threadgroup size along each dimension.
+// Defines the threadgroup size along each dimension.
 struct ThreadgroupSize {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
+// Describes the behavior of each buffer binding.
+// Used to populate MTLPipelineBufferDescriptor.
+enum BindingBits:uint64 (bit_flags) {
+  IMMUTABLE = 0,  // 1u << 0
+}
+
+// A compute pipeline (roughly MTLComputePipelineDescriptor).
+table PipelineDef {
+  // Ordinal of the MTLLibrary containing the entry point in the executable
+  // libraries list.
+  library_ordinal:uint32;
+
+  // String name of the entry point MTLFunction in the library.
+  entry_point:string;
+
+  // The maximum number of threads in a threadgroup that can be dispatched to
+  // the compute function. Omit for the default as determined at runtime.
+  // See: maxTotalThreadsPerThreadgroup
+  max_threads_per_threadgroup:uint32;
+
+  // Threadgroup size passed to dispatch commands.
+  threadgroup_size:ThreadgroupSize;
+
+  // Indicates whether the threadgroup size is always a multiple of the thread
+  // execution width.
+  // See: threadGroupSizeIsMultipleOfThreadExecutionWidth
+  threadgroup_size_aligned:bool;
+
+  // Total count in 32-bit words of constants passed to dispatch operations.
+  constant_count:uint32;
+
+  // Buffers used by the pipeline in the order as passed to dispatch operations.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// MSL (Metal Shading Language) source code.
+table MSLSourceDef {
+  // MTLLanguageVersion enum indicating the version to interpret the code as.
+  // When omitted the default (latest) version will be used.
+  version:uint32;
+
+  // Source text.
+  code:string;
+
+  // TODO: add compilation options we want to control from the compiler:
+  // https://developer.apple.com/documentation/metal/mtlcompileoptions/4354201-mathmode
+  // https://developer.apple.com/documentation/metal/mtlcompileoptions/4354200-mathfloatingpointfunctions
+  // https://developer.apple.com/documentation/metal/mtlcompileoptions/3564462-preserveinvariance
+}
+
+// A MTLLibrary containing one or more functions.
+table LibraryDef {
+  // Optional MSL (Metal Shading Language) textual source code.
+  // May be provided even if metallib binaries are present in order to support
+  // fallback compilation on new devices.
+  source:MSLSourceDef;
+
+  // Precompiled Metal library.
+  // https://developer.apple.com/documentation/metal/shader_libraries/metal_libraries/building_a_shader_library_by_precompiling_source_files
+  metallib:string;
+
+  // Split debug symbols for the precompiled Metal library.
+  // https://developer.apple.com/documentation/metal/shader_libraries/metal_libraries/generating_and_loading_a_metal_library_symbol_file
+  metallibsym:string;
+}
+
 // A Metal shader library and runtime pipeline state description.
 // This information is used to create MTLLibrary, MTLFunction and pipeline
 // state objects.
 table ExecutableDef {
-  // A map of entry point ordinals to string names as used in the shader
-  // library.
-  entry_points:[string];
+  // Exported functions in canonical executable entry point order.
+  // Each creates a single MTLComputePipelineState.
+  pipelines:[PipelineDef];
 
-  // Threadgroup sizes for each entry point.
-  //
-  // We need this because workgroup size is directly baked inside SPIR-V code,
-  // but in Metal it's specified when dispatching workload. So when cross
-  // compiling SPIR-V to MSL, we need to persist the information here so that
-  // later it can be used for dispatching.
-  // TODO(antiagainst): support SPIR-V specialization constant.
-  threadgroup_sizes:[ThreadgroupSize];
+  // A list of libraries hosting various entry points. Each library contains at
+  // least one entry point.
+  // This list may not have the same size as the exports list.
+  libraries:[LibraryDef];
 
-  // Shader content can be provided as either a serialized library or in the
-  // form of source code strings.
-
-  // Serialized Metal shader library.
-  // TODO(#14047): enable linking and consolidate into one library.
-  shader_libraries:[string];
-  // Original Metal shader source code.
-  shader_sources:[string];
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;

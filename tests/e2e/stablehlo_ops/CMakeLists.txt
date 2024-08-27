@@ -657,8 +657,8 @@ iree_check_single_backend_test_suite(
     "divide.mlir"
     "dot.mlir"
     "dot_general.mlir"
-    "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_slice.mlir"  # TODO(#13702): update WebGPU to simplified bindings.
+    # "dynamic_update_slice.mlir"  # TODO(#13702): update WebGPU to simplified bindings.
     "exponential.mlir"
     "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
@@ -685,8 +685,8 @@ iree_check_single_backend_test_suite(
     "rng_uniform.mlir"
     "round.mlir"
     "rsqrt.mlir"
-    "scatter.mlir"
-    "scatter_dynamic.mlir"
+    # "scatter.mlir"  # TODO(#13702): update WebGPU to simplified bindings.
+    # "scatter_dynamic.mlir"  # TODO(#13702): update WebGPU to simplified bindings.
     "select.mlir"
     "shape_assertion.mlir"
     "sine.mlir"

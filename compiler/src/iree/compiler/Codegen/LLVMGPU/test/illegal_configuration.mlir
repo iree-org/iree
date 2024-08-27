@@ -1,19 +1,17 @@
 // RUN: iree-opt --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<4x8xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<8x16xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<4x16xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8x16xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x16xf32>
   // expected-error @+1 {{Total number of threads in a thread block 2048 exceeds the limit of 1024 with compilation pipeline LLVMGPUMatmulSimt}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
@@ -21,20 +19,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<4x8xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<8x16xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<4x16xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8x16xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x16xf32>
   // expected-error @+1 {{Expected workgroup size in z-dim = 1, but got 2 with compilation pipeline LLVMGPUMatmulSimt}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<4x8xf32>, memref<8x16xf32>) outs(%2 : memref<4x16xf32>)
   return
@@ -42,20 +38,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 10], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<32x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x32xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<32x32xf32>
   // expected-error @+1 {{Total number of threads in a thread block 1280 exceeds the limit of 1024 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x16xf32>, memref<16x32xf32>) outs(%2 : memref<32x32xf32>)
   return
@@ -63,20 +57,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [48, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<32x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x32xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<32x32xf32>
   // expected-error @+1 {{Number of threads in x-dim 48 is not a multiple of warp size (32) or integer units of warps in x-dim with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x16xf32>, memref<16x32xf32>) outs(%2 : memref<32x32xf32>)
   return
@@ -84,20 +76,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<32x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x32xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<32x32xf32>
   // expected-error @+1 {{Expected workgroup size in z-dim = 1, but got 2 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x16xf32>, memref<16x32xf32>) outs(%2 : memref<32x32xf32>)
   return
@@ -105,20 +95,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<32x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x32xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<32x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<32x32xf32>
   // expected-error @+1 {{Thread block shape 32, 32, 20 cannot be tiled on matmul shape 32, 32, 16 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x16xf32>, memref<16x32xf32>) outs(%2 : memref<32x32xf32>)
   return
@@ -126,20 +114,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [128, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1024x512xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<512x256xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<1024x256xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<512x256xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1024x256xf32>
   // expected-error @+1 {{Tensor Core instruction shape 16, 16, 8 cannot be tiled on warp shape 64, 8, 16 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<1024x512xf32>, memref<512x256xf32>) outs(%2 : memref<1024x256xf32>)
   return
@@ -147,20 +133,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<48x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x32xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<48x32xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<48x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<48x32xf32>
   // expected-error @+1 {{Thread block shape 32, 32, 16 cannot be tiled on matmul shape 48, 32, 16 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<48x16xf32>, memref<16x32xf32>) outs(%2 : memref<48x32xf32>)
   return
@@ -168,20 +152,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<32x16xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16x48xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<32x48xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32x16xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x48xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<32x48xf32>
   // expected-error @+1 {{Thread block shape 32, 32, 16 cannot be tiled on matmul shape 32, 48, 16 with compilation pipeline LLVMGPUMatmulTensorCore}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<32x16xf32>, memref<16x48xf32>) outs(%2 : memref<32x48xf32>)
   return
@@ -189,12 +171,10 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
 #map = affine_map<()[s0] -> (s0 * 8)>
@@ -209,11 +189,11 @@ func.func @illegal() attributes {translation_info = #translation} {
   %c4 = arith.constant 4 : index
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) offset(%c0) : memref<4x32x1024xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) offset(%c0) : memref<4x32x1024xf32>
   memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) offset(%c0) : memref<4x1024x64xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) offset(%c0) : memref<4x1024x64xf32>
   memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(32) offset(%c0) : memref<4x32x64xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) offset(%c0) : memref<4x32x64xf32>
   memref.assume_alignment %2, 32 : memref<4x32x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -242,20 +222,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 48]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1024x512xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<512x256xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<1024x256xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<512x256xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1024x256xf32>
   // expected-error @+1 {{Thread block shape 64, 32, 48 cannot be tiled on matmul shape 1024, 256, 512 with compilation pipeline LLVMGPUMatmulTensorCoreMmaSync}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<1024x512xf32>, memref<512x256xf32>) outs(%2 : memref<1024x256xf32>)
   return
@@ -263,20 +241,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1024x512xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<512x256xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<1024x256xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<512x256xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1024x256xf32>
   // expected-error @+1 {{Tensor Core instruction shape 16, 8, 8 cannot be tiled on warp shape 64, 8, 4 with compilation pipeline LLVMGPUMatmulTensorCoreMmaSync}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<1024x512xf32>, memref<512x256xf32>) outs(%2 : memref<1024x256xf32>)
   return
@@ -284,20 +260,18 @@ func.func @illegal() attributes {translation_info = #translation} {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 func.func @illegal() attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1024x512xi8>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<512x256xi8>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<1024x256xi8>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1024x512xi8>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<512x256xi8>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1024x256xi8>
   // expected-error @+1 {{Expected f16, bf16 or f32 for Tensor Core (MMA.SYNC) pipeline}}
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<1024x512xi8>, memref<512x256xi8>) outs(%2 : memref<1024x256xi8>)
   return

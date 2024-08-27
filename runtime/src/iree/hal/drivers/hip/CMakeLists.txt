@@ -40,8 +40,6 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "pipeline_layout.c"
-    "pipeline_layout.h"
     "rccl_channel.c"
     "rccl_channel.h"
     "stream_command_buffer.c"
@@ -64,6 +62,7 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::collective_batch
+    iree::hal::utils::executable_debug_info
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::deferred_work_queue
     iree::hal::utils::file_transfer
@@ -71,7 +70,8 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing
-    iree::schemas::rocm_executable_def_c_fbs
+    iree::schemas::executable_debug_info_c_fbs
+    iree::schemas::hip_executable_def_c_fbs
   PUBLIC
 )
 

@@ -53,9 +53,11 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/webgpu/platform",
         "//runtime/src/iree/hal/drivers/webgpu/shaders",
         "//runtime/src/iree/hal/utils:buffer_transfer",
+        "//runtime/src/iree/hal/utils:executable_debug_info",
         "//runtime/src/iree/hal/utils:file_transfer",
         "//runtime/src/iree/hal/utils:memory_file",
-        "//runtime/src/iree/schemas:wgsl_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+        "//runtime/src/iree/schemas:webgpu_executable_def_c_fbs",
         "@webgpu_headers",
     ],
 )

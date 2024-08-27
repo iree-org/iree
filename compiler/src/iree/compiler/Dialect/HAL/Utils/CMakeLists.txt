@@ -12,6 +12,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    ExecutableDebugInfoUtils
+  HDRS
+    "ExecutableDebugInfoUtils.h"
+  SRCS
+    "ExecutableDebugInfoUtils.cpp"
+  DEPS
+    MLIRIR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
+    iree::schemas::executable_debug_info_c_fbs
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     LLVMLinkerUtils
   HDRS
     "LLVMLinkerUtils.h"

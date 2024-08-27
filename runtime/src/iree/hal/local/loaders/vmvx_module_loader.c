@@ -221,8 +221,6 @@ static iree_status_t iree_hal_vmvx_executable_create(
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(bytecode_module);
   IREE_ASSERT_ARGUMENT(executable_params);
-  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
-                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -230,30 +228,17 @@ static iree_status_t iree_hal_vmvx_executable_create(
   // NOTE: pipeline layouts are optional but if provided must be consistent.
   iree_host_size_t entry_count =
       iree_vm_module_signature(bytecode_module).export_function_count;
-  if (executable_params->pipeline_layout_count > 0 &&
-      entry_count != executable_params->pipeline_layout_count) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "executable provides %" PRIhsz
-                            " entry points but caller "
-                            "provided %" PRIhsz "; must match",
-                            entry_count,
-                            executable_params->pipeline_layout_count);
-  }
 
   iree_hal_vmvx_executable_t* executable = NULL;
   const iree_host_size_t entry_fn_ordinals_size =
       iree_host_align(entry_count * sizeof(*executable->entry_fn_ordinals), 8);
   const iree_host_size_t dispatch_attrs_size = iree_host_align(
       entry_count * sizeof(*executable->base.dispatch_attrs), 8);
-  const iree_host_size_t pipeline_layouts_size =
-      iree_host_align(executable_params->pipeline_layout_count *
-                          sizeof(iree_hal_pipeline_layout_t*),
-                      8);
   const iree_host_size_t worker_states_size =
       iree_host_align(worker_capacity * sizeof(*executable->worker_states), 8);
-  const iree_host_size_t total_size =
-      sizeof(*executable) + entry_fn_ordinals_size + dispatch_attrs_size +
-      pipeline_layouts_size + worker_states_size;
+  const iree_host_size_t total_size = sizeof(*executable) +
+                                      entry_fn_ordinals_size +
+                                      dispatch_attrs_size + worker_states_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
@@ -262,14 +247,8 @@ static iree_status_t iree_hal_vmvx_executable_create(
         (uint8_t*)executable + sizeof(*executable) + entry_fn_ordinals_size;
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
     ptr += dispatch_attrs_size;
-    iree_hal_pipeline_layout_t** pipeline_layouts_ptr =
-        (iree_hal_pipeline_layout_t**)ptr;
-    ptr += pipeline_layouts_size;
-    iree_hal_local_executable_initialize(
-        &iree_hal_vmvx_executable_vtable,
-        executable_params->pipeline_layout_count,
-        executable_params->pipeline_layouts, pipeline_layouts_ptr,
-        host_allocator, &executable->base);
+    iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
+                                         host_allocator, &executable->base);
     executable->base.dispatch_attrs = dispatch_attrs;
 
     executable->worker_capacity = worker_capacity;
@@ -455,9 +434,8 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   iree_vm_buffer_t constants_buffer;
   iree_vm_buffer_initialize(
       IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
-      iree_make_byte_span(
-          (void*)dispatch_state->push_constants,
-          sizeof(uint32_t) * dispatch_state->push_constant_count),
+      iree_make_byte_span((void*)dispatch_state->constants,
+                          sizeof(uint32_t) * dispatch_state->constant_count),
       iree_allocator_null(), &constants_buffer);
 
   // Prepare call argument buffer. We've verified the signature on creation and

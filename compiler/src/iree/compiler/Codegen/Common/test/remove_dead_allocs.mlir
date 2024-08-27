@@ -19,13 +19,11 @@ func.func @alloc_keep(%arg0: index, %arg1: index) -> memref<?x?xf32> {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @cleanup_only_assume_alignment_uses() {
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<42xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<42xf32>
   memref.assume_alignment %0, 64 : memref<42xf32>
   return
 }

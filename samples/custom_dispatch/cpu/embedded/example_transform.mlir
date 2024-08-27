@@ -26,7 +26,7 @@
 // multiple targets, but this example is maintaining an implicit requirement
 // that the custom kernel being spliced in is supported by the target device,
 // hence we only support llvm-cpu here.
-#cpu_target = #hal.device.target<"llvm-cpu", [
+#cpu_target = #hal.device.target<"local", [
   #x86_64_target
 ]> : !hal.device
 

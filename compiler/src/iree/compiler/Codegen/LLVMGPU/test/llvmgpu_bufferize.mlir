@@ -1,17 +1,15 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-llvmgpu-bufferization-pipeline))" --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @bufferize_with_thread_private_memory(%arg0: index) {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %cst_ved = arith.constant dense<0.000000e+00> : vector<1x1x4x4xf16>
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<320xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>>
   %2 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg0, %arg0, %arg0], sizes = [1, 1, 8, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf16>> -> tensor<1x1x8x64xf16>
   %3 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:tensor<320xf16>> -> tensor<1xf16>
   %4 = scf.forall (%arg1, %arg2) in (2, 16) shared_outs(%arg3 = %2) -> (tensor<1x1x8x64xf16>) {

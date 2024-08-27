@@ -5,19 +5,17 @@
 
 // Transform dialect attributes are tested separately.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0) -> (d0)>
 func.func @add_dispatch_0() {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16384xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16384xf32>>
   %3 = tensor.empty() : tensor<16384xf32>
   %4 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [16384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<16384xf32>> -> tensor<16384xf32>
   %5 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [16384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<16384xf32>> -> tensor<16384xf32>
@@ -39,21 +37,19 @@ func.func @add_dispatch_0() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @dot_dispatch_1() {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<2x3xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<3x4xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<2x4xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2x3xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x4xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<2x4xf32>
   linalg.fill ins(%cst : f32) outs(%2 : memref<2x4xf32>)
   linalg.matmul ins(%0, %1 : memref<2x3xf32>, memref<3x4xf32>) outs(%2 : memref<2x4xf32>)
   return
@@ -70,21 +66,19 @@ func.func @dot_dispatch_1() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @unaligned_k() {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<128x258xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<258x64xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<128x64xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<128x258xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<258x64xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<128x64xf32>
   linalg.fill ins(%cst : f32) outs(%2 : memref<128x64xf32>)
   linalg.matmul ins(%0, %1 : memref<128x258xf32>, memref<258x64xf32>) outs(%2 : memref<128x64xf32>)
   return
@@ -101,11 +95,9 @@ func.func @unaligned_k() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
@@ -113,8 +105,8 @@ func.func @predict_dispatch_153() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0x7FC00000 : f32
   %cst_0 = arith.constant 0xFF800000 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1000xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<f32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1000xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<f32>
   linalg.fill ins(%cst_0 : f32) outs(%1 : memref<f32>)
   linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
   ^bb0(%in: f32, %out: f32):
@@ -138,19 +130,17 @@ func.func @predict_dispatch_153() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @reduction_aligned2() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x128x384xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x128x384xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 128, 384], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x128x384xf32>> -> tensor<4x128x384xf32>
   %3 = tensor.empty() : tensor<128x384xf32>
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<128x384xf32>) -> tensor<128x384xf32>
@@ -174,19 +164,17 @@ func.func @reduction_aligned2() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @copy_as_generic() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<?x?xi32>{%0, %1}
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<?x?xi32>{%0, %1}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xi32>{%0, %1}
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xi32>{%0, %1}
   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : memref<?x?xi32>) outs(%3 : memref<?x?xi32>) {
   ^bb0(%in: i32, %out: i32):
     linalg.yield %in : i32
@@ -203,19 +191,17 @@ func.func @copy_as_generic() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @static_1d_fft_stage2() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
   %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readwrite:tensor<32xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readwrite:tensor<32xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readwrite:tensor<32xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readwrite:tensor<32xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
   %3 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
   %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
@@ -233,11 +219,9 @@ func.func @static_1d_fft_stage2() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @static_3d_fft_stage3() {
   %c0 = arith.constant 0 : index
@@ -249,8 +233,8 @@ func.func @static_3d_fft_stage3() {
   %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
   %0 = bufferization.to_memref %cst_0 : memref<4xf32>
   %1 = bufferization.to_memref %cst : memref<4xf32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<64x128x32xf32>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<64x128x32xf32>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x128x32xf32>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<64x128x32xf32>
   iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c3, %1, %0 : index, memref<4xf32>, memref<4xf32>) outs(%2, %3 : memref<64x128x32xf32>, memref<64x128x32xf32>)
   return
 }
@@ -264,12 +248,10 @@ func.func @static_3d_fft_stage3() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 64]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
@@ -279,9 +261,9 @@ func.func @_lowering_config_test_dispatch_1() {
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>> -> tensor<256x1024xf32>
   %5 = tensor.empty() : tensor<128x1024xf32>
@@ -302,22 +284,20 @@ func.func @_lowering_config_test_dispatch_1() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @sort_op() {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %c2304000 = arith.constant 2304000 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x576000xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x576000xi32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<1x576000xf32>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(32) offset(%c2304000) : !flow.dispatch.tensor<writeonly:tensor<1x576000xi32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x576000xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x576000xi32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<1x576000xf32>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(32) offset(%c2304000) : !flow.dispatch.tensor<writeonly:tensor<1x576000xi32>>
   %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 576000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x576000xf32>> -> tensor<1x576000xf32>
   %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1, 576000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x576000xi32>> -> tensor<1x576000xi32>
   %6:2 = iree_linalg_ext.sort dimension(1) outs(%4, %5 : tensor<1x576000xf32>, tensor<1x576000xi32>) {
@@ -339,21 +319,19 @@ func.func @sort_op() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @matmul_config_sm35() {
   %cst = arith.constant 0.000000e+00 : f32
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>> -> tensor<256x1024xf32>
   %5 = tensor.empty() : tensor<128x1024xf32>
@@ -369,21 +347,19 @@ func.func @matmul_config_sm35() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @matmul_config_sm80() {
   %cst = arith.constant 0.000000e+00 : f32
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>> -> tensor<256x1024xf32>
   %5 = tensor.empty() : tensor<128x1024xf32>
@@ -399,21 +375,19 @@ func.func @matmul_config_sm80() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @matmul_config_sm86() {
   %cst = arith.constant 0.000000e+00 : f32
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<128x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<128x1024xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf32>> -> tensor<256x1024xf32>
   %5 = tensor.empty() : tensor<128x1024xf32>
@@ -429,12 +403,10 @@ func.func @matmul_config_sm86() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -445,9 +417,9 @@ func.func @contract_reduction() {
   %c40064 = arith.constant 40064 : index
   %c34752 = arith.constant 34752 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x7xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c40064) : !flow.dispatch.tensor<readonly:tensor<3x64x4x8xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c34752) : !flow.dispatch.tensor<writeonly:tensor<3x64xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x7xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c40064) : !flow.dispatch.tensor<readonly:tensor<3x64x4x8xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c34752) : !flow.dispatch.tensor<writeonly:tensor<3x64xf32>>
   %3 = tensor.empty() : tensor<3x64xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 4], sizes = [3, 64, 4, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x64x4x8xf32>> -> tensor<3x64x4xf32>
   %5 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%3 : tensor<3x64xf32>) -> tensor<3x64xf32>
@@ -470,11 +442,9 @@ func.func @contract_reduction() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @dynamic_pack_2x2() {
   %c0 = arith.constant 0 : index
@@ -487,8 +457,8 @@ func.func @dynamic_pack_2x2() {
   %5 = arith.index_castui %1 : i32 to index
   %6 = arith.index_castui %2 : i32 to index
   %7 = arith.index_castui %3 : i32 to index
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5}
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5}
+  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x2x2xi32>>{%6, %7}
   %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%4, %5} -> tensor<?x?xi32>
   %11 = tensor.empty(%6, %7) : tensor<?x?x2x2xi32>
   %pack = tensor.pack %10 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %11 : tensor<?x?xi32> -> tensor<?x?x2x2xi32>
@@ -505,21 +475,19 @@ func.func @dynamic_pack_2x2() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @large_matmul_f16() {
   %cst = arith.constant 0.000000e+00 : f16
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<2560x1792xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1792x2048xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2560x2048xf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<2560x1792xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<1792x2048xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2560x2048xf16>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2560, 1792], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2560x1792xf16>> -> tensor<2560x1792xf16>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1792, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1792x2048xf16>> -> tensor<1792x2048xf16>
   %5 = tensor.empty() : tensor<2560x2048xf16>
@@ -539,21 +507,19 @@ func.func @large_matmul_f16() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @large_matmul_f32() {
   %cst = arith.constant 0.000000e+00 : f32
   %c128 = arith.constant 128 : index
   %c1024 = arith.constant 1024 : index
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<2560x1792xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<1792x2048xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2560x2048xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<2560x1792xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<1792x2048xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<2560x2048xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2560, 1792], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2560x1792xf32>> -> tensor<2560x1792xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1792, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1792x2048xf32>> -> tensor<1792x2048xf32>
   %5 = tensor.empty() : tensor<2560x2048xf32>
@@ -574,19 +540,17 @@ func.func @large_matmul_f32() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @inner_unit_dim() {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16384x1xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<16384x1xf32>>
   %3 = tensor.empty() : tensor<16384x1xf32>
   %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16384, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>> -> tensor<16384x1xf32>
   %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [16384, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>> -> tensor<16384x1xf32>
@@ -608,12 +572,10 @@ func.func @inner_unit_dim() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3)>
@@ -627,9 +589,9 @@ func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
   %cst_3 = arith.constant dense_resource<__elided__> : tensor<64xf32>
   %cst_4 = arith.constant dense_resource<__elided__> : tensor<64xf32>
   %cst_5 = arith.constant dense_resource<__elided__> : tensor<64xf32>
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x230x230x3xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<7x7x3x64xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c162508800) : !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x230x230x3xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<7x7x3x64xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c162508800) : !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [256, 230, 230, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<256x230x230x3xf32>> -> tensor<256x230x230x3xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [7, 7, 3, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<7x7x3x64xf32>> -> tensor<7x7x3x64xf32>
   %5 = tensor.empty() : tensor<256x112x112x64xf32>
@@ -660,11 +622,9 @@ func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>
@@ -679,9 +639,9 @@ func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
   %3 = arith.index_castui %0 {stream.alignment = 64 : index, stream.values = [35524672 : index, 240930880 : index, 446337088 : index, 651743296 : index]} : i32 to index
   %4 = arith.index_castui %1 {stream.alignment = 64 : index, stream.values = [57544768 : index, 262950976 : index, 468357184 : index, 673763392 : index]} : i32 to index
   %5 = arith.index_castui %2 {stream.alignment = 64 : index, stream.values = [1728 : index, 36472832 : index, 72943744 : index, 109415936 : index]} : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%4) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<512x4x42x42xf32>>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<512x4x42x42xf32>>
   %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [512, 42, 4, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>> -> tensor<512x42x4x64xf32>
   %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0, 0], sizes = [512, 42, 4, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>> -> tensor<512x42x4x64xf32>
   %11 = tensor.empty() : tensor<512x4x42x42xf32>
@@ -712,13 +672,11 @@ func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 9, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 9, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -755,12 +713,12 @@ func.func @i4_dequant_matvec() {
   %24 = arith.shli %23, %c32_i64 : i64
   %25 = arith.ori %22, %24 : i64
   %26 = arith.index_castui %25 : i64 to index
-  %27 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%9) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x11008xi4>>
-  %28 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%10) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
-  %29 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%11) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
+  %27 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%9) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x11008xi4>>
+  %28 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%10) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
+  %29 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%11) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
   %30 = flow.dispatch.workload.ordinal %26, 0 : index
-  %31 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%16) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x11008xf32>>{%30}
-  %32 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(3) alignment(64) offset(%21) : !flow.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%30}
+  %31 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%16) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x11008xf32>>{%30}
+  %32 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%21) : !flow.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%30}
   %33 = flow.dispatch.tensor.load %27, offsets = [0, 0], sizes = [4096, 11008], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x11008xi4>> -> tensor<4096x11008xi4>
   %34 = flow.dispatch.tensor.load %28, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf32>> -> tensor<4096xf32>
   %35 = flow.dispatch.tensor.load %29, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf32>> -> tensor<4096xf32>

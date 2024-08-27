@@ -43,11 +43,9 @@ module {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @interleave_and_bitcast_lowering() {
   %cst = arith.constant dense<4> : vector<4x2xi8>
@@ -58,8 +56,8 @@ func.func @interleave_and_bitcast_lowering() {
   %c3 = arith.constant 3 : index
   %c4096 = arith.constant 4096 : index
   %c8192 = arith.constant 8192 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c4096) flags(ReadOnly) : memref<128xi8, strided<[1], offset: 4096>>
-  %out_buffer = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c8192) : memref<256x64xi4, strided<[64, 1], offset: 8192>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c4096) flags(ReadOnly) : memref<128xi8, strided<[1], offset: 4096>>
+  %out_buffer = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c8192) : memref<256x64xi4, strided<[64, 1], offset: 8192>>
   %2 = vector.load %0[%c0] : memref<128xi8, strided<[1], offset: 4096>>, vector<2xi8>
   %3 = vector.bitcast %2 : vector<2xi8> to vector<4xi4>
   %4 = vector.insert %3, %cst_0 [3] : vector<4xi4> into vector<4x4xi4>

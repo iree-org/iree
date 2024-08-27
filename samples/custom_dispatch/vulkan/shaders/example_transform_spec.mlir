@@ -36,15 +36,13 @@ module attributes {transform.with_named_sequence} {
         %c1_0 = arith.constant 1 : index
         hal.return %c1_0, %c1_0, %c1_0 : index, index, index
       }
-      layout(#hal.pipeline.layout<push_constants = 1, sets = [
-        <0, bindings = [
-            <0, storage_buffer, ReadOnly>,
-            <1, storage_buffer>
-        ]>
+      layout(#hal.pipeline.layout<constants = 1, bindings = [
+        #hal.pipeline.binding<storage_buffer, ReadOnly>,
+        #hal.pipeline.binding<storage_buffer>
       ]>)
       bindings([
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>
+        #hal.interface.binding<0>,
+        #hal.interface.binding<1>
       ])
       objects({
         #spirv_target ordinal(0) = [

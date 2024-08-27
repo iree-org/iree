@@ -94,43 +94,34 @@ convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
   }
 }
 
-static IREE::HAL::DescriptorSetBindingAttr
-convertDescriptorSetBinding(IREE::Input::DescriptorSetBindingAttr src) {
-  return IREE::HAL::DescriptorSetBindingAttr::get(
-      src.getContext(), src.getOrdinal(), convertDescriptorType(src.getType()),
+static IREE::HAL::PipelineBindingAttr
+convertPipelineBinding(IREE::Input::PipelineBindingAttr src) {
+  return IREE::HAL::PipelineBindingAttr::get(
+      src.getContext(), convertDescriptorType(src.getType()),
       convertDescriptorFlags(src.getFlags()));
 }
 
-static std::optional<IREE::HAL::DescriptorSetLayoutFlags>
-convertDescriptorSetLayoutFlags(
-    std::optional<IREE::Input::DescriptorSetLayoutFlags> src) {
+static std::optional<IREE::HAL::PipelineLayoutFlags> convertPipelineLayoutFlags(
+    std::optional<IREE::Input::PipelineLayoutFlags> src) {
   if (!src.has_value())
     return std::nullopt;
   switch (*src) {
-  case IREE::Input::DescriptorSetLayoutFlags::None:
-    return IREE::HAL::DescriptorSetLayoutFlags::None;
-  case IREE::Input::DescriptorSetLayoutFlags::Indirect:
-    return IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+  case IREE::Input::PipelineLayoutFlags::None:
+    return IREE::HAL::PipelineLayoutFlags::None;
+  case IREE::Input::PipelineLayoutFlags::Indirect:
+    return IREE::HAL::PipelineLayoutFlags::Indirect;
   default:
     return std::nullopt;
   }
 }
 
-static IREE::HAL::DescriptorSetLayoutAttr
-convertDescriptorSetLayout(IREE::Input::DescriptorSetLayoutAttr src) {
-  return IREE::HAL::DescriptorSetLayoutAttr::get(
-      src.getContext(), src.getOrdinal(),
-      convertAttributes<IREE::HAL::DescriptorSetBindingAttr>(
-          src.getBindings(), convertDescriptorSetBinding),
-      convertDescriptorSetLayoutFlags(src.getFlags()));
-}
-
 static IREE::HAL::PipelineLayoutAttr
 convertPipelineLayout(IREE::Input::PipelineLayoutAttr src) {
   return IREE::HAL::PipelineLayoutAttr::get(
-      src.getContext(), src.getPushConstants(),
-      convertAttributes<IREE::HAL::DescriptorSetLayoutAttr>(
-          src.getSetLayouts(), convertDescriptorSetLayout));
+      src.getContext(),
+      convertAttributes<IREE::HAL::PipelineBindingAttr>(src.getBindings(),
+                                                        convertPipelineBinding),
+      src.getConstants(), convertPipelineLayoutFlags(src.getFlags()));
 }
 
 static IREE::HAL::ExecutableObjectAttr

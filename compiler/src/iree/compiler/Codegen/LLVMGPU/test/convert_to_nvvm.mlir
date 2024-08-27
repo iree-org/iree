@@ -1,14 +1,10 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-nvvm))))" --iree-gpu-test-target=sm_60 --split-input-file %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -17,9 +13,9 @@ hal.executable @abs_ex_dispatch_0 {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(4) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<16xi32>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<16xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -44,14 +40,10 @@ hal.executable @abs_ex_dispatch_0 {
 //  CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<4, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @abs_dynamic {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -66,9 +58,9 @@ hal.executable @abs_dynamic {
         %d0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
         %d1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %d2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(4) offset(%o) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1, %d2}
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<?x?x?xi32>{%d0, %d1, %d2}
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<?x?x?xf32>{%d0, %d1, %d2}
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%o) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%d0, %d1, %d2}
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?x?xi32>{%d0, %d1, %d2}
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<?x?x?xf32>{%d0, %d1, %d2}
         %9 = memref.load %0[%c3, %c5, %c7] : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
         %10 = memref.load %1[%c3, %c5, %c7] : memref<?x?x?xi32>
         %11 = arith.sitofp %10 : i32 to f32
@@ -106,13 +98,9 @@ hal.executable @abs_dynamic {
 
 // Test that we handle correctly the case where bindings are sparse (set 0
 // binding 0 is not used).
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @dead_symbol {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -121,8 +109,8 @@ hal.executable @dead_symbol {
       func.func @dead_symbol() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16xi32>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<16xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -146,11 +134,9 @@ hal.executable @dead_symbol {
 
 // A single binding may contain different data types.
 // Test that we cast pointers correctly.
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @mixed_type {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -159,9 +145,9 @@ hal.executable @mixed_type {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: 4>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c0) : memref<16xi32>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<16xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: 4>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c0) : memref<16xi32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -187,10 +173,8 @@ hal.executable @mixed_type {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @shared_memory_lowering {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -227,10 +211,8 @@ hal.executable @shared_memory_lowering {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @shared_memory_dealloc_elision {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -253,10 +235,8 @@ hal.executable @shared_memory_dealloc_elision {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @shared_memory_lowering_aligned_alloc {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -288,15 +268,11 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @check_not_readonly {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -305,13 +281,13 @@ hal.executable @check_not_readonly {
       func.func @check_not_readonly() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<16xi32>
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
-        %b11 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) flags(ReadOnly) : memref<16xi32>
-        %b12 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) offset(%c128) : memref<16xf32, strided<[1], offset: 32>>
-        %b21 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) flags(ReadOnly) : memref<16xi32>
-        %b22 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(3) : memref<16xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %b11 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) flags(ReadOnly) : memref<16xi32>
+        %b12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) : memref<16xf32, strided<[1], offset: 32>>
+        %b21 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) flags(ReadOnly) : memref<16xi32>
+        %b22 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -332,13 +308,9 @@ hal.executable @check_not_readonly {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>,
-  #hal.descriptor_set.layout<1, bindings = [
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @complex {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -347,8 +319,8 @@ hal.executable @complex {
       func.func @complex() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) offset(%c128) flags(ReadOnly) : memref<16xcomplex<f32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(1) binding(2) : memref<16xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) flags(ReadOnly) : memref<16xcomplex<f32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -371,10 +343,8 @@ hal.executable @complex {
 // -----
 
 // Check that we don't choke on memref of index.
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @shared_memory_lowering_index {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -398,11 +368,9 @@ hal.executable @shared_memory_lowering_index {
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 
 // -----
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable @masked_load_store {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
@@ -412,8 +380,8 @@ hal.executable @masked_load_store {
         %c0 = arith.constant 0 : index
         %idx = gpu.thread_id x
         %pass_thru = arith.constant dense<0.000000e+00> : vector<1xf32>
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xf32, #gpu.address_space<global>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<64xf32, #gpu.address_space<global>>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xf32, #gpu.address_space<global>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<64xf32, #gpu.address_space<global>>
         %mask = vector.create_mask %idx : vector<1xi1>
         %ld = vector.maskedload %0[%idx], %mask, %pass_thru : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32> into vector<1xf32>
         vector.maskedstore %1[%idx], %mask, %ld : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32>
@@ -429,12 +397,10 @@ hal.executable @masked_load_store {
 
 // -----
 // Test workgroup size lowering
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
@@ -446,7 +412,7 @@ hal.executable private @interface_wg_size {
         %c0 = arith.constant 0.0 : f32
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<64x64xf32>
+        %subspan = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x64xf32>
         memref.store %c0, %subspan[%workgroup_size_x, %workgroup_size_y] : memref<64x64xf32>
         return
       }

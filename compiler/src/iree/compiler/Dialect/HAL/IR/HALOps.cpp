@@ -47,14 +47,14 @@ static void printDescriptorType(OpAsmPrinter &p, Operation *,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<DescriptorSetBindings>($binding_ordinals,
+// custom<PipelineBindings>($binding_ordinals,
 //                               $binding_buffers,
 //                               type($binding_buffers),
 //                               $binding_offsets,
 //                               $binding_lengths)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseDescriptorSetBindings(
+static ParseResult parsePipelineBindings(
     OpAsmParser &parser,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
@@ -86,11 +86,11 @@ static ParseResult parseDescriptorSetBindings(
   return success();
 }
 
-static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
-                                       ValueRange ordinals, ValueRange buffers,
-                                       TypeRange bufferTypes,
-                                       ValueRange bufferOffsets,
-                                       ValueRange bufferLengths) {
+static void printPipelineBindings(OpAsmPrinter &p, Operation *op,
+                                  ValueRange ordinals, ValueRange buffers,
+                                  TypeRange bufferTypes,
+                                  ValueRange bufferOffsets,
+                                  ValueRange bufferLengths) {
   llvm::interleaveComma(llvm::zip_equal(ordinals, buffers, bufferTypes,
                                         bufferOffsets, bufferLengths),
                         p,
@@ -1076,49 +1076,15 @@ void CommandBufferUpdateBufferOp::setSubrangeOperand(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.push_descriptor_set
+// hal.command_buffer.dispatch + .indirect
 //===----------------------------------------------------------------------===//
 
-void CommandBufferPushDescriptorSetOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value pipelineLayout, int64_t set,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  build(builder, state, commandBuffer, pipelineLayout,
-        builder.createOrFold<arith::ConstantIndexOp>(state.location, set),
-        bindings);
-}
-
-void CommandBufferPushDescriptorSetOp::build(
-    OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value pipelineLayout, Value set,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({commandBuffer, pipelineLayout, set});
-  SmallVector<Value> bindingOrdinals;
-  SmallVector<Value> bindingBuffers;
-  SmallVector<Value> bindingOffsets;
-  SmallVector<Value> bindingLengths;
-  for (auto binding : bindings) {
-    bindingOrdinals.push_back(binding.ordinal);
-    bindingBuffers.push_back(binding.buffer);
-    bindingOffsets.push_back(binding.byteOffset);
-    bindingLengths.push_back(binding.byteLength);
-  }
-  state.addOperands(bindingOrdinals);
-  state.addOperands(bindingBuffers);
-  state.addOperands(bindingOffsets);
-  state.addOperands(bindingLengths);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch2 + .indirect
-//===----------------------------------------------------------------------===//
-
-void CommandBufferDispatch2Op::build(OpBuilder &builder, OperationState &state,
-                                     Value commandBuffer, Value executable,
-                                     Value entryPoint, ValueRange workgroups,
-                                     ValueRange constants,
-                                     ArrayRef<BindingValue> bindings,
-                                     IREE::HAL::DispatchFlags flags) {
+void CommandBufferDispatchOp::build(OpBuilder &builder, OperationState &state,
+                                    Value commandBuffer, Value executable,
+                                    Value entryPoint, ValueRange workgroups,
+                                    ValueRange constants,
+                                    ArrayRef<BindingValue> bindings,
+                                    IREE::HAL::DispatchFlags flags) {
   state.addOperands({commandBuffer, executable, entryPoint});
   state.addOperands(workgroups);
   state.addOperands(constants);
@@ -1150,7 +1116,7 @@ void CommandBufferDispatch2Op::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-void CommandBufferDispatch2IndirectOp::build(
+void CommandBufferDispatchIndirectOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
     Value executable, Value entryPoint, Value workgroupsBuffer,
     Value workgroupsOffset, ValueRange constants,
@@ -1185,10 +1151,10 @@ void CommandBufferDispatch2IndirectOp::build(
                      }));
 }
 
-static LogicalResult verifyDispatch2Bindings(Operation *op,
-                                             ValueRange bindingBuffers,
-                                             ValueRange bindingOffsets,
-                                             ValueRange bindingLengths) {
+static LogicalResult verifyDispatchBindings(Operation *op,
+                                            ValueRange bindingBuffers,
+                                            ValueRange bindingOffsets,
+                                            ValueRange bindingLengths) {
   if (bindingBuffers.size() != bindingOffsets.size() ||
       bindingBuffers.size() != bindingLengths.size()) {
     return op->emitOpError() << "requires that binding fields all have the "
@@ -1197,27 +1163,16 @@ static LogicalResult verifyDispatch2Bindings(Operation *op,
   return success();
 }
 
-LogicalResult CommandBufferDispatch2Op::verify() {
-  CommandBufferDispatch2Op op = *this;
-  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
-                                 op.getBindingOffsets(),
-                                 op.getBindingLengths());
+LogicalResult CommandBufferDispatchOp::verify() {
+  CommandBufferDispatchOp op = *this;
+  return verifyDispatchBindings(op, op.getBindingBuffers(),
+                                op.getBindingOffsets(), op.getBindingLengths());
 }
 
-LogicalResult CommandBufferDispatch2IndirectOp::verify() {
-  CommandBufferDispatch2IndirectOp op = *this;
-  return verifyDispatch2Bindings(op, op.getBindingBuffers(),
-                                 op.getBindingOffsets(),
-                                 op.getBindingLengths());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.create
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set_layout");
+LogicalResult CommandBufferDispatchIndirectOp::verify() {
+  CommandBufferDispatchIndirectOp op = *this;
+  return verifyDispatchBindings(op, op.getBindingBuffers(),
+                                op.getBindingOffsets(), op.getBindingLengths());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1902,16 +1857,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   // TODO(benvanik): name after sanitized symbol.
-  setNameFn(getResult(), StringRef("exe"));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.executable.create2
-//===----------------------------------------------------------------------===//
-
-void ExecutableCreate2Op::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), StringRef("executable"));
 }
 
@@ -1942,7 +1887,7 @@ void ExecutableExportOrdinalOp::getAsmResultNames(
 LogicalResult InterfaceConstantLoadOp::verify() {
   InterfaceConstantLoadOp op = *this;
   auto layoutAttr = op.getLayout();
-  if (op.getOrdinal().getZExtValue() >= layoutAttr.getPushConstants()) {
+  if (op.getOrdinal().getZExtValue() >= layoutAttr.getConstants()) {
     return op.emitOpError("push constant ordinal out of bounds");
   }
   return success();
@@ -1952,18 +1897,20 @@ LogicalResult InterfaceConstantLoadOp::verify() {
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-void InterfaceBindingSubspanOp::build(
-    OpBuilder &builder, OperationState &result, Type resultType,
-    IREE::HAL::PipelineLayoutAttr layout, APInt set, APInt binding,
-    Value byte_offset, ValueRange dynamic_dims, IntegerAttr alignment,
-    std::optional<DescriptorFlags> flags) {
+void InterfaceBindingSubspanOp::build(OpBuilder &builder,
+                                      OperationState &result, Type resultType,
+                                      IREE::HAL::PipelineLayoutAttr layout,
+                                      APInt binding, Value byte_offset,
+                                      ValueRange dynamic_dims,
+                                      IntegerAttr alignment,
+                                      std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
                                                          flags.value());
   }
-  build(builder, result, resultType, layout, set, binding, byte_offset,
-        dynamic_dims, alignment, descriptorAttr);
+  build(builder, result, resultType, layout, binding, byte_offset, dynamic_dims,
+        alignment, descriptorAttr);
 }
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
@@ -1976,56 +1923,22 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
              << " associated dimension SSA values";
     }
   }
-  int64_t set = op.getSet().getSExtValue();
-  int64_t binding = op.getBinding().getSExtValue();
-  bool foundSet = false;
-  bool foundBinding = false;
-  for (auto setLayoutAttr : op.getLayout().getSetLayouts()) {
-    if (setLayoutAttr.getOrdinal() == set) {
-      foundSet = true;
-      for (auto bindingAttr : setLayoutAttr.getBindings()) {
-        if (bindingAttr.getOrdinal() == binding) {
-          foundBinding = true;
-          break;
-        }
-      }
-    }
-  }
-  if (!foundSet) {
-    return op.emitOpError("set ordinal ")
-           << set << " not present in pipeline layout";
-  } else if (!foundBinding) {
+  uint64_t binding = op.getBinding().getZExtValue();
+  if (binding >= op.getLayout().getBindings().size()) {
     return op.emitOpError("binding ordinal ")
-           << binding << " not present in descriptor set layout";
+           << binding << " out of bounds in layout " << op.getLayout();
   }
   return success();
 }
 
-IREE::HAL::DescriptorSetBindingAttr
-InterfaceBindingSubspanOp::getDescriptorSetBindingAttr() {
-  int64_t set = getSet().getSExtValue();
-  int64_t binding = getBinding().getSExtValue();
-  for (auto setLayoutAttr : getLayout().getSetLayouts()) {
-    if (setLayoutAttr.getOrdinal() == set) {
-      for (auto bindingAttr : setLayoutAttr.getBindings()) {
-        if (bindingAttr.getOrdinal() == binding) {
-          return bindingAttr;
-        }
-      }
-    }
-  }
-  return {};
+IREE::HAL::PipelineBindingAttr
+InterfaceBindingSubspanOp::getPipelineBindingAttr() {
+  return getLayout().getBinding(getBinding());
 }
 
 IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
-  auto bindingAttr = getDescriptorSetBindingAttr();
+  auto bindingAttr = getPipelineBindingAttr();
   return bindingAttr.getType();
-}
-
-int64_t InterfaceBindingSubspanOp::getFlatBindingIndex() {
-  int64_t set = getSet().getSExtValue();
-  int64_t binding = getBinding().getSExtValue();
-  return getLayout().getFlatBindingIndex(set, binding);
 }
 
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {
@@ -2105,24 +2018,6 @@ void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", getDimension(),
                                            getResult(), setNameFn);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.pipeline_layout.create
-//===----------------------------------------------------------------------===//
-
-void PipelineLayoutCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "pipeline_layout");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.pipeline_layout.lookup
-//===----------------------------------------------------------------------===//
-
-void PipelineLayoutLookupOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "pipeline_layout");
 }
 
 //===----------------------------------------------------------------------===//

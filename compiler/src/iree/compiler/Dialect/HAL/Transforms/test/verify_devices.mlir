@@ -53,7 +53,7 @@ module @module {
   util.global private @optional = #hal.device.fallback<@device> : !hal.device
   util.global private @ordinal = #hal.device.ordinal<0> : !hal.device
   util.global private @selected = #hal.device.select<[
-    #hal.device.target<"llvm-cpu"> : !hal.device,
+    #hal.device.target<"local"> : !hal.device,
     #hal.device.target<"vmvx"> : !hal.device
   ]> : !hal.device
   util.func private @func() -> () attributes {

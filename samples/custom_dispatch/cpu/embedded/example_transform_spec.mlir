@@ -16,16 +16,14 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary (CPU + Vulkan, etc).
-#cpu_target = #hal.device.target<"llvm-cpu", [
+#cpu_target = #hal.device.target<"local", [
   #x86_64_target
 ]>
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
-  <0, bindings = [
-      <0, storage_buffer, ReadOnly>,
-      <1, storage_buffer, ReadOnly>,
-      <2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 module attributes {transform.with_named_sequence} {
@@ -56,9 +54,9 @@ module attributes {transform.with_named_sequence} {
           %workgroup_id_x = hal.interface.workgroup.id[0] : index
           %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
-          %binding0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
-          %binding2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
+          %binding2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
           func.call @simple_mul_abs_negate_workgroup(%binding0, %binding1, %binding2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
           return

@@ -81,9 +81,9 @@ struct ConvertHalInterfaceBindingSubspan final
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        op, newResultType, adaptor.getLayout(), adaptor.getSet(),
-        adaptor.getBinding(), byteOffset, dynamicLinearizedSize,
-        adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
+        op, newResultType, adaptor.getLayout(), adaptor.getBinding(),
+        byteOffset, dynamicLinearizedSize, adaptor.getAlignmentAttr(),
+        adaptor.getDescriptorFlagsAttr());
     return success();
   }
 };

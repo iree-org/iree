@@ -10,17 +10,15 @@ util.global private @default_device = #hal.device.target<"cpu", [
 ]> : !hal.device
 
 // CHECK: #pipeline_layout = #hal.pipeline.layout<
-// CHECK-SAME: push_constants = 1
-// CHECK-SAME: sets = [
-// CHECK-SAME:   <0, bindings = [
-// CHECK-SAME:     <0, storage_buffer, "ReadOnly|Indirect">
-// CHECK-SAME:     <1, storage_buffer, "ReadOnly|Indirect">
-// CHECK-SAME:     <2, storage_buffer, Indirect>
+// CHECK-SAME: constants = 1
+// CHECK-SAME: bindings = [
+// CHECK-SAME:   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+// CHECK-SAME:   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+// CHECK-SAME:   #hal.pipeline.binding<storage_buffer, Indirect>
 
 // CHECK: hal.executable private @ex
 // CHECK:   hal.executable.variant public @arm_64 target(#executable_target_arm_64
 // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
-// CHECK-SAME:   hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]
 // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
@@ -29,7 +27,6 @@ util.global private @default_device = #hal.device.target<"cpu", [
 // CHECK-NEXT:  func.func @entry
 // CHECK:   hal.executable.variant public @x86_64 target(#executable_target_x86_64
 // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
-// CHECK-SAME:   hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]
 // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
@@ -159,10 +156,8 @@ util.global private @riscv_device =  #hal.device.target<"cpu", [
 // CHECK:   hal.executable.variant public @riscv_32
 // CHECK:   hal.executable.variant public @x86_64
 hal.executable.source private @ex {
-  hal.executable.export public @entry layout(#hal.pipeline.layout<push_constants = 0, sets = [
-    #hal.descriptor_set.layout<0, bindings = [
-      #hal.descriptor_set.binding<0, storage_buffer>
-    ]>
+  hal.executable.export public @entry layout(#hal.pipeline.layout<bindings = [
+    #hal.pipeline.binding<storage_buffer>
   ]>)
   builtin.module {
     func.func @entry() {
@@ -227,10 +222,8 @@ module {
   // CHECK:   hal.executable.variant public @riscv_32
   // CHECK:   hal.executable.variant public @x86_64
   hal.executable.source public @ex {
-    hal.executable.export public @entry layout(#hal.pipeline.layout<push_constants = 0, sets = [
-      #hal.descriptor_set.layout<0, bindings = [
-        #hal.descriptor_set.binding<0, storage_buffer>
-      ]>
+    hal.executable.export public @entry layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
     ]>)
     builtin.module {
       func.func @entry() {

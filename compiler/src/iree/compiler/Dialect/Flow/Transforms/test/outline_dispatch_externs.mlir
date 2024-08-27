@@ -4,8 +4,7 @@
 // CHECK-NEXT:   hal.executable.variant public @a target(<"llvm-cpu", "a">)
 // CHECK-SAME:       objects([#hal.executable.object<{path = "a.o"}>])
 // CHECK-NEXT:     hal.executable.export public @main ordinal(100)
-// CHECK-SAME:         layout(#hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
-// CHECK-SAME:         hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>]
+// CHECK-SAME:         layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer>]>)
 // CHECK-NEXT:     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
 // CHECK-NEXT:       %ok, %value = hal.device.query<%arg0 : !hal.device> key("some" :: "value") : i1, i32
 // CHECK-NEXT:       %0 = arith.index_cast %value : i32 to index
@@ -16,8 +15,7 @@
 // CHECK-NEXT:       %ok, %value = hal.device.query<%arg0 : !hal.device> key("some" :: "feature") : i1, i32
 // CHECK-NEXT:       hal.return %ok : i1
 //      CHECK:     hal.executable.export public @main ordinal(200)
-// CHECK-SAME:         layout(#hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
-// CHECK-SAME:         hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>]
+// CHECK-SAME:         layout(#hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer>]>)
 // CHECK-NEXT:     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
 
 // Demonstrates the full functionality of an extern dispatch op.
@@ -41,17 +39,10 @@ util.func public @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %ar
       hal.return %x_capture, %y_capture, %z : index, index, index
     }
     // Must match the external definition.
-    layout(#hal.pipeline.layout<push_constants = 1, sets = [
-      <0, bindings = [
-          <0, storage_buffer, ReadOnly>,
-          <1, storage_buffer>
-      ]>
+    layout(#hal.pipeline.layout<constants = 1, bindings = [
+      #hal.pipeline.binding<storage_buffer, ReadOnly>,
+      #hal.pipeline.binding<storage_buffer>
     ]>)
-    // Optional, automatically inferred if omitted.
-    bindings([
-      #hal.interface.binding<0, 0>,
-      #hal.interface.binding<0, 1>
-    ])
     // Can have object references for multiple targets or configurations.
     objects({
       #hal.executable.target<"llvm-cpu", "a"> ordinal(100) = [#hal.executable.object<{path = "a.o"}>],

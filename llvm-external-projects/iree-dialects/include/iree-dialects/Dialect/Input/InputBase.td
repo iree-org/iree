@@ -265,52 +265,31 @@ def IREEInput_DescriptorFlagsAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
 }
 
-def IREEInput_DescriptorSetBindingAttr :
-    AttrDef<IREEInput_Dialect, "DescriptorSetBinding", []> {
-  let mnemonic = "descriptor_set.binding";
+def IREEInput_PipelineBindingAttr :
+    AttrDef<IREEInput_Dialect, "PipelineBinding", []> {
+  let mnemonic = "pipeline.binding";
   let summary = [{descriptor set binding specification}];
 
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$ordinal,
     AttrParameter<"DescriptorType", "">:$type,
     OptionalParameter<"std::optional<DescriptorFlags>">:$flags
   );
 
   let assemblyFormat = [{
-    `<` $ordinal `,` $type (`,` $flags^)? `>`
+    `<` $type (`,` $flags^)? `>`
   }];
 }
 
-def IREEInput_DescriptorSetLayoutFlags_None :
+def IREEInput_PipelineLayoutFlags_None :
     I32BitEnumAttrCase<"None", 0x0000>;
-def IREEInput_DescriptorSetLayoutFlags_Indirect :
+def IREEInput_PipelineLayoutFlags_Indirect :
     I32BitEnumAttrCase<"Indirect", 0x0001>;
-def IREEInput_DescriptorSetLayoutFlagsAttr :
-    I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
-      IREEInput_DescriptorSetLayoutFlags_None,
-      IREEInput_DescriptorSetLayoutFlags_Indirect,
+def IREEInput_PipelineLayoutFlagsAttr :
+    I32BitEnumAttr<"PipelineLayoutFlags", "valid PipelineLayout flags", [
+      IREEInput_PipelineLayoutFlags_None,
+      IREEInput_PipelineLayoutFlags_Indirect,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
-}
-
-def IREEInput_DescriptorSetLayoutAttr :
-    AttrDef<IREEInput_Dialect, "DescriptorSetLayout", []> {
-  let mnemonic = "descriptor_set.layout";
-  let summary = [{descriptor set layout specification}];
-
-  let parameters = (ins
-    AttrParameter<"int64_t", "">:$ordinal,
-    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings,
-    OptionalParameter<"std::optional<DescriptorSetLayoutFlags>">:$flags
-  );
-
-  let assemblyFormat = [{
-    `<`
-    $ordinal `,`
-    `bindings` `=` `[` $bindings `]`
-    (`,` `flags` `=` $flags^)?
-    `>`
-  }];
 }
 
 def IREEInput_PipelineLayoutAttr :
@@ -319,14 +298,16 @@ def IREEInput_PipelineLayoutAttr :
   let summary = [{executable entry point layout specification}];
 
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$pushConstants,
-    ArrayRefParameter<"DescriptorSetLayoutAttr", "">:$setLayouts
+    ArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
+    OptionalParameter<"int64_t", "0">:$constants,
+    OptionalParameter<"std::optional<PipelineLayoutFlags>">:$flags
   );
 
   let assemblyFormat = [{
     `<`
-    `push_constants` `=` $pushConstants `,`
-    `sets` `=` `[` $setLayouts `]`
+    (`constants` `=` $constants^ `,`)?
+    `bindings` `=` `[` qualified($bindings) `]`
+    (`,` `flags` `=` $flags^)?
     `>`
   }];
 }

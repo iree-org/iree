@@ -37,8 +37,6 @@ iree_runtime_cc_library(
         "nccl_channel.h",
         "nop_executable_cache.c",
         "nop_executable_cache.h",
-        "pipeline_layout.c",
-        "pipeline_layout.h",
         "stream_command_buffer.c",
         "stream_command_buffer.h",
         "timepoint_pool.c",
@@ -63,12 +61,14 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:collective_batch",
         "//runtime/src/iree/hal/utils:deferred_command_buffer",
         "//runtime/src/iree/hal/utils:deferred_work_queue",
+        "//runtime/src/iree/hal/utils:executable_debug_info",
         "//runtime/src/iree/hal/utils:file_transfer",
         "//runtime/src/iree/hal/utils:memory_file",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/hal/utils:stream_tracing",
         "//runtime/src/iree/schemas:cuda_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
     ],
 )
 

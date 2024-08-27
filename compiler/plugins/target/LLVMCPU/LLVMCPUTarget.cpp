@@ -398,10 +398,10 @@ public:
 
       // Specify the constant and binding information used to validate
       // dispatches.
-      // TODO(#18189): pack per-binding information bitfields.
-      dispatchAttrs.constantCount = exportOp.getLayout().getPushConstants();
-      dispatchAttrs.bindingCount =
-          exportOp.getLayout().getSetLayout(0).getBindings().size();
+      if (auto layoutAttr = exportOp.getLayout()) {
+        dispatchAttrs.constantCount = layoutAttr.getConstants();
+        dispatchAttrs.bindingCount = layoutAttr.getBindings().size();
+      }
 
       LibraryBuilder::SourceLocation sourceLocation;
       if (options.debugLevel >= 1) {

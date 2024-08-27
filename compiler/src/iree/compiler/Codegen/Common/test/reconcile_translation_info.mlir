@@ -1,6 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info)))" %s --verify-diagnostics | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @err_multiple_entry_point {
   // expected-error @+1 {{reconciliation for multiple export ops unsupported}}
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
@@ -11,7 +13,9 @@ hal.executable private @err_multiple_entry_point {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @reconcile_workgroup_size {
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
@@ -31,7 +35,9 @@ hal.executable private @reconcile_workgroup_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @single_translation_info {
   hal.executable.variant public @single_translation_info target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
@@ -51,7 +57,9 @@ hal.executable private @single_translation_info {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @err_mistmatched_workgroup_size {
   hal.executable.variant public @err_mismatched_workgroup_size target(#hal.executable.target<"", "", {}>) {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
@@ -69,7 +77,9 @@ hal.executable private @err_mistmatched_workgroup_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @err_mistmatched_workgroup_size2 {
   hal.executable.variant public @err_mismatched_workgroup_size2 target(#hal.executable.target<"", "", {}>) {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
@@ -87,7 +97,9 @@ hal.executable private @err_mistmatched_workgroup_size2 {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @reconcile_subgroup_size {
   hal.executable.variant public @reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
@@ -107,7 +119,9 @@ hal.executable private @reconcile_subgroup_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @err_reconcile_subgroup_size {
   hal.executable.variant public @err_reconcile_subgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
@@ -127,7 +141,9 @@ hal.executable private @err_reconcile_subgroup_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @llvm_func_attrs {
   hal.executable.variant public @llvm_func_attrs target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)

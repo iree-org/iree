@@ -4,18 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree.hal.wgsl;
+include "iree/schemas/executable_debug_info.fbs";
 
-// 'WGSL Executable'.
-file_identifier "WGSL";
-file_extension "wgsl";
+namespace iree.hal.webgpu;
+
+// 'WGSL v1 Executable'.
+file_identifier "WGS1";
+file_extension "wgs1";
 
 // Contents of one WGPUShaderModule, possibly with multiple entry points.
 // Entry points have the name "dN" where N is the executable-wide entry point
 // ordinal.
 table ShaderModuleDef {
   // WGSL source code.
-  code:string;
+  wgsl_source:string;
 
   // Optional `source-map-v3` format source map.
   source_map:string;
@@ -28,6 +30,9 @@ table ExecutableDef {
   // A mapping of executable entry point ordinals to the shader module in which
   // they reside.
   entry_points:[uint];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
 }
 
 root_type ExecutableDef;

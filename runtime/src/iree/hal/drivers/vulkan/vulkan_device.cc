@@ -24,7 +24,6 @@
 #include "iree/hal/drivers/vulkan/handle_util.h"
 #include "iree/hal/drivers/vulkan/native_allocator.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
-#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
 #include "iree/hal/drivers/vulkan/nop_executable_cache.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
@@ -851,10 +850,10 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_get_device_properties(
+static iree_status_t iree_hal_vulkan_query_device_properties(
     DynamicSymbols* instance_syms, VkPhysicalDevice physical_device,
-    iree_hal_vulkan_device_properties_t* device_properties) {
-  memset(device_properties, 0, sizeof(*device_properties));
+    iree_hal_vulkan_device_properties_t* out_properties) {
+  memset(out_properties, 0, sizeof(*out_properties));
 
   VkPhysicalDeviceFeatures2 physical_device_features;
   memset(&physical_device_features, 0, sizeof(physical_device_features));
@@ -941,40 +940,40 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
                                                 &physical_device_properties);
 
   if (shader_float16_int8_features.shaderFloat16) {
-    device_properties->compute_float |= 0x1u;
+    out_properties->compute_float |= 0x1u;
   }
   if (physical_device_features.features.shaderFloat64) {
-    device_properties->compute_float |= 0x2u;
+    out_properties->compute_float |= 0x2u;
   }
   if (shader_float16_int8_features.shaderInt8) {
-    device_properties->compute_int |= 0x1u;
+    out_properties->compute_int |= 0x1u;
   }
   if (physical_device_features.features.shaderInt16) {
-    device_properties->compute_int |= 0x2u;
+    out_properties->compute_int |= 0x2u;
   }
   if (physical_device_features.features.shaderInt64) {
-    device_properties->compute_int |= 0x4u;
+    out_properties->compute_int |= 0x4u;
   }
   if (supported_8bit_storage_features.storageBuffer8BitAccess &&
       supported_8bit_storage_features.uniformAndStorageBuffer8BitAccess) {
-    device_properties->storage |= 0x1u;
+    out_properties->storage |= 0x1u;
   }
   if (supported_16bit_storage_features.storageBuffer16BitAccess &&
       supported_16bit_storage_features.uniformAndStorageBuffer16BitAccess) {
-    device_properties->storage |= 0x2u;
+    out_properties->storage |= 0x2u;
   }
 
   if (iree_all_bits_set(subgroup_properties.supportedOperations,
                         VK_SUBGROUP_FEATURE_SHUFFLE_BIT)) {
-    device_properties->subgroup |= 0x1u;
+    out_properties->subgroup |= 0x1u;
   }
   if (iree_all_bits_set(subgroup_properties.supportedOperations,
                         VK_SUBGROUP_FEATURE_ARITHMETIC_BIT)) {
-    device_properties->subgroup |= 0x2u;
+    out_properties->subgroup |= 0x2u;
   }
 
   if (dot_product_features.shaderIntegerDotProduct) {
-    device_properties->dot_product |= 0x1u;
+    out_properties->dot_product |= 0x1u;
   }
 
   if (coop_matrix_features.cooperativeMatrix &&
@@ -999,7 +998,7 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
           p->BType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
         if (p->CType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
           if (p->MSize == 16 && p->NSize == 16 && p->KSize == 16) {
-            device_properties->cooperative_matrix |= 0x1u;
+            out_properties->cooperative_matrix |= 0x1u;
           }
         }
       }
@@ -1007,8 +1006,17 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
   }
 
   if (address_features.bufferDeviceAddress) {
-    device_properties->address |= 0x1u;
+    out_properties->address |= 0x1u;
   }
+
+  out_properties->limits.max_push_constants_size =
+      physical_device_properties.properties.limits.maxPushConstantsSize;
+  out_properties->limits.max_per_stage_descriptor_uniform_buffers =
+      physical_device_properties.properties.limits
+          .maxPerStageDescriptorUniformBuffers;
+  out_properties->limits.max_per_stage_descriptor_storage_buffers =
+      physical_device_properties.properties.limits
+          .maxPerStageDescriptorStorageBuffers;
 
   return iree_ok_status();
 }
@@ -1277,7 +1285,7 @@ iree_status_t iree_hal_vulkan_device_create(
   }
 
   iree_hal_vulkan_device_properties_t device_properties;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_get_device_properties(
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_device_properties(
       instance_syms, physical_device, &device_properties));
 
   auto logical_device = new VkDeviceHandle(
@@ -1350,9 +1358,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   iree_hal_vulkan_device_extensions_t enabled_device_extensions =
       iree_hal_vulkan_infer_enabled_device_extensions(device_syms.get());
 
-  // We can still retrieve the correct device properties though.
+  // We can retrieve the device properties and limits from the wrapped handle.
   iree_hal_vulkan_device_properties_t device_properties;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_get_device_properties(
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_device_properties(
       device_syms.get(), physical_device, &device_properties));
 
   iree_hal_vulkan_features_t enabled_features = 0;
@@ -1571,18 +1579,6 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
       device->builtin_executables, &device->block_pool, out_command_buffer);
 }
 
-static iree_status_t iree_hal_vulkan_device_create_descriptor_set_layout(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_flags_t flags,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_layout_binding_t* bindings,
-    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  return iree_hal_vulkan_native_descriptor_set_layout_create(
-      device->logical_device, flags, binding_count, bindings,
-      out_descriptor_set_layout);
-}
-
 static iree_status_t iree_hal_vulkan_device_create_event(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
@@ -1612,17 +1608,6 @@ static iree_status_t iree_hal_vulkan_device_import_file(
   return iree_hal_memory_file_wrap(
       queue_affinity, access, handle, iree_hal_device_allocator(base_device),
       iree_hal_device_host_allocator(base_device), out_file);
-}
-
-static iree_status_t iree_hal_vulkan_device_create_pipeline_layout(
-    iree_hal_device_t* base_device, iree_host_size_t push_constants,
-    iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_pipeline_layout_t** out_pipeline_layout) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  return iree_hal_vulkan_native_pipeline_layout_create(
-      device->logical_device, push_constants, set_layout_count, set_layouts,
-      out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_semaphore(
@@ -1913,14 +1898,10 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
-    /*.create_descriptor_set_layout=*/
-    iree_hal_vulkan_device_create_descriptor_set_layout,
     /*.create_event=*/iree_hal_vulkan_device_create_event,
     /*.create_executable_cache=*/
     iree_hal_vulkan_device_create_executable_cache,
     /*.import_file=*/iree_hal_vulkan_device_import_file,
-    /*.create_pipeline_layout=*/
-    iree_hal_vulkan_device_create_pipeline_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
     /*.query_semaphore_compatibility=*/
     iree_hal_vulkan_device_query_semaphore_compatibility,

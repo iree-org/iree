@@ -1,10 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -18,8 +16,8 @@ func.func @copy_as_generic() attributes {hal.executable.target = #executable_tar
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<?x?xi32>{%0, %1}
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<?x?xi32>{%0, %1}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xi32>{%0, %1}
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<?x?xi32>{%0, %1}
   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : memref<?x?xi32>) outs(%3 : memref<?x?xi32>) {
   ^bb0(%in: i32, %out: i32):
     linalg.yield %in : i32
@@ -35,11 +33,9 @@ func.func @copy_as_generic() attributes {hal.executable.target = #executable_tar
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -53,8 +49,8 @@ func.func @copy() attributes {hal.executable.target = #executable_target_vulkan_
   %c0 = arith.constant 0 : index
   %c224 = arith.constant 224 : index
   %c3 = arith.constant 3 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<1x224x224x3xf32>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<1x224x224x3xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1x224x224x3xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<1x224x224x3xf32>
   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%0 : memref<1x224x224x3xf32>) outs(%1 : memref<1x224x224x3xf32>) {
   ^bb0(%in: f32, %out: f32):
     linalg.yield %in : f32
@@ -73,11 +69,9 @@ func.func @copy() attributes {hal.executable.target = #executable_target_vulkan_
 
 // Average pooling op with nice tilable input.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -91,8 +85,8 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c8 = arith.constant 8 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x2x2x8xf32>>
   %2 = tensor.empty() : tensor<12x12xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 24, 24, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x24x24x8xf32>> -> tensor<1x24x24x8xf32>
   %4 = tensor.empty() : tensor<1x2x2x8xf32>
@@ -111,11 +105,9 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -129,8 +121,8 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 4.900000e+01 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x1280xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1x1x1280xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 7, 7, 1280], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x7x7x1280xf32>> -> tensor<1x7x7x1280xf32>
   %3 = tensor.empty() : tensor<7x7xf32>
   %4 = tensor.empty() : tensor<1x1x1x1280xf32>
@@ -156,11 +148,9 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
 
 // Max pooling op with odd size-1 dimension sizes.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -175,8 +165,8 @@ func.func @max_pool() attributes {hal.executable.target = #executable_target_vul
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %c320 = arith.constant 320 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x76x1x1xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x38x1x1xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x76x1x1xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x38x1x1xf32>>
   %2 = tensor.empty() : tensor<2x1xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 76, 1, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x76x1x1xf32>> -> tensor<1x76x1x1xf32>
   %4 = tensor.empty() : tensor<1x38x1x1xf32>
@@ -197,12 +187,10 @@ func.func @max_pool() attributes {hal.executable.target = #executable_target_vul
 
 // Element wise op with mismatched input and output rank.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -217,9 +205,9 @@ func.func @elementwise() attributes {hal.executable.target = #executable_target_
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x10xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<readonly:tensor<10xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : !flow.dispatch.tensor<writeonly:tensor<10xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x10xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<10xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<10xf32>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x10xf32>> -> tensor<1x10xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [10], strides = [1] : !flow.dispatch.tensor<readonly:tensor<10xf32>> -> tensor<10xf32>
   %5 = tensor.empty() : tensor<10xf32>
@@ -240,11 +228,9 @@ func.func @elementwise() attributes {hal.executable.target = #executable_target_
 
 // Fused depthwise convolution and element wise ops: don't vectorize with partially active subgroups.
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -263,8 +249,8 @@ func.func @dwconv_elementwise() attributes {hal.executable.target = #executable_
   %c4 = arith.constant 4 : index
   %c4576 = arith.constant 4576 : index
   %c6272 = arith.constant 6272 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x21x20x1xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x19x18x1x4xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x21x20x1xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x19x18x1x4xf32>>
   %2 = tensor.empty() : tensor<1x19x18x1x4xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 21, 20, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x21x20x1xf32>> -> tensor<1x21x20x1xf32>
   %4 = tensor.empty() : tensor<1x19x18x1x4xf32>
@@ -289,11 +275,9 @@ func.func @dwconv_elementwise() attributes {hal.executable.target = #executable_
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -307,8 +291,8 @@ func.func @dwconv_elementwise() attributes {hal.executable.target = #executable_
 func.func @outermost_reduction() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 2048, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x2048x512xf32>> -> tensor<4x2048x512xf32>
   %3 = tensor.empty() : tensor<2048x512xf32>
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2048x512xf32>) -> tensor<2048x512xf32>
@@ -330,11 +314,9 @@ func.func @outermost_reduction() attributes {hal.executable.target = #executable
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -353,9 +335,9 @@ func.func @innermost_reduction() attributes {hal.executable.target = #executable
   %3 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 394752 : index, 984064 : index]} : i32 to index
   %4 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [0 : index, 196608 : index, 197120 : index]} : i32 to index
   %5 = arith.index_cast %2 {stream.alignment = 512 : index, stream.values = [512 : index, 197120 : index, 197632 : index]} : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%3) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
-  %7 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%4) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
   %9 = flow.dispatch.tensor.load %6, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<128x384xf32>
   %10 = flow.dispatch.tensor.load %7, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
   %11 = tensor.empty() : tensor<128xf32>
@@ -380,11 +362,9 @@ func.func @innermost_reduction() attributes {hal.executable.target = #executable
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -397,8 +377,8 @@ func.func @innermost_reduction() attributes {hal.executable.target = #executable
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @four_dim_elementwise() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x256x4x8xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x256x4x8xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [128, 8, 256, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x8x256x4xf32>> -> tensor<128x8x256x4xf32>
   %3 = tensor.empty() : tensor<128x256x4x8xf32>
   %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<128x8x256x4xf32>) outs(%3 : tensor<128x256x4x8xf32>) {
@@ -418,11 +398,9 @@ func.func @four_dim_elementwise() attributes {hal.executable.target = #executabl
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -436,8 +414,8 @@ func.func @four_dim_elementwise() attributes {hal.executable.target = #executabl
 func.func @odd_reduction_dimension_size_501() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0xFF800000 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x501xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x501xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x501xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x501xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 501], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x501xf32>> -> tensor<512x501xf32>
   %3 = tensor.empty() : tensor<512x501xf32>
   %4 = tensor.empty() : tensor<512xf32>
@@ -466,11 +444,9 @@ func.func @odd_reduction_dimension_size_501() attributes {hal.executable.target 
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -484,8 +460,8 @@ func.func @odd_reduction_dimension_size_501() attributes {hal.executable.target 
 func.func @odd_reduction_dimension_size_2809() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0xFF800000 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x2809xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x2809xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x2809xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<512x2809xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 2809], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x2809xf32>> -> tensor<512x2809xf32>
   %3 = tensor.empty() : tensor<512x2809xf32>
   %4 = tensor.empty() : tensor<512xf32>
@@ -514,11 +490,9 @@ func.func @odd_reduction_dimension_size_2809() attributes {hal.executable.target
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
@@ -533,8 +507,8 @@ func.func @broadcast() attributes {hal.executable.target = #executable_target_vu
   %c0 = arith.constant 0 : index
   %cst = arith.constant 1.000000e-10 : f32
   %cst_0 = arith.constant -1.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<f32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x1x1x1xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<f32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2048x1x1x1xf32>>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
   %3 = tensor.empty() : tensor<2048x1x1x1xf32>
   %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<f32>) outs(%3 : tensor<2048x1x1x1xf32>) {

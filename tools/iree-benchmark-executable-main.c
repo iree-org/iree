@@ -43,41 +43,29 @@ IREE_FLAG_LIST(
 // dynamically growable.
 #define IREE_HAL_MAX_EXECUTABLE_CONSTANT_COUNT 512
 // Total number of push constants we (currently) allow any executable to have.
-#define IREE_HAL_MAX_PUSH_CONSTANT_COUNT 64
-// Maximum number of descriptor sets in an pipeline layout.
-#define IREE_HAL_MAX_DESCRIPTOR_SET_COUNT 2
+#define IREE_HAL_MAX_CONSTANT_COUNT 64
 // Total number of bindings we (currently) allow any executable to have.
-#define IREE_HAL_MAX_TOTAL_BINDING_COUNT \
-  (IREE_HAL_MAX_DESCRIPTOR_SET_COUNT * 32)
+#define IREE_HAL_MAX_BINDING_COUNT 64
 
 // Parsed dispatch parameters from flags.
 // Used to construct the dispatch parameters for the benchmark invocation.
 struct {
-  int32_t set_count;
-  struct {
-    // For now we only track the binding counts and assume they are all storage
-    // buffers. When we support more types we'll need an encoding.
-    int32_t binding_count;
-  } sets[IREE_HAL_MAX_DESCRIPTOR_SET_COUNT];
-
   int32_t executable_constant_count;
   union {
     uint32_t ui32;
   } executable_constants[IREE_HAL_MAX_EXECUTABLE_CONSTANT_COUNT];
 
-  int32_t push_constant_count;
+  int32_t constant_count;
   union {
     uint32_t ui32;
-  } push_constants[IREE_HAL_MAX_PUSH_CONSTANT_COUNT];
+  } constants[IREE_HAL_MAX_CONSTANT_COUNT];
 
   int32_t binding_count;
-  iree_string_view_t binding_specs[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
-  char binding_cconv[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
-  iree_hal_descriptor_set_layout_binding_t
-      binding_layouts[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
+  iree_string_view_t binding_specs[IREE_HAL_MAX_BINDING_COUNT];
+  char binding_cconv[IREE_HAL_MAX_BINDING_COUNT];
 } parsed_params = {
     .executable_constant_count = 0,
-    .push_constant_count = 0,
+    .constant_count = 0,
     .binding_count = 0,
 };
 
@@ -117,11 +105,10 @@ IREE_FLAG_CALLBACK(parse_executable_constant, print_executable_constant,
                    &parsed_params, executable_constant,
                    "Appends a uint32_t executable constant value.\n");
 
-static iree_status_t parse_push_constant(iree_string_view_t flag_name,
-                                         void* storage,
-                                         iree_string_view_t value) {
-  IREE_ASSERT_LE(parsed_params.push_constant_count + 1,
-                 IREE_ARRAYSIZE(parsed_params.push_constants),
+static iree_status_t parse_constant(iree_string_view_t flag_name, void* storage,
+                                    iree_string_view_t value) {
+  IREE_ASSERT_LE(parsed_params.constant_count + 1,
+                 IREE_ARRAYSIZE(parsed_params.constants),
                  "too many push constants");
   uint32_t value_ui32 = 0;
   if (!iree_string_view_atoi_uint32(value, &value_ui32)) {
@@ -130,27 +117,26 @@ static iree_status_t parse_push_constant(iree_string_view_t flag_name,
         "invalid push constant value `%.*s`; expects uint32_t", (int)value.size,
         value.data);
   }
-  parsed_params.push_constants[parsed_params.push_constant_count++].ui32 =
-      value_ui32;
+  parsed_params.constants[parsed_params.constant_count++].ui32 = value_ui32;
   return iree_ok_status();
 }
-static void print_push_constant(iree_string_view_t flag_name, void* storage,
-                                FILE* file) {
-  if (parsed_params.push_constant_count == 0) {
+static void print_constant(iree_string_view_t flag_name, void* storage,
+                           FILE* file) {
+  if (parsed_params.constant_count == 0) {
     fprintf(file, "# --%.*s=[integer value]\n", (int)flag_name.size,
             flag_name.data);
     return;
   }
-  for (int32_t i = 0; i < parsed_params.push_constant_count; ++i) {
+  for (int32_t i = 0; i < parsed_params.constant_count; ++i) {
     fprintf(file, "--%.*s=%u", (int)flag_name.size, flag_name.data,
-            parsed_params.push_constants[i].ui32);
-    if (i < parsed_params.push_constant_count - 1) {
+            parsed_params.constants[i].ui32);
+    if (i < parsed_params.constant_count - 1) {
       fprintf(file, "\n");
     }
   }
 }
-IREE_FLAG_CALLBACK(parse_push_constant, print_push_constant, &parsed_params,
-                   push_constant, "Appends a uint32_t push constant value.\n");
+IREE_FLAG_CALLBACK(parse_constant, print_constant, &parsed_params, constant,
+                   "Appends a uint32_t constant value.\n");
 
 static iree_status_t parse_binding(iree_string_view_t flag_name, void* storage,
                                    iree_string_view_t value) {
@@ -160,12 +146,6 @@ static iree_status_t parse_binding(iree_string_view_t flag_name, void* storage,
   int32_t i = parsed_params.binding_count++;
   parsed_params.binding_specs[i] = value;
   parsed_params.binding_cconv[i] = 'r';
-  // TODO(benvanik): allow for a specification of type/immutability.
-  parsed_params.binding_layouts[i] = (iree_hal_descriptor_set_layout_binding_t){
-      .binding = (uint32_t)i,
-      .type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-      .flags = IREE_HAL_DESCRIPTOR_FLAG_NONE,
-  };
   return iree_ok_status();
 }
 static void print_binding(iree_string_view_t flag_name, void* storage,
@@ -205,7 +185,6 @@ IREE_FLAG_CALLBACK(
 typedef struct iree_benchmark_executable_args_t {
   iree_hal_device_t* device;
   iree_hal_executable_t* executable;
-  iree_hal_pipeline_layout_t* pipeline_layout;
   const iree_hal_buffer_ref_t* bindings;
   uint32_t workgroup_count[3];
 } iree_benchmark_executable_args_t;
@@ -232,6 +211,33 @@ static iree_status_t iree_benchmark_executable_run(
       .payload_values = &fence_value,
   };
 
+  // Record a command buffer with the dispatches.
+  // The same command buffer recording is reused on each benchmark step.
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
+      args->device, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &command_buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_begin(command_buffer));
+  iree_const_byte_span_t constants = iree_make_const_byte_span(
+      &parsed_params.constants[0].ui32,
+      parsed_params.constant_count * sizeof(parsed_params.constants[0]));
+  iree_hal_buffer_ref_list_t bindings = {
+      .count = parsed_params.binding_count,
+      .values = args->bindings,
+  };
+  for (int32_t i = 0; i < FLAG_batch_size; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
+        command_buffer, args->executable, FLAG_entry_point,
+        args->workgroup_count, constants, bindings,
+        IREE_HAL_DISPATCH_FLAG_NONE));
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
+        command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+        IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, NULL, 0, NULL));
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer));
+
   // Start profiling now - all subsequent device operations will be what the
   // user wants to measure.
   IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(args->device));
@@ -244,48 +250,6 @@ static iree_status_t iree_benchmark_executable_run(
   // number of workgroups executed.
   int64_t dispatch_count = 0;
   while (iree_benchmark_keep_running(benchmark_state, FLAG_batch_size)) {
-    // TODO(benvanik): record a secondary command buffer and just replay it
-    // here. This should fix the overhead at just primary command buffer
-    // creation. Most backends don't support reusable command buffers, yet, and
-    // some only support inline execution so we are conservatively doing that.
-    // In the future we should have an option (possibly based on device query)
-    // as to which path to use.
-
-    // Record a command buffer with the dispatches.
-    // Note that today we are doing this inside of the benchmark loop so that
-    // we can use inline execution. This is a boost to devices that support it
-    // like CUDA streams and synchronous CPU executors but a pessimization to
-    // devices that benefit from reusable command buffers like CUDA graphs.
-    // In the future we can add a flag that switches the mode between
-    // reusable and one-shot.
-    iree_hal_command_buffer_t* command_buffer = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-        args->device,
-        IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
-            IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
-        IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-        /*binding_capacity=*/0, &command_buffer));
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_begin(command_buffer));
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_push_constants(
-        command_buffer, args->pipeline_layout, /*offset=*/0,
-        &parsed_params.push_constants[0].ui32,
-        parsed_params.push_constant_count *
-            sizeof(parsed_params.push_constants[0])));
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_push_descriptor_set(
-        command_buffer, args->pipeline_layout, /*set=*/0,
-        parsed_params.binding_count, args->bindings));
-    for (int32_t i = 0; i < FLAG_batch_size; ++i) {
-      IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
-          command_buffer, args->executable, FLAG_entry_point,
-          args->workgroup_count[0], args->workgroup_count[1],
-          args->workgroup_count[2], IREE_HAL_DISPATCH_FLAG_NONE));
-      IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
-          command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-          IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,
-          IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, NULL, 0, NULL));
-    }
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer));
-
     // Submit the command buffer; if the device could not start executing while
     // we were recording then this will kick off the execution.
     ++fence_value;
@@ -300,9 +264,6 @@ static iree_status_t iree_benchmark_executable_run(
                                                  iree_infinite_timeout()));
 
     iree_benchmark_pause_timing(benchmark_state);
-
-    // Don't count cleanup time in the benchmark.
-    iree_hal_command_buffer_release(command_buffer);
 
     // Accumulate the total number of dispatches executed.
     dispatch_count += FLAG_batch_size;
@@ -325,6 +286,7 @@ static iree_status_t iree_benchmark_executable_run(
                               args->workgroup_count[2];
   iree_benchmark_set_items_processed(benchmark_state, total_invocations);
 
+  iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(fence_semaphore);
 
   return iree_ok_status();
@@ -389,7 +351,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
       (iree_string_view_list_t){parsed_params.binding_count,
                                 parsed_params.binding_specs},
       device, device_allocator, host_allocator, &binding_list));
-  iree_hal_buffer_ref_t bindings[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
+  iree_hal_buffer_ref_t bindings[IREE_HAL_MAX_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < parsed_params.binding_count; ++i) {
     iree_vm_ref_t value = iree_vm_ref_null();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(binding_list, i, &value));
@@ -406,7 +368,6 @@ static iree_status_t iree_benchmark_executable_from_flags(
           i);
     }
     bindings[i] = iree_hal_make_buffer_ref(buffer, 0, IREE_WHOLE_BUFFER);
-    bindings[i].ordinal = i;
   }
 
   // Setup the specification used to perform the executable load.
@@ -435,19 +396,6 @@ static iree_status_t iree_benchmark_executable_from_flags(
       iree_make_cstring_view(FLAG_executable_format);
   executable_params.executable_data = file_contents->const_buffer;
 
-  // Setup the layouts defining how each entry point is interpreted.
-  iree_hal_pipeline_layout_t* pipeline_layout = NULL;
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_layout_create(
-      device, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
-      parsed_params.binding_count, parsed_params.binding_layouts,
-      &descriptor_set_layout));
-  IREE_RETURN_IF_ERROR(iree_hal_pipeline_layout_create(
-      device, parsed_params.push_constant_count,
-      /*set_layout_count=*/1, &descriptor_set_layout, &pipeline_layout));
-  executable_params.pipeline_layout_count = 1;
-  executable_params.pipeline_layouts = &pipeline_layout;
-
   // Executable-level constants allow us to perform some basic load-time value
   // propagation - usually dependent on device features or tuning parameters.
   executable_params.constant_count = parsed_params.executable_constant_count;
@@ -468,7 +416,6 @@ static iree_status_t iree_benchmark_executable_from_flags(
     args[i] = (iree_benchmark_executable_args_t){
         .device = device,
         .executable = executable,
-        .pipeline_layout = pipeline_layout,
         .bindings = bindings,
         .workgroup_count = {1, 1, 1},
     };
@@ -495,8 +442,6 @@ static iree_status_t iree_benchmark_executable_from_flags(
 
   iree_vm_list_release(binding_list);
   iree_hal_executable_release(executable);
-  iree_hal_descriptor_set_layout_release(descriptor_set_layout);
-  iree_hal_pipeline_layout_release(pipeline_layout);
   iree_file_contents_free(file_contents);
   iree_hal_executable_cache_release(executable_cache);
   iree_hal_device_release(device);

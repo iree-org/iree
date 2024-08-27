@@ -1,12 +1,10 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-capture-executable-sources{stage=configured})' %s | FileCheck %s
 
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
 ]>
 
 // CHECK-DAG: #[[EX0_VARIANT0_LOC:.+]] = loc("module_ex0_variant0.configured.mlir"
