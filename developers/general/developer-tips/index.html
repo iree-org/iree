@@ -4263,6 +4263,10 @@ for more information and examples.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>start</code></td>
+<td>Entry point to the compilation pipeline</td>
+</tr>
+<tr>
 <td><code>input</code></td>
 <td>Performs input processing and lowering into core IREE input dialects (linalg/etc)</td>
 </tr>
@@ -4275,6 +4279,14 @@ for more information and examples.</p>
 <td>Applies customizable <code>preprocessing</code> prior to FLow/Stream/HAL/VM</td>
 </tr>
 <tr>
+<td><code>global-optimization</code></td>
+<td>Performs global program optimization</td>
+</tr>
+<tr>
+<td><code>dispatch-creation</code></td>
+<td>Fuses operations and forms dispatch regions</td>
+</tr>
+<tr>
 <td><code>flow</code></td>
 <td>Models execution data flow and partitioning using the <code>flow</code> dialect</td>
 </tr>
@@ -4285,6 +4297,10 @@ for more information and examples.</p>
 <tr>
 <td><code>executable-sources</code></td>
 <td>Prepares <code>hal</code> dialect executables for translation, prior to codegen</td>
+</tr>
+<tr>
+<td><code>executable-configurations</code></td>
+<td>Selects translation strategies for code generation</td>
 </tr>
 <tr>
 <td><code>executable-targets</code></td>
@@ -4304,8 +4320,9 @@ for more information and examples.</p>
 </tr>
 </tbody>
 </table>
-<p>For an accurate list of phases, see the source code or check the help output
-with a command such as:</p>
+<p>For an accurate list of phases, see
+<a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Pipelines/Pipelines.h">the source code</a>
+or check the help output with a command such as:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--help<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;/--compile-to/,/--/p&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span>-1
 </code></pre></div>
 </details>
@@ -4365,13 +4382,14 @@ each phase, much like <code>--compile-to</code> but without exiting early:</p>
 <span class="go">simple_abs.2.abi.mlir</span>
 <span class="go">simple_abs.3.preprocessing.mlir</span>
 <span class="go">simple_abs.4.global-optimization.mlir</span>
-<span class="go">simple_abs.5.flow.mlir</span>
-<span class="go">simple_abs.6.stream.mlir</span>
-<span class="go">simple_abs.7.executable-sources.mlir</span>
-<span class="go">simple_abs.8.executable-configurations.mlir</span>
-<span class="go">simple_abs.9.executable-targets.mlir</span>
-<span class="go">simple_abs.10.hal.mlir</span>
-<span class="go">simple_abs.11.vm.mlir</span>
+<span class="go">simple_abs.5.dispatch-creation.mlir</span>
+<span class="go">simple_abs.6.flow.mlir</span>
+<span class="go">simple_abs.7.stream.mlir</span>
+<span class="go">simple_abs.8.executable-sources.mlir</span>
+<span class="go">simple_abs.9.executable-configurations.mlir</span>
+<span class="go">simple_abs.10.executable-targets.mlir</span>
+<span class="go">simple_abs.11.hal.mlir</span>
+<span class="go">simple_abs.12.vm.mlir</span>
 </code></pre></div>
 <p>As with <code>--compile-to</code>, these files can be used together with <code>--compile-from</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.2.abi.mlir<span class="w"> </span><span class="se">\</span>
