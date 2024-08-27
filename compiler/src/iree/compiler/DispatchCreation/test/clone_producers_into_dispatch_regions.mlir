@@ -326,3 +326,19 @@ util.func public @clone_broadcast_dequant_op(
 //  CHECK-SAME:         ins(%[[DEQUANT]] :
 //       CHECK:     flow.return %[[REDUCE]]
 //       CHECK:   return %[[RETURN]]
+
+// -----
+
+// Do no clone index cast operations when they are operands to the dispatch
+util.func public @dont_clone_index_cast(%arg0 : i64) {
+  %0 = arith.index_cast %arg0 : i64 to index
+  %1 = flow.dispatch.region[] -> (tensor<?xf32>{%0}) {
+    %2 = tensor.empty(%0) : tensor<?xf32>
+    flow.return %2 : tensor<?xf32>
+  }
+  util.return
+}
+// CHECK-LABEL: func public @dont_clone_index_cast
+//       CHECK:   arith.index_cast
+//       CHECK:   flow.dispatch.region
+//   CHECK-NOT:   arith.index_cast

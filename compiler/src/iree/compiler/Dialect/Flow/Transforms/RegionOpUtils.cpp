@@ -761,6 +761,15 @@ bool isClonableIntoDispatchOp(Operation *op) {
 static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
+
+    // Do not fuse `index_cast` operations if it is already an operand of the
+    // owner.
+    if (auto indexCastOp = v.getDefiningOp<arith::IndexCastOp>()) {
+      if (user == dispatchOp) {
+        return true;
+      }
+    }
+
     Operation *ownerWorkgroupsOp =
         user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
     Operation *ownerRegionOp =
