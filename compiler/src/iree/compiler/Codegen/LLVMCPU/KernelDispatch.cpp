@@ -3037,12 +3037,12 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
     return failure();
   Operation *rootOperation = rootOp.value();
 
-  LLVM_DEBUG(KD_DBGS() << "Root op: " << *rootOperation << "\n");
-
   // Handle the case with no known root operation.
   if (!rootOperation) {
     return lowerUsingDefaultPipeline(entryPointFn);
   }
+
+  LLVM_DEBUG(KD_DBGS() << "Root op: " << *rootOperation << "\n");
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =

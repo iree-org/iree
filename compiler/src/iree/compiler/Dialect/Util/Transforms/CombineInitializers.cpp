@@ -48,10 +48,10 @@ public:
       return;
     auto fusedLoc = FusedLoc::get(&getContext(), locs);
 
-    // Make the new initializer op in the same location as the last initializer
+    // Make the new initializer op in the same location as the first initializer
     // we are combining - this ensures that module initialization order is
     // preserved.
-    OpBuilder builder(initializerOps.back());
+    OpBuilder builder(initializerOps.front());
     auto newOp = builder.create<IREE::Util::InitializerOp>(fusedLoc);
     builder.setInsertionPointToStart(newOp.addEntryBlock());
     InlinerInterface inlinerInterface(&getContext());
