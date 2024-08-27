@@ -4242,7 +4242,7 @@ Python executable to use with <code>Python3_EXECUTABLE</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Configure (including other options as discussed above)</span>
 cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON<span class="w">  </span><span class="se">\</span>
-<span class="w">  </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which<span class="w"> </span>python<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which<span class="w"> </span>python3<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>.
 
 <span class="c1"># Build</span>
