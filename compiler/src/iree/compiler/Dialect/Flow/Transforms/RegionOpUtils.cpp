@@ -762,10 +762,11 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
 
-    // Do not fuse `index_cast` operations if it is already an operand of the
-    // owner.
-    if (auto indexCastOp = v.getDefiningOp<arith::IndexCastOp>()) {
-      if (user == dispatchOp) {
+    // Do not fuse operations if they are already an operand of the
+    // owner and have an index return type as that means its a shape
+    // computation that needs to happen on the host.
+    if (auto op = v.getDefiningOp()) {
+      if (user == dispatchOp && v.getType().isIndex()) {
         return true;
       }
     }
