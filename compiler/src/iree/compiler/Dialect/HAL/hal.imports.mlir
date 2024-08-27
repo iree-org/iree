@@ -201,7 +201,7 @@ vm.import private @command_buffer.create(
   %binding_capacity : i32
 ) -> !vm.ref<!hal.command_buffer>
 attributes {
-  minimum_version = 3 : i32  // command buffer API version
+  minimum_version = 5 : i32  // command buffer API version
 }
 
 // Finalizes recording into the command buffer and prepares it for submission.
@@ -299,9 +299,6 @@ vm.import private @command_buffer.dispatch(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
-attributes {
-  minimum_version = 4 : i32
-}
 
 // Dispatches an execution request with the dispatch parameters loaded from the
 // given buffer.
@@ -317,9 +314,6 @@ vm.import private @command_buffer.dispatch.indirect(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
-attributes {
-  minimum_version = 4 : i32
-}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
@@ -448,7 +442,6 @@ vm.import private @executable.create(
   %constants : !vm.buffer
 ) -> !vm.ref<!hal.executable>
 attributes {
-  minimum_version = 4 : i32,
   nosideeffects
 }
 

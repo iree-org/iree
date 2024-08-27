@@ -48,10 +48,11 @@ public:
     // or some semantic versioning we track in whatever spec we end up having.
     V_0_3 = 0x0000'0003u, // v0.3 - ~2022-08-08
     V_0_4 = 0x0000'0004u, // v0.4 - ~2024-03-12
+    V_0_5 = 0x0000'0005u, // v0.5 - ~2024-08-25
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_4,
+    LATEST = V_0_5,
   };
 
   // iree_hal_executable_library_features_t
