@@ -386,7 +386,7 @@ Python executable to use with `Python3_EXECUTABLE`:
 # Configure (including other options as discussed above)
 cmake -G Ninja -B ../iree-build/ \
   -DIREE_BUILD_PYTHON_BINDINGS=ON  \
-  -DPython3_EXECUTABLE="$(which python)" \
+  -DPython3_EXECUTABLE="$(which python3)" \
   .
 
 # Build
