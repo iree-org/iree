@@ -37,7 +37,7 @@ or [Linux](https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html).
 Please make sure you have followed the
 [Getting started](../../building-from-source/getting-started.md) page to build
 the IREE compiler, then enable the ROCm compiler target with the
-`IREE_TARGET_BACKEND_ROCM` option.
+`IREE_TARGET_BACKEND_HIP` option.
 
 !!! tip
     `iree-compile` will be built under the `iree-build/tools/` directory. You
@@ -75,7 +75,7 @@ following commands to compile:
 
 ```shell hl_lines="2-5"
 iree-compile \
-    --iree-hal-target-backends=rocm \
+    --iree-hal-target-backends=hip \
     --iree-hip-target=<...> \
     mobilenet_iree_input.mlir -o mobilenet_rocm.vmfb
 ```

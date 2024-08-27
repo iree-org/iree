@@ -197,7 +197,7 @@ function build_iree_runtime() {
 
 function build_iree_compiler() {
   IREE_ENABLE_LLD=ON \
-  IREE_TARGET_BACKEND_ROCM=ON \
+  IREE_TARGET_BACKEND_HIP=ON \
   IREE_TARGET_BACKEND_CUDA="${enable_cuda}" \
   build_wheel compiler/
 }

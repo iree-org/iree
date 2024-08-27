@@ -102,7 +102,7 @@ iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
     srcs = LLVM_GPU_SRCS,
     driver = "hip",
-    target_backend = "rocm",
+    target_backend = "hip",
 )
 
 SPIRV_SRCS = enforce_glob(

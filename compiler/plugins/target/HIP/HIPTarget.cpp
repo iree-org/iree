@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "ROCMTargetUtils.h"
+#include "HIPTargetUtils.h"
 
 #include <cstdint>
 
@@ -260,8 +260,8 @@ public:
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
     SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-    targetRegistry.getTargetBackend("rocm")->getDefaultExecutableTargets(
-        context, "rocm", executableConfigAttr, executableTargetAttrs);
+    targetRegistry.getTargetBackend("hip")->getDefaultExecutableTargets(
+        context, "hip", executableConfigAttr, executableTargetAttrs);
 
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("hip"),
                                             deviceConfigAttr,
@@ -306,7 +306,7 @@ public:
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
-        b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
+        b.getStringAttr("hip"), b.getStringAttr("hip-hsaco-fb"),
         b.getDictionaryAttr(configItems));
   }
 
@@ -714,7 +714,7 @@ struct ROCMSession final
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"rocm", ...
-    targets.add("rocm", [&]() {
+    targets.add("hip", [&]() {
       LLVMInitializeAMDGPUTarget();
       LLVMInitializeAMDGPUTargetMC();
       LLVMInitializeAMDGPUTargetInfo();
@@ -729,10 +729,10 @@ struct ROCMSession final
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
-extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
+extern "C" bool iree_register_compiler_plugin_hal_target_hip(
     mlir::iree_compiler::PluginRegistrar *registrar) {
   registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::ROCMSession>(
-      "hal_target_rocm");
+      "hal_target_hip");
   return true;
 }
 

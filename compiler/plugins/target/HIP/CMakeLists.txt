@@ -12,19 +12,19 @@ iree_add_all_subdirs()
 
 iree_compiler_register_plugin(
   PLUGIN_ID
-    hal_target_rocm
+    hal_target_hip
   TARGET
-    ::ROCM
+    ::HIP
 )
 
 iree_cc_library(
   NAME
-    ROCM
+    HIP
   HDRS
-    "ROCMTargetUtils.h"
+    "HIPTargetUtils.h"
   SRCS
-    "ROCMTarget.cpp"
-    "ROCMTargetUtils.cpp"
+    "HIPTarget.cpp"
+    "HIPTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
     LLVMAnalysis
@@ -151,14 +151,14 @@ add_custom_command(
   POST_BUILD
     ${_all_device_bc_copy_commands}
 )
-add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
+add_custom_target(iree_compiler_plugins_target_HIP_GenDeviceLibs
   DEPENDS
     ${_all_device_bc_files}
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
 set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DEPENDS
-  iree_compiler_plugins_target_ROCM_GenDeviceLibs)
+  iree_compiler_plugins_target_HIP_GenDeviceLibs)
 
 # Install.
 install(FILES ${_all_device_bc_files}

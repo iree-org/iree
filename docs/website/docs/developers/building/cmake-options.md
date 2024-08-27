@@ -117,7 +117,7 @@ Individual options enabling the build for each compiler target backend:
 * `IREE_TARGET_BACKEND_LLVM_CPU_WASM`
 * `IREE_TARGET_BACKEND_METAL_SPIRV`
 * `IREE_TARGET_BACKEND_VULKAN_SPIRV`
-* `IREE_TARGET_BACKEND_ROCM`
+* `IREE_TARGET_BACKEND_HIP`
 
 ### `IREE_INPUT_*`
 

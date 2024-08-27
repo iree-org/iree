@@ -105,7 +105,7 @@ iree_check_single_backend_test_suite(
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
-    "rocm"
+    "hip"
   DRIVER
     "hip"
 )

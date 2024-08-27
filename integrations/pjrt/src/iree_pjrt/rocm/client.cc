@@ -31,7 +31,7 @@ iree_status_t ROCMClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
 }
 
 bool ROCMClientInstance::SetDefaultCompilerFlags(CompilerJob* compiler_job) {
-  return compiler_job->SetFlag("--iree-hal-target-backends=rocm");
+  return compiler_job->SetFlag("--iree-hal-target-backends=hip");
 }
 
 }  // namespace iree::pjrt::rocm

@@ -551,7 +551,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "rocm"
+    "hip"
   DRIVER
     "hip"
   INPUT_TYPE
@@ -775,7 +775,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "rocm"
+    "hip"
   # Only test compilation for now, the ROCm driver is experimental.
   # DRIVER
   #   "rocm"

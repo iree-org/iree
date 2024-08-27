@@ -28,8 +28,8 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/MetalSPIRV target/MetalSPIRV)
 endif()
 
-if(IREE_TARGET_BACKEND_ROCM)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/ROCM target/ROCM)
+if(IREE_TARGET_BACKEND_HIP)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/HIP target/HIP)
 endif()
 
 if(IREE_TARGET_BACKEND_VMVX)

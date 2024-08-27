@@ -13,18 +13,18 @@ package(
 )
 
 iree_compiler_register_plugin(
-    plugin_id = "hal_target_rocm",
-    target = ":ROCM",
+    plugin_id = "hal_target_hip",
+    target = ":HIP",
 )
 
 iree_compiler_cc_library(
-    name = "ROCM",
+    name = "HIP",
     srcs = [
-        "ROCMTarget.cpp",
-        "ROCMTargetUtils.cpp",
+        "HIPTarget.cpp",
+        "HIPTargetUtils.cpp",
     ],
     hdrs = [
-        "ROCMTargetUtils.h",
+        "HIPTargetUtils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",

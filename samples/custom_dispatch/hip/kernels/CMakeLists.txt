@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if((NOT IREE_TARGET_BACKEND_ROCM) OR
+if((NOT IREE_TARGET_BACKEND_HIP) OR
    (NOT "rocm" IN_LIST IREE_EXTERNAL_HAL_DRIVERS))
   return()
 endif()

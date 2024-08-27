@@ -66,7 +66,7 @@
           "type": "BOOL",
           "value": "OFF"
         },
-        "IREE_TARGET_BACKEND_ROCM": {
+        "IREE_TARGET_BACKEND_HIP": {
           "type": "BOOL",
           "value": "OFF"
         },

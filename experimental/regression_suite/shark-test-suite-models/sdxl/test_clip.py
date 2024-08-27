@@ -88,7 +88,7 @@ def SDXL_CLIP_COMMON_RUN_FLAGS(
 
 
 ROCM_COMPILE_FLAGS = [
-    "--iree-hal-target-backends=rocm",
+    "--iree-hal-target-backends=hip",
     f"--iree-hip-target={rocm_chip}",
     "--iree-input-type=torch",
     "--iree-opt-const-eval=false",

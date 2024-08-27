@@ -60,7 +60,7 @@ def SDXL_VAE_COMMON_RUN_FLAGS(
 
 
 ROCM_COMPILE_FLAGS = [
-    "--iree-hal-target-backends=rocm",
+    "--iree-hal-target-backends=hip",
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",

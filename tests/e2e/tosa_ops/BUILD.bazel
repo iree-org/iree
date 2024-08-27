@@ -198,5 +198,5 @@ iree_check_single_backend_test_suite(
     runner_args = [
         "--hip_use_streams=true",
     ],
-    target_backend = "rocm",
+    target_backend = "hip",
 )

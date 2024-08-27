@@ -3,7 +3,7 @@
 module attributes {
   hal.device.targets = [
     #hal.device.target<"hip", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+      #hal.executable.target<"hip", "hip-hsaco-fb">
     ]> : !hal.device
   ]
 } {
@@ -35,9 +35,9 @@ stream.executable public @add_dispatch_0 {
 
 }
 
-//      CHECK:   hal.executable.binary public @rocm_hsaco_fb attributes {
+//      CHECK:   hal.executable.binary public @hip_hsaco_fb attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = "rocm-hsaco-fb"
+// CHECK-SAME:     format = "hip-hsaco-fb"
 
 // -----
 
@@ -47,7 +47,7 @@ stream.executable public @add_dispatch_0 {
 module attributes {
   hal.device.targets = [
     #hal.device.target<"hip", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+      #hal.executable.target<"hip", "hip-hsaco-fb">
     ]> : !hal.device
   ]
 } {

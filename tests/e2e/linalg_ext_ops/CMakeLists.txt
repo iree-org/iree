@@ -78,7 +78,7 @@ iree_check_single_backend_test_suite(
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
-    "rocm"
+    "hip"
   DRIVER
     "hip"
 )

@@ -95,7 +95,7 @@ def llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb(llama2_7b_f16qi4_stripped_source):
         "rdna3_rocm",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-backends=hip",
             "--iree-hip-target=gfx1100",
         ],
     )

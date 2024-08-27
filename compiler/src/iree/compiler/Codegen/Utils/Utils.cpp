@@ -131,7 +131,7 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 }
 
 bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return targetAttr && targetAttr.getBackend().getValue().starts_with("rocm");
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("hip");
 }
 
 static const char *

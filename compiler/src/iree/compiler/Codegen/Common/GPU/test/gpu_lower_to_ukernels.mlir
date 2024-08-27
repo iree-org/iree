@@ -3,7 +3,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s --check-prefix=CDNA1
 
 func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -36,7 +36,7 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 // -----
 
 func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor<1x1x1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -63,7 +63,7 @@ func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor
 // -----
 
 func.func @argmax_2d_non_unit_parallel_f32i64(%arg0 : tensor<4x?xf32>) -> tensor<4xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -90,7 +90,7 @@ func.func @argmax_2d_non_unit_parallel_f32i64(%arg0 : tensor<4x?xf32>) -> tensor
 // -----
 
 func.func @argmax_2d_dyn_parallel_f32i64(%arg0 : tensor<?x?xf32>) -> tensor<?xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -119,7 +119,7 @@ func.func @argmax_2d_dyn_parallel_f32i64(%arg0 : tensor<?x?xf32>) -> tensor<?xi6
 // -----
 
 func.func @argmax_none_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "none"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "none"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -146,7 +146,7 @@ func.func @argmax_none_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64>
 // -----
 
 func.func @argmax_only_argmax_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "argmax"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -173,7 +173,7 @@ func.func @argmax_only_argmax_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor
 // -----
 
 func.func @argmax_only_foo_argmax_bar_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "foo,argmax,bar"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "foo,argmax,bar"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -202,7 +202,7 @@ func.func @argmax_only_foo_argmax_bar_ukernel_enabled(%arg0 : tensor<1x?xf32>) -
 // -----
 
 func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "foo"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "foo"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -230,7 +230,7 @@ func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1x
 
 // Currently we do only handle -Inf case as initial values.
 func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0.0 : f32
@@ -261,7 +261,7 @@ func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<
 //       to minimize compile time and space.
 
 func.func @argmax_ukernel_unsupported_arch(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32

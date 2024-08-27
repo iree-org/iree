@@ -4,7 +4,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
@@ -51,7 +51,7 @@ func.func @argmax_1d_f16i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
@@ -100,7 +100,7 @@ func.func @argmax_2d_f32i64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"hip", "hip-hsaco-fb">
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
@@ -147,7 +147,7 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {hal.executable.target = #ex
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"hip", "hip-hsaco-fb", {ukernels = "argmax"}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 func.func @not_neg_inf_init_argmax_1d() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {

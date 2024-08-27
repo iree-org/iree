@@ -41,7 +41,7 @@ def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
         "gfx90a_rocm",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-backends=hip",
             "--iree-hip-target=gfx90a",
             "--iree-hip-enable-ukernels=argmax",
         ],
@@ -55,7 +55,7 @@ def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
         "gfx940_rocm",
         flags=COMMON_FLAGS
         + [
-            "--iree-hal-target-backends=rocm",
+            "--iree-hal-target-backends=hip",
             "--iree-hip-target=gfx940",
             "--iree-hip-enable-ukernels=argmax",
         ],

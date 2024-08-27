@@ -1,7 +1,7 @@
 {
   "config_name": "gpu_rocm",
   "iree_compile_flags": [
-    "--iree-hal-target-backends=rocm",
+    "--iree-hal-target-backends=hip",
     "--iree-hip-target=gfx90a",
     "--iree-input-demote-f64-to-f32"
   ],
