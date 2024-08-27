@@ -5,13 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <numeric>
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_AMDGPUPREPAREFORCHAINEDMATMULPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 using VectorValue = TypedValue<VectorType>;
 
@@ -59,11 +62,19 @@ namespace {
 ///   C = A @ B --> C.T = B.T @ A.T
 /// is only defined on standard "@" function, it may be a different
 /// transformation for other indexing maps.
-struct AMDGPUPrepareForChainedMatmulPass
-    : public AMDGPUPrepareForChainedMatmulBase<
+struct AMDGPUPrepareForChainedMatmulPass final
+    : impl::AMDGPUPrepareForChainedMatmulPassBase<
           AMDGPUPrepareForChainedMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
+  }
+
+  VectorContractOpInfo getOpInfo(vector::ContractionOp contract) const {
+    auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+        contract.getIndexingMapsArray());
+    assert(succeeded(maybeOpInfo) &&
+           "contraction info for vector.contract should always be valid");
+    return maybeOpInfo.value();
   }
 
   VectorValue swapDims(RewriterBase &rewriter, VectorValue val, int64_t dimA,
@@ -106,7 +117,7 @@ struct AMDGPUPrepareForChainedMatmulPass
   /// simply swap the operands without transposing them.
   void swapOperandsAndTranspose(RewriterBase &rewriter,
                                 vector::ContractionOp contractOp) const {
-    VectorContractOpInfo opInfo(contractOp);
+    VectorContractOpInfo opInfo = getOpInfo(contractOp);
     auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
     auto [accM, accN] = opInfo.getResultMNIndex();
@@ -174,7 +185,7 @@ struct AMDGPUPrepareForChainedMatmulPass
   bool isOperandSwapInvariant(vector::ContractionOp contractOp) const {
     // Check if the innermost m, n, k dimensions are in the order:
     // lhs: (m, k), rhs: (n, k)
-    VectorContractOpInfo opInfo(contractOp);
+    VectorContractOpInfo opInfo = getOpInfo(contractOp);
     auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
     bool isLhsTransposed = lhsM > lhsK;
@@ -255,10 +266,4 @@ struct AMDGPUPrepareForChainedMatmulPass
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createAMDGPUPrepareForChainedMatmulPass() {
-  return std::make_unique<AMDGPUPrepareForChainedMatmulPass>();
-}
-
 } // namespace mlir::iree_compiler

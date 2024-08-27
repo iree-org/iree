@@ -1,7 +1,8 @@
 // RUN: (iree-compile --iree-execution-model=async-external --iree-hal-target-backends=vmvx %p/module_a.mlir -o=%t.module_a.vmfb && \
 // RUN:  iree-compile --iree-execution-model=async-external --iree-hal-target-backends=vmvx %p/module_b.mlir -o=%t.module_b.vmfb && \
 // RUN:  iree-compile --iree-execution-model=async-external --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-task \
+// RUN:  iree-run-module \
+// RUN:    --device=local-task \
 // RUN:    --module=%t.module_a.vmfb \
 // RUN:    --module=%t.module_b.vmfb \
 // RUN:    --module=- --function=run \

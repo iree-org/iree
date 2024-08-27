@@ -26,7 +26,6 @@ iree_cc_library(
     "ROCMTarget.cpp"
     "ROCMTargetUtils.cpp"
   DEPS
-    IREEVectorExtDialect
     LLVMAMDGPUCodeGen
     LLVMAnalysis
     LLVMBitWriter
@@ -56,6 +55,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

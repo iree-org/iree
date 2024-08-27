@@ -1,0 +1,59 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "clone_producers_into_dispatch_regions.mlir",
+            "collapse_dimensions.mlir",
+            "collapse_linalg_generic_on_tensors.mlir",
+            "collapse_reduction.mlir",
+            "attention_fuse_by_expansion.mlir",
+            "dispatch_linalg_transform_dialect.mlir",
+            "dispatch_region_formation_preprocessing.mlir",
+            "fold_unit_dims.mlir",
+            "form_dispatch_regions.mlir",
+            "dispatch_linalg_on_tensors.mlir",
+            "convert_region_to_workgroups.mlir",
+            "form_dispatch_workgroups.mlir",
+            "dispatch_linalg_ext_fusion.mlir",
+            "hoist_encoding_ops.mlir",
+            "dispatch_linalg_on_tensors_default.mlir",
+            "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
+            "form_scalar_dispatches.mlir",
+            "fuse_horizontal_contractions.mlir",
+            "fuse_multiuse_elementwise_producer.mlir",
+            "fusion_preprocessing.mlir",
+            "pad_fusion_with_consumer.mlir",
+            "pad_fusion_with_producer.mlir",
+            "set_encoding.mlir",
+            "sink_reshapes.mlir",
+            "split_reduction.mlir",
+            "tensor_pad_to_tensor_insert_slice.mlir",
+            "transform_dispatch_region_formation.mlir",
+            "transpose_generic_ops.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "transform_dialect_dispatch_spec.mlir",
+        ],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    data = ["transform_dialect_dispatch_spec.mlir"],
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

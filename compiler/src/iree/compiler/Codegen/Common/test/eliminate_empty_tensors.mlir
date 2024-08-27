@@ -1,12 +1,18 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-eliminate-empty-tensors))" %s | FileCheck %s
 
 // -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @eliminate_empty_tensors_with_store_op() {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
   %c32 = arith.constant 32 : index
   %c128 = arith.constant 128 : index
-  %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
   %1 = tensor.empty() : tensor<32x384xf32>
   scf.for %arg0 = %c0 to %c128 step %c32 {
     %2 = scf.for %arg1 = %c0 to %c32 step %c8 iter_args(%arg2 = %1) -> (tensor<32x384xf32>) {

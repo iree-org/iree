@@ -8,8 +8,10 @@ import pytest
 from ireers_tools import *
 import os
 from conftest import VmfbManager
+from pathlib import Path
 
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
+vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 
 ###############################################################################
 # Fixtures
@@ -59,16 +61,16 @@ def SD3_VAE_COMMON_RUN_FLAGS(
 
 ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
-    f"--iree-rocm-target-chip={rocm_chip}",
+    f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-opt-outer-dim-concat=true",
     "--iree-llvmgpu-enable-prefetch=true",
-    "--iree-rocm-waves-per-eu=2",
-    "--iree-flow-enable-aggressive-fusion=true",
+    "--iree-hip-waves-per-eu=2",
+    "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
 ]
 
 ###############################################################################
@@ -77,7 +79,13 @@ ROCM_COMPILE_FLAGS = [
 
 
 def test_compile_vae_cpu(sd3_vae_mlir):
-    VmfbManager.sd3_vae_cpu_vmfb = iree_compile(sd3_vae_mlir, "cpu", CPU_COMPILE_FLAGS)
+    VmfbManager.sd3_vae_cpu_vmfb = iree_compile(
+        sd3_vae_mlir,
+        CPU_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sd3_vae_vmfbs")
+        / Path(sd3_vae_mlir.path.name).with_suffix(f".cpu.vmfb"),
+    )
 
 
 @pytest.mark.depends(on=["test_compile_vae_cpu"])
@@ -101,7 +109,11 @@ def test_run_vae_cpu(SD3_VAE_COMMON_RUN_FLAGS, sd3_vae_real_weights):
 
 def test_compile_vae_rocm(sd3_vae_mlir):
     VmfbManager.sd3_vae_rocm_vmfb = iree_compile(
-        sd3_vae_mlir, f"rocm_{rocm_chip}", ROCM_COMPILE_FLAGS
+        sd3_vae_mlir,
+        ROCM_COMPILE_FLAGS,
+        Path(vmfb_dir)
+        / Path("sd3_vae_vmfbs")
+        / Path(sd3_vae_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
     )
 
 

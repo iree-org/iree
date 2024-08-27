@@ -26,24 +26,35 @@ std::pair<int, int> VectorContractOpInfo::getResultMNIndex() const {
   return std::make_pair(outMDims.back(), outNDims.back());
 }
 
-VectorContractOpInfo::VectorContractOpInfo(vector::ContractionOp op) {
-  contractionDims = *linalg::inferContractionDims(op.getIndexingMapsArray());
+FailureOr<VectorContractOpInfo>
+VectorContractOpInfo::inferFromIndexingMaps(ArrayRef<AffineMap> maps) {
+  auto maybeContractionDims = linalg::inferContractionDims(maps);
+  if (failed(maybeContractionDims)) {
+    return failure();
+  }
 
-  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
-  MLIRContext *ctx = op.getContext();
-
+  auto contractionDims = maybeContractionDims.value();
+  MLIRContext *ctx = maps[0].getContext();
+  VectorContractOpInfo opInfo;
   for (auto m : contractionDims.m) {
-    lhsMDims.push_back(*maps[0].getResultPosition(getAffineDimExpr(m, ctx)));
-    outMDims.push_back(*maps[2].getResultPosition(getAffineDimExpr(m, ctx)));
+    opInfo.lhsMDims.push_back(
+        *maps[0].getResultPosition(getAffineDimExpr(m, ctx)));
+    opInfo.outMDims.push_back(
+        *maps[2].getResultPosition(getAffineDimExpr(m, ctx)));
   }
   for (auto n : contractionDims.n) {
-    rhsNDims.push_back(*maps[1].getResultPosition(getAffineDimExpr(n, ctx)));
-    outNDims.push_back(*maps[2].getResultPosition(getAffineDimExpr(n, ctx)));
+    opInfo.rhsNDims.push_back(
+        *maps[1].getResultPosition(getAffineDimExpr(n, ctx)));
+    opInfo.outNDims.push_back(
+        *maps[2].getResultPosition(getAffineDimExpr(n, ctx)));
   }
-
   int64_t k = contractionDims.k.back();
-  lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
-  rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
+  opInfo.lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
+  opInfo.rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
+
+  opInfo.contractionDims = contractionDims;
+
+  return opInfo;
 }
 
 } // namespace mlir::iree_compiler

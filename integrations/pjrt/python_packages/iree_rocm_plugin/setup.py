@@ -86,7 +86,7 @@ setup(
         # plugins. This augments the path based scanning that Jax does, which
         # is not always robust to all packaging circumstances.
         "jax_plugins": [
-            "iree-rocm = jax_plugins.iree_rocm",
+            "iree-hip = jax_plugins.iree_rocm",
         ],
     },
     install_requires=iree_pjrt_setup.install_requires,

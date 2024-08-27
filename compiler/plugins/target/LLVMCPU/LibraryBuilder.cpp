@@ -111,19 +111,22 @@ makeDispatchFunctionType(llvm::LLVMContext &context) {
 
 // %struct.iree_hal_executable_dispatch_attrs_v0_t = type {
 //   i16,
-//   i16
+//   i8,
+//   i8
 // }
 static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
   if (auto *existingType = llvm::StructType::getTypeByName(
           context, "iree_hal_executable_dispatch_attrs_v0_t")) {
     return existingType;
   }
+  auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *type =
       llvm::StructType::create(context,
                                {
                                    i16Type,
-                                   i16Type,
+                                   i8Type,
+                                   i8Type,
                                },
                                "iree_hal_executable_dispatch_attrs_v0_t",
                                /*isPacked=*/false);
@@ -502,7 +505,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   bool hasNonDefaultAttrs = llvm::any_of(exports, [](const auto &dispatch) {
     return !dispatch.attrs.isDefault();
   });
-  if (!hasNonDefaultAttrs) {
+  if (hasNonDefaultAttrs) {
     SmallVector<llvm::Constant *> exportAttrValues;
     for (auto dispatch : exports) {
       exportAttrValues.push_back(llvm::ConstantStruct::get(
@@ -513,8 +516,10 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
                   i16Type, roundUpToAlignment(dispatch.attrs.localMemorySize,
                                               kWorkgroupLocalMemoryPageSize) /
                                kWorkgroupLocalMemoryPageSize),
-              // reserved=
-              llvm::ConstantInt::get(i16Type, 0),
+              // constant_count=
+              llvm::ConstantInt::get(i8Type, dispatch.attrs.constantCount),
+              // binding_count=
+              llvm::ConstantInt::get(i8Type, dispatch.attrs.bindingCount),
           }));
     }
     exportAttrs = createArrayConstant(libraryName + "_attrs", dispatchAttrsType,

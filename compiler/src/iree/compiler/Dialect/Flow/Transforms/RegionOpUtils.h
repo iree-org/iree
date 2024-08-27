@@ -104,41 +104,17 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
-/// Returns true if the operation increases/decreases bitwidths of tensors.
-/// This function checks that the genericOp:
-/// 1. Has only one output.
-/// 2. Has all parallel loops.
-/// 3. Compared to the element type of the input with highest rank,
-///    the output element type has either a higher or lower bitwidth.
-struct BitWidthChangeInfo {
-  // The operand the recognizer treats as the "input".
-  // Is guaranteed to be a `RankedTensorType`.
-  OpOperand *inputOperand = nullptr;
-  // The output element type is int or float type.
-  Type outputElementType = nullptr;
-
-  // Helper methods.
-  Type getInputElementType() const;
-  bool isExtensionOp() const {
-    return getInputElementType().getIntOrFloatBitWidth() <
-           outputElementType.getIntOrFloatBitWidth();
-  }
-  bool isTruncationOp() const {
-    return outputElementType.getIntOrFloatBitWidth() <
-           getInputElementType().getIntOrFloatBitWidth();
-  }
-};
-std::optional<BitWidthChangeInfo> isBitExtendOrTruncateOp(Operation *op);
-inline bool isBitExtendOp(Operation *op) {
-  std::optional<BitWidthChangeInfo> bitWidthChangeInfo =
-      isBitExtendOrTruncateOp(op);
-  return bitWidthChangeInfo && bitWidthChangeInfo->isExtensionOp();
-}
-inline bool isBitTruncateOp(Operation *op) {
-  std::optional<BitWidthChangeInfo> bitWidthChangeInfo =
-      isBitExtendOrTruncateOp(op);
-  return bitWidthChangeInfo && bitWidthChangeInfo->isTruncationOp();
-}
+/// Hoists an operation out of a dispatch region, as long as it does not have
+/// producers inside of the dispatch region, or all of its uses are part of
+/// the dispatch region op return. If these criteria are not met, then return
+/// failure.
+///
+/// If all producers are defined outside of the dispatch region, then the op
+/// will be hoisted above the dispatch region op. Otherwise, the op will be
+/// hoisted below the dispatch region op, and the operands of the hoisted op
+/// will be added to the yielded values of the dispatch region op.
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op);
 
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);

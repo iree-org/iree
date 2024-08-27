@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Utils/StringUtils.h"
@@ -25,6 +24,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_VECTORCONTRACTCUSTOMKERNELSPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -1115,7 +1117,8 @@ public:
 };
 
 class VectorContractCustomKernelsPass
-    : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
+    : public impl::VectorContractCustomKernelsPassBase<
+          VectorContractCustomKernelsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect,
@@ -1131,9 +1134,6 @@ public:
       signalPassFailure();
     }
   }
-
-private:
-  IREE::HAL::ExecutableTargetAttr target;
 };
 
 } // namespace
@@ -1171,10 +1171,4 @@ void populateVectorContractCustomKernelsPatterns(
     }
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createVectorContractCustomKernelsPass() {
-  return std::make_unique<VectorContractCustomKernelsPass>();
-}
-
 } // namespace mlir::iree_compiler

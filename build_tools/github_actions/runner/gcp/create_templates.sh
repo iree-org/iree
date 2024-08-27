@@ -51,9 +51,9 @@ VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
-GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.317.0}"
-GITHUB_RUNNER_X64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST:-9e883d210df8c6028aff475475a457d380353f9d01877d51cc01a17b2a91161d}"
-GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST:-7e8e2095d2c30bbaa3d2ef03505622b883d9cb985add6596dbe2f234ece308f3}"
+GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.319.1}"
+GITHUB_RUNNER_X64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST:-3f6efb7488a183e291fc2c62876e14c9ee732864173734facc85a1bfb1744464}"
+GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST:-03d993c65e0c4daa5e3bf5a5a35ba356f363bdb5ceb6b5808fd52fdb813dd8e8}"
 GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-zbhz5clunq-ue.a.run.app}"
 
 if (( TESTING_SELF_DELETER==1 )); then
@@ -162,14 +162,6 @@ function create_template() {
         --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
       )
       ;;
-    c2s601t)
-      cmd+=(
-        --machine-type=c2-standard-60
-        --threads-per-core=1
-        --maintenance-policy=MIGRATE
-        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-      )
-      ;;
     arm64)
       cmd+=(
         --machine-type=t2a-standard-8
@@ -193,8 +185,7 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
-  for type in gpu a100 cpu c2s601t arm64; do
+  for type in gpu a100 cpu arm64; do
     create_template "${group}" "${type}"
   done
 done

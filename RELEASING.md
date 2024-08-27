@@ -38,32 +38,31 @@ A number of packages are produced automatically:
 
 #### Linux Builds
 
-Binary Linux packages are built using a custom `manylinux` based Docker
-image hosted here: https://github.com/nod-ai/base-docker-images/pkgs/container/manylinux_x86_64
-(TODO: this repository of Docker images should be moved into `iree-org`) using
-isolated self-hosted runners (only used for building checked in code) of
+Binary Linux packages are built using a custom `manylinux` based Docker image
+hosted here:
+https://github.com/iree-org/base-docker-images/pkgs/container/manylinux_x86_64
+using isolated self-hosted runners (only used for building checked in code) of
 sufficient size for building large components and GitHub managed runners for
 smaller components. The project aims to target all non-EOL Python versions with
 Linux builds on x86_64 and aarch64.
 
 #### Windows Builds
 
-Windows builds are built using GitHub managed large Windows runners. Due to the
-cost, the project aims to target the most recent version of Python only while
-building version N-1 for the first year of the lifecycle of the next version.
+Windows builds are built using GitHub-hosted runners. Due to the cost, the
+project aims to target the most recent version of Python only while building
+version N-1 for the first year of the lifecycle of the next version.
 
 Only the Python `iree-compiler` and `iree-runtime` packages are built for
 Windows.
 
-The release is published even if the MacOS build fails. When this happens, it
+The release is published even if the Windows build fails. When this happens, it
 is fixed forward for the next snapshot.
 
 #### MacOS Builds
 
-MacOS builds are performed using self hosted MacOS runners in a dedicated
-post-submit pool. Due to the cost, the project aims to target the most recent
-version of Python only while building version N-1 for the first year of the
-lifecycle of the next version.
+MacOS builds are performed using GitHub-hosted runners. Due to the cost, the
+project aims to target the most recent version of Python only while building
+version N-1 for the first year of the lifecycle of the next version.
 
 Only the Python `iree-compiler` and `iree-runtime` packages are built for
 MacOS.

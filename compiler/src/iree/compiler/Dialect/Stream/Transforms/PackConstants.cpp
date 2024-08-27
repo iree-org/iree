@@ -11,7 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/IndexSet.h"
+#include "iree/compiler/Utils/IntegerSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
@@ -253,6 +253,7 @@ struct ParameterSlice {
 };
 
 static ParameterSlice getParameterSlice(Location loc, Attribute value,
+                                        IntegerSet<int64_t> &i64Set,
                                         IndexSet &indexSet,
                                         OpBuilder &builder) {
   auto parameterAttr = cast<IREE::Stream::NamedParameterAttr>(value);
@@ -260,17 +261,18 @@ static ParameterSlice getParameterSlice(Location loc, Attribute value,
   Value sourceLength;
   if (auto configAttr = parameterAttr.getConfig()) {
     if (auto offsetAttr = configAttr.getAs<IntegerAttr>("offset")) {
-      sourceOffset =
-          builder.create<arith::ConstantIntOp>(loc, offsetAttr.getInt(), 64);
+      sourceOffset = i64Set.get(offsetAttr.getValue());
     }
     if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
       sourceLength = indexSet.get(lengthAttr.getInt());
     }
   }
-  if (!sourceOffset)
-    sourceOffset = builder.create<arith::ConstantIntOp>(loc, 0, 64);
-  if (!sourceLength)
+  if (!sourceOffset) {
+    sourceOffset = i64Set.get(0);
+  }
+  if (!sourceLength) {
     sourceLength = indexSet.get(parameterAttr.getStorageSize());
+  }
   return ParameterSlice{parameterAttr, sourceOffset, sourceLength};
 }
 
@@ -278,7 +280,8 @@ static Value buildParameterLoad(Value awaitTimepoint,
                                 IREE::Stream::AffinityAttr affinityAttr,
                                 Type targetType, StringAttr scope,
                                 ArrayRef<StorageResource *> storageResources,
-                                IndexSet &indexSet, OpBuilder &builder) {
+                                IntegerSet<int64_t> &i64Set, IndexSet &indexSet,
+                                OpBuilder &builder) {
   SmallVector<Location> spanLocs;
   SmallVector<Attribute> sourceKeys;
   SmallVector<Value> sourceOffsets;
@@ -289,8 +292,8 @@ static Value buildParameterLoad(Value awaitTimepoint,
            "expected single span per resource for load");
     for (auto &packedSpan : storageResource->spans) {
       auto spanLoc = packedSpan.slice.result.getLoc();
-      auto parameterSlice =
-          getParameterSlice(spanLoc, packedSpan.slice.value, indexSet, builder);
+      auto parameterSlice = getParameterSlice(spanLoc, packedSpan.slice.value,
+                                              i64Set, indexSet, builder);
       spanLocs.push_back(spanLoc);
       sourceKeys.push_back(parameterSlice.parameterAttr.getKey());
       sourceOffsets.push_back(parameterSlice.sourceOffset);
@@ -324,11 +327,10 @@ static Value buildParameterLoad(Value awaitTimepoint,
   return loadOp.getResultTimepoint();
 }
 
-static TimepointResource
-buildParameterGather(Location loc, Value awaitTimepoint,
-                     IREE::Stream::AffinityAttr affinityAttr, Type targetType,
-                     Value targetSize, MutableArrayRef<PackedSpan> packedSpans,
-                     IndexSet &indexSet, OpBuilder &builder) {
+static TimepointResource buildParameterGather(
+    Location loc, Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
+    Type targetType, Value targetSize, MutableArrayRef<PackedSpan> packedSpans,
+    IntegerSet<int64_t> &i64Set, IndexSet &indexSet, OpBuilder &builder) {
   // Allocate the resulting storage resource of the final resource type.
   auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
       loc, targetType, targetSize,
@@ -352,8 +354,8 @@ buildParameterGather(Location loc, Value awaitTimepoint,
     SmallVector<Value> targetLengths;
     sourceKeys.reserve(packedSpans.size());
     for (auto &packedSpan : packedSpans) {
-      auto parameterSlice =
-          getParameterSlice(loc, packedSpan.slice.value, indexSet, builder);
+      auto parameterSlice = getParameterSlice(loc, packedSpan.slice.value,
+                                              i64Set, indexSet, builder);
       sourceKeys.push_back(parameterSlice.parameterAttr.getKey());
       sourceOffsets.push_back(parameterSlice.sourceOffset);
       targetOffsets.push_back(indexSet.get(packedSpan.offset));
@@ -384,13 +386,11 @@ buildParameterGather(Location loc, Value awaitTimepoint,
                            allocOp.getResultSize(0)};
 }
 
-static TimepointResource buildFileRead(Location loc, Value awaitTimepoint,
-                                       IREE::Stream::AffinityAttr affinityAttr,
-                                       IREE::Stream::ResourceType resourceType,
-                                       Value storageResourceSize,
-                                       Value storageBuffer,
-                                       Value storageBufferSize,
-                                       IndexSet &indexSet, OpBuilder &builder) {
+static TimepointResource buildFileRead(
+    Location loc, Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
+    IREE::Stream::ResourceType resourceType, Value storageResourceSize,
+    Value storageBuffer, Value storageBufferSize, IntegerSet<int64_t> &i64Set,
+    IndexSet &indexSet, OpBuilder &builder) {
   // Allocate the resulting storage resource of the final resource type.
   auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
       loc, resourceType, storageResourceSize,
@@ -402,7 +402,7 @@ static TimepointResource buildFileRead(Location loc, Value awaitTimepoint,
       storageResourceSize, affinityAttr);
 
   // Issue asynchronous file read into the buffer.
-  auto zeroI64 = builder.create<arith::ConstantIntOp>(loc, 0, 64);
+  auto zeroI64 = i64Set.get(0);
   auto readOp = builder.create<IREE::Stream::FileReadOp>(
       loc, fileOp.getResult(), zeroI64, allocOp.getResult(),
       allocOp.getResultSize(0), indexSet.get(0), storageResourceSize,
@@ -419,8 +419,8 @@ static TimepointResource buildFileRead(Location loc, Value awaitTimepoint,
 static TimepointResource buildTryMapConstantResource(
     Location loc, Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
     IREE::Stream::ResourceType resourceType, Value storageResourceSize,
-    Value storageBuffer, Value storageBufferSize, IndexSet &indexSet,
-    OpBuilder &builder) {
+    Value storageBuffer, Value storageBufferSize, IntegerSet<int64_t> &i64Set,
+    IndexSet &indexSet, OpBuilder &builder) {
   // Try mapping; this may fail if the device can't use the storage buffer as
   // the type of resource requested.
   auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
@@ -443,7 +443,7 @@ static TimepointResource buildTryMapConstantResource(
         auto readResult =
             buildFileRead(loc, awaitTimepoint, affinityAttr, resourceType,
                           storageResourceSize, storageBuffer, storageBufferSize,
-                          indexSet, elseBuilder);
+                          i64Set, indexSet, elseBuilder);
         elseBuilder.create<scf::YieldOp>(loc, ValueRange{
                                                   readResult.timepoint,
                                                   readResult.resource,
@@ -457,7 +457,8 @@ static TimepointResource buildTryMapConstantResource(
 static Value generateSerializedUpload(
     Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
     IREE::Stream::ResourceConfigAttr resourceConfig,
-    ArrayRef<ConstantSlice> slices, IndexSet &indexSet, OpBuilder &builder) {
+    ArrayRef<ConstantSlice> slices, IntegerSet<int64_t> &i64Set,
+    IndexSet &indexSet, OpBuilder &builder) {
   // Perform the packing of dense values to compute the storage resources we
   // will need and where each value will be placed.
   auto storageResources =
@@ -491,11 +492,11 @@ static Value generateSerializedUpload(
     if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
       uploadedResource = buildTryMapConstantResource(
           storageResource.loc, currentTimepoint, affinityAttr, resourceType,
-          resourceSize, storageBuffer, resourceSize, indexSet, builder);
+          resourceSize, storageBuffer, resourceSize, i64Set, indexSet, builder);
     } else {
       uploadedResource = buildFileRead(
           storageResource.loc, currentTimepoint, affinityAttr, resourceType,
-          resourceSize, storageBuffer, resourceSize, indexSet, builder);
+          resourceSize, storageBuffer, resourceSize, i64Set, indexSet, builder);
     }
 
     for (auto &span : storageResource.spans) {
@@ -516,7 +517,8 @@ static Value generateSerializedUpload(
 static Value generateParameterUpload(
     Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
     IREE::Stream::ResourceConfigAttr resourceConfig,
-    ArrayRef<ConstantSlice> slices, IndexSet &indexSet, OpBuilder &builder) {
+    ArrayRef<ConstantSlice> slices, IntegerSet<int64_t> &i64Set,
+    IndexSet &indexSet, OpBuilder &builder) {
   auto anyResult = slices.front().result;
   auto resourceType =
       llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
@@ -574,7 +576,7 @@ static Value generateParameterUpload(
   for (auto &[scope, scopeResources] : resourceLoads) {
     uploadTimepoints.push_back(
         buildParameterLoad(awaitTimepoint, affinityAttr, resourceType, scope,
-                           scopeResources, indexSet, builder));
+                           scopeResources, i64Set, indexSet, builder));
   }
 
   // Emit gathers, of which there may be multiple batches based on the target
@@ -583,7 +585,7 @@ static Value generateParameterUpload(
     auto resourceSize = indexSet.get(storageResource->totalSize);
     auto uploadedResource = buildParameterGather(
         storageResource->loc, awaitTimepoint, affinityAttr, resourceType,
-        resourceSize, storageResource->spans, indexSet, builder);
+        resourceSize, storageResource->spans, i64Set, indexSet, builder);
     uploadTimepoints.push_back(uploadedResource.timepoint);
   }
 
@@ -594,7 +596,8 @@ static Value generateParameterUpload(
 static Value generateUploads(Value awaitTimepoint,
                              IREE::Stream::ResourceConstantsOp constantsOp,
                              IREE::Stream::ResourceConfigAttr resourceConfig,
-                             IndexSet &indexSet, OpBuilder &builder) {
+                             IntegerSet<int64_t> &i64Set, IndexSet &indexSet,
+                             OpBuilder &builder) {
   // Split the slices based on whether they are sourced from serialized data or
   // externally-defined parameters.
   // TODO(benvanik): remove stream.resource.constants and this coupling;
@@ -622,12 +625,12 @@ static Value generateUploads(Value awaitTimepoint,
   if (!serializedSlices.empty()) {
     uploadTimepoints.push_back(generateSerializedUpload(
         awaitTimepoint, constantsOp.getAffinityAttr(), resourceConfig,
-        serializedSlices, indexSet, builder));
+        serializedSlices, i64Set, indexSet, builder));
   }
   if (!parameterSlices.empty()) {
     uploadTimepoints.push_back(generateParameterUpload(
         awaitTimepoint, constantsOp.getAffinityAttr(), resourceConfig,
-        parameterSlices, indexSet, builder));
+        parameterSlices, i64Set, indexSet, builder));
   }
   return IREE::Stream::TimepointJoinOp::join(uploadTimepoints, builder);
 }
@@ -664,14 +667,16 @@ struct PackConstantsPass
       // statically-known - CSE would collapse them but we use an IndexSet to
       // reduce the IR churn.
       OpBuilder builder(constantsOp);
+      IntegerSet<int64_t> i64Set(constantsOp.getLoc(), builder);
       IndexSet indexSet(constantsOp.getLoc(), builder);
       indexSet.populate(constantsOp.getResultSizes());
 
       // Perform upload/processing for immutable and mutable constants.
       Value awaitTimepoint = builder.create<IREE::Stream::TimepointImmediateOp>(
           constantsOp.getLoc());
-      auto uploadTimepoint = generateUploads(awaitTimepoint, constantsOp,
-                                             resourceConfig, indexSet, builder);
+      auto uploadTimepoint =
+          generateUploads(awaitTimepoint, constantsOp, resourceConfig, i64Set,
+                          indexSet, builder);
       constantsOp.getResultTimepoint().replaceAllUsesWith(uploadTimepoint);
 
       constantsOp.erase();

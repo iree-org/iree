@@ -69,13 +69,6 @@ def pytest_addoption(parser):
         help="Golden vmfb size to test benchmark",
     )
     parser.addoption(
-        "--gpu-number",
-        action="store",
-        default=0,
-        type=int,
-        help="IREE GPU device number to test on",
-    )
-    parser.addoption(
         "--rocm-chip",
         action="store",
         default="gfx90a",
@@ -137,8 +130,3 @@ def goldensize_rocm_vae(request):
 @pytest.fixture
 def rocm_chip(request):
     return request.config.getoption("--rocm-chip")
-
-
-@pytest.fixture
-def gpu_number(request):
-    return request.config.getoption("--gpu-number")

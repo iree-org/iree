@@ -27,12 +27,9 @@ func.func @push_down_unpack_through_expand(%5: tensor<?x32x8x8xf32>, %dim: index
 // CHECK-LABEL: func.func @push_down_unpack_through_expand
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
-// TODO(#17734): Flip the check after we have better control function support.
-// CHECK:           tensor.unpack
-// CHECK:           tensor.expand_shape
-// NO-CHECK:         %[[C0:.+]] = arith.constant 0 : index
-// NO-CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape {{.*}} : tensor<?x32x8x8xf32> into tensor<?x32x32x8x8xf32>
-// NO-CHECK:         %[[DIM:.+]] = tensor.dim %[[EXPANDED]], %[[C0]] : tensor<?x32x32x8x8xf32>
-// NO-CHECK:         %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<?x256x256xf32>
-// NO-CHECK:         %[[UNPACK:.+]] = tensor.unpack %[[EXPANDED:.+]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 8] into %[[EMPTY]] : tensor<?x32x32x8x8xf32> -> tensor<?x256x256xf32>
-// NO-CHECK:         return %[[UNPACK]] : tensor<?x256x256xf32>
+// CHECK:         %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3], [4]] output_shape {{.*}} : tensor<?x32x8x8xf32> into tensor<?x32x32x8x8xf32>
+// CHECK:         %[[DIM:.+]] = tensor.dim %[[EXPANDED]], %[[C0]] : tensor<?x32x32x8x8xf32>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<?x256x256xf32>
+// CHECK:         %[[UNPACK:.+]] = tensor.unpack %[[EXPANDED:.+]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 8] into %[[EMPTY]] : tensor<?x32x32x8x8xf32> -> tensor<?x256x256xf32>
+// CHECK:         return %[[UNPACK]] : tensor<?x256x256xf32>

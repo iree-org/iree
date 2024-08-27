@@ -3,8 +3,6 @@ set(LIBS
   IREEInputDialect
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses
-  IREEVectorExtDialect
-  IREEVectorExtTestPasses
   # Core dialects.
   MLIRAffineDialect
   MLIRArithDialect
@@ -15,6 +13,8 @@ set(LIBS
   MLIRFuncDialect
   MLIRFuncInlinerExtension
   MLIRIndexToLLVM
+  MLIRLLVMDialect
+  MLIRLLVMIRTransforms
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -17,12 +16,17 @@
 #define DEBUG_TYPE "iree-llvmcpu-vector-transfer-lowering"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUVECTORTRANSFERLOWERINGPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 class LLVMCPUVectorTransferLoweringPass
-    : public LLVMCPUVectorTransferLoweringBase<
+    : public impl::LLVMCPUVectorTransferLoweringPassBase<
           LLVMCPUVectorTransferLoweringPass> {
 public:
-  using LLVMCPUVectorTransferLoweringBase::LLVMCPUVectorTransferLoweringBase;
+  using impl::LLVMCPUVectorTransferLoweringPassBase<
+      LLVMCPUVectorTransferLoweringPass>::LLVMCPUVectorTransferLoweringPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, scf::SCFDialect,
@@ -40,14 +44,12 @@ void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
                                                  /*maxTransferRank=*/1);
   auto vectorTransferToSCFOptions =
       VectorTransferToSCFOptions().enableFullUnroll();
+  if (enableScalableLowerings) {
+    vectorTransferToSCFOptions.enableLowerScalable();
+  }
+
   populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVectorTransferLoweringPass() {
-  return std::make_unique<LLVMCPUVectorTransferLoweringPass>();
-}
-
 } // namespace mlir::iree_compiler

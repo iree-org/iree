@@ -36,6 +36,7 @@ print("IREE version:", v.VERSION)
 
 check_tool("iree-compile", ["--help"], "IREE compilation driver")
 check_tool("iree-ir-tool", ["--help"], "IREE IR Tool")
+check_tool("iree-opt", ["--help"], "IREE modular optimizer driver")
 
 # ONNX dependent.
 onnx_available = False

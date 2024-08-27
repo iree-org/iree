@@ -15,16 +15,27 @@ iree_cc_library(
     Analysis
   HDRS
     "BindingLayout.h"
+    "Captures.h"
+    "DeviceAnalysis.h"
+    "DeviceSet.h"
   SRCS
     "BindingLayout.cpp"
+    "Captures.cpp"
+    "DeviceAnalysis.cpp"
+    "DeviceSet.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
+    iree::compiler::Dialect::HAL::Analysis::Attributes
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

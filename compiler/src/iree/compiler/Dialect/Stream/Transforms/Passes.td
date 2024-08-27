@@ -457,6 +457,11 @@ def PackDispatchOperandsPass :
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
+def AnnotateAffinitiesPass :
+    Pass<"iree-stream-annotate-affinities", "mlir::ModuleOp"> {
+  let summary = "Annotates affinities on all ops for debugging.";
+}
+
 def DumpStatisticsPass :
     Pass<"iree-stream-dump-statistics", "mlir::ModuleOp"> {
   let summary = "Dumps stream dialect usage information to a file.";
@@ -484,6 +489,11 @@ def DumpStatisticsPass :
 def VerifyInputPass :
     Pass<"iree-stream-verify-input", "mlir::ModuleOp"> {
   let summary = "Verifies that input dialects are supported by the streams dialect.";
+}
+
+def VerifyAffinitiesPass :
+    Pass<"iree-stream-verify-affinities", "mlir::ModuleOp"> {
+  let summary = "Verifies that all operations have affinities assigned (directly or indirectly).";
 }
 
 def VerifyLoweringToTensorsPass :

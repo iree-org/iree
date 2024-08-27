@@ -64,9 +64,14 @@ func.func @resolve_subview_rankreducing_not_at_the_end_memref(%arg0: memref<8x16
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @resolve_binding_subspan_zero_offset_memref() -> (memref<f32>, index, index, index, index, index) {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<512x384xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<512x384xf32>
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xf32> -> memref<f32>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
 }
@@ -75,14 +80,19 @@ func.func @resolve_binding_subspan_zero_offset_memref() -> (memref<f32>, index, 
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<196608xf32>
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<196608xf32>
 //     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
 //     CHECK:   return %[[BASE_PTR]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @resolve_binding_subspan_offset_index_memref(%arg0 : index) -> (memref<index>, index, index, index, index, index) {
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%arg0) : memref<512x384xindex, strided<[384, 1], offset:?>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%arg0) : memref<512x384xindex, strided<[384, 1], offset:?>>
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xindex, strided<[384, 1], offset:?>> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
@@ -96,15 +106,20 @@ func.func @resolve_binding_subspan_offset_index_memref(%arg0 : index) -> (memref
 //     CHECK:   %[[SIZEOF:.+]] = util.sizeof index
 //     CHECK:   %[[OFFSET:.+]] = affine.apply #[[MAP0]]()[%arg0, %[[SIZEOF]]]
 //     CHECK:   %[[SUBSPAN_SIZE:.+]] = affine.apply #[[MAP1]]()[%arg0, %[[SIZEOF]]]
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SUBSPAN_SIZE]]}
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SUBSPAN_SIZE]]}
 //     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
 //     CHECK:   return %[[BASE_PTR]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @resolve_binding_subspan_dyn_dims_memref(%arg0 : index, %arg1 : index) -> (memref<index>, index, index, index, index, index) {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?x?xindex>{%arg0, %arg1}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<?x?xindex>{%arg0, %arg1}
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<?x?xindex> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
@@ -113,7 +128,7 @@ func.func @resolve_binding_subspan_dyn_dims_memref(%arg0 : index, %arg1 : index)
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[MAP]]()[%arg0, %arg1]
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SIZE]]}
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SIZE]]}
 //     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
 //     CHECK:   return %[[BASE_PTR]], %[[C0]], %arg0, %arg1, %arg1, %[[C1]]
 
@@ -169,11 +184,17 @@ func.func @resolve_global_memref() -> (memref<f32>, index, index, index, index, 
 
 // -----
 
-// Test for the part of the pass that converts iree_codegen to memref
+// Tests for the part of the pass that converts iree_codegen to memref.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
 func.func @external_func_entry_point() -> (memref<bf16>, index) {
-  %0 = hal.interface.constant.load[0] : i32
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
   %1 = arith.index_castui %0 : i32 to index
-  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
   %base_buffer, %offset, %sizes:3, %strides:3 = iree_codegen.extract_strided_metadata %2 : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>> -> memref<bf16>, index, index, index, index, index, index, index
   return %base_buffer, %offset : memref<bf16>, index
 }

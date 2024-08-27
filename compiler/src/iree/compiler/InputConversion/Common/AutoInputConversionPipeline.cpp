@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -14,10 +13,17 @@
 
 namespace mlir::iree_compiler::InputConversion {
 
+#define GEN_PASS_DEF_AUTOINPUTCONVERSIONPIPELINEPASS
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
+
 namespace {
 
-struct AutoInputConversionPipelinePass final
-    : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
+class AutoInputConversionPipelinePass final
+    : public impl::AutoInputConversionPipelinePassBase<
+          AutoInputConversionPipelinePass> {
+public:
+  using impl::AutoInputConversionPipelinePassBase<
+      AutoInputConversionPipelinePass>::AutoInputConversionPipelinePassBase;
   AutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions)
       : pipelineExtensions(pipelineExtensions) {}
   void runOnOperation() override;
@@ -76,11 +82,6 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 }
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createAutoInputConversionPipelinePass() {
-  return std::make_unique<AutoInputConversionPipelinePass>(nullptr);
-}
 
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions) {

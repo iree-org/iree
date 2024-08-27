@@ -45,16 +45,11 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
     "base-arm64": [],
-    "android": ["base"],
     "emscripten": ["base"],
-    "nvidia": ["base"],
-    "riscv": ["base"],
     "riscv-toolchain-builder": [],
-    "samples": ["base"],
     # Containers with all the newest versions of dependencies that we support
     # instead of the oldest.
     "base-bleeding-edge": [],
-    "nvidia-bleeding-edge": ["base-bleeding-edge"],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}

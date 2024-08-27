@@ -8,8 +8,9 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -527,105 +528,180 @@ wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
-//===---------------------------------------------------------------------===//
-// Classification of ops that change bit-widths
-//===---------------------------------------------------------------------===//
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op) {
+  assert(op && !isNonNullAndOutsideDispatch(op) &&
+         "op expected to be in a dispatch");
 
-Type BitWidthChangeInfo::getInputElementType() const {
-  return cast<RankedTensorType>(inputOperand->get().getType()).getElementType();
-}
+  // Step 1: Clone the op outside of the dispatch region.
 
-std::optional<BitWidthChangeInfo> isBitExtendOrTruncateOp(Operation *op) {
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) {
-    return std::nullopt;
-  }
-  if (genericOp.getNumDpsInits() != 1) {
-    return std::nullopt;
-  }
+  OpBuilder::InsertionGuard g(rewriter);
+  auto dispatchRegionOp = op->getParentOfType<DispatchRegionOp>();
 
-  // Check that the all loops are parallel
-  unsigned numLoops = genericOp.getNumLoops();
-  unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  if (numLoops != numParallelLoops) {
-    return std::nullopt;
+  // If all operands of the `op` come from outside the dispatch, then the op can
+  // be hoisted out before the dispatch region. Otherwise, the op can be hoisted
+  // out below the dispatch if the only users of the op are the dispatch return.
+  if (llvm::none_of(op->getOperands(), [&](Value operand) {
+        Operation *producer = operand.getDefiningOp();
+        return producer && producer->getParentOfType<DispatchRegionOp>();
+      })) {
+    rewriter.setInsertionPoint(dispatchRegionOp);
+  } else if (llvm::all_of(op->getUsers(), [&](Operation *user) {
+               return isa<IREE::Flow::ReturnOp>(user);
+             })) {
+    rewriter.setInsertionPointAfter(dispatchRegionOp);
+  } else {
+    return rewriter.notifyMatchFailure(
+        op, "op has both operands and users insided of its dispatch");
   }
+  Operation *hoistedOp = rewriter.clone(*op);
 
-  // Check that all operands that have the highest rank have bit width
-  // less than the output bit-width.
-  DenseMap<int64_t, SmallVector<OpOperand *>> rankBuckets;
-  int64_t maxOperandRank = 0;
-  for (OpOperand *input : genericOp.getDpsInputOperands()) {
-    auto inputType = dyn_cast<RankedTensorType>(input->get().getType());
-    if (!inputType) {
-      continue;
-    }
-    int64_t currRank = inputType.getRank();
-    maxOperandRank = std::max(currRank, maxOperandRank);
-    rankBuckets[currRank].push_back(input);
-  }
-  if (maxOperandRank == 0 || rankBuckets[maxOperandRank].empty()) {
-    return std::nullopt;
-  }
+  // Step 2: Replace op uses inside and outside of the dispatch region with the
+  //         hoisted results.
 
-  unsigned int maxInputElementBitWidth = 0;
-  OpOperand *inputOperand;
-  for (OpOperand *operand : rankBuckets[maxOperandRank]) {
-    RankedTensorType tensorType =
-        cast<RankedTensorType>(operand->get().getType());
-    Type elementType = tensorType.getElementType();
-    if (!elementType.isIntOrFloat()) {
-      return std::nullopt;
-    }
-    unsigned elementBitWidth = Util::getTypeBitWidth(elementType);
-    if (elementBitWidth > maxInputElementBitWidth) {
-      maxInputElementBitWidth = elementBitWidth;
-      inputOperand = operand;
-    }
-  }
-  if (!inputOperand) {
-    return std::nullopt;
-  }
-  Type inputElementType =
-      cast<RankedTensorType>(inputOperand->get().getType()).getElementType();
-
-  // Check that the identity input element bitwidth is smaller than the output
-  // element bitwidth.
-  RankedTensorType outputType =
-      dyn_cast<RankedTensorType>(genericOp->getResultTypes()[0]);
-  if (!outputType) {
-    return std::nullopt;
-  }
-  Type outputElementType = outputType.getElementType();
-  if (!outputElementType.isIntOrFloat()) {
-    return std::nullopt;
-  }
-
-  unsigned inputBitWidth = Util::getTypeBitWidth(inputElementType);
-  unsigned outputBitWidth = Util::getTypeBitWidth(outputElementType);
-  if (inputBitWidth == outputBitWidth) {
-    return std::nullopt;
-  }
-
-  // Checks specific to bit extend operations.
-  if (inputBitWidth < outputBitWidth) {
-    // Since these are cloned into dispatches, avoid expensive operations.
-    for (Operation &op : *genericOp.getBody()) {
-      if (op.getDialect() == op.getContext()->getLoadedDialect("math")) {
-        return std::nullopt;
+  auto getMatchingDispatchResult =
+      [&](Value result) -> std::optional<OpResult> {
+    for (OpOperand &use : result.getUses()) {
+      if (isa<IREE::Flow::ReturnOp>(use.getOwner())) {
+        return dispatchRegionOp.getResults()[use.getOperandNumber()];
       }
     }
-  }
-
-  // Checks specific to bit truncate operations.
-  if (outputBitWidth < inputBitWidth) {
-    // For now enforce that the input and output ranks match for truncates.
-    if (maxOperandRank != outputType.getRank()) {
-      return std::nullopt;
+    return std::nullopt;
+  };
+  bool yieldsResults = false;
+  for (OpResult result : op->getResults()) {
+    Value hoistedResult = hoistedOp->getResult(result.getResultNumber());
+    // Replace all results yielded by the dispatch region with the hoisted
+    // op results.
+    std::optional<OpResult> dispResult = getMatchingDispatchResult(result);
+    if (dispResult.has_value()) {
+      yieldsResults = true;
+      rewriter.replaceAllUsesWith(dispResult.value(), hoistedResult);
     }
+    // Replace uses inside the dispatch region.
+    rewriter.replaceAllUsesWith(result, hoistedResult);
+  }
+  // If no results were yielded from `op`, then nothing more to do.
+  if (!yieldsResults) {
+    return hoistedOp;
   }
 
-  return BitWidthChangeInfo{inputOperand, outputElementType};
+  // Step 3: Collect the new set of dispatch results and dynamic dims, and
+  //         create a new dispatch region to replace the old one. The new
+  //         dispatch may have duplicated results,
+
+  // Get the new dispatch region return values and dynamic dims, excluding the
+  // ones coming from the `hoistedOp`.
+  auto dispatchReturnOp = cast<IREE::Flow::ReturnOp>(
+      dispatchRegionOp.getBody().front().getTerminator());
+  SmallVector<Value, 2> newDispatchReturnOperands;
+  SmallVector<Value, 4> newDispatchResultDynamicDims;
+  // Keep track of which results in the original dispatch region correspond to
+  // which results in the new dispatch region with `oldDispatchResultInds`.
+  SmallVector<int64_t, 2> oldDispatchResultInds;
+  for (OpOperand &operand : dispatchReturnOp->getOpOperands()) {
+    if (operand.get().getDefiningOp() == hoistedOp) {
+      continue;
+    }
+    oldDispatchResultInds.push_back(operand.getOperandNumber());
+    newDispatchReturnOperands.push_back(operand.get());
+    auto dims =
+        dispatchRegionOp.getResultDynamicDims(operand.getOperandNumber());
+    newDispatchResultDynamicDims.append(dims.begin(), dims.end());
+  }
+
+  // Add the operands of the `op` to the new return values of the dispatch, and
+  // add their result dynamic dims to the new result dynamic dims.
+  // Save the result index in the new dispatch corresponding to each hoisted op
+  // operand in `resultIndsForHoistedOperands`, so uses can be replaced later.
+  SmallVector<int64_t> resultIndsForHoistedOperands;
+  for (OpOperand &operand : op->getOpOperands()) {
+    // Only need to yield operands defined in the dispatch region.
+    if (operand.get().getParentRegion() != &dispatchRegionOp.getBody()) {
+      continue;
+    }
+
+    // If the operand is already yielded by the dispatch, don't yield it again,
+    // and save the result index.
+    bool resultAlreadyYielded = false;
+    for (auto [idx, returnOperand] :
+         llvm::enumerate(newDispatchReturnOperands)) {
+      if (returnOperand == operand.get()) {
+        resultAlreadyYielded = true;
+        resultIndsForHoistedOperands.push_back(idx);
+        break;
+      }
+    }
+    if (resultAlreadyYielded) {
+      break;
+    }
+    resultIndsForHoistedOperands.push_back(newDispatchReturnOperands.size());
+    newDispatchReturnOperands.push_back(operand.get());
+
+    // Save operand and dynamic dims to add to the dispatch region.
+    SmallVector<Value> dims;
+    if (failed(reifyDynamicResultDims(rewriter, operand.get(), dims))) {
+      return op->emitOpError(
+          "failed to reify dynamic dims of result to be yielded from "
+          "dispatch region");
+    }
+    newDispatchResultDynamicDims.append(dims.begin(), dims.end());
+  }
+
+  // Create the new dispatch region op. `newDispatchReturnOperands` now has all
+  // the original return operands, excluding the hoisted op's results, and
+  // including any new results coming from the hoisted op's old operands. The
+  // `newDispatchResultDynamicDims` contains the corresponding result dynamic
+  // dims for `newDispatchReturnOperands`.
+  SmallVector<Type> newResultTypes =
+      llvm::map_to_vector(newDispatchReturnOperands,
+                          [](Value operand) { return operand.getType(); });
+  rewriter.setInsertionPoint(dispatchRegionOp);
+  auto newDispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
+      dispatchRegionOp->getLoc(), newResultTypes, newDispatchResultDynamicDims,
+      dispatchRegionOp.getWorkload());
+  rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
+                              newDispatchRegionOp.getBody(),
+                              newDispatchRegionOp.getBody().begin());
+  // Move the workgroup count region over.
+  if (!dispatchRegionOp.getWorkgroupCount().empty()) {
+    Region &newWorkgroupCountRegion = newDispatchRegionOp.getWorkgroupCount();
+    rewriter.inlineRegionBefore(dispatchRegionOp.getWorkgroupCount(),
+                                newWorkgroupCountRegion,
+                                newWorkgroupCountRegion.begin());
+  }
+  // Need to make a new flow.return op, since the body was copied from the
+  // old dispatch region.
+  auto newDispatchReturnOp = cast<IREE::Flow::ReturnOp>(
+      newDispatchRegionOp.getBody().front().getTerminator());
+  rewriter.setInsertionPoint(newDispatchReturnOp);
+  rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(newDispatchReturnOp,
+                                                    newDispatchReturnOperands);
+
+  // Replace operands of the `hoistedOp` with dispatch region results. They are
+  // currently using values from inside the dispatch region.
+  for (auto [idx, operand] : llvm::enumerate(hoistedOp->getOperands())) {
+    auto newResultIdx = resultIndsForHoistedOperands[idx];
+    Value newDispatchResult = newDispatchRegionOp->getResults()[newResultIdx];
+    rewriter.replaceUsesWithIf(operand, newDispatchResult,
+                               [&](OpOperand &opOperand) {
+                                 return opOperand.getOwner() == hoistedOp;
+                               });
+  }
+
+  // Step 4: Fixup all uses. Still need to replace the operands of the hoisted
+  //         op, and replace the remaining uses of the old dispatch region with
+  //         the new dispatch region results.
+
+  // Replace the uses of the original dispatch region results with the final
+  // dispatch region results.
+  for (auto [oldIdx, newIdx] : llvm::enumerate(oldDispatchResultInds)) {
+    Value newDispatchResult = newDispatchRegionOp->getResults()[newIdx];
+    Value dispatchResult = dispatchRegionOp->getResults()[oldIdx];
+    rewriter.replaceAllUsesWith(dispatchResult, newDispatchResult);
+  }
+
+  return hoistedOp;
 }
 
 //===---------------------------------------------------------------------===//
@@ -643,7 +719,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (isBitExtendOp(op)) {
+  if (LinalgExt::isBitExtendOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {

@@ -27,7 +27,7 @@
 set -xeuo pipefail
 
 
-PACKAGE_DIR="$1"
+BINARY_DIR="$1"
 BUILD_DIR="${BUILD_DIR:-build-tests}"
 
 source build_tools/scripts/install_lit.sh
@@ -76,7 +76,7 @@ cmake_args=(
   "-DIREE_BUILD_PYTHON_BINDINGS=OFF"
   "-DIREE_BUILD_COMPILER=OFF"
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
-  "-DIREE_HOST_BIN_DIR=${PACKAGE_DIR?}/bin"
+  "-DIREE_HOST_BIN_DIR=${BINARY_DIR?}"
   "-DLLVM_EXTERNAL_LIT=${LLVM_EXTERNAL_LIT?}"
 )
 cmake_args+=(${cmake_config_options[@]})

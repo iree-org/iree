@@ -65,6 +65,7 @@ ALL_SRCS = enforce_glob(
         "scatter.mlir",
         "scatter_dynamic.mlir",
         "select.mlir",
+        "shape_assertion.mlir",
         "sine.mlir",
         "slice.mlir",
         "sort.mlir",
@@ -169,6 +170,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             "scatter_dynamic.mlir",
             "select.mlir",
+            "shape_assertion.mlir",
             "sine.mlir",
             "slice.mlir",
             "sort.mlir",
@@ -247,6 +249,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             "scatter_dynamic.mlir",
             "select.mlir",
+            "shape_assertion.mlir",
             "sine.mlir",
             "slice.mlir",
             "sort.mlir",
@@ -327,7 +330,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_meta-spirv_metal",
+    name = "check_metal-spirv_metal",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -381,6 +384,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             "scatter_dynamic.mlir",
             "select.mlir",
+            "shape_assertion.mlir",
             "sine.mlir",
             "slice.mlir",
             "sort.mlir",

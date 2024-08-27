@@ -299,15 +299,25 @@ void buildLLVMCPUVectorLoweringPipeline(
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
-      options.splitVectorTransfersTo, options.enableArmI8mm));
+      LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
+                                              options.enableArmI8mm}));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
   funcPassManager.addPass(createCanonicalizerPass());
 
-  funcPassManager.addPass(createLLVMCPUVectorTransferLoweringPass());
+  LLVMCPUVectorTransferLoweringPassOptions transferLoweringOptions{};
+  if (!options.enableArmSME) {
+    // The ArmSME dialect has its own (more specific) lowerings for scalable
+    // vectors that occur later in the pipeline, so only enable the general
+    // lowerings if SME is not available.
+    transferLoweringOptions.enableScalableLowerings = true;
+  }
+  funcPassManager.addPass(
+      createLLVMCPUVectorTransferLoweringPass(transferLoweringOptions));
   funcPassManager.addPass(createLLVMCPUVectorTransposeLoweringPass(
-      options.lowerVectorTransposeToAVX2));
+      LLVMCPUVectorTransposeLoweringPassOptions{
+          options.lowerVectorTransposeToAVX2}));
 
   // Potentially removes shape_cast and broadcast on unit dims before shape_cast
   // lowering.
@@ -352,6 +362,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -394,12 +405,12 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createLLVMCPUPeelPass());
   }
 
-  if (pipelineOpt.enableAArch64SSVE) {
+  if (pipelineOpt.enableAArch64SME) {
     funcPassManager.addPass(createLLVMCPU2DScalableTo1DScalablePass());
   }
 
   {
-    funcPassManager.addPass(createVectorizePadPass());
+    funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     if (pipelineOpt.decomposePackUnPackOps) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());
       funcPassManager.addPass(createCanonicalizerPass());
@@ -430,6 +441,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -449,8 +461,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
+  funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperands(
+      tilingConfig.getVectorReductionLevel()));
   funcPassManager.addPass(
       createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
@@ -463,7 +475,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   }
 
   {
-    funcPassManager.addPass(createVectorizePadPass());
+    funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
@@ -479,7 +491,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
   }
 
   // Eliminate redundant transfer_read/write to avoid stack allocations.
-  funcPassManager.addPass(createOptimizeVectorTransferPass(/*flatten=*/true));
+  funcPassManager.addPass(createOptimizeVectorTransferPass(
+      OptimizeVectorTransferPassOptions{/*flatten=*/true}));
 
   addCPUBufferizePasses(funcPassManager);
 
@@ -491,6 +504,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "shuffle";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -531,13 +545,15 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   // Vector lowering of Mmt4d.
   funcPassManager.addPass(createLLVMCPUMmt4dVectorLoweringPass(
-      clEnableVectorContractCustomKernels));
+      LLVMCPUMmt4dVectorLoweringPassOptions{
+          clEnableVectorContractCustomKernels}));
 
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
   options.splitVectorTransfersTo = "linalg-copy";
   options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+  options.enableArmSME = pipelineOpt.enableAArch64SME;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -579,6 +595,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -619,6 +636,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
+    options.enableArmSME = pipelineOpt.enableAArch64SME;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -702,7 +720,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(
-            clFailOnOutOfBoundsStackAllocation);
+            LLVMCPUCheckIRBeforeLLVMConversionPassOptions{
+                clFailOnOutOfBoundsStackAllocation});
       })
       // SCF -> CF
       .addPass(createConvertSCFToCFPass)
@@ -750,7 +769,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added
       // way to late and should insted be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)
-      .addPass([&]() { return createCPUMaterializeEncodingPass(); })
+      .addPass(createCPUMaterializeDeviceEncodingPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);

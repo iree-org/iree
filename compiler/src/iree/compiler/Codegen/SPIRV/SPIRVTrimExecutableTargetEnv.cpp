@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -15,10 +14,14 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVTRIMEXECUTABLETARGETENVPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 
 struct SPIRVTrimExecutableTargetEnvPass final
-    : SPIRVTrimExecutableTargetEnvBase<SPIRVTrimExecutableTargetEnvPass> {
+    : impl::SPIRVTrimExecutableTargetEnvPassBase<
+          SPIRVTrimExecutableTargetEnvPass> {
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variant = getOperation();
     if (!usesSPIRVCodeGen(variant)) {
@@ -67,10 +70,4 @@ struct SPIRVTrimExecutableTargetEnvPass final
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVTrimExecutableTargetEnvPass() {
-  return std::make_unique<SPIRVTrimExecutableTargetEnvPass>();
-}
-
 } // namespace mlir::iree_compiler

@@ -20,9 +20,9 @@ hal.executable private @static_scatter_update_slice  {
         %c40 = arith.constant 40 : index
         %c500 = arith.constant 500 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<40x500xi32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<40x1xi32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<100x500xi32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) : memref<40x500xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) : memref<40x1xi32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) : memref<100x500xi32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -50,9 +50,9 @@ hal.executable private @static_scatter_update_slice  {
 }
 
 // CHECK-LABEL: func.func @static_scatter_update_slice()
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK: %[[ARG2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(0)
+//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(1)
+//       CHECK: %[[ARG2:.+]] = hal.interface.binding.subspan layout({{.+}}) set(0) binding(2)
 //       CHECK: scf.for
 //       CHECK:   scf.for
 //       CHECK:     %[[WG_UPDATE:.+]] = memref.subview %[[ARG0]]

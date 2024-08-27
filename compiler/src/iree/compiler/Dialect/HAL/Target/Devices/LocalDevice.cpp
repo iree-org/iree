@@ -87,7 +87,7 @@ LocalDevice::getHostDeviceTarget(MLIRContext *context,
 Value LocalDevice::buildDeviceTargetMatch(
     Location loc, Value device, IREE::HAL::DeviceTargetAttr targetAttr,
     OpBuilder &builder) const {
-  return buildDeviceIDAndExecutableFormatsMatch(
+  return IREE::HAL::DeviceTargetAttr::buildDeviceIDAndExecutableFormatsMatch(
       loc, device, "local*", targetAttr.getExecutableTargets(), builder);
 }
 

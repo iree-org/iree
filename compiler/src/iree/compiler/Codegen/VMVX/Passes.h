@@ -19,25 +19,8 @@
 namespace mlir::iree_compiler {
 
 //------------------------------------------------------------------------------
-// VMVX passes
+// VMVX Pass Pipelines
 //------------------------------------------------------------------------------
-
-// Lowers high level library calls from named ops and generics. This operates
-// at the bufferized linalg level.
-std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
-
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are VMVX specific.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createVMVXMaterializeEncodingPass();
-
-/// Pass to select a lowering strategy for a hal.executable.variant operation.
-std::unique_ptr<OperationPass<ModuleOp>> createVMVXSelectLoweringStrategyPass();
-
-/// Pass to lower the module an hal.executable.variant operation to external
-/// dialect.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createVMVXLowerExecutableTargetPass();
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
@@ -48,19 +31,15 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
 // VMVX Linking Passes and Pipelines
 //----------------------------------------------------------------------------//
 
-/// Assigns executable constant ordinals across all VMVX variants.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createVMVXAssignConstantOrdinalsPass();
-
-/// Links VMVX HAL executables within the top-level program module.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
-
 /// Populates passes needed to link HAL executables across VMVX targets.
 void buildVMVXLinkingPassPipeline(OpPassManager &variantPassManager);
 
 //----------------------------------------------------------------------------//
 // Register VMVX Passes
 //----------------------------------------------------------------------------//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc" // IWYU pragma: keep
 
 void registerCodegenVMVXPasses();
 

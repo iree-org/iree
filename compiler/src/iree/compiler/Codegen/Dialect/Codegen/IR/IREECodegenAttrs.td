@@ -9,7 +9,12 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
+
+//===---------------------------------------------------------------------===//
+// Pass pipelines
+//===---------------------------------------------------------------------===//
 
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
@@ -126,6 +131,82 @@ def DispatchLoweringPassPipelineAttr :
   let assemblyFormat = "``$value";
 }
 
+//===---------------------------------------------------------------------===//
+// IREE Codegen workgroup mapping attributes
+//===---------------------------------------------------------------------===//
+
+def IdX : I64EnumAttrCase<"IdX", 0, "x">;
+def IdY : I64EnumAttrCase<"IdY", 1, "y">;
+def IdZ : I64EnumAttrCase<"IdZ", 2, "z">;
+
+def WorkgroupIdEnum :
+    I64EnumAttr<"WorkgroupId", "Attribute that map to hal.workgrpoup.ids", [
+      IdX, IdY, IdZ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+}
+
+def WorkgroupMappingAttr :
+    AttrDef<IREECodegen_Dialect, "WorkgroupMapping", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
+  let mnemonic = "workgroup_mapping";
+
+  let parameters = (ins
+    EnumParameter<WorkgroupIdEnum>:$id,
+    DefaultValuedParameter<"int64_t", "0">:$delinearizedDim
+  );
+  let assemblyFormat = "`<` $id (`` `:` `` $delinearizedDim^)? `>`";
+
+  let description = [{
+    Attribute that eventually will be used to map distributed loop iterations
+    to `hal.workgroup.id`s.
+
+    The `x`,`y` and `z` values for `id` map to `hal.workgroup.id[0]`,
+    `hal.workgroup.id[1]` and `hal.workgroup.id[2]` respectively.
+
+    In addition it is possible to specify if the `z` dimension is to be
+    delinearized on mapping. For example if the list of mapping attributes is
+    `[workgroup_mapping<z:1>, workgroup_mapping<z:0>]`, then the `z` dimension
+    is delinearized to map to `workgroup_mapping<z:1>` and
+    `workgroup_mapping<z:0>`. In other words if the number of logical parallel
+    workers along the `z:0` dimension is `W`, then
+    ```
+    workgroup_mapping<z:0> = hal.workgroup.id[1] mod W,
+    worgrkoup_mapping<z:1> = hal.workgroup.id[1] div W
+    ```
+
+    Note: It is expected that this attribute is always used in a list of mapping
+    attributes (with a single element being a list of size 1). It is illegal for
+    a list to have `workgroup_mapping<z:a>` without `workgroup_mapping<z:b>`
+    if `a > b`. In the same way it is illegal to for the list to
+    - have `workgroup_mapping<y>` but not `workgroup_mapping<x>`
+    - have `workgroup_mapping<z:*>`  but not have `workgroup_mapping<x>`
+      and `workgroup_mapping<y>`
+  }];
+  let builders = [
+    AttrBuilder<(ins "WorkgroupId":$id)>
+  ];
+  let extraClassDeclaration = [{
+    // Checks that a list of attributes is well-defined.
+    static LogicalResult verifyAttrList(::mlir::MLIRContext *context,
+      ::llvm::function_ref<::mlir::InFlightDiagnostic ()> emitError,
+      ArrayRef<Attribute> attrs);
+
+    // Convert from mapping ID to attribute.
+    static ::mlir::iree_compiler::IREE::Codegen::WorkgroupMappingAttr
+    getAttributeFromMappingId(MLIRContext *context, int64_t mappingId);
+
+    // Less than operator for easy comparison.
+    bool operator<(
+        const ::mlir::iree_compiler::IREE::Codegen::WorkgroupMappingAttr &rhs)
+        const;
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.translation_info
+//===---------------------------------------------------------------------===//
 
 def IREECodegen_TranslationInfoAttr :
     AttrDef<IREECodegen_Dialect, "TranslationInfo", []> {
@@ -182,6 +263,10 @@ def IREECodegen_TranslationInfoAttr :
   }];
   let genVerifyDecl = 1;
 }
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.lowering_config
+//===---------------------------------------------------------------------===//
 
 def IREECodegen_LoweringConfigTilingLevelAttr :
   AttrDef<IREECodegen_Dialect, "LoweringConfigTilingLevel", []>
@@ -278,6 +363,10 @@ def IREECodegen_LoweringConfigAttr :
   let genVerifyDecl = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.compilation_info
+//===---------------------------------------------------------------------===//
+
 def IREECodegen_CompilationInfoAttr :
     AttrDef<IREECodegen_Dialect, "CompilationInfo", []> {
   let mnemonic = "compilation_info";
@@ -308,6 +397,10 @@ def IREECodegen_CompilationInfoAttr :
 
   let genVerifyDecl = 1;
 }
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.export_config
+//===---------------------------------------------------------------------===//
 
 def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> {
   let mnemonic = "export_config";

@@ -5,14 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
 
 /// A class for querying information about a contract op.
 class VectorContractOpInfo {
 public:
-  explicit VectorContractOpInfo(vector::ContractionOp op);
+  static FailureOr<VectorContractOpInfo>
+  inferFromIndexingMaps(ArrayRef<AffineMap> maps);
 
   // Returns the (LHS M, RHS N) dimension index pair.
   std::pair<int, int> getOperandMNIndex() const;

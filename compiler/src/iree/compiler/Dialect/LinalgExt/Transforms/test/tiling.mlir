@@ -1652,6 +1652,57 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @attention_fusion(
+    %query: tensor<2x10x4096x64xf16>,
+    %key: tensor<2x10x4096x64xf16>,
+    %value: tensor<2x10x4096x64xf16>,
+    %scale : f16, %bias : tensor<10x64xf16>) -> tensor<2x10x4096x64xf16> {
+  %0 = tensor.empty() : tensor<2x10x4096x64xf16>
+  %1 = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+      ins(%query, %key, %value, %scale : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, f16)
+      outs(%0 : tensor<2x10x4096x64xf16>) -> tensor<2x10x4096x64xf16>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%1, %bias : tensor<2x10x4096x64xf16>, tensor<10x64xf16>)
+      outs(%0 : tensor<2x10x4096x64xf16>) {
+    ^bb0(%b0 : f16, %b1 : f16, %b2 : f16):
+      %3 = arith.addf %b0, %b1 : f16
+      linalg.yield %3 : f16
+  } -> tensor<2x10x4096x64xf16>
+  return %2 : tensor<2x10x4096x64xf16>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.match ops{["linalg.generic"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %2, %loops = transform.structured.tile_using_forall %1 tile_sizes [1, 1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %_, %__ = transform.structured.fuse_into_containing_op %0 into %loops : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func @attention_fusion(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x10x4096x64xf16>
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] = %[[EMPTY]])
+//       CHECK:     %[[EMPTY_SLICE:.+]] = tensor.extract_slice %[[EMPTY]]
+//       CHECK:     %[[ATTENTION_SLICE:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:         outs(%[[EMPTY_SLICE]] :
+//       CHECK:     %[[OUTS_SLICE:.+]] = tensor.extract_slice %[[OUTS]]
+//       CHECK:     %[[BIAS_SLICE:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ATTENTION_SLICE]],
+//  CHECK-SAME:         outs(%[[OUTS_SLICE]] :
+//       CHECK:     tensor.parallel_insert_slice %[[BIAS_SLICE]] into %[[OUTS]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>

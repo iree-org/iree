@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -27,12 +26,16 @@ static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_LLVMCPUMMT4DVECTORLOWERINGPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
 namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
-    : public LLVMCPUMmt4dVectorLoweringBase<LLVMCPUMmt4dVectorLoweringPass> {
-  LLVMCPUMmt4dVectorLoweringPass(bool enableVectorContractCustomKernels) {
-    this->enableVectorContractCustomKernels = enableVectorContractCustomKernels;
-  }
+    : public impl::LLVMCPUMmt4dVectorLoweringPassBase<
+          LLVMCPUMmt4dVectorLoweringPass> {
+  using impl::LLVMCPUMmt4dVectorLoweringPassBase<
+      LLVMCPUMmt4dVectorLoweringPass>::LLVMCPUMmt4dVectorLoweringPassBase;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
   }
@@ -104,11 +107,4 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     }
   }
 }
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUMmt4dVectorLoweringPass(bool enableVectorContractCustomKernels) {
-  return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>(
-      enableVectorContractCustomKernels);
-}
-
 } // namespace mlir::iree_compiler

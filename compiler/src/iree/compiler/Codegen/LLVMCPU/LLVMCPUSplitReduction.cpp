@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,6 +22,9 @@
 #define DEBUG_TYPE "iree-llvmcpu-split-reduction"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUSPLITREDUCTIONPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -163,12 +165,13 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 
 /// Pass to splitReduce linalg operations.
 class LLVMCPUSplitReductionPass
-    : public LLVMCPUSplitReductionBase<LLVMCPUSplitReductionPass> {
+    : public impl::LLVMCPUSplitReductionPassBase<LLVMCPUSplitReductionPass> {
 public:
-  LLVMCPUSplitReductionPass(bool fpReductionReordering) {
+  using impl::LLVMCPUSplitReductionPassBase<
+      LLVMCPUSplitReductionPass>::LLVMCPUSplitReductionPassBase;
+  explicit LLVMCPUSplitReductionPass(bool fpReductionReordering) {
     this->enableFpReductionReordering = fpReductionReordering;
   }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, scf::SCFDialect>();
   }
@@ -215,13 +218,10 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
     }
   }
 }
-
 } // namespace
-
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);
 }
-
 } // namespace mlir::iree_compiler

@@ -22,8 +22,12 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgUtils
     MLIRSupport
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
   PUBLIC
 )
 

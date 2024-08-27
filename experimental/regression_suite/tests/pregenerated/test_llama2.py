@@ -35,10 +35,7 @@ def llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb(llama2_7b_f16qi4_stripped_source
         llama2_7b_f16qi4_stripped_source,
         "rdna3_vulkan",
         flags=COMMON_FLAGS
-        + [
-            "--iree-hal-target-backends=vulkan-spirv",
-            "--iree-vulkan-target-triple=rdna3-unknown-linux",
-        ],
+        + ["--iree-hal-target-backends=vulkan-spirv", "--iree-vulkan-target=rdna3"],
     )
 
 
@@ -74,10 +71,7 @@ def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_stripped_source):
         llama2_7b_f16qi4_stripped_source,
         "a100_vulkan",
         flags=COMMON_FLAGS
-        + [
-            "--iree-hal-target-backends=vulkan-spirv",
-            f"--iree-vulkan-target-triple=ampere-a100-linux",
-        ],
+        + ["--iree-hal-target-backends=vulkan-spirv", f"--iree-vulkan-target=ampere"],
     )
 
 
@@ -89,7 +83,7 @@ def llama2_7b_f16qi4_stripped_sm80_cuda_vmfb(llama2_7b_f16qi4_stripped_source):
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=cuda",
-            f"--iree-hal-cuda-llvm-target-arch=sm_80",
+            f"--iree-cuda-target=sm_80",
         ],
     )
 
@@ -102,7 +96,7 @@ def llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb(llama2_7b_f16qi4_stripped_source):
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=rocm",
-            "--iree-rocm-target-chip=gfx1100",
+            "--iree-hip-target=gfx1100",
         ],
     )
 
@@ -115,7 +109,7 @@ def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=cuda",
-            f"--iree-hal-cuda-llvm-target-arch=sm_70",
+            f"--iree-cuda-target=sm_70",
         ],
     )
 
@@ -223,7 +217,7 @@ def test_step_a100_vulkan_stripped(llama2_7b_f16qi4_a100_vulkan_vmfb):
 def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
     iree_benchmark_module(
         llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="first_vicuna_forward",
         args=[
             "--input=1x1xi64",
@@ -231,7 +225,7 @@ def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
     )
     iree_benchmark_module(
         llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="second_vicuna_forward",
         args=[
             "--input=1x1xi64",

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
@@ -26,6 +25,9 @@
 #define DEBUG_TYPE "iree-llvmcpu-tile-and-fuse"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_LLVMCPUTILEANDFUSEPASS
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
 
@@ -82,9 +84,12 @@ foldIfGeneratedFromPadding(RewriterBase &rewriter, tensor::PadOp untiledPadOp,
 /// This pass starts with the last TilingInterface operation, tiles the op and
 /// fuses its producers recursively. The `tilingLevel` must be specified. It
 /// picks the `tilingLevel`-th list as tiling sizes from lowering_config.
-struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
-  LLVMCPUTileAndFusePass(int64_t tilingLevel = -1) {
-    this->tilingLevel.setValue(tilingLevel);
+struct LLVMCPUTileAndFusePass
+    : impl::LLVMCPUTileAndFusePassBase<LLVMCPUTileAndFusePass> {
+  using impl::LLVMCPUTileAndFusePassBase<
+      LLVMCPUTileAndFusePass>::LLVMCPUTileAndFusePassBase;
+  explicit LLVMCPUTileAndFusePass(int64_t tilingLevel) {
+    this->tilingLevel = tilingLevel;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,

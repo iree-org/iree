@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 
@@ -25,6 +25,13 @@ struct DistributeContractions final
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    auto maybeOpInfo = VectorContractOpInfo::inferFromIndexingMaps(
+        contractOp.getIndexingMapsArray());
+    if (failed(maybeOpInfo)) {
+      return rewriter.notifyMatchFailure(contractOp, "invalid contraction");
+    }
+    VectorContractOpInfo opInfo = maybeOpInfo.value();
+
     VectorValue result = dyn_cast<VectorValue>(contractOp.getResult());
     if (!result) {
       return rewriter.notifyMatchFailure(contractOp,
@@ -67,7 +74,6 @@ struct DistributeContractions final
     Value vector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    VectorContractOpInfo opInfo(contractOp);
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
 
     std::optional<int64_t> kBatch = layouts[LHS].getBatchDim(lhsK);

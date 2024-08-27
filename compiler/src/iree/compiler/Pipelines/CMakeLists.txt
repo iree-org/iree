@@ -46,6 +46,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
+    iree::compiler::DispatchCreation
     iree::compiler::GlobalOptimization
     iree::compiler::InputConversion::Common
     iree::compiler::InputConversion::Common::AutoInputConversionPipeline

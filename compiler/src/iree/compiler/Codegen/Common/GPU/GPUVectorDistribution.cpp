@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
@@ -285,8 +285,6 @@ LogicalResult distributeVectorOps(Operation *root,
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
-  if (failed(options.setAnchorOps(analysis)))
-    return failure();
   if (failed(analysis.run()))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");

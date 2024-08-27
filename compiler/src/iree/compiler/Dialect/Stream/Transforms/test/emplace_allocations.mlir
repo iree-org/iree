@@ -156,6 +156,35 @@ util.func public @emplaceMultiResultDispatchInto(
 
 // -----
 
+// Test that multiple results with the last result updated first get placed correctly
+
+// CHECK-LABEL: @emplaceMultiResultDispatchIntoSwapped
+util.func public @emplaceMultiResultDispatchIntoSwapped(
+    // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
+    %input: !stream.resource<*>, %input_size: index,
+    // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
+    %update_size: index, %target_size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %c64 = arith.constant 64 : index
+  // CHECK: %[[TARGET:.+]] = stream.async.alloca
+  // CHECK: %[[DISPATCH:.+]]:2 = stream.async.dispatch @ex::@dispatch0
+  // CHECK-SAME: ({{.+}}, %[[TARGET]][%c0 to %c32 for %[[UPDATE_SIZE]]], %[[TARGET]][%c32 to %c64 for %[[UPDATE_SIZE]]]) :
+  // CHECK-SAME: ({{.+}}) -> (%[[TARGET]]{%[[TARGET_SIZE]]}, %[[TARGET]]{%[[TARGET_SIZE]]})
+  %update:2 = stream.async.dispatch @ex::@dispatch0(%input[%c0 to %input_size for %input_size]) :
+      (!stream.resource<*>{%input_size}) -> (!stream.resource<*>{%update_size}, !stream.resource<*>{%update_size})
+  // CHECK-NOT: stream.async.alloca
+  %target = stream.async.alloca : !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target0 = stream.async.update %update#1, %target[%c0 to %c32] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
+  // CHECK-NOT: stream.async.update
+  %target1 = stream.async.update %update#0, %target0[%c32 to %c64] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
+  // CHECK: util.return %[[DISPATCH]]#0
+  util.return %target1 : !stream.resource<*>
+}
+
+// -----
+
 // TODO(#14566): multiple results with sparse ties don't work due to implicit
 // operand/result ordering on the dispatch ops. Flow and stream dispatch ops and
 // the executable entry points need to be reworked to remove the implicit

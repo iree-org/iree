@@ -193,11 +193,8 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 struct VectorReductionToGPUPass final
     : impl::VectorReductionToGPUPassBase<VectorReductionToGPUPass> {
-  VectorReductionToGPUPass(
-      bool expandSubgroupReduction,
-      std::function<int(mlir::FunctionOpInterface)> getWarpSize)
-      : expandSubgroupReduction(expandSubgroupReduction),
-        getWarpSize(getWarpSize) {}
+  VectorReductionToGPUPass(bool expandSubgroupReduction)
+      : expandSubgroupReduction(expandSubgroupReduction) {}
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
@@ -259,12 +256,16 @@ struct VectorReductionToGPUPass final
     // 4. Distribute transfer write operations and propagate vector
     // distribution.
     {
-      int warpSize = this->getWarpSize ? this->getWarpSize(funcOp) : 32;
+      std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
+      if (!subgroupSize) {
+        funcOp->emitOpError("missing subgroup size");
+        return signalPassFailure();
+      }
       auto groupReductionFn = [=](Location loc, OpBuilder &builder, Value input,
                                   vector::CombiningKind kind,
                                   uint32_t size) -> Value {
-        return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize,
-                                     expandSubgroupReduction);
+        return emitGPUGroupReduction(loc, builder, input, kind, size,
+                                     *subgroupSize, expandSubgroupReduction);
       };
       auto distributionFn = [](Value val) {
         auto vecType = llvm::dyn_cast<VectorType>(val.getType());
@@ -312,17 +313,13 @@ struct VectorReductionToGPUPass final
 
 private:
   bool expandSubgroupReduction;
-  std::function<int(mlir::FunctionOpInterface)> getWarpSize;
 };
 
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertVectorReductionToGPUPass(
-    bool expandSubgroupReduction,
-    std::function<int(mlir::FunctionOpInterface)> getWarpSize) {
-  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction,
-                                                    getWarpSize);
+createConvertVectorReductionToGPUPass(bool expandSubgroupReduction) {
+  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction);
 }
 
 } // namespace mlir::iree_compiler

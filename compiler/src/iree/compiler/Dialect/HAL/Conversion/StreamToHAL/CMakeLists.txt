@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     MLIRSCFDialect
+    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target

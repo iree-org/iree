@@ -50,8 +50,8 @@ public:
   ChangeResult resolveWithPossibleConflict(const VectorLayoutInterface &rhs,
                                            OpOperand &operand);
 
-  ChangeResult resolve(const DistributionLayout *rhs);
-  ChangeResult resolve(const VectorLayoutInterface &rhs);
+  ChangeResult resolve(const DistributionLayout *rhs, bool force = false);
+  ChangeResult resolve(const VectorLayoutInterface &rhs, bool force = false);
 
   VectorLayoutInterface getLayout() const { return vectorLayout; }
 
@@ -100,7 +100,9 @@ private:
   /// should only be used when you know there will be no layout conflicts.
   /// Otherwise, the resolve-like functions should be used.
   void setInnerLayout(const VectorLayoutInterface &layout) {
-    assert(layout && layout.isValidLayout(getValue()).succeeded());
+    assert(layout &&
+           layout.isValidLayout(getValue().getType(), getValue().getLoc())
+               .succeeded());
     vectorLayout = layout;
   }
 
@@ -140,11 +142,8 @@ private:
 
 class PropagateLayout : public DataFlowAnalysis {
 public:
-  explicit PropagateLayout(
-      DataFlowSolver &solver,
-      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
-      MLIRContext *ctx)
-      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
+  explicit PropagateLayout(DataFlowSolver &solver, MLIRContext *ctx)
+      : DataFlowAnalysis(solver), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
 
@@ -165,8 +164,6 @@ private:
                              OperandRange operands);
 
   DistributionLayout *getLatticeElement(Value val);
-
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
 
   MLIRContext *ctx;
 };
@@ -218,8 +215,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Create a resolution operation. This conflict should be handeled later by
   // someone else, not this analysis.
   Operation *resolveOp =
-      builder.create<IREE ::VectorExt::LayoutConflictResolutionOp>(
-          input.getLoc(), input.getType(), input, vectorLayout, rhs);
+      builder.create<IREE::VectorExt::ToLayoutOp>(input.getLoc(), input, rhs);
   Value resolvedValue = resolveOp->getResult(0);
   opOperand.set(resolvedValue);
 
@@ -249,7 +245,15 @@ DistributionLayout::resolveWithPossibleConflict(const DistributionLayout *rhs,
   return resolveWithPossibleConflict(rhs->vectorLayout, opOperand);
 }
 
-ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
+ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs,
+                                         bool force) {
+  // If forced, set the layout regardless of a possible conflict.
+  if (force) {
+    bool changed = (vectorLayout != rhs);
+    setInnerLayout(rhs);
+    return changed ? ChangeResult::Change : ChangeResult::NoChange;
+  }
+
   ResolutionResult result = doResolution(rhs);
 
   switch (result) {
@@ -270,9 +274,10 @@ ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
   return ChangeResult::NoChange;
 }
 
-ChangeResult DistributionLayout::resolve(const DistributionLayout *rhs) {
+ChangeResult DistributionLayout::resolve(const DistributionLayout *rhs,
+                                         bool force) {
   assert(rhs && "layout to resolve with should not be null");
-  return resolve(rhs->vectorLayout);
+  return resolve(rhs->vectorLayout, force);
 }
 
 void DistributionLayout::print(raw_ostream &os) const {
@@ -335,19 +340,25 @@ static OpOperand &getOpOperand(Operation *op, unsigned operandLatticeIndex) {
   llvm::report_fatal_error("No vector operand found");
 }
 
-/// Get a layout if all the given layouts are same. If all layouts are not same,
-/// return nullptr.
+/// Get a layout if all the given initialized layouts are same.
+/// If any initialized layouts are not same, return nullptr.
 static const DistributionLayout *
 getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
-  if (layouts.empty())
+  SmallVector<const DistributionLayout *> initializedLayouts;
+  for (auto layout : layouts) {
+    if (layout->isUninitialized())
+      continue;
+    initializedLayouts.push_back(layout);
+  }
+
+  if (initializedLayouts.empty())
     return nullptr;
 
   // Check if all layouts are same.
-  if (!llvm::all_equal(llvm::make_pointee_range(layouts))) {
+  if (!llvm::all_equal(llvm::make_pointee_range(initializedLayouts)))
     return nullptr;
-  }
 
-  return layouts[0];
+  return initializedLayouts[0];
 }
 
 /// Hueristic to use to choose the best layout when enforcing the same layout
@@ -390,6 +401,19 @@ static void enforceSameLayoutForOperands(
 /// ==========================================================================
 ///        PROPAGATION TRANSFER FUNCTIONS
 /// ==========================================================================
+
+static void propagateLayoutToLayoutOp(
+    ToLayoutOp toLayout, ArrayRef<const DistributionLayout *> operandLattices,
+    ArrayRef<DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  DistributionLayout *result = resultLattices[0];
+
+  // ToLayout operation propagates layout even if the result already has a
+  // layout.
+
+  ChangeResult changed = result->resolve(toLayout.getLayout(), /*force=*/true);
+  update(result, changed);
+}
 
 static void propagateLayoutToElementwiseOp(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
@@ -511,6 +535,12 @@ void propagationTransferFunction(
     ArrayRef<DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
 
+  if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
+    propagateLayoutToLayoutOp(toLayout, operandLattices, resultLattices,
+                              update);
+    return;
+  }
+
   // Propagate layout to elementwise operations.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
     propagateLayoutToElementwiseOp(op, operandLattices, resultLattices, update);
@@ -541,6 +571,24 @@ void propagationTransferFunction(
 /// ==========================================================================
 ///        ENFORCEMENT TRANSFER FUNCTIONS
 /// ==========================================================================
+
+static void enforceLayoutToLayoutOp(
+    ToLayoutOp toLayout, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  DistributionLayout *input = operandLattices[0];
+
+  // If the operand already has a layout, we don't do anything. The result
+  // will already have the layout desired by this operation.
+  if (input->hasLayout()) {
+    return;
+  }
+
+  // Enforce the result layout on init.
+  ChangeResult changed = input->resolve(toLayout.getLayout());
+  update(input, changed);
+}
 
 static void enforceLayoutToElementwiseOp(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
@@ -683,6 +731,10 @@ void enforcementTransferFunction(
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
 
+  if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
+    enforceLayoutToLayoutOp(toLayout, operandLattices, resultLattices, update);
+  }
+
   // Propagate layout to elementwise operations.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
     enforceLayoutToElementwiseOp(op, operandLattices, resultLattices, update);
@@ -719,12 +771,14 @@ void enforcementTransferFunction(
 /// ==========================================================================
 
 LogicalResult PropagateLayout::initialize(Operation *root) {
-  // Set layout for anchor ops.
-  for (auto [val, layout] : anchors) {
-    DistributionLayout *latticeEl = getLatticeElement(val);
-    ChangeResult changed = latticeEl->resolve(layout);
+  // Initialize/set anchor layouts.
+  root->walk([&](IREE::VectorExt::ToLayoutOp toLayout) {
+    Value anchorVal = toLayout.getResult();
+    DistributionLayout *latticeEl = getLatticeElement(anchorVal);
+    ChangeResult changed =
+        latticeEl->resolve(toLayout.getLayout(), /*force=*/true);
     propagateIfChanged(latticeEl, changed);
-  }
+  });
 
   root->walk([&](Operation *traversed) { visitOperation(traversed); });
 
@@ -974,23 +1028,12 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
 ///        VectorLayoutAnalysis
 /// ==========================================================================
 
-LogicalResult VectorLayoutAnalysis::setAnchor(Value val,
-                                              VectorLayoutInterface layout) {
-  auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
-  assert(typedVal && "expected value to be a vector type");
-  if (layout.isValidLayout(typedVal).failed()) {
-    return failure();
-  }
-  anchors[typedVal] = cast<VectorLayoutInterface>(layout);
-  return success();
-}
-
 LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
   // propagation.
+  solver.load<PropagateLayout>(root->getContext());
   solver.load<EnforceLayout>(root->getContext());
-  solver.load<PropagateLayout>(anchors, root->getContext());
   return solver.initializeAndRun(root);
 }
 
@@ -1015,9 +1058,9 @@ void VectorLayoutAnalysis::debugAnnotateLayouts() {
         continue;
       }
 
-      // Do not annotate resolve_conflict operations since they already have
+      // Do not annotate to_layout operations since they already have
       // this information in their attributes.
-      if (isa<IREE::VectorExt::LayoutConflictResolutionOp>(op)) {
+      if (isa<IREE::VectorExt::ToLayoutOp>(op)) {
         continue;
       }
 
@@ -1040,54 +1083,3 @@ void VectorLayoutAnalysis::dump() {
   print(llvm::dbgs());
   llvm::dbgs() << "\n";
 }
-
-namespace mlir::iree_compiler {
-
-LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                         Operation *root) {
-  WalkResult result = root->walk([&](Operation *op) {
-    for (NamedAttribute attr : op->getAttrs()) {
-      StringRef name = attr.getName().strref();
-      if (name.contains("__vector_layout_test_anchor_operand_")) {
-        int operandNum;
-        name.substr(name.find_last_of("_") + 1)
-            .getAsInteger(/*Radix=*/10, operandNum);
-        if (operandNum >= op->getNumOperands()) {
-          op->emitError("Operand number for anchor is out of range");
-          return WalkResult::interrupt();
-        }
-        auto layout = dyn_cast<VectorLayoutInterface>(attr.getValue());
-        if (!layout) {
-          op->emitError("Anchor should implement VectorLayoutInteface");
-        }
-        if (analysis.setAnchor(op->getOperand(operandNum), layout).failed()) {
-          return WalkResult::interrupt();
-        }
-      }
-      if (name.contains("__vector_layout_test_anchor_result_")) {
-        int resultNum;
-        name.substr(name.find_last_of("_") + 1)
-            .getAsInteger(/*Radix=*/10, resultNum);
-        if (resultNum >= op->getNumResults()) {
-          op->emitError("Result number for anchor is out of range");
-          return WalkResult::interrupt();
-        }
-        auto layout = dyn_cast<VectorLayoutInterface>(attr.getValue());
-        if (!layout) {
-          op->emitError("Anchor should implement VectorLayoutInteface");
-        }
-        if (analysis.setAnchor(op->getResult(resultNum), layout).failed()) {
-          return WalkResult::interrupt();
-        }
-      }
-    }
-    return WalkResult::advance();
-  });
-
-  if (result.wasInterrupted()) {
-    return failure();
-  }
-  return success();
-}
-
-} // namespace mlir::iree_compiler

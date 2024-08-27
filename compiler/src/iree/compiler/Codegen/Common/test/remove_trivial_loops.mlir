@@ -206,11 +206,11 @@ hal.executable private @simple_mul {
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) : memref<4xf32>
         memref.assume_alignment %0, 64 : memref<4xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<4xf32>
         memref.assume_alignment %1, 64 : memref<4xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0) : memref<4xf32>
         memref.assume_alignment %2, 64 : memref<4xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index

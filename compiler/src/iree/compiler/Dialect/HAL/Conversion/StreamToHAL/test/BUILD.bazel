@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "channel_ops.mlir",
+            "cmd_dispatch2_ops.mlir",
             "cmd_ops.mlir",
             "context_ops.mlir",
             "debug_ops.mlir",

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -21,10 +20,13 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_SPIRVERASESTORAGEBUFFERSTATICSHAPEPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
+
 namespace {
 
 class EraseStorageBufferStaticShapePass final
-    : public SPIRVEraseStorageBufferStaticShapeBase<
+    : public impl::SPIRVEraseStorageBufferStaticShapePassBase<
           EraseStorageBufferStaticShapePass> {
   void runOnOperation() override;
 };
@@ -48,14 +50,16 @@ bool is1DStaticShapedStorageBuffer(
 /// e.g.,
 ///
 /// ```mlir
-///  hal.interface.binding.subspan set(0) binding(0) offset(%offset)
+///  hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0)
+///  offset(%offset)
 ///      : memref<16xf32>
 /// ```
 ///
 /// is re-written to
 ///
 /// ```mlir
-///  hal.interface.binding.subspan set(0) binding(0) offset(%offset)
+///  hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0)
+///  offset(%offset)
 ///      : memref<?xf32>{%c16}
 /// ```
 IREE::HAL::InterfaceBindingSubspanOp
@@ -82,8 +86,8 @@ rewriteStorageBufferSubspanOp(RewriterBase &rewriter,
       subspanOp.getLoc(), oldType.getNumElements()));
 
   auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp.getLoc(), newType, subspanOp.getSetAttr(),
-      subspanOp.getBindingAttr(), subspanOp.getDescriptorTypeAttr(),
+      subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
+      subspanOp.getSetAttr(), subspanOp.getBindingAttr(),
       subspanOp.getByteOffset(), dynamicDims, subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
 
@@ -125,11 +129,6 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
       return signalPassFailure();
     }
   }
-}
-
-std::unique_ptr<mlir::InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVEraseStorageBufferStaticShapePass() {
-  return std::make_unique<EraseStorageBufferStaticShapePass>();
 }
 
 } // namespace mlir::iree_compiler

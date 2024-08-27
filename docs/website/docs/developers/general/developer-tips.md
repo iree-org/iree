@@ -463,19 +463,24 @@ graph LR
 
     | Phase name | Description |
     | ---------- | ----------- |
+    `start` | Entry point to the compilation pipeline
     `input` | Performs input processing and lowering into core IREE input dialects (linalg/etc)
     `abi` | Adjusts the program ABI for the specified execution environment
     `preprocessing` | Applies customizable `preprocessing` prior to FLow/Stream/HAL/VM
+    `global-optimization` | Performs global program optimization
+    `dispatch-creation` | Fuses operations and forms dispatch regions
     `flow` | Models execution data flow and partitioning using the `flow` dialect
     `stream` | Models execution partitioning and scheduling using the `stream` dialect
     `executable-sources` | Prepares `hal` dialect executables for translation, prior to codegen
+    `executable-configurations` | Selects translation strategies for code generation
     `executable-targets` | Runs code generation for `hal` dialect executables
     `hal` | Finishes `hal` dialect processing
     `vm` | Lowers to IREE's abstract virtual machine using the `vm` dialect
     `end` | Completes the full compilation pipeline
 
-    For an accurate list of phases, see the source code or check the help output
-    with a command such as:
+    For an accurate list of phases, see
+    [the source code](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Pipelines/Pipelines.h)
+    or check the help output with a command such as:
 
     ```shell
     iree-compile --help | sed -n '/--compile-to/,/--/p' | head -n -1
@@ -550,13 +555,14 @@ simple_abs.1.input.mlir
 simple_abs.2.abi.mlir
 simple_abs.3.preprocessing.mlir
 simple_abs.4.global-optimization.mlir
-simple_abs.5.flow.mlir
-simple_abs.6.stream.mlir
-simple_abs.7.executable-sources.mlir
-simple_abs.8.executable-configurations.mlir
-simple_abs.9.executable-targets.mlir
-simple_abs.10.hal.mlir
-simple_abs.11.vm.mlir
+simple_abs.5.dispatch-creation.mlir
+simple_abs.6.flow.mlir
+simple_abs.7.stream.mlir
+simple_abs.8.executable-sources.mlir
+simple_abs.9.executable-configurations.mlir
+simple_abs.10.executable-targets.mlir
+simple_abs.11.hal.mlir
+simple_abs.12.vm.mlir
 ```
 
 As with `--compile-to`, these files can be used together with `--compile-from`:

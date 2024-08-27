@@ -302,6 +302,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
           .linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT,
           .ordinal = executable->entry_fn_ordinals[i],
       };
+
       iree_string_view_t local_memory_str =
           iree_vm_function_lookup_attr_by_name(
               &entry_fn, iree_make_cstring_view("local_memory"));
@@ -309,8 +310,26 @@ static iree_status_t iree_hal_vmvx_executable_create(
       if (!iree_string_view_is_empty(local_memory_str)) {
         iree_string_view_atoi_uint32(local_memory_str, &local_memory_size);
       }
-      local_memory_size /= IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE;
+      local_memory_size /= IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE;
       dispatch_attrs[i].local_memory_pages = (uint16_t)local_memory_size;
+
+      iree_string_view_t constant_count_str =
+          iree_vm_function_lookup_attr_by_name(
+              &entry_fn, iree_make_cstring_view("constant_count"));
+      uint32_t constant_count = 0;
+      if (!iree_string_view_is_empty(constant_count_str)) {
+        iree_string_view_atoi_uint32(constant_count_str, &constant_count);
+      }
+      dispatch_attrs[i].constant_count = (uint8_t)constant_count;
+
+      iree_string_view_t binding_count_str =
+          iree_vm_function_lookup_attr_by_name(
+              &entry_fn, iree_make_cstring_view("binding_count"));
+      uint32_t binding_count = 0;
+      if (!iree_string_view_is_empty(binding_count_str)) {
+        iree_string_view_atoi_uint32(binding_count_str, &binding_count);
+      }
+      dispatch_attrs[i].binding_count = (uint8_t)binding_count;
     }
   }
 

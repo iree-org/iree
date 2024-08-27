@@ -28,6 +28,7 @@ enum class IREEVMPipelinePhase {
   ABI,
   Preprocessing,
   GlobalOptimization,
+  DispatchCreation,
   Flow,
   Stream,
   ExecutableSources,
@@ -53,6 +54,8 @@ inline static void enumerateIREEVMPipelinePhases(
            "Compiles up to the `preprocessing` specified");
   callback(IREEVMPipelinePhase::GlobalOptimization, "global-optimization",
            "Compiles up to global optimization.");
+  callback(IREEVMPipelinePhase::DispatchCreation, "dispatch-creation",
+           "Compiles up to dispatch creation.");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
@@ -102,7 +105,7 @@ void buildIREEPrecompileTransformPassPipeline(
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions halTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
     IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::GlobalOptimization);
@@ -118,8 +121,8 @@ void buildIREEVMTransformPassPipeline(
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions halTargetOptions,
+    IREE::VM::TargetOptions vmTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
     IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);

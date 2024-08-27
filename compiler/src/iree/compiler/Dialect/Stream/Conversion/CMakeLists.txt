@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::IR
   PUBLIC
 )

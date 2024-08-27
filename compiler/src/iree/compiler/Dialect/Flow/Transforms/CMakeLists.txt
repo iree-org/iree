@@ -25,50 +25,31 @@ iree_cc_library(
   HDRS
     "ConvertRegionToWorkgroups.h"
     "FormDispatchRegions.h"
-    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
   SRCS
     "AnnotateDispatches.cpp"
-    "BubbleUpExpandShapes.cpp"
     "Canonicalizer.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
-    "CloneProducersIntoDispatchRegions.cpp"
-    "CollapseDimensions.cpp"
-    "CollapseReductionDimensions.cpp"
-    "ConvertDispatchRegionsToWorkgroups.cpp"
     "ConvertMeshToFlow.cpp"
     "ConvertRegionToWorkgroups.cpp"
-    "ConvertTensorToFlow.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
-    "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
-    "ElementwiseOpFusion.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
-    "FormScalarDispatches.cpp"
-    "FuseMultiUseElementwiseProducer.cpp"
-    "FusionPreprocessing.cpp"
-    "FusionUtils.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
-    "MaterializeDefaultWorkgroupCountRegion.cpp"
     "OutlineConstants.cpp"
     "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
     "Passes.cpp"
     "RegionOpUtils.cpp"
-    "SinkReshapes.cpp"
-    "SplitReduction.cpp"
-    "TensorPadToTensorInsertSlice.cpp"
     "TopLevelSCFToCFG.cpp"
-    "TransposeGenericOps.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -92,8 +73,6 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRMeshDialect
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRSCFDialect
@@ -104,10 +83,9 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTosaDialect
-    MLIRTransformDialect
-    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::Conversion::MeshToFlow
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

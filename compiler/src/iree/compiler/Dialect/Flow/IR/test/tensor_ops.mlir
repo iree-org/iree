@@ -7,12 +7,16 @@ util.func public @tensorReshape(%arg0 : tensor<4x4xf32>) -> tensor<16xf32> {
   util.return %0 : tensor<16xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @tensorReshapeScalar
 util.func public @tensorReshapeScalar(%arg0 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<f32>
   %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<f32>
   util.return %0 : tensor<f32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorReshapeDynamic
 util.func public @tensorReshapeDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x2xf32> {
@@ -22,6 +26,8 @@ util.func public @tensorReshapeDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x2xf3
   %0 = flow.tensor.reshape %arg0 : tensor<?x4xf32>{%c4} -> tensor<?x2xf32>{%c8}
   util.return %0 : tensor<?x2xf32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorReshapeComplex
 util.func public @tensorReshapeComplex(%arg0 : tensor<4x4xcomplex<f32>>) -> tensor<16xcomplex<f32>> {
@@ -48,12 +54,16 @@ util.func public @tensorLoad(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : ind
   util.return %0 : f32
 }
 
+// -----
+
 // CHECK-LABEL: @tensorLoadScalar
 util.func public @tensorLoadScalar(%arg0 : tensor<f32>) -> f32 {
   // CHECK-NEXT: %0 = flow.tensor.load %arg0 : tensor<f32>
   %0 = flow.tensor.load %arg0 : tensor<f32>
   util.return %0 : f32
 }
+
+// -----
 
 // CHECK-LABEL: @tensorLoadDynamic
 util.func public @tensorLoadDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : index) -> f32 {
@@ -72,12 +82,16 @@ util.func public @tensorStore(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : in
   util.return %0 : tensor<4x4xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @tensorStoreScalar
 util.func public @tensorStoreScalar(%arg0 : f32, %arg1 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: %0 = flow.tensor.store %arg0, %arg1 : tensor<f32>
   %0 = flow.tensor.store %arg0, %arg1 : tensor<f32>
   util.return %0 : tensor<f32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorStoreDynamic
 util.func public @tensorStoreDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : index, %arg3 : f32) -> tensor<?x4xf32> {
@@ -114,12 +128,16 @@ util.func public @tensorSplat(%arg0 : f32) -> tensor<4x4xf32> {
   util.return %0 : tensor<4x4xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @tensorSplatScalar
 util.func public @tensorSplatScalar(%arg0 : f32) -> tensor<f32> {
   // CHECK-NEXT: %0 = flow.tensor.splat %arg0 : tensor<f32>
   %0 = flow.tensor.splat %arg0 : tensor<f32>
   util.return %0 : tensor<f32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorSplatDynamic
 util.func public @tensorSplatDynamic(%arg0 : f32) -> tensor<?x4xf32> {
@@ -138,12 +156,25 @@ util.func public @tensorClone(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   util.return %0 : tensor<4x4xf32>
 }
 
+// -----
+
+// CHECK-LABEL: @tensorTransfer
+util.func public @tensorTransfer(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-NEXT: %0 = flow.tensor.transfer %arg0 : tensor<4x4xf32> to "dummy"
+  %0 = flow.tensor.transfer %arg0 : tensor<4x4xf32> to "dummy"
+  util.return %0 : tensor<4x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorCloneScalar
 util.func public @tensorCloneScalar(%arg0 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: %0 = flow.tensor.clone %arg0 : tensor<f32>
   %0 = flow.tensor.clone %arg0 : tensor<f32>
   util.return %0 : tensor<f32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorCloneDynamic
 util.func public @tensorCloneDynamic(%arg0 : tensor<?x4xf32>) -> tensor<?x4xf32> {
@@ -162,6 +193,8 @@ util.func public @tensorSlice(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : in
   util.return %0 : tensor<2x2xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @tensorSliceDynamic
 util.func public @tensorSliceDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : index) -> tensor<?x2xf32> {
   %c2 = arith.constant 2 : index
@@ -179,6 +212,8 @@ util.func public @tensorUpdate(%arg0 : tensor<2x2xf32>, %arg1 : tensor<4x4xf32>,
   %0 = flow.tensor.update %arg0, %arg1[%arg2, %arg3] : tensor<2x2xf32> -> %arg1 as tensor<4x4xf32>
   util.return %0 : tensor<4x4xf32>
 }
+
+// -----
 
 // CHECK-LABEL: @tensorUpdateDynamic
 util.func public @tensorUpdateDynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x4xf32>, %arg2 : index, %arg3 : index) -> tensor<?x4xf32> {

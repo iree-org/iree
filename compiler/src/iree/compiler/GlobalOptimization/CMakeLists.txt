@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -50,7 +49,6 @@ iree_cc_library(
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "FuseDequantizationMatmul.cpp"
-    "FuseHorizontalContractions.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
@@ -59,9 +57,10 @@ iree_cc_library(
     "OptimizeNumerics.cpp"
     "Passes.cpp"
     "PropagateLinalgTranspose.cpp"
+    "QuantizedConvToConv.cpp"
+    "QuantizedMatmulToMatmul.cpp"
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
-    "SetEncoding.cpp"
     "SimplifyPackUnpack.cpp"
     "Utils.cpp"
   DEPS
@@ -93,11 +92,11 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
-    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::LinalgExt::IR
@@ -108,6 +107,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::DispatchCreation
     iree::compiler::Modules::IO::Parameters::Transforms
     iree::compiler::Pipelines::Options
     iree::compiler::Utils

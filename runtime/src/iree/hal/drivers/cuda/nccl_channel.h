@@ -12,8 +12,8 @@
 #include "iree/hal/drivers/cuda/api.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/nccl_dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/collective_batch.h"
+#include "iree/hal/utils/stream_tracing.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,8 +48,8 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
 // Note that operations in the batch may apply to different channels.
 iree_status_t iree_hal_cuda_nccl_submit_batch(
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols,
-    iree_hal_cuda_tracing_context_t* tracing_context,
-    iree_hal_cuda_tracing_context_event_list_t* tracing_event_list,
+    iree_hal_stream_tracing_context_t* tracing_context,
+    iree_hal_stream_tracing_context_event_list_t* tracing_event_list,
     const iree_hal_collective_batch_t* batch, CUstream stream);
 
 #ifdef __cplusplus

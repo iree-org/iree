@@ -18,7 +18,7 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK:        %[[D3:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-SAME:     "parallel", "reduction"]} ins(%[[ARG0]] : tensor<2x16x32xf32>) outs(%[[D2]] : tensor<2x16xf32>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:          %[[D8:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
+// CHECK:          %[[D8:.+]] = arith.maxnumf %[[IN]], %[[OUT]] : f32
 // CHECK:          linalg.yield %[[D8]] : f32
 // CHECK:        } -> tensor<2x16xf32>
 // CHECK:        %[[CST0:.+]] = arith.constant 0.0
@@ -54,7 +54,7 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK-NO-FUSE:        %[[D3:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-NO-FUSE-SAME:     "parallel", "reduction"]} ins(%[[ARG0]] : tensor<2x16x32xf32>) outs(%[[D2]] : tensor<2x16xf32>) {
 // CHECK-NO-FUSE:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK-NO-FUSE:          %[[D8:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
+// CHECK-NO-FUSE:          %[[D8:.+]] = arith.maxnumf %[[IN]], %[[OUT]] : f32
 // CHECK-NO-FUSE:          linalg.yield %[[D8]] : f32
 // CHECK-NO-FUSE:        } -> tensor<2x16xf32>
 // CHECK-NO-FUSE:        %[[D4:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP]]], iterator_types = ["parallel",

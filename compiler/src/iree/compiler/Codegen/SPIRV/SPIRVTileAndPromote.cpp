@@ -15,7 +15,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -36,6 +35,9 @@
 #define DEBUG_TYPE "iree-spirv-tile-and-promote"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_SPIRVTILEANDPROMOTEPASS
+#include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 //====---------------------------------------------------------------------===//
 // Reduction tiling patterns
@@ -107,24 +109,13 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
 namespace {
 
 class SPIRVTileAndPromotePass final
-    : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
+    : public impl::SPIRVTileAndPromotePassBase<SPIRVTileAndPromotePass> {
 public:
-  SPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel)
-      : promoteCMatrix(promoteCMatrix), skipThreadLevel(skipThreadLevel) {}
+  using impl::SPIRVTileAndPromotePassBase<
+      SPIRVTileAndPromotePass>::SPIRVTileAndPromotePassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
-  }
-
-  LogicalResult initializeOptions(
-      StringRef options,
-      function_ref<LogicalResult(const Twine &)> errorHandler) override {
-    if (failed(Pass::initializeOptions(options, errorHandler)))
-      return failure();
-    // Consider pass option too
-    promoteCMatrix |= this->promoteC;
-    skipThreadLevel |= this->skipThread;
-    return success();
   }
 
   void runOnOperation() override;
@@ -133,11 +124,6 @@ private:
   /// Promotes C matrix to shared memory when necessary and returns success if
   /// no error happens.
   LogicalResult doPromoteCMatrix(mlir::FunctionOpInterface funcOp) const;
-
-  // Whether to promote C matrix to use shared memory.
-  bool promoteCMatrix = false;
-  // Whether to skip thread level tiling and distribution.
-  bool skipThreadLevel = false;
 };
 
 } // namespace
@@ -199,8 +185,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  std::optional<int> subgroupSize =
-      getGPUSubgroupSize(funcOp, /*pickLargest=*/true);
+  std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
   if (!subgroupSize) {
     funcOp.emitError("failed to query subgroup size");
     return signalPassFailure();
@@ -350,12 +335,6 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
     llvm::dbgs() << "\n\n";
   });
   return success();
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel) {
-  return std::make_unique<SPIRVTileAndPromotePass>(promoteCMatrix,
-                                                   skipThreadLevel);
 }
 
 } // namespace mlir::iree_compiler

@@ -23,7 +23,8 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRTransforms
-    iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::DispatchCreation
     iree::compiler::GlobalOptimization
     iree::compiler::Pipelines::Options
     iree::compiler::PluginAPI

@@ -36,10 +36,14 @@ IREE_FLAG(
     "Enables HIP asynchronous stream-ordered allocations when supported.");
 
 IREE_FLAG(
-    bool, hip_tracing, true,
-    "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
-    "Severely impacts benchmark timings and should only be used when\n"
-    "analyzing dispatch timings.");
+    int32_t, hip_tracing, 2,
+    "Controls the verbosity of tracing when Tracy instrumentation is enabled.\n"
+    "The impact to benchmark timing becomes more severe as the verbosity\n"
+    "increases, and thus should be only enabled when needed.\n"
+    "Permissible values are:\n"
+    "   0 : stream tracing disabled.\n"
+    "   1 : coarse command buffer level tracing enabled.\n"
+    "   2 : fine-grained kernel level tracing enabled.\n");
 
 IREE_FLAG(int32_t, hip_default_index, 0,
           "Specifies the index of the default HIP device to use");
@@ -152,10 +156,9 @@ static iree_status_t iree_hal_hip_driver_populate_options(
             "Option 'hip_use_streams' expected to be int. Got: '%.*s'",
             (int)value.size, value.data);
       }
-      if (ivalue) {
-        device_params->command_buffer_mode =
-            IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
-      }
+      device_params->command_buffer_mode =
+          ivalue ? IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM
+                 : IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
     } else if (iree_string_view_equal(key, key_hip_allow_inline_execution)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
         return iree_make_status(
@@ -182,7 +185,7 @@ static iree_status_t iree_hal_hip_driver_populate_options(
             "Option 'hip_tracing' expected to be int. Got: '%.*s'",
             (int)value.size, value.data);
       }
-      device_params->stream_tracing = ivalue ? true : false;
+      device_params->stream_tracing = ivalue;
     } else if (iree_string_view_equal(key, key_hip_default_index)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
         return iree_make_status(

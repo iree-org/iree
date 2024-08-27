@@ -31,6 +31,10 @@ struct Global {
   // currently have any input programs that require doing so.
   bool isIndirect = false;
 
+  // True if all stores to the global are performed within initializers or calls
+  // only reachable from initializers.
+  bool onlyInitialized = false;
+
   // All util.global.load ops referencing the global.
   SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps;
   // All util.global.store ops referencing the global.
@@ -81,11 +85,19 @@ enum class GlobalAction {
 // A constructed table of analyzed globals in a module with some utilities for
 // manipulating them. This is designed for simple uses and more advanced
 // analysis should be performed with an Explorer or DFX.
+//
+// The global table is not built on creation and `rebuild` must be called before
+// querying it.
 struct GlobalTable {
   GlobalTable() = delete;
   explicit GlobalTable(mlir::ModuleOp moduleOp);
 
   MLIRContext *getContext() { return moduleOp.getContext(); }
+
+  // Rebuilds the global table.
+  // Must be called if the table is to be used after any globals or operations
+  // on globals have changed.
+  void rebuild();
 
   // Total number of globals in the module.
   size_t size() const { return globalOrder.size(); }
@@ -114,10 +126,13 @@ struct GlobalTable {
   void eraseGlobal(StringRef globalName);
 
 private:
-  void rebuild();
-
   // Module under analysis.
   mlir::ModuleOp moduleOp;
+
+  // Top-level callables that are externally reachable.
+  // Excludes initializers or any callable only reachable from initializers.
+  DenseSet<Operation *> externallyReachableOps;
+
   // All globals in the order they are declared by symbol name.
   SmallVector<StringRef> globalOrder;
   // A map of global symbol names to analysis results.

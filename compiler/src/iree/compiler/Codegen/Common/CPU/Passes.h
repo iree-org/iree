@@ -13,49 +13,28 @@
 #define IREE_COMPILER_CODEGEN_COMMON_CPU_PASSES_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
 
-/// Convert encoding-specific operations based on target attributes. Examples:
-///   encoding.set_encoding   -> tensor.pack
-///   encoding.unset_encoding -> tensor.unpack
-///   linalg.matmul             -> linalg.mmt4d
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeEncodingPass(
-    IREE::HAL::ExecutableTargetAttr targetAttr = nullptr);
+//------------------------------------------------------------------------------
+// Wrappers that not use tablegen options.
+//------------------------------------------------------------------------------
 
-/// Like createLLVMCPUMaterializeEncodingPass, but specifically for
-/// encoding.upper_bound_tile_size, converting it to constants.
-///
-/// Unlike createLLVMCPUMaterializeEncodingPass, this does not require the
-/// op to have a specific HAL target attribute. Instead, this will iterate over
-/// all HAL target attributes, use the maximum of all padding sizes from each
-/// target. This is needed because in top-level functions outside of HAL
-/// executables, there are upper_bound_tile_size ops (created by SetEncoding,
-/// and computing buffer allocation sizes) and there isn't one specific HAL
-/// target.
-///
-/// In the VMVX case where padding sizes are not compile-time constants, this
-/// converts upper_bound_tile_size to some specific constant size (currently 16)
-/// that is the largest tile size that we can use in VMVX, and can be adjusted
-// as needed.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeUpperBoundTileSizePass(
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs = {});
+std::unique_ptr<OperationPass<>>
+createCPULowerToUKernelsPass(bool skipIntermediateRoundings);
 
 /// Adds CPU bufferization passes to the pipeline.
 void addCPUBufferizePasses(OpPassManager &funcPassManager);
 
-/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
-/// operation.
-std::unique_ptr<OperationPass<>>
-createCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
+//----------------------------------------------------------------------------//
+// Register Common CPU Passes
+//----------------------------------------------------------------------------//
 
-/// Pass to decompose batch_mmt4d/pack/etc to fit ukernel requirements.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createCPUPrepareUkernelsPass();
+#define GEN_PASS_DECL
+#include "iree/compiler/Codegen/Common/CPU/Passes.h.inc" // IWYU pragma: keep
 
 void registerCodegenCommonCPUPasses();
 

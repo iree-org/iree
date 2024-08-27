@@ -33,7 +33,9 @@ namespace {
 // Emplacement
 //===----------------------------------------------------------------------===//
 
-static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
+static void
+replaceUsesAndTransfer(Value oldValue, Value newValue,
+                       IREE::Stream::AffinityAttr usageAffinityAttr) {
   assert(isa<IREE::Stream::ResourceType>(oldValue.getType()));
   assert(isa<IREE::Stream::ResourceType>(newValue.getType()));
   if (oldValue.getType() == newValue.getType()) {
@@ -44,8 +46,8 @@ static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
   builder.setInsertionPointAfterValue(newValue);
   Value newValueSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
       newValue.getLoc(), newValue, builder);
-  IREE::Stream::AffinityAttr sourceAffinity;
-  IREE::Stream::AffinityAttr resultAffinity;
+  IREE::Stream::AffinityAttr sourceAffinity = usageAffinityAttr;
+  IREE::Stream::AffinityAttr resultAffinity = usageAffinityAttr;
   Value transferValue = builder.create<IREE::Stream::AsyncTransferOp>(
       newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
       newValueSize, sourceAffinity, resultAffinity);
@@ -59,6 +61,8 @@ static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
 // first we can't then bail and leave them out-of-place.
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
+  // Collect the Update ops and their corresponding resultIndex.
+  SmallVector<std::tuple<IREE::Stream::AsyncUpdateOp, int>> updateOpDataVec;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
     // Ignore results with multiple users. We could potentially place these but
     // that makes tracking much more complicated.
@@ -74,55 +78,69 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
       break;
     }
 
-    // Find potential.
-    Value targetResource;
-    Value targetResourceSize;
-    Value targetOffset;
-    Value targetEnd;
-    Value targetLength;
-    Value targetResult;
-    Value targetResultSize;
+    // Find potential update to place the dispatch result into.
     Operation *userOp = *result.user_begin();
-    if (auto updateOp = dyn_cast<IREE::Stream::AsyncUpdateOp>(userOp)) {
-      if (updateOp.getUpdate() != result) {
-        // TODO(#14566): continue if sparse emplacement on multiple results.
-        break;
-      }
-      if (!IREE::Util::tryMoveProducerBefore(updateOp.getUpdateSize(),
-                                             dispatchOp) ||
-          !IREE::Util::tryMoveProducerBefore(updateOp.getTargetSize(),
-                                             dispatchOp) ||
-          !IREE::Util::tryMoveProducerBefore(updateOp.getTargetOffset(),
-                                             dispatchOp) ||
-          !IREE::Util::tryMoveProducerBefore(updateOp.getTargetEnd(),
-                                             dispatchOp) ||
-          !IREE::Util::tryMoveProducerBefore(updateOp.getTarget(),
-                                             dispatchOp)) {
-        // Failed to move while keeping valid SSA dominance.
-        // TODO(#14566): continue if sparse emplacement on multiple results.
-        break;
-      }
-      targetResource = updateOp.getTarget();
-      if (targetResource.getDefiningOp() == dispatchOp) {
-        // NOTE: we may have already replaced the update target with one of our
-        // results - if so we need to find the operand to capture tied to that
-        // new result instead of our own new result (which would make a cycle).
-        targetResource = dispatchOp.getTiedResultOperand(targetResource);
-      }
-      targetResourceSize = updateOp.getTargetSize();
-      targetOffset = updateOp.getTargetOffset();
-      targetEnd = updateOp.getTargetEnd();
-      targetLength = updateOp.getUpdateSize();
-      targetResult = updateOp.getResult();
-      targetResultSize = updateOp.getTargetSize();
+    auto updateOp = dyn_cast_or_null<IREE::Stream::AsyncUpdateOp>(userOp);
+    if (!updateOp)
+      break;
+    if (updateOp.getUpdate() != result) {
+      // TODO(#14566): continue if sparse emplacement on multiple results.
+      break;
+    }
+
+    // Currently only allow exactly matching affinities.
+    // TODO(multi-device): memory compatibility - if compatible then allow.
+    if (updateOp.getAffinityAttr() != dispatchOp.getAffinityAttr()) {
+      continue;
+    }
+    updateOpDataVec.emplace_back(updateOp, resultIndex);
+  }
+  // Sort the update ops in block order so that we dont accidentally move them
+  // above the dispatch op in the next section which will cause a dominance
+  // issue.
+  llvm::sort(updateOpDataVec, [&](const auto &a, const auto &b) {
+    return std::get<0>(a)->isBeforeInBlock(std::get<0>(b));
+  });
+  for (auto updateOpData : updateOpDataVec) {
+    int resultIndex;
+    IREE::Stream::AsyncUpdateOp updateOp;
+    std::tie(updateOp, resultIndex) = updateOpData;
+    Value targetResource = updateOp.getTarget();
+    if (targetResource.getDefiningOp() == dispatchOp) {
+      // NOTE: we may have already replaced the update target with one of our
+      // results - if so we need to find the operand to capture tied to that
+      // new result instead of our own new result (which would make a cycle).
+      targetResource = dispatchOp.getTiedResultOperand(targetResource);
     }
     if (!targetResource) {
       // TODO(#14566): continue if sparse emplacement on multiple results.
       break;
     }
+    Value targetResourceSize = updateOp.getTargetSize();
+    Value targetOffset = updateOp.getTargetOffset();
+    Value targetEnd = updateOp.getTargetEnd();
+    Value targetLength = updateOp.getUpdateSize();
+    Value targetResult = updateOp.getResult();
+    Value targetResultSize = updateOp.getTargetSize();
+
+    // Try to move all SSA values required into the appropriate place.
+    // TODO(benvanik): undo this if there's a failure (or record/roll-back).
+    if (!IREE::Util::tryMoveProducerBefore(updateOp.getUpdateSize(),
+                                           dispatchOp) ||
+        !IREE::Util::tryMoveProducerBefore(updateOp.getTargetSize(),
+                                           dispatchOp) ||
+        !IREE::Util::tryMoveProducerBefore(updateOp.getTargetOffset(),
+                                           dispatchOp) ||
+        !IREE::Util::tryMoveProducerBefore(updateOp.getTargetEnd(),
+                                           dispatchOp) ||
+        !IREE::Util::tryMoveProducerBefore(updateOp.getTarget(), dispatchOp)) {
+      // Failed to move while keeping valid SSA dominance.
+      // TODO(#14566): continue if sparse emplacement on multiple results.
+      break;
+    }
 
     // Add operand and tie the result.
-    operandIndex = dispatchOp.getResourceOperands().size();
+    auto operandIndex = dispatchOp.getResourceOperands().size();
     dispatchOp.getResourceOperandsMutable().append(targetResource);
     dispatchOp.getResourceOperandSizesMutable().append(targetResourceSize);
     dispatchOp.getResourceOperandOffsetsMutable().append(targetOffset);
@@ -136,8 +154,9 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     dispatchOp.getResultSizesMutable().assign(resultSizes);
 
     // Replace users with the result of the dispatch op.
-    replaceUsesAndTransfer(targetResult, result);
-    userOp->erase();
+    replaceUsesAndTransfer(targetResult, updateOp.getUpdate(),
+                           dispatchOp.getAffinityAttr());
+    updateOp->erase();
 
     didChange = true;
   }

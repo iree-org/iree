@@ -51,6 +51,7 @@ iree_lit_test_suite(
     "select_x86_64_lowering_strategy.mlir"
     "split_reduction.mlir"
     "synchronize_symbol_visibility.mlir"
+    "tile-root-fuse-consumer-producer.mlir"
     "tile.mlir"
     "tile_and_fuse.mlir"
     "transform_dialect_bufferize.mlir"

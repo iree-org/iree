@@ -209,6 +209,61 @@ util.func public @uniform_result_caller(%arg0: i1) -> index {
 
 // -----
 
+// Tests that uniform args that come from immutable globals are inlined into
+// callees.
+
+util.global private @global : index
+
+// CHECK-LABEL: util.func private @immutable_global_arg_callee
+// CHECK-SAME: () -> index
+util.func private @immutable_global_arg_callee(%arg0: index) -> index {
+  // CHECK: %[[GLOBAL_VALUE:.+]] = util.global.load immutable @global
+  // CHECK: %[[ADD:.+]] = arith.addi %[[GLOBAL_VALUE]], %[[GLOBAL_VALUE]]
+  %add = arith.addi %arg0, %arg0 : index
+  // CHECK: util.return %[[ADD]]
+  util.return %add : index
+}
+
+// CHECK: util.func public @immutable_global_arg_caller
+util.func public @immutable_global_arg_caller() -> index {
+  %global_value = util.global.load immutable @global : index
+  // CHECK: %[[RET:.+]] = util.call @immutable_global_arg_callee() : () -> index
+  %ret = util.call @immutable_global_arg_callee(%global_value) : (index) -> index
+  // CHECK: util.return %[[RET]]
+  util.return %ret : index
+}
+
+// -----
+
+// Tests that uniformly results that are immutable global loads get inlined into
+// callers.
+
+util.global private @global : index
+
+// CHECK-LABEL: util.func private @immutable_global_result_callee
+// CHECK-SAME: (%[[ARG0:.+]]: i1)
+util.func private @immutable_global_result_callee(%arg0: i1) -> index {
+  %global_value = util.global.load immutable @global : index
+  cf.cond_br %arg0, ^bb1, ^bb2
+^bb1:
+  // CHECK: util.return
+  util.return %global_value : index
+^bb2:
+  // CHECK: util.return
+  util.return %global_value : index
+}
+
+// CHECK: util.func public @immutable_global_result_caller(%[[ARG0:.+]]: i1)
+util.func public @immutable_global_result_caller(%arg0: i1) -> index {
+  // CHECK: call @immutable_global_result_callee(%[[ARG0]]) : (i1) -> ()
+  %ret0 = util.call @immutable_global_result_callee(%arg0) : (i1) -> index
+  // CHECK: %[[GLOBAL_VALUE:.+]] = util.global.load immutable @global
+  // CHECK: util.return %[[GLOBAL_VALUE]]
+  util.return %ret0 : index
+}
+
+// -----
+
 // Tests that uniformly duplicate constant results get combined/inlined.
 
 // CHECK-LABEL: util.func private @dupe_constant_result_callee
@@ -414,14 +469,33 @@ util.func public @nonuniform_result_caller(%arg0: i1) -> index {
 
 // CHECK-LABEL: util.func private @passthrough_callee() {
 util.func private @passthrough_callee(%arg0: index) -> index {
+  // Prevent DCE.
+  arith.constant 4 : index
   // CHECK: util.return
   util.return %arg0 : index
 }
 
 // CHECK: util.func public @passthrough_caller(%[[ARG0:.+]]: index)
 util.func public @passthrough_caller(%arg0: index) -> index {
-  // CHECK: call @passthrough_callee() : () -> ()
+  // CHECK: util.call @passthrough_callee() : () -> ()
   %ret0 = util.call @passthrough_callee(%arg0) : (index) -> index
+  // CHECK: util.return %[[ARG0]]
+  util.return %ret0 : index
+}
+
+// -----
+
+// Tests that functions which become empty are removed.
+
+// CHECK-NOT: util.func private @empty_passthrough_callee() {
+util.func private @empty_passthrough_callee(%arg0: index) -> index {
+  util.return %arg0 : index
+}
+
+// CHECK: util.func public @empty_passthrough_caller(%[[ARG0:.+]]: index)
+util.func public @empty_passthrough_caller(%arg0: index) -> index {
+  // CHECK-NOT: util.call
+  %ret0 = util.call @empty_passthrough_callee(%arg0) : (index) -> index
   // CHECK: util.return %[[ARG0]]
   util.return %ret0 : index
 }

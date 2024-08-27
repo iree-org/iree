@@ -165,7 +165,6 @@ LogicalResult FunctionCall::initialize(Location loc) {
 FailureOr<iree::vm::ref<iree_hal_buffer_t>>
 FunctionCall::importSerializableAttr(
     Location loc, IREE::Util::SerializableAttrInterface serializableAttr) {
-
   // Allocate buffer.
   int64_t storageSize = serializableAttr.getStorageSize();
   if (storageSize < 0) {
@@ -206,7 +205,6 @@ FunctionCall::importSerializableAttr(
   }
 
   if (!iree_status_is_ok(status)) {
-    iree_hal_buffer_release(buffer.get());
     return handleRuntimeError(loc, status);
   }
 

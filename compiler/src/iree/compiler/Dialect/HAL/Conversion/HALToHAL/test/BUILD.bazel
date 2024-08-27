@@ -15,7 +15,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["pseudo_ops.mlir"],
+        [
+            "device_ops.mlir",
+            "pseudo_ops.mlir",
+        ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",

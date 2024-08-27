@@ -1,6 +1,5 @@
 // RUN: iree-opt %s \
-// RUN: --iree-codegen-transform-dialect-library=%p/convolution_match_spec.mlir \
-// RUN: --iree-transform-dialect-interpreter \
+// RUN: --iree-transform-dialect-interpreter="library-file-name=%p/convolution_match_spec.mlir" \
 // RUN: --split-input-file --verify-diagnostics
 
 

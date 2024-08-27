@@ -224,13 +224,6 @@ to running CTest (from the build directory):
 cmake --build . --target iree-test-deps
 ```
 
-To run e2e model tests in
-[generated_e2e_model_tests.cmake](https://github.com/iree-org/iree/blob/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
-because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
-set when configuring CMake. Also see
-[IREE Benchmark Suite Prerequisites](../performance/benchmark-suites.md#prerequisites)
-for required packages.
-
 ### Running a Test
 
 For the test
@@ -401,14 +394,35 @@ There are other test targets that generate tests based on template configuraton
 and platform detection, such as `iree_static_linker_test`. Those targets are
 not supported by Bazel rules at this point.
 
-## External test suite
+## External test suites
 
-An out-of-tree test suite is under development at
-[nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite/tree/main/iree_tests)
-for large collections of generated tests and machine learning models that are
-too large to fit into the main git repository.
+Multiple test suites are under development in the
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+repository.
 
-Testing these programs follows several stages:
+* Many program, input, and output files are too large to store directly in Git,
+  especially in a monorepo, so test suites may use
+  [Git LFS](https://git-lfs.com/), cloud storage, and persistent caches on
+  test machines as needed.
+* Keeping tests out of tree forces them to use public project APIs and allows
+  the core project to keep its infrastructure simpler.
+
+The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite)
+repository also contains tests for many machine learning models. Some of these
+tests are planned to be migrated into
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites).
+
+### ONNX operator tests
+
+Tests for individual ONNX operators are included at
+[`onnx-ops/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx-ops)
+in the
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+repository. These tests are generated from the upstream tests at
+[`onnx/backend/test/data/node/`](https://github.com/onnx/onnx/tree/main/onnx/backend/test/data/node)
+in the [onnxx/onnx](https://github.com/onnx/onnx) repository.
+
+Testing ONNX programs follows several stages:
 
 ```mermaid
 graph LR
@@ -416,68 +430,56 @@ graph LR
   Compile --> Run
 ```
 
-This particular test suite treats importing (e.g. from ONNX, PyTorch, or
-TensorFlow) as an offline step and contains test cases organized into folders
-of programs, inputs, and expected outputs:
+This particular test suite treats importing as an offline step and contains
+test cases organized into folders of programs, inputs, and expected outputs:
 
 ```text title="Sample test case directory"
 test_case_name/
   model.mlir
-  input_0.npy
-  output_0.npy
-  test_data_flags.txt
+  input_0.bin
+  output_0.bin
+  run_module_io_flags.txt
 ```
 
-```text title="Sample test_data_flags.txt"
---input=@input_0.npy
---expected_output=@output_0.npy
+```text title="Sample run_module_io_flags.txt"
+--input=2x3xf32=@input_0.bin
+--expected_output=2x3xf32=@output_0.bin
 ```
-
-* Many model, input, and output files are too large to store directly in Git,
-so the external test suite also uses [Git LFS](https://git-lfs.com/) and cloud
-storage.
 
 Each test case can be run using a sequence of commands like:
 
 ```bash
 iree-compile model.mlir {flags} -o model.vmfb
-iree-run-module --module=model.vmfb --flagfile=test_data_flags.txt
+iree-run-module --module=model.vmfb --flagfile=run_module_io_flags.txt
 ```
 
 To run slices of the test suite, a [pytest](https://docs.pytest.org/en/stable/)
 runner is included that can be configured using JSON files. The JSON files
 tested in the IREE repo itself are stored in
-[`build_tools/pkgci/external_test_suite/`](https://github.com/iree-org/iree/tree/main/build_tools/pkgci/external_test_suite).
+[`tests/external/iree-test-suites/onnx_ops/`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/onnx_ops).
 
 For example, here is part of a config file for running ONNX tests on CPU:
 
-```json title="build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json" linenums="1"
---8<-- "build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json::20"
+<!-- markdownlint-disable-next-line -->
+```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
+--8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
 ```
 
-### Adding new test cases
+#### Updating config files
 
-To add new test cases to the external test suite:
+If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
+for the nature of the failure. Often, a test is *newly passing*, with logs
+like this:
 
-1. Import the programs you want to test into MLIR. This can be done manually or
-   using automation. Prefer to automate, or at least document, the process so
-   test cases can be regenerated later.
-2. Construct sets of inputs and expected outputs (as .npy or .bin files). These
-   can be manually authored or imported by running the program through a
-   reference backend.
-3. Group the program, inputs, and outputs together using a flagfile.
+```text
+=================================== FAILURES ===================================
+_ IREE compile and run: test_mod_uint64::model.mlir::model.mlir::cpu_llvm_sync _
+[gw1] linux -- Python 3.11.9 /home/runner/work/iree/iree/venv/bin/python
+[XPASS(strict)] Expected run to fail (included in 'expected_run_failures')
+```
 
-To start running new test cases:
+The workflow job that failed should then upload a new config file as an
+"Artifact", which can be downloaded from the action run summary page and then
+committed:
 
-1. Bump the commit of the test suite that is used in IREE's
-   [`.github/workflows/` files](https://github.com/iree-org/iree/tree/main/.github/workflows)
-2. Add new pytest invocations and/or config files that run the new tests
-
-### Usage from other projects
-
-The external test suite only needs `iree-compile` and `iree-run-module` to run,
-so it is well suited for use in downstream projects that implement plugins for
-IREE. The
-[`conftest.py`](https://github.com/nod-ai/SHARK-TestSuite/blob/main/iree_tests/conftest.py)
-file can also be forked (or bypassed entirely) to further customize the test
-runner behavior.
+![image](https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2)

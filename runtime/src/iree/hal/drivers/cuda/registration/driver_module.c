@@ -26,10 +26,14 @@ IREE_FLAG(
     "Enables CUDA asynchronous stream-ordered allocations when supported.");
 
 IREE_FLAG(
-    bool, cuda_tracing, true,
-    "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
-    "Severely impacts benchmark timings and should only be used when\n"
-    "analyzing dispatch timings.");
+    int32_t, cuda_tracing, 2,
+    "Controls the verbosity of tracing when Tracy instrumentation is enabled.\n"
+    "The impact to benchmark timing becomes more severe as the verbosity\n"
+    "increases, and thus should be only enabled when needed.\n"
+    "Permissible values are:\n"
+    "   0 : stream tracing disabled.\n"
+    "   1 : coarse command buffer level tracing enabled.\n"
+    "   2 : fine-grained kernel level tracing enabled.\n");
 
 IREE_FLAG(int32_t, cuda_default_index, 0,
           "Specifies the index of the default CUDA device to use");
@@ -98,10 +102,9 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
 
   iree_hal_cuda_device_params_t device_params;
   iree_hal_cuda_device_params_initialize(&device_params);
-  if (FLAG_cuda_use_streams) {
-    device_params.command_buffer_mode =
-        IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
-  }
+  device_params.command_buffer_mode =
+      FLAG_cuda_use_streams ? IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM
+                            : IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
   device_params.stream_tracing = FLAG_cuda_tracing;
   device_params.async_allocations = FLAG_cuda_async_allocations;
 

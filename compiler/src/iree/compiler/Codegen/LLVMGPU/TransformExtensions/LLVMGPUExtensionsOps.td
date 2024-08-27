@@ -165,7 +165,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
       func.func @foo() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c1 : index
         scf.if %2 {
@@ -186,7 +186,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -266,7 +266,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -290,7 +290,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
         %c4 = arith.constant 4 : index
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
-        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c32 : index
         // Single-warp guard filters out threads 32-63.
@@ -525,47 +525,6 @@ def CreateAsyncGroupsOp :
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
-}
-
-def LayoutAnalysisAndDistributionOp :
-  Op<Transform_Dialect, "iree.layout_analysis_and_distribution",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Targets the whole func op and does the following:
-
-    1. First, computes the layouts of the of any vector.contract ops
-       that could lower to mma.syncs. Then, propagates these layouts to
-       neighboring ops.
-
-    2. Next, it lowers each of these ops based on their layout.
-
-    The layout is represented as an 8D vector with the following shape:
-    batch0, batch1, laneidz, laneidy, laneidx, vecidz, vecidy, vecidx
-
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
-
-  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::FunctionOpInterface target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-
 }
 
 def ReorderTransposeOp :

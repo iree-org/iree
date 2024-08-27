@@ -136,6 +136,19 @@ util.func public @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
 
 // -----
 
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @tensorTransfer
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
+util.func public @tensorTransfer(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]} -> to(#hal.device.affinity<@device>) !stream.resource<*>{%[[INPUT_SIZE]]}
+  %transfer = flow.tensor.transfer %input : tensor<?x128xi8>{%dim0} to #hal.device.affinity<@device>
+  // CHECK: util.return %[[TRANSFER]], %[[INPUT_SIZE]]
+  util.return %transfer : tensor<?x128xi8>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
 util.func public @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
@@ -171,14 +184,28 @@ util.func public @tensorUpdate(%update : tensor<1x1x10xf32>, %target : tensor<5x
 util.func public @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK: %[[T0:.+]] = stream.async.transfer
-  // CHECK-SAME:           %[[SOURCE]] : !stream.resource<*>{%[[SOURCE_SIZE]]}
-  // CHECK-SAME:           from(#hal.affinity.queue<[0, 1]>) -> !stream.resource<staging>{%[[SOURCE_SIZE]]}
-  // CHECK: %[[T1:.+]] = stream.tensor.load %[[T0]][%c0, %c1] : tensor<2x3xi32> in !stream.resource<staging>{%[[SOURCE_SIZE]]} -> i32
-  %0 = flow.tensor.load %source[%c0, %c1] : tensor<2x3xi32> attributes {
-    stream.affinity = #hal.affinity.queue<[0, 1]>
-  }
-  // CHECK: util.return %[[T1]]
+  // CHECK: %[[SLICE_SIZE:.+]] = stream.tensor.sizeof tensor<1x1xi32>
+  // CHECK: %[[SLICE:.+]] = stream.tensor.slice %[[SOURCE]][%c0, %c1 for %c1, %c1] : tensor<2x3xi32> in !stream.resource<*>{%[[SOURCE_SIZE]]} -> tensor<1x1xi32> in !stream.resource<*>{%[[SLICE_SIZE]]}
+  // CHECK: %[[STAGING:.+]] = stream.async.transfer
+  // CHECK-SAME: %[[SLICE]] : !stream.resource<*>{%[[SLICE_SIZE]]}
+  // CHECK-SAME: !stream.resource<staging>{%[[SLICE_SIZE]]}
+  // CHECK: %[[VALUE:.+]] = stream.tensor.load %[[STAGING]][%c0, %c0] : tensor<1x1xi32> in !stream.resource<staging>{%[[SLICE_SIZE]]} -> i32
+  %0 = flow.tensor.load %source[%c0, %c1] : tensor<2x3xi32>
+  // CHECK: util.return %[[VALUE]]
+  util.return %0 : i32
+}
+
+// -----
+
+// CHECK-LABEL: @tensorLoadScalar
+//  CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<*>, %[[SOURCE_SIZE:.+]]: index)
+util.func public @tensorLoadScalar(%source : tensor<i32>) -> i32 {
+  // CHECK: %[[STAGING:.+]] = stream.async.transfer
+  // CHECK-SAME: %[[SOURCE]] : !stream.resource<*>{%[[SOURCE_SIZE]]}
+  // CHECK-SAME: !stream.resource<staging>{%[[SOURCE_SIZE]]}
+  // CHECK: %[[VALUE:.+]] = stream.tensor.load %[[STAGING]] : tensor<i32> in !stream.resource<staging>{%[[SOURCE_SIZE]]} -> i32
+  %0 = flow.tensor.load %source : tensor<i32>
+  // CHECK: util.return %[[VALUE]]
   util.return %0 : i32
 }
 
@@ -189,18 +216,25 @@ util.func public @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
 util.func public @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c9 = arith.constant 9 : i32
-  // CHECK: %[[T0:.+]] = stream.async.transfer %[[TARGET]] : !stream.resource<*>{%[[TARGET_SIZE]]}
-  // CHECK-SAME:           from(#hal.affinity.queue<[0, 1]>) -> !stream.resource<staging>{%[[TARGET_SIZE]]}
-  // CHECK: %[[T1:.+]] = stream.tensor.store %c9_i32, %[[T0]][%c0, %c1] :
-  // CHECK-SAME:           i32 -> tensor<2x3xi32> in %[[T0]] as !stream.resource<staging>{%[[TARGET_SIZE]]}
-  // CHECK: %[[T2:.+]] = stream.async.transfer %[[T1]] : !stream.resource<staging>{%[[TARGET_SIZE]]} ->
-  // CHECK-SAME:           to(#hal.affinity.queue<[0, 1]>) !stream.resource<*>{%[[TARGET_SIZE]]}
-  %0 = flow.tensor.store %c9, %target[%c0, %c1] : tensor<2x3xi32> attributes {
-    stream.affinity = #hal.affinity.queue<[0, 1]>
-  }
-  // CHECK: util.return %[[T2]]
+  // CHECK: %[[VALUE:.+]] = arith.constant 9
+  %value = arith.constant 9 : i32
+  // CHECK: %[[FILL:.+]] = stream.tensor.fill %[[VALUE]], %[[TARGET]][%c0, %c1 for %c1, %c1] : i32 -> tensor<2x3xi32> in %[[TARGET]] as !stream.resource<*>{%[[TARGET_SIZE]]}
+  %0 = flow.tensor.store %value, %target[%c0, %c1] : tensor<2x3xi32>
+  // CHECK: util.return %[[FILL]]
   util.return %0 : tensor<2x3xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorStoreScalar
+//  CHECK-SAME: (%[[TARGET:.+]]: !stream.resource<*>, %[[TARGET_SIZE:.+]]: index)
+util.func public @tensorStoreScalar(%target : tensor<i32>) -> tensor<i32> {
+  // CHECK: %[[VALUE:.+]] = arith.constant 9
+  %value = arith.constant 9 : i32
+  // CHECK: %[[FILL:.+]] = stream.tensor.fill %[[VALUE]], %[[TARGET]] : i32 -> tensor<i32> in %[[TARGET]] as !stream.resource<*>{%[[TARGET_SIZE]]}
+  %0 = flow.tensor.store %value, %target : tensor<i32>
+  // CHECK: util.return %[[FILL]]
+  util.return %0 : tensor<i32>
 }
 
 // -----

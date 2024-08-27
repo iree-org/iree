@@ -372,19 +372,27 @@ typedef int (*iree_hal_executable_dispatch_v0_t)(
 
 // Bytes per page of workgroup local memory.
 // This is chosen to match the common page size of devices.
-#define IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE 4096
+#define IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE 4096
+
+// Maximum number of constants that can be used by a single dispatch.
+#define IREE_HAL_EXECUTABLE_MAX_CONSTANT_COUNT 64
+// Maximum number of bindings that can be used by a single dispatch.
+#define IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT 64
 
 // Attributes for exported dispatch functions defining how they are to be
 // executed. 0 defaults are well-specified and the entire attributes table may
 // be omitted if no dispatch functions require these fields.
 typedef struct iree_hal_executable_dispatch_attrs_v0_t {
-  // Number of IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE byte pages (or 0)
-  // indicating how much workgroup local memory is required for the dispatch.
-  // This is the size of the buffer referenced by the `local_memory` argument.
+  // Number of IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE byte pages
+  // (or 0) indicating how much workgroup local memory is required for the
+  // dispatch. This is the size of the buffer referenced by the `local_memory`
+  // argument.
   uint16_t local_memory_pages;
-  // Must be 0. May be used in the future for flags controlling the dispatch
-  // behavior/synchronization requirements.
-  uint16_t reserved;
+  // Total number of 32-bit constants used by the dispatch.
+  uint8_t constant_count;
+  // Total number of bindings used by the dispatch.
+  uint8_t binding_count;
+  // TODO(#18189): add ~8 uint64_t fields for binding bits (readonly/indirect).
 } iree_hal_executable_dispatch_attrs_v0_t;
 static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 

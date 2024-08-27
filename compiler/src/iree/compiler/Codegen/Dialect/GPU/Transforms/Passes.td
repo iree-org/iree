@@ -11,12 +11,29 @@ include "mlir/Pass/PassBase.td"
 
 def DistributeMmaToLanesPass :
     InterfacePass<"iree-gpu-distribute-mma-to-lanes", "mlir::FunctionOpInterface"> {
-  let summary = "Converts and distributes linalg ops with mma kinds to lanes";
+  let summary = "Distributes iree_gpu.multi_mma ops to lanes";
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",
     "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect",
+  ];
+}
+
+def ConcretizeMmaShapesPass :
+    InterfacePass<"iree-gpu-concretize-mma-shapes", "mlir::FunctionOpInterface"> {
+  let summary = "Expands the inner dimensions of iree_gpu.multi_mma ops to match the thread layout";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+  let options = [
+    Option<"concretizeInputs", "concretize-inputs",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the lhs and rhs operands of the multi_mma ops.">,
+    Option<"concretizeResult", "concretize-result",
+      "bool", /*default=*/"true",
+      "Expand the inner dimensions for the acc operand of the multi_mma ops.">,
   ];
 }
 
@@ -30,13 +47,29 @@ def FuseAndHoistParallelLoopsPass :
   ];
 }
 
+def LowerIREEGPUOpsPass :
+    InterfacePass<"iree-gpu-lower-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Post bufferization lowerings of iree_gpu ops before late lowerings";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect",
+  ];
+}
 
 def PackToIntrinsicsPass :
     InterfacePass<"iree-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations to specified intrinsic shapes";
+  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def UnrollToIntrinsicsPass :
+    InterfacePass<"iree-gpu-unroll-to-intrinsics", "mlir::FunctionOpInterface"> {
+  let summary = "Unrolls iree_gpu.multi_mma ops to their inner vector size.";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::vector::VectorDialect",
   ];
 }
 
@@ -47,14 +80,6 @@ def VectorizeIREEGPUOpsPass :
     "::mlir::vector::VectorDialect",
     "::mlir::arith::ArithDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
-  ];
-}
-
-def LowerIREEGPUOpsPass :
-    InterfacePass<"iree-gpu-lower-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Post bufferization lowerings of iree_gpu ops before late lowerings";
-  let dependentDialects = [
-    "::mlir::gpu::GPUDialect",
   ];
 }
 

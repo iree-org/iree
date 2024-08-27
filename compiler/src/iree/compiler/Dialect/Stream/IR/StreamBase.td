@@ -504,6 +504,7 @@ def Stream_Channel : TypeDef<Stream_Dialect, "Channel", [
 }
 
 def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
+  Stream_AffinityType,
   Util_ReferenceType,
   Util_SizeAwareType,
   DeclareTypeInterfaceMethods<Util_GlobalType, [

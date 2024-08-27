@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -21,19 +20,18 @@ static const llvm::StringLiteral kStrictSymbolsMarker =
 
 namespace mlir::iree_compiler::TorchInput {
 
-namespace {
-struct SetStrictSymbolicShapesPass
-    : public SetStrictSymbolicShapesPassBase<SetStrictSymbolicShapesPass> {
+#define GEN_PASS_DEF_SETSTRICTSYMBOLICSHAPESPASS
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
+namespace {
+class SetStrictSymbolicShapesPass final
+    : public impl::SetStrictSymbolicShapesPassBase<
+          SetStrictSymbolicShapesPass> {
+public:
   void runOnOperation() override {
     getOperation()->setAttr(kStrictSymbolsMarker, UnitAttr::get(&getContext()));
   }
 };
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSetStrictSymbolicShapesPass() {
-  return std::make_unique<SetStrictSymbolicShapesPass>();
-}
 
 } // namespace mlir::iree_compiler::TorchInput
