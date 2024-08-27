@@ -155,7 +155,12 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
-      // 4. After elementwise operation fusion sink reshapes that block
+      // 4. Try to fuse any leftover transposes into other non-elementwise ops.
+      .addPass(DispatchCreation::createFoldTransposesPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // 5. After elementwise operation fusion sink reshapes that block
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
@@ -169,11 +174,11 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   }
 
   FunctionLikeNest(passManager)
-      // 5. After all the reshape propagations, fuse elementwise operations
+      // 6. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
       .addPass(DispatchCreation::createFuseMultiUseElementwiseProducerPass)
 
-      // 6. Some more "post elementwise fusion passes".
+      // 7. Some more "post elementwise fusion passes".
       //    a. Detensorize.
       //       TODO: This is probably not in the right place.
       .addPredicatedPass(clDetensoring,

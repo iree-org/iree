@@ -21,6 +21,7 @@ iree_lit_test_suite(
             "collapse_linalg_generic_on_tensors.mlir",
             "collapse_reduction.mlir",
             "attention_fuse_by_expansion.mlir",
+            "fold_transpose.mlir",
             "dispatch_linalg_transform_dialect.mlir",
             "dispatch_region_formation_preprocessing.mlir",
             "fold_unit_dims.mlir",

@@ -25,6 +25,7 @@ iree_cc_library(
     "ConvertTensorToFlow.cpp"
     "DispatchWithTransformDialect.cpp"
     "ElementwiseOpFusion.cpp"
+    "FoldTransposes.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
