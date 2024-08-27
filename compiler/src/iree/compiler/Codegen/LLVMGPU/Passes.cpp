@@ -406,6 +406,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   addGPUVectorizationPasses(funcPassManager);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
+  funcPassManager.addPass(createGPUCombineValueBarriersPass());
 
   // Step 7. Bufferize.
   addGPUBufferizePasses(funcPassManager);
