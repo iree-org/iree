@@ -4122,7 +4122,7 @@ for all the unused code paths within each microkernel.</p>
 [...]
 // -----// IR Dump After Inliner (inline) //----- //
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
+#device_target_llvm_cpu = #hal.device.target&lt;&quot;local&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
     %0 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[0] : index
@@ -4148,7 +4148,7 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
 // -----// IR Dump After CSE (cse) //----- //
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
 #map = affine_map&lt;()[s0] -&gt; (s0 ceildiv 16)&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;llvm-cpu&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
+#device_target_llvm_cpu = #hal.device.target&lt;&quot;local&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -4245,9 +4245,9 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor&lt;readonly:tensor&lt;?x?x16x1xf32&gt;&gt;{%30, %35}
-    %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor&lt;readonly:tensor&lt;?x?x16x1xf32&gt;&gt;{%40, %45}
-    %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor&lt;readwrite:tensor&lt;?x?x16x16xf32&gt;&gt;{%50, %55}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor&lt;readonly:tensor&lt;?x?x16x1xf32&gt;&gt;{%30, %35}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : !flow.dispatch.tensor&lt;readonly:tensor&lt;?x?x16x1xf32&gt;&gt;{%40, %45}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : !flow.dispatch.tensor&lt;readwrite:tensor&lt;?x?x16x16xf32&gt;&gt;{%50, %55}
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -4341,11 +4341,11 @@ func.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32() {
   %53 = arith.shli %52, %c32_i64 : i64
   %54 = arith.ori %51, %53 : i64
   %55 = arith.index_castui %54 : i64 to index
-  %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref&lt;?x?x16x1xf32, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%30, %35}
+  %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref&lt;?x?x16x1xf32, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%30, %35}
   memref.assume_alignment %56, 64 : memref&lt;?x?x16x1xf32, #hal.descriptor_type&lt;storage_buffer&gt;&gt;
-  %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%40, %45}
+  %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%40, %45}
   memref.assume_alignment %57, 1 : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;
-  %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%50, %55}
+  %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;{%50, %55}
   memref.assume_alignment %58, 1 : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -4429,11 +4429,11 @@ module {
     %53 = arith.shli %52, %c32_i64 : i64
     %54 = arith.ori %51, %53 : i64
     %55 = arith.index_castui %54 : i64 to index
-    %56 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref&lt;?x?x16x1xf32&gt;{%30, %35}
+    %56 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref&lt;?x?x16x1xf32&gt;{%30, %35}
     memref.assume_alignment %56, 64 : memref&lt;?x?x16x1xf32&gt;
-    %57 = hal.interface.binding.subspan layout(#layout) set(0) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;&gt;{%40, %45}
+    %57 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%20) flags(ReadOnly) : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;&gt;{%40, %45}
     memref.assume_alignment %57, 1 : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;&gt;
-    %58 = hal.interface.binding.subspan layout(#layout) set(0) binding(1) alignment(64) offset(%25) : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;&gt;{%50, %55}
+    %58 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%25) : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;&gt;{%50, %55}
     memref.assume_alignment %58, 1 : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;&gt;
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index

@@ -3287,15 +3287,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#resource-descriptors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Resource descriptors
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#command-buffer-dispatch" class="md-nav__link">
     <span class="md-ellipsis">
       Command buffer dispatch
@@ -4104,15 +4095,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#resource-descriptors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Resource descriptors
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#command-buffer-dispatch" class="md-nav__link">
     <span class="md-ellipsis">
       Command buffer dispatch
@@ -4248,14 +4230,6 @@ relatively straightforward:</p>
 <td style="text-align: center;"><a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable_cache.h"><code>iree_hal_executable_cache_t</code></a></td>
 <td style="text-align: center;">N/A</td>
 </tr>
-<tr>
-<td style="text-align: center;"><a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_descriptor_set_layout_t</code></a></td>
-<td style="text-align: center;">N/A</td>
-</tr>
-<tr>
-<td style="text-align: center;"><a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_pipeline_layout_t</code></a></td>
-<td style="text-align: center;">N/A</td>
-</tr>
 </tbody>
 </table>
 <p>In the following subsections, we go over each pair to provide more details.</p>
@@ -4351,7 +4325,7 @@ caching allocator.</p>
 <p>IREE <a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable.h"><code>iree_hal_executable_t</code></a> represents a GPU program archive with
 a driver-defined format. It maps naturally to Metal <a href="https://developer.apple.com/documentation/metal/mtllibrary?language=objc"><code>MTLLibrary</code></a>.
 An entry point in a <code>MTLLibrary</code> is a <a href="https://developer.apple.com/documentation/metal/mtlfunction?language=objc"><code>MTLFunction</code></a>. We define
-<a href="https://github.com/iree-org/iree/tree/main/experimental/metal/kernel_library.h"><code>iree_hal_metal_kernel_params_t</code></a> to wrap around a
+<a href="https://github.com/iree-org/iree/tree/main/experimental/metal/executable.h"><code>iree_hal_metal_executable_t</code></a> to wrap around a
 <code>MTLLibrary</code>, its <code>MTLFunction</code>s, and also <code>MTLComputePipelineState</code> objects
 constructed from <code>MTLFunction</code>s.</p>
 <h3 id="executable-cache">Executable cache<a class="headerlink" href="#executable-cache" title="Permanent link">link</a></h3>
@@ -4408,30 +4382,6 @@ The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
 information extracted from the SPIR-V code. We encode an additional 3-D vector
 for each entry point and use it as the threadgroup size when later dispatching
 the <code>MTLFunction</code> corresponding to the entry point.</p>
-<h3 id="resource-descriptors">Resource descriptors<a class="headerlink" href="#resource-descriptors" title="Permanent link">link</a></h3>
-<p>A descriptor is an opaque handle pointing to a resource that is accessed in
-the compute kernel. IREE's HAL models several concepts related to GPU resource
-management explicitly:</p>
-<ul>
-<li><a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_descriptor_set_layout_t</code></a>: a schema for
-  describing an array of descriptor bindings. Each descriptor binding specifies
-  the resource type, access mode and other information.</li>
-<li><a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_pipeline_layout_t</code></a>: a schema for describing all
-  the resources accessed by a compute pipeline. It includes zero or more
-  <code>DescriptorSetLayout</code>s and (optional) push constants.</li>
-</ul>
-<p>However, this isn't totally matching Metal's paradigm.
-In the Metal framework, the closest concept to descriptor sets would be <a href="https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc">argument
-buffer</a>. There is no direct correspondence to
-descriptor set layout and pipeline layout. Rather, the layout is implicitly
-encoded in Metal shaders as MSL structs. The APIs for creating argument buffers
-do not encourage early creation without pipelines: one typically creates them
-for each <code>MTLFunction</code>.</p>
-<p>All of this means it's better to defer the creation of the argument buffer
-until the point of compute pipeline creation and dispatch. Therefore, the Metal
-HAL driver's <code>iree_hal_metal_descriptor_set_layout_t</code> and
-<code>iree_hal_metal_pipeline_layout_t</code> are just containers holding the information
-up for recording <a href="#command-buffer-dispatch">command buffer dispatch</a>.</p>
 <h3 id="command-buffer-dispatch">Command buffer dispatch<a class="headerlink" href="#command-buffer-dispatch" title="Permanent link">link</a></h3>
 <p>Metal HAL driver command buffer dispatch recording performs the following steps
 with the current active <code>MTLComputeCommandEncoder</code>:</p>

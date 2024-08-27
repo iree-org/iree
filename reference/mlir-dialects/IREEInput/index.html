@@ -2414,24 +2414,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#descriptorsetbindingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DescriptorSetBindingAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#descriptorsetlayoutattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DescriptorSetLayoutAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#descriptortypeattr" class="md-nav__link">
     <span class="md-ellipsis">
       DescriptorTypeAttr
@@ -2471,6 +2453,15 @@
   <a href="#executabletargetattr" class="md-nav__link">
     <span class="md-ellipsis">
       ExecutableTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipelinebindingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PipelineBindingAttr
     </span>
   </a>
   
@@ -2618,13 +2609,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#descriptorsetlayoutflags" class="md-nav__link">
+  <a href="#pipelinelayoutflags" class="md-nav__link">
     <span class="md-ellipsis">
-      DescriptorSetLayoutFlags
+      PipelineLayoutFlags
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="DescriptorSetLayoutFlags">
+    <nav class="md-nav" aria-label="PipelineLayoutFlags">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4925,24 +4916,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#descriptorsetbindingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DescriptorSetBindingAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#descriptorsetlayoutattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DescriptorSetLayoutAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#descriptortypeattr" class="md-nav__link">
     <span class="md-ellipsis">
       DescriptorTypeAttr
@@ -4982,6 +4955,15 @@
   <a href="#executabletargetattr" class="md-nav__link">
     <span class="md-ellipsis">
       ExecutableTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipelinebindingattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      PipelineBindingAttr
     </span>
   </a>
   
@@ -5129,13 +5111,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#descriptorsetlayoutflags" class="md-nav__link">
+  <a href="#pipelinelayoutflags" class="md-nav__link">
     <span class="md-ellipsis">
-      DescriptorSetLayoutFlags
+      PipelineLayoutFlags
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="DescriptorSetLayoutFlags">
+    <nav class="md-nav" aria-label="PipelineLayoutFlags">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5293,13 +5275,12 @@ LLVM/MLIR's API surface is itself unstable.</p>
 </ul>
 </li>
 <li><a href="#attributes_13">Attributes</a><ul>
-<li><a href="#descriptorsetbindingattr">DescriptorSetBindingAttr</a></li>
-<li><a href="#descriptorsetlayoutattr">DescriptorSetLayoutAttr</a></li>
 <li><a href="#descriptortypeattr">DescriptorTypeAttr</a></li>
 <li><a href="#devicetargetattr">DeviceTargetAttr</a></li>
 <li><a href="#executableobjectattr">ExecutableObjectAttr</a></li>
 <li><a href="#executableobjectsattr">ExecutableObjectsAttr</a></li>
 <li><a href="#executabletargetattr">ExecutableTargetAttr</a></li>
+<li><a href="#pipelinebindingattr">PipelineBindingAttr</a></li>
 <li><a href="#pipelinelayoutattr">PipelineLayoutAttr</a></li>
 </ul>
 </li>
@@ -5321,7 +5302,7 @@ LLVM/MLIR's API surface is itself unstable.</p>
 <li><a href="#cases">Cases:</a></li>
 </ul>
 </li>
-<li><a href="#descriptorsetlayoutflags">DescriptorSetLayoutFlags</a><ul>
+<li><a href="#pipelinelayoutflags">PipelineLayoutFlags</a><ul>
 <li><a href="#cases_1">Cases:</a></li>
 </ul>
 </li>
@@ -6800,78 +6781,6 @@ restricted to 3 (XYZ).</p>
 </tbody>
 </table>
 <h2 id="attributes_13">Attributes<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h2>
-<h3 id="descriptorsetbindingattr">DescriptorSetBindingAttr<a class="headerlink" href="#descriptorsetbindingattr" title="Permanent link">link</a></h3>
-<p>descriptor set binding specification</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_input.descriptor_set.binding&lt;
-  int64_t,   # ordinal
-  DescriptorType,   # type
-  std::optional&lt;DescriptorFlags&gt;   # flags
-&gt;
-</code></pre></div>
-<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">ordinal</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">type</td>
-<td style="text-align: center;"><code>DescriptorType</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">flags</td>
-<td style="text-align: center;"><code>std::optional&lt;DescriptorFlags&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="descriptorsetlayoutattr">DescriptorSetLayoutAttr<a class="headerlink" href="#descriptorsetlayoutattr" title="Permanent link">link</a></h3>
-<p>descriptor set layout specification</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_input.descriptor_set.layout&lt;
-  int64_t,   # ordinal
-  ::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;,   # bindings
-  std::optional&lt;DescriptorSetLayoutFlags&gt;   # flags
-&gt;
-</code></pre></div>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">ordinal</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">bindings</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">flags</td>
-<td style="text-align: center;"><code>std::optional&lt;DescriptorSetLayoutFlags&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
 <h3 id="descriptortypeattr">DescriptorTypeAttr<a class="headerlink" href="#descriptortypeattr" title="Permanent link">link</a></h3>
 <p>valid DescriptorType</p>
 <p>Syntax:</p>
@@ -6882,7 +6791,7 @@ restricted to 3 (XYZ).</p>
 <p>Enum cases:
 * uniform_buffer (<code>UniformBuffer</code>)
 * storage_buffer (<code>StorageBuffer</code>)</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
+<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6901,7 +6810,7 @@ restricted to 3 (XYZ).</p>
 </table>
 <h3 id="devicetargetattr">DeviceTargetAttr<a class="headerlink" href="#devicetargetattr" title="Permanent link">link</a></h3>
 <p>generic device target specification</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6925,7 +6834,7 @@ restricted to 3 (XYZ).</p>
 </table>
 <h3 id="executableobjectattr">ExecutableObjectAttr<a class="headerlink" href="#executableobjectattr" title="Permanent link">link</a></h3>
 <p>executable object reference</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6949,7 +6858,7 @@ restricted to 3 (XYZ).</p>
 </table>
 <h3 id="executableobjectsattr">ExecutableObjectsAttr<a class="headerlink" href="#executableobjectsattr" title="Permanent link">link</a></h3>
 <p>target-specific object file references</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6973,7 +6882,7 @@ restricted to 3 (XYZ).</p>
 </table>
 <h3 id="executabletargetattr">ExecutableTargetAttr<a class="headerlink" href="#executabletargetattr" title="Permanent link">link</a></h3>
 <p>generic executable target specification</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7000,15 +6909,15 @@ restricted to 3 (XYZ).</p>
 </tr>
 </tbody>
 </table>
-<h3 id="pipelinelayoutattr">PipelineLayoutAttr<a class="headerlink" href="#pipelinelayoutattr" title="Permanent link">link</a></h3>
-<p>executable entry point layout specification</p>
+<h3 id="pipelinebindingattr">PipelineBindingAttr<a class="headerlink" href="#pipelinebindingattr" title="Permanent link">link</a></h3>
+<p>descriptor set binding specification</p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_input.pipeline.layout&lt;
-  int64_t,   # pushConstants
-  ::llvm::ArrayRef&lt;DescriptorSetLayoutAttr&gt;   # setLayouts
+<div class="highlight"><pre><span></span><code>#iree_input.pipeline.binding&lt;
+  DescriptorType,   # type
+  std::optional&lt;DescriptorFlags&gt;   # flags
 &gt;
 </code></pre></div>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7019,13 +6928,49 @@ restricted to 3 (XYZ).</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;">pushConstants</td>
-<td style="text-align: center;"><code>int64_t</code></td>
+<td style="text-align: center;">type</td>
+<td style="text-align: center;"><code>DescriptorType</code></td>
 <td></td>
 </tr>
 <tr>
-<td style="text-align: center;">setLayouts</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;DescriptorSetLayoutAttr&gt;</code></td>
+<td style="text-align: center;">flags</td>
+<td style="text-align: center;"><code>std::optional&lt;DescriptorFlags&gt;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="pipelinelayoutattr">PipelineLayoutAttr<a class="headerlink" href="#pipelinelayoutattr" title="Permanent link">link</a></h3>
+<p>executable entry point layout specification</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_input.pipeline.layout&lt;
+  ::llvm::ArrayRef&lt;PipelineBindingAttr&gt;,   # bindings
+  int64_t,   # constants
+  std::optional&lt;PipelineLayoutFlags&gt;   # flags
+&gt;
+</code></pre></div>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">bindings</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;PipelineBindingAttr&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">constants</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td style="text-align: center;">flags</td>
+<td style="text-align: center;"><code>std::optional&lt;PipelineLayoutFlags&gt;</code></td>
 <td></td>
 </tr>
 </tbody>
@@ -7066,7 +7011,7 @@ be efficiently stored in an unboxed form. Reference types and variants
 are permitted.</p>
 <p>Lists can either be homogenous, with a fixed element type, or heterogenous
 by parameterizing them with a VariantType.</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7085,7 +7030,7 @@ by parameterizing them with a VariantType.</p>
 </table>
 <h3 id="ptrtype">PtrType<a class="headerlink" href="#ptrtype" title="Permanent link">link</a></h3>
 <p>Pointer to a concrete type</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7132,8 +7077,8 @@ can contain any legal primitive, reference or null in the IREE type system.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="descriptorsetlayoutflags">DescriptorSetLayoutFlags<a class="headerlink" href="#descriptorsetlayoutflags" title="Permanent link">link</a></h3>
-<p>valid DescriptorSetLayout flags</p>
+<h3 id="pipelinelayoutflags">PipelineLayoutFlags<a class="headerlink" href="#pipelinelayoutflags" title="Permanent link">link</a></h3>
+<p>valid PipelineLayout flags</p>
 <h4 id="cases_1">Cases:<a class="headerlink" href="#cases_1" title="Permanent link">link</a></h4>
 <table>
 <thead>
