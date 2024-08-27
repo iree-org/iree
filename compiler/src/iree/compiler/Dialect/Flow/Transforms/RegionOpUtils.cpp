@@ -81,8 +81,9 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(
-      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
+  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
+    return Range{zero, v, one};
+  });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
@@ -761,6 +762,15 @@ bool isClonableIntoDispatchOp(Operation *op) {
 static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
+
+    // Do not fuse `index_cast` operations if it is already an operand of the
+    // owner.
+    if (auto indexCastOp = v.getDefiningOp<arith::IndexCastOp>()) {
+      if (user == dispatchOp) {
+        return true;
+      }
+    }
+
     Operation *ownerWorkgroupsOp =
         user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
     Operation *ownerRegionOp =
