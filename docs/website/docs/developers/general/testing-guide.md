@@ -415,7 +415,7 @@ tests are planned to be migrated into
 ### ONNX operator tests
 
 Tests for individual ONNX operators are included at
-[`onnx-ops/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx-ops)
+[`onnx_ops/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops)
 in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository. These tests are generated from the upstream tests at
