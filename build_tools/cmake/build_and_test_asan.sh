@@ -21,11 +21,11 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable CUDA and HIP/ROCM compiler and runtime by default if not on Darwin.
-platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
-IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
-IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
-IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${platform_supported}}"
-IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${platform_supported}}"
+OFF_IF_DARWIN="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${OFF_IF_DARWIN}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${OFF_IF_DARWIN}}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${OFF_IF_DARWIN}}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh

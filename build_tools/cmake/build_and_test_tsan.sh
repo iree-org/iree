@@ -19,11 +19,11 @@ set -euo pipefail
 
 BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 # Enable CUDA and HIP/ROCM compiler and runtime by default if not on Darwin.
-platform_supported="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
-IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${platform_supported}}"
-IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${platform_supported}}"
-IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${platform_supported}}"
-IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${platform_supported}}"
+OFF_IF_DARWIN="$(uname | awk '{print ($1 == "Darwin") ? "OFF" : "ON"}')"
+IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${OFF_IF_DARWIN}}"
+IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${OFF_IF_DARWIN}}"
+IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${OFF_IF_DARWIN}}"
+IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -32,7 +32,6 @@ CMAKE_ARGS=(
   "-G" "Ninja"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-
 
   # The debug information will help get more helpful TSan reports (stacks).
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
