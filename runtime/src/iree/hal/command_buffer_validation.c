@@ -66,8 +66,6 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
           },
           iree_hal_buffer_allocation_size(buffer), /*out_params=*/NULL,
           /*out_allocation_size=*/NULL);
-  fprintf(stderr, "++allowed_compatibility=0x%x\n", allowed_compatibility);
-  fprintf(stderr, "++required_compatibility=0x%x\n", required_compatibility);
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
 #if IREE_STATUS_MODE
     // Buffer cannot be used on the queue for the given usage.
