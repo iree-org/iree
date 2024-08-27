@@ -11,7 +11,8 @@
   "skip_compile_tests": [
     "onnx/node/generated/test_dequantizelinear",
     "onnx/node/generated/test_group_normalization_epsilon_expanded",
-    "onnx/node/generated/test_group_normalization_example_expanded"
+    "onnx/node/generated/test_group_normalization_example_expanded",
+    "onnx/node/generated/test_einsum_inner_prod"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
@@ -137,7 +138,6 @@
     "onnx/node/generated/test_dft_opset19",
     "onnx/node/generated/test_edge_pad",
     "onnx/node/generated/test_einsum_batch_matmul",
-    "onnx/node/generated/test_einsum_inner_prod",
     "onnx/node/generated/test_einsum_sum",
     "onnx/node/generated/test_gridsample_bicubic",
     "onnx/node/generated/test_gridsample_bicubic_align_corners_0_additional_1",
