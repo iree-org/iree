@@ -765,8 +765,8 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     // Do not fuse operations if they are already an operand of the
     // owner and have an index return type as that means its a shape
     // computation that needs to happen on the host.
-    auto op = v.getDefiningOp();
-    if (op && user == dispatchOp && v.getType().isIndex()) {
+    if (user == dispatchOp && v.getType().isIndex() &&
+        isa<IREE::Flow::DispatchRegionOp>(dispatchOp)) {
       return true;
     }
 
