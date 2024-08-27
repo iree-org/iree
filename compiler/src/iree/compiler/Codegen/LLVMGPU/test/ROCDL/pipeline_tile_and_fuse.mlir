@@ -556,9 +556,10 @@ hal.executable public @main {
 // Verify that it compiles, meaning the consumer was successfully fused into
 // the producer's (convolution's) distributed scf.forall loop.
 // CHECK-LABEL: func @conv_nchw_fused
+//       CHECK:   %[[ALLOCA:.+]] = memref.alloca() : memref<1x1x1x1xf32, #gpu.address_space<private>>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c1
 //       CHECK:     linalg.conv_2d_nchw_fchw
-//  CHECK-SAME:       outs(%{{.*}} : memref<1x1x1x1xf32, #gpu.address_space<private>>)
+//  CHECK-SAME:       outs(%[[ALLOCA]] : memref<1x1x1x1xf32, #gpu.address_space<private>>)
 //       CHECK:   arith.addf
 //       CHECK:   arith.cmpf
 //       CHECK:   arith.select

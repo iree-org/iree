@@ -11,8 +11,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -28,10 +26,8 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -299,8 +295,15 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
                                                        ValueRange dynamicSizes,
                                                        unsigned alignment) {
   // Bail out if the memref type does not specify a memory space.
-  if (!isa<gpu::AddressSpaceAttr>(memRefType.getMemorySpace())) {
+  if (!llvm::isa_and_nonnull<gpu::AddressSpaceAttr>(
+          memRefType.getMemorySpace())) {
     return failure();
+  }
+  auto privateSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getPrivateAddressSpace());
+  if (memRefType.getMemorySpace() == privateSpace) {
+    return builder.create<memref::AllocaOp>(loc, memRefType, dynamicSizes)
+        .getResult();
   }
   return builder.create<memref::AllocOp>(loc, memRefType, dynamicSizes)
       .getResult();
