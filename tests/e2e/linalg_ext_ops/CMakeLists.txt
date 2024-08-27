@@ -119,7 +119,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda-topk-split-reduction
   SRCS
-    "top-k-scf-lowering.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
@@ -139,7 +138,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda-topk-split-reduction-double
   SRCS
-    "top-k-scf-lowering.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
