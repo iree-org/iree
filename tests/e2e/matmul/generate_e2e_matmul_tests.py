@@ -299,6 +299,13 @@ def get_rocm_test_compilation_infos(
             MMASchedule("WMMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
             MMASchedule("WMMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
             MMASchedule("WMMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
+            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_I32_16x16x16_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_I32_16x16x16_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_I32_16x16x16_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
