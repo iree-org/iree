@@ -197,7 +197,7 @@ jobs:
             -DIREE_RUNTIME_OPTIMIZATION_PROFILE=size \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_HAL_DRIVER_CUDA=ON \
-            -DIREE_HAL_DRIVER_HIP=ON 
+            -DIREE_HAL_DRIVER_HIP=ON
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
       - name: CTest
@@ -245,7 +245,7 @@ jobs:
             -DIREE_ENABLE_RUNTIME_TRACING=ON \
             -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER} \
             -DIREE_HAL_DRIVER_CUDA=ON \
-            -DIREE_HAL_DRIVER_HIP=ON 
+            -DIREE_HAL_DRIVER_HIP=ON
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
 
