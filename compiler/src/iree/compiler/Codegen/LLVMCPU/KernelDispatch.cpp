@@ -2549,6 +2549,8 @@ static bool canTopkBeLoweredUsingSCF(mlir::FunctionOpInterface entryPointFn,
   auto shapedTy = llvm::cast<ShapedType>(arg0.getType());
   SmallVector<int64_t> vectorSizes;
   vectorSizes.append(shapedTy.getShape().begin(), shapedTy.getShape().end());
+  if (shapedTy.isDynamicShape(vectorSizes))
+    return false;
   auto out0 = topkOp.getResults()[0];
   auto resShapedTy = llvm::cast<ShapedType>(out0.getType());
   ArrayRef<int64_t> resShape = resShapedTy.getShape();

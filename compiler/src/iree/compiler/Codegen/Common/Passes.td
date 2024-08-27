@@ -298,7 +298,7 @@ def GenericVectorizationPass :
 
 def TopkLoweringPass :
     InterfacePass<"iree-codegen-topk-scf-lowering", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to perform lowering TopKkto SCF operations.";
+  let summary = "Pass to perform lowering Topk to SCF operations.";
 }
 
 def OptimizeTensorInsertExtractSlicesPass

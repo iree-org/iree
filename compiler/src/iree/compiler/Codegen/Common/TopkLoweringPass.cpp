@@ -43,11 +43,10 @@ public:
   void runOnOperation() override;
 };
 
-static LogicalResult
-lowerTopkOpPreconditionUsingSCF(IREE::LinalgExt::TopkOp topkOp) {
+static bool canLowerTopkOpUsingSCF(IREE::LinalgExt::TopkOp topkOp) {
   if (isTopkSCFLowerEnabled(topkOp))
-    return success();
-  return failure();
+    return true;
+  return false;
 }
 
 static scf::ForOp replaceForOpWithNewSignature(RewriterBase &rewriter,
@@ -873,11 +872,8 @@ void TopkLoweringPass::runOnOperation() {
       SmallVector<int64_t> vectorSizes;
       vectorSizes.append(shapedTy.getShape().begin(),
                          shapedTy.getShape().end());
-      if (shapedTy.isDynamicShape(vectorSizes))
-        continue;
-      if (failed(lowerTopkOpPreconditionUsingSCF(topkOp))) {
-        VEC_LDBG("Vectorization TopK pre-conditions failed\n");
-        return; // falied.
+      if (!canLowerTopkOpUsingSCF(topkOp)) {
+        return; // Not marked for SCF lowering.
       }
 
       auto results = lowerAsLinalgExtTopkUsingSCF(rewriter, topkOp,
@@ -910,10 +906,5 @@ void TopkLoweringPass::runOnOperation() {
 }
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTopkLowering() {
-  return std::make_unique<TopkLoweringPass>();
-}
 
 } // namespace mlir::iree_compiler
