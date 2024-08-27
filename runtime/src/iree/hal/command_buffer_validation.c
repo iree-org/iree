@@ -69,18 +69,24 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
 #if IREE_STATUS_MODE
     // Buffer cannot be used on the queue for the given usage.
-    iree_bitfield_string_temp_t temp0, temp1;
+    iree_bitfield_string_temp_t temp0, temp1, temp2, temp3;
     iree_string_view_t allowed_usage_str = iree_hal_buffer_usage_format(
         iree_hal_buffer_allowed_usage(buffer), &temp0);
     iree_string_view_t intended_usage_str =
         iree_hal_buffer_usage_format(intended_usage, &temp1);
+    iree_string_view_t allowed_compatibility_str =
+        iree_hal_buffer_compatibility_format(allowed_compatibility, &temp2);
+    iree_string_view_t required_compatibility_str =
+        iree_hal_buffer_compatibility_format(required_compatibility, &temp3);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "requested buffer usage is not supported for the buffer on this queue; "
-        "buffer allows %.*s, operation requires %.*s (allocator compatibility "
-        "mismatch)",
+        "buffer allows usage %.*s, operation requires %.*s (allocator "
+        "compatibility mismatch: allowed compatibility %.*s, requires %.*s)",
         (int)allowed_usage_str.size, allowed_usage_str.data,
-        (int)intended_usage_str.size, intended_usage_str.data);
+        (int)intended_usage_str.size, intended_usage_str.data,
+        (int)allowed_compatibility_str.size, allowed_compatibility_str.data,
+        (int)required_compatibility_str.size, required_compatibility_str.data);
 #else
     return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
 #endif  // IREE_STATUS_MODE
