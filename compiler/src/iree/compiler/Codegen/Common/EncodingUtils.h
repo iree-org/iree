@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
+#include <cstdint>
+#include <optional>
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/SmallVector.h"
@@ -26,6 +28,7 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerTileShapes;
   SmallVector<int64_t> intrinsicSize;
   SmallVector<int64_t> permutation;
+  std::optional<int64_t> unrollingFactor = std::nullopt;
 };
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
@@ -157,11 +160,12 @@ bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 } // namespace mlir::iree_compiler
 
 template <typename T>
-llvm::SmallVector<T>
-getDataTilingTransposeDimensions(llvm::ArrayRef<T> sourceShape,
-                                 llvm::ArrayRef<int64_t> innerTileSizes,
-                                 llvm::ArrayRef<int64_t> intrinsicVectorShape,
-                                 mlir::Builder *builder = nullptr) {
+llvm::SmallVector<T> getDataTilingTransposeDimensions(
+    llvm::ArrayRef<T> sourceShape, llvm::ArrayRef<int64_t> innerTileSizes,
+    llvm::ArrayRef<int64_t> intrinsicVectorShape,
+    std::optional<int64_t> unrollFactor = std::nullopt,
+    mlir::Builder *builder = nullptr) {
+
   auto dividerFn = [](T val, int64_t divisor) -> T {
     if constexpr (std::is_same_v<T, mlir::OpFoldResult>) {
       if (auto attr = llvm::dyn_cast<mlir::Attribute>(val)) {

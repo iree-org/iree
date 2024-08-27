@@ -41,12 +41,11 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-
-static llvm::cl::opt<std::string> clUnrollingFactor(
+static llvm::cl::opt<int64_t> clUnrollingFactor(
     "iree-data-tiling-unrolling-factor",
-    llvm::cl::desc(
-        "custom unrolling factor for data tiling"),
-    llvm::cl::value_desc("unrolling factor"));
+    llvm::cl::desc("custom unrolling factor for data tiling (0 means "
+                   "non-specified unrolling factor)"),
+    llvm::cl::value_desc("unrolling factor"), llvm::cl::init(0));
 
 using namespace IREE::GPU;
 using SmallVectorType = SmallVector<int64_t>;
@@ -162,6 +161,11 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   encodingInfo.intrinsicSize = {std::get<0>(mnkShape), std::get<1>(mnkShape),
                                 std::get<2>(mnkShape)};
   encodingInfo.permutation = permutation;
+
+  if (clUnrollingFactor != 0) {
+    encodingInfo.unrollingFactor = clUnrollingFactor;
+  }
+
   return encodingInfo;
 }
 
@@ -255,7 +259,7 @@ struct GPUSetEncodingOpLoweringConversion
     SmallVector<int64_t> expandShapeShape =
         getDataTilingTransposeDimensions<int64_t>(
             sourceShape, maybeEncodingInfo->innerTileSizes,
-            intrinsicVectorShape);
+            intrinsicVectorShape, clUnrollingFactor);
     auto expandShapeType = RankedTensorType::get(
         expandShapeShape, encodingOp.getSourceType().getElementType());
 

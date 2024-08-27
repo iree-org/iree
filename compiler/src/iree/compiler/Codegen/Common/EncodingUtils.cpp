@@ -117,7 +117,8 @@ resolveTileSwizzlingType(RankedTensorType packedType,
 
   SmallVector<int64_t> intrinsicVectorShape = encodingInfo.innerTileShapes;
   SmallVector<int64_t> newShape = getDataTilingTransposeDimensions<int64_t>(
-      packedType.getShape(), encodingInfo.innerTileSizes, intrinsicVectorShape);
+      packedType.getShape(), encodingInfo.innerTileSizes, intrinsicVectorShape,
+      encodingInfo.unrollingFactor);
 
   applyPermutationToVector(newShape, perm);
   return RankedTensorType::get(newShape, packedType.getElementType());
@@ -140,7 +141,7 @@ resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
   SmallVector<OpFoldResult> newShape =
       getDataTilingTransposeDimensions<OpFoldResult>(
           packedShape, encodingInfo.innerTileSizes,
-          encodingInfo.innerTileShapes, &b);
+          encodingInfo.innerTileShapes, encodingInfo.unrollingFactor, &b);
   applyPermutationToVector(newShape, perm);
 
   return newShape;
