@@ -62,16 +62,6 @@ def ElementwiseOpFusionPass :
   ];
 }
 
-def FoldTransposesPass :
-    Pass<"iree-dispatch-creation-fold-transposes", ""> {
-  let summary = "Fold transpose-like linalg ops into other ops";
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::linalg::LinalgDialect",
-    "IREE::LinalgExt::IREELinalgExtDialect",
-  ];
-}
-
 def FoldUnitExtentDimsPass :
     Pass<"iree-dispatch-creation-fold-unit-extent-dims", "mlir::ModuleOp"> {
   let summary = "Fold unit extent dimension of operations.";

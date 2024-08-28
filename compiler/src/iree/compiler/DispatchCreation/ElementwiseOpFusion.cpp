@@ -73,6 +73,8 @@ void ElementwiseOpFusionPass::runOnOperation() {
       };
   linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                fuseElementwiseOpsControlFn);
+  IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
+      fusionPatterns, fuseElementwiseOpsControlFn);
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
   if (failed(applyPatternsAndFoldGreedily(
