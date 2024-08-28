@@ -99,6 +99,10 @@ struct ConvertToROCDLPass final
     bool use32BitIndices = clROCMIndexingBits == 32;
     StringRef chipset = getGPUTargetAttr(m).getArch();
     FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
+    if (failed(maybeChipset)) {
+      m.emitOpError("failed to get chipset info");
+      return signalPassFailure();
+    }
 
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
@@ -125,11 +129,11 @@ struct ConvertToROCDLPass final
       RewritePatternSet patterns(&getContext());
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
-      bool convertFP8Arithmetic = (*maybeChipset).majorVersion == 9 &&
-                                  (*maybeChipset).minorVersion >= 0x40;
+      bool convertFP8Arithmetic =
+          maybeChipset->majorVersion == 9 && maybeChipset->minorVersion >= 0x40;
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, convertFP8Arithmetic, /*saturateFP8Truncf=*/false,
-          /*allowPacked16Rtz=*/false, maybeChipset.value_or(amdgpu::Chipset()));
+          /*allowPacked16Rtz=*/false, maybeChipset.value());
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
@@ -194,8 +198,8 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      populateAMDGPUToROCDLConversionPatterns(
-          converter, llvmPatterns, maybeChipset.value_or(amdgpu::Chipset()));
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
+                                              maybeChipset.value());
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown);
