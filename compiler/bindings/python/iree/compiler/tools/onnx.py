@@ -56,8 +56,8 @@ def load_onnx_model(raw_model: onnx.ModelProto,
     # the revised model with shapes.
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_dir_path = Path(temp_dir_name)
-        temp_input_file = temp_dir_path + "/" + "temp.onnx"
-        temp_inferred_file = temp_dir_path + "/" + "temp-inferred.onnx"
+        temp_input_file = temp_dir_path / "temp.onnx"
+        temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
         onnx.save(raw_model, temp_input_file)
         onnx.shape_inference.infer_shapes_path(
             temp_input_file, temp_inferred_file, data_prop=data_prop
