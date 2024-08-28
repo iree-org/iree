@@ -751,3 +751,15 @@ util.func public @innermost_unit_dim(%4: !flow.dispatch.tensor<readonly:tensor<3
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
 //       CHECK:   flow.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]
+
+// -----
+
+util.func public @constant_fold_workload_ordinal() -> (index) {
+  %c2 = arith.constant 2: index
+  %0 = flow.dispatch.workload.ordinal %c2, 0 : index
+  util.return %0 : index
+}
+// CHECK-LABEL: util.func public @constant_fold_workload_ordinal()
+//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-NOT:   flow.dispatch.workload.ordinal
+//       CHECK:   util.return %[[C2]]

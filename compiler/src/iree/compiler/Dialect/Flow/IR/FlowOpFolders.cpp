@@ -414,6 +414,10 @@ OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
       return producerOrdinalOp.getOperand();
     }
   }
+  if (auto producerConstantOp = dyn_cast_or_null<arith::ConstantIndexOp>(
+          getOperand().getDefiningOp())) {
+    return producerConstantOp.getValue();
+  }
   return {};
 }
 
