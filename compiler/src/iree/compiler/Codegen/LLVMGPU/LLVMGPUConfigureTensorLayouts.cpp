@@ -38,7 +38,7 @@ LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   FailureOr<VectorContractOpInfo> opInfo =
       VectorContractOpInfo::inferFromIndexingMaps(
           contract.getIndexingMapsArray());
-  assert(succeeded(opInfo) && "contraction should have been infered");
+  assert(succeeded(opInfo) && "contraction should have been inferred");
 
   auto layouts = schedule.getContractionLayout(opInfo.value(), contract);
   if (failed(layouts)) {

@@ -24,10 +24,9 @@ struct DropToLayoutUnitDims final
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
                                 PatternRewriter &rewriter) const override {
     if (!toLayoutOp.hasTensorSemantics()) {
-      return failure();
+      return rewriter.notifyMatchFailure(toLayoutOp,
+                                         "requires tensor semanticS");
     }
-
-    rewriter.setInsertionPoint(toLayoutOp);
 
     Location loc = toLayoutOp.getLoc();
     ShapedType inputTy = toLayoutOp.getType();
@@ -67,6 +66,8 @@ struct DropToLayoutUnitDims final
         toLayoutOp->getDiscardableAttrDictionary());
 
     // Expand to preserve output shape using insert_slice.
+    // Here, since the shape comes from the result of a to_layout op, it will
+    // always be static.
     Value dest =
         rewriter.create<tensor::EmptyOp>(loc, shape, inputTy.getElementType());
 
