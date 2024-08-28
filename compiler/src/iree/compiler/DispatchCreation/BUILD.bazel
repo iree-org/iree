@@ -16,6 +16,7 @@ iree_compiler_cc_library(
     name = "DispatchCreation",
     srcs = [
         "BubbleUpExpandShapes.cpp",
+        "BubbleUpExtractSlices.cpp",
         "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",
         "CollapseReductionDimensions.cpp",
