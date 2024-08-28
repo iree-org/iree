@@ -36,6 +36,12 @@ CMAKE_ARGS=(
 
   # Enable TSan in all C/C++ targets, including IREE runtime, compiler, tests.
   "-DIREE_ENABLE_TSAN=ON"
+
+  # Workaround for this weird issue:
+  # https://github.com/google/benchmark/issues/773#issuecomment-616067912
+  "-DRUN_HAVE_STD_REGEX=0"
+  "-DRUN_HAVE_POSIX_REGEX=0"
+  "-DCOMPILE_HAVE_GNU_POSIX_REGEX=0"
 )
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
