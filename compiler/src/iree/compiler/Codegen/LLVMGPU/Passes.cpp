@@ -203,22 +203,18 @@ static void addBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 }
 
-static void
-tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
-                             bool useWARForCooperativeMatrixCodegen = false,
-                             bool convertInputsToDestinations = true) {
+static void tileAndDistributeToWorkgroup(
+    OpPassManager &funcPassManager,
+    std::optional<ConvertToDestinationPassingStylePassOptions>
+        convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{}) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
       kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
   funcPassManager.addPass(createCSEPass());
 
-  {
-    ConvertToDestinationPassingStylePassOptions options;
-    options.convertInputsToDestinations = convertInputsToDestinations;
-    options.useWARForCooperativeMatrixCodegen =
-        useWARForCooperativeMatrixCodegen;
+  if (convertToDpsOptions) {
     funcPassManager.addPass(
-        createConvertToDestinationPassingStylePass(options));
+        createConvertToDestinationPassingStylePass(*convertToDpsOptions));
   }
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
@@ -228,8 +224,9 @@ tileAndDistributeToWorkgroup(OpPassManager &funcPassManager,
 }
 
 static void tileAndBufferize(OpPassManager &funcPassManager) {
-  tileAndDistributeToWorkgroup(funcPassManager,
-                               /*useWARForCooperativeMatrixCodegen=*/true);
+  ConvertToDestinationPassingStylePassOptions options;
+  options.useWARForCooperativeMatrixCodegen = true;
+  tileAndDistributeToWorkgroup(funcPassManager, options);
   addBufferizePasses(funcPassManager);
 }
 
@@ -326,8 +323,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager,
-                               /*useWARForCooperativeMatrixCodegen=*/false,
-                               /*convertInputsToDestinations=*/false);
+                               /*convertToDpsOptions=*/std::nullopt);
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
@@ -959,8 +955,9 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const LLVMGPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager,
-                               /*useWARForCooperativeMatrixCodegen=*/true);
+  ConvertToDestinationPassingStylePassOptions dpsOptions;
+  dpsOptions.useWARForCooperativeMatrixCodegen = true;
+  tileAndDistributeToWorkgroup(funcPassManager, dpsOptions);
   if (options.enableUkernels) {
     funcPassManager.addPass(createGPULowerToUKernelsPass());
   }
