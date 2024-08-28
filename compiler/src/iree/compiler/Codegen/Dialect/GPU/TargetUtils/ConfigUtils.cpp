@@ -86,6 +86,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   GPUMMAHeuristicSeeds seeds;
+  int64_t inBitWidth = lhsElemType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -96,11 +97,13 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup*/ 512 / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestMNTileCountPerSubgroup=*/16,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ 512 / inBitWidth};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
