@@ -994,8 +994,8 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     return failure();
   }
 
-  int64_t batchCount = opInfo.getBatchCount();
-  if (batchCount == 1 && bounds[0] != 1) {
+  if (!llvm::all_of(opInfo.getBatchDims(),
+                    [&bounds](int64_t dim) { return bounds[dim] == 1; })) {
     LLVM_DEBUG({ llvm::errs() << "non-unit batch dimension\n"; });
     return failure();
   }

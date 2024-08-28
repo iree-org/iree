@@ -29,6 +29,9 @@ public:
   SmallVector<unsigned, 2> getMDims() const { return contractionDims.m; }
   SmallVector<unsigned, 2> getNDims() const { return contractionDims.n; }
   SmallVector<unsigned, 2> getKDims() const { return contractionDims.k; }
+  SmallVector<unsigned, 2> getBatchDims() const {
+    return contractionDims.batch;
+  }
 
   int64_t getARank() const {
     return contractionDims.batch.size() + contractionDims.m.size() +
