@@ -47,9 +47,9 @@ static SmallVector<int64_t> getPermutation(linalg::LinalgOp linalgOp) {
 
 namespace {
 
-struct FuseTransposeWithLinalgExtOp final
+struct FuseTransposeWithAttentionOp final
     : public OpRewritePattern<LinalgExt::AttentionOp> {
-  FuseTransposeWithLinalgExtOp(MLIRContext *context,
+  FuseTransposeWithAttentionOp(MLIRContext *context,
                                linalg::ControlFusionFn controlFn,
                                PatternBenefit benefit = 1)
       : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
@@ -105,7 +105,7 @@ private:
 void populateFuseLinalgExtOpsWithTransposes(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFusionFn) {
-  patterns.add<FuseTransposeWithLinalgExtOp>(patterns.getContext(),
+  patterns.add<FuseTransposeWithAttentionOp>(patterns.getContext(),
                                              controlFusionFn);
 }
 
