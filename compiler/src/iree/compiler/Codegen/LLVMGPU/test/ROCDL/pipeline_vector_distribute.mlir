@@ -767,6 +767,6 @@ hal.executable private @attention_multiple_m_transpose {
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 
 // CHECK: scf.for %{{.*}} = %c0 to %c72 step %c1
-// CHECK-SAME: -> (vector<2x1x4xf32>, vector<2x8x1x1x4x1xf16>, vector<2x1x4xf32>)
+// CHECK-SAME: -> (vector<2x1x4xf32>, vector<2x1x4xf32>, vector<2x8x1x1x4x1xf16>)
 // CHECK-COUNT-128:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
