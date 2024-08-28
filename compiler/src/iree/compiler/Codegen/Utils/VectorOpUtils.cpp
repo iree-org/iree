@@ -28,6 +28,13 @@ std::pair<int, int> VectorContractOpInfo::getResultMNIndex() const {
 
 FailureOr<VectorContractOpInfo>
 VectorContractOpInfo::inferFromIndexingMaps(ArrayRef<AffineMap> maps) {
+  // Ensure all maps are projected permutations.
+  if (!llvm::all_of(maps, [](AffineMap map) {
+        return map.isProjectedPermutation(/*allowZeroInResults=*/true);
+      })) {
+    return failure();
+  }
+
   auto maybeContractionDims = linalg::inferContractionDims(maps);
   if (failed(maybeContractionDims)) {
     return failure();
@@ -51,6 +58,10 @@ VectorContractOpInfo::inferFromIndexingMaps(ArrayRef<AffineMap> maps) {
   int64_t k = contractionDims.k.back();
   opInfo.lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
   opInfo.rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
+
+  opInfo.lhsUnitDims = maps[0].getBroadcastDims();
+  opInfo.rhsUnitDims = maps[1].getBroadcastDims();
+  opInfo.accUnitDims = maps[2].getBroadcastDims();
 
   opInfo.contractionDims = contractionDims;
 

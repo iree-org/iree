@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_CODEGEN_UTILS_VECTORUTILS_H_
+#define IREE_COMPILER_CODEGEN_UTILS_VECTORUTILS_H_
+
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 namespace mlir::iree_compiler {
@@ -26,18 +29,21 @@ public:
   SmallVector<unsigned, 2> getMDims() const { return contractionDims.m; }
   SmallVector<unsigned, 2> getNDims() const { return contractionDims.n; }
   SmallVector<unsigned, 2> getKDims() const { return contractionDims.k; }
+  SmallVector<unsigned, 2> getBatchDims() const {
+    return contractionDims.batch;
+  }
 
   int64_t getARank() const {
     return contractionDims.batch.size() + contractionDims.m.size() +
-           contractionDims.k.size();
+           contractionDims.k.size() + lhsUnitDims.size();
   }
   int64_t getBRank() const {
     return contractionDims.batch.size() + contractionDims.k.size() +
-           contractionDims.n.size();
+           contractionDims.n.size() + rhsUnitDims.size();
   }
   int64_t getCRank() const {
     return contractionDims.batch.size() + contractionDims.m.size() +
-           contractionDims.n.size();
+           contractionDims.n.size() + accUnitDims.size();
   }
 
   int64_t getBatchCount() const { return contractionDims.batch.size(); }
@@ -49,8 +55,14 @@ public:
   SmallVector<int64_t> outMDims;
   SmallVector<int64_t> outNDims;
 
+  SmallVector<unsigned> lhsUnitDims;
+  SmallVector<unsigned> rhsUnitDims;
+  SmallVector<unsigned> accUnitDims;
+
 private:
   linalg::ContractionDimensions contractionDims;
 };
 
 } // namespace mlir::iree_compiler
+
+#endif // IREE_COMPILER_CODEGEN_UTILS_VECTORUTILS_H_

@@ -19,4 +19,13 @@ def VectorizeIREEVectorExtOpsPass :
   ];
 }
 
+def VectorExtFoldUnitExtentDimsPass :
+    Pass<"iree-vector-ext-fold-unit-extent-dims", ""> {
+  let summary = "Folds unit dims for iree_vector_ext ops";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_PASSES

@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h.inc"
   SRCS
     "Passes.cpp"
+    "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"
   DEPS
     ::PassesIncGen
