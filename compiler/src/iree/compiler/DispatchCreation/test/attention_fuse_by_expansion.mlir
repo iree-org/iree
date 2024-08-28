@@ -12,11 +12,11 @@ util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<
   util.return %expanded : tensor<2x10x4096x64xf16>
 }
 
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
-//      CHECK: func public @attention_static(
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//  CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//  CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//CHECK-LABEL: func public @attention_static(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x4096x16xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
@@ -26,7 +26,7 @@ util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<
 //  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, 10, 1024, 16]
 //  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, 10, 1024, 64]
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:       indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]]]
+// CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]]]
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
@@ -45,11 +45,11 @@ util.func public @attention_expand_all(%arg0: tensor<20x4096x16xf16>, %arg1: ten
   util.return %expanded : tensor<2x10x2048x2x2x32xf16>
 }
 
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d4)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d6, d7)>
-//      CHECK: func public @attention_expand_all(
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d4)>
+//  CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7)>
+//  CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d6, d7)>
+//CHECK-LABEL: func public @attention_expand_all(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x4096x16xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
@@ -59,7 +59,7 @@ util.func public @attention_expand_all(%arg0: tensor<20x4096x16xf16>, %arg1: ten
 //  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[\[}}0, 1], [2], [3]] output_shape [2, 10, 1024, 16] : tensor<20x1024x16xf16> into tensor<2x10x1024x16xf16>
 //  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[\[}}0, 1], [2], [3, 4]] output_shape [2, 10, 1024, 2, 32] : tensor<20x1024x64xf16> into tensor<2x10x1024x2x32xf16>
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:       indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]]]
+// CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]]]
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
@@ -90,12 +90,12 @@ util.func public @attention_dynamic(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x
   util.return %expanded : tensor<2x?x?x?xf16>
 }
 
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
-//  CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0] -> (s0 floordiv 2)>
-//      CHECK: func public @attention_dynamic(
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//  CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//  CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-DAG: #[[$MAP4:.+]] = affine_map<()[s0] -> (s0 floordiv 2)>
+//CHECK-LABEL: func public @attention_dynamic(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?xf16>
@@ -108,7 +108,7 @@ util.func public @attention_dynamic(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG2]], %[[C2]]
 //  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divui %[[D0]]
-//  CHECK-DAG:   %[[VAL:.+]] = affine.apply #[[MAP4]]()[%[[D0]]]
+//  CHECK-DAG:   %[[VAL:.+]] = affine.apply #[[$MAP4]]()[%[[D0]]]
 //  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[VAL]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
 //  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D1]], %[[D2]]]
 //  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
@@ -121,7 +121,71 @@ util.func public @attention_dynamic(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x
 //  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divui %[[D8]], %[[C2]]
 //  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT2]], %[[D9]], %[[D4]]]
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:       indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]]]
+// CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]]]
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+
+util.func public @sink_through_attention(%0 : tensor<4x32x64x128xf16>, %1 : tensor<4x32x64x128xf16>, %2 : tensor<4x32x64x128xf16>, %cst : f16) -> (tensor<128x64x128xf16>) {
+  %13 = tensor.empty() : tensor<4x32x64x128xf16>
+  %collapsed_12 = tensor.collapse_shape %0 [[0, 1], [2], [3]] : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+  %collapsed_13 = tensor.collapse_shape %1 [[0, 1], [2], [3]] : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+  %collapsed_14 = tensor.collapse_shape %2 [[0, 1], [2], [3]] : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+  %17 = tensor.empty() : tensor<128x64x128xf16>
+  %18 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3]} ins(%collapsed_12, %collapsed_13, %collapsed_14, %cst : tensor<128x64x128xf16>, tensor<128x64x128xf16>, tensor<128x64x128xf16>, f16) outs(%17 : tensor<128x64x128xf16>) -> tensor<128x64x128xf16>
+  util.return %18 : tensor<128x64x128xf16>
+}
+
+//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//   CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//   CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+// CHECK-LABEL: util.func public @sink_through_attention
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG3:.+]]: f16
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]]]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
+//       CHECK:   %[[RET:.+]] = tensor.collapse_shape %[[ATTENTION]] {{\[}}[0, 1], [2], [3]{{\]}} : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+//       CHECK:   util.return %[[RET]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+
+util.func public @sink_single_collapse(%0 : tensor<4x32x64x128xf16>, %1 : tensor<128x64x128xf16>, %2 : tensor<128x64x128xf16>, %cst : f16) -> (tensor<128x64x128xf16>) {
+  %13 = tensor.empty() : tensor<4x32x64x128xf16>
+  %collapsed_12 = tensor.collapse_shape %0 [[0, 1], [2], [3]] : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+  %17 = tensor.empty() : tensor<128x64x128xf16>
+  %18 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3]} ins(%collapsed_12, %1, %2, %cst : tensor<128x64x128xf16>, tensor<128x64x128xf16>, tensor<128x64x128xf16>, f16) outs(%17 : tensor<128x64x128xf16>) -> tensor<128x64x128xf16>
+  util.return %18 : tensor<128x64x128xf16>
+}
+
+//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//   CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//   CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+// CHECK-LABEL: util.func public @sink_single_collapse
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG3:.+]]: f16
+//   CHECK-DAG:   %[[EXPANDED1:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [4, 32, 64, 128]
+//   CHECK-DAG:   %[[EXPANDED2:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [4, 32, 64, 128]
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]]]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[EXPANDED1]], %[[EXPANDED2]], %[[ARG3]] :
+//       CHECK:   %[[RET:.+]] = tensor.collapse_shape %[[ATTENTION]] {{\[}}[0, 1], [2], [3]{{\]}} : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+//       CHECK:   util.return %[[RET]]
