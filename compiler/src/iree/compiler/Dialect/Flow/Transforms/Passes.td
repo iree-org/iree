@@ -9,6 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
+// File organization:
+// Groups passes that are related under one banner //===....===//. For any new
+// pass add it to the relevant group and keep them alphabetical within a group.
+
 //===---------------------------------------------------------------------===//
 // General Flow passes
 //===---------------------------------------------------------------------===//

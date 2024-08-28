@@ -10,29 +10,18 @@
 
 include "mlir/Pass/PassBase.td"
 
+// File organization:
+// Groups passes that are related under one banner //===....===//. For example
+// the dispatch region creation preprocessing passes and dispatch region
+// formation passes are a couple of such groups. For any new pass add it to the
+// relevant group and keep them alphabetical within a group.
+
 //===---------------------------------------------------------------------===//
 // Dispatch region creation preprocessing passes :
 // Passes that transform the program before forming dispatches, like
 // - Elementwise operation fusion
 // - Reshape propagation passes
 //===---------------------------------------------------------------------===//
-
-def TensorPadToTensorInsertSlicePass :
-    Pass<"iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"> {
-  let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice.";
-  let options = [
-    Option<"skipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
-           /*default=*/"false",
-           "Skip the op that has only one use which is used"
-           "by a Linalg op">,
-  ];
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::math::MathDialect",
-    "mlir::memref::MemRefDialect",
-  ];
-}
 
 def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
@@ -132,6 +121,23 @@ def SplitReductionPass :
   let summary = "Split reduction dimension to increase parallelism.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+  ];
+}
+
+def TensorPadToTensorInsertSlicePass :
+    Pass<"iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"> {
+  let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice.";
+  let options = [
+    Option<"skipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
+           /*default=*/"false",
+           "Skip the op that has only one use which is used"
+           "by a Linalg op">,
+  ];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::math::MathDialect",
+    "mlir::memref::MemRefDialect",
   ];
 }
 
@@ -248,6 +254,17 @@ def FormScalarDispatchesPass :
   ];
 }
 
+def HoistEncodingOpsPass :
+    InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
+
 def SetEncodingPass :
     InterfacePass<"iree-dispatch-creation-set-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
@@ -261,6 +278,10 @@ def SetEncodingPass :
            "provides padding size hints that will be attached to encodings.">,
   ];
 }
+
+//===---------------------------------------------------------------------===//
+// Dispatch region to workgroups passes
+//===---------------------------------------------------------------------===//
 
 def ConvertDispatchRegionsToWorkgroupsPass :
     InterfacePass<"iree-dispatch-creation-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
@@ -316,14 +337,5 @@ def MaterializeDefaultWorkgroupCountRegionPass:
       ];
 }
 
-def HoistEncodingOpsPass :
-    InterfacePass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-    "IREE::Flow::FlowDialect",
-    "IREE::Encoding::IREEEncodingDialect",
-  ];
-}
 
 #endif // IREE_COMPILER_DISPATCHCREATION_PASSES
