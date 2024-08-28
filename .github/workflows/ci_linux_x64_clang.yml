@@ -45,20 +45,27 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
-      - name: "Configuring GCP"
-        id: configure-gcp
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18238): add local or remote ccache
+      - name: CMake - configure
         run: |
-          google_apikey=$(gcloud auth application-default print-access-token)
-          echo "::add-mask::$google_apikey"
-          echo "google_apikey=$google_apikey" >> "$GITHUB_OUTPUT"
-      - name: "Building IREE"
-        env:
-          CCACHE_NAMESPACE: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
-          IREE_CCACHE_GCP_TOKEN: ${{ steps.configure-gcp.outputs.google_apikey }}
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-      - name: "Testing IREE"
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DPython3_EXECUTABLE="$(which python3)" \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            -DIREE_BUILD_DOCS=ON \
+            -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
+      - name: CMake - build
+        run: |
+          cmake --build ${BUILD_DIR} -- -k 0
+          cmake --build ${BUILD_DIR} --target install -- -k 0
+          cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
+      - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      - name: "Testing iree-dialects"
+      - name: Test iree-dialects
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
