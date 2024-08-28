@@ -34,31 +34,31 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+    defaults:
+      run:
+        shell: bash
     env:
-      BUILD_DIR: full-build-dir
+      BUILD_DIR: build
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
+      - name: "Configuring GCP"
+        id: configure-gcp
+        run: |
+          google_apikey=$(gcloud auth application-default print-access-token)
+          echo "::add-mask::$google_apikey"
+          echo "google_apikey=$google_apikey" >> "$GITHUB_OUTPUT"
       - name: "Building IREE"
         env:
+          CCACHE_NAMESPACE: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+          IREE_CCACHE_GCP_TOKEN: ${{ steps.configure-gcp.outputs.google_apikey }}
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+          IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: "Testing iree-dialects"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
+        run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
