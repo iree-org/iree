@@ -23,9 +23,9 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def load_onnx_model(raw_model: onnx.ModelProto, 
-                    data_prop: bool = True, 
-                    data_dir : IO[bytes] | str | os.PathLike | None = None):
+def load_onnx_model(raw_model: onnx.ModelProto,
+                    data_prop: bool = True,
+                    data_dir: IO[bytes] | str | os.PathLike | None = None):
     # Load the model, with possible external data coming from the default
     # location, or the location specified on the command line.
     if data_dir:
@@ -107,9 +107,16 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs):
         if original_model.ir_version < _IR_MIN_VERSION:
             logger.info("Converting onnx model opset version from %s to %s",
                         original_model.ir_version, _IR_MIN_VERSION)
-            converted_model = onnx.version_converter.convert_version(
-                original_model, _IR_MIN_VERSION)
+            try:
+                converted_model = onnx.version_converter.convert_version(
+                    original_model, _IR_MIN_VERSION)
+            except:
+                # Conversion failed. Do our best with the original file.
+                logger.warning("Converting onnx model opset version from %s to %s failed. Continuning without conversion.",
+                               original_model.ir_version, _IR_MIN_VERSION)
+                converted_model = original_model
         else:
+            # No conversion needed.
             converted_model = original_model
 
         if options.entry_point_name:
@@ -162,4 +169,3 @@ def compile_model(model: onnx.ModelProto, **kwargs):
         temp_model_file = temp_dir_path / "temp.onnx"
         onnx.save(model, temp_model_file)
         return compile_saved_model(temp_model_file, **kwargs)
-
