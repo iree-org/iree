@@ -28,12 +28,7 @@ jobs:
   linux_x64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: azure-linux
     env:
       BUILD_DIR: full-build-dir
     steps:
