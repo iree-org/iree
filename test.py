@@ -16,8 +16,9 @@ if __name__ == "__main__":
     np.save("attn_q.npy", q.detach().to(dtype=torch.float16, device="cpu").numpy())
     np.save("attn_k.npy", k.detach().to(dtype=torch.float16, device="cpu").numpy())
     np.save("attn_v.npy", v.detach().to(dtype=torch.float16, device="cpu").numpy())
-    np.save("attn_mask.npy", mask.detach().to(dtype=torch.float16, device="cpu").numpy())
+    np.save("attn_mask.npy", mask.detach().to(dtype=torch.bool, device="cpu").numpy())
 
     # Post attention func
-    out = torch._scaled_dot_product_flash_attention_for_cpu(q, k, v, attn_mask=mask).output
+    out = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+    print(mask)
     np.save("attn_ref.npy", out.detach().to(device="cpu").numpy())
