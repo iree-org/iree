@@ -4,8 +4,8 @@ contact_links:
     url: https://github.com/iree-org/iree/issues/new
     about: If you know what you're doing (especially collaborators)
   - name: 📧 Send an email to our mailing list
-    url: https://groups.google.com/forum/#!forum/iree-discuss
-    about: For announcements and asynchronous discussion
+    url: https://lists.lfaidata.foundation/g/iree-technical-discussion
+    about: For asynchronous discussion
   - name: 🗣 Start a discussion on GitHub
     url: https://github.com/iree-org/iree/discussions
     about: An alternative platform for asynchronous discussion

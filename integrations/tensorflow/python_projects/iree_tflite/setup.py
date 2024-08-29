@@ -45,7 +45,7 @@ setup(
     name=f"iree-tools-tflite{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="The IREE Team",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     license="Apache-2.0",
     description="IREE TFLite Compiler Tools",
     long_description=README,

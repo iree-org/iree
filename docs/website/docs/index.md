@@ -186,8 +186,10 @@ using various languages.
 * :fontawesome-brands-discord:
   [IREE Discord server](https://discord.gg/wEWh6Z9nMU): Daily development
   discussions with the core team and collaborators
-* :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
-  Announcements, general and low-priority discussion
+* :fontawesome-solid-users: [iree-announce email list](https://lists.lfaidata.foundation/g/iree-announce):
+  Announcements
+* :fontawesome-solid-users: [iree-technical-discussion email list](https://lists.lfaidata.foundation/g/iree-technical-discussion):
+  General and low-priority discussion
 
 ## Roadmap
 

@@ -418,7 +418,7 @@ setup(
     name=f"{custom_package_prefix}iree-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     description="IREE Compiler API",
     long_description="",
     license="Apache-2.0",
