@@ -72,6 +72,20 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 
 } // namespace
 
+// Function to check valid data types on the ROCm backend.
+LogicalResult validateDataTypes(Operation *op) {
+  if (llvm::any_of(op->getOperandTypes(),
+                   [](Type type) {
+                     return (type.isFloat8E4M3FN() || type.isFloat8E4M3FN());
+                   }) ||
+      llvm::any_of(op->getResultTypes(), [](Type type) {
+        return (type.isFloat8E4M3FN() || type.isFloat8E4M3FN());
+      }))
+    return failure();
+
+  return success();
+}
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -89,6 +103,16 @@ struct ConvertToROCDLPass final
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
+
+    m.walk(
+        [&](Operation *op) {
+          if (failed(validateDataTypes(op))) {
+            op->emitOpError()
+                << "F8E5M2 and F8E4M3FN types are not supported on "
+                   "the ROCm backend; try F8E5M2FNUZ or F8E4M3FNUZ instead.";
+            return signalPassFailure();
+          }
+        });
 
     if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
       m.emitOpError() << "unsupported: ROCm index bit widths must either be "
