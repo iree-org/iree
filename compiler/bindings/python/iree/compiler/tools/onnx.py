@@ -84,7 +84,7 @@ class ImportOptions(CompilerOptions):
     use_bytecode: bool = False
 
 
-def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs):
+def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
     options = ImportOptions(**kwargs)
 
     with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
@@ -152,8 +152,12 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs):
         if options.import_only:
             if options.output_file:
                 return None
-            with open(onnx_iree_input, "rb") as f:
-                return f.read()
+            if options.use_bytecode:
+                with open(onnx_iree_input, "rb") as f:
+                    return f.read()
+            else:
+                with open(onnx_iree_input, "rt", encoding="utf-8") as f:
+                    return f.read()
 
         # compile onnx model
         compile_cl = build_compile_command_line(onnx_iree_input, tfs, options)
@@ -163,7 +167,7 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs):
         return result
 
 
-def compile_model(model: onnx.ModelProto, **kwargs):
+def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_dir_path = Path(tmpdir)
         temp_model_file = temp_dir_path / "temp.onnx"
