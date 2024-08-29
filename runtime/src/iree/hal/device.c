@@ -313,7 +313,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
   for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
-        iree_hal_command_buffer_validate_binding_table(
+        iree_hal_command_buffer_validate_submission(
             command_buffers[i], binding_tables ? &binding_tables[i] : NULL));
   }
 

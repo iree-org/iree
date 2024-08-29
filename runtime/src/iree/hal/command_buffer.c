@@ -587,10 +587,16 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
 // Validation support
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_binding_table(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_buffer_binding_table_t* binding_table) {
   IREE_ASSERT_ARGUMENT(command_buffer);
+
+  // Validate the command buffer has been recorded properly.
+  IF_VALIDATING(command_buffer, {
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_submission_validation(
+        command_buffer, VALIDATION_STATE(command_buffer)));
+  });
 
   // Only check binding tables when one is required and otherwise ignore any
   // bindings provided. Require at least as many bindings in the table as there

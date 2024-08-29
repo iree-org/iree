@@ -198,6 +198,19 @@ DistributionLayout::doResolution(const VectorLayoutInterface &rhs) {
 
 ChangeResult DistributionLayout::resolveWithPossibleConflict(
     const VectorLayoutInterface &rhs, OpOperand &opOperand) {
+
+  IRRewriter builder(opOperand.getOwner());
+  // Handle case where constantOp may have multiple consumers with different
+  // layouts by creating a copy of constOp for other users.
+  if (!opOperand.get().hasOneUse() && !vectorLayout &&
+      llvm::dyn_cast_or_null<arith::ConstantOp>(
+          opOperand.get().getDefiningOp())) {
+    Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
+    Value copiedConst = copiedConstOp->getResult(0);
+    builder.replaceAllUsesExcept(opOperand.get(), copiedConst,
+                                 opOperand.getOwner());
+  }
+
   ResolutionResult result = doResolution(rhs);
 
   // If there is no conflict, simply return.
@@ -210,7 +223,6 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
 
   // Resolve conflict by create an operation that takes the input the conflicted
   // value and returns the resolved value.
-  OpBuilder builder(opOperand.getOwner());
   Value input = opOperand.get();
   // Create a resolution operation. This conflict should be handeled later by
   // someone else, not this analysis.
