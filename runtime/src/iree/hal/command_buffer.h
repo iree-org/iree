@@ -761,7 +761,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
 // requirements of |command_buffer| as recorded. If the command buffer does not
 // use any indirect bindings the table will be ignored. If more bindings than
 // are used by the command buffer are provided they will be ignored.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_binding_table(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_buffer_binding_table_t* binding_table);
 
