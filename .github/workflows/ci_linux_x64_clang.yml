@@ -29,31 +29,38 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     runs-on: azure-linux
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+    defaults:
+      run:
+        shell: bash
     env:
-      BUILD_DIR: full-build-dir
+      BUILD_DIR: build
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: "Building IREE"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18238): add local or remote ccache
+      - name: CMake - configure
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-      - name: "Testing IREE"
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DPython3_EXECUTABLE="$(which python3)" \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            -DIREE_BUILD_DOCS=ON \
+            -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
+      - name: CMake - build
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      - name: "Testing iree-dialects"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
+          cmake --build ${BUILD_DIR} -- -k 0
+          cmake --build ${BUILD_DIR} --target install -- -k 0
+          cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
+      - name: Run CTest
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      - name: Test iree-dialects
+        run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
