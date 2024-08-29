@@ -47,6 +47,12 @@ CMAKE_ARGS=(
   "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
   "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
   "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
+  
+  # Workaround for this weird issue:
+  # https://github.com/google/benchmark/issues/773#issuecomment-616067912
+  "-DRUN_HAVE_STD_REGEX=0"
+  "-DRUN_HAVE_POSIX_REGEX=0"
+  "-DCOMPILE_HAVE_GNU_POSIX_REGEX=0"
 )
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
