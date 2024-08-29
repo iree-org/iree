@@ -36,6 +36,8 @@ jobs:
       # TSan in particular needs some settings that this option includes:
       #   * https://github.com/google/sanitizers/issues/1716
       #   * https://security.stackexchange.com/q/214923
+      # Note that we are not using Docker for sandboxing. If we were, this
+      # would *not* be safe.
       options: --privileged
     defaults:
       run:

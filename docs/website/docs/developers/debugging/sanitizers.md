@@ -172,11 +172,15 @@ You may also need:
     -DCOMPILE_HAVE_GNU_POSIX_REGEX=0 \
     ```
 
-* Depending on your system (see <https://stackoverflow.com/a/77856955>):
+* For clang < 18.1.0 on system with `vm.mmap_rnd_bits` > 28 (see
+  <https://stackoverflow.com/a/77856955>):
 
     ```shell
     sudo sysctl vm.mmap_rnd_bits=28
     ```
+
+    TSan in LLVM >= 18.1.0 supports 30 bits of ASLR entropy. If the layout is
+    unsupported, TSan will automatically re-execute without ASLR.
 
 * If running under Docker, add `--privileged` to your `docker run` command
 
