@@ -30,10 +30,12 @@ typedef struct iree_hal_command_buffer_validation_state_t {
   // Allocator from the device the command buffer is targeting.
   // Used to verify buffer compatibility.
   iree_hal_allocator_t* device_allocator;
-  // 1 when in a begin/end recording sequence.
-  int32_t is_recording : 1;
+  // 1 when begin has been called.
+  int32_t has_began : 1;
+  // 1 when end has been called.
+  int32_t has_ended : 1;
   // Debug group depth for tracking proper begin/end pairing.
-  int32_t debug_group_depth : 31;
+  int32_t debug_group_depth : 30;
   // TODO(benvanik): current pipeline layout/descriptor set layout info.
   // TODO(benvanik): valid push constant bit ranges.
   // Requirements for each binding table entry.
@@ -139,6 +141,10 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
+iree_status_t iree_hal_command_buffer_submission_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    const iree_hal_command_buffer_validation_state_t* validation_state);
 
 iree_status_t iree_hal_command_buffer_binding_table_validation(
     iree_hal_command_buffer_t* command_buffer,

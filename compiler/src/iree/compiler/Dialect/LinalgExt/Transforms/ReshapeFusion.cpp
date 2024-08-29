@@ -13,6 +13,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -157,11 +159,7 @@ static bool isFusableWithReshapeByDimExpansion(OpTy op,
          llvm::all_of(
              op.getIndexingMapsArray(),
              [](AffineMap map) { return map.isProjectedPermutation(); }) &&
-         operandMap.getNumResults() > 0 &&
-         llvm::all_of(operandMap.getResults(), [&](AffineExpr expr) {
-           return iteratorTypes[cast<AffineDimExpr>(expr).getPosition()] ==
-                  utils::IteratorType::parallel;
-         });
+         operandMap.getNumResults() > 0;
 }
 
 static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
@@ -284,11 +282,14 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   return resultVals;
 }
 
-struct FoldReshapeWithAttentionOpByExpansion
+namespace {
+
+// Fold attention with its consumer expand_shape op.
+struct FoldAttentionWithConsumerReshapeByExpansion
     : public OpRewritePattern<tensor::ExpandShapeOp> {
-  FoldReshapeWithAttentionOpByExpansion(MLIRContext *context,
-                                        linalg::ControlFusionFn foldReshapes,
-                                        PatternBenefit benefit = 1)
+  FoldAttentionWithConsumerReshapeByExpansion(
+      MLIRContext *context, linalg::ControlFusionFn foldReshapes,
+      PatternBenefit benefit = 1)
       : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
         controlFoldingReshapes(std::move(foldReshapes)) {}
 
@@ -337,11 +338,54 @@ struct FoldReshapeWithAttentionOpByExpansion
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
+// Fold a collapse_shape op with its consumer attention op.
+// class FoldWith
+
+struct FoldAttentionWithProducerReshapeByExpansion final
+    : public OpRewritePattern<AttentionOp> {
+  FoldAttentionWithProducerReshapeByExpansion(
+      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
+      PatternBenefit benefit = 1)
+      : OpRewritePattern<AttentionOp>(context, benefit),
+        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
+
+  LogicalResult matchAndRewrite(AttentionOp attentionOp,
+                                PatternRewriter &rewriter) const override {
+    for (OpOperand *opOperand : attentionOp.getDpsInputOperands()) {
+      tensor::CollapseShapeOp reshapeOp =
+          opOperand->get().getDefiningOp<tensor::CollapseShapeOp>();
+      if (!reshapeOp)
+        continue;
+      // Fold only if
+      // - The tensor reshape op is folding.
+      // - All constraints of fusing with reshape by expansion are met.
+      if (!isFusableWithReshapeByDimExpansion(attentionOp, opOperand) ||
+          (!controlFoldingReshapes(opOperand)))
+        continue;
+
+      std::optional<SmallVector<Value>> replacementValues =
+          fuseAttentionWithReshapeByExpansion(attentionOp, reshapeOp, opOperand,
+                                              rewriter);
+      if (!replacementValues)
+        return failure();
+      rewriter.replaceOp(attentionOp, *replacementValues);
+      return success();
+    }
+    return failure();
+  }
+
+  linalg::ControlFusionFn controlFoldingReshapes;
+};
+
+} // namespace
+
 void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes) {
-  patterns.insert(std::make_unique<FoldReshapeWithAttentionOpByExpansion>(
-      patterns.getContext(), controlFoldingReshapes));
+  patterns.add<FoldAttentionWithConsumerReshapeByExpansion>(
+      patterns.getContext(), controlFoldingReshapes);
+  patterns.add<FoldAttentionWithProducerReshapeByExpansion>(
+      patterns.getContext(), controlFoldingReshapes);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

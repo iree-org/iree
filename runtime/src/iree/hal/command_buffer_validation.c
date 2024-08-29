@@ -23,11 +23,14 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
     const iree_hal_command_buffer_t* command_buffer,
     const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_command_category_t required_categories) {
-  if (IREE_UNLIKELY(!validation_state->is_recording)) {
+  if (IREE_UNLIKELY(!validation_state->has_began ||
+                    validation_state->has_ended)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "command buffer is not in a recording state");
+                            "command buffer is not in a recording state; all "
+                            "recording must happen between a begin/end pair");
   }
-  if (!iree_all_bits_set(command_buffer->allowed_categories,
+  if (required_categories &&
+      !iree_all_bits_set(command_buffer->allowed_categories,
                          required_categories)) {
 #if IREE_STATUS_MODE
     iree_bitfield_string_temp_t temp0, temp1;
@@ -220,18 +223,23 @@ void iree_hal_command_buffer_initialize_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* out_validation_state) {
   out_validation_state->device_allocator = device_allocator;
-  out_validation_state->is_recording = false;
+  out_validation_state->has_began = false;
+  out_validation_state->has_ended = false;
   out_validation_state->debug_group_depth = 0;
 }
 
 iree_status_t iree_hal_command_buffer_begin_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state) {
-  if (validation_state->is_recording) {
+  if (validation_state->has_began && validation_state->has_ended) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer has already been recorded; "
+                            "re-recording command buffers is not allowed");
+  } else if (validation_state->has_began) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer is already in a recording state");
   }
-  validation_state->is_recording = true;
+  validation_state->has_began = true;
   return iree_ok_status();
 }
 
@@ -242,11 +250,11 @@ iree_status_t iree_hal_command_buffer_end_validation(
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "unbalanced debug group depth (expected 0, is %d)",
                             validation_state->debug_group_depth);
-  } else if (!validation_state->is_recording) {
+  } else if (!validation_state->has_began || validation_state->has_ended) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer is not in a recording state");
   }
-  validation_state->is_recording = false;
+  validation_state->has_ended = true;
   return iree_ok_status();
 }
 
@@ -635,6 +643,20 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
   return iree_hal_command_buffer_dispatch_validation_base(
       command_buffer, validation_state, executable, entry_point, constants,
       bindings, flags);
+}
+
+iree_status_t iree_hal_command_buffer_submission_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    const iree_hal_command_buffer_validation_state_t* validation_state) {
+  if (!validation_state->has_began) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer has not been recorded");
+  } else if (!validation_state->has_ended) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer recording has not been ended and "
+                            "it is still in a recording state");
+  }
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_binding_table_validation(

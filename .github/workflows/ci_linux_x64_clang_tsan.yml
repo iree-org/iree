@@ -31,13 +31,7 @@ jobs:
 
   linux_x64_clang_tsan:
     needs: setup
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-
+    runs-on: azure-linux
     container:
       # TODO(scotttodd): use ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64 here
       image: gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a

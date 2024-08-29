@@ -144,6 +144,9 @@ private:
       auto tilingOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
       if (!tilingOp)
         continue;
+      if (isa<tensor::PadOp>(sliceOp.getSource().getDefiningOp())) {
+        continue;
+      }
       // Restrict to fully parallel ops for now for simplicity.
       auto isParallel = [](utils::IteratorType it) {
         return linalg::isParallelIterator(it);
