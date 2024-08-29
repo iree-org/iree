@@ -183,6 +183,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // Traverse the slices in BFS fashion.
     tensor::ExtractSliceOp candidateSliceOp = candidates.front();
     candidates.pop_front();
+    if (candidateSliceOp.getSource().getDefiningOp<tensor::PadOp>()) {
+      continue;
+    }
 
     // Materialize the slice of the producer in place.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
