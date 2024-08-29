@@ -546,7 +546,7 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
                                      /*scopeline=*/1,
                                      LLVM::DISubprogramFlags::Definition |
                                          LLVM::DISubprogramFlags::Optimized,
-                                     subroutineTypeAttr);
+                                     subroutineTypeAttr, /*retainedNodes =*/{});
 }
 
 // Returns the most local DISubprogramAttr starting from |forOp|.
