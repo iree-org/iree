@@ -75,6 +75,7 @@ def load_onnx_model(raw_model: onnx.ModelProto,
 @dataclass
 class ImportOptions(CompilerOptions):
     input_type: Union[InputType, str] = InputType.ONNX
+    min_opset_version: int = 17
     entry_point_name: Optional[str] = None
     module_name: Optional[str] = None
     import_only: bool = False
@@ -100,20 +101,19 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs):
             onnx_iree_input = os.path.join(tmpdir, "onnx-iree-input.mlirbc")
             # onnx_iree_input = io.BytesIO()
 
-        _IR_MIN_VERSION = 17
-
         # convert onnx model to version if needed 17
         original_model = onnx.load_model(model_path)
-        if original_model.ir_version < _IR_MIN_VERSION:
+        opset_version = original_model.opset_import[0].version
+        if opset_version < options.min_opset_version:
             logger.info("Converting onnx model opset version from %s to %s",
-                        original_model.ir_version, _IR_MIN_VERSION)
+                        opset_version, options.min_opset_version)
             try:
                 converted_model = onnx.version_converter.convert_version(
-                    original_model, _IR_MIN_VERSION)
+                    original_model, options.min_opset_version)
             except:
                 # Conversion failed. Do our best with the original file.
                 logger.warning("Converting onnx model opset version from %s to %s failed. Continuning without conversion.",
-                               original_model.ir_version, _IR_MIN_VERSION)
+                               opset_version, options.min_opset_version)
                 converted_model = original_model
         else:
             # No conversion needed.
