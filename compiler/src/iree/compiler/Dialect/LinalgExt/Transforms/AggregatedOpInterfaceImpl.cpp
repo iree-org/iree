@@ -175,30 +175,37 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
-  static Value computeAdd(OpBuilder &builder, Location loc, AffineMap lhsMap,
-                          AffineMap rhsMap, AffineMap accMap, Value lhs,
-                          Value rhs, Value acc) {
+static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
+                        AffineMap maskMap, Value qk,
+                        Value mask) {
 
     SmallVector<AffineMap> compressedMaps =
-        compressUnusedDims(SmallVector<AffineMap>{lhsMap, rhsMap, accMap});
-    lhsMap = compressedMaps[0];
-    rhsMap = compressedMaps[1];
-    accMap = compressedMaps[2];
+        compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
+    qkMap = compressedMaps[0];
+    maskMap = compressedMaps[1];
 
-    // Since this is an addition, all dimensions are parallel (no reduction).
     SmallVector<utils::IteratorType> iteratorTypes(
-        accMap.getNumDims(), utils::IteratorType::parallel);
+        qkMap.getNumDims(), utils::IteratorType::parallel);
+
+    Value zero = builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
+    Value negInf = builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), -INFINITY));
 
     auto genericOp = builder.create<linalg::GenericOp>(
-        loc, acc.getType(), SmallVector<Value>{lhs, rhs}, acc,
-        SmallVector<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
+        loc, qk.getType(), SmallVector<Value>{mask}, qk,
+        SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
         [&](OpBuilder &b, Location loc, ValueRange args) {
-          // Cast inputs to match output datatype.
-          Value lhs = convertScalarToDtype(b, loc, args[0], args[2].getType(),
-                                          /*isUnsignedCast=*/false);
-          Value rhs = convertScalarToDtype(b, loc, args[1], args[2].getType(),
-                                          /*isUnsignedCast=*/false);
-          Value add = b.create<arith::AddFOp>(loc, lhs, rhs);
+          Value qkVal = args[1];
+          Value maskVal = args[0];
+
+          // llvm::outs() << getElementTypeOrSelf(args[0].getType()) << "\n";
+          if (maskVal.getType().isInteger()) {
+            maskVal = b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
+            maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
+          } else {
+            maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
+                                            /*isUnsignedCast=*/false);
+          }
+          Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
           b.create<linalg::YieldOp>(loc, add);
         });
 
@@ -290,12 +297,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
   Value scale = getScale();
-  Value log2e = b.create<arith::ConstantOp>(
-      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = b.create<arith::MulFOp>(loc, scale, log2e);
 
   auto qETy = getElementTypeOrSelf(query.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
+
+  AffineMap scaleMap = AffineMap::get(/*dimCount=*/getQueryMap().getNumInputs(),
+                                      /*symbolCount=*/0, getContext());
 
   // In the original algorithm, the scaling is done after the softmax:
   //        softmax(Q @ K.T * scale) @ V
@@ -307,10 +314,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
     AffineMap qMap = getQueryMap();
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
-                                                   query, scale);
+    query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -335,28 +339,15 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     // losing numerical precision due to the low dynamic range of fp8 types when
     // pre applying the sclaing.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
-                                               scale);
-
-    // If we need to truncate to fp8 post softmax we apply a scaling to use the
-    // full fp8 range. We can do this with a offset as post `exp2` this equates
-    // to multiplying by a static value. We are able to do this as `max` and
-    // `sum` are scaled by the same value so the end result is the same.
-    auto fpTy = cast<FloatType>(qETy);
-    double mx =
-        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-            .convertToDouble();
-    Value offset = b.create<arith::ConstantOp>(
-        loc, b.getFloatAttr(elementType, clAttentionSoftmaxMax / mx));
-    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
-                                               offset);
+    s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
   }
 
   if (*mask) {
-      s = computeAdd(b, loc, sMap, *getMaskMap(), sMap, s, *mask, s);
+      s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
+
+  Value log2e = b.create<arith::ConstantOp>( loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  s = scaleValueInPlace(b, loc, sMap, scaleMap, s, log2e);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
