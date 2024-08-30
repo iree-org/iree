@@ -65,6 +65,15 @@ allocateVariable(OpBuilder builder, Location location, Type type,
       emitc::OpaqueAttr::get(ctx, initializer.value_or("")));
 }
 
+std::pair<TypedValue<emitc::LValueType>, TypedValue<emitc::PointerType>>
+allocateZeroVariable(OpBuilder builder, Location location, Type type) {
+  auto var = allocateVariable(builder, location, type);
+  auto varPtr = addressOf(builder, location, var);
+  auto size = sizeOf(builder, location, TypeAttr::get(type));
+  emitc_builders::memset(builder, location, varPtr, 0, size);
+  return {var, varPtr};
+}
+
 TypedValue<emitc::LValueType> asLValue(OpBuilder builder, Location loc,
                                        Value value) {
   auto var = allocateVariable(builder, loc, value.getType());
