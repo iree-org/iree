@@ -11,7 +11,6 @@ from .. import CompilerOptions, InputType, TempFileSaver
 from ..ir import Context, StringAttr
 from .binaries import invoke_pipeline
 from .core import build_compile_command_line
-from ...runtime import Config, VmInstance, VmModule, load_vm_module
 
 try:
     import onnx

@@ -25,7 +25,7 @@ def main(args: argparse.Namespace):
 
     compile_saved_model(args.input_file,
                         output_file=output_file,
-                        import_onyl=True,
+                        import_only=True,
                         use_bytecode=False,
                         verify_module=not args.no_verify,
                         data_prop=args.data_prop,
