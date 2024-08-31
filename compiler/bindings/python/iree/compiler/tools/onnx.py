@@ -1,18 +1,33 @@
 import os
+import sys
 import tempfile
 import logging
-import onnx
 
 from dataclasses import dataclass
 from typing import IO, Any, Optional, Union
 from pathlib import Path
 
 from .. import CompilerOptions, InputType, TempFileSaver
-from ..extras import onnx_importer
 from ..ir import Context, StringAttr
 from .binaries import invoke_pipeline
 from .core import build_compile_command_line
 from ...runtime import Config, VmInstance, VmModule, load_vm_module
+
+try:
+    import onnx
+except ModuleNotFoundError as e:
+    raise ModuleNotFoundError(
+        f"iree-import-onnx requires that the `onnx` Python package is installed "
+        f"(typically `{sys.executable} -m pip install onnx`)"
+    ) from e
+
+try:
+    from ..extras import onnx_importer
+except ModuleNotFoundError as e:
+    raise ModuleNotFoundError(
+        "iree-import-onnx is only available if IREE was built with Torch support"
+    ) from e
+
 
 __all__ = [
     "compile_saved_model",
