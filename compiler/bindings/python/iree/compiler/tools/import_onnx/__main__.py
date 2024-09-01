@@ -35,6 +35,7 @@ def main(args: argparse.Namespace):
                         data_prop=args.data_prop,
                         data_dir=args.data_dir)
 
+
 def parse_arguments(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="IREE ONNX import tool")
     parser.add_argument("input_file", help="ONNX protobuf input", type=Path)
@@ -60,7 +61,8 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--min-opset-version",
-        help="Minimum ONNX opset version. Model with lower opset version will be converted to this version",
+        help="Minimum ONNX opset version. Model with lower opset version will"
+        " be converted to this version",
         type=int,
         default=17,
         required=False,
@@ -69,7 +71,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         "--entry-point-name",
         help="Name of the entry point for the exported graph",
         type=str,
-        required=False,       
+        required=False,
     )
     parser.add_argument(
         "--module-name",
