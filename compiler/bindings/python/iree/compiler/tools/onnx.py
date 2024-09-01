@@ -141,11 +141,11 @@ class ImportOptions(CompilerOptions):
     data_dir: Optional[Path] = None
 
 
-def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
     """Import and compile an ONNX model.
 
     Args:
-        model_path (IO[bytes] | str | os.PathLike): The path to the ONNX model file.
+        model_path onnx.ModelProto: The ONNX model to import and compile.
 
     Returns:
         None | str | IO[bytes]: If no output file is specified, the compiled
@@ -169,23 +169,22 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
             # onnx_iree_input = io.BytesIO()
 
         # convert onnx model to version if needed 17
-        original_model = onnx.load_model(model_path)
-        opset_version = original_model.opset_import[0].version
+        opset_version = model.opset_import[0].version
         if opset_version < options.min_opset_version:
             logger.info("Converting onnx model opset version from %s to %s",
                         opset_version, options.min_opset_version)
             try:
                 converted_model = onnx.version_converter.convert_version(
-                    original_model, options.min_opset_version)
+                    model, options.min_opset_version)
             except:
                 # Conversion failed. Do our best with the original file.
                 logger.warning("Converting onnx model opset version from %s "
                                "to %s failed. Continuning without conversion.",
                                opset_version, options.min_opset_version)
-                converted_model = original_model
+                converted_model = model
         else:
             # No conversion needed.
-            converted_model = original_model
+            converted_model = model
 
         if options.entry_point_name:
             converted_model.graph.name = options.entry_point_name
@@ -236,18 +235,16 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
         return result
 
 
-def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
-    """Compile an ONNX model.
+def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+    """Import and compile an ONNX model.
 
     Args:
-        model (onnx.ModelProto): The ONNX model file.
+        model IO[bytes] | str | os.PathLike: The path for the ONNX model to
+            import and compile.
 
     Returns:
         None | str | IO[bytes]: If no output file is specified, the compiled
             model as a string or bytes depending on `output_format` and `use_bytecode`.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        temp_dir_path = Path(tmpdir)
-        temp_model_file = temp_dir_path / "temp.onnx"
-        onnx.save(model, temp_model_file)
-        return compile_saved_model(temp_model_file, **kwargs)
+    model = onnx.load_model(model_path)
+    return compile_model(model, **kwargs)
