@@ -45,11 +45,21 @@ iree_cc_library(
     core_headers
   HDRS
     "alignment.h"
+    "allocator.h"
+    "assert.h"
     "attributes.h"
+    "bitfield.h"
     "config.h"
+    "loop.h"
+    "loop_inline.h"
+    "status.h"
+    "status_cc.h"
+    "string_builder.h"
+    "string_view.h"
     "target_platform.h"
     "time.h"
     "tracing.h"
+    "wait_source.h"
   PUBLIC
 )
 
