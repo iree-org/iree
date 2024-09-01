@@ -179,7 +179,8 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
                     original_model, options.min_opset_version)
             except:
                 # Conversion failed. Do our best with the original file.
-                logger.warning("Converting onnx model opset version from %s to %s failed. Continuning without conversion.",
+                logger.warning("Converting onnx model opset version from %s "
+                               "to %s failed. Continuning without conversion.",
                                opset_version, options.min_opset_version)
                 converted_model = original_model
         else:
