@@ -60,7 +60,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--min-opset-version",
-        help="Minimu ONNX opset version. Model with lower opset version will be converted to this version",
+        help="Minimum ONNX opset version. Model with lower opset version will be converted to this version",
         type=int,
         default=17,
         required=False,
