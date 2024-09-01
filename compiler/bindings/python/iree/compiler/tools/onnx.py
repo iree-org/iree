@@ -1,3 +1,11 @@
+# Lint-as: python3
+# Copyright 20204 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Imports and compiles onnx models."""
+
 import os
 import sys
 import tempfile
@@ -39,7 +47,19 @@ logger = logging.getLogger(__name__)
 
 def load_onnx_model(raw_model: onnx.ModelProto,
                     data_prop: bool = True,
-                    data_dir: IO[bytes] | str | os.PathLike | None = None):
+                    data_dir: IO[bytes] | str | os.PathLike | None = None) -> onnx.ModelProto:
+    """Load an ONNX model with external data and perform shape inference.
+
+    Args:
+        raw_model (onnx.ModelProto): The ONNX model to load.
+        data_prop (bool, optional): Toggle data propagation for ONNX shape
+            inference. Defaults to True.
+        data_dir (IO[bytes] | str | os.PathLike | None, optional): Path to the
+            base directory of the model data. Defaults to None.
+
+    Returns:
+        onnx.ModelProto: The ONNX model with inferred shapes.
+    """
     # Load the model, with possible external data coming from the default
     # location, or the location specified on the command line.
     if data_dir:
@@ -88,6 +108,27 @@ def load_onnx_model(raw_model: onnx.ModelProto,
 
 @dataclass
 class ImportOptions(CompilerOptions):
+    """Options for Onnx imports
+
+    Args:
+        input_type: The input dialect used to import the model. 
+            Default is InputType.ONNX.
+        min_opset_version: The minimum opset version to convert the model to.
+            Default is 17.
+        entry_point_name: The name of the entry point for the exported graph.
+        model_name: The symbol name for the exported MLIR module.
+        import_only: Only import the ONNX graph do not run the IREE compiler.
+            Default is False.
+        save_temp_iree_input: Save the IR resulting from the import before
+            compilation. Default is None.
+        verify_module: Verify the module after importing. Default is False.
+        use_bytecode: Use MLIR bytecode instead of textual IR. 
+            Default is False.
+        data_prop: Toggle data propagation for ONNX shape inference.
+            Default is True.
+        data_dir: Path to the base directory of the model data.
+            Default is None.
+    """
     input_type: Union[InputType, str] = InputType.ONNX
     min_opset_version: int = 17
     entry_point_name: Optional[str] = None
@@ -101,6 +142,15 @@ class ImportOptions(CompilerOptions):
 
 
 def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+    """Import and compile an ONNX model.
+
+    Args:
+        model_path (IO[bytes] | str | os.PathLike): The path to the ONNX model file.
+
+    Returns:
+        None | str | IO[bytes]: If no output file is specified, the compiled
+            model as a string or bytes depending on `output_format` and `use_bytecode`.
+    """
     options = ImportOptions(**kwargs)
 
     with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
@@ -140,7 +190,8 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
             converted_model.graph.name = options.entry_point_name
 
         # import onnx model
-        model_proto = load_onnx_model(converted_model, options.data_prop, options.data_dir)
+        model_proto = load_onnx_model(
+            converted_model, options.data_prop, options.data_dir)
 
         logger.info("Importing graph: '%s' from onnx model",
                     model_proto.graph.name)
@@ -185,6 +236,15 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
 
 
 def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
+    """Compile an ONNX model.
+
+    Args:
+        model (onnx.ModelProto): The ONNX model file.
+
+    Returns:
+        None | str | IO[bytes]: If no output file is specified, the compiled
+            model as a string or bytes depending on `output_format` and `use_bytecode`.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_dir_path = Path(tmpdir)
         temp_model_file = temp_dir_path / "temp.onnx"
