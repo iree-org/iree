@@ -109,8 +109,9 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
             onnx_iree_input = options.output_file
         elif options.save_temp_iree_input:
             # Saving the file, use tfs.
+            extension = ".mlirbc" if options.use_bytecode else ".mlir"
             onnx_iree_input = tfs.alloc_optional(
-                "onnx-iree-input.mlirbc", export_as=options.save_temp_iree_input
+                "onnx-iree-input" + extension, export_as=options.save_temp_iree_input
             )
         else:
             # Not saving the file, so generate a loose temp file without tfs.
