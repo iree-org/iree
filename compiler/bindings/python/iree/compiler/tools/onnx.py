@@ -96,7 +96,7 @@ class ImportOptions(CompilerOptions):
     save_temp_iree_input: Optional[str] = None
     verify_module: bool = False
     use_bytecode: bool = False
-    data_prop: bool = True,
+    data_prop: bool = True
     data_dir: Optional[Path] = None
 
 
