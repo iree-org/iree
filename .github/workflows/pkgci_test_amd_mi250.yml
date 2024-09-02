@@ -26,8 +26,8 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/.venv
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 1
-      IREE_CUDA_DISABLE: 1
-      IREE_HIP_DISABLE: 0
+      IREE_CUDA_ENABLE: 0
+      IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
     steps:
       - name: Check out repository
