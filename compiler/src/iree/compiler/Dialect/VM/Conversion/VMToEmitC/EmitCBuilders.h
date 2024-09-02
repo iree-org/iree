@@ -62,6 +62,10 @@ TypedValue<emitc::LValueType> asLValue(OpBuilder builder, Location loc,
 Value asRValue(OpBuilder builder, Location loc,
                TypedValue<emitc::LValueType> value);
 
+/// Replace values of lvalue type with rvalues.
+void asRValues(OpBuilder builder, Location location,
+               SmallVector<Value> &values);
+
 TypedValue<emitc::PointerType> addressOf(OpBuilder builder, Location location,
                                          TypedValue<emitc::LValueType> operand);
 

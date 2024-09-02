@@ -1485,19 +1485,6 @@ ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
   return globalOp;
 }
 
-void updateResultUses(Operation *op, ConversionPatternRewriter &rewriter,
-                      SmallVector<Value> &resultOperands) {
-  for (auto [result, resultOperand] :
-       llvm::zip(op->getResults(), resultOperands)) {
-    if (!llvm::isa<IREE::VM::RefType>(result.getType())) {
-      auto operand = cast<TypedValue<emitc::LValueType>>(resultOperand);
-      auto operandRValue =
-          emitc_builders::asRValue(rewriter, op->getLoc(), operand);
-      result.replaceAllUsesWith(operandRValue);
-    }
-  }
-}
-
 template <typename OpTy>
 class EmitCConversionPattern : public OpConversionPattern<OpTy> {
 public:
@@ -2647,9 +2634,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         /*rewriter=*/rewriter, /*location=*/loc, /*callee=*/funcOp,
         /*operands=*/updatedOperands, this->getModuleAnalysis());
 
-    updateResultUses(op, rewriter, resultOperands);
-
-    rewriter.eraseOp(op);
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+    rewriter.replaceOp(op, resultOperands);
 
     return success();
   }
@@ -2714,9 +2700,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     returnIfError(rewriter, loc, callee, updatedOperands,
                   this->getModuleAnalysis());
 
-    updateResultUses(op, rewriter, resultOperands);
-
-    rewriter.eraseOp(op);
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+    rewriter.replaceOp(op, resultOperands);
 
     return success();
   }
@@ -3833,9 +3818,8 @@ private:
           /*operands=*/ArrayRef<Value>(unwrappedOperands),
           this->getModuleAnalysis());
 
-      updateResultUses(op.getOperation(), rewriter, resultOperands);
-
-      rewriter.eraseOp(op);
+      emitc_builders::asRValues(rewriter, loc, resultOperands);
+      rewriter.replaceOp(op, resultOperands);
     } else {
       rewriter.replaceOpWithNewOp<emitc::CallOpaqueOp>(
           /*op=*/op,
