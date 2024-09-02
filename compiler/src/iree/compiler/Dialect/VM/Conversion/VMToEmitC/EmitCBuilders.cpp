@@ -78,6 +78,15 @@ Value asRValue(OpBuilder builder, Location loc,
                                        value);
 }
 
+void asRValues(OpBuilder builder, Location location,
+               SmallVector<Value> &values) {
+  for (auto &value : values) {
+    if (auto lvalue = llvm::dyn_cast<TypedValue<emitc::LValueType>>(value)) {
+      value = emitc_builders::asRValue(builder, location, lvalue);
+    }
+  }
+}
+
 TypedValue<emitc::PointerType>
 addressOf(OpBuilder builder, Location location,
           TypedValue<emitc::LValueType> operand) {
