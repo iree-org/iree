@@ -97,10 +97,10 @@ jobs:
         include:
           - name: ubuntu-20.04
             runs-on: ubuntu-20.04
-            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON
+            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: windows-2022
             runs-on: windows-2022
-            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON
+            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: macos-14
             runs-on: macos-14
             driver-options: -DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF
@@ -136,8 +136,6 @@ jobs:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
       - name: CMake - configure
-        env:
-          JOB_NAME: ${{matrix.name}}
         run: |
           cmake \
             -G Ninja \
