@@ -89,7 +89,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: iree-org/iree-test-suites
-          ref: 323c2df477544d789c56e4dfda9b047580b77cbf
+          ref: 9e921d0ea271a85f772eee22965585461c9b14c2
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
