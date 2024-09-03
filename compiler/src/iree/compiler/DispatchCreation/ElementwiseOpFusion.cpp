@@ -73,8 +73,16 @@ void ElementwiseOpFusionPass::runOnOperation() {
       };
   linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                fuseElementwiseOpsControlFn);
+
+  linalg::ControlFusionFn foldTransposeControlFn = [](OpOperand *fusedOperand) {
+    Operation *producer = fusedOperand->get().getDefiningOp();
+    Operation *consumer = fusedOperand->getOwner();
+
+    return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
+  };
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
-      fusionPatterns, fuseElementwiseOpsControlFn);
+      fusionPatterns, foldTransposeControlFn);
+
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
   if (failed(applyPatternsAndFoldGreedily(

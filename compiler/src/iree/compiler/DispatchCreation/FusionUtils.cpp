@@ -44,15 +44,13 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   }
 
   // If the generic op is "just" copy, then fuse always.
-  if (producerOp->getNumRegions() != 0) {
-    Block &body = producerOp->getRegion(0).front();
-    if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
-      return true;
-    if (llvm::all_of(body.getArguments(),
-                     [](BlockArgument arg) { return arg.use_empty(); })) {
-      // The operands aren't used, its just an `linalg.index` op.
-      return true;
-    }
+  Block &body = producerOp->getRegion(0).front();
+  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+    return true;
+  if (llvm::all_of(body.getArguments(),
+                   [](BlockArgument arg) { return arg.use_empty(); })) {
+    // The operands aren't used, its just an `linalg.index` op.
+    return true;
   }
 
   // If producer does not have a single user, dont fuse.
