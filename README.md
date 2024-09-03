@@ -52,10 +52,12 @@ https://iree.dev/developers/general/github-actions/.
     bugs, and other work tracking
 *   [IREE Discord server](https://discord.gg/wEWh6Z9nMU): Daily development
     discussions with the core team and collaborators
-*   [iree-announce email list](https://lists.lfaidata.foundation/g/iree-announce):
+*   (New) [iree-announce email list](https://lists.lfaidata.foundation/g/iree-announce):
     Announcements
-*   [iree-technical-discussion email list](https://lists.lfaidata.foundation/g/iree-technical-discussion):
+*   (New) [iree-technical-discussion email list](https://lists.lfaidata.foundation/g/iree-technical-discussion):
     General and low-priority discussion
+*   (Legacy) [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
+    Announcements, general and low-priority discussion
 
 #### Related Project Channels
 
