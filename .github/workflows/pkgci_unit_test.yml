@@ -76,6 +76,6 @@ jobs:
       - name: Test TensorFlow importer
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install tensorflow>=2.16.1
+          bash ./build_tools/scripts/setup_tf_python.sh
           python compiler/bindings/python/test/tools/compiler_tflite_test.py
           python compiler/bindings/python/test/tools/compiler_tf_test.py
