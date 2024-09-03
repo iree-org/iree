@@ -260,3 +260,47 @@ func.func @multi_hoist_and_fuse_trailing_with_producer_fusion(%2: tensor<128x128
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
+
+// -----
+
+func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<128x128xf16>
+  %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %empty) -> (tensor<128x128xf16>) {
+    %abs = math.absi %arg0 : index
+    %id = arith.ori %abs, %arg0 : index
+    %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf16>) {
+      %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<128x128xf16> to tensor<64x64xf16>
+      %10 = scf.forall (%arg5, %arg6) in (32, 16) shared_outs(%arg7 = %extracted_slice) -> (tensor<64x64xf16>) {
+        %add = arith.addi %arg5, %id : index
+        %extracted_slice_1 = tensor.extract_slice %2[%add, %arg6] [2, 4] [1, 1] : tensor<128x128xf16> to tensor<2x4xf16>
+        %extracted_slice_2 = tensor.extract_slice %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<64x64xf16> to tensor<2x4xf16>
+        %16 = linalg.copy ins(%extracted_slice_1 : tensor<2x4xf16>) outs(%extracted_slice_2 : tensor<2x4xf16>) -> tensor<2x4xf16>
+        scf.forall.in_parallel {
+          tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<64x64xf16>
+        }
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<64x64xf16> into tensor<128x128xf16>
+      }
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+    scf.yield %9 : tensor<128x128xf16>
+  }
+  return %8 : tensor<128x128xf16>
+}
+
+// CHECK-LABEL: func @multi_hoist_with_other_ops_in_loop
+//  CHECK-SAME:   %[[I0:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//  CHECK-SAME:   %[[I1:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall
+//       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<2x4xf16>)
+//       CHECK:         math.absi
+//       CHECK:         arith.ori
+//       CHECK:         arith.addi
+//       CHECK:         linalg.copy
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   return
