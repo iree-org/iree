@@ -45,7 +45,6 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
     "base-arm64": [],
-    "emscripten": ["base"],
     "riscv-toolchain-builder": [],
     # Containers with all the newest versions of dependencies that we support
     # instead of the oldest.
