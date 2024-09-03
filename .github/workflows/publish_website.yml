@@ -57,6 +57,10 @@ jobs:
           ./build_tools/scripts/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}
       - name: Building documentation files
         run: ./docs/website/generate_extra_files.sh
       # - name: Setting git config
