@@ -20,6 +20,19 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const GPUMMASchedule &schedule) {
+  os << "mSize: " << schedule.mSize << "\n";
+  os << "nSize: " << schedule.nSize << "\n";
+  os << "kSize: " << schedule.kSize << "\n";
+  os << "mTileCount: " << schedule.mTileCount << "\n";
+  os << "nTileCount: " << schedule.nTileCount << "\n";
+  os << "kTileCount: " << schedule.kTileCount << "\n";
+  os << "mWarpCount: " << schedule.mWarpCount << "\n";
+  os << "nWarpCount: " << schedule.nWarpCount << "\n";
+  return os;
+}
+
 static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
                                                 int64_t lhsBitwidth,
                                                 int64_t rhsBitwidth) {
@@ -31,7 +44,7 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
 
 static bool isScheduleAligned(const GPUMatmulShapeType &problem,
                               const GPUMMASchedule &schedule,
-                              const int64_t mustBeAligned) {
+                              bool mustBeAligned) {
   auto alignedMSize =
       mustBeAligned
           ? problem.mSize
@@ -83,20 +96,12 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
 
 static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     GPUMatmulShapeType intrinsic, GPUMMASchedule schedule,
-    const std::function<bool(const GPUMMASchedule &schedule)>
-        &isScheduleValid) {
+    llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
 
   while (!isScheduleValid(schedule)) {
     LLVM_DEBUG({
       llvm::dbgs() << "Chosen schedule is invalid:\n";
-      llvm::dbgs() << "mSize: " << schedule.mSize << "\n";
-      llvm::dbgs() << "nSize: " << schedule.nSize << "\n";
-      llvm::dbgs() << "kSize: " << schedule.kSize << "\n";
-      llvm::dbgs() << "mTileCount: " << schedule.mTileCount << "\n";
-      llvm::dbgs() << "nTileCount: " << schedule.nTileCount << "\n";
-      llvm::dbgs() << "kTileCount: " << schedule.kTileCount << "\n";
-      llvm::dbgs() << "mWarpCount: " << schedule.mWarpCount << "\n";
-      llvm::dbgs() << "nWarpCount: " << schedule.nWarpCount << "\n";
+      llvm::dbgs() << schedule;
       llvm::dbgs() << "Shrinking schedule...\n";
     });
 
@@ -134,14 +139,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
 
   LLVM_DEBUG({
     llvm::dbgs() << "Chosen schedule is valid:\n";
-    llvm::dbgs() << "mSize: " << schedule.mSize << "\n";
-    llvm::dbgs() << "nSize: " << schedule.nSize << "\n";
-    llvm::dbgs() << "kSize: " << schedule.kSize << "\n";
-    llvm::dbgs() << "mTileCount: " << schedule.mTileCount << "\n";
-    llvm::dbgs() << "nTileCount: " << schedule.nTileCount << "\n";
-    llvm::dbgs() << "kTileCount: " << schedule.kTileCount << "\n";
-    llvm::dbgs() << "mWarpCount: " << schedule.mWarpCount << "\n";
-    llvm::dbgs() << "nWarpCount: " << schedule.nWarpCount << "\n";
+    llvm::dbgs() << schedule;
   });
 
   return schedule;
@@ -154,19 +152,19 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     return failure(); // Cannot use this intrinsic for mismatched types
   }
   if (problem.cType != intrinsic.cType) {
-    auto isFpCase =
+    bool isFpCase =
         isa<FloatType>(problem.cType) && isa<FloatType>(intrinsic.cType);
-    auto isUpcast = problem.cType.getIntOrFloatBitWidth() <
+    bool isUpcast = problem.cType.getIntOrFloatBitWidth() <
                     intrinsic.cType.getIntOrFloatBitWidth();
     if (!(canUpcastAcc && isFpCase && isUpcast)) {
-      return failure(); // Cannot use this intrinsic if not upcasting
+      return failure(); // Cannot use this intrinsic if not upcasting.
     }
   }
 
   if (mustBeAligned && (problem.mSize % intrinsic.mSize != 0 ||
                         problem.nSize % intrinsic.nSize != 0 ||
                         problem.kSize % intrinsic.kSize != 0)) {
-    return failure(); // Cannot use this intrinsic for misaligned cases
+    return failure(); // Cannot use this intrinsic for misaligned cases.
   }
 
   // Cannot use the intrinsic when the tile size is greater than problem size.
