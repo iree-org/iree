@@ -1,11 +1,11 @@
 // RUN: iree-opt %s -pass-pipeline='builtin.module(func.func(iree-vector-ext-vectorize-ops, iree-codegen-generic-vectorization))' | FileCheck %s
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [1, 1],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [1, 1],
-  elements_per_thread = [64, 64],
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [64, 64],
 
   subgroup_strides = [0, 0],
   thread_strides   = [0, 0]

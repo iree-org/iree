@@ -8,11 +8,11 @@
 
 // A: shape = 32x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -20,11 +20,11 @@
 
 // B: shape = 8x32, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -32,11 +32,11 @@
 
 // C: shape = 32x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [4, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [4, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -95,11 +95,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 16x16, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [16, 4],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [16, 4],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 16]
@@ -107,11 +107,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 16x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [4, 16],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [16, 1]
@@ -173,11 +173,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 64x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -185,11 +185,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 8x32, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -197,11 +197,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // C: shape = 64x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 1],
-  outers_per_batch        = [4, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile        = [4, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -262,11 +262,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 32x16, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 2],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 2],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -274,11 +274,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 16x32, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides         = [1, 1],
   thread_strides          = [32, 1]
@@ -286,11 +286,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // C: shape = 32x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [4, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [4, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides         = [1, 1],
   thread_strides          = [32, 1]
@@ -345,11 +345,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 64x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -357,11 +357,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 8x96, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 3],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 3],
+  outer_tile        = [1, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -369,11 +369,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // C: shape = 64x96, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 3],
-  outers_per_batch        = [4, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 3],
+  outer_tile        = [4, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -436,11 +436,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 32x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -448,11 +448,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 64x8, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [2, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [32, 2],
-  elements_per_thread     = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [32, 2],
+  element_tile     = [1, 4],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 32]
@@ -460,11 +460,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // C: shape = 32x64, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 2],
-  outers_per_batch        = [4, 1],
-  threads_per_outer       = [2, 32],
-  elements_per_thread     = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 2],
+  outer_tile        = [4, 1],
+  thread_tile       = [2, 32],
+  element_tile     = [4, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [32, 1]
@@ -515,11 +515,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // A: shape = 16x16, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [16, 1],
-  elements_per_thread     = [1, 16],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [16, 1],
+  element_tile     = [1, 16],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [1, 16]
@@ -527,11 +527,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // B: shape = 16x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [1, 1],
-  threads_per_outer       = [1, 16],
-  elements_per_thread     = [16, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [1, 16],
+  element_tile     = [16, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [16, 1]
@@ -539,11 +539,11 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // C: shape = 16x16, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup    = [1, 1],
-  outers_per_batch        = [8, 1],
-  threads_per_outer       = [2, 16],
-  elements_per_thread     = [1, 1],
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [8, 1],
+  thread_tile       = [2, 16],
+  element_tile     = [1, 1],
 
   subgroup_strides        = [1, 1],
   thread_strides          = [16, 1]

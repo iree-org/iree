@@ -35,11 +35,11 @@ namespace {
 // The layout this generates is approximately the following:
 //
 // #layout = #iree_vector_ext.nested_layout<
-//    subgroups_per_workgroup = [1, ..., 1]
-//    batches_per_subgroup =    [<remaining undistributed elements>]
-//    outers_per_batch =        [1, ..., 1]
-//    threads_per_outer =       [<greedy from innermost memref dim>]
-//    elements_per_thread =     [1, ..., 128/element_bitwidth, ..., 1]
+//    subgroup_tile = [1, ..., 1]
+//    batch_tile    = [<remaining undistributed elements>]
+//    outer_tile    = [1, ..., 1]
+//    thread_tile   = [<greedy from innermost memref dim>]
+//    element_tile  = [1, ..., 128/element_bitwidth, ..., 1]
 //            innermost_memref_dimension ^^^^^^
 //
 // (All orders are the same)
@@ -50,13 +50,11 @@ namespace {
 //
 // We use the following layout:
 // #layout = #iree_vector_ext.nested_layout<
-//    subgroups_per_workgroup = [1, 1]
-//    batches_per_subgroup =    [1, 1]
-//    outers_per_batch =        [1, 1]
-//    threads_per_outer =       [16, 4]
-//    elements_per_thread =     [1, 8]
-//
-//    *_order = [0, 1]>
+//    subgroup_tile = [1, 1]
+//    batch_tile    = [1, 1]
+//    outer_tile    = [1, 1]
+//    thread_tile   = [16, 4]
+//    element_tile  = [1, 8]
 LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
                                     RewriterBase &rewriter,
                                     vector::TransferReadOp transfer) {
@@ -110,7 +108,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
         std::to_string(bitWidth) + " is not yet implemented");
     return failure();
   }
-  int64_t numElementsPerThread = 128 / bitWidth;
+  int64_t numElementTile = 128 / bitWidth;
   int64_t flatNumElements =
       ShapedType::getNumElements(transfer.getVectorType().getShape());
   int64_t flatNumThreads = ShapedType::getNumElements(workgroupSize);
@@ -122,8 +120,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
         << ", workgroup size: " << flatNumThreads;
     return failure();
   }
-  numElementsPerThread =
-      std::min(numElementsPerThread, flatNumElements / flatNumThreads);
+  numElementTile = std::min(numElementTile, flatNumElements / flatNumThreads);
 
   AffineMap transferMap = transfer.getPermutationMap();
   if (transferMap.getNumDims() == 0) {
@@ -146,7 +143,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
   // dimensions in cases where the innermost read vector dimension is small,
   // but that requires comparing memref strides and is uncommon. For now
   // prioritize warp contiguity over 128-bit read granularity.
-  numElementsPerThread = std::min(numElementsPerThread, vectorShape[distXDim]);
+  numElementTile = std::min(numElementTile, vectorShape[distXDim]);
 
   llvm::SetVector<unsigned> vectorDimDistributionOrder;
   // Get the order in which to distribute vector dimensions to threads, going
@@ -170,7 +167,7 @@ LogicalResult setTransferReadAnchor(ArrayRef<int64_t> workgroupSize,
   }
 
   int64_t residualThreads = flatNumThreads;
-  int64_t residualElements = numElementsPerThread;
+  int64_t residualElements = numElementTile;
 
   SmallVector<int64_t> order(vectorDimDistributionOrder.rbegin(),
                              vectorDimDistributionOrder.rend());

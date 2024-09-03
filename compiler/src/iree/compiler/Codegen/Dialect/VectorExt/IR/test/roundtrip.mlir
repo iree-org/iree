@@ -18,22 +18,22 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 // -----
 
 #nested_0 = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [2, 4],
-  outers_per_batch = [4, 1],
-  threads_per_outer = [4, 2],
-  elements_per_thread = [1, 4],
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 4],
+  outer_tile = [4, 1],
+  thread_tile = [4, 2],
+  element_tile = [1, 4],
 
   subgroup_strides = [0, 0],
   thread_strides   = [1, 4]
 >
 
 #nested_1 = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [4, 2],
-  outers_per_batch = [1, 4],
-  threads_per_outer = [2, 4],
-  elements_per_thread = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile = [4, 2],
+  outer_tile = [1, 4],
+  thread_tile = [2, 4],
+  element_tile = [4, 1],
 
   subgroup_strides = [0, 0],
   thread_strides = [8, 2]
@@ -51,20 +51,20 @@ func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 }
 
 // CHECK: #[[$LAYOUT0:.+]] = #iree_vector_ext.nested_layout<
-// CHECK-SAME: subgroups_per_workgroup = [1, 1],
-// CHECK-SAME: batches_per_subgroup = [2, 4],
-// CHECK-SAME: outers_per_batch = [4, 1],
-// CHECK-SAME: threads_per_outer = [4, 2],
-// CHECK-SAME: elements_per_thread = [1, 4],
+// CHECK-SAME: subgroup_tile = [1, 1],
+// CHECK-SAME: batch_tile = [2, 4],
+// CHECK-SAME: outer_tile = [4, 1],
+// CHECK-SAME: thread_tile = [4, 2],
+// CHECK-SAME: element_tile = [1, 4],
 // CHECK-SAME: subgroup_strides = [0, 0],
 // CHECK-SAME: thread_strides = [1, 4]>
 
 // CHECK: #[[$LAYOUT1:.+]] = #iree_vector_ext.nested_layout<
-// CHECK-SAME: subgroups_per_workgroup = [1, 1],
-// CHECK-SAME: batches_per_subgroup = [4, 2],
-// CHECK-SAME: outers_per_batch = [1, 4],
-// CHECK-SAME: threads_per_outer = [2, 4],
-// CHECK-SAME: elements_per_thread = [4, 1],
+// CHECK-SAME: subgroup_tile = [1, 1],
+// CHECK-SAME: batch_tile = [4, 2],
+// CHECK-SAME: outer_tile = [1, 4],
+// CHECK-SAME: thread_tile = [2, 4],
+// CHECK-SAME: element_tile = [4, 1],
 // CHECK-SAME: subgroup_strides = [0, 0],
 // CHECK-SAME: thread_strides = [8, 2]>
 
