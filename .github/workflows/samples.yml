@@ -41,17 +41,16 @@ jobs:
 
   samples:
     runs-on: ubuntu-20.04
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - name: "Setting up Python"
         uses: actions/setup-python@v5.1.0
         with:
@@ -63,6 +62,8 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
+      CC: clang
+      CXX: clang++
     defaults:
       run:
         shell: bash
@@ -74,11 +75,7 @@ jobs:
       - name: "Check out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.11"

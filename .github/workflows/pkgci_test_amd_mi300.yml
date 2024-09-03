@@ -24,6 +24,8 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
       VENV_DIR: ${{ github.workspace }}/.venv
+      CC: clang
+      CXX: clang++
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 1
       IREE_CUDA_DISABLE: 1
@@ -49,10 +51,6 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Configure build toolchain
-        run: |
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin

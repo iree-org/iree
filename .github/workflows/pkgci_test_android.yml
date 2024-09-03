@@ -37,6 +37,8 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       VENV_DIR: ${{ github.workspace }}/.venv
       IREE_TARGET_BUILD_DIR: build-android-arm_64
+      CC: clang
+      CXX: clang++
     steps:
       # General setup.
       - name: "Checking out repository"
@@ -62,11 +64,7 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Install build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
 
       - uses: nttld/setup-ndk@v1
         with:
