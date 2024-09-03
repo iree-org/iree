@@ -22,14 +22,14 @@ namespace mlir::iree_compiler {
 
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const GPUMMASchedule &schedule) {
-  os << "mSize: " << schedule.mSize << "\n";
-  os << "nSize: " << schedule.nSize << "\n";
-  os << "kSize: " << schedule.kSize << "\n";
-  os << "mTileCount: " << schedule.mTileCount << "\n";
-  os << "nTileCount: " << schedule.nTileCount << "\n";
-  os << "kTileCount: " << schedule.kTileCount << "\n";
-  os << "mWarpCount: " << schedule.mWarpCount << "\n";
-  os << "nWarpCount: " << schedule.nWarpCount << "\n";
+  os << "mSize: " << schedule.mSize << ", ";
+  os << "nSize: " << schedule.nSize << ", ";
+  os << "kSize: " << schedule.kSize << ", ";
+  os << "mTileCount: " << schedule.mTileCount << ", ";
+  os << "nTileCount: " << schedule.nTileCount << ", ";
+  os << "kTileCount: " << schedule.kTileCount << ", ";
+  os << "mWarpCount: " << schedule.mWarpCount << ", ";
+  os << "nWarpCount: " << schedule.nWarpCount;
   return os;
 }
 
@@ -269,13 +269,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  intrinsic (M, N, K) = (" << intrinsic.mSize << ", "
-                   << intrinsic.nSize << ", " << intrinsic.kSize << ")\n";
-      llvm::dbgs() << "  subgroup count (M, N) = (" << schedule.mWarpCount
-                   << ", " << schedule.nWarpCount << ")\n";
-      llvm::dbgs() << "  subgroup tile count (M, N, K) = ("
-                   << schedule.mTileCount << ", " << schedule.nTileCount << ", "
-                   << schedule.kTileCount << ")\n";
+      llvm::dbgs() << "  " << schedule << "\n";
     });
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
@@ -327,13 +321,7 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
 
     LLVM_DEBUG({
       llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  intrinsic (M, N, K) = (" << intrinsic.mSize << ", "
-                   << intrinsic.nSize << ", " << intrinsic.kSize << ")\n";
-      llvm::dbgs() << "  subgroup count (M, N) = (" << schedule.mWarpCount
-                   << ", " << schedule.nWarpCount << ")\n";
-      llvm::dbgs() << "  subgroup tile count (M, N, K) = ("
-                   << schedule.mTileCount << ", " << schedule.nTileCount << ", "
-                   << schedule.kTileCount << ")\n";
+      llvm::dbgs() << "  " << schedule << "\n";
     });
 
     int64_t intrinsicK = intrinsic.kSize;
