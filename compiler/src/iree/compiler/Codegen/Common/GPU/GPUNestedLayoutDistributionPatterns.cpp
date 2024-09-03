@@ -97,12 +97,11 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
         b.getIndexAttr(outerVectorOffsets[i]), threadIndices[i]};
     // The order in which a vector dimension is "tiled" is
     // subgroups -> batches -> outer vectors -> threads -> elements
-    SmallVector<int64_t> sizes = {vectorLayout.getSubgroupsPerWorkgroup()[i],
-                                  vectorLayout.getBatchesPerSubgroup()[i],
-                                  vectorLayout.getOutersPerBatch()[i],
-                                  vectorLayout.getThreadsPerOuter()[i]};
+    SmallVector<int64_t> sizes = {
+        vectorLayout.getSubgroupTile()[i], vectorLayout.getBatchTile()[i],
+        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i]};
     slicedIndices[pos] = linearizeIndex(b, indices[pos], ids, sizes,
-                                        vectorLayout.getElementsPerThread()[i]);
+                                        vectorLayout.getElementTile()[i]);
   }
   return slicedIndices;
 }
@@ -179,7 +178,7 @@ struct DistributeTransferRead final
     // The shape of the vector we read is pre-permutation. The permutation is
     // a transpose on the resulting read vector.
     auto innerVectorType =
-        VectorType::get(vectorLayout.getElementsPerThread(), elementType);
+        VectorType::get(vectorLayout.getElementTile(), elementType);
 
     // Initialize the full distributed vector for unrolling the batch/outer
     // vector dimensions.
@@ -336,7 +335,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     Value distributedSource = getDistributed(rewriter, srcVector, sourceLayout);
 
     VectorType broadcastTargetType =
-        VectorType::get(vectorLayout.getElementsPerThread(), elementType);
+        VectorType::get(vectorLayout.getElementTile(), elementType);
 
     int64_t sourceRank = sourceLayout.getRank();
 
@@ -387,7 +386,7 @@ static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
 }
 
 static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
-  return layout.getThreadsPerOuter()[dim];
+  return layout.getThreadTile()[dim];
 }
 
 /// The lowering for multi_reduction is done in two steps:

@@ -24,14 +24,14 @@ using VectorValue = TypedValue<VectorType>;
 static LogicalResult isSubgroupLayoutCompatible(
     IREE::GPU::MMAAttr::SingleSubgroupLayout subgroupLayout,
     NestedLayoutAttr layout, int64_t dim1, int64_t dim2) {
-  SmallVector<int64_t> element = {layout.getElementsPerThread()[dim1],
-                                  layout.getElementsPerThread()[dim2]};
-  SmallVector<int64_t> thread = {layout.getThreadsPerOuter()[dim1],
-                                 layout.getThreadsPerOuter()[dim2]};
+  SmallVector<int64_t> element = {layout.getElementTile()[dim1],
+                                  layout.getElementTile()[dim2]};
+  SmallVector<int64_t> thread = {layout.getThreadTile()[dim1],
+                                 layout.getThreadTile()[dim2]};
   SmallVector<int64_t> tstrides = {layout.getThreadStrides()[dim1],
                                    layout.getThreadStrides()[dim2]};
-  SmallVector<int64_t> outer = {layout.getOutersPerBatch()[dim1],
-                                layout.getOutersPerBatch()[dim2]};
+  SmallVector<int64_t> outer = {layout.getOuterTile()[dim1],
+                                layout.getOuterTile()[dim2]};
 
   if (subgroupLayout.element != element) {
     return failure();
@@ -158,7 +158,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     SmallVector<int64_t> rhsBatchOffsets(rank, 0);
 
     // Offsets into the result batches.
-    ArrayRef<int64_t> resultBatches = resultLayout.getBatchesPerSubgroup();
+    ArrayRef<int64_t> resultBatches = resultLayout.getBatchTile();
     SmallVector<int64_t> resultBatchTileSizes(rank, 1);
     LLVM_DEBUG({
       llvm::dbgs() << "result batches: [";
@@ -244,8 +244,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
     auto [lhsK, rhsK] = opDetail.getOperandKIndex();
-    int64_t lhsKBatch = lhsLayout.getBatchesPerSubgroup()[lhsK];
-    int64_t rhsKBatch = rhsLayout.getBatchesPerSubgroup()[rhsK];
+    int64_t lhsKBatch = lhsLayout.getBatchTile()[lhsK];
+    int64_t rhsKBatch = rhsLayout.getBatchTile()[rhsK];
 
     if (lhsKBatch != rhsKBatch)
       return std::nullopt;
