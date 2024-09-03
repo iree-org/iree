@@ -63,10 +63,10 @@ extra:
     - icon: fontawesome/brands/discord
       link: https://discord.gg/wEWh6Z9nMU
       name: IREE Discord Server
-    - icon: fontawesome/solid/envelope
+    - icon: fontawesome/solid/bullhorn
       link: https://lists.lfaidata.foundation/g/iree-announce
       name: IREE Announcement Mailing List
-    - icon: fontawesome/solid/users
+    - icon: fontawesome/solid/envelope
       link: https://lists.lfaidata.foundation/g/iree-technical-discussion
       name: IREE Technical Discussion Mailing List
 
