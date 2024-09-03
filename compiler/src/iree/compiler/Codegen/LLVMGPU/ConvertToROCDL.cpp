@@ -123,8 +123,11 @@ struct ConvertToROCDLPass final
       RewritePatternSet patterns(&getContext());
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
+      StringRef chipset = getGPUTargetAttr(m).getArch();
+      FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
       arith::populateArithToAMDGPUConversionPatterns(
-          patterns, /*saturateFP8Truncf=*/false);
+          patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
+          /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
