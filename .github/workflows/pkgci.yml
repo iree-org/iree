@@ -79,11 +79,11 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
 
-  test_tensorflow_cpu:
-    name: Test TensorFlow CPU
+  test_tensorflow:
+    name: Test TensorFlow
     needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_cpu')
-    uses: ./.github/workflows/pkgci_test_tensorflow_cpu.yml
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow')
+    uses: ./.github/workflows/pkgci_test_tensorflow.yml
 
   test_android:
     needs: [setup, build_packages]
