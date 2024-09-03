@@ -8,8 +8,6 @@ name: CI - Linux x64 clang debug
 
 on:
   pull_request:
-    branches:
-      - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_debug.yml"
   schedule:
@@ -34,7 +32,7 @@ jobs:
   linux_x64_clang_debug:
     needs: setup
     runs-on: azure-linux-scale
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:ba10d33ef502d8b33aaa43800e640a6866983ef353b73fda2ed6595c4275e066
     defaults:
       run:
         shell: bash

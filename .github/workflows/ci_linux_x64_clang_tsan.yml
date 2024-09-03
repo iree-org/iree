@@ -31,8 +31,7 @@ jobs:
     needs: setup
     runs-on: azure-linux-scale
     container:
-      # TODO(scotttodd): use ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64 here
-      image: gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:ba10d33ef502d8b33aaa43800e640a6866983ef353b73fda2ed6595c4275e066
       # TSan in particular needs some settings that this option includes:
       #   * https://github.com/google/sanitizers/issues/1716
       #   * https://security.stackexchange.com/q/214923
