@@ -63,10 +63,10 @@ jobs:
           key: ${{ github.job }}
       - name: Building documentation files
         run: ./docs/website/generate_extra_files.sh
-      # - name: Setting git config
-      #   run: |
-      #     git config --local user.email "iree-github-actions-bot@google.com"
-      #     git config --local user.name "Website Publish Action"
-      # - name: Deploying to gh-pages
-      #   working-directory: docs/website
-      #   run: mkdocs gh-deploy
+      - name: Setting git config
+        run: |
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "Website Publish Action"
+      - name: Deploying to gh-pages
+        working-directory: docs/website
+        run: mkdocs gh-deploy
