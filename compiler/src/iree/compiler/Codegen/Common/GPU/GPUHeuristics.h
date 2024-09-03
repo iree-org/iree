@@ -54,4 +54,15 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
                   bool transposedLhs = false, bool transposedRhs = false,
                   bool canUpcastAcc = false, bool mustBeAligned = true);
 
+/// Returns a schedule for the pvMatmul in attention using one of the given MMA
+/// |intrinsics| to target the given attention matmul problems, |qkMatmul|
+/// and |pvMatmul|. Returns std::nullopt if we cannot find such a schedule.
+FailureOr<GPUMMASchedule> deduceAttentionSchedule(
+    const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
+    ArrayRef<GPUMatmulShapeType> intrinsics,
+    const GPUMMAHeuristicSeeds &pvMatmulSeeds, int64_t sharedMemLimitInBytes,
+    int64_t subgroupSize, bool transposedQ = false, bool transposedK = true,
+    bool transposedV = false, bool canUpcastAcc = false,
+    bool mustBeAligned = true);
+
 } // namespace mlir::iree_compiler
