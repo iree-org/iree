@@ -55,11 +55,11 @@ struct FuseTransposeWithAttentionOp final
       : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
         controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(LinalgExt::AttentionOp linalgOp,
+  LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *transposeOperand = nullptr;
     linalg::LinalgOp transposeOp;
-    for (OpOperand *input : linalgOp.getDpsInputOperands()) {
+    for (OpOperand *input : attentionOp.getDpsInputOperands()) {
       if (controlFn && !controlFn(input)) {
         continue;
       }
@@ -73,25 +73,26 @@ struct FuseTransposeWithAttentionOp final
       }
     }
     if (!transposeOperand) {
-      return rewriter.notifyMatchFailure(linalgOp, "no transpose operand");
+      return rewriter.notifyMatchFailure(attentionOp, "no transpose operand");
     }
 
     int64_t inputIndex = transposeOperand->getOperandNumber();
     SmallVector<int64_t> perm = getPermutation(transposeOp);
     auto invPerm = invertPermutationVector(perm);
 
-    rewriter.modifyOpInPlace(linalgOp, [&]() {
-      SmallVector<AffineMap> newIndexingMaps = linalgOp.getIndexingMapsArray();
-      AffineMap inputMap = linalgOp.getMatchingIndexingMap(transposeOperand);
+    rewriter.modifyOpInPlace(attentionOp, [&]() {
+      SmallVector<AffineMap> newIndexingMaps =
+          attentionOp.getIndexingMapsArray();
+      AffineMap inputMap = attentionOp.getMatchingIndexingMap(transposeOperand);
       SmallVector<AffineExpr> newExprs =
           applyPermutation(inputMap.getResults(), invPerm);
       AffineMap transposedMap =
           AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                          newExprs, rewriter.getContext());
       newIndexingMaps[inputIndex] = transposedMap;
-      linalgOp.setIndexingMapsAttr(
+      attentionOp.setIndexingMapsAttr(
           rewriter.getAffineMapArrayAttr(newIndexingMaps));
-      linalgOp.setOperand(inputIndex, transposeOp.getDpsInputs()[0]);
+      attentionOp.setOperand(inputIndex, transposeOp.getDpsInputs()[0]);
     });
 
     return success();
