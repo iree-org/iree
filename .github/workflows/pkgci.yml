@@ -37,17 +37,23 @@ jobs:
     with:
       package_version: 0.dev1
 
+  # Package sanity checks.
   unit_test:
     name: Unit Test
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'unit_test')
     uses: ./.github/workflows/pkgci_unit_test.yml
 
+  # Tests for large programs.
   regression_test:
     name: Regression Test
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
     uses: ./.github/workflows/pkgci_regression_test.yml
+
+  ########################### Hardware/accelerators ###########################
+  # Jobs that run unit tests on special hardware platforms or accelerators
+  #############################################################################
 
   test_amd_mi250:
     name: Test AMD MI250
@@ -73,6 +79,26 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
     uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
 
+  test_android:
+    name: Test Android
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_android')
+    uses: ./.github/workflows/pkgci_test_android.yml
+    with:
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  test_riscv64:
+    name: Test RISC-V 64
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_riscv64')
+    uses: ./.github/workflows/pkgci_test_riscv64.yml
+    with:
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  ################################# Frameworks ################################
+  # Jobs that test machine learning frameworks or their Python APIs
+  #############################################################################
+
   test_onnx:
     name: Test ONNX
     needs: [setup, build_packages]
@@ -84,17 +110,3 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow')
     uses: ./.github/workflows/pkgci_test_tensorflow.yml
-
-  test_android:
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_android')
-    uses: ./.github/workflows/pkgci_test_android.yml
-    with:
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-
-  test_riscv64:
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_riscv64')
-    uses: ./.github/workflows/pkgci_test_riscv64.yml
-    with:
-      write-caches: ${{ needs.setup.outputs.write-caches }}
