@@ -42,11 +42,11 @@ func.func @distribute_elementwise_i32(%a: vector<16x16xi32>, %b: vector<16x16xi3
 }
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [2, 1, 1],
-  batches_per_subgroup    = [8, 2, 4],
-  outers_per_batch        = [1, 4, 4],
-  threads_per_outer       = [8, 2, 4],
-  elements_per_thread     = [1, 8, 2],
+  subgroup_tile = [2, 1, 1],
+  batch_tile    = [8, 2, 4],
+  outer_tile        = [1, 4, 4],
+  thread_tile       = [8, 2, 4],
+  element_tile     = [1, 8, 2],
 
   subgroup_strides        = [1, 1, 1],
   thread_strides          = [1, 8, 16]

@@ -261,11 +261,11 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   llvm::DenseMap<int64_t, int64_t> indexToRankReducedIndexMap;
   for (auto [idx, isProjected] : llvm::enumerate(droppedDims)) {
     if (!isProjected) {
-      subgroupCount.push_back(getSubgroupsPerWorkgroup()[idx]);
-      batchCount.push_back(getBatchesPerSubgroup()[idx]);
-      outerCount.push_back(getOutersPerBatch()[idx]);
-      threadCount.push_back(getThreadsPerOuter()[idx]);
-      elementCount.push_back(getElementsPerThread()[idx]);
+      subgroupCount.push_back(getSubgroupTile()[idx]);
+      batchCount.push_back(getBatchTile()[idx]);
+      outerCount.push_back(getOuterTile()[idx]);
+      threadCount.push_back(getThreadTile()[idx]);
+      elementCount.push_back(getElementTile()[idx]);
       subgroupStrides.push_back(getSubgroupStrides()[idx]);
       threadStrides.push_back(getThreadStrides()[idx]);
       indexToRankReducedIndexMap[idx] = count++;
@@ -283,15 +283,15 @@ VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
   SmallVector<int64_t> subgroupCount =
-      applyPermutation(getSubgroupsPerWorkgroup(), permutation);
+      applyPermutation(getSubgroupTile(), permutation);
   SmallVector<int64_t> batchCount =
-      applyPermutation(getBatchesPerSubgroup(), permutation);
+      applyPermutation(getBatchTile(), permutation);
   SmallVector<int64_t> outerCount =
-      applyPermutation(getOutersPerBatch(), permutation);
+      applyPermutation(getOuterTile(), permutation);
   SmallVector<int64_t> threadCount =
-      applyPermutation(getThreadsPerOuter(), permutation);
+      applyPermutation(getThreadTile(), permutation);
   SmallVector<int64_t> elementCount =
-      applyPermutation(getElementsPerThread(), permutation);
+      applyPermutation(getElementTile(), permutation);
   SmallVector<int64_t> subgroupStrides =
       applyPermutation(getSubgroupStrides(), permutation);
   SmallVector<int64_t> threadStrides =
@@ -305,9 +305,9 @@ NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
 /// <BATCH x OUTER x ELEMENT>
 SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   SmallVector<int64_t> shape;
-  shape.append(getBatchesPerSubgroup().begin(), getBatchesPerSubgroup().end());
-  shape.append(getOutersPerBatch().begin(), getOutersPerBatch().end());
-  shape.append(getElementsPerThread().begin(), getElementsPerThread().end());
+  shape.append(getBatchTile().begin(), getBatchTile().end());
+  shape.append(getOuterTile().begin(), getOuterTile().end());
+  shape.append(getElementTile().begin(), getElementTile().end());
   return shape;
 }
 
@@ -316,7 +316,7 @@ int64_t NestedLayoutAttr::getRank() const {
   // The layout requires that all size lists are the same length and match
   // the rank of the undistributed vector, so just return the length of one
   // of the fields.
-  return getBatchesPerSubgroup().size();
+  return getBatchTile().size();
 }
 
 LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
@@ -330,10 +330,9 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
   }
   // Multiply all shapes in the layout.
   for (int i = 0, e = rank; i < e; ++i) {
-    int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
-                            getBatchesPerSubgroup()[i] *
-                            getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
-                            getElementsPerThread()[i];
+    int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
+                            getOuterTile()[i] * getThreadTile()[i] *
+                            getElementTile()[i];
     if (expectedShape != shape[i]) {
       std::string shapeStr;
       llvm::raw_string_ostream shapeOs(shapeStr);
@@ -352,26 +351,25 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
 }
 NestedLayoutAttr NestedLayoutAttr::getChecked(
     llvm::function_ref<InFlightDiagnostic()> emitError, MLIRContext *context,
-    ArrayRef<int64_t> subgroupsPerWorkgroup,
-    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
-    ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> elementsPerThread,
-    ArrayRef<int64_t> subgroupStrides, ArrayRef<int64_t> threadStrides) {
-  if (failed(NestedLayoutAttr::verify(emitError, subgroupsPerWorkgroup,
-                                      batchesPerSubgroup, outersPerBatch,
-                                      threadsPerOuter, elementsPerThread,
+    ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,
+    ArrayRef<int64_t> outerTile, ArrayRef<int64_t> threadTile,
+    ArrayRef<int64_t> elementTile, ArrayRef<int64_t> subgroupStrides,
+    ArrayRef<int64_t> threadStrides) {
+  if (failed(NestedLayoutAttr::verify(emitError, subgroupTile, batchTile,
+                                      outerTile, threadTile, elementTile,
                                       subgroupStrides, threadStrides))) {
     return NestedLayoutAttr();
   }
 
-  return NestedLayoutAttr::get(
-      context, subgroupsPerWorkgroup, batchesPerSubgroup, outersPerBatch,
-      threadsPerOuter, elementsPerThread, subgroupStrides, threadStrides);
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
 }
 
 NestedLayoutAttr NestedLayoutAttr::get(
-    MLIRContext *context, ArrayRef<int64_t> subgroupsPerWorkgroup,
-    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
-    ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> elementsPerThread,
+    MLIRContext *context, ArrayRef<int64_t> subgroupTile,
+    ArrayRef<int64_t> batchTile, ArrayRef<int64_t> outerTile,
+    ArrayRef<int64_t> threadTile, ArrayRef<int64_t> elementTile,
     ArrayRef<int64_t> subgroupStrides, ArrayRef<int64_t> threadStrides) {
 
   SmallVector<int64_t> normalizedSubgroupStrides(subgroupStrides);
@@ -381,32 +379,32 @@ NestedLayoutAttr NestedLayoutAttr::get(
   // anything. We normalize the stride to be 0, to have consistency.
 
   for (auto [stride, size] :
-       llvm::zip_equal(normalizedSubgroupStrides, subgroupsPerWorkgroup)) {
+       llvm::zip_equal(normalizedSubgroupStrides, subgroupTile)) {
     if (size == 1) {
       stride = 0;
     }
   }
 
   for (auto [stride, size] :
-       llvm::zip_equal(normalizedThreadStrides, threadsPerOuter)) {
+       llvm::zip_equal(normalizedThreadStrides, threadTile)) {
     if (size == 1) {
       stride = 0;
     }
   }
 
-  return Base::get(context, subgroupsPerWorkgroup, batchesPerSubgroup,
-                   outersPerBatch, threadsPerOuter, elementsPerThread,
-                   normalizedSubgroupStrides, normalizedThreadStrides);
+  return Base::get(context, subgroupTile, batchTile, outerTile, threadTile,
+                   elementTile, normalizedSubgroupStrides,
+                   normalizedThreadStrides);
 }
 
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
-    ArrayRef<int64_t> subgroupsPerWorkgroup,
-    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
-    ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> elementsPerThread,
-    ArrayRef<int64_t> subgroupStrides, ArrayRef<int64_t> threadStrides) {
+    ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,
+    ArrayRef<int64_t> outerTile, ArrayRef<int64_t> threadTile,
+    ArrayRef<int64_t> elementTile, ArrayRef<int64_t> subgroupStrides,
+    ArrayRef<int64_t> threadStrides) {
 
-  size_t rank = subgroupsPerWorkgroup.size();
+  size_t rank = subgroupTile.size();
   auto checkTile = [&](ArrayRef<int64_t> tileShape) {
     if (tileShape.size() != rank) {
       emitError() << "all fields must have the same rank as the layout";
@@ -415,11 +413,10 @@ LogicalResult NestedLayoutAttr::verify(
     return success();
   };
 
-  if (failed(checkTile(subgroupsPerWorkgroup)) ||
-      failed(checkTile(batchesPerSubgroup)) ||
-      failed(checkTile(outersPerBatch)) || failed(checkTile(threadsPerOuter)) ||
-      failed(checkTile(elementsPerThread)) ||
-      failed(checkTile(subgroupStrides)) || failed(checkTile(threadStrides))) {
+  if (failed(checkTile(subgroupTile)) || failed(checkTile(batchTile)) ||
+      failed(checkTile(outerTile)) || failed(checkTile(threadTile)) ||
+      failed(checkTile(elementTile)) || failed(checkTile(subgroupStrides)) ||
+      failed(checkTile(threadStrides))) {
     return failure();
   }
 
@@ -452,7 +449,7 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
       /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
 
   for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getSubgroupsPerWorkgroup(), getSubgroupStrides())) {
+       llvm::zip_equal(getSubgroupTile(), getSubgroupStrides())) {
     // Dimension is not distributed.
     if (dimStride == 0) {
       virtualTids.push_back(rewriter.create<arith::ConstantOp>(
@@ -469,7 +466,7 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
   }
 
   for (auto [dimSize, dimStride] :
-       llvm::zip_equal(getThreadsPerOuter(), getThreadStrides())) {
+       llvm::zip_equal(getThreadTile(), getThreadStrides())) {
     // Dimension is not distributed.
     if (dimStride == 0) {
       virtualTids.push_back(rewriter.create<arith::ConstantOp>(
