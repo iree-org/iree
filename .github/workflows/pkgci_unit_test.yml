@@ -60,3 +60,22 @@ jobs:
           source ${VENV_DIR}/bin/activate
           echo "Testing compiler package:"
           python -m iree.compiler._package_test
+
+      # Test tools and importers that require additional deps.
+      - name: Test ONNX importer
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install onnx>=1.16.0
+          python compiler/bindings/python/test/tools/import_onnx_test.py
+          python compiler/bindings/python/test/extras/onnx_importer_test.py
+      - name: Test FX (PyTorch) importer
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install torch>=2.3.0
+          python compiler/bindings/python/test/extras/fx_importer_test.py
+      - name: Test TensorFlow importer
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install tensorflow>=2.16.1
+          python compiler/bindings/python/test/tools/compiler_tflite_test.py
+          python compiler/bindings/python/test/tools/compiler_tf_test.py
