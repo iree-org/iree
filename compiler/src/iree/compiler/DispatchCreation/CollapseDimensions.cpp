@@ -10,6 +10,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -280,10 +281,9 @@ public:
   // Debug print the current operation & reassociation indicies
   void dump() const;
 
-  // Update `collapsableLoops` by taking the set intersection with
-  // `otherCollapsable` and update the reassociation indicies accordingly.
-  // Returns true if the operation modified the number of collapsable loops.
-  bool updateCollapseViaIntersect(const CollapsableLoopsSet &otherCollapsable);
+  // Update CollapseInfo to ensure that all dimensions collapsable in `this` are
+  // also collapsable in `consumerInfo`.
+  bool updateFromConsumer(OpOperand *operand, const CollapseInfo &consumerInfo);
 
   // Update `collapsableLoops` by subtracting `uncollapsable` and update the
   // reassociation indicies accordingly.
@@ -295,6 +295,9 @@ public:
   // copy.
   FailureOr<CollapsableLoopsSet>
   getTransformedCollapsableLoops(AffineMap map) const;
+
+  FailureOr<SmallVector<ReassociationIndices>>
+  getTransformedReassociation(AffineMap map) const;
 
   // Clear internal data
   void clear() {
@@ -405,19 +408,133 @@ CollapseInfo::getTransformedCollapsableLoops(AffineMap map) const {
   return transformedLoops;
 }
 
-// Update `collapsableLoops` by taking the set intersection with
-// `otherCollapsable` and update the reassociation indicies accordingly.
-bool CollapseInfo::updateCollapseViaIntersect(
-    const CollapsableLoopsSet &otherCollapsable) {
-  CollapsableLoopsSet toRemove;
-  for (auto elem : collapsableLoops) {
-    if (!otherCollapsable.contains(elem)) {
-      toRemove.insert(elem);
+FailureOr<SmallVector<ReassociationIndices>>
+CollapseInfo::getTransformedReassociation(AffineMap map) const {
+  if (!map) {
+    return failure();
+  }
+
+  SmallVector<ReassociationIndices> transformedReassociation(reassociation);
+  for (const auto &[idxOne, indicies] : llvm::enumerate(reassociation)) {
+    for (auto [idxTwo, elem] : llvm::enumerate(indicies)) {
+      assert(elem < map.getNumResults() && "index has no valid mapping");
+      auto dimExpr = dyn_cast<AffineDimExpr>(map.getResult(elem));
+      if (!dimExpr) {
+        continue;
+      }
+      transformedReassociation[idxOne][idxTwo] = dimExpr.getPosition();
     }
   }
-  collapsableLoops.set_subtract(toRemove);
-  updateReassociation();
-  return toRemove.size();
+  return transformedReassociation;
+}
+
+// Update CollapseInfo to ensure that all dimensions collapsable in `this` are
+// also collapsable in `otherInfo`. This means:
+// 1. Any dimension not collapsable in `otherInfo` should not be collapsable in
+// `this`
+// 2. For any pair of dimensions in `this`, if they are collapsable in
+// `consumerInfo`, they must be collapsable into the same dimension in
+// `consumerInfo` to be collapsable into the same dimension in `this`.
+bool CollapseInfo::updateFromConsumer(OpOperand *operand,
+                                      const CollapseInfo &consumerInfo) {
+  bool didChange = false;
+  FailureOr<AffineMap> consumerToProducerMap =
+      getConsumerLoopToProducerLoopsMap(*operand);
+  if (failed(consumerToProducerMap)) {
+    this->clear();
+    return !consumerInfo.getCollapsibleLoops().empty();
+  }
+
+  FailureOr<CollapsableLoopsSet> consumerCollapsable =
+      consumerInfo.getTransformedCollapsableLoops(
+          consumerToProducerMap.value());
+  if (failed(consumerCollapsable)) {
+    didChange = collapsableLoops.size();
+    this->clear();
+    return didChange;
+  }
+
+  FailureOr<SmallVector<ReassociationIndices>> consumerReassoc =
+      consumerInfo.getTransformedReassociation(consumerToProducerMap.value());
+  assert(succeeded(consumerReassoc));
+
+  // Get a map from original index to the index it gets collapsed into
+  llvm::DenseMap<long, long> consumerCollapseMap;
+  for (const auto &[idx, indicies] : llvm::enumerate(consumerReassoc.value())) {
+    for (const auto elem : indicies) {
+      consumerCollapseMap[elem] = idx;
+    }
+  }
+
+  // Remove all collapsable loops in `producer` that are not collapsable in
+  // `consumer` (set intersect)
+  didChange = collapsableLoops.remove_if([&](long elem) -> bool {
+    return !consumerCollapsable.value().contains(elem);
+  });
+
+  // Now update the reassociation indicies given the updated `collapsableLoops`
+  // and `consumerCollapsableMap`.
+  // The idea is to reconstruct the reassociation indicies, and at each index:
+  // (1) If `index` IS NOT in `collapsableLoops`, split `indicies` and don't add
+  // `index` to either.
+  //
+  // (2) If `index` IS in `collapsableLoops` but `consumerCollapseMap` maps
+  // `index` to a different collapsed loop then the other indicies,  split
+  // `indicies` and insert `index` into the new one.
+  //
+  // For example:
+  // producer reassociation = [[0, 1], [2, 3]]
+  // consumer reassociation = [0, 1, 2, 3]
+  // then, consumer reassociation gets updated to [[0, 1], [2, 3]] because
+  // [0, 1] and [2, 3] get collapsed into different loops
+  //
+  // (3) Otherwise, keep the index
+  SmallVector<ReassociationIndices> newReassociation;
+  for (ReassociationIndicesRef indicies : reassociation) {
+    // Track the loop index that `indicies` get collapsed into.
+    long collapseIntoIdx = -1;
+
+    // Holds dimensions that should be collapsed together
+    ReassociationIndices newIndicies;
+    for (int64_t index : indicies) {
+      // (1) Because `index` isn't collapsable, the indicies in `newIndicies`
+      // are no longer adjacent to the upcoming indicies. If there is >1 index
+      // to collapse, add it to the new reassociation. Otherwise, discard it
+      // because there is no dimension to collapse with.
+      if (!collapsableLoops.contains(index)) {
+        if (newIndicies.size() > 1) {
+          newReassociation.push_back(std::move(newIndicies));
+        }
+        newIndicies.clear();
+        collapseIntoIdx = -1;
+        continue;
+      }
+
+      if (collapseIntoIdx == -1) {
+        collapseIntoIdx = consumerCollapseMap.at(index);
+      }
+
+      if (collapseIntoIdx != -1 &&
+          consumerCollapseMap.at(index) != collapseIntoIdx) {
+        didChange = true;
+        if (newIndicies.size() > 1) {
+          newReassociation.push_back(std::move(newIndicies));
+        }
+        newIndicies.clear();
+        collapseIntoIdx = consumerCollapseMap[index];
+      }
+
+      newIndicies.push_back(index);
+      continue;
+    }
+
+    if (newIndicies.size() > 1) {
+      newReassociation.push_back(newIndicies);
+    }
+  }
+  reassociation = std::move(newReassociation);
+
+  return didChange;
 }
 
 // Update `collapsableLoops` by subtracting `uncollapsable` and update the
@@ -694,7 +811,7 @@ static bool updateConsumersFromProducers(
         continue;
       }
 
-      CollapseInfo &producerInfo = opMap.find(producerOp)->second;
+      const CollapseInfo &producerInfo = opMap.at(producerOp);
       FailureOr<CollapseInfo::CollapsableLoopsSet> producerCollapsable =
           producerInfo.getTransformedCollapsableLoops(mapping.value());
       if (!failed(producerCollapsable)) {
@@ -722,7 +839,7 @@ static bool updateProducersFromConsumers(
   for (auto op : llvm::reverse(slice)) {
     auto genericConsumer = cast<linalg::GenericOp>(op);
     assert(opMap.contains(genericConsumer));
-    const CollapseInfo &consumerInfo = opMap.find(genericConsumer)->second;
+    const CollapseInfo &consumerInfo = opMap.at(genericConsumer);
 
     for (auto operand : genericConsumer.getDpsInputOperands()) {
       auto definingOp = operand->get().getDefiningOp();
@@ -736,26 +853,10 @@ static bool updateProducersFromConsumers(
 
       // Get a mapping from the consumer's iteration space to the producer's.
       CollapseInfo &producerInfo = opMap.find(genericProducer)->second;
-      FailureOr<AffineMap> consumerToProducerMap =
-          getConsumerLoopToProducerLoopsMap(*operand);
-      if (failed(consumerToProducerMap)) {
-        didChange |= !producerInfo.getCollapsibleLoops().empty();
-        producerInfo.clear();
-        continue;
-      }
 
-      // Use the map to get the consumer's collapsable loops in terms of the
-      // producer.
-      auto consumerCollapsable = consumerInfo.getTransformedCollapsableLoops(
-          consumerToProducerMap.value());
-      if (failed(consumerCollapsable)) {
-        producerInfo.clear();
-        continue;
-      }
       // Only loops collapsable in both the consumer and producer may be
       // collapsed.
-      didChange |=
-          producerInfo.updateCollapseViaIntersect(consumerCollapsable.value());
+      didChange |= producerInfo.updateFromConsumer(operand, consumerInfo);
     }
   }
   return didChange;
