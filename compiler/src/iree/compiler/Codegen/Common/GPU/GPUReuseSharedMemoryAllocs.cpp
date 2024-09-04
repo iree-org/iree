@@ -12,7 +12,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-reuse-shared-memory-allocs"
@@ -236,10 +235,6 @@ struct GPUReuseSharedMemoryAllocsPass final
     for (SmallVector<Operation *> group : aliasGroups) {
       aliasGroupLivenessRanges.push_back(
           getAliasGroupLivenessRange(group, dominanceInfo, livenessMap));
-      // llvm::dbgs() << "livenessRange first: " <<
-      // *(aliasGroupLivenessRanges.back().first) << "\n"; llvm::dbgs() <<
-      // "livenessRange second: " << *(aliasGroupLivenessRanges.back().second)
-      // << "\n\n";
     }
     // Add a barrier at the start of the LivenessRange of any AliasGroup that
     // has a preceding AliasGroup.
@@ -253,8 +248,6 @@ struct GPUReuseSharedMemoryAllocsPass final
         }
         LivenessRange otherLiveness = aliasGroupLivenessRanges[otherIdx];
         // Add a barrier if the `otherLiveness` comes before `liveness`.
-        // llvm::dbgs() << "this first: " << *(otherLiveness.first) << "\n";
-        // llvm::dbgs() << "other first: " << *(liveness.first) << "\n\n";
         if (dominanceInfo.dominates(otherLiveness.first, liveness.first)) {
           builder.setInsertionPoint(liveness.first);
           builder.create<gpu::BarrierOp>(liveness.first->getLoc());

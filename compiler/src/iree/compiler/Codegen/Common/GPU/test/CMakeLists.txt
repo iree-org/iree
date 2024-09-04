@@ -30,7 +30,7 @@ iree_lit_test_suite(
     "gpu_promote_matmul_operands.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
-    "gpu_reuse_shared_memroy_allocs.mlir"
+    "gpu_reuse_shared_memory_allocs.mlir"
     "gpu_tensor_alloc.mlir"
     "gpu_tensor_tile.mlir"
     "gpu_tile.mlir"
