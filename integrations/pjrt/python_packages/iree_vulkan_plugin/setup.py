@@ -52,7 +52,7 @@ setup(
     name=f"iree-pjrt-plugin-vulkan{iree_pjrt_setup.PACKAGE_SUFFIX}",
     version=f"{iree_pjrt_setup.PACKAGE_VERSION}",
     author="The IREE Team",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     license="Apache-2.0",
     description="IREE PJRT Plugin for Vulkan (generic)",
     long_description=README,

@@ -521,7 +521,7 @@ setup(
     name=f"{custom_package_prefix}iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     description="IREE Python Runtime Components",
     long_description=README,
     long_description_content_type="text/markdown",
