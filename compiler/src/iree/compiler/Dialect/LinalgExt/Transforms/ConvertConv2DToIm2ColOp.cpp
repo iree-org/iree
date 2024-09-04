@@ -137,17 +137,19 @@ public:
     SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
     SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
                                             rewriter.getIndexAttr(fw)};
-    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
     SmallVector<OpFoldResult> mOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> mBasis = {rewriter.getIndexAttr(1)};
+    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> kBasis = {rewriter.getIndexAttr(1)};
     SmallVector<int64_t> batchPos = {0};
     SmallVector<int64_t> mPos = {1, 2};
     SmallVector<int64_t> kPos = {3};
-    Value img2ColTensor =
-        rewriter
-            .create<IREE::LinalgExt::Im2colOp>(
-                loc, input, /*output=*/colTensor, strides, dilations,
-                kernelSize, mOffset, kOffset, batchPos, mPos, kPos)
-            .getResult(0);
+    Value img2ColTensor = rewriter
+                              .create<IREE::LinalgExt::Im2colOp>(
+                                  loc, input, /*output=*/colTensor, strides,
+                                  dilations, kernelSize, mOffset, mBasis,
+                                  kOffset, kBasis, batchPos, mPos, kPos)
+                              .getResult(0);
 
     SmallVector<ReassociationIndices> filterReassocIndices = {{0, 1, 2}, {3}};
     auto reshapedFilterType =
@@ -260,17 +262,19 @@ public:
     SmallVector<int64_t> dilations(convOp.getDilations().getValues<int64_t>());
     SmallVector<OpFoldResult> kernelSize = {rewriter.getIndexAttr(fh),
                                             rewriter.getIndexAttr(fw)};
-    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
     SmallVector<OpFoldResult> mOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> mBasis = {rewriter.getIndexAttr(1)};
+    SmallVector<OpFoldResult> kOffset = {rewriter.getIndexAttr(0)};
+    SmallVector<OpFoldResult> kBasis = {rewriter.getIndexAttr(1)};
     SmallVector<int64_t> batchPos = {0};
     SmallVector<int64_t> mPos = {2, 3};
     SmallVector<int64_t> kPos = {1};
-    Value img2ColTensor =
-        rewriter
-            .create<IREE::LinalgExt::Im2colOp>(
-                loc, input, /*output=*/colTensor, strides, dilations,
-                kernelSize, mOffset, kOffset, batchPos, mPos, kPos)
-            .getResult(0);
+    Value img2ColTensor = rewriter
+                              .create<IREE::LinalgExt::Im2colOp>(
+                                  loc, input, /*output=*/colTensor, strides,
+                                  dilations, kernelSize, mOffset, mBasis,
+                                  kOffset, kBasis, batchPos, mPos, kPos)
+                              .getResult(0);
 
     SmallVector<ReassociationIndices> filterReassocIndices = {{0}, {1, 2, 3}};
     auto reshapedFilterType =

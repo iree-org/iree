@@ -389,7 +389,8 @@ module {
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [2, 3] k_pos = [1]
+      m_offset = [0] * [1] k_offset = [0] * [1]
+      batch_pos = [0] m_pos = [2, 3] k_pos = [1]
       ins(%2 : tensor<2x34x34x128xf16>)
       outs(%3 : tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
     return %4 : tensor<2x128x8xf16>

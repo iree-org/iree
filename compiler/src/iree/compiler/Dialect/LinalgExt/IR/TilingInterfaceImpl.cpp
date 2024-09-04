@@ -1265,9 +1265,10 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputSizes = getDims(builder, loc, getInput());
 
   // Set batch offsets and sizes for input
-  for (auto [idx, dim] : llvm::enumerate(getBatchPos())) {
-    inputOffsets[dim] = offsets[idx];
-    inputSizes[dim] = sizes[idx];
+  for (auto [outDim, inDim] :
+       llvm::zip_equal(getBatchOutputDims(), getBatchPos())) {
+    inputOffsets[inDim] = offsets[outDim];
+    inputSizes[inDim] = sizes[outDim];
   }
 
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
@@ -1292,26 +1293,35 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
                        outputSlice->result_type_end());
   }
 
+  // Adjust m_offset and k_offset by adding the offsets from tiling.
+  SmallVector<OpFoldResult> newKOffsets, newMOffsets;
   AffineExpr d0, d1;
   bindDims(getContext(), d0, d1);
   auto map = AffineMap::get(2, 0, {d0 + d1}, getContext());
-  OpFoldResult kTileOffset = offsets.back();
-  OpFoldResult kOpOffset = getMixedKOffset()[0];
-  OpFoldResult kOffset = affine::makeComposedFoldedAffineApply(
-      builder, loc, map, {kTileOffset, kOpOffset});
-  OpFoldResult mTileOffset = offsets[offsets.size() - 2];
-  OpFoldResult mOpOffset = getMixedMOffset()[0];
-  OpFoldResult mOffset = affine::makeComposedFoldedAffineApply(
-      builder, loc, map, {mTileOffset, mOpOffset});
+  for (auto [outDim, kOffset] :
+       llvm::zip_equal(getKOutputDims(), getMixedKOffset())) {
+    OpFoldResult kTileOffset = offsets[outDim];
+    newKOffsets.push_back(affine::makeComposedFoldedAffineApply(
+        builder, loc, map, {kTileOffset, kOffset}));
+  }
+  for (auto [outDim, mOffset] :
+       llvm::zip_equal(getMOutputDims(), getMixedMOffset())) {
+    OpFoldResult mTileOffset = offsets[outDim];
+    newMOffsets.push_back(affine::makeComposedFoldedAffineApply(
+        builder, loc, map, {mTileOffset, mOffset}));
+  }
 
+  // Create the tiled op.
   SmallVector<Value> operands = {inputSlice->getResult(0),
                                  outputSlice->getResult(0)};
+  // Copy all metadata operands from the untiled operation.
   operands.append(getOperation()->getOperands().begin() + 2,
                   getOperation()->getOperands().end());
   Im2colOp tiledOp =
       mlir::clone(builder, *this, outputSlice->getResultTypes(), operands);
-  tiledOp.setMixedKOffset({kOffset});
-  tiledOp.setMixedMOffset({mOffset});
+  // Set the new k_offset and m_offset, since they have changed with tiling.
+  tiledOp.setMixedKOffset(newKOffsets);
+  tiledOp.setMixedMOffset(newMOffsets);
 
   return TilingResult{{tiledOp},
                       SmallVector<Value>(tiledOp->getResults()),

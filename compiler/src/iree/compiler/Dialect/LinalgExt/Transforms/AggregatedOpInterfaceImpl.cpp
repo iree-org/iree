@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 
@@ -278,6 +279,15 @@ static OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
   return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
 }
 
+// Helper method to multiply 2 OpFoldResult inputs with affine.apply.
+static OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                            OpFoldResult b) {
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  auto addMap = AffineMap::get(2, 0, {d0 * d1});
+  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
+}
+
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
@@ -448,7 +458,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 /// ```
 ///   %im2col = iree_linalg_ext.im2col
 ///       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-///       m_offset = [%m_off] k_offset = [%k_off]
+///       m_offset = [%m_off] * [1] k_offset = [%k_off] * [1]
 ///       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 ///       ins(%in : tensor<2x34x34x640xf32>)
 ///       outs(%out : tensor<2x4x8xf32>) -> tensor<2x4x8xf32>
@@ -470,13 +480,25 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
   Value inputSlice = getInput();
-  // Unroll all but the K loop
-  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
-  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
-  // Only support single K and M output dimension for now.
-  if (kOffset.size() != 1 || mOffset.size() != 1) {
-    return failure();
-  }
+
+  // Get the linearized mOffset and kOffset
+  auto linearizeIndex = [&](SmallVector<OpFoldResult> inds,
+                            SmallVector<OpFoldResult> basis) {
+    MLIRContext *ctx = b.getContext();
+    SmallVector<AffineExpr> dims(inds.size()), symbols(basis.size());
+    bindDimsList<AffineExpr>(ctx, dims);
+    bindSymbolsList<AffineExpr>(ctx, symbols);
+    AffineExpr linearExpr = mlir::linearize(ctx, dims, symbols);
+    SmallVector<OpFoldResult> mapOperands(inds);
+    mapOperands.append(basis);
+    auto linearMap = AffineMap::get(
+        /*dimCount=*/inds.size(), /*symbolCount=*/basis.size(), linearExpr);
+    OpFoldResult linearIdx =
+        affine::makeComposedFoldedAffineApply(b, loc, linearMap, mapOperands);
+    return linearIdx;
+  };
+  OpFoldResult mOffset = linearizeIndex(getMixedMOffset(), getMixedMBasis());
+  OpFoldResult kOffset = linearizeIndex(getMixedKOffset(), getMixedKBasis());
 
   // Step 1: Tile the im2col op to loops with contiguous slices in the
   // innermost loop.
@@ -504,9 +526,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
       break;
     }
   }
-  bool tileK =
-      !willBeContiguousSlice(innerSliceSize, kTileSize, kOffset.front());
-  if (!tileK) {
+  bool vectorizeInnerKLoop =
+      willBeContiguousSlice(innerSliceSize, kTileSize, kOffset);
+  if (vectorizeInnerKLoop) {
     iterationDomain.pop_back();
   } else {
     kTileSize = b.getIndexAttr(1);
@@ -571,9 +593,15 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     }
     kBasis.push_back(size);
   }
-  OpFoldResult kIndex = kOffset.front();
-  if (tileK) {
-    kIndex = addOfrs(b, nestedLoc, kOffset.front(), ivs.back());
+  OpFoldResult kIndex = kOffset;
+  for (auto [i, offset] : llvm::enumerate(getMixedKOffset())) {
+    if (vectorizeInnerKLoop && i == getMixedKOffset().size() - 1) {
+      break;
+    }
+    int64_t ivIdx = getKOutputDims()[i];
+    OpFoldResult ivOffset =
+        mulOfrs(b, nestedLoc, getMixedKBasis()[i], ivs[ivIdx]);
+    kIndex = addOfrs(b, nestedLoc, kIndex, ivOffset);
   }
   FailureOr<SmallVector<Value>> maybeDelinKOffset = affine::delinearizeIndex(
       b, nestedLoc, getValueOrCreateConstantIndexOp(b, loc, kIndex),
@@ -599,8 +627,13 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Compute offsets for extract. Start by delinearizing the combined offset
   // of m_offset and the offset from the tiled loop, using the mBasis. This
   // will give an index into the delinearized output space of the convolution.
-  Value mArg = tileK ? ivs[ivs.size() - 2] : ivs.back();
-  OpFoldResult linearMOffset = addOfrs(b, nestedLoc, mArg, mOffset.front());
+  SmallVector<int64_t> mOutDims = getMOutputDims();
+  SmallVector<OpFoldResult> mIvs, mOutBasis(getMixedMBasis());
+  for (auto [idx, dim] : llvm::enumerate(getMOutputDims())) {
+    mIvs.push_back(ivs[dim]);
+  }
+  OpFoldResult linearMIv = linearizeIndex(mIvs, mOutBasis);
+  OpFoldResult linearMOffset = addOfrs(b, nestedLoc, linearMIv, mOffset);
   FailureOr<SmallVector<Value>> maybeDelinMOffset = affine::delinearizeIndex(
       b, nestedLoc,
       getValueOrCreateConstantIndexOp(b, nestedLoc, linearMOffset), mBasis);
@@ -648,7 +681,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Extract a slice from the input tensor.
 
   ShapedType outputType = getOutputType();
-  SmallVector<OpFoldResult> kTileSizes(outputType.getRank(), b.getIndexAttr(1));
+  SmallVector<OpFoldResult> kTileSizes(
+      std::min<int64_t>(getOutputRank(), getInputRank()), b.getIndexAttr(1));
   kTileSizes.back() = kTileSize;
 
   SmallVector<int64_t> kTileSizeStatic;

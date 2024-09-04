@@ -162,7 +162,7 @@ hal.executable private @main {
         %6 = tensor.empty() : tensor<2x256x11520xf16>
         %7 = iree_linalg_ext.im2col
             strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [0] k_offset = [0]
+            m_offset = [0] * [1] k_offset = [0] * [1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
           ins(%3 : tensor<2x34x34x1280xf16>)
           outs(%6 : tensor<2x256x11520xf16>) -> tensor<2x256x11520xf16>
