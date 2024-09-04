@@ -73,15 +73,16 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 } // namespace
 
 // Function to check valid data types on the ROCm backend.
-LogicalResult validateDataTypes(Operation *op) {
-  if (llvm::any_of(op->getOperandTypes(),
-                   [](Type type) {
-                     return (type.isFloat8E4M3FN() || type.isFloat8E4M3FN());
-                   }) ||
-      llvm::any_of(op->getResultTypes(), [](Type type) {
-        return (type.isFloat8E4M3FN() || type.isFloat8E4M3FN());
-      }))
+static LogicalResult validateDataTypes(Operation *op) {
+  auto operandTypes = llvm::to_vector(op->getOperandTypes());
+  auto resultTypes = llvm::to_vector(op->getResultTypes());
+  if (llvm::any_of(llvm::concat<Type>(operandTypes, resultTypes),
+                   llvm::IsaPred<Float8E4M3FNType, Float8E5M2Type>)) {
+    op->emitOpError()
+        << "F8E5M2 and F8E4M3FN types are not supported on "
+           "the ROCm backend; try F8E5M2FNUZ or F8E4M3FNUZ instead.";
     return failure();
+  }
 
   return success();
 }
@@ -104,15 +105,10 @@ struct ConvertToROCDLPass final
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    m.walk(
-        [&](Operation *op) {
-          if (failed(validateDataTypes(op))) {
-            op->emitOpError()
-                << "F8E5M2 and F8E4M3FN types are not supported on "
-                   "the ROCm backend; try F8E5M2FNUZ or F8E4M3FNUZ instead.";
-            return signalPassFailure();
-          }
-        });
+    m.walk([&](Operation *op) {
+      if (failed(validateDataTypes(op)))
+        return signalPassFailure();
+    });
 
     if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
       m.emitOpError() << "unsupported: ROCm index bit widths must either be "
