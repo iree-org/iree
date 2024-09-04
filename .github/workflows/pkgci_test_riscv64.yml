@@ -36,6 +36,8 @@ jobs:
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       VENV_DIR: ${{ github.workspace }}/.venv
+      CC: clang
+      CXX: clang++
       BOOTSTRAP_WORK_DIR: ${{ github.workspace }}/.bootstrap
       RISCV_RV64_LINUX_TOOLCHAIN_ROOT: ${{ github.workspace }}/riscv/toolchain
       QEMU_PATH_PREFIX: ${{ github.workspace }}/riscv/qemu
@@ -59,11 +61,7 @@ jobs:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Install build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - name: Setup base venv
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \

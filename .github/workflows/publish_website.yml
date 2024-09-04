@@ -30,6 +30,9 @@ jobs:
   publish_website:
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - name: Checkout out repository
         uses: actions/checkout@v4.1.7
@@ -50,8 +53,6 @@ jobs:
           pip install requests
           sudo apt update
           sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
       - name: Generating release index
         run: |
           ./build_tools/scripts/generate_release_index.py \

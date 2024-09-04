@@ -29,6 +29,8 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
       VENV_DIR: ${{ github.workspace }}/.venv
+      CC: clang
+      CXX: clang++
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
@@ -61,8 +63,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y cmake clang ninja-build libstdc++-12-dev
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin

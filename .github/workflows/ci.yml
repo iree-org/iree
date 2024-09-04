@@ -156,14 +156,12 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
+      CC: clang
+      CXX: clang++
     steps:
       - uses: actions/checkout@v4.1.7
       - name: Install requirements
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
@@ -200,15 +198,13 @@ jobs:
           - provider: console
     env:
       BUILD_DIR: build-tracing
+      CC: clang
+      CXX: clang++
       TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@v4.1.7
       - name: Install requirements
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
