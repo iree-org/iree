@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-reuse-shared-memory-allocs"
@@ -38,9 +40,9 @@ static LivenessRange getLivenessRange(memref::AllocOp alloc,
   SmallVector<Operation *> workList;
   workList.push_back(alloc);
   while (!workList.empty()) {
-    auto op = workList.pop_back_val();
+    Operation *op = workList.pop_back_val();
     for (auto user : op->getUsers()) {
-      if (isa<memref::SubViewOp>(user)) {
+      if (isa<ViewLikeOpInterface, arith::SelectOp>(user)) {
         workList.push_back(user);
         continue;
       }
@@ -57,7 +59,7 @@ static LivenessRange getLivenessRange(memref::AllocOp alloc,
       }
     }
   }
-  return std::make_pair(begin, end);
+  return {begin, end};
 }
 
 /// Compute the liveness range within the single block of the `rootOp` for each
@@ -67,10 +69,9 @@ static LivenessRange getLivenessRange(memref::AllocOp alloc,
 /// 1. `rootOp` must have only a single region with a single block.
 /// 2. `rootOp` must not have control flow.
 /// 3. `rootOp` must have at least 2 shared memory allocations.
-static LogicalResult
-populateLivenessRanges(Operation *rootOp,
-                       DenseMap<Operation *, LivenessRange> &livenessMap,
-                       DominanceInfo &dominanceInfo) {
+static LogicalResult populateLivenessRanges(
+    Operation *rootOp, DenseMap<Operation *, LivenessRange> &livenessMap,
+    SmallVector<memref::AllocOp> &allocs, DominanceInfo &dominanceInfo) {
   if (rootOp->getNumRegions() != 1) {
     return failure();
   }
@@ -95,10 +96,11 @@ populateLivenessRanges(Operation *rootOp,
     return failure();
   }
 
-  for (auto alloc : sharedMemAllocs) {
+  for (memref::AllocOp alloc : sharedMemAllocs) {
     LivenessRange livenessRange =
         getLivenessRange(alloc, dominanceInfo, rootOp->getRegion(0));
     livenessMap.insert(std::make_pair(alloc, livenessRange));
+    allocs.push_back(alloc);
   }
   return success();
 }
@@ -117,17 +119,34 @@ static bool livenessRangesOverlap(LivenessRange range, LivenessRange other,
 
 /// Returns the sets of allocations that have overlapping liveness ranges.
 /// Each set will not have any overlapping liveness ranges with any other set.
+/// This greedily fuses allocs into the same group if the range between their
+/// first and last uses overlap.
+///
+/// Example:
+/// ```
+/// %alloc0 = memref.alloc()
+/// %alloc1 = memref.alloc()
+/// %alloc2 = memref.alloc()
+/// %w0 = memref.store %val0, %alloc0
+/// %w1 = memref.store %val1, %alloc1
+/// %r0 = memref.load %alloc0
+/// %w2 = memref.store %val2, %alloc2
+/// %r1 = memref.load %alloc1
+/// %r2 = memref.load %alloc2
+/// ```
+/// The alias group will be {%alloc0, %alloc1, %alloc2}, since `%alloc0`
+/// overlaps with `%alloc1` and `%alloc1` overlaps with `%alloc2`.
 static SmallVector<AliasGroup>
 computeAliasGroups(DenseMap<Operation *, LivenessRange> livenessMap,
+                   SmallVector<memref::AllocOp> allocs,
                    DominanceInfo &dominanceInfo, Block *entryBlock) {
   SmallVector<AliasGroup> aliasGroups;
-  for (auto val : livenessMap) {
-    Operation *alloc = val.getFirst();
-    LivenessRange livenessRange = val.getSecond();
+  for (memref::AllocOp alloc : allocs) {
+    LivenessRange livenessRange = livenessMap[alloc];
     // Check for overlapping liveness with other alias groups. Combine all
     // groups that overlap with the `alloc`.
     SmallVector<AliasGroup> overlappingGroups, newAliasGroups;
-    for (auto group : aliasGroups) {
+    for (AliasGroup group : aliasGroups) {
       if (llvm::any_of(group, [&](Operation *alias) {
             return livenessRangesOverlap(livenessRange, livenessMap[alias],
                                          dominanceInfo, entryBlock);
@@ -138,7 +157,7 @@ computeAliasGroups(DenseMap<Operation *, LivenessRange> livenessMap,
       }
     }
     AliasGroup combinedGroup;
-    for (auto group : overlappingGroups) {
+    for (AliasGroup group : overlappingGroups) {
       combinedGroup.append(group);
     }
     combinedGroup.push_back(alloc);
@@ -151,8 +170,8 @@ computeAliasGroups(DenseMap<Operation *, LivenessRange> livenessMap,
 /// Get all subviews of the `op` recursively. Child subviews come before their
 /// parent views in the set of `views`.
 static void getAllSubviews(Operation *op, SetVector<Operation *> &views) {
-  for (auto user : op->getUsers()) {
-    if (isa<memref::SubViewOp>(user)) {
+  for (Operation *user : op->getUsers()) {
+    if (isa<ViewLikeOpInterface, arith::SelectOp>(user)) {
       if (user->getUsers().empty()) {
         return;
       }
@@ -162,66 +181,92 @@ static void getAllSubviews(Operation *op, SetVector<Operation *> &views) {
   }
 }
 
-/// Sink all share memory allocations and their subviews within the CFG, so
-/// they are as close as possible to their first user.
-static void sinkSharedMemoryAllocsInCFG(FunctionOpInterface funcOp) {
-  SetVector<Operation *> allocViews;
-  for (auto alloc : funcOp.getFunctionBody().getOps<memref::AllocOp>()) {
-    if (hasSharedMemoryAddressSpace(alloc.getType())) {
-      getAllSubviews(alloc, allocViews);
-      allocViews.insert(alloc);
+/// Compute the combined LivenessRange of the `aliasGroup`. The resulting
+/// LivenessRange will span the LivenessRange of all aliases in the group.
+static LivenessRange
+getAliasGroupLivenessRange(AliasGroup group, DominanceInfo &dominanceInfo,
+                           DenseMap<Operation *, LivenessRange> livenessMap) {
+  Operation *begin = nullptr, *end = nullptr;
+  for (Operation *alias : group) {
+    LivenessRange liveness = livenessMap[alias];
+    if (!begin || dominanceInfo.dominates(liveness.first, begin)) {
+      begin = liveness.first;
+    }
+    if (!end || dominanceInfo.dominates(end, liveness.second)) {
+      end = liveness.second;
     }
   }
-  DominanceInfo dominance(funcOp);
-  // Child subviews block parent views from sinking, so the subview ops in
-  // `allocViews` are in order of child subview before parent subview.
-  sinkOpsInCFG(allocViews.takeVector(), dominance);
+  return {begin, end};
 }
 
 namespace {
 struct GPUReuseSharedMemoryAllocsPass final
     : impl::GPUReuseSharedMemoryAllocsPassBase<GPUReuseSharedMemoryAllocsPass> {
   using GPUReuseSharedMemoryAllocsPassBase::GPUReuseSharedMemoryAllocsPassBase;
-  void runOnOperation() override;
+  void runOnOperation() override {
+    FunctionOpInterface funcOp = getOperation();
+
+    // Map for storing the liveness range of each buffer. Because this pass only
+    // considers functions with a single block and no control flow, this can
+    // just be a pair of operations representing the first and last use of the
+    // buffer.
+    DenseMap<Operation *, LivenessRange> livenessMap;
+    SmallVector<memref::AllocOp> allocs;
+
+    DominanceInfo dominanceInfo(funcOp);
+    // If the funcOp does not meet the conditions for the analysis, do nothing.
+    if (failed(populateLivenessRanges(funcOp, livenessMap, allocs,
+                                      dominanceInfo))) {
+      return;
+    }
+
+    // Vector of aliasGroups with non-overlapping liveness ranges.
+    Block *entryBlock = &(*funcOp.getBlocks().begin());
+    SmallVector<AliasGroup> aliasGroups =
+        computeAliasGroups(livenessMap, allocs, dominanceInfo, entryBlock);
+
+    // Nothing to reuse if there is only a single alias group.
+    if (aliasGroups.size() < 2) {
+      return;
+    }
+
+    // We may need to add extra barriers to make sure we are done writing or
+    // reading from the previous alias group before starting a new one.
+    SmallVector<LivenessRange> aliasGroupLivenessRanges;
+    for (SmallVector<Operation *> group : aliasGroups) {
+      aliasGroupLivenessRanges.push_back(
+          getAliasGroupLivenessRange(group, dominanceInfo, livenessMap));
+      // llvm::dbgs() << "livenessRange first: " <<
+      // *(aliasGroupLivenessRanges.back().first) << "\n"; llvm::dbgs() <<
+      // "livenessRange second: " << *(aliasGroupLivenessRanges.back().second)
+      // << "\n\n";
+    }
+    // Add a barrier at the start of the LivenessRange of any AliasGroup that
+    // has a preceding AliasGroup.
+    OpBuilder builder(funcOp->getContext());
+    for (size_t groupIdx = 0; groupIdx < aliasGroups.size(); groupIdx++) {
+      OpBuilder::InsertionGuard guard(builder);
+      LivenessRange liveness = aliasGroupLivenessRanges[groupIdx];
+      for (size_t otherIdx = 0; otherIdx < aliasGroups.size(); otherIdx++) {
+        if (otherIdx == groupIdx) {
+          continue;
+        }
+        LivenessRange otherLiveness = aliasGroupLivenessRanges[otherIdx];
+        // Add a barrier if the `otherLiveness` comes before `liveness`.
+        // llvm::dbgs() << "this first: " << *(otherLiveness.first) << "\n";
+        // llvm::dbgs() << "other first: " << *(liveness.first) << "\n\n";
+        if (dominanceInfo.dominates(otherLiveness.first, liveness.first)) {
+          builder.setInsertionPoint(liveness.first);
+          builder.create<gpu::BarrierOp>(liveness.first->getLoc());
+          break;
+        }
+      }
+    }
+
+    // Pack all the allocations into one i8 alloc.
+    packAllocs(builder, funcOp, aliasGroups);
+  }
 };
 } // namespace
-
-void GPUReuseSharedMemoryAllocsPass::runOnOperation() {
-  FunctionOpInterface funcOp = getOperation();
-
-  sinkSharedMemoryAllocsInCFG(funcOp);
-  // Map for storing the liveness range of each buffer. Because this pass only
-  // considers functions with a single block and no control flow, this can just
-  // be a pair of operations representing the first and last use of the buffer.
-  DenseMap<Operation *, LivenessRange> livenessMap;
-
-  DominanceInfo dominanceInfo(funcOp);
-  // If the funcOp does not meet the conditions for the analysis, do nothing.
-  if (failed(populateLivenessRanges(funcOp, livenessMap, dominanceInfo))) {
-    return;
-  }
-
-  // Vector of aliasGroups with non-overlapping liveness ranges.
-  Block *entryBlock = &(*funcOp.getBlocks().begin());
-  SmallVector<AliasGroup> aliasGroups =
-      computeAliasGroups(livenessMap, dominanceInfo, entryBlock);
-
-  // Nothing to reuse if there is only a single alias group.
-  if (aliasGroups.size() < 2) {
-    return;
-  }
-
-  // Pack all the allocations into one i8 alloc.
-  // We may need to add extra barriers to make sure we are done writting or
-  // reading from the previous alias group before starting a new one.
-  for (size_t i = 0; i < aliasGroups.size(); i++) {
-    for (Operation *alloc : aliasGroups[i]) {
-      addBarrier(funcOp, alloc, aliasGroups[i], /*hasAsyncCopies=*/false);
-    }
-  }
-
-  OpBuilder builder(funcOp.getContext());
-  packAllocs(builder, funcOp, aliasGroups);
-}
 
 } // namespace mlir::iree_compiler
