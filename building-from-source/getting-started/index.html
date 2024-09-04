@@ -4051,8 +4051,8 @@ at
 for common configurations.</p>
 <p>By default, the CMake build includes:</p>
 <ul>
-<li>All <a href="../../developers/building/cmake-options/#iree_target_backend_">compiler targets</a>
-  (<code>llvm-cpu</code>, <code>cuda</code>, <code>vulkan-spirv</code>, etc.)</li>
+<li>All small to medium size <a href="../../developers/building/cmake-options/#iree_target_backend_">compiler targets</a>
+  (<code>llvm-cpu</code>, <code>vulkan-spirv</code>, etc.)</li>
 <li>All <a href="../../developers/building/cmake-options/#iree_hal_driver_">runtime HAL drivers</a>
   (<code>local-task</code>, <code>cuda</code>, <code>vulkan</code>, etc.)</li>
 <li>All <a href="../../developers/building/cmake-options/#iree_input_">compiler input formats</a>
@@ -4061,13 +4061,14 @@ for common configurations.</p>
 </ul>
 <p>The default build does <em>not</em> include:</p>
 <ul>
+<li>CUDA and ROCM/HIP targets</li>
 <li>Python and other language bindings for the compiler or runtime</li>
 <li>Advanced features like AddressSanitizer or tracing instrumentation</li>
 <li>Experimental components</li>
 </ul>
 <div class="admonition example">
 <p class="admonition-title">Configuration examples</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Disable all backends except CPU</label><label for="__tabbed_3_2">Disable just CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Disable all backends except CPU</label><label for="__tabbed_3_2">Enable CUDA</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>This configure command will</p>
@@ -4087,12 +4088,12 @@ for common configurations.</p>
 <div class="tabbed-block">
 <p>This configure command will</p>
 <ul>
-<li>Disable just the CUDA compiler target backend</li>
-<li>Disable just the CUDA runtime HAL driver</li>
+<li>Enable the CUDA compiler target backend</li>
+<li>Enable the CUDA runtime HAL driver</li>
 </ul>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-DIREE_TARGET_BACKEND_CUDA<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-DIREE_HAL_DRIVER_CUDA<span class="o">=</span>OFF
+<span class="w">    </span>-DIREE_TARGET_BACKEND_CUDA<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_HAL_DRIVER_CUDA<span class="o">=</span>ON
 </code></pre></div>
 </div>
 </div>
