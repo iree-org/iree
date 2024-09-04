@@ -125,5 +125,7 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Passes.td",
-    deps = [":td_files"],
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
 )
