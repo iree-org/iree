@@ -181,6 +181,7 @@ nav:
           # Dialects from llvm-external-projects/iree-dialects/
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
+      - "Compiler passes": "reference/Passes.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
@@ -241,6 +242,9 @@ plugins:
       blog_toc: true
       post_url_date_format: yyyy-MM-dd
       post_url_format: "{date}-{slug}"
+
+  # https://github.com/mondeja/mkdocs-include-markdown-plugin
+  - include-markdown
 
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/
   - search

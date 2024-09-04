@@ -14,6 +14,8 @@ repository.
 
 * [Index page](./mlir-dialects/index.md)
 
+## [Compiler passes](./Passes.md)
+
 ## Other topics
 
 * [Glossary](./glossary.md)

@@ -90,7 +90,6 @@ def main(args):
         filename = pathlib.Path(file).name
         relative_path = dialect_sources_map.get(filename, None)
         if not relative_path:
-            print("Warning: missing dialect source path for '%s'" % filename)
             continue
 
         full_url = base_url + relative_path
