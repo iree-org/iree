@@ -135,6 +135,14 @@ def GPUReduceBankConflictsPass :
   ];
 }
 
+def GPUReuseSharedMemoryAllocsPass :
+    InterfacePass<"iree-codegen-gpu-reuse-shared-memory-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to reuse shared memory allocations with no overlapping liveness.";
+  let dependentDialects = [
+    "::mlir::nvgpu::NVGPUDialect"
+  ];
+}
+
 def GPUTensorAllocPass :
     InterfacePass<"iree-codegen-gpu-tensor-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to create allocations for some tensor values to use"

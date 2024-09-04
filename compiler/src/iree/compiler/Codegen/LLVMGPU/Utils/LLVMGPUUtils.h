@@ -41,6 +41,11 @@ void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp);
 
+/// Insert barriers and wait operations if there are allocs of a different alias
+/// group before the given alloc.
+void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
+                ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies = true);
+
 } // namespace mlir::iree_compiler
 
 #endif
