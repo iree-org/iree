@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -72,6 +73,16 @@ void ElementwiseOpFusionPass::runOnOperation() {
       };
   linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                fuseElementwiseOpsControlFn);
+
+  linalg::ControlFusionFn foldTransposeControlFn = [](OpOperand *fusedOperand) {
+    Operation *producer = fusedOperand->get().getDefiningOp();
+    Operation *consumer = fusedOperand->getOwner();
+
+    return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
+  };
+  IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(
+      fusionPatterns, foldTransposeControlFn);
+
   GreedyRewriteConfig rewriteConfig;
   rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
   if (failed(applyPatternsAndFoldGreedily(
