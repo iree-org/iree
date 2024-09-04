@@ -6,12 +6,13 @@ icon: octicons/package-16
 
 ## Tools and Locations
 
-* `.github/workflows/build_package.yml`: Release packaging jobs
-* `build_tools/github_actions/build_dist.py`: Main script to build various
-  release packages (for all platforms). We usually use this when reproing to
-  approximate exactly what the CI does. Assumes a subdirectory of `c`
-  and writes builds to `iree-build` and `iree-install` as a peer of it. To use
-  locally, just symlink your source dir as `c` in an empty
+* [`.github/workflows/build_package.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/build_package.yml):
+  Release packaging jobs
+* [`build_tools/github_actions/build_dist.py`](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/build_dist.py):
+  Main script to build various release packages (for all platforms). We usually
+  use this when reproing to approximate exactly what the CI does. Assumes a
+  subdirectory of `c` and writes builds to `iree-build` and `iree-install` as a
+  peer of it. To use locally, just symlink your source dir as `c` in an empty
   directory (versus checking out).
 
 ## Mapping releases back to git commits
@@ -36,16 +37,20 @@ f1cb2692a086738d7f16274b9b3af6d2c15ef133
 
 ## Manylinux releases
 
-The Linux releases are done in a manylinux2014 docker container. At the time of
-this writing, it has gcc 9.3.1 and Python versions 3.5 - 3.9 under `/opt/python`.
-Note that this docker image approximates a 2014 era RHEL distro, patched with
-backported (newer) dev packages. It builds with gcc and BFD linker unless if
-you arrange otherwise. `yum` can be used to get some packages.
+The Linux releases are done in a manylinux2014 docker container defined in the
+[`manylinux_x86_64.Dockerfile`](https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile)
+file within the
+[iree-org/base-docker-images repository](https://github.com/iree-org/base-docker-images/).
+At the time of this writing, it has gcc 9.3.1 and Python versions 3.5 - 3.9
+under `/opt/python`. Note that this docker image approximates a 2014 era RHEL
+distro, patched with backported (newer) dev packages. It builds with gcc and
+BFD linker unless if you arrange otherwise. `yum` can be used to get some
+packages.
 
 Get a docker shell (see exact docker image in build_package.yml workflow):
 
 ```shell
-docker run --rm -it -v $(pwd):/work/c stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
+docker run --rm -it -v $(pwd):/work/c ghcr.io/iree-org/manylinux_x86_64:main /bin/bash
 ```
 
 Remember that docker runs as root unless if you take steps otherwise. Don't
