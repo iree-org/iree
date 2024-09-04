@@ -18,7 +18,7 @@ on:
         default: ""
 
 jobs:
-  test:
+  test_t4:
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}

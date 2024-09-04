@@ -18,7 +18,7 @@ on:
         default: ""
 
 jobs:
-  test:
+  test_mi250:
     runs-on: nodai-amdgpu-mi250-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
