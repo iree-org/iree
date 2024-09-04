@@ -125,6 +125,10 @@ struct ConvertToROCDLPass final
       // rocdl intrinsics (e.g. fp8 conversions).
       StringRef chipset = getGPUTargetAttr(m).getArch();
       FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
+      if (failed(maybeChipset)) {
+        m.emitOpError() << "Invalid chipset name: " << chipset;
+        return signalPassFailure();
+      }
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
