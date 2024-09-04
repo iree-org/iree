@@ -197,8 +197,7 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
           Value qkVal = args[1];
           Value maskVal = args[0];
 
-          // llvm::outs() << getElementTypeOrSelf(args[0].getType()) << "\n";
-          if (maskVal.getType().isInteger()) {
+          if (maskVal.getType().isInteger()) { // TODO: Replace boolean mask condition once treated as i1 (instead of i8)
             maskVal = b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
             maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
           } else {
@@ -345,11 +344,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
   }
 
+  // S += mask
   if (*mask) {
       s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
 
-  Value log2e = b.create<arith::ConstantOp>( loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
   s = scaleValueInPlace(b, loc, sMap, scaleMap, s, log2e);
 
   // TODO: This decomposition should be in a seperate op called
