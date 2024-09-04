@@ -28,7 +28,7 @@ jobs:
   linux_x64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
-    runs-on: azure-linux
+    runs-on: azure-linux-scale
     env:
       BUILD_DIR: full-build-dir
     steps:
