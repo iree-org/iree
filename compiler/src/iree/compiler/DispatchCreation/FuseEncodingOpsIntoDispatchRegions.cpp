@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -17,12 +17,12 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-clone-producers-into-dispatch-regions"
+#define DEBUG_TYPE "iree-dispatch-creation-producers-into-dispatch-regions"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FUSEENCODINGOPSINTODISPATCHREGIONSPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
 
@@ -33,7 +33,7 @@ static bool isFusableWithSetEncoding(Operation *op) {
 }
 
 struct FuseEncodingOpsIntoDispatchRegionsPass
-    : public IREE::Flow::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
+    : public DispatchCreation::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
           FuseEncodingOpsIntoDispatchRegionsPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
@@ -47,10 +47,11 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
     for (IREE::Encoding::SetEncodingOp encodingOp : encodingOps) {
       OpOperand &operand = encodingOp.getSourceMutable();
-      auto producerDispatch = operand.get().getDefiningOp<DispatchRegionOp>();
+      auto producerDispatch =
+          operand.get().getDefiningOp<IREE::Flow::DispatchRegionOp>();
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
       if (!producerDispatch) {
-        if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
+        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
         continue;
@@ -64,7 +65,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
       auto producerInRegion = dyn_cast<OpResult>(
           dispatchReturnOp->getOperand(result.getResultNumber()));
       if (!producerInRegion) {
-        if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
+        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
         continue;
@@ -72,7 +73,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
       // Place the op in its own dispatch region if fusion is not possible.
       if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
-        if (failed(wrapOpInDispatchRegion(rewriter, encodingOp))) {
+        if (failed(IREE::Flow::wrapOpInDispatchRegion(rewriter, encodingOp))) {
           return signalPassFailure();
         }
         continue;
@@ -96,4 +97,4 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
 
 } // namespace
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::DispatchCreation
