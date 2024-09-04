@@ -3730,12 +3730,13 @@
 <h1 id="release-debugging-playbook">Release debugging playbook<a class="headerlink" href="#release-debugging-playbook" title="Permanent link">link</a></h1>
 <h2 id="tools-and-locations">Tools and Locations<a class="headerlink" href="#tools-and-locations" title="Permanent link">link</a></h2>
 <ul>
-<li><code>.github/workflows/build_package.yml</code>: Release packaging jobs</li>
-<li><code>build_tools/github_actions/build_dist.py</code>: Main script to build various
-  release packages (for all platforms). We usually use this when reproing to
-  approximate exactly what the CI does. Assumes a subdirectory of <code>c</code>
-  and writes builds to <code>iree-build</code> and <code>iree-install</code> as a peer of it. To use
-  locally, just symlink your source dir as <code>c</code> in an empty
+<li><a href="https://github.com/iree-org/iree/blob/main/.github/workflows/build_package.yml"><code>.github/workflows/build_package.yml</code></a>:
+  Release packaging jobs</li>
+<li><a href="https://github.com/iree-org/iree/blob/main/build_tools/github_actions/build_dist.py"><code>build_tools/github_actions/build_dist.py</code></a>:
+  Main script to build various release packages (for all platforms). We usually
+  use this when reproing to approximate exactly what the CI does. Assumes a
+  subdirectory of <code>c</code> and writes builds to <code>iree-build</code> and <code>iree-install</code> as a
+  peer of it. To use locally, just symlink your source dir as <code>c</code> in an empty
   directory (versus checking out).</li>
 </ul>
 <h2 id="mapping-releases-back-to-git-commits">Mapping releases back to git commits<a class="headerlink" href="#mapping-releases-back-to-git-commits" title="Permanent link">link</a></h2>
@@ -3752,13 +3753,17 @@ IREE<span class="w"> </span><span class="o">(</span>https://iree.dev<span class=
 f1cb2692a086738d7f16274b9b3af6d2c15ef133
 </code></pre></div>
 <h2 id="manylinux-releases">Manylinux releases<a class="headerlink" href="#manylinux-releases" title="Permanent link">link</a></h2>
-<p>The Linux releases are done in a manylinux2014 docker container. At the time of
-this writing, it has gcc 9.3.1 and Python versions 3.5 - 3.9 under <code>/opt/python</code>.
-Note that this docker image approximates a 2014 era RHEL distro, patched with
-backported (newer) dev packages. It builds with gcc and BFD linker unless if
-you arrange otherwise. <code>yum</code> can be used to get some packages.</p>
+<p>The Linux releases are done in a manylinux2014 docker container defined in the
+<a href="https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile"><code>manylinux_x86_64.Dockerfile</code></a>
+file within the
+<a href="https://github.com/iree-org/base-docker-images/">iree-org/base-docker-images repository</a>.
+At the time of this writing, it has gcc 9.3.1 and Python versions 3.5 - 3.9
+under <code>/opt/python</code>. Note that this docker image approximates a 2014 era RHEL
+distro, patched with backported (newer) dev packages. It builds with gcc and
+BFD linker unless if you arrange otherwise. <code>yum</code> can be used to get some
+packages.</p>
 <p>Get a docker shell (see exact docker image in build_package.yml workflow):</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/work/c<span class="w"> </span>stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest<span class="w"> </span>/bin/bash
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/work/c<span class="w"> </span>ghcr.io/iree-org/manylinux_x86_64:main<span class="w"> </span>/bin/bash
 </code></pre></div>
 <p>Remember that docker runs as root unless if you take steps otherwise. Don't
 touch write files in the <code>/work/c</code> directory to avoid scattering

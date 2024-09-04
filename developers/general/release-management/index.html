@@ -2290,6 +2290,16 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running a release
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running a release">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#picking-a-candidate-to-promote" class="md-nav__link">
     <span class="md-ellipsis">
       Picking a candidate to promote
@@ -2297,13 +2307,18 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#promoting-a-candidate-to-stable" class="md-nav__link">
     <span class="md-ellipsis">
       Promoting a candidate to stable
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3669,6 +3684,16 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running a release
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running a release">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#picking-a-candidate-to-promote" class="md-nav__link">
     <span class="md-ellipsis">
       Picking a candidate to promote
@@ -3676,13 +3701,18 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#promoting-a-candidate-to-stable" class="md-nav__link">
     <span class="md-ellipsis">
       Promoting a candidate to stable
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3746,17 +3776,25 @@ on GitHub. We also push the Python packages for this release to PyPI.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="picking-a-candidate-to-promote">Picking a candidate to promote<a class="headerlink" href="#picking-a-candidate-to-promote" title="Permanent link">link</a></h2>
+<h2 id="running-a-release">Running a release<a class="headerlink" href="#running-a-release" title="Permanent link">link</a></h2>
+<p>A pinned issue tracking the next release should be filed like
+<a href="https://github.com/iree-org/iree/issues/18380">https://github.com/iree-org/iree/issues/18380</a>. Developers authoring patches
+that include major or breaking changes should coordinate merge timing and
+contribute release notes on those issues.</p>
+<h3 id="picking-a-candidate-to-promote">Picking a candidate to promote<a class="headerlink" href="#picking-a-candidate-to-promote" title="Permanent link">link</a></h3>
+<p>After approximately one month since the previous release, a new release should
+be promoted from nightly release candidates.</p>
 <p>When selecting a candidate we use the following criteria:</p>
 <ol>
 <li>⪆4 days old so that problems with it may have been spotted</li>
 <li>Contains no P0 regressions vs the previous stable release</li>
 <li>LLVM submodule commit ideally exists upstream (no cherry picks or patches)</li>
+<li>Includes packages for all platforms, including macOS and Windows</li>
 </ol>
-<p>When you've identified a potential candidate, email the iree-discuss list with
+<p>When you've identified a potential candidate, comment on the tracking issue with
 the proposal and solicit feedback. People may point out known regressions or
 request that some feature make the cut.</p>
-<h2 id="promoting-a-candidate-to-stable">Promoting a candidate to stable<a class="headerlink" href="#promoting-a-candidate-to-stable" title="Permanent link">link</a></h2>
+<h3 id="promoting-a-candidate-to-stable">Promoting a candidate to stable<a class="headerlink" href="#promoting-a-candidate-to-stable" title="Permanent link">link</a></h3>
 <ol>
 <li>
 <p>(Authorized users only) Push to PyPI using
