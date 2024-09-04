@@ -23,7 +23,7 @@ Release artifacts are uploaded as a GitHub
 is updated by periodic automation at https://iree.dev/pip-release-links.html.
 
 Some debugging notes for this process are available here:
-https://iree.dev/developers/debugging/releases/
+https://iree.dev/developers/debugging/releases/.
 
 ### Nightly Release Packages
 

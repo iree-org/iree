@@ -24,19 +24,30 @@ GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/re
 Python iree-compiler | [![PyPI version](https://badge.fury.io/py/iree-compiler.svg)](https://badge.fury.io/py/iree-compiler)
 Python iree-runtime | [![PyPI version](https://badge.fury.io/py/iree-runtime.svg)](https://badge.fury.io/py/iree-runtime)
 
-## Picking a candidate to promote
+## Running a release
+
+A pinned issue tracking the next release should be filed like
+<https://github.com/iree-org/iree/issues/18380>. Developers authoring patches
+that include major or breaking changes should coordinate merge timing and
+contribute release notes on those issues.
+
+### Picking a candidate to promote
+
+After approximately one month since the previous release, a new release should
+be promoted from nightly release candidates.
 
 When selecting a candidate we use the following criteria:
 
 1. ⪆4 days old so that problems with it may have been spotted
 2. Contains no P0 regressions vs the previous stable release
 3. LLVM submodule commit ideally exists upstream (no cherry picks or patches)
+4. Includes packages for all platforms, including macOS and Windows
 
-When you've identified a potential candidate, email the iree-discuss list with
+When you've identified a potential candidate, comment on the tracking issue with
 the proposal and solicit feedback. People may point out known regressions or
 request that some feature make the cut.
 
-## Promoting a candidate to stable
+### Promoting a candidate to stable
 
 1. (Authorized users only) Push to PyPI using
     [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
