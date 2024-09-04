@@ -33,8 +33,8 @@ jobs:
       CXX: clang++
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
-      IREE_CUDA_DISABLE: 0
-      IREE_HIP_DISABLE: 1
+      IREE_CUDA_ENABLE: 1
+      IREE_HIP_ENABLE: 0
     steps:
       - name: Check out repository
         uses: actions/checkout@v4.1.7

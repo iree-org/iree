@@ -97,10 +97,13 @@ jobs:
         include:
           - name: ubuntu-20.04
             runs-on: ubuntu-20.04
+            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: windows-2022
             runs-on: windows-2022
+            driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
           - name: macos-14
             runs-on: macos-14
+            driver-options: -DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF
     env:
       BUILD_DIR: build-runtime
     steps:
@@ -144,7 +147,8 @@ jobs:
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_BUILD_SAMPLES=ON \
             -DIREE_ENABLE_LLD=ON \
-            -DIREE_ENABLE_ASSERTIONS=ON
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            ${{matrix.driver-options}}
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
       - name: CTest
@@ -223,7 +227,9 @@ jobs:
             -DIREE_BUILD_COMPILER=OFF \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_RUNTIME_TRACING=ON \
-            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER}
+            -DIREE_TRACING_PROVIDER=${TRACING_PROVIDER} \
+            -DIREE_HAL_DRIVER_CUDA=ON \
+            -DIREE_HAL_DRIVER_HIP=ON
       - name: CMake - build
         run: cmake --build ${BUILD_DIR} -- -k 0
 
