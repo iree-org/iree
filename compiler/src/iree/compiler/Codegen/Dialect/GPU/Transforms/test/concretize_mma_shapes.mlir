@@ -35,6 +35,38 @@ func.func @concretize_multi_mma_F32_16x16x16_F16(%lhs: tensor<2x2x16x16xf16>, %r
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 4], thread = [8, 4]}>
+func.func @concretize_multi_mma_I32_16x16x16_I8(%lhs: tensor<2x2x16x16xi8>, %rhs: tensor<2x2x16x16xi8>, %acc: tensor<2x2x16x16xi32>) -> tensor<2x2x16x16xi32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_I32_16x16x16_I8>, lowering_config = #config
+  } : tensor<2x2x16x16xi8>, tensor<2x2x16x16xi8> into tensor<2x2x16x16xi32>
+  return %0 : tensor<2x2x16x16xi32>
+}
+
+// CHECK-LABEL:       func @concretize_multi_mma_I32_16x16x16_I8
+// CHECK-SAME:          %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xi8>
+// CHECK-SAME:          %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x16x16xi8>
+// CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<2x2x16x16xi32>
+
+// CHECK-INPUTS:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-INPUTS-SAME:     lowering_config = #iree_gpu.lowering_config
+// CHECK-INPUTS-SAME:     : tensor<2x2x16x16xi8>, tensor<2x2x16x16xi8> into tensor<2x2x16x16xi32>
+// CHECK-INPUTS:        return %[[MMA]]
+
+// CHECK-RESULT:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-RESULT-SAME:     lowering_config = #iree_gpu.lowering_config
+// CHECK-RESULT-SAME:     : tensor<2x2x16x16xi8>, tensor<2x2x16x16xi8> into tensor<2x2x16x16xi32>
+// CHECK-RESULT:        return %[[MMA]]
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
  affine_map<(i, j, k) -> (j, k)>,
  affine_map<(i, j, k) -> (i, j)>
 ]
@@ -96,6 +128,40 @@ func.func @concretize_multi_mma_F32_32x32x8_F16(%lhs: tensor<2x2x32x8xf16>, %rhs
 // CHECK-RESULT:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[EXPANDED_ACC]]
 // CHECK-RESULT-SAME:     lowering_config = #iree_gpu.lowering_config
 // CHECK-RESULT-SAME:     : tensor<2x2x32x8xf16>, tensor<2x2x8x32xf16> into tensor<2x2x4x8x32xf32>
+// CHECK-RESULT:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0], [1], [2, 3], [4]]
+// CHECK-RESULT:        return %[[COLLAPSED]]
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 4], thread = [8, 4]}>
+func.func @concretize_multi_mma_I32_32x32x8_I8(%lhs: tensor<2x2x32x8xi8>, %rhs: tensor<2x2x8x32xi8>, %acc: tensor<2x2x32x32xi32>) -> tensor<2x2x32x32xi32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_I32_32x32x8_I8>, lowering_config = #config
+  } : tensor<2x2x32x8xi8>, tensor<2x2x8x32xi8> into tensor<2x2x32x32xi32>
+  return %0 : tensor<2x2x32x32xi32>
+}
+
+// CHECK-LABEL:       func @concretize_multi_mma_I32_32x32x8_I8
+// CHECK-SAME:          %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x32x8xi8>
+// CHECK-SAME:          %[[RHS:[A-Za-z0-9]+]]: tensor<2x2x8x32xi8>
+// CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<2x2x32x32xi32>
+
+// CHECK-INPUTS:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-INPUTS-SAME:     lowering_config = #iree_gpu.lowering_config
+// CHECK-INPUTS-SAME:     : tensor<2x2x32x8xi8>, tensor<2x2x8x32xi8> into tensor<2x2x32x32xi32>
+// CHECK-INPUTS:        return %[[MMA]]
+
+// CHECK-RESULT-DAG:    %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0], [1], [2, 3], [4]] output_shape [2, 2, 4, 8, 32]
+// CHECK-RESULT:        %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[EXPANDED_ACC]]
+// CHECK-RESULT-SAME:     lowering_config = #iree_gpu.lowering_config
+// CHECK-RESULT-SAME:     : tensor<2x2x32x8xi8>, tensor<2x2x8x32xi8> into tensor<2x2x4x8x32xi32>
 // CHECK-RESULT:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0], [1], [2, 3], [4]]
 // CHECK-RESULT:        return %[[COLLAPSED]]
 
