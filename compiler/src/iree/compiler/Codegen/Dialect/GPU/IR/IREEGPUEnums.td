@@ -113,6 +113,10 @@ def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 7>;
 // This will need to become its own class of MMA attribute.
 def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 8>;
 
+// CDNA2 instrinsics that are different than CDNA2
+def MFMA_I32_16x16x16_I8  : I32EnumAttrCase<"MFMA_I32_16x16x16_I8", 9>;
+def MFMA_I32_32x32x8_I8  : I32EnumAttrCase<"MFMA_I32_32x32x8_I8", 10>;
+
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [
       MFMA_F32_16x16x4_F32,
@@ -123,7 +127,9 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_I32_32x32x16_I8,
       WMMA_F32_16x16x16_F16,
       WMMA_F16_16x16x16_F16,
-      WMMA_I32_16x16x16_I8
+      WMMA_I32_16x16x16_I8,
+      MFMA_I32_16x16x16_I8,
+      MFMA_I32_32x32x8_I8
     ]>;
 
 def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
