@@ -6,13 +6,16 @@
 
 try:
     from iree.compiler.extras import onnx_importer
+
+    print("onnx_importer imported successfully")
 except ModuleNotFoundError as e:
+    e_orig = e
     while e is not None:
         if isinstance(e, ModuleNotFoundError) and e.name == "onnx":
+            print("onnx not found, skipping onnx_importer_test")
             break
         e = e.__cause__
     else:
         raise ModuleNotFoundError(
-            "Failed to import the fx_importer (for a reason other than onnx "
-            "not being found)"
-        ) from e
+            "Failed to import the onnx_importer (for a reason other than onnx not being found)"
+        ) from e_orig

@@ -6,13 +6,16 @@
 
 try:
     from iree.compiler.extras import fx_importer
+
+    print("fx_importer imported successfully")
 except ModuleNotFoundError as e:
+    e_orig = e
     while e is not None:
         if isinstance(e, ModuleNotFoundError) and e.name == "torch":
+            print("torch not found, skipping fx_importer_test")
             break
         e = e.__cause__
     else:
         raise ModuleNotFoundError(
-            "Failed to import the fx_importer (for a reason other than torch "
-            "not being found)"
-        ) from e
+            f"Failed to import the fx_importer (for a reason other than torch not being found)"
+        ) from e_orig

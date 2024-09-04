@@ -18,7 +18,7 @@ on:
         default: ""
 
 jobs:
-  test:
+  test_w7900:
     runs-on: nodai-amdgpu-w7900-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
