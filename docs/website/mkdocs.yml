@@ -291,3 +291,7 @@ plugins:
         # "Developers" section was added
         "guides/developer-tips.md": "developers/general/developer-tips.md"
         "developers/building/cmake-options-and-variables.md": "developers/building/cmake-options.md"
+
+validation:
+  nav:
+    omitted_files: info
