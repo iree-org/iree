@@ -15,11 +15,8 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -28,7 +25,6 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -40,71 +36,49 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-/// Returns the corresponding native vector sizes defined by the `mma`
-/// intrinsic.
-static SmallVector<int64_t> getIntrinsicVectorSize(IREE::GPU::MMAIntrinsic mma,
-                                                   int64_t roleIdx) {
+// Get the swizzle bringing a tile from row-major layout into the given
+// intrinsic's preferred layout, that is, the "subgroup-contiguous" layout where
+// each each thread `tid` accesses data at offset `tid`.
+// This is focusing only on the intrinsic and not on unrolling factors.
+// Separate code will transform this swizzle into the swizzled for an unrolled
+// kernel tile.
+static std::optional<MaterializeEncodingInfo::Swizzle>
+getSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
+  std::optional<MaterializeEncodingInfo::Swizzle> swizzle;
   if (mma == IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
-    // TODO: Query the value from GPU attributes.
-    if (roleIdx == 0 || roleIdx == 1) {
-      return {1, 1};
-    }
-    if (roleIdx == 0 || roleIdx == 1) {
-      return {1, 1};
-    }
-    if (roleIdx == 2) {
-      return {4, 1};
+    if (operandIdx == 2) {
+      swizzle = {/*expandShape=*/{{4, 4}, {16}}, /*permutation=*/{0, 2, 1}};
+    } else {
+      swizzle = {/*expandShape=*/{{16}, {4}}, /*permutation=*/{1, 0}};
     }
   }
-  return {};
+  return swizzle;
 }
 
-// Given encoding's role index and element types, return the transpose
-// permutation used in GPU materialization.
-static SmallVector<int64_t>
-getEncodingTransposePerm(IREE::GPU::MMAIntrinsic mma, int64_t roleIdx) {
-  // TODO: Support other intrinsics.
-  if (mma != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
-    return {};
+static bool hasIntrinsic(IREE::GPU::TargetAttr target,
+                         IREE::GPU::MMAIntrinsic intrinsic) {
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    if (mma.getIntrinsic().getValue() == intrinsic) {
+      return true;
+    }
   }
-
-  switch (roleIdx) {
-  case 0: // A
-  case 1: // B
-    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
-    // -> OuterTileY x OuterTileX x InnerTileY x InnerTileX
-    return {2, 0, 3, 1};
-  case 2: // C
-    // ACC:
-    // OuterTileX x InnerTileX x OuterTileY x InnerTileY
-    // -> OuterTileX x OuterTileY x InnerTileX x InnerTileY
-    return {0, 2, 1, 3};
-  default:
-    return {};
-  }
+  return false;
 }
 
 static std::optional<IREE::GPU::DataTiledMMAAttr>
-enumerateMmaIntrinsic(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
+chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   assert(elementTypes.size() == 3);
   MLIRContext *ctx = target.getContext();
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    IREE::GPU::MMAIntrinsic type = mma.getIntrinsic().getValue();
-    // TODO: Drop this once all intrinsics are supported.
-    if (type != IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
-      continue;
+  if (lhs.isF32() && rhs.isF32() && out.isF32()) {
+    auto intrinsic = IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32;
+    if (hasIntrinsic(target, intrinsic)) {
+      return IREE::GPU::DataTiledMMAAttr::get(
+          ctx, IREE::GPU::MMAIntrinsicAttr::get(ctx, intrinsic), 1, 1, 1);
     }
-
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    if (lhs != aType || rhs != bType || out != cType) {
-      continue;
-    }
-    return IREE::GPU::DataTiledMMAAttr::get(ctx, mma.getIntrinsic().getValue());
   }
-
   // Fallback - no architecture-optimized tile size for this case.
   return std::nullopt;
 }
@@ -136,7 +110,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
         return cast<TypeAttr>(a).getValue();
       }));
   std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-      enumerateMmaIntrinsic(elementTypes, gpuTargetAttr);
+      chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
   if (!mma) {
     return failure();
   }
@@ -148,18 +122,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma->getMNKShape();
   auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
-
-  // insert inner tile shapes and permutation info
   auto roleIdx = encoding.getOperandIndex().getInt();
-  auto intrinsicVectorSizes =
-      getIntrinsicVectorSize(mma->getIntrinsic().getValue(), roleIdx);
-  auto permutation =
-      getEncodingTransposePerm(mma->getIntrinsic().getValue(), roleIdx);
-  encodingInfo.innerTileShapes = intrinsicVectorSizes;
-  std::tuple<int64_t, int64_t, int64_t> mnkShape = mma->getMNKShape();
-  encodingInfo.intrinsicSize = {std::get<0>(mnkShape), std::get<1>(mnkShape),
-                                std::get<2>(mnkShape)};
-  encodingInfo.permutation = permutation;
+  encodingInfo.swizzle = getSwizzle(mma->getIntrinsic().getValue(), roleIdx);
   return encodingInfo;
 }
 
@@ -176,6 +140,24 @@ struct GPUMaterializeDeviceEncodingPass final
   }
   void runOnOperation() override;
 };
+
+SmallVector<ReassociationIndices>
+getReassociationIndices(int outerDims,
+                        SmallVector<SmallVector<int64_t>> expandShape) {
+  SmallVector<ReassociationIndices> result;
+  int expandedIdx = 0;
+  for (int i = 0; i < outerDims; ++i) {
+    result.push_back({expandedIdx++});
+  }
+  for (auto expandShapeDim : expandShape) {
+    result.push_back({});
+    for (int64_t d : expandShapeDim) {
+      (void)d;
+      result.back().push_back(expandedIdx++);
+    }
+  }
+  return result;
+}
 
 /// Convert iree_linalg_ext.set_encoding op to pack + tile swizzling ops. We use
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
@@ -210,70 +192,38 @@ struct GPUSetEncodingOpLoweringConversion
       return rewriter.notifyMatchFailure(encodingOp,
                                          "unhandled result encoding");
     }
+    if (!maybeEncodingInfo->swizzle) {
+      rewriter.replaceOp(encodingOp, packOp->getResult());
+      return success();
+    }
     SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
-    SmallVector<int64_t> intrinsicVectorShape =
-        maybeEncodingInfo->innerTileShapes;
 
     // TODO(hanchung): Add a util to the encoding attribute, so we don't need
     // the map_to_vector method here.
-    auto encoding = IREE::Encoding::getEncodingAttr(encodingOp.getResultType());
-    int64_t roleIdx = encoding.getOperandIndex().getInt();
     auto loc = encodingOp.getLoc();
 
-    SmallVector<int64_t> targetShape; // for unrolling
-    switch (roleIdx) {
-    case 0: // A
-      targetShape = {maybeEncodingInfo->intrinsicSize[0],
-                     maybeEncodingInfo->intrinsicSize[2]};
-      break;
-    case 1: // B
-      targetShape = {maybeEncodingInfo->intrinsicSize[1],
-                     maybeEncodingInfo->intrinsicSize[2]};
-      break;
-    case 2: // C
-      targetShape = {maybeEncodingInfo->intrinsicSize[0],
-                     maybeEncodingInfo->intrinsicSize[1]};
-      break;
-    default:
-      return failure();
-    }
-
-    assert(innerTiles.size() == targetShape.size());
-    for (auto [packedShape, targetShape] :
-         llvm::zip_equal(innerTiles, targetShape)) {
-      // TODO(lialan): Relax the condition for unrolling when it is supported.
-      (void)packedShape;
-      (void)targetShape;
-      assert(packedShape == targetShape);
-    }
-
     // Create expand_shape op to tile the innermost two dimensions.
-    auto sourceShape = packOp->getDestType().getShape();
-    assert(intrinsicVectorShape.size() == 2); // TODO: relax this
-    auto iT1 = intrinsicVectorShape[0];
-    auto iT2 = intrinsicVectorShape[1];
-    auto oT1 = sourceShape[2] / iT1;
-    auto oT2 = sourceShape[3] / iT2;
-    SmallVector<int64_t> expandShapeShape = {
-        sourceShape[0], sourceShape[1], oT1, iT1, oT2, iT2};
-    assert(expandShapeShape.size() == 6);
+    int origRank = encodingOp.getSourceType().getRank();
+    SmallVector<int64_t> expandShapeShape(packOp->getDestType().getShape());
+    expandShapeShape.truncate(origRank);
+    expandShapeShape.append(
+        getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
+
     auto expandShapeType = RankedTensorType::get(
         expandShapeShape, encodingOp.getSourceType().getElementType());
 
-    std::optional<SmallVector<ReassociationIndices>> reassociationMap =
-        getReassociationIndicesForReshape(packOp->getDestType(),
-                                          expandShapeType);
-    assert(reassociationMap.has_value());
+    SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
+        origRank, maybeEncodingInfo->swizzle->expandShape);
     auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandShapeType, packOp->getResult(), *reassociationMap);
+        loc, expandShapeType, packOp->getResult(), reassociation);
 
     // create linalg.transpose on expandShapeShape
-    size_t origRank = encodingOp.getSourceType().getRank();
 
     SmallVector<int64_t> transposePerm;
-    transposePerm.push_back(0);
-    transposePerm.push_back(1);
-    for (auto perm : maybeEncodingInfo->permutation) {
+    for (int i = 0; i < origRank; ++i) {
+      transposePerm.push_back(i);
+    }
+    for (auto perm : maybeEncodingInfo->swizzle->permutation) {
       transposePerm.push_back(origRank + perm);
     }
     SmallVector<int64_t> transposeResultDims = expandShapeShape;
@@ -309,56 +259,49 @@ struct GPUUnsetEncodingOpLoweringConversion
       return rewriter.notifyMatchFailure(unsetEncodingOp,
                                          "unhandled result encoding");
     }
-    SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
-    SmallVector<int64_t> intrinsicVectorShape =
-        maybeEncodingInfo->innerTileShapes;
+    Value unpackSrc = adaptor.getSource();
+    if (maybeEncodingInfo->swizzle) {
+      SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
 
-    // compute sourceShape:
-    auto srcConvertedType =
-        cast<RankedTensorType>(adaptor.getSource().getType());
-    SmallVector<int64_t> unpackSrcShape(
-        srcConvertedType.getShape().take_front(maybeEncodingInfo->srcRank));
-    unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
-                          maybeEncodingInfo->innerTileSizes.end());
-    auto unpackSrcType = RankedTensorType::get(
-        unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
+      int targetRank = unsetEncodingOp.getResultType().getRank();
+      auto srcConvertedType =
+          cast<RankedTensorType>(adaptor.getSource().getType());
+      SmallVector<int64_t> expandShapeShape(srcConvertedType.getShape());
+      expandShapeShape.truncate(targetRank);
+      expandShapeShape.append(
+          getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
 
-    auto iT1 = intrinsicVectorShape[0];
-    auto iT2 = intrinsicVectorShape[1];
-    auto oT1 = unpackSrcShape[2] / iT1;
-    auto oT2 = unpackSrcShape[3] / iT2;
-    SmallVector<int64_t> transposeSourceDims = {
-        unpackSrcShape[0], unpackSrcShape[1], oT1, iT1, oT2, iT2};
-    assert(transposeSourceDims.size() == 6);
+      SmallVector<int64_t> transposePerm;
+      for (int i = 0; i < targetRank; ++i) {
+        transposePerm.push_back(i);
+      }
+      for (auto perm : maybeEncodingInfo->swizzle->permutation) {
+        transposePerm.push_back(targetRank + perm);
+      }
+      SmallVector<int64_t> expandShapeResultDims = expandShapeShape;
+      applyPermutationToVector(expandShapeResultDims, transposePerm);
+      auto invertedTransposePerm = invertPermutationVector(transposePerm);
 
-    size_t targetRank = unsetEncodingOp.getResultType().getRank();
+      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+          loc, expandShapeShape,
+          unsetEncodingOp.getSourceType().getElementType());
+      auto transposeOp = rewriter.create<linalg::TransposeOp>(
+          loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
 
-    SmallVector<int64_t> transposePerm;
-    transposePerm.push_back(0);
-    transposePerm.push_back(1);
-    for (auto perm : maybeEncodingInfo->permutation) {
-      transposePerm.push_back(targetRank + perm);
+      SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
+          targetRank, maybeEncodingInfo->swizzle->expandShape);
+      SmallVector<int64_t> unpackSrcShape(
+          srcConvertedType.getShape().take_front(targetRank));
+      unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
+                            maybeEncodingInfo->innerTileSizes.end());
+      auto unpackSrcType = RankedTensorType::get(
+          unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
+      unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
+          loc, unpackSrcType, transposeOp->getResult(0), reassociation);
     }
-    SmallVector<int64_t> expandShapeResultDims = transposeSourceDims;
-    applyPermutationToVector(expandShapeResultDims, transposePerm);
-    auto invertedTransposePerm = invertPermutationVector(transposePerm);
-
-    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, transposeSourceDims,
-        unsetEncodingOp.getSourceType().getElementType());
-    auto transposeOp = rewriter.create<linalg::TransposeOp>(
-        loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
-
-    auto transposeResultType = RankedTensorType::get(
-        transposeSourceDims, unsetEncodingOp.getSourceType().getElementType());
-    std::optional<SmallVector<ReassociationIndices>> collapseReassoc =
-        getReassociationIndicesForReshape(transposeResultType, unpackSrcType);
-    assert(collapseReassoc.has_value());
-    auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
-        loc, unpackSrcType, transposeOp->getResult(0), *collapseReassoc);
 
     auto unPackOp = lowerUnsetEncodingToUnpackOp(
-        rewriter, unsetEncodingOp, collapseShapeOp, *converter,
+        rewriter, unsetEncodingOp, unpackSrc, *converter,
         this->materializeEncodingValueFn);
     if (failed(unPackOp)) {
       Value result = adaptor.getSource();
@@ -424,7 +367,7 @@ public:
         resultEncoding.getElementTypes().getValue(),
         [](Attribute a) { return cast<TypeAttr>(a).getValue(); }));
     std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-        enumerateMmaIntrinsic(elementTypes, gpuTargetAttr);
+        chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();

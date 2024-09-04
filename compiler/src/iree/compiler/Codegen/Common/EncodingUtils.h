@@ -16,15 +16,18 @@ namespace mlir::iree_compiler {
 
 /// Container of information needed to materialize the pack operation.
 struct MaterializeEncodingInfo {
+  // Metadata for a swizzle, that is, an (expand_shape -> transposition)
+  // pair of ops performing a change of layout within the tiles described by
+  // a MaterializeEncodingInfo.
+  struct Swizzle {
+    SmallVector<SmallVector<int64_t>> expandShape;
+    SmallVector<int64_t> permutation;
+  };
+
   SmallVector<int64_t> innerDimsPos;
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
-  unsigned srcRank = 0;
-  // Metadata for inner packed tile swizzling (i.e., generalized
-  // tensor.expand_shape + linalg.transpose).
-  SmallVector<int64_t> innerTileShapes;
-  SmallVector<int64_t> intrinsicSize;
-  SmallVector<int64_t> permutation;
+  std::optional<Swizzle> swizzle;
 };
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
@@ -89,20 +92,6 @@ protected:
 // Utility methods about Encoding.
 //===---------------------------------------------------------------------===//
 
-/// Returns the type that applies tile swizzling on `packedType`. If there are
-/// tile swizzling config in the `encodingInfo`, returns the `packedType`.
-RankedTensorType resolveTileSwizzlingType(RankedTensorType packedType,
-                                          MaterializeEncodingInfo encodingInfo);
-
-/// Returns the shape that applies tile swizzling on `packedType`. If there are
-/// tile swizzling config in the `encodingInfo`, returns the `packedShape`.
-SmallVector<OpFoldResult>
-resolveTileSwizzlingShape(ArrayRef<OpFoldResult> packedShape,
-                          MaterializeEncodingInfo encodingInfo);
-
-/// Returns the original type that carried by encoding.
-RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
-
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
@@ -152,6 +141,10 @@ void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
 // Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 // result of a matvec.
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
+
+// Concatenates the vectors.
+SmallVector<int64_t>
+getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape);
 
 } // namespace mlir::iree_compiler
 

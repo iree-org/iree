@@ -260,24 +260,14 @@ def IREEGPU_DataTiledMMAAttr :
     additional information can be added to `parameters`.
   }];
 
-  let hasCustomAssemblyFormat = 1;
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
-  ];
+  let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    IREEGPU_MMAIntrinsicAttr:$intrinsic
+    "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
+    "int64_t":$unroll_m,
+    "int64_t":$unroll_n,
+    "int64_t":$unroll_k
   );
-
-  let extraClassDeclaration = [{
-    /// Infers the unrolling factor for (M, N, K) dimensions from the inner
-    /// tile shapes after tile swizzling. If the provided shapes are not valid,
-    /// returns {0, 0, 0}.
-    std::tuple<int64_t, int64_t, int64_t> getUnrollingFactor(ArrayRef<int64_t>
-        lhsShape, ArrayRef<int64_t> rhsShape, ArrayRef<int64_t> accShape);
-  }];
 }
 
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
