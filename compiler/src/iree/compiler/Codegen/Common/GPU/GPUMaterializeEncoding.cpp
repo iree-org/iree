@@ -45,14 +45,34 @@ namespace mlir::iree_compiler {
 static std::optional<MaterializeEncodingInfo::Swizzle>
 getSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
   std::optional<MaterializeEncodingInfo::Swizzle> swizzle;
-  if (mma == IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32) {
+  switch (mma) {
+  case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32:
     if (operandIdx == 2) {
-      swizzle = {/*expandShape=*/{{4, 4}, {16}}, /*permutation=*/{0, 2, 1}};
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
+                                              /*permutation=*/{0, 2, 1}};
     } else {
-      swizzle = {/*expandShape=*/{{16}, {4}}, /*permutation=*/{1, 0}};
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4}},
+                                              /*permutation=*/{1, 0}};
     }
+  case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16:
+    if (operandIdx == 2) {
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
+                                              /*permutation=*/{0, 2, 1}};
+    } else {
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4, 4}},
+                                              /*permutation=*/{1, 0, 2}};
+    }
+  case IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8:
+    if (operandIdx == 2) {
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
+                                              /*permutation=*/{0, 2, 1}};
+    } else {
+      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4, 8}},
+                                              /*permutation=*/{1, 0, 2}};
+    }
+  default:
+    return std::nullopt;
   }
-  return swizzle;
 }
 
 static bool hasIntrinsic(IREE::GPU::TargetAttr target,
@@ -68,16 +88,33 @@ static bool hasIntrinsic(IREE::GPU::TargetAttr target,
 static std::optional<IREE::GPU::DataTiledMMAAttr>
 chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   assert(elementTypes.size() == 3);
+  using namespace IREE::GPU;
   MLIRContext *ctx = target.getContext();
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
-  if (lhs.isF32() && rhs.isF32() && out.isF32()) {
-    auto intrinsic = IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32;
-    if (hasIntrinsic(target, intrinsic)) {
-      return IREE::GPU::DataTiledMMAAttr::get(
-          ctx, IREE::GPU::MMAIntrinsicAttr::get(ctx, intrinsic), 1, 1, 1);
+  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollN,
+                   int unrollK) -> std::optional<DataTiledMMAAttr> {
+    if (!hasIntrinsic(target, intrinsic)) {
+      return std::nullopt;
     }
+    auto candidate = DataTiledMMAAttr::get(
+        ctx, MMAIntrinsicAttr::get(ctx, intrinsic), unrollM, unrollN, unrollK);
+    auto [candidateLhs, candidateRhs, candidateOut] =
+        candidate.getABCElementTypes();
+    if (candidateLhs != lhs || candidateRhs != rhs || candidateOut != out) {
+      return std::nullopt;
+    }
+    return candidate;
+  };
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 1, 1, 1)) {
+    return m;
+  }
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 1, 1, 1)) {
+    return m;
+  }
+  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 1, 1, 1)) {
+    return m;
   }
   // Fallback - no architecture-optimized tile size for this case.
   return std::nullopt;
