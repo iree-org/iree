@@ -105,17 +105,18 @@ def MFMA_F32_32x32x8_F16  : I32EnumAttrCase<"MFMA_F32_32x32x8_F16", 2>;
 def MFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"MFMA_F32_16x16x32_F8E4M3FNUZ", 3>;
 def MFMA_I32_16x16x32_I8  : I32EnumAttrCase<"MFMA_I32_16x16x32_I8", 4>;
 def MFMA_I32_32x32x16_I8  : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 5>;
+
+// CDNA2 instrinsics
+def MFMA_I32_16x16x16_I8  : I32EnumAttrCase<"MFMA_I32_16x16x16_I8", 6>;
+def MFMA_I32_32x32x8_I8  : I32EnumAttrCase<"MFMA_I32_32x32x8_I8", 7>;
+
 // TODO: Create separate WMMA ops for AMD and NVIDIA GPUs
-def WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"WMMA_F32_16x16x16_F16", 6>;
-def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 7>;
+def WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"WMMA_F32_16x16x16_F16", 8>;
+def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 9>;
 
 // TODO: The actual I8 instruction allows specifying (mixed) signedness.
 // This will need to become its own class of MMA attribute.
-def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 8>;
-
-// CDNA2 instrinsics that are different than CDNA2
-def MFMA_I32_16x16x16_I8  : I32EnumAttrCase<"MFMA_I32_16x16x16_I8", 9>;
-def MFMA_I32_32x32x8_I8  : I32EnumAttrCase<"MFMA_I32_32x32x8_I8", 10>;
+def WMMA_I32_16x16x16_I8 : I32EnumAttrCase<"WMMA_I32_16x16x16_I8", 10>;
 
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [
@@ -125,11 +126,11 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_F32_16x16x32_F8E4M3FNUZ,
       MFMA_I32_16x16x32_I8,
       MFMA_I32_32x32x16_I8,
+      MFMA_I32_16x16x16_I8,
+      MFMA_I32_32x32x8_I8,
       WMMA_F32_16x16x16_F16,
       WMMA_F16_16x16x16_F16,
-      WMMA_I32_16x16x16_I8,
-      MFMA_I32_16x16x16_I8,
-      MFMA_I32_32x32x8_I8
+      WMMA_I32_16x16x16_I8
     ]>;
 
 def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
