@@ -46,7 +46,6 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1280 step %c4 {{.*}} -> (vector<8x4xf32>)
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2xf16>
 //       CHECK:     vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC:[A-Za-z0-9]+]]
 //       CHECK:     gpu.barrier
@@ -105,7 +104,6 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
 //       CHECK:     vector.transfer_write %[[LHS_RD]]
 //       CHECK:     gpu.barrier
@@ -190,7 +188,6 @@ hal.executable private @main {
 //     CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //     CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //         CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x2x2x4x1xf32>)
-//         CHECK:     gpu.barrier
 //         CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
 //         CHECK:     vector.transfer_write %[[LHS_RD]]
 //         CHECK:     gpu.barrier
@@ -257,7 +254,6 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2x8xf16>
 //       CHECK:     vector.transfer_write %[[LHS_RD]]
 //       CHECK:     gpu.barrier

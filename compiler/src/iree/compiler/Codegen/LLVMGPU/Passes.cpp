@@ -306,13 +306,19 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
       .getResult();
 }
 
+static LogicalResult gpuBasicCopyFn(OpBuilder &builder, Location loc,
+                                    Value from, Value to) {
+  builder.create<memref::CopyOp>(loc, from, to);
+  return success();
+}
+
 static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuBasicCopyFn;
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
