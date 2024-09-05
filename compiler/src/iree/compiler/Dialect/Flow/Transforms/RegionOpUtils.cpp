@@ -719,7 +719,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (LinalgExt::isBitExtendOp(op)) {
+  if (LinalgExt::isBitExtendOp(op) || LinalgExt::isGatherlikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -282,6 +283,35 @@ bool isBroadcastingOp(linalg::LinalgOp op) {
     return false;
   }
   return llvm::hasSingleElement(op.getBlock()->getOperations());
+}
+
+bool isGatherlikeOp(Operation *op) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) {
+    return false;
+  }
+
+  if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+    return false;
+  }
+
+  auto &region = genericOp->getRegion(0);
+  if (!llvm::hasSingleElement(region)) {
+    return false;
+  }
+
+  auto yieldOp = cast<linalg::YieldOp>(region.front().getTerminator());
+  if (yieldOp.getNumOperands() != 1) {
+    return false;
+  }
+
+  // `yieldOp` should yield a single value from a `tensor.extract`
+  auto extractOp = yieldOp.getOperand(0).getDefiningOp<tensor::ExtractOp>();
+  if (!extractOp) {
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

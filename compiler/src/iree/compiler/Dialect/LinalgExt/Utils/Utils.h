@@ -139,5 +139,7 @@ bool isBitTruncateOp(Operation *op);
 ///     6. Has a body with only a linalg.yield op.
 bool isBroadcastingOp(linalg::LinalgOp op);
 
+bool isGatherlikeOp(Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
