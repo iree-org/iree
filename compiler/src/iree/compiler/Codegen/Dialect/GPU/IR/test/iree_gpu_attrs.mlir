@@ -29,12 +29,12 @@ module {
 
 module {
   func.func @test_data_tiled_mfma_f32_16x16x4_f32() attributes {
-      mma_types = #iree_gpu.data_tiled_mma_layout<MFMA_F32_16x16x4_F32>} {
+      mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 1, unroll_n = 1, unroll_k = 1>} {
     return
   }
 }
 // CHECK-LABEL: func @test_data_tiled_mfma_f32_16x16x4_f32
-//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<MFMA_F32_16x16x4_F32>
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 1, unroll_n = 1, unroll_k = 1>
 
 module {
   func.func @test_any_lowering_config() attributes {

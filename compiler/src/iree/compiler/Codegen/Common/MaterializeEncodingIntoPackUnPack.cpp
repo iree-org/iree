@@ -507,6 +507,33 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       .Default([](Operation *op) { return failure(); });
 }
 
+// Utility to apply a tile-swizzling to a packed shape.
+static SmallVector<OpFoldResult>
+getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
+                 MaterializeEncodingInfo encodingInfo) {
+  if (packedShape.empty() || !encodingInfo.swizzle) {
+    return SmallVector<OpFoldResult>(packedShape);
+  }
+
+  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
+  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
+  for (auto i : encodingInfo.swizzle->permutation) {
+    perm.push_back(i + srcRank);
+  }
+
+  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
+  SmallVector<int64_t> expandedTileShape =
+      getExpandedTileShape(encodingInfo.swizzle->expandShape);
+  MLIRContext *ctx = packedShape[0].getContext();
+  Builder b(ctx);
+  for (int64_t d : expandedTileShape) {
+    newShape.push_back(b.getIndexAttr(d));
+  }
+  applyPermutationToVector(newShape, perm);
+
+  return newShape;
+}
+
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the materialized shape of the `dispatchTensorType`. The
 /// dynamic dimensions of the `dispatchTensorType` are provided in
@@ -542,7 +569,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
       tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
                                      encodingInfo->innerDimsPos,
                                      encodingInfo->outerDimsPerm);
-  return resolveTileSwizzlingShape(convertedTargetShape, *encodingInfo);
+  return getSwizzledShape(convertedTargetShape, *encodingInfo);
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,

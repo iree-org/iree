@@ -212,9 +212,9 @@ LogicalResult MultiMmaOp::verify() {
   // land this part to main branch.
   if (auto dataTiledMmaAttr =
           dyn_cast<IREE::GPU::DataTiledMMAAttr>(getKind())) {
-    auto [mUnrollFactor, nUnrollFactor, kUnrollFactor] =
-        dataTiledMmaAttr.getUnrollingFactor(
-            getLhsInnerShape(), getRhsInnerShape(), getAccInnerShape());
+    int mUnrollFactor = dataTiledMmaAttr.getUnrollM();
+    int nUnrollFactor = dataTiledMmaAttr.getUnrollN();
+    int kUnrollFactor = dataTiledMmaAttr.getUnrollK();
     expectedNumLhsElem *= mUnrollFactor * kUnrollFactor;
     expectedNumRhsElem *= nUnrollFactor * kUnrollFactor;
     expectedNumAccElem *= mUnrollFactor * nUnrollFactor;
