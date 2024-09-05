@@ -68,7 +68,7 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: false
       - uses: actions/setup-python@v5.1.0
@@ -86,7 +86,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           repository: iree-org/iree-test-suites
           ref: 9e921d0ea271a85f772eee22965585461c9b14c2

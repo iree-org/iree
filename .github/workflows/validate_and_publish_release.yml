@@ -122,7 +122,7 @@ jobs:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. Otherwise the latest-snapshot branch can't be

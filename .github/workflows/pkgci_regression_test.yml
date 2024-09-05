@@ -63,7 +63,7 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: false
       - uses: actions/setup-python@v5.1.0
@@ -82,7 +82,7 @@ jobs:
 
       # Out of tree tests
       - name: Check out external TestSuite repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
           ref: f5615ab29da491c0047146258dfa3a0c40c735e5
@@ -152,7 +152,7 @@ jobs:
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: false
       - uses: actions/setup-python@v5.1.0

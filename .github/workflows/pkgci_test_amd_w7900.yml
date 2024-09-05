@@ -31,7 +31,7 @@ jobs:
       IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: false
       - name: Check out runtime submodules

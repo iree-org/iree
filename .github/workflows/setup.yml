@@ -52,7 +52,7 @@ jobs:
       write-caches: ${{ steps.configure.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2

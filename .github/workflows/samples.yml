@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Setting up Python"
         uses: actions/setup-python@v5.1.0
         with:
@@ -46,7 +46,7 @@ jobs:
       CXX: clang++
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
@@ -69,7 +69,7 @@ jobs:
         shell: bash
     steps:
       - name: "Check out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Mark git safe.directory"
         run: git config --global --add safe.directory '*'
       - name: "Check out runtime submodules"

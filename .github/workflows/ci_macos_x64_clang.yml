@@ -30,7 +30,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       # There may be multiple versions of Xcode and SDKs installed.
