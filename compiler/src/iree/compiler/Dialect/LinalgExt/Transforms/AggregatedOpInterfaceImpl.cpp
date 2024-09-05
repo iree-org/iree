@@ -100,10 +100,10 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
         // used by attention's exp2 who's value is always > 0.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value clamped = b.create<arith::MinimumFOp>(loc, mx, args[0]);
+        Value sel0 = b.create<arith::MinimumFOp>(loc, mx, arg[0]);
 
         // Convert scale to the same datatype as input.
-        Value trunc = convertScalarToDtype(b, loc, clamped, dstTy,
+        Value trunc = convertScalarToDtype(b, loc, sel0, dstTy,
                                            /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, trunc);
       });
@@ -313,7 +313,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
     AffineMap qMap = getQueryMap();
-    query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
+    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap, query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -338,7 +338,23 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     // losing numerical precision due to the low dynamic range of fp8 types when
     // pre applying the sclaing.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
-    s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
+                                                scale);
+
+    // If we need to truncate to fp8 post softmax we apply a scaling to use the
+    // full fp8 range. We can do this with a offset as post `exp2` this equates
+    // to multiplying by a static value. We are able to do this as `max` and
+    // `sum` are scaled by the same value so the end result is the same.
+    auto fpTy = cast<FloatType>(qETy);
+    double mx =
+        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+            .convertToDouble();
+    Value offset = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(elementType, clAttentionSoftmaxMax / mx));
+    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
+                                               offset);
   }
 
   // S += mask
@@ -392,13 +408,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // newAcc = P @ V + newAcc
   newAcc = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value, newAcc);
-
-  // Update for for the FP8 dynamic scale:
-  if (pScale) {
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/maxMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    newAcc = scaleValueInPlace(b, loc, accMap, scaleMap, newAcc, pScale);
-  }
 
   return SmallVector<Value>{newAcc, newMax, newSum};
 }
