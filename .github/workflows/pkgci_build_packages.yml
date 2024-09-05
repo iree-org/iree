@@ -15,7 +15,7 @@ on:
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
-    runs-on: azure-linux
+    runs-on: azure-linux-scale
     strategy:
       fail-fast: false
     env:

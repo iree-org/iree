@@ -28,7 +28,7 @@ jobs:
   linux_x64_clang_asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
-    runs-on: azure-linux
+    runs-on: azure-linux-scale
     container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:ba10d33ef502d8b33aaa43800e640a6866983ef353b73fda2ed6595c4275e066
     defaults:
       run:
