@@ -134,6 +134,7 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
+    "UnitBroadcastToExpandShape.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
   DEPS
@@ -199,6 +200,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

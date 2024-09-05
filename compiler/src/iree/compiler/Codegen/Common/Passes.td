@@ -538,4 +538,9 @@ def VectorizeMemrefCopyPass :
   let summary = "Vectorizes memref copy operations.";
 }
 
+def UnitBroadCastToExpandShapePass :
+    InterfacePass<"iree-codegen-unit-broadcast-to-expand-shape", "mlir::FunctionOpInterface"> {
+  let summary = "Convert broadcast with unit dims to expand shape op.";
+}
+
 #endif // IREE_CODEGEN_COMMON_PASSES

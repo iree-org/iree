@@ -72,6 +72,7 @@ iree_lit_test_suite(
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "type_propagation_packing.mlir"
+    "unit_broadcast_to_expand_shape.mlir"
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
