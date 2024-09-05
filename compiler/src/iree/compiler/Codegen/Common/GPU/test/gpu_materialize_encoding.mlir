@@ -15,7 +15,7 @@
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-func.func @set_encoding_LHS() {
+func.func @set_encoding_LHS_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
@@ -25,7 +25,7 @@ func.func @set_encoding_LHS() {
   return
 }
 
-// CHECK-LABEL: func.func @set_encoding_LHS
+// CHECK-LABEL: func.func @set_encoding_LHS_MFMA_F32_16x16x4_F32
 // CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x129x4x16xf32>
 // CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
@@ -45,7 +45,7 @@ func.func @set_encoding_LHS() {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-func.func @set_encoding_RHS() {
+func.func @set_encoding_RHS_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
@@ -55,7 +55,7 @@ func.func @set_encoding_RHS() {
   return
 }
 
-// CHECK-LABEL: func.func @set_encoding_RHS
+// CHECK-LABEL: func.func @set_encoding_RHS_MFMA_F32_16x16x4_F32
 // CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<33x64x4x16xf32>
 // CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
@@ -75,7 +75,7 @@ func.func @set_encoding_RHS() {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-func.func @set_encoding_ACC() {
+func.func @set_encoding_ACC_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
@@ -85,7 +85,7 @@ func.func @set_encoding_ACC() {
   return
 }
 
-// CHECK-LABEL: func.func @set_encoding_ACC
+// CHECK-LABEL: func.func @set_encoding_ACC_MFMA_F32_16x16x4_F32
 // CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x33x16x16xf32>
 // CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
@@ -102,58 +102,6 @@ func.func @set_encoding_ACC() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
-                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
-                                    round_dims_to = array<i64: 16, 16, 16>>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-func.func @unset_encoding_LHS() {
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32, #encoding>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xf32, #encoding>> -> tensor<255x513xf32, #encoding>
-  %3 = iree_encoding.unset_encoding %2 : tensor<255x513xf32, #encoding> -> tensor<255x513xf32>
-  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32> -> !flow.dispatch.tensor<writeonly:tensor<255x513xf32>>
-  return
-}
-
-// CHECK-LABEL: func.func @unset_encoding_LHS() {
-// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xf32>
-// CHECK:         tensor.unpack {{.+}} outer_dims_perm = [0, 1] inner_dims_pos = [1, 0] inner_tiles = [4, 16]
-// CHECK-SAME:       tensor<16x129x4x16xf32> -> tensor<255x513xf32>
-
-// -----
-
-#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
-                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
-                                    round_dims_to = array<i64: 16, 16, 16>>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-func.func @unset_encoding_RHS() {
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32, #encoding>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xf32, #encoding>> -> tensor<255x513xf32, #encoding>
-  %3 = iree_encoding.unset_encoding %2 : tensor<255x513xf32, #encoding> -> tensor<255x513xf32>
-  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32> -> !flow.dispatch.tensor<writeonly:tensor<255x513xf32>>
-  return
-}
-
-// CHECK-LABEL: func.func @unset_encoding_RHS() {
-// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xf32>
-// CHECK:         tensor.unpack {{.+}} outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [4, 16]
-// CHECK-SAME:      tensor<33x64x4x16xf32> -> tensor<255x513xf32>
-
-// -----
-
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
@@ -163,7 +111,7 @@ func.func @unset_encoding_RHS() {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-func.func @unset_encoding_ACC() {
+func.func @unset_encoding_ACC_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32, #encoding>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32>>
@@ -173,7 +121,7 @@ func.func @unset_encoding_ACC() {
   return
 }
 
-// CHECK-LABEL: func.func @unset_encoding_ACC() {
+// CHECK-LABEL: func.func @unset_encoding_ACC_MFMA_F32_16x16x4_F32() {
 // CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<16x33x4x4x16xf32>
 // CHECK:         %[[UNSET_TRANSPOSE:.*]] = linalg.transpose ins(%{{.+}} : tensor<16x33x4x16x4xf32>)
 // CHECK-SAME:       outs(%[[UNSET_EMPTY]] : tensor<16x33x4x4x16xf32>) permutation = [0, 1, 2, 4, 3]
@@ -191,23 +139,23 @@ func.func @unset_encoding_ACC() {
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 16>>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
+#pipeline_layout_2 = #hal.pipeline.layout<push_constants = 3, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-func.func @matmul_lowering_f32f32f32() {
+func.func @matmul_lowering_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
-  %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-  %N = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-  %K = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
+  %M = hal.interface.constant.load layout(#pipeline_layout_2) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_2) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_2) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_2) set(0) binding(0) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%M, %K}
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_2) set(0) binding(1) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>{%K, %N}
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0)
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_2) set(0) binding(2) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_lhs>>{%M, %K}
@@ -231,7 +179,7 @@ func.func @matmul_lowering_f32f32f32() {
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK:     func.func @matmul_lowering_f32f32f32
+// CHECK:     func.func @matmul_lowering_MFMA_F32_16x16x4_F32
 // CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
 // CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
 // CHECK-DAG:   %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
@@ -242,4 +190,205 @@ func.func @matmul_lowering_f32f32f32() {
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 1, unroll_n = 1, unroll_k = 1>
+// CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
+
+
+//-----------------------------------------------------------------------------
+// 3. MFMA_I32_16x16x32_I8
+//-----------------------------------------------------------------------------
+
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi8>,
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+func.func @set_encoding_LHS_MFMA_I32_16x16x32_I8() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xi8>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xi8, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xi8>> -> tensor<255x513xi8>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xi8, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xi8,  #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @set_encoding_LHS_MFMA_I32_16x16x32_I8
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x17x16x32xi8>
+// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i8)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [16, 32] into %[[EMPTY]]
+// CHECK-SAME:      : tensor<255x513xi8> -> tensor<16x17x16x32xi8>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape
+// CHECK-SAME:      : tensor<16x17x16x32xi8> into tensor<16x17x16x4x8xi8>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]] : tensor<16x17x16x4x8xi8>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<16x17x4x16x8xi8>)
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi8>,
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+func.func @set_encoding_RHS_MFMA_I32_16x16x32_I8() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xi8>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xi8, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xi8>> -> tensor<255x513xi8>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xi8, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xi8,  #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @set_encoding_RHS_MFMA_I32_16x16x32_I8
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<33x8x16x32xi8>
+// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i8)
+// CHECK-SAME:      outer_dims_perm = [1, 0]
+// CHECK-SAME:      inner_dims_pos = [1, 0]
+// CHECK-SAME:      inner_tiles = [16, 32] into %[[EMPTY]]
+// CHECK-SAME:      : tensor<255x513xi8> -> tensor<33x8x16x32xi8>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape
+// CHECK-SAME:      : tensor<33x8x16x32xi8> into tensor<33x8x16x4x8xi8>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]] : tensor<33x8x16x4x8xi8>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<33x8x4x16x8xi8>)
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi32>,
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+func.func @set_encoding_ACC_MFMA_I32_16x16x32_I8() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xi32, #encoding>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xi32>> -> tensor<255x513xi32>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xi32> -> tensor<255x513xi32, #encoding>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xi32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xi32,  #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @set_encoding_ACC_MFMA_I32_16x16x32_I8
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x33x16x16xi32>
+// CHECK:         %[[PACK:.*]] = tensor.pack %{{.+}} padding_value(%{{.+}} : i32)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [16, 16] into %[[EMPTY]]
+// CHECK-SAME:      : tensor<255x513xi32> -> tensor<16x33x16x16xi32>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK:         %[[EMPTY2:.*]] = tensor.empty() : tensor<16x33x4x16x4xi32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]]
+// CHECK-SAME:      outs(%[[EMPTY2]]
+// CHECK-SAME:      permutation = [0, 1, 2, 4, 3]
+// CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi32>,
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+func.func @unset_encoding_ACC_MFMA_I32_16x16x32_I8() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xi32, #encoding>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xi32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<255x513xi32, #encoding>> -> tensor<255x513xi32, #encoding>
+  %3 = iree_encoding.unset_encoding %2 : tensor<255x513xi32, #encoding> -> tensor<255x513xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xi32> -> !flow.dispatch.tensor<writeonly:tensor<255x513xi32>>
+  return
+}
+
+// CHECK-LABEL: func.func @unset_encoding_ACC_MFMA_I32_16x16x32_I8() {
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<16x33x4x4x16xi32>
+// CHECK:         %[[UNSET_TRANSPOSE:.*]] = linalg.transpose ins(%{{.+}} : tensor<16x33x4x16x4xi32>)
+// CHECK-SAME:       outs(%[[UNSET_EMPTY]] : tensor<16x33x4x4x16xi32>) permutation = [0, 1, 2, 4, 3]
+// CHECK:         %[[UNSET_COLLAPSE:.*]] = tensor.collapse_shape %[[UNSET_TRANSPOSE]]
+// CHECK-SAME:      tensor<16x33x4x4x16xi32> into tensor<16x33x16x16xi32>
+// CHECK:         %[[UNSET_EMPTY:.*]] = tensor.empty() : tensor<255x513xi32>
+// CHECK:         tensor.unpack %[[UNSET_COLLAPSE:.*]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into
+// CHECK-SAME:      tensor<16x33x16x16xi32> -> tensor<255x513xi32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+func.func @matmul_lowering_MFMA_I32_16x16x32_I8() {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) set(0) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK:     func.func @matmul_lowering_MFMA_I32_16x16x32_I8
+// CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+// CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+// CHECK-DAG:   %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
+// CHECK-DAG:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]{{.+}} -> tensor<?x?x4x16x8xi8>
+// CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]{{.+}} -> tensor<?x?x4x16x8xi8>
+// CHECK-DAG:   %[[ACC:.+]] = flow.dispatch.tensor.load %[[ACC_BINDING]]{{.+}} -> tensor<?x?x4x16x4xi32>
+// CHECK:       %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
+// CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 1, unroll_n = 1, unroll_k = 1>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
