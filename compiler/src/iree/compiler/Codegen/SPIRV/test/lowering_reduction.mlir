@@ -342,7 +342,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK-COUNT-6: gpu.shuffle  xor {{.*}} : i32
+// CHECK:         gpu.subgroup_reduce maxnumf
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
