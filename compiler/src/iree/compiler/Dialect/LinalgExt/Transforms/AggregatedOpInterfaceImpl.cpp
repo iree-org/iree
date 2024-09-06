@@ -100,7 +100,7 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
         // used by attention's exp2 who's value is always > 0.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value sel0 = b.create<arith::MinimumFOp>(loc, mx, arg[0]);
+        Value sel0 = b.create<arith::MinimumFOp>(loc, mx, args[0]);
 
         // Convert scale to the same datatype as input.
         Value trunc = convertScalarToDtype(b, loc, sel0, dstTy,
@@ -362,8 +362,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
       s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
 
-  Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  s = scaleValueInPlace(b, loc, sMap, scaleMap, s, log2e);
+  // Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  // s = scaleValueInPlace(b, loc, sMap, scaleMap, s, log2e);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
