@@ -173,8 +173,8 @@ getProcIdsAndNprocs(
 }
 
 /// Resolve scf.forall operation by using the workgroup ID and counts.
-static LogicalResult resolveForAllOp(RewriterBase &rewriter,
-                                     scf::ForallOp forallOp) {
+static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
+                                            scf::ForallOp forallOp) {
   if (forallOp->getNumResults() != 0) {
     return forallOp.emitOpError(
         "cannot resolve for all ops with return values");
@@ -192,7 +192,6 @@ static LogicalResult resolveForAllOp(RewriterBase &rewriter,
   rewriter.setInsertionPoint(forallOp);
 
   SmallVector<OpFoldResult> procId;
-  SmallVector<OpFoldResult> nprocs;
 
   {
     FailureOr<std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>>
@@ -204,7 +203,6 @@ static LogicalResult resolveForAllOp(RewriterBase &rewriter,
       return failure();
     }
     std::swap(procId, procInfo->first);
-    std::swap(nprocs, procInfo->second);
   }
 
   /// For now this is assuming that number of workgroups is exactly equal to
@@ -249,8 +247,8 @@ static LogicalResult resolveWorkgroupCount(RewriterBase &rewriter,
   return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount);
 }
 
-static LogicalResult resolveForallOps(RewriterBase &rewriter,
-                                      FunctionOpInterface funcOp) {
+static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
+                                            FunctionOpInterface funcOp) {
   Region &body = funcOp.getFunctionBody();
 
   if (body.empty()) {
@@ -294,7 +292,7 @@ static LogicalResult resolveForallOps(RewriterBase &rewriter,
     return failure();
   }
 
-  return resolveForAllOp(rewriter, *forAllOps.begin());
+  return resolveWorkgroupForAll(rewriter, *forAllOps.begin());
 }
 
 //===---------------------------------------------------------------------===//
@@ -364,7 +362,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   auto walkResult =
       innerModuleOp->walk([&](FunctionOpInterface funcOp) -> WalkResult {
         // Resolve workgroup distribution related `scf.forall` ops.
-        if (failed(resolveForallOps(rewriter, funcOp))) {
+        if (failed(resolveWorkgroupForAll(rewriter, funcOp))) {
           return failure();
         }
 

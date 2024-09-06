@@ -163,7 +163,8 @@ hal.executable private @llvm_func_attrs {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 3, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D {
   hal.executable.variant public @scf_forall_2D target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @scf_forall_2D layout(#pipeline_layout) {
@@ -206,7 +207,8 @@ hal.executable private @scf_forall_2D {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D_dynamic_tile_size {
   hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @scf_forall_2D_dynamic_tile_size layout(#pipeline_layout) {
@@ -251,7 +253,8 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 12, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 12, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_4D {
   hal.executable.variant public @scf_forall_4D target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @scf_forall_4D layout(#pipeline_layout) {
@@ -337,7 +340,8 @@ hal.executable private @scf_forall_4D {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_4D_static_interchange {
   hal.executable.variant public @scf_forall_4D_static_interchange target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @scf_forall_4D_static_interchange layout(#pipeline_layout) {
@@ -378,7 +382,8 @@ hal.executable private @scf_forall_4D_static_interchange {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @no_loop_do_nothing {
   hal.executable.variant public @no_loop_do_nothing target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @no_loop_do_nothing layout(#pipeline_layout) {
@@ -403,7 +408,8 @@ hal.executable private @no_loop_do_nothing {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @no_loop_default_workgroup_count {
   hal.executable.variant public @no_loop_default_workgroup_count target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @no_loop_default_workgroup_count layout(#pipeline_layout) {
