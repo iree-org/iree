@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
@@ -26,7 +26,7 @@ jobs:
           git tag "${tag_name}"
 
       - name: Pushing changes
-        uses: ad-m/github-push-action@v0.8.0
+        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: ${{ github.ref_name }}
@@ -46,7 +46,7 @@ jobs:
           prerelease: true
 
       - name: "Invoke workflow :: Build Release Packages"
-        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
           workflow: Build Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
