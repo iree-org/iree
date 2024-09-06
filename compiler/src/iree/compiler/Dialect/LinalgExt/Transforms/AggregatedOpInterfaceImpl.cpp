@@ -368,10 +368,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
   s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, log2e);
 
-  // TODO: This decomposition should be in a seperate op called
-  // "online softmax".
-  // ---- Online Softmax ----
-
   // newMax = max(oldMax, rowMax(S))
   AffineMap maxMap = getMaxMap();
   Value newMax = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
