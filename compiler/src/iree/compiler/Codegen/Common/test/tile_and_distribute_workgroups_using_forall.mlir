@@ -410,7 +410,7 @@ func.func @generate_no_distribution(%arg0 : tensor<16xf16>) -> tensor<16xf16> {
 // -----
 
 func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
-    %arg1 : tensor<?x?xf16>) -> tensor<?x?xf32> {
+    %arg1 : tensor<?x?xf16>, %arg2: tensor<?xf16>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -442,11 +442,21 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
       {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
       ins(%extf_lhs, %extf_rhs : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %empty_biasadd = tensor.empty(%M, %N) : tensor<?x?xf32>
+  %bias_add = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+    ins(%matmul,%arg2 : tensor<?x?xf32>, tensor<?xf16>) outs(%empty_biasadd : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1: f16, %b2 : f32) :
+      %0 = arith.extf %b1 : f16 to f32
+      %1 = arith.addf %b0, %0 : f32
+      linalg.yield %1 : f32
+  } -> tensor<?x?xf32>
   %empty_relu = tensor.empty(%M, %N) : tensor<?x?xf32>
   %relu = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
-    ins(%matmul : tensor<?x?xf32>) outs(%empty_relu : tensor<?x?xf32>) {
+    ins(%bias_add : tensor<?x?xf32>) outs(%empty_relu : tensor<?x?xf32>) {
     ^bb0(%b0 : f32, %b1 : f32) :
       %0 = arith.maximumf %b0, %cst0 : f32
       linalg.yield %0 : f32
@@ -456,6 +466,7 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
 // CHECK-LABEL: func @matmul_consumer_fusion_test(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf16>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf16>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?xf16>
 //       CHECK:   %[[RESULT:.+]] = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]]) =
 //       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]], 0]
 //       CHECK:     %[[LHS:.+]] = linalg.generic
@@ -467,8 +478,10 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
 //       CHECK:     %[[MATMUL:.+]] = linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
 //  CHECK-SAME:         outs(%[[FILL]] :
+//       CHECK:     %[[BIASADD:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[MATMUL]]
 //       CHECK:     %[[RELU:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[MATMUL]] :
+//  CHECK-SAME:         ins(%[[BIASADD]] :
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[RELU]]
 //       CHECK:   return %[[RESULT]]
