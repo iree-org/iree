@@ -377,9 +377,9 @@ func.func @attention_20x4096x64x4096x64() {
 
 // -----
 
-// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[16, 0, 32, 16]{{\]}}
+// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[32, 0, 16, 32]{{\]}}
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME:  subgroup_m_count = 1, subgroup_n_count = 1
+// CHECK-SAME:  subgroup_m_count = 2, subgroup_n_count = 2
 // CHECK-NOT:   prefetch_shared_memory = true
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
