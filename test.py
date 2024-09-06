@@ -85,3 +85,5 @@ def gen_attention_causal_mask():
     # Post attention func
     out = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask)
     np.save("attn_ref.npy", out.detach().to(device="cpu").numpy())
+
+gen_attention_no_mask()
