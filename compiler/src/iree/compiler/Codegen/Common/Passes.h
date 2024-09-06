@@ -68,7 +68,8 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvolutionToIGEMMPass(ConfigFn configFn);
 
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne);
+createDecomposePackUnPackOpsPass(bool tileOuterToOne,
+                                 bool useOnlyReshapes = false);
 
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 

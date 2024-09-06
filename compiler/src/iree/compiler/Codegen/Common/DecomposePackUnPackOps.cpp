@@ -68,8 +68,10 @@ struct DecomposePackUnPackOpsPass final
     : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
   using impl::DecomposePackUnPackOpsPassBase<
       DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
-  explicit DecomposePackUnPackOpsPass(bool tileOuterToOne) {
+  explicit DecomposePackUnPackOpsPass(bool tileOuterToOne,
+                                      bool useOnlyReshapes) {
     this->tileOuterToOne = tileOuterToOne;
+    this->useOnlyReshapes = useOnlyReshapes;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
@@ -86,7 +88,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   // Generalization patterns for outer unit dims have higher priority because
   // they do not generate reshape ops.
-  {
+  if (!useOnlyReshapes) {
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
@@ -197,8 +199,12 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(ctx);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    if (useOnlyReshapes) {
+      patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
+    } else {
+      patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
+                   linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -206,8 +212,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
-  return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
+createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes) {
+  return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne,
+                                                      useOnlyReshapes);
 }
 
 } // namespace mlir::iree_compiler
