@@ -41,7 +41,7 @@ jobs:
           xcrun metal --version
           xcrun metallib --version
       - name: "Setting up Python"
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.10"
           cache: "pip"
