@@ -102,7 +102,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
              /*bestKElementCountPerSubgroup*/ cacheLineSizeBits / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
+             /*bestMNTileCountPerSubgroup=*/8,
              /*bestKTileCountPerSubgroup=*/4,
              /*bestKElementCountPerSubgroup*/ cacheLineSizeBits / inBitWidth};
   }
