@@ -312,7 +312,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
-        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
