@@ -7,8 +7,8 @@ become much clearer when seeing where we want to go with the infrastructure we
 are building (as opposed to where we currently are with our MVP slice). This
 document is not meant to encompass the entire design of any individual feature
 and if there's interest please say hi on the
-[iree-discuss](https://groups.google.com/forum/#!forum/iree-discuss) mailing
-list.
+[iree-technical-discussion](https://lists.lfaidata.foundation/g/iree-technical-discussion)
+mailing list.
 
 [TOC]
 

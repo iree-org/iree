@@ -418,7 +418,7 @@ setup(
     name=f"{custom_package_prefix}iree-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     description="IREE Compiler API",
     long_description="",
     license="Apache-2.0",
@@ -454,10 +454,7 @@ setup(
     packages=packages,
     entry_points={
         "console_scripts": [
-            "iree-compile = iree.compiler.tools.scripts.ireec.__main__:main",
-            # TODO: We have renamed to iree-compile on 2022-03-18. Remove
-            # this alias once no longer needed.
-            "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-compile = iree.compiler.tools.scripts.iree_compile.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
             "iree-opt = iree.compiler.tools.scripts.iree_opt.__main__:main",

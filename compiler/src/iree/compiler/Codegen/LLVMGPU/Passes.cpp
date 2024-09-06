@@ -312,7 +312,11 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUInferMemorySpacePass());
   BufferizationOptions::AllocationFn allocationFn =
       gpuRequireMemSpaceAllocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
+                                               Value from, Value to) {
+    builder.create<memref::CopyOp>(loc, from, to);
+    return success();
+  };
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memcpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
@@ -402,6 +406,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   addGPUVectorizationPasses(funcPassManager);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
+  funcPassManager.addPass(createGPUCombineValueBarriersPass());
 
   // Step 7. Bufferize.
   addGPUBufferizePasses(funcPassManager);

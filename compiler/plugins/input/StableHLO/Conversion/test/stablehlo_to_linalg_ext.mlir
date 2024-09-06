@@ -516,7 +516,6 @@ func.func @reverse_unsigned(%arg0: tensor<3x5xui32>) -> tensor<3x5xui32> {
 }
 // CHECK-LABEL: func.func @reverse_unsigned
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
-// CHECK:        %[[BITCAST:.+]] = builtin.unrealized_conversion_cast %[[IN]] : tensor<3x5xui32> to tensor<3x5xi32>
 // CHECK:        %[[INIT:.+]] = tensor.empty() : tensor<3x5xui32>
 // CHECK:        %[[GEN:.+]] = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%[[INIT]] : tensor<3x5xui32>)
 // CHECK:        %[[SAME_DIM:.+]] = linalg.index 0 : index
@@ -654,7 +653,6 @@ func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
   }) {base_dilations = array<i64: 1, 1>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = array<i64: 1, 1>, window_dimensions = array<i64: 1, 5>, window_strides = array<i64: 1, 1>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
   return %reduce : tensor<7x5xi32>
 }
-// CHECK:       %extracted = tensor.extract %[[ARG1]][] : tensor<i32>
 // CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
 // CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
 // CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)

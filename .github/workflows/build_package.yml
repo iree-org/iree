@@ -105,7 +105,7 @@ jobs:
       MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: true
@@ -121,7 +121,7 @@ jobs:
         run: ./c/build_tools/python_deploy/install_windows_deps.ps1
       - name: "Configure MSVC (Windows)"
         if: "matrix.build-family == 'windows'"
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       ##########################################################################
       # Write version_info.json
@@ -285,7 +285,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@v4.3.3
+      - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           # We upload all wheels (which includes deps so that subsequent
@@ -312,7 +312,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
-        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+        uses: benc-uk/workflow-dispatch@e2e5e9a103e331dad343f381a29e654aea3cf8fc # v1.2.4
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}

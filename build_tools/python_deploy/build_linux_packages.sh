@@ -71,7 +71,7 @@ packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"
 toolchain_suffix="${toolchain_suffix:-release}"
 # Return ON if we are on a supported platform for CUDA.
-enable_cuda="$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}')"
+enable_cuda="$(uname -m | awk '{print ($1 == "x86_64" || $1 == "aarch64") ? "ON" : "OFF"}')"
 
 function run_on_host() {
   echo "Running on host"

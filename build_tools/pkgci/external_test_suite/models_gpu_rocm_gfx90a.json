@@ -18,10 +18,7 @@
     // TODO(#17344): need to regenerate .mlirbc
     "pytorch/models/opt-125M",
     "pytorch/models/resnet50",
-    "pytorch/models/sdxl-vae-decode-tank",
-
-    // TODO: Add I8 MFMA layout support for CDNA2. Currently only CDNA3 specific I8 layout is implemented.
-    "sharktank/punet/int8"
+    "pytorch/models/sdxl-vae-decode-tank"
   ],
   "expected_run_failures": []
 }

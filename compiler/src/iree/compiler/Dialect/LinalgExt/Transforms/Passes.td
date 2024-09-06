@@ -54,6 +54,10 @@ def DecomposeIm2colPass :
     InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes im2col ops into insert and extract slice ops";
+  let options = [
+    Option<"unroll", "unroll", "bool", /*default=*/"true",
+           "Unroll the resulting loop nest after decomposition.">,
+  ];
 }
 
 def DecomposeWinogradTransformPass :
