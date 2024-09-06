@@ -101,7 +101,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
   while (!isScheduleValid(schedule)) {
     LLVM_DEBUG({
       llvm::dbgs() << "Chosen schedule is invalid:\n";
-      llvm::dbgs() << schedule;
+      llvm::dbgs() << schedule << "\n";
       llvm::dbgs() << "Shrinking schedule...\n";
     });
 
@@ -139,7 +139,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
 
   LLVM_DEBUG({
     llvm::dbgs() << "Chosen schedule is valid:\n";
-    llvm::dbgs() << schedule;
+    llvm::dbgs() << schedule << "\n";
   });
 
   return schedule;
