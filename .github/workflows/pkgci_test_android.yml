@@ -66,7 +66,7 @@ jobs:
       - name: Install build dependencies
         run: sudo apt update && sudo apt install -y ninja-build
 
-      - uses: nttld/setup-ndk@v1
+      - uses: nttld/setup-ndk@afb4c9964b521afb97c864b7d40b11e6911bd410 # v1.5.0
         with:
           ndk-version: r25b
       - name: Build for Android
