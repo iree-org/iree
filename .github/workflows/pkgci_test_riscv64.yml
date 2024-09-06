@@ -52,7 +52,7 @@ jobs:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
           key: ${{ github.job }}
           save: ${{ inputs.write-caches == 1 }}
