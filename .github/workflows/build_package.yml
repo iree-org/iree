@@ -121,7 +121,7 @@ jobs:
         run: ./c/build_tools/python_deploy/install_windows_deps.ps1
       - name: "Configure MSVC (Windows)"
         if: "matrix.build-family == 'windows'"
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       ##########################################################################
       # Write version_info.json

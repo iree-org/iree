@@ -45,7 +45,7 @@ jobs:
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: "Building IREE"
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"

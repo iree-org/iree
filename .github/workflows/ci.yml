@@ -121,7 +121,7 @@ jobs:
           echo "CXX=clang++" >> $GITHUB_ENV
       - name: (Windows) Configure MSVC
         if: contains(matrix.name, 'windows')
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: (macOS) Install requirements
         if: contains(matrix.name, 'macos')
         run: brew install ninja ccache coreutils bash
