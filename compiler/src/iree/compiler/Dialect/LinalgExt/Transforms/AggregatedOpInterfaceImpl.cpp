@@ -362,8 +362,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
       s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
 
-  // Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  // s = scaleValueInPlace(b, loc, sMap, scaleMap, s, log2e);
+  Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, log2e);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
