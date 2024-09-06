@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "conv2d_to_im2col.mlir"
     "conv2d_to_winograd.mlir"
     "convert_to_loops.mlir"
+    "convert_to_online_attention.mlir"
     "decompose_attention.mlir"
     "decompose_im2col.mlir"
     "decompose_online_attention.mlir"

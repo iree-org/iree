@@ -104,8 +104,7 @@ def DecomposeAttentionPass :
 }
 
 def ConvertAttentionToOnlineAttentionPass :
-    InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
-    "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-convert-attention-to-online-attention", ""> {
   let summary = "Converts attention op to online_attention op";
 }
 
