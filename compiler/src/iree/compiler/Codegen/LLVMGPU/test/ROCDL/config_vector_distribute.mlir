@@ -393,7 +393,7 @@ func.func @attention_20x4096x64x4096x64() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @attention_large_k1_shared_mem() {
+func.func @attention_large_head_dim_shared_mem() {
   %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x512xf16>>
