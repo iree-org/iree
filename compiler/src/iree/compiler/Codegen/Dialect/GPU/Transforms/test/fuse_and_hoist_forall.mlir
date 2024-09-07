@@ -304,3 +304,39 @@ func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>, %3: tenso
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
+
+// -----
+
+func.func @hoist_with_single_trip_loops(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<128x128xf16>
+  %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %empty) -> (tensor<128x128xf16>) {
+    %9 = scf.forall (%arg2, %arg3) in (1, 1) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf16>) {
+      %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3] [128, 128] [1, 1] : tensor<128x128xf16> to tensor<128x128xf16>
+      %10 = scf.forall (%arg5, %arg6) in (1, 1) shared_outs(%arg7 = %extracted_slice) -> (tensor<128x128xf16>) {
+        %16 = linalg.copy ins(%arg7 : tensor<128x128xf16>) outs(%2 : tensor<128x128xf16>) -> tensor<128x128xf16>
+        scf.forall.in_parallel {
+          tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [128, 128] [1, 1] : tensor<128x128xf16> into tensor<128x128xf16>
+        }
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3] [128, 128] [1, 1] : tensor<128x128xf16> into tensor<128x128xf16>
+      }
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+    scf.yield %9 : tensor<128x128xf16>
+  }
+  return %8 : tensor<128x128xf16>
+}
+
+// CHECK-LABEL: func @hoist_with_single_trip_loops
+//  CHECK-SAME:   %[[I0:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//  CHECK-SAME:   %[[I1:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall
+//       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<128x128xf16>)
+//       CHECK:         linalg.copy
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   return
