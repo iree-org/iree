@@ -196,6 +196,8 @@ struct FuseTilableForallConsumers final
 void FuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
+  FunctionOpInterface funcOp = getOperation();
+
   // First run the hoisting and fusion patterns.
   {
     RewritePatternSet patterns(context);
