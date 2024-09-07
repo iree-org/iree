@@ -207,10 +207,9 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
 }
 
 namespace {
-class CastLikeExtractSliceOpFolder final
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-public:
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+struct CastLikeExtractSliceOpFolder final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -223,10 +222,9 @@ public:
   }
 };
 
-class CastLikeInsertSliceOpFolder final
-    : public OpRewritePattern<tensor::InsertSliceOp> {
-public:
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+struct CastLikeInsertSliceOpFolder final
+    : OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
