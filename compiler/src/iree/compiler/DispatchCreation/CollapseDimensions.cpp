@@ -170,23 +170,6 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
   if (genericOp.hasIndexSemantics())
     return false;
 
-  // TODO(#17948) GPU codegen fails when we collapse the dimensions of softmax.
-  if (llvm::any_of(genericOp.getDpsInputOperands(),
-                   [&](OpOperand *operand) -> bool {
-                     auto genericOperand =
-                         operand->get().getDefiningOp<linalg::GenericOp>();
-                     if (!genericOperand)
-                       return false;
-
-                     if (genericOperand.getNumReductionLoops() == 0)
-                       return false;
-
-                     return genericOp.getMatchingIndexingMap(operand)
-                         .isProjectedPermutation();
-                   })) {
-    return false;
-  }
-
   return true;
 }
 
