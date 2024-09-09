@@ -31,11 +31,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 // Pass Pipeline Options
 //===----------------------------------------------------------------------===//
 
+using IREE::GPU::PipelineOptions::GPUPipelineOption;
 using IREE::GPU::PipelineOptions::ReorderWorkgroupsStrategy;
-using IREE::GPU::PipelineOptions::UnitPipelineOption;
-
-StringRef getPipelineOptionName(UnitPipelineOption option);
-StringRef getPipelineOptionName(ReorderWorkgroupsStrategy option);
 
 struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;

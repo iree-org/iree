@@ -430,4 +430,30 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Options
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GPUPipelineOptionAttr :
+    EnumAttr<IREEGPU_Dialect, IREEGPU_GPUPipelineOptionEnum, ""> {
+  let assemblyFormat = "``$value";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_GPUPipelineOptionsArrayAttr :
+    ArrayOfAttr<IREEGPU_Dialect, "GPUPipelineOptionsArray",
+        "gpu_pipeline_options", "GPUPipelineOptionAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let extraClassDeclaration = [{
+    // Return the key name for GPUPipelineOptionsArray in the translation info
+    // config dictionary.
+    static StringRef getDictKeyName() {
+      return "gpu_pipeline_options";
+    }
+
+    // Return new GPUPipelineOptionsArray with an additional option.
+    GPUPipelineOptionsArrayAttr addOption(GPUPipelineOptionAttr optionAttr);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

@@ -1353,6 +1353,17 @@ bool LaneIdAttr::isLinearMapping() const { return true; }
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Options
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptionsArrayAttr
+GPUPipelineOptionsArrayAttr::addOption(GPUPipelineOptionAttr optionAttr) {
+  SmallVector<GPUPipelineOptionAttr> optionAttrs(getValue());
+  optionAttrs.push_back(optionAttr);
+  return GPUPipelineOptionsArrayAttr::get(getContext(), optionAttrs);
+}
+
+//===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
 

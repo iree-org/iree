@@ -477,63 +477,36 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 
-constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
-    "no_reduce_shared_memory_bank_conflicts";
-constexpr StringLiteral kPrefetchSharedMemory = "prefetch_shared_memory";
-constexpr StringLiteral kReorderWorkgroupsStrategy =
-    "reorder_workgroups_strategy";
-
-StringRef getPipelineOptionName(UnitPipelineOption option) {
-  switch (option) {
-  case UnitPipelineOption::NoReduceSharedMemoryBankConflicts:
-    return kNoReduceSharedMemoryBankConflicts;
-  case UnitPipelineOption::PrefetchSharedMemory:
-    return kPrefetchSharedMemory;
-  }
-  assert(false && "Unknown pipeline option");
-  return StringRef();
-}
-
-StringRef getPipelineOptionName(ReorderWorkgroupsStrategy option) {
-  switch (option) {
-  case ReorderWorkgroupsStrategy::None:
-  case ReorderWorkgroupsStrategy::Swizzle:
-  case ReorderWorkgroupsStrategy::Transpose:
-    return kReorderWorkgroupsStrategy;
-  }
-  assert(false && "Unknown pipeline option");
-  return StringRef();
-}
-
 GPUPipelineOptions
 getPipelineOptions(FunctionOpInterface funcOp,
                    IREE::Codegen::TranslationInfoAttr translationInfo) {
   GPUPipelineOptions pipelineOptions = {};
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
-  LLVM_DEBUG(llvm::dbgs() << "Translation Info: " << translationInfo << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "Target Attr: " << targetAttr << "\n");
-
   if (DictionaryAttr config = translationInfo.getConfiguration()) {
-    if (config.contains(getPipelineOptionName(
-            UnitPipelineOption::NoReduceSharedMemoryBankConflicts))) {
-      pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
+
+    std::optional<NamedAttribute> pipelineOptionsListAttr =
+        config.getNamed(GPUPipelineOptionsArrayAttr::getDictKeyName());
+    if (!pipelineOptionsListAttr.has_value()) {
+      return pipelineOptions;
     }
-    if (config.contains(
-            getPipelineOptionName(UnitPipelineOption::PrefetchSharedMemory))) {
-      pipelineOptions.prefetchSharedMemory = true;
-    }
-    if (config.contains(
-            getPipelineOptionName(ReorderWorkgroupsStrategy::None))) {
-      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::None;
-    }
-    if (config.contains(
-            getPipelineOptionName(ReorderWorkgroupsStrategy::Transpose))) {
-      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Transpose;
-    }
-    if (config.contains(
-            getPipelineOptionName(ReorderWorkgroupsStrategy::Swizzle))) {
-      pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Swizzle;
+    ArrayRef<GPUPipelineOptionAttr> pipelineOptionsList =
+        cast<GPUPipelineOptionsArrayAttr>(pipelineOptionsListAttr->getValue())
+            .getValue();
+    for (GPUPipelineOptionAttr pipelineAttr : pipelineOptionsList) {
+      switch (pipelineAttr.getValue()) {
+      case GPUPipelineOption::NoReduceSharedMemoryBankConflicts:
+        pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
+        continue;
+      case GPUPipelineOption::PrefetchSharedMemory:
+        pipelineOptions.prefetchSharedMemory = true;
+        continue;
+      case GPUPipelineOption::ReorderWorkgroupsNone:
+      case GPUPipelineOption::ReorderWorkgroupsSwizzle:
+      case GPUPipelineOption::ReorderWorkgroupsTranspose:
+        pipelineOptions.reorderStrategy =
+            static_cast<ReorderWorkgroupsStrategy>(pipelineAttr.getValue());
+      }
     }
   }
 
@@ -548,14 +521,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUPipelineOptions &options) {
   StringRef reorderStr = "<not set>";
   if (options.reorderStrategy) {
-    if (options.reorderStrategy == ReorderWorkgroupsStrategy::Transpose) {
+    switch (options.reorderStrategy.value()) {
+    case ReorderWorkgroupsStrategy::ReorderWorkgroupsTranspose:
       reorderStr = "transpose";
-    } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
+      break;
+    case ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle:
       reorderStr = "swizzle";
-    } else {
-      assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
-             "Unhandled reorder option");
+      break;
+    case ReorderWorkgroupsStrategy::ReorderWorkgroupsNone:
       reorderStr = "none";
+      break;
+    default:
+      assert(false && "Unhandled reorder option");
     }
   }
 

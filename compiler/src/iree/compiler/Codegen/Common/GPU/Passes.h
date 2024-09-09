@@ -102,13 +102,12 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true);
 
 using IREE::GPU::PipelineOptions::ReorderWorkgroupsStrategy;
-using IREE::GPU::PipelineOptions::UnitPipelineOption;
-// enum class ReorderWorkgroupsStrategy { None, Swizzle, Transpose };
 
 /// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
-    ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None,
+    ReorderWorkgroupsStrategy strategy =
+        ReorderWorkgroupsStrategy::ReorderWorkgroupsNone,
     unsigned swizzleLogTile = 0,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 

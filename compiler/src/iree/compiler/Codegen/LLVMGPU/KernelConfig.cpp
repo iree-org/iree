@@ -381,10 +381,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
+    SmallVector<IREE::GPU::GPUPipelineOptionAttr> pipelineOptions;
+    pipelineOptions.push_back(IREE::GPU::GPUPipelineOptionAttr::get(
+        context,
+        IREE::GPU::PipelineOptions::GPUPipelineOption::PrefetchSharedMemory));
     attrs.emplace_back(
-        StringAttr::get(context, IREE::GPU::getPipelineOptionName(
-                                     UnitPipelineOption::PrefetchSharedMemory)),
-        UnitAttr::get(context));
+        StringAttr::get(
+            context, IREE::GPU::GPUPipelineOptionsArrayAttr::getDictKeyName()),
+        IREE::GPU::GPUPipelineOptionsArrayAttr::get(context, pipelineOptions));
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -612,10 +616,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
+    SmallVector<IREE::GPU::GPUPipelineOptionAttr> pipelineOptions;
+    pipelineOptions.push_back(IREE::GPU::GPUPipelineOptionAttr::get(
+        context,
+        IREE::GPU::PipelineOptions::GPUPipelineOption::PrefetchSharedMemory));
     attrs.emplace_back(
-        StringAttr::get(context, IREE::GPU::getPipelineOptionName(
-                                     UnitPipelineOption::PrefetchSharedMemory)),
-        UnitAttr::get(context));
+        StringAttr::get(
+            context, IREE::GPU::GPUPipelineOptionsArrayAttr::getDictKeyName()),
+        IREE::GPU::GPUPipelineOptionsArrayAttr::get(context, pipelineOptions));
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);

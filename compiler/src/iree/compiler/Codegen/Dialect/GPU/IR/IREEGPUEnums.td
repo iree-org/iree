@@ -178,25 +178,39 @@ class IREEGPU_I32PipelineEnumAttr<string name, string summary, list<I32EnumAttrC
   let genSpecializedAttr = 0;
 }
 
-def ReorderWorkgroups_None : I32EnumAttrCase<"None", 0>;
-def ReorderWorkgroups_Swizzle : I32EnumAttrCase<"Swizzle", 1>;
-def ReorderWorkgroups_Transpose : I32EnumAttrCase<"Transpose", 2>;
+// ReorderWorkgroups EnumAttrCases.
+def ReorderWorkgroupsNone : I32EnumAttrCase<"ReorderWorkgroupsNone", 0>;
+def ReorderWorkgroupsSwizzle : I32EnumAttrCase<"ReorderWorkgroupsSwizzle", 1>;
+def ReorderWorkgroupsTranspose : I32EnumAttrCase<"ReorderWorkgroupsTranspose", 2>;
 
+// EnumAttr for workgroup reordering strategy enums.
 def IREEGPU_ReorderWorkgroupsStrategy : IREEGPU_I32PipelineEnumAttr<"ReorderWorkgroupsStrategy",
     "Strategy for workgroup reordering", [
-      ReorderWorkgroups_None,
-      ReorderWorkgroups_Swizzle,
-      ReorderWorkgroups_Transpose
+      ReorderWorkgroupsNone,
+      ReorderWorkgroupsSwizzle,
+      ReorderWorkgroupsTranspose
     ]> {
 }
 
-def NoReduceSharedMemoryBankConflicts : I32EnumAttrCase<"NoReduceSharedMemoryBankConflicts", 0>;
-def PrefetchSharedMemory : I32EnumAttrCase<"PrefetchSharedMemory", 1>;
+// Other GPU pipeline option EnumAttrCases.
+def NoReduceSharedMemoryBankConflicts : I32EnumAttrCase<"NoReduceSharedMemoryBankConflicts", 3>;
+def PrefetchSharedMemory : I32EnumAttrCase<"PrefetchSharedMemory", 4>;
 
-def IREEGPU_UnitPipelineOption : IREEGPU_I32PipelineEnumAttr<"UnitPipelineOption",
-    "Pipeline options", [
-      NoReduceSharedMemoryBankConflicts,
-      PrefetchSharedMemory,
-    ]>;
+// EnumAttr for all GPU pipeline option enums.
+def IREEGPU_GPUPipelineOptionEnum : IREEGPU_I32PipelineEnumAttr<
+  "GPUPipelineOption",
+  "identifier for pass pipeline options", [
+    // ReorderWorkgroups
+    ReorderWorkgroupsNone,
+    ReorderWorkgroupsSwizzle,
+    ReorderWorkgroupsTranspose,
+
+    // Other Options
+    NoReduceSharedMemoryBankConflicts,
+    PrefetchSharedMemory
+  ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU::PipelineOptions";
+  let genSpecializedAttr = 0;
+}
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS
