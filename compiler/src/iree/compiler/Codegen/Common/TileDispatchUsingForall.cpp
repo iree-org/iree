@@ -17,7 +17,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/IR/StorageUniquerSupport.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -279,8 +278,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
-          context, ::mlir::detail::getDefaultDiagnosticEmitFn(funcOp.getLoc()),
-          deviceMappingAttribute))) {
+          context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
   tilingOptions.setMapping(deviceMappingAttribute);
