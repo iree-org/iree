@@ -536,8 +536,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  return os << "{"
-            << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts << ", "
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", reorderWorkgroupsStrategy = " << reorderStr
