@@ -27,6 +27,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
@@ -87,7 +89,6 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   GPUMMAHeuristicSeeds seeds;
   int64_t inBitWidth = lhsElemType.getIntOrFloatBitWidth();
-  int64_t cacheLineSizeBits = 1024;
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -99,12 +100,12 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
              /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ cacheLineSizeBits / inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
              /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ cacheLineSizeBits / inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
