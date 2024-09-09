@@ -45,7 +45,7 @@ static llvm::cl::opt<bool> clMemoization{
     "iree-hal-memoization",
     llvm::cl::desc(
         "Whether to memoize device resources such as command buffers."),
-    llvm::cl::init(false),
+    llvm::cl::init(true),
 };
 
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{

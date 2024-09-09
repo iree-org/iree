@@ -29,7 +29,7 @@ static llvm::cl::opt<bool> clIndirectCommandBuffers{
     "iree-hal-indirect-command-buffers",
     llvm::cl::desc("Whether to turn buffer bindings into indirect references "
                    "when recording command buffers."),
-    llvm::cl::init(false),
+    llvm::cl::init(true),
 };
 
 struct ContextResolveOpPattern
