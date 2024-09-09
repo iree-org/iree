@@ -18,7 +18,7 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 
 // CHECK-LABEL: func.func @attention
 // CHECK-SAME: %[[Q:.+]]: tensor<2x10x4096x128xf16>, %[[K:.+]]: tensor<2x10x4096x128xf16>, %[[V:.+]]: tensor<2x10x4096x128xf16>
-// CHECK-DAG: %[[ACC_INIT:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG: %[[ACC_INIT:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[MAX_INIT:.+]] = arith.constant -3.40282347E+38 : f32
 // CHECK-DAG: %[[SUM_INIT:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[ACC_FILL:.+]] = linalg.fill ins(%[[ACC_INIT]]
