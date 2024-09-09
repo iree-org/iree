@@ -296,6 +296,33 @@ func.func @scatter_update_scalar_1D(
 
 // -----
 
+func.func @scatter_update_i64_scalar_1D(
+    %original: tensor<8xi32>, %indices: tensor<3x1xi64>,
+    %updates: tensor<3xi32>) -> tensor<8xi32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi64>)
+    outs(%original : tensor<8xi32>)  {
+    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+      iree_linalg_ext.yield %arg0 : i32
+    } -> tensor<8xi32>
+  return %0 : tensor<8xi32>
+}
+// CHECK-LABEL: func.func @scatter_update_i64_scalar_1D(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @scatter_update_scalar_2D(
     %original: tensor<4x3xi32>, %indices: tensor<3x2xi32>,
     %updates: tensor<3xi32>) -> tensor<4x3xi32> {
