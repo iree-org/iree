@@ -1227,6 +1227,9 @@ LogicalResult AttentionOp::verify() {
 
   // Check if indexing maps can represent attention.
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+  if (indexingMaps.size() != getOperation()->getNumOperands()) {
+    return attnOp->emitOpError("expected an indexing map for each operand");
+  }
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
   if (failed(maybeOpInfo)) {
@@ -1261,8 +1264,8 @@ LogicalResult AttentionOp::verify() {
       }
       if (shape[pos] != valShape[i]) {
         return attnOp->emitError("Shape Mismatch for ")
-               << operandName << ". Expected: " << shape[pos]
-               << " Got: " << valShape[i];
+               << operandName << " at position " << i
+               << ". Expected: " << shape[pos] << " Got: " << valShape[i];
       }
     }
     return success();
@@ -1339,14 +1342,12 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
   auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin(),
-                                maps.begin() + getNumDpsInputs() - 1);
+  return SmallVector<AffineMap>(maps.begin(), maps.begin() + getNumDpsInputs());
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
   auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs() - 1,
-                                maps.end());
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
 }
 
 //===----------------------------------------------------------------------===//

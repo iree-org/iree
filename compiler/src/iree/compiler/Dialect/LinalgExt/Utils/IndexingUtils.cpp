@@ -84,10 +84,6 @@ void AttentionOpDetail::inferFromIndexingMaps(
 
 FailureOr<AttentionOpDetail>
 AttentionOpDetail::get(ArrayRef<AffineMap> indexingMaps) {
-  if (indexingMaps.size() < 4 || indexingMaps.size() > 7) {
-    return failure();
-  }
-
   AttentionOpDetail opInfo;
   opInfo.inferFromIndexingMaps(indexingMaps);
   opInfo.maps = SmallVector<AffineMap>(indexingMaps);
