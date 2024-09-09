@@ -456,7 +456,7 @@ void TileAttentionPass::runOnOperation() {
   if (tileSize.hasValue()) {
     optionalTileSize = tileSize.getValue();
   }
-  getOperation().walk([&](AttentionOp attnOp) {
+  getOperation()->walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
     tileAttention(attnOp, ops, rewriter, optionalTileSize);
   });
@@ -465,7 +465,7 @@ void TileAttentionPass::runOnOperation() {
 void ConvertAttentionToOnlineAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
-  getOperation().walk([&](AttentionOp attnOp) {
+  getOperation()->walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
     convertToOnlineAttention(attnOp, ops, rewriter);
   });

@@ -76,10 +76,9 @@ struct DecomposeIm2colPass final
 
 void DecomposeIm2colPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
 
   SmallVector<Im2colOp> candidates;
-  funcOp->walk([&](Im2colOp op) { candidates.push_back(op); });
+  getOperation()->walk([&](Im2colOp op) { candidates.push_back(op); });
   IRRewriter rewriter(context);
   for (auto im2colOp : candidates) {
     if (failed(decomposeIm2col(im2colOp, rewriter, unroll))) {

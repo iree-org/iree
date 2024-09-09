@@ -360,11 +360,11 @@ void DecomposeAttentionPass::runOnOperation() {
   if (tileSize.hasValue()) {
     optionalTileSize = tileSize.getValue();
   }
-  getOperation().walk([&](AttentionOp attnOp) {
+  getOperation()->walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
     decomposeTiledAttention(attnOp, ops, rewriter, optionalTileSize);
   });
-  getOperation().walk([&](OnlineAttentionOp onlineAtt) {
+  getOperation()->walk([&](OnlineAttentionOp onlineAtt) {
     rewriter.setInsertionPoint(onlineAtt);
     FailureOr<SmallVector<Value>> results =
         onlineAtt.decomposeOperation(rewriter);

@@ -9,8 +9,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgExtToLoopsPass :
-    InterfacePass<"iree-linalg-ext-to-loops", "mlir::FunctionOpInterface"> {
+def LinalgExtToLoopsPass : Pass<"iree-linalg-ext-to-loops", ""> {
   let summary = "Convert LinalgExt ops to loops and Linalg ops.";
 }
 
@@ -37,7 +36,7 @@ def PadContractionToBlockSizePass :
 }
 
 def TopkSplitReductionPass:
-    InterfacePass<"iree-linalg-ext-topk-split-reduction", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-topk-split-reduction", ""> {
   let summary = "Topk split reduction pass.";
   let description = [{
     Produces a "map-reduce" style of parallelizing a Topk Op. The op is split
@@ -50,8 +49,7 @@ def TopkSplitReductionPass:
   ];
 }
 
-def DecomposeIm2colPass :
-    InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
+def DecomposeIm2colPass : Pass<"iree-linalg-ext-decompose-im2col", ""> {
   let summary =
       "Decomposes im2col ops into insert and extract slice ops";
   let options = [
@@ -61,18 +59,18 @@ def DecomposeIm2colPass :
 }
 
 def DecomposeWinogradTransformPass :
-    InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-decompose-winograd", ""> {
   let summary =
       "Decomposes winograd transform ops into linalg ops";
 }
 
 def ConvertConv2DToIm2ColOpPass :
-    InterfacePass<"iree-linalg-ext-convert-conv2d-to-im2col-op", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-convert-conv2d-to-im2col-op", ""> {
   let summary = "Convert linalg convolution ops to im2col gemm based implementation.";
 }
 
 def ConvertConv2DToWinogradPass :
-    InterfacePass<"iree-linalg-ext-convert-conv2d-to-winograd", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
   let summary = "Convert linalg convolution ops to winograd based implementation. By default, "
                 "only convs annotated with a `__winograd_conv` attribute will be rewritten.";
   let options = [
@@ -84,7 +82,7 @@ def ConvertConv2DToWinogradPass :
 }
 
 def TileAttentionPass :
-    InterfacePass<"iree-linalg-ext-tile-attention", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-tile-attention", ""> {
   let summary =
       "Tile the attention op along the reduction dimension";
   let options = [
@@ -94,7 +92,7 @@ def TileAttentionPass :
 }
 
 def DecomposeAttentionPass :
-    InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-decompose-attention", ""> {
   let summary =
       "Decomposes attention op into a sequence of linalg ops";
   let options = [
@@ -104,8 +102,7 @@ def DecomposeAttentionPass :
 }
 
 def ConvertAttentionToOnlineAttentionPass :
-    InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
-    "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-convert-attention-to-online-attention", ""> {
   let summary = "Converts attention op to online_attention op";
 }
 

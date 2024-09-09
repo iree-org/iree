@@ -320,9 +320,9 @@ struct TopkSplitReductionPass final
     };
 
     IRRewriter rewriter(&getContext());
-    auto funcOp = getOperation();
     SmallVector<LinalgExt::TopkOp> topkCandidates;
-    funcOp->walk([&](LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
+    getOperation()->walk(
+        [&](LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
     for (auto op : topkCandidates) {
       (void)splitReduction(rewriter, op, splitReductionFn);
     }
