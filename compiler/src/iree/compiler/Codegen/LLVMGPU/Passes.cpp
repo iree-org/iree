@@ -51,14 +51,13 @@ constexpr int64_t kDefaultSubgroupSize = 32;
 static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
     "iree-codegen-reorder-workgroups-strategy",
     llvm::cl::desc("Reorder workgroup IDs using the selected strategy"),
-    llvm::cl::values(
-        clEnumValN(ReorderWorkgroupsStrategy::ReorderWorkgroupsNone, "none",
-                   "No workgroup reordering"),
-        clEnumValN(ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle,
-                   "swizzle", "Swizzle"),
-        clEnumValN(ReorderWorkgroupsStrategy::ReorderWorkgroupsTranspose,
-                   "transpose", "Transpose")),
-    llvm::cl::init(ReorderWorkgroupsStrategy::ReorderWorkgroupsNone));
+    llvm::cl::values(clEnumValN(ReorderWorkgroupsStrategy::None, "none",
+                                "No workgroup reordering"),
+                     clEnumValN(ReorderWorkgroupsStrategy::Swizzle, "swizzle",
+                                "Swizzle"),
+                     clEnumValN(ReorderWorkgroupsStrategy::Transpose,
+                                "transpose", "Transpose")),
+    llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
 static llvm::cl::opt<unsigned> clReorderWorkgroupsLogSwizzleTile(
     "iree-codegen-reorder-workgroups-log-swizzle-tile",

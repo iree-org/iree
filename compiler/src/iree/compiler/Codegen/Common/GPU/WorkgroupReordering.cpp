@@ -113,7 +113,7 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
 static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
                                              ReorderWorkgroupsStrategy strategy,
                                              unsigned swizzleLogTile) {
-  assert(strategy != ReorderWorkgroupsStrategy::ReorderWorkgroupsNone &&
+  assert(strategy != ReorderWorkgroupsStrategy::None &&
          "Expected a concrete strategy");
 
   unsigned swizzleTile = 1u << swizzleLogTile;
@@ -150,12 +150,12 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
-  if (strategy == ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle) {
+  if (strategy == ReorderWorkgroupsStrategy::Swizzle) {
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                         workgroupCntX, workgroupCntY, swizzleTile);
   } else {
-    assert(strategy == ReorderWorkgroupsStrategy::ReorderWorkgroupsTranspose &&
+    assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
            "Unhandled strategy");
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeTransposedIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
@@ -178,9 +178,8 @@ LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
   if (swizzleLogTile == 0)
     return success();
 
-  return reorderWorkgroupsInFunc(
-      funcOp, ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle,
-      swizzleLogTile);
+  return reorderWorkgroupsInFunc(funcOp, ReorderWorkgroupsStrategy::Swizzle,
+                                 swizzleLogTile);
 }
 
 namespace {
@@ -201,11 +200,9 @@ struct ReorderWorkgroupsPass final
     logSwizzleTile = logTile;
     auto selectedStrategy =
         llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
-            .Case("", ReorderWorkgroupsStrategy::ReorderWorkgroupsNone)
-            .Case("swizzle",
-                  ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle)
-            .Case("transpose",
-                  ReorderWorkgroupsStrategy::ReorderWorkgroupsTranspose)
+            .Case("", ReorderWorkgroupsStrategy::None)
+            .Case("swizzle", ReorderWorkgroupsStrategy::Swizzle)
+            .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
             .Default(failure());
     if (failed(selectedStrategy))
       return failure();
@@ -215,11 +212,10 @@ struct ReorderWorkgroupsPass final
   }
 
   void runOnOperation() override {
-    if (reorderingStrategy == ReorderWorkgroupsStrategy::ReorderWorkgroupsNone)
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::None)
       return;
 
-    if (reorderingStrategy ==
-            ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle &&
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
         logSwizzleTile == 0)
       return;
 
@@ -247,7 +243,7 @@ struct ReorderWorkgroupsPass final
 
 private:
   ReorderWorkgroupsStrategy reorderingStrategy =
-      ReorderWorkgroupsStrategy::ReorderWorkgroupsNone;
+      ReorderWorkgroupsStrategy::None;
   unsigned logSwizzleTile = 0;
   std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn;
 };

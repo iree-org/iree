@@ -1356,11 +1356,19 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
 
-GPUPipelineOptionsArrayAttr
-GPUPipelineOptionsArrayAttr::addOption(GPUPipelineOptionAttr optionAttr) {
-  SmallVector<GPUPipelineOptionAttr> optionAttrs(getValue());
-  optionAttrs.push_back(optionAttr);
-  return GPUPipelineOptionsArrayAttr::get(getContext(), optionAttrs);
+GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
+    MLIRContext *context, bool prefetchSharedMemory,
+    bool noReduceSharedMemoryBankConflicts,
+    std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
+  auto strategyAttr = ReorderWorkgroupsStrategyAttr();
+  if (reorderWorkgroupsStrategy.has_value()) {
+    strategyAttr = ReorderWorkgroupsStrategyAttr::get(
+        context, reorderWorkgroupsStrategy.value());
+  }
+  Builder b(context);
+  return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
+                   b.getBoolAttr(noReduceSharedMemoryBankConflicts),
+                   strategyAttr);
 }
 
 //===----------------------------------------------------------------------===//

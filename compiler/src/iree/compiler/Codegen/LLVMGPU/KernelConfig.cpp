@@ -381,14 +381,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
-    SmallVector<IREE::GPU::GPUPipelineOptionAttr> pipelineOptions;
-    pipelineOptions.push_back(IREE::GPU::GPUPipelineOptionAttr::get(
-        context,
-        IREE::GPU::PipelineOptions::GPUPipelineOption::PrefetchSharedMemory));
+    auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+        context, /*prefetchSharedMemory=*/true,
+        /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*reorder_workgroups_strategy=*/std::nullopt);
     attrs.emplace_back(
-        StringAttr::get(
-            context, IREE::GPU::GPUPipelineOptionsArrayAttr::getDictKeyName()),
-        IREE::GPU::GPUPipelineOptionsArrayAttr::get(context, pipelineOptions));
+        StringAttr::get(context,
+                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -616,14 +616,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
-    SmallVector<IREE::GPU::GPUPipelineOptionAttr> pipelineOptions;
-    pipelineOptions.push_back(IREE::GPU::GPUPipelineOptionAttr::get(
-        context,
-        IREE::GPU::PipelineOptions::GPUPipelineOption::PrefetchSharedMemory));
+    auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+        context, /*prefetchSharedMemory=*/true,
+        /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*reorder_workgroups_strategy=*/std::nullopt);
     attrs.emplace_back(
-        StringAttr::get(
-            context, IREE::GPU::GPUPipelineOptionsArrayAttr::getDictKeyName()),
-        IREE::GPU::GPUPipelineOptionsArrayAttr::get(context, pipelineOptions));
+        StringAttr::get(context,
+                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);

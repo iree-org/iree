@@ -484,29 +484,28 @@ getPipelineOptions(FunctionOpInterface funcOp,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
   if (DictionaryAttr config = translationInfo.getConfiguration()) {
-
-    std::optional<NamedAttribute> pipelineOptionsListAttr =
-        config.getNamed(GPUPipelineOptionsArrayAttr::getDictKeyName());
-    if (!pipelineOptionsListAttr.has_value()) {
+    std::optional<NamedAttribute> maybePipelineOptionsAttr =
+        config.getNamed(GPUPipelineOptionsAttr::getDictKeyName());
+    if (!maybePipelineOptionsAttr.has_value()) {
       return pipelineOptions;
     }
-    ArrayRef<GPUPipelineOptionAttr> pipelineOptionsList =
-        cast<GPUPipelineOptionsArrayAttr>(pipelineOptionsListAttr->getValue())
-            .getValue();
-    for (GPUPipelineOptionAttr pipelineAttr : pipelineOptionsList) {
-      switch (pipelineAttr.getValue()) {
-      case GPUPipelineOption::NoReduceSharedMemoryBankConflicts:
-        pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
-        continue;
-      case GPUPipelineOption::PrefetchSharedMemory:
-        pipelineOptions.prefetchSharedMemory = true;
-        continue;
-      case GPUPipelineOption::ReorderWorkgroupsNone:
-      case GPUPipelineOption::ReorderWorkgroupsSwizzle:
-      case GPUPipelineOption::ReorderWorkgroupsTranspose:
-        pipelineOptions.reorderStrategy =
-            static_cast<ReorderWorkgroupsStrategy>(pipelineAttr.getValue());
-      }
+    auto pipelineOptionsAttr =
+        cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
+    BoolAttr prefetchSharedMemory =
+        pipelineOptionsAttr.getPrefetchSharedMemory();
+    if (prefetchSharedMemory) {
+      pipelineOptions.prefetchSharedMemory = prefetchSharedMemory.getValue();
+    }
+    BoolAttr noReduceBankConflicts =
+        pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
+    if (noReduceBankConflicts) {
+      pipelineOptions.enableReduceSharedMemoryBankConflicts =
+          !noReduceBankConflicts.getValue();
+    }
+    ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
+        pipelineOptionsAttr.getReorderWorkgroupsStrategy();
+    if (reorderWorkgroupsStrategy) {
+      pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
     }
   }
 
@@ -522,13 +521,13 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   StringRef reorderStr = "<not set>";
   if (options.reorderStrategy) {
     switch (options.reorderStrategy.value()) {
-    case ReorderWorkgroupsStrategy::ReorderWorkgroupsTranspose:
+    case ReorderWorkgroupsStrategy::Transpose:
       reorderStr = "transpose";
       break;
-    case ReorderWorkgroupsStrategy::ReorderWorkgroupsSwizzle:
+    case ReorderWorkgroupsStrategy::Swizzle:
       reorderStr = "swizzle";
       break;
-    case ReorderWorkgroupsStrategy::ReorderWorkgroupsNone:
+    case ReorderWorkgroupsStrategy::None:
       reorderStr = "none";
       break;
     default:

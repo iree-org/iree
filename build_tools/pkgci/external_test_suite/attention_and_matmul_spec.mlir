@@ -637,7 +637,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>}>
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -657,7 +657,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
               subgroup_m_count = 1, subgroup_n_count = 4>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>,
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>,
            llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
@@ -678,7 +678,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>}>
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -698,7 +698,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>}>
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -718,7 +718,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 4, subgroup_n_count = 2>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>,
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>,
            llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
@@ -739,7 +739,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
               subgroup_m_count = 1, subgroup_n_count = 5>,
-           gpu_pipeline_options = #iree_gpu<gpu_pipeline_options[ReorderWorkgroupsTranspose]>}>
+           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }

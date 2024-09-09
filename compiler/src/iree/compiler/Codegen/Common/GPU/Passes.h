@@ -101,13 +101,12 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true);
 
-using IREE::GPU::PipelineOptions::ReorderWorkgroupsStrategy;
+using IREE::GPU::ReorderWorkgroupsStrategy;
 
 /// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
-    ReorderWorkgroupsStrategy strategy =
-        ReorderWorkgroupsStrategy::ReorderWorkgroupsNone,
+    ReorderWorkgroupsStrategy strategy = ReorderWorkgroupsStrategy::None,
     unsigned swizzleLogTile = 0,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 
