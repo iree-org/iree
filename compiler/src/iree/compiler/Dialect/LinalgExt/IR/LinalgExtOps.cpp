@@ -1200,14 +1200,20 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
-void AttentionOp::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ::mlir::TypeRange results, ::mlir::Value query, ::mlir::Value key, ::mlir::Value value, ::mlir::Value scale, ::mlir::ValueRange outputs, ::mlir::ArrayAttr indexing_maps, std::optional<::mlir::Value> mask) {
+void AttentionOp::build(::mlir::OpBuilder &odsBuilder,
+                        ::mlir::OperationState &odsState,
+                        ::mlir::TypeRange results, ::mlir::Value query,
+                        ::mlir::Value key, ::mlir::Value value,
+                        ::mlir::Value scale, ::mlir::ValueRange outputs,
+                        ::mlir::ArrayAttr indexing_maps,
+                        std::optional<::mlir::Value> mask) {
   Value mask_in;
   if (mask.has_value()) {
     mask_in = mask.value();
   }
-  build(odsBuilder, odsState, results, query, key, value, scale, mask_in, outputs, indexing_maps);
+  build(odsBuilder, odsState, results, query, key, value, scale, mask_in,
+        outputs, indexing_maps);
 }
-
 
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
@@ -1347,8 +1353,16 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
-void OnlineAttentionOp::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ::mlir::TypeRange results, ::mlir::Value query, ::mlir::Value key, ::mlir::Value value, ::mlir::Value scale, ::mlir::Value output, ::mlir::Value max, ::mlir::Value sum, ::mlir::ArrayAttr indexing_maps, std::optional<::mlir::Value> mask) {
-  build(odsBuilder, odsState, results, query, key, value, *mask ? *mask : Value(), scale, output, max, sum, indexing_maps);
+void OnlineAttentionOp::build(::mlir::OpBuilder &odsBuilder,
+                              ::mlir::OperationState &odsState,
+                              ::mlir::TypeRange results, ::mlir::Value query,
+                              ::mlir::Value key, ::mlir::Value value,
+                              ::mlir::Value scale, ::mlir::Value output,
+                              ::mlir::Value max, ::mlir::Value sum,
+                              ::mlir::ArrayAttr indexing_maps,
+                              std::optional<::mlir::Value> mask) {
+  build(odsBuilder, odsState, results, query, key, value,
+        *mask ? *mask : Value(), scale, output, max, sum, indexing_maps);
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -1406,7 +1420,8 @@ LogicalResult OnlineAttentionOp::verify() {
 }
 
 MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4, /*numInits=*/3);
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+                             /*numInits=*/3);
 }
 
 LogicalResult OnlineAttentionOp::reifyResultShapes(
