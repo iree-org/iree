@@ -10,7 +10,9 @@
 #include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Dominance.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -95,6 +97,25 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     }
   }
   return true;
+}
+
+// Returns true when an operation `op` is horizontal to `currGroup` when
+// considering the program slice between `seedOp` and `op`.
+bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
+                         const DominanceInfo &dominanceInfo,
+                         Operation *seedOp) {
+  assert(dominanceInfo.properlyDominates(seedOp, op) &&
+         op->getParentRegion() == seedOp->getParentRegion());
+  BackwardSliceOptions options;
+  // Limit the slice to the seed to make sure the slice is small.
+  options.filter = [&](Operation *op) {
+    return !dominanceInfo.properlyDominates(op, seedOp);
+  };
+  llvm::SetVector<Operation *> slice;
+  getBackwardSlice(op, &slice, options);
+  return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
+    return slice.contains(groupedOp);
+  });
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation
