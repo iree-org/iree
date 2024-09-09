@@ -244,8 +244,13 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 
   const uint64_t kTotalTileCount =
       llvm::divideCeil(problem.kSize, intrinsic.kSize);
-  APInt kGCD = GreatestCommonDivisor(
-      APInt(64, kTotalTileCount), APInt(64, seeds.bestKTileCountPerSubgroup));
+  int64_t bestKTileCountPerSubgroup =
+      seeds.bestKElementCountPerSubgroup
+          ? llvm::divideCeil(seeds.bestKElementCountPerSubgroup,
+                             intrinsic.kSize)
+          : seeds.bestKTileCountPerSubgroup;
+  APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCount),
+                                     APInt(64, bestKTileCountPerSubgroup));
   int64_t kTileCount = kGCD.getSExtValue();
 
   return GPUMMASchedule{intrinsicIndex,  intrinsic.mSize, intrinsic.nSize,
