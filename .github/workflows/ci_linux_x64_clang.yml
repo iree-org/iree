@@ -29,12 +29,17 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     runs-on: azure-linux-scale
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:ba10d33ef502d8b33aaa43800e640a6866983ef353b73fda2ed6595c4275e066
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:2b2ad51d7de988be13086bc618d89d2ba47fbf09eb5b38c60dce82b595fb1c74
     defaults:
       run:
         shell: bash
     env:
       BUILD_DIR: build
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
@@ -54,12 +59,17 @@ jobs:
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
             -DIREE_BUILD_DOCS=ON \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
       - name: CMake - build
         run: |
+          sccache --zero-stats
+          sccache --show-stats
           cmake --build ${BUILD_DIR} -- -k 0
           cmake --build ${BUILD_DIR} --target install -- -k 0
           cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
+          sccache --show-stats
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: Test iree-dialects
