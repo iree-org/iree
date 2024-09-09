@@ -395,8 +395,9 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value rowRedEmpty =
       rewriter.create<tensor::EmptyOp>(loc, rowRedSize, f32Type);
 
-  Value accInit = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(attnOp.getOutputType().getElementType()));
+  Value accInit =
+      arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type, rewriter,
+                              loc, /*useOnlyFiniteValue=*/true);
   Value maxInit =
       arith::getIdentityValue(arith::AtomicRMWKind::maximumf, f32Type, rewriter,
                               loc, /*useOnlyFiniteValue=*/true);
