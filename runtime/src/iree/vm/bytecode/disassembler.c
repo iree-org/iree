@@ -173,7 +173,8 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
   }
 }
 #define EMIT_TYPE_NAME(type_def) \
-  iree_vm_bytecode_disassembler_emit_type_name(type_def, b);
+  IREE_RETURN_IF_ERROR(          \
+      iree_vm_bytecode_disassembler_emit_type_name(type_def, b))
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
     const iree_vm_registers_t* regs, const iree_vm_register_list_t* list,
@@ -194,8 +195,9 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
   }
   return iree_ok_status();
 }
-#define EMIT_OPERAND_REG_LIST(reg_list) \
-  iree_vm_bytecode_disassembler_emit_operand_list(regs, reg_list, format, b)
+#define EMIT_OPERAND_REG_LIST(reg_list)                                 \
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_operand_list( \
+      regs, reg_list, format, b))
 static iree_status_t iree_vm_bytecode_disassembler_emit_result_list(
     const iree_vm_register_list_t* list,
     iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
@@ -209,7 +211,8 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_result_list(
   return iree_ok_status();
 }
 #define EMIT_RESULT_REG_LIST(reg_list) \
-  iree_vm_bytecode_disassembler_emit_result_list(reg_list, format, b)
+  IREE_RETURN_IF_ERROR(                \
+      iree_vm_bytecode_disassembler_emit_result_list(reg_list, format, b))
 static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     const iree_vm_registers_t* regs,
     const iree_vm_register_remap_list_t* remap_list,
@@ -231,8 +234,9 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
   }
   return iree_ok_status();
 }
-#define EMIT_REMAP_LIST(remap_list) \
-  iree_vm_bytecode_disassembler_emit_remap_list(regs, remap_list, format, b)
+#define EMIT_REMAP_LIST(remap_list)                                   \
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_remap_list( \
+      regs, remap_list, format, b))
 
 #define EMIT_OPTIONAL_VALUE_I32(expr)                                          \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) {  \
@@ -2742,16 +2746,20 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
   if (iree_status_is_ok(status)) {
     iree_string_view_t module_name =
         iree_vm_module_name(frame->function.module);
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-        &b, "[%.*s", (int)module_name.size, module_name.data));
+    status = iree_string_builder_append_format(
+        &b, "[%.*s", (int)module_name.size, module_name.data);
+  }
+  if (iree_status_is_ok(status)) {
     iree_string_view_t function_name = iree_vm_function_name(&frame->function);
     if (iree_string_view_is_empty(function_name)) {
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          &b, "@%u", (uint32_t)frame->function.ordinal));
+      status = iree_string_builder_append_format(
+          &b, "@%u", (uint32_t)frame->function.ordinal);
     } else {
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          &b, ".%.*s", (int)function_name.size, function_name.data));
+      status = iree_string_builder_append_format(
+          &b, ".%.*s", (int)function_name.size, function_name.data);
     }
+  }
+  if (iree_status_is_ok(status)) {
     status = iree_string_builder_append_format(&b, "+%08" PRIX64 "]    ", pc);
   }
 
@@ -2766,6 +2774,8 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
   if (iree_status_is_ok(status)) {
     fprintf(file, "%.*s\n", (int)iree_string_builder_size(&b),
             iree_string_builder_buffer(&b));
+  } else {
+    fprintf(file, "<<disassembly failed>>\n");
   }
 
   iree_string_builder_deinitialize(&b);
