@@ -140,10 +140,10 @@ public:
       : promoteSharedMemPattern(promoteSharedMemPattern) {}
 
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
+    Operation *rootOp = getOperation();
 
     SmallVector<Operation *> opsToPromote;
-    funcOp.walk([&](Operation *op) {
+    rootOp->walk([&](Operation *op) {
       switch (promoteSharedMemPattern) {
       case GPUPromoteSharedMemPattern::ContractionOpPattern:
         if (contractOpFilter(op))
@@ -191,7 +191,7 @@ public:
 
     LLVM_DEBUG({
       llvm::dbgs() << "// --- After promotion ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      rootOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
 
@@ -202,7 +202,7 @@ public:
       MLIRContext *context = &getContext();
       RewritePatternSet patterns(context);
       patterns.add<SwapAllocTensorPattern>(context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -211,7 +211,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+std::unique_ptr<Pass>
 createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern) {
   return std::make_unique<GPUTensorAllocPass>(promoteSharedMemPattern);
 }

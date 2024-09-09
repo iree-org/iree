@@ -201,34 +201,34 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
 }
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
-  auto funcOp = getOperation();
-  linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
-  IRRewriter rewriter(funcOp->getContext());
+  Operation *rootOp = getOperation();
+  linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(rootOp));
+  IRRewriter rewriter(rootOp->getContext());
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
-  funcOp.walk(
+  rootOp->walk(
       [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
-  LDBG("after hoisting loop invariant subsets\n" << funcOp);
+  LDBG("after hoisting loop invariant subsets\n" << rootOp);
 
-  funcOp.walk([&](scf::ForOp forOp) {
+  rootOp->walk([&](scf::ForOp forOp) {
     hoistSubsetWithLoopInvariantTensor(rewriter, forOp);
   });
-  LDBG("after hoisting subset loop invariant tensors" << funcOp);
-  vector::transferOpflowOpt(rewriter, funcOp);
+  LDBG("after hoisting subset loop invariant tensors" << rootOp);
+  vector::transferOpflowOpt(rewriter, rootOp);
   MLIRContext *context = &getContext();
 
-  LDBG("after hoisting redundant transfers on tensors\n" << funcOp);
+  LDBG("after hoisting redundant transfers on tensors\n" << rootOp);
 
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 
   LDBG("after folding tensor.extract_slice and vector.transfer_read Ops \n"
-       << funcOp);
+       << rootOp);
 }
 
 } // namespace

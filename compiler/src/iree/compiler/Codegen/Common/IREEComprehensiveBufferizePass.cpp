@@ -166,27 +166,27 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 }
 
 void EliminateEmptyTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  Operation *rootOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Run the convert to destination style patterns.
   {
     RewritePatternSet patterns(context);
     linalg::populateConvertToDestinationStylePatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp->emitOpError("Failed in conversion to destination style patterns");
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
+      rootOp->emitOpError("Failed in conversion to destination style patterns");
       return signalPassFailure();
     }
   }
 
-  IRRewriter rewriter(funcOp->getContext());
+  IRRewriter rewriter(rootOp->getContext());
   auto bufferizationOptions = getBufferizationOptions();
-  OneShotAnalysisState state(funcOp, bufferizationOptions);
+  OneShotAnalysisState state(rootOp, bufferizationOptions);
   // Analyze IR.
-  if (failed(analyzeOp(funcOp, state)))
+  if (failed(analyzeOp(rootOp, state)))
     return signalPassFailure();
   // Eliminate empty tensors.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, rootOp, state)))
     return signalPassFailure();
 }
 
@@ -205,7 +205,7 @@ runIREEOneShotBufferize(Operation *op,
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
-  auto funcOp = getOperation();
+  Operation *rootOp = getOperation();
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
@@ -217,7 +217,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
-  if (failed(runIREEOneShotBufferize(funcOp, options))) {
+  if (failed(runIREEOneShotBufferize(rootOp, options))) {
     return signalPassFailure();
   }
 
@@ -225,14 +225,13 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   {
     RewritePatternSet patterns(&getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createIREEComprehensiveBufferizePass(
+std::unique_ptr<Pass> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   if (!allocationFn)

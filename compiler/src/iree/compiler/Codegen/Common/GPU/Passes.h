@@ -93,7 +93,7 @@ createGPUCheckResourceUsagePass(
 
 // Creates a pass to create allocations for some tensor values to use GPU
 // shared memory.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+std::unique_ptr<Pass>
 createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
                          GPUPromoteSharedMemPattern::ContractionOpPattern);
 

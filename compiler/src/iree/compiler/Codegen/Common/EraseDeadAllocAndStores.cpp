@@ -32,9 +32,9 @@ public:
 };
 
 void EraseDeadAllocAndStoresPass::runOnOperation() {
-  auto funcOp = getOperation();
+  Operation *rootOp = getOperation();
   IRRewriter rewriter(&getContext());
-  memref::eraseDeadAllocAndStores(rewriter, funcOp);
+  memref::eraseDeadAllocAndStores(rewriter, rootOp);
 }
 
 } // namespace

@@ -61,12 +61,11 @@ def GPUDistributeScfForPass :
 }
 
 def GPUGeneralizeNamedOpsPass :
-    InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-gpu-generalize-named-ops", ""> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
 }
 
-def GPUInferMemorySpacePass :
-    InterfacePass<"iree-codegen-gpu-infer-memory-space", "mlir::FunctionOpInterface"> {
+def GPUInferMemorySpacePass : Pass<"iree-codegen-gpu-infer-memory-space", ""> {
   let summary = "Pass to infer and set the memory space for all alloc_tensor ops.";
   let dependentDialects = [
     "::mlir::gpu::GPUDialect"
@@ -93,8 +92,7 @@ def GPUMultiBufferingPass :
   ];
 }
 
-def GPUPipeliningPass :
-    InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
+def GPUPipeliningPass : Pass<"iree-codegen-gpu-pipelining", ""> {
   let summary = "Pass to do software pipelining.";
   let options = [
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
@@ -115,8 +113,7 @@ def GPUPipeliningPass :
 }
 
 def GPUPromoteMatmulOperandsPass :
-    InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
-                  "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-gpu-promote-matmul-operands", ""> {
   let summary = "Pass to insert copies with a different thread configuration "
                 "on matmul operands";
   let dependentDialects = [
@@ -143,8 +140,7 @@ def GPUReuseSharedMemoryAllocsPass :
   ];
 }
 
-def GPUTensorAllocPass :
-    InterfacePass<"iree-codegen-gpu-tensor-alloc", "mlir::FunctionOpInterface"> {
+def GPUTensorAllocPass : Pass<"iree-codegen-gpu-tensor-alloc", ""> {
   let summary = "Pass to create allocations for some tensor values to use"
                 "GPU shared memory";
   let constructor = "mlir::iree_compiler::createGPUTensorAlloc()";
@@ -164,8 +160,7 @@ def GPUTensorTilePass :
   ];
 }
 
-def GPUApplyTilingLevelPass :
-    InterfacePass<"iree-codegen-gpu-apply-tiling-level", "mlir::FunctionOpInterface"> {
+def GPUApplyTilingLevelPass : Pass<"iree-codegen-gpu-apply-tiling-level", ""> {
   let summary = "Pass to tile tensor ops based on tiling configs";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
@@ -187,7 +182,8 @@ def GPUApplyTilingLevelPass :
 }
 
 def GPUTensorTileToSerialLoopsPass :
-    InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops",
+                  "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
   let dependentDialects = ["::mlir::scf::SCFDialect"];
   let options = [
@@ -206,13 +202,11 @@ def GPUTileReductionPass :
   let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
-def GPUVerifyDistributionPass :
-    InterfacePass<"iree-codegen-gpu-verify-distribution", "mlir::FunctionOpInterface"> {
+def GPUVerifyDistributionPass : Pass<"iree-codegen-gpu-verify-distribution", ""> {
   let summary = "Pass to verify writes before resolving distributed contexts.";
 }
 
-def GPUVectorAllocPass :
-    InterfacePass<"iree-codegen-gpu-vector-alloc", "mlir::FunctionOpInterface"> {
+def GPUVectorAllocPass : Pass<"iree-codegen-gpu-vector-alloc", ""> {
   let summary = "Pass to create allocations for contraction inputs to copy "
                 "to GPU shared memory";
   let dependentDialects = [

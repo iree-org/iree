@@ -20,12 +20,12 @@ struct FuseTensorPadWithConsumerPass final
     : impl::FuseTensorPadWithConsumerPassBase<FuseTensorPadWithConsumerPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    Operation *rootOp = getOperation();
 
     RewritePatternSet patterns(context);
     patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
         context, [](tensor::ExtractSliceOp) { return false; });
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

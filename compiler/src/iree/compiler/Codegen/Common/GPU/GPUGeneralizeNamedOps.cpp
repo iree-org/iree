@@ -51,9 +51,8 @@ namespace {
 struct GPUGeneralizeNamedOpsPass final
     : impl::GPUGeneralizeNamedOpsPassBase<GPUGeneralizeNamedOpsPass> {
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
     SmallVector<linalg::LinalgOp> namedOpCandidates;
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    getOperation()->walk([&](linalg::LinalgOp linalgOp) {
       if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
               linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
         namedOpCandidates.push_back(linalgOp);

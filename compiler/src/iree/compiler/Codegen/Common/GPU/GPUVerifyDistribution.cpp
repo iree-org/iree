@@ -28,9 +28,9 @@ struct GPUVerifyDistributionPass final
     : impl::GPUVerifyDistributionPassBase<GPUVerifyDistributionPass> {
 
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
+    Operation *rootOp = getOperation();
 
-    WalkResult res = funcOp.walk([](Operation *op) {
+    WalkResult res = rootOp->walk([](Operation *op) {
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         std::optional<ArrayAttr> mapping = forallOp.getMapping();
         if (!mapping || mapping.value().empty()) {

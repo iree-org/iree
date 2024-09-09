@@ -32,7 +32,7 @@ struct MaterializeEncodingIntoNopPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto operation = getOperation();
+    Operation *operation = getOperation();
 
     auto materializeEncodingFn = [](RankedTensorType,
                                     IREE::HAL::ExecutableTargetAttr)
@@ -53,7 +53,7 @@ struct MaterializeEncodingIntoNopPass final
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
-      operation.emitOpError("materialization failed");
+      operation->emitOpError("materialization failed");
       return signalPassFailure();
     }
 
@@ -65,7 +65,7 @@ struct MaterializeEncodingIntoNopPass final
           ->getCanonicalizationPatterns(patterns);
       if (failed(
               applyPatternsAndFoldGreedily(operation, std::move(patterns)))) {
-        operation.emitOpError("folding patterns failed");
+        operation->emitOpError("folding patterns failed");
         return signalPassFailure();
       }
     }

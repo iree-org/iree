@@ -83,15 +83,15 @@ struct DecomposePackUnPackOpsPass final
 
 void DecomposePackUnPackOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  Operation *rootOp = getOperation();
   // Generalization patterns for outer unit dims have higher priority because
   // they do not generate reshape ops.
   {
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitError(
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
+      rootOp->emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "outer unit dims cases");
       return signalPassFailure();
@@ -103,8 +103,8 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   if (!tileOuterToOne) {
     RewritePatternSet patterns(ctx);
     patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitError(
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
+      rootOp->emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "general cases.");
       return signalPassFailure();
@@ -135,7 +135,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
                                                   builder.getIndexAttr(1));
               return tileSizes;
             }));
-    funcOp->walk([&](tensor::PackOp op) {
+    rootOp->walk([&](tensor::PackOp op) {
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
           scf::tileConsumerAndFuseProducersUsingSCF(
               rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
@@ -160,7 +160,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               }
               return tileSizes;
             });
-    funcOp->walk([&](tensor::UnPackOp op) {
+    rootOp->walk([&](tensor::UnPackOp op) {
       FailureOr<scf::SCFTilingResult> tilingResult =
           scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
                             unpackTilingOptions);
@@ -172,7 +172,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     LLVM_DEBUG({
       llvm::dbgs()
           << "--- After applying tiling that makes outer dims be all 1s ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      rootOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
   }
@@ -184,14 +184,14 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- After canonicalizing tiled ops ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    rootOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -199,14 +199,13 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
+std::unique_ptr<Pass> createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
   return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }
 

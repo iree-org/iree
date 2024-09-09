@@ -59,8 +59,7 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen);
 
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne);
+std::unique_ptr<Pass> createDecomposePackUnPackOpsPass(bool tileOuterToOne);
 
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
@@ -72,8 +71,7 @@ std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 /// is specified, the default allocator generates an `std.alloc` instruction
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createIREEComprehensiveBufferizePass(
+std::unique_ptr<Pass> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn);
 

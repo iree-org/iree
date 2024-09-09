@@ -191,23 +191,23 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 }
 
 void GPUApplyTilingLevelPass::runOnOperation() {
-  FunctionOpInterface funcOp = getOperation();
+  Operation *rootOp = getOperation();
 
   if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
       tilingLevel != IREE::GPU::TilingLevel::Thread &&
       tilingLevel != IREE::GPU::TilingLevel::Subgroup) {
-    funcOp.emitError() << "unsupported tiling level: "
-                       << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
+    rootOp->emitError() << "unsupported tiling level: "
+                        << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
     return signalPassFailure();
   }
 
   llvm::SmallDenseSet<TilingInterface> targetOps =
-      getTiledOps(funcOp, tilingLevel);
+      getTiledOps(rootOp, tilingLevel);
 
-  IRRewriter rewriter(funcOp);
+  IRRewriter rewriter(rootOp);
   if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel))) {
-    funcOp.emitError() << "tiling of level "
-                       << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
+    rootOp->emitError() << "tiling of level "
+                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
   }
 
@@ -223,8 +223,8 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
     scf::ForOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitError() << "tiling cleanup failed\n";
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
+      rootOp->emitError() << "tiling cleanup failed\n";
       return signalPassFailure();
     }
   }

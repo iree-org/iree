@@ -11,13 +11,11 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
@@ -99,10 +97,9 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
 struct GPUVectorAllocPass final
     : impl::GPUVectorAllocPassBase<GPUVectorAllocPass> {
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
 
     SmallVector<IREE::VectorExt::ToLayoutOp> opsToPromote;
-    funcOp.walk([&](IREE::VectorExt::ToLayoutOp op) {
+    getOperation()->walk([&](IREE::VectorExt::ToLayoutOp op) {
       if (op.getSharedMemoryConversion()) {
         opsToPromote.push_back(op);
       }

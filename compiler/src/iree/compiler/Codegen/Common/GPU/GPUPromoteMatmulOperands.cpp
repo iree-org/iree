@@ -95,10 +95,10 @@ bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
 struct GPUPromoteMatmulOperandsPass final
     : impl::GPUPromoteMatmulOperandsPassBase<GPUPromoteMatmulOperandsPass> {
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
+    Operation *rootOp = getOperation();
 
-    OpBuilder builder(funcOp);
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    OpBuilder builder(rootOp);
+    rootOp->walk([&](linalg::LinalgOp linalgOp) {
       if (!isNonMatvecContraction(linalgOp)) {
         return;
       }

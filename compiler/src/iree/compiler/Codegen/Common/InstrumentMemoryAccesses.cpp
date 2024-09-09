@@ -26,7 +26,7 @@ struct InstrumentMemoryAccessesPass
     // Lookup the root instrumentation op. If not present it means the dispatch
     // is not instrumented and we can skip it.
     IREE::HAL::InstrumentWorkgroupOp instrumentOp;
-    getOperation().walk([&](IREE::HAL::InstrumentWorkgroupOp op) {
+    getOperation()->walk([&](IREE::HAL::InstrumentWorkgroupOp op) {
       instrumentOp = op;
       return WalkResult::interrupt();
     });

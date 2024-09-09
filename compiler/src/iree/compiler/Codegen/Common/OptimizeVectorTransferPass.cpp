@@ -53,11 +53,11 @@ public:
   }
 };
 
-static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
+static void loopInvariantCodeMotion(Operation *rootOp) {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
-  funcOp.walk(
+  rootOp->walk(
       [&](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
 }
 
@@ -67,8 +67,8 @@ struct OptimizeVectorTransferPass final
       OptimizeVectorTransferPass>::OptimizeVectorTransferPassBase;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    LDBG("before optimize vector transfer\n" << funcOp);
+    Operation *rootOp = getOperation();
+    LDBG("before optimize vector transfer\n" << rootOp);
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
@@ -80,48 +80,48 @@ struct OptimizeVectorTransferPass final
       mlir::vector::
           populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
               patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    LDBG("after dropping leading unit dims\n" << funcOp);
+    LDBG("after dropping leading unit dims\n" << rootOp);
 
     // Workaround, run loop invariant code motion before hoist redundant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
-    loopInvariantCodeMotion(funcOp);
-    linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
-    IRRewriter rewriter(funcOp->getContext());
-    vector::transferOpflowOpt(rewriter, funcOp);
+    loopInvariantCodeMotion(rootOp);
+    linalg::hoistRedundantVectorTransfers(rootOp);
+    IRRewriter rewriter(rootOp->getContext());
+    vector::transferOpflowOpt(rewriter, rootOp);
 
-    LDBG("after folding redundant vector transfers\n" << funcOp);
+    LDBG("after folding redundant vector transfers\n" << rootOp);
 
     // Move bitcast inwards from loop region boundaries to increase chances to
     // cancel them.
     {
       RewritePatternSet patterns(&getContext());
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    LDBG("after bubbling vector bitcasts\n" << funcOp);
+    LDBG("after bubbling vector bitcasts\n" << rootOp);
 
     // Second stage of patterns to flatten transfer ops.
     if (flatten) {
       RewritePatternSet patterns(&getContext());
       mlir::vector::populateFlattenVectorTransferPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
-    LDBG("after flattening vector transfers\n" << funcOp);
+    LDBG("after flattening vector transfers\n" << rootOp);
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
-    memref::eraseDeadAllocAndStores(rewriter, funcOp);
-    LDBG("after erasing unused allocs and stores\n" << funcOp);
+    memref::eraseDeadAllocAndStores(rewriter, rootOp);
+    LDBG("after erasing unused allocs and stores\n" << rootOp);
   }
 };
 

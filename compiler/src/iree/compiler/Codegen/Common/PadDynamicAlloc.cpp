@@ -81,11 +81,11 @@ namespace {
 struct PadDynamicAllocPass final
     : impl::PadDynamicAllocPassBase<PadDynamicAllocPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    Operation *rootOp = getOperation();
     MLIRContext *context = &getContext();
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
-    funcOp.walk(
+    rootOp->walk(
         [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
       if (failed(padAlloc(context, alloc)))

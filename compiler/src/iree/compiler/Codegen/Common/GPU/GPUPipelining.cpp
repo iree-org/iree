@@ -670,10 +670,10 @@ struct GPUPipeliningPass final
   using GPUPipeliningPassBase::GPUPipeliningPassBase;
 
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
+    Operation *rootOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     // Mark the loop with shared memory copy for pipelining.
-    funcOp.walk([&forOps](scf::ForOp forOp) { forOps.push_back(forOp); });
+    rootOp->walk([&forOps](scf::ForOp forOp) { forOps.push_back(forOp); });
     for (scf::ForOp forOp : forOps) {
       (void)applyPipelining(
           forOp, depth, epiloguePeeling,
@@ -681,7 +681,7 @@ struct GPUPipeliningPass final
     }
     // Remove extra barriers from the prologue assuming appropriate
     // multi-buffering.
-    funcOp.walk([](gpu::BarrierOp barrierOp) {
+    rootOp->walk([](gpu::BarrierOp barrierOp) {
       if (barrierOp->hasAttr(kPipeliningExtraBarrier))
         barrierOp->erase();
     });

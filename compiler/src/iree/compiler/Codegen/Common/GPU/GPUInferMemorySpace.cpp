@@ -50,14 +50,14 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
 
 void GPUInferMemorySpacePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  FunctionOpInterface funcOp = getOperation();
+  Operation *rootOp = getOperation();
 
   gpu::AddressSpaceAttr privateAddressSpace = gpu::AddressSpaceAttr::get(
       context, gpu::GPUDialect::getPrivateAddressSpace());
   gpu::AddressSpaceAttr sharedAddressSpace = gpu::AddressSpaceAttr::get(
       context, gpu::GPUDialect::getWorkgroupAddressSpace());
 
-  WalkResult res = funcOp.walk([&](bufferization::AllocTensorOp alloc) {
+  WalkResult res = rootOp->walk([&](bufferization::AllocTensorOp alloc) {
     // Continue if the allocation already has a valid memory space.
     std::optional<Attribute> currentMemSpace = alloc.getMemorySpace();
     if (currentMemSpace.has_value()) {
@@ -95,7 +95,7 @@ void GPUInferMemorySpacePass::runOnOperation() {
   });
 
   if (res.wasInterrupted()) {
-    funcOp->emitOpError("failed to set the gpu memory space for all "
+    rootOp->emitOpError("failed to set the gpu memory space for all "
                         "`bufferization.alloc_tensor` ops");
     return signalPassFailure();
   }

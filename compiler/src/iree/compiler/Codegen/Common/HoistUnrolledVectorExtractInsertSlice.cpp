@@ -212,9 +212,9 @@ public:
 };
 
 void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
-  auto funcOp = getOperation();
-  IRRewriter rewriter(funcOp->getContext());
-  funcOp.walk([&](scf::ForOp forOp) {
+  Operation *rootOp = getOperation();
+  IRRewriter rewriter(rootOp->getContext());
+  rootOp->walk([&](scf::ForOp forOp) {
     hoistUnrolledVectorExtractInsert(rewriter, forOp);
   });
 
@@ -224,7 +224,7 @@ void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
   scf::ForOp::getCanonicalizationPatterns(patterns, ctx);
   vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
   vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(patterns)))) {
     LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
     return signalPassFailure();
   }

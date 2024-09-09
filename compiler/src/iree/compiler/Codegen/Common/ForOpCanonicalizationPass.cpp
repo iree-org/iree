@@ -296,18 +296,20 @@ struct ForOpCanonicalizationPass final
   }
 
   void runOnOperation() override {
-    auto fn = getOperation();
+    Operation *rootOp = getOperation();
     // These patterns collide so we apply them one after another. The
     // canonicalization pattern will be blocked by the packing pattern
     // so we apply that first.
     RewritePatternSet canonPatterns(&getContext());
-    canonPatterns.insert<CanonicalizeForOpInductionVarShape>(fn.getContext());
-    if (failed(applyPatternsAndFoldGreedily(fn, std::move(canonPatterns)))) {
+    canonPatterns.insert<CanonicalizeForOpInductionVarShape>(
+        rootOp->getContext());
+    if (failed(
+            applyPatternsAndFoldGreedily(rootOp, std::move(canonPatterns)))) {
       return signalPassFailure();
     }
     RewritePatternSet packPatterns(&getContext());
-    packPatterns.insert<PackForOpInductionVarVector>(fn.getContext());
-    if (failed(applyPatternsAndFoldGreedily(fn, std::move(packPatterns)))) {
+    packPatterns.insert<PackForOpInductionVarVector>(rootOp->getContext());
+    if (failed(applyPatternsAndFoldGreedily(rootOp, std::move(packPatterns)))) {
       return signalPassFailure();
     }
   }

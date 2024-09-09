@@ -123,8 +123,7 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   ];
 }
 
-def ConvolutionToIGEMMPass :
-    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+def ConvolutionToIGEMMPass : Pass<"iree-codegen-convolution-to-igemm", ""> {
   let summary =
       "Transforms convolution operations into an implicit GEMM format.";
 }
@@ -149,7 +148,7 @@ def DecomposeLinalgGenericPass :
 }
 
 def DecomposePackUnPackOpsPass :
-    InterfacePass<"iree-codegen-decompose-pack-unpack-ops", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-decompose-pack-unpack-ops", ""> {
   let summary = "Decompose pack/unpack ops into vectorizable ops";
   let options = [
     Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
@@ -157,8 +156,7 @@ def DecomposePackUnPackOpsPass :
   ];
 }
 
-def DecomposeSoftmaxPass :
-    InterfacePass<"iree-codegen-decompose-softmax", "mlir::FunctionOpInterface"> {
+def DecomposeSoftmaxPass : Pass<"iree-codegen-decompose-softmax", ""> {
   let summary =
       "Decomposes softmax op into a sequence of linalg ops";
   let options = [
@@ -177,19 +175,17 @@ def ReconcileTranslationInfoPass
 }
 
 def ReplaceSlowMinMaxOpsPass
-    : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
+    : Pass<"iree-codegen-replace-slow-min-max-ops", ""> {
   let summary =
       "Replace slow min/max operations that propagate NaNs and distinguish "
       "between +/-0.0 with faster min/max operations that ignore them.";
 }
 
-def EliminateEmptyTensorsPass :
-    InterfacePass<"iree-eliminate-empty-tensors", "mlir::FunctionOpInterface"> {
+def EliminateEmptyTensorsPass : Pass<"iree-eliminate-empty-tensors", ""> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
 }
 
-def EmulateNarrowTypePass :
-    Pass<"iree-codegen-emulate-narrow-type", ""> {
+def EmulateNarrowTypePass : Pass<"iree-codegen-emulate-narrow-type", ""> {
   let summary = "Emulate narrow integer operations using wide integer operations";
   let description = [{
     A pass to emulate memref load operations that use narrow integer types
@@ -198,7 +194,7 @@ def EmulateNarrowTypePass :
 }
 
 def EraseDeadAllocAndStoresPass :
-    InterfacePass<"iree-codegen-erase-dead-alloc-and-stores", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-erase-dead-alloc-and-stores", ""> {
   let summary = "Erase alloc ops if all the uses are just stores";
 }
 
@@ -245,7 +241,8 @@ def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "Modu
 }
 
 def FoldAffineMinInDistributedLoopsPass :
-  InterfacePass<"iree-codegen-fold-affinemin-in-distributed-loops", "mlir::FunctionOpInterface"> {
+  InterfacePass<"iree-codegen-fold-affinemin-in-distributed-loops",
+                "mlir::FunctionOpInterface"> {
   let summary = "Fold `affine.min` ops in distributed loops";
 }
 
@@ -260,14 +257,13 @@ def FoldTensorExtractOpPass :
   }];
 }
 
-def ForOpCanonicalizationPass :
-  InterfacePass<"iree-codegen-canonicalize-scf-for", "mlir::FunctionOpInterface"> {
+def ForOpCanonicalizationPass : Pass<"iree-codegen-canonicalize-scf-for", ""> {
   let summary =
       "Adhoc canonicalization of selected loop-carried values/dependencies for scf.for ops";
 }
 
 def FuseTensorPadWithConsumerPass :
-    InterfacePass<"iree-codegen-fuse-tensor-pad-with-consumer", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-fuse-tensor-pad-with-consumer", ""> {
   let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
 }
 
@@ -297,14 +293,13 @@ def GenericVectorizationPass :
 }
 
 def OptimizeTensorInsertExtractSlicesPass
-    : InterfacePass<"iree-codegen-optimize-tensor-insert-extract-slices",
-                    "mlir::FunctionOpInterface"> {
+    : Pass<"iree-codegen-optimize-tensor-insert-extract-slices", ""> {
   let summary = "Optimize tensor.insert_slice/tensor.extract_slice operations "
                 "(e.g. hoist and fold)";
 }
 
 def HoistUnrolledVectorExtractInsertSlicePass :
-    InterfacePass<"iree-codegen-hoist-vector-extract-insert-slice", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-hoist-vector-extract-insert-slice", ""> {
   let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
 }
 
@@ -327,7 +322,7 @@ def HoistStaticallyBoundAllocationsPass :
 }
 
 def IREEComprehensiveBufferizePass :
-    InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-iree-comprehensive-bufferize", ""> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let options = [
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
@@ -349,7 +344,7 @@ def IREEExpandStridedMetadataPass :
 }
 
 def InstrumentMemoryAccessesPass :
-    InterfacePass<"iree-codegen-instrument-memory-accesses", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-instrument-memory-accesses", ""> {
   let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
 }
 
@@ -364,7 +359,7 @@ def LowerUKernelOpsToCallsPass :
 }
 
 def MaterializeEncodingIntoNopPass :
-    InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-materialize-encoding-into-nop", ""> {
   let summary = "Drop the encodings from tensor types with encodings.";
 }
 
@@ -375,8 +370,7 @@ def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "
   ];
 }
 
-def MemrefCopyToLinalgPass :
-    InterfacePass<"iree-codegen-memrefcopy-to-linalg", "mlir::FunctionOpInterface"> {
+def MemrefCopyToLinalgPass : Pass<"iree-codegen-memrefcopy-to-linalg", ""> {
   let summary = "Convert memref.copy to linalg op";
 }
 
@@ -400,7 +394,7 @@ def NormalizeLoopBoundsPass :
 }
 
 def OptimizeVectorTransferPass :
-    InterfacePass<"iree-codegen-optimize-vector-transfer", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-optimize-vector-transfer", ""> {
   let summary =
       "Run optimization transformations on vector transfer operations";
   let options = [
@@ -412,8 +406,7 @@ def OptimizeVectorTransferPass :
   ];
 }
 
-def PadDynamicAllocPass :
-    InterfacePass<"iree-codegen-pad-dynamic-alloc", "mlir::FunctionOpInterface"> {
+def PadDynamicAllocPass : Pass<"iree-codegen-pad-dynamic-alloc", ""> {
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
@@ -432,7 +425,7 @@ def PropagateReshapesByExpansionPass :
 }
 
 def RematerializeParallelOpsPass :
-    InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-rematerialize-parallel-ops", ""> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
 }
 
@@ -442,7 +435,7 @@ def RemoveSingleIterationLoopPass :
 }
 
 def SplitFullPartialTransferPass :
-    InterfacePass<"iree-codegen-split-full-partial-transfer", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-split-full-partial-transfer", ""> {
   let summary =
       "Split a vector.transfer operation into an in-bounds (i.e., no "
       "out-of-bounds masking) fastpath and a slowpath.";
@@ -459,7 +452,7 @@ def SplitFullPartialTransferPass :
 }
 
 def TensorToVectorVectorizePadPass :
-    InterfacePass<"iree-codegen-vectorize-tensor-pad", "mlir::FunctionOpInterface"> {
+    Pass<"iree-codegen-vectorize-tensor-pad", ""> {
   let summary = "Vectorize a very specific form of tensor.pad with "
                 "control flows";
 }

@@ -66,12 +66,13 @@ struct RematerializeParallelOpsPattern
 struct RematerializeParallelOpsPass final
     : impl::RematerializeParallelOpsPassBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    RewritePatternSet fusionPatterns(funcOp.getContext());
-    fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
+    Operation *rootOp = getOperation();
+    RewritePatternSet fusionPatterns(rootOp->getContext());
+    fusionPatterns.insert<RematerializeParallelOpsPattern>(
+        rootOp->getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
     if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
+            applyPatternsAndFoldGreedily(rootOp, std::move(fusionPatterns)))) {
       return signalPassFailure();
     }
   }
