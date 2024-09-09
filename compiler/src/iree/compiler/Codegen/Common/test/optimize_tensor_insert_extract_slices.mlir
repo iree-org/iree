@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-tensor-insert-extract-slices))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-tensor-insert-extract-slices{fold-identity-slices=true}))" --split-input-file %s | FileCheck %s
 
 func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf16>, %arg1: index) -> tensor<1x?x128xf16> {
   %c0 = arith.constant 0 : index
@@ -308,3 +308,16 @@ func.func @subset_hoisting_invariant_tensor_nonequivalent_subset(%init: tensor<6
 // CHECK:       tensor.insert_slice
 // CHECK:       scf.yield
 // CHECK-NOT: tensor.insert_slice
+
+// -----
+
+func.func @fold_identity_extract_slice(%arg0: tensor<?xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?xf32>
+  %slice = tensor.extract_slice %arg0[0][%dim][1] : tensor<?xf32> to tensor<?xf32>
+  return %slice : tensor<?xf32>
+}
+
+// CHECK-LABEL: @fold_identity_extract_slice
+//       CHECK:   %[[ARG0:.+]]: tensor<?xf32>
+//       CHECK:   return %[[ARG0]]

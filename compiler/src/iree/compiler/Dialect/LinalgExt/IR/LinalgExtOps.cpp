@@ -130,9 +130,9 @@ LogicalResult ScatterOp::verify() {
 
   auto indicesType = getIndicesType();
   if (indicesType.getRank() != 2 ||
-      !indicesType.getElementType().isInteger(32)) {
+      !isa<IntegerType>(indicesType.getElementType())) {
     return op->emitOpError(
-        "expected indices to be of rank 2 of i32 element type");
+        "expected indices to be of rank 2 of integer element type");
   }
   auto indexDepth = getIndexDepth();
   if (ShapedType::isDynamic(indexDepth)) {

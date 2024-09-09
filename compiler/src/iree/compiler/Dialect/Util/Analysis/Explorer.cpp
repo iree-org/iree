@@ -57,8 +57,16 @@ TraversalAction Explorer::getTraversalAction(Operation *op) {
 
   // Explicit op actions override all behavior.
   auto opIt = opActions.find(name);
-  if (opIt != opActions.end())
+  if (opIt != opActions.end()) {
     return opIt->second;
+  }
+
+  // Contents of object-like ops are ignored by default.
+  if (op->hasTrait<OpTrait::SymbolTable>()) {
+    LLVM_DEBUG(llvm::dbgs() << "  -- skipping contents of object-like op "
+                            << op->getName() << "\n");
+    return TraversalAction::SHALLOW;
+  }
 
   // Dialect actions let us carve out entire dialects and override interfaces
   // that may otherwise pick up ops.
@@ -73,14 +81,16 @@ TraversalAction Explorer::getTraversalAction(Operation *op) {
     return TraversalAction::IGNORE;
   }
   auto dialectIt = dialectActions.find(dialect->getNamespace());
-  if (dialectIt != dialectActions.end())
+  if (dialectIt != dialectActions.end()) {
     return dialectIt->second;
+  }
 
   // Slow path for interfaces as there's no way to enumerate the interfaces an
   // op has registered (AFAICT).
   for (auto [interfaceId, action] : interfaceActions) {
-    if (name.hasInterface(interfaceId))
+    if (name.hasInterface(interfaceId)) {
       return action;
+    }
   }
 
   return defaultAction;
@@ -139,18 +149,24 @@ void Explorer::initializeGlobalInfos() {
 // the same calculation over again. Maybe there's a way to use all that
 // GraphTraits goo to do this, but I don't know it.
 void Explorer::initializeInverseCallGraph() {
-  rootOp->walk([&](CallOpInterface callOp) {
-    if (callOp.getCallableForCallee().is<Value>()) {
-      // Indirect calls can't be tracked in the call graph, so ensure we mark
-      // the incomplete flag so that any call graph queries return
-      // TraversalResult::INCOMPLETE.
-      isCallGraphIncomplete = true;
-    } else {
-      auto *node = callGraph.resolveCallable(callOp, symbolTables);
-      if (!node->isExternal()) {
-        callGraphInv[node->getCallableRegion()].push_back(callOp);
+  forEachFunctionLikeOp([&](FunctionOpInterface parentOp) {
+    parentOp->walk([&](CallOpInterface callOp) {
+      if (callOp.getCallableForCallee().is<Value>()) {
+        // Indirect calls can't be tracked in the call graph, so ensure we mark
+        // the incomplete flag so that any call graph queries return
+        // TraversalResult::INCOMPLETE.
+        //
+        // TODO(benvanik): we should be keeping this finer-grained; today any
+        // indirect call invalidates all calls when really it should be for
+        // only those calls that are reachable via the indirect callee tree.
+        isCallGraphIncomplete = true;
+      } else {
+        auto *node = callGraph.resolveCallable(callOp, symbolTables);
+        if (!node->isExternal()) {
+          callGraphInv[node->getCallableRegion()].push_back(callOp);
+        }
       }
-    }
+    });
   });
 }
 
@@ -196,23 +212,36 @@ void Explorer::forEachFunction(std::function<void(FunctionOpInterface)> fn) {
   for (auto &scc : llvm::make_range(llvm::scc_begin(&callGraph),
                                     llvm::scc_end(&callGraph))) {
     for (auto *node : scc) {
-      if (node->isExternal())
+      if (node->isExternal()) {
         continue;
+      }
       auto parentOp =
           node->getCallableRegion()->getParentOfType<FunctionOpInterface>();
-      if (parentOp && parentOp->getParentOp() == rootOp)
+      if (parentOp && parentOp->getParentOp() == rootOp) {
         fn(parentOp);
+      }
     }
   }
 }
 
 void Explorer::forEachFunctionLikeOp(
     std::function<void(FunctionOpInterface)> fn) {
-  forEachInitializer([=](IREE::Util::InitializerOpInterface op) {
-    if (auto funcOp = dyn_cast<FunctionOpInterface>(op.getOperation()))
+  // The call graph may not include initializers unless they make calls; we do
+  // initializers first and then walk the remainder of the call graph ignoring
+  // any initializers that may be in there.
+  DenseSet<FunctionOpInterface> visitedFuncOps;
+  forEachInitializer([&](IREE::Util::InitializerOpInterface op) {
+    if (auto funcOp = dyn_cast<FunctionOpInterface>(op.getOperation())) {
       fn(funcOp);
+      visitedFuncOps.insert(funcOp);
+    }
   });
-  forEachFunction(fn);
+  forEachFunction([&](FunctionOpInterface funcOp) {
+    if (!visitedFuncOps.contains(funcOp)) {
+      fn(funcOp);
+      visitedFuncOps.insert(funcOp);
+    }
+  });
 }
 
 bool Explorer::mayValuesAlias(Value a, Value b) {
@@ -471,6 +500,19 @@ Explorer::walkIncomingCalls(CallableOpInterface callableOp,
         llvm::dbgs()
             << "  !! traversal incomplete due to public function-like op @"
             << symbolOp.getName() << "\n";
+      }
+      if (isCallGraphIncomplete) {
+        llvm::dbgs()
+            << "  !! traversal incomplete due to incomplete call graph for op @"
+            << symbolOp.getName() << "\n";
+      }
+    });
+  } else {
+    LLVM_DEBUG({
+      if (isCallGraphIncomplete) {
+        llvm::dbgs()
+            << "  !! traversal incomplete due to incomplete call graph for op"
+            << callableOp->getName() << "\n";
       }
     });
   }

@@ -29,6 +29,10 @@ struct GPUMMAHeuristicSeeds {
   int64_t bestMNTileCountPerSubgroup;
   // The best number of tiles along K dimension per subgroup
   int64_t bestKTileCountPerSubgroup;
+  // The best number of elements along K dimension per subgroup. This is
+  // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
+  // some chosen intrinsic `bestIntrinsic`.
+  int64_t bestKElementCountPerSubgroup = 0;
 };
 
 struct GPUMMASchedule {

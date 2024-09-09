@@ -45,7 +45,7 @@ static llvm::cl::opt<bool> clMemoization{
     "iree-hal-memoization",
     llvm::cl::desc(
         "Whether to memoize device resources such as command buffers."),
-    llvm::cl::init(false),
+    llvm::cl::init(true),
 };
 
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
@@ -506,10 +506,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Initialize device globals now that we've done the analysis that is easier
   // with them in their original target specification.
   passManager.addPass(IREE::HAL::createInitializeDevicesPass({targetRegistry}));
-
-  // Combine the initializers we emitted during resource cache
-  // materialization.
-  passManager.addPass(IREE::Util::createCombineInitializersPass());
 
   // TODO: Maybe this should be a part of Affine lowering pass.
   // Remove if it is added there.
