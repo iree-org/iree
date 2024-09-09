@@ -981,7 +981,6 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
       iree_hal_command_buffer_mode_t mode =
           iree_hal_command_buffer_mode(command_buffer) |
           IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
-          IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
           // NOTE: we need to validate if a binding table is provided as the
           // bindings were not known when it was originally recorded.
           (iree_hal_buffer_binding_table_is_empty(binding_table)

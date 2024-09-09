@@ -75,7 +75,7 @@ public:
                ValueRange bufferSizes, IndexSet &indexSet);
 
   // True if binding tables are supported for the consumer.
-  bool isSupported() const { return !hasUnsupportedOps; }
+  bool isSupported() const { return true; }
 
   // True if the binding table is empty.
   bool empty() const { return indirectBuffers.empty(); }
@@ -91,8 +91,6 @@ public:
   std::optional<Value> lookupResourceSlot(Value resourceValue);
 
 private:
-  // True if any ops are nested that may prevent binding table usage.
-  bool hasUnsupportedOps = false;
   // Buffer binding table with <buffer, offset, length>.
   SmallVector<IREE::HAL::BindingValue> indirectBuffers;
   // A mapping of resources to binding table slot ordinals.

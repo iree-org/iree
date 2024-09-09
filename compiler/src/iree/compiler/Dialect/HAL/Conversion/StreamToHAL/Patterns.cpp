@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 
+#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -18,6 +19,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler {
 
@@ -803,25 +805,44 @@ struct CmdFuncOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    SmallVector<DictionaryAttr> oldArgAttrs;
+    funcOp.getAllArgAttrs(oldArgAttrs);
     SmallVector<Type> newArgTypes;
-    SmallVector<DictionaryAttr> newArgAttrs;
+    SmallVector<Attribute> newArgAttrs;
     newArgTypes.push_back(rewriter.getType<IREE::HAL::CommandBufferType>());
     newArgAttrs.push_back(rewriter.getDictionaryAttr({})); // command buffer
-    funcOp.getAllArgAttrs(newArgAttrs);
+    for (auto [i, oldType] : llvm::enumerate(funcOp.getArgumentTypes())) {
+      if (isa<IREE::Stream::ResourceType>(oldType)) {
+        // Resource converted into a (binding ordinal, buffer) pair.
+        newArgTypes.push_back(rewriter.getIndexType());
+        newArgAttrs.push_back(rewriter.getDictionaryAttr({}));
+        newArgTypes.push_back(rewriter.getType<IREE::HAL::BufferType>());
+        newArgAttrs.push_back(oldArgAttrs[i]);
+      } else {
+        // Primitive/other pass-through.
+        // Support expansion by preserving the arg attr on the first expanded
+        // type and filling in empty attrs for the remainder.
+        size_t oldCount = newArgTypes.size();
+        if (failed(getTypeConverter()->convertType(oldType, newArgTypes))) {
+          return rewriter.notifyMatchFailure(funcOp,
+                                             "failed to convert arg types");
+        }
+        size_t typeCount = newArgTypes.size() - oldCount;
+        newArgAttrs.push_back(oldArgAttrs[i]);
+        newArgAttrs.append(typeCount - 1, rewriter.getDictionaryAttr({}));
+      }
+    }
     SmallVector<Type> newResultTypes;
-    if (failed(getTypeConverter()->convertTypes(funcOp.getArgumentTypes(),
-                                                newArgTypes)) ||
-        failed(getTypeConverter()->convertTypes(funcOp.getResultTypes(),
+    if (failed(getTypeConverter()->convertTypes(funcOp.getResultTypes(),
                                                 newResultTypes))) {
-      return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert result types");
     }
     auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::FuncOp>(
         funcOp, funcOp.getNameAttr(),
         rewriter.getFunctionType(newArgTypes, newResultTypes),
         /*tied_operands=*/ArrayAttr{}, funcOp.getSymVisibilityAttr(),
-        rewriter.getArrayAttr(
-            ArrayRef<Attribute>(newArgAttrs.data(), newArgAttrs.size())),
-        funcOp.getAllResultAttrs(),
+        rewriter.getArrayAttr(newArgAttrs), funcOp.getAllResultAttrs(),
         /*inlining_policy=*/IREE::Util::InliningPolicyAttrInterface{});
     newOp->setDialectAttrs(funcOp->getDialectAttrs());
     return success();
@@ -836,6 +857,23 @@ struct CmdCallOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     auto commandBufferMapping = mapping->lookupCommandBufferFor(callOp);
 
+    // Memoized dummy values.
+    Value zeroIndex;
+    auto getZeroIndex = [&]() {
+      if (!zeroIndex) {
+        zeroIndex = rewriter.create<arith::ConstantIndexOp>(callOp.getLoc(), 0);
+      }
+      return zeroIndex;
+    };
+    Value nullBuffer;
+    auto getNullBuffer = [&]() {
+      if (!nullBuffer) {
+        nullBuffer = rewriter.create<IREE::Util::NullOp>(
+            callOp.getLoc(), rewriter.getType<IREE::HAL::BufferType>());
+      }
+      return nullBuffer;
+    };
+
     // Always pass the command buffer as the first arg.
     SmallVector<Value> operands;
     operands.push_back(commandBufferMapping.getHandle());
@@ -843,10 +881,20 @@ struct CmdCallOpPattern
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
       if (llvm::isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
-        // Resource type, add offset/length.
-        operands.push_back(convertedOperand);
-        operands.push_back(adaptor.getResourceOperandOffsets()[resourceIndex]);
-        operands.push_back(adaptor.getResourceOperandLengths()[resourceIndex]);
+        // Resource type, pass binding index or buffer and offset/length.
+        auto binding = commandBufferMapping.resolveBinding(
+            callOp.getLoc(), originalOperand, convertedOperand,
+            adaptor.getResourceOperandOffsets()[resourceIndex],
+            adaptor.getResourceOperandLengths()[resourceIndex], rewriter);
+        if (binding.buffer.getType().isIndex()) {
+          operands.push_back(binding.buffer);
+          operands.push_back(getNullBuffer());
+        } else {
+          operands.push_back(getZeroIndex());
+          operands.push_back(binding.buffer);
+        }
+        operands.push_back(binding.byteOffset);
+        operands.push_back(binding.byteLength);
         ++resourceIndex;
       } else {
         // Primitive/custom type.
@@ -871,6 +919,43 @@ struct CmdCallOpPattern
     return success();
   }
 };
+
+// Returns true if any primitive uniform value (i32, index, etc) captured within
+// |op| (but not _by_ op) is a dynamic value (mutable global, calculated, etc).
+// Returns false if all values are derived from constants or immutable globals.
+static bool regionCapturesDynamicUniformValues(Operation *op) {
+  auto isDynamicUniform = [](Value value) {
+    if (value.getType().isIntOrIndexOrFloat()) {
+      switch (IREE::HAL::categorizeValue(value)) {
+      default:
+      case IREE::HAL::ValueOrigin::Unknown:
+      case IREE::HAL::ValueOrigin::MutableGlobal:
+        return true;
+      case IREE::HAL::ValueOrigin::LocalConstant:
+      case IREE::HAL::ValueOrigin::ImmutableGlobal:
+        return false;
+      }
+    }
+    return false;
+  };
+  for (auto operand : op->getOperands()) {
+    if (isDynamicUniform(operand)) {
+      // Today this usually indicates a dynamic buffer size. We could perform
+      // some tricks to adjust the size based on usage instead of requiring that
+      // this size match however it's safer to treat dynamically sized buffers
+      // as fully dynamic for now.
+      return true;
+    }
+  }
+  SetVector<Value> capturedValues;
+  mlir::getUsedValuesDefinedAbove(op->getRegions(), capturedValues);
+  for (auto capturedValue : capturedValues) {
+    if (isDynamicUniform(capturedValue)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 static void insertSerializationBarriers(Location loc, Block &block,
                                         Value commandBuffer,
@@ -911,17 +996,25 @@ struct CmdExecuteOpPattern
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(executeOp, rewriter);
 
+    // Until uniform buffers are implemented we can't reuse command buffers that
+    // contain non-constant uniform values (i32, index, etc). We'll have a pass
+    // that runs prior to conversion that creates new stream resources and
+    // changes dispatches to use them for any dispatch we can - note that there
+    // may still be some that slip through due to custom executables.
+    const bool capturesDynamicUniformValues =
+        regionCapturesDynamicUniformValues(executeOp);
+
     // Calculate the indirect buffer references used within the command buffer
     // by analyzing captured resources. This analysis will be used by subsequent
     // conversion to decide between embedding the direct buffer references or
     // indirect ones. We only do this if the execution region is reused.
     IndexSet indexSet(loc, rewriter);
     BindingTable bindingTable;
-    if (!executeOp.getOnce() && clIndirectCommandBuffers) {
+    if (!executeOp.getOnce() && !capturesDynamicUniformValues &&
+        clIndirectCommandBuffers) {
       bindingTable = BindingTable(executeOp, adaptor.getResourceOperands(),
                                   adaptor.getResourceOperandSizes(), indexSet);
     }
-    auto bindingTableValues = llvm::to_vector(bindingTable.getValues());
 
     // If the execute op is one-shot or there's no indirect bindings then mark
     // the command buffer one-shot.
@@ -933,7 +1026,11 @@ struct CmdExecuteOpPattern
         modes =
             modes | IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
       }
+      bindingTable = {};
     }
+
+    // Cache the binding table values for use with the indirect execute.
+    auto bindingTableValues = llvm::to_vector(bindingTable.getValues());
 
     // Derive the command buffer type based on the kind of operations present.
     // This can help the submission get routed to appropriate hardware queues
