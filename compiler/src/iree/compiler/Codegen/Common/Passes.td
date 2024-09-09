@@ -301,6 +301,10 @@ def OptimizeTensorInsertExtractSlicesPass
                     "mlir::FunctionOpInterface"> {
   let summary = "Optimize tensor.insert_slice/tensor.extract_slice operations "
                 "(e.g. hoist and fold)";
+  let options = [
+    Option<"foldIdentitySlices", "fold-identity-slices", "bool", "false",
+           "Enable folding of identity tensor.*_slice ops.">
+  ];
 }
 
 def HoistUnrolledVectorExtractInsertSlicePass :
