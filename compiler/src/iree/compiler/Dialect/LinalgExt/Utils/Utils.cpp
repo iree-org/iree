@@ -45,25 +45,27 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
       [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); });
 }
 
-Value getSlice(OpBuilder &b, Location loc, Value src, ArrayRef<Range> slice) {
+Operation *getSlice(OpBuilder &b, Location loc, Value src,
+                    ArrayRef<Range> slice) {
   return getSlice(b, loc, src,
                   llvm::map_to_vector(slice, [](Range x) { return x.offset; }),
                   llvm::map_to_vector(slice, [](Range x) { return x.size; }),
                   llvm::map_to_vector(slice, [](Range x) { return x.stride; }));
 }
 
-Value getSlice(OpBuilder &b, Location loc, Value src,
-               ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-               ArrayRef<OpFoldResult> strides) {
-  return TypeSwitch<Type, Value>(src.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+Operation *getSlice(OpBuilder &b, Location loc, Value src,
+                    ArrayRef<OpFoldResult> offsets,
+                    ArrayRef<OpFoldResult> sizes,
+                    ArrayRef<OpFoldResult> strides) {
+  return TypeSwitch<Type, Operation *>(src.getType())
+      .Case<RankedTensorType>([&](RankedTensorType t) -> Operation * {
         return b.create<tensor::ExtractSliceOp>(loc, src, offsets, sizes,
                                                 strides);
       })
-      .Case<MemRefType>([&](MemRefType type) -> Value {
+      .Case<MemRefType>([&](MemRefType type) -> Operation * {
         return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
       })
-      .Default([&](Type t) {
+      .Default([&](Type t) -> Operation * {
         assert(false && "invalid type");
         return nullptr;
       });
