@@ -1854,6 +1854,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Value scale = getScale();
 
+<<<<<<< HEAD
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> slices;
 
@@ -1865,6 +1866,12 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     }
     tiledOperands.emplace_back(querySliceOp->getResult(0));
     slices.push_back(querySliceOp);
+=======
+  Value attnMask = getMask();
+  if (attnMask != nullptr) {
+    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, attnMask, maskSlice));    
+>>>>>>> 1d802142f4 ((WIP) Fixing stuff)
   }
 
   // Key
@@ -1912,7 +1919,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(maxSliceOp);
   }
 
-  std::optional<Value> sum = getMax();
+  std::optional<Value> sum = getSum();
   if (sum) {
     SmallVector<Range> sumSlice =
         getPermutedSlice(*getSumMap(), offsets, sizes);
@@ -1926,12 +1933,12 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[getMask() ? 5 : 4].getType());
-    if (max) {
-      resultTypes.push_back(tiledOperands[getMask() ? 6 : 5].getType());
-    }
-    if (sum) {
-      resultTypes.push_back(tiledOperands[getMask() ? 7 : 6].getType());
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
+    if (max || sum) {
+      resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
+      if (max && sum) {
+        resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
+      }
     }
   }
 
@@ -2030,6 +2037,7 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   std::optional<SmallVector<Range>> maskSlice = 
       getMaskMap() ? std::optional<SmallVector<Range>>(getPermutedSlice(*getMaskMap(), offsets, sizes))
                   : std::nullopt;
+
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
   SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
@@ -2102,9 +2110,9 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[maskSlice ? 5 : 4].getType());
-  resultTypes.push_back(tiledOperands[maskSlice ? 6 : 5].getType());
-  resultTypes.push_back(tiledOperands[maskSlice ? 7 : 6].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
