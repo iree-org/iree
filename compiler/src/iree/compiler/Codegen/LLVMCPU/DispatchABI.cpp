@@ -143,7 +143,7 @@ ExecutableLibraryDI::getPtrOf(LLVM::DITypeAttr typeAttr) {
 LLVM::DICompositeTypeAttr
 ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
   return LLVM::DICompositeTypeAttr::get(
-      builder.getContext(), llvm::dwarf::DW_TAG_array_type, /*recId=*/{},
+      builder.getContext(), llvm::dwarf::DW_TAG_array_type,
       /*name=*/builder.getStringAttr(""), fileAttr,
       /*line=*/227, fileAttr,
       /*baseType=*/typeAttr, LLVM::DIFlags::Zero,
@@ -221,7 +221,7 @@ LLVM::DITypeAttr ExecutableLibraryDI::getBasicType(Type type) {
 LLVM::DICompositeTypeAttr ExecutableLibraryDI::getProcessorV0T() {
   unsigned offsetInBits = 0;
   return LLVM::DICompositeTypeAttr::get(
-      builder.getContext(), llvm::dwarf::DW_TAG_structure_type, /*recId=*/{},
+      builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
       builder.getStringAttr("iree_hal_processor_v0_t"), fileAttr,
       /*line=*/227, fileAttr,
       /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/512,
@@ -239,7 +239,6 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
       "iree_hal_executable_environment_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
-          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_environment_v0_t"),
           fileAttr,
           /*line=*/246, fileAttr,
@@ -268,7 +267,6 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
       "iree_hal_executable_dispatch_state_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
-          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_dispatch_state_v0_t"),
           fileAttr, /*line=*/275, fileAttr,
           /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/384,
@@ -304,7 +302,6 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
       "iree_hal_executable_workgroup_state_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
-          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_workgroup_state_v0_t"),
           fileAttr, /*line=*/321, fileAttr,
           /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/256,
