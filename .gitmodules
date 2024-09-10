@@ -41,3 +41,7 @@
 [submodule "third_party/hip-build-deps"]
 	path = third_party/hip-build-deps
 	url = https://github.com/iree-org/hip-build-deps.git
+[submodule "third_party/hsa-build-deps"]
+	path = third_party/hsa-build-deps
+	url = https://github.com/nod-ai/ROCR-Runtime.git
+
