@@ -1361,9 +1361,9 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
     bool noReduceSharedMemoryBankConflicts,
     std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
   auto strategyAttr = ReorderWorkgroupsStrategyAttr();
-  if (reorderWorkgroupsStrategy.has_value()) {
-    strategyAttr = ReorderWorkgroupsStrategyAttr::get(
-        context, reorderWorkgroupsStrategy.value());
+  if (reorderWorkgroupsStrategy) {
+    strategyAttr =
+        ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
   }
   Builder b(context);
   return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
