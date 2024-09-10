@@ -103,9 +103,10 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestMNTileCountPerSubgroup=*/16,
              /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                 inBitWidth};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
