@@ -744,6 +744,14 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
+  // TODO: Due to a bug in layout configuration, we cannot set warp count on
+  // the N dimension. This is however ok, because we generally do not want to
+  // distribute subgroups on N dimension anyway.
+  if (schedule->nWarpCount != 1) {
+    schedule->nTileCount *= schedule->nWarpCount;
+    schedule->nWarpCount = 1;
+  }
+
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
                            << schedule->kSize << "]");
