@@ -20,7 +20,7 @@ bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
   // trickiness and weirdness of packing and cross-byte access.
   // Also disallow boolean values for now--they may require separate interface
   // choices.
-  return bitWidth < 8 && llvm::isPowerOf2_32(bitWidth) && bitWidth != 1;
+  return bitWidth < 8 && llvm::isPowerOf2_32(bitWidth);
 }
 
 bool needToPackSubByteElements(RankedTensorType shapedType) {
@@ -97,6 +97,11 @@ Value calculateStorageElementCountInBytes(Location loc,
     for (auto k : cDims->k) {
       pad(k, roundDimsTo[2]);
     }
+  }
+
+  // make sure the last dimension is byte aligned.
+  if (needToPackSubByteElementBitWidth(elementBits)) {
+    paddedShape.back() = llvm::alignTo(paddedShape.back(), 8 / elementBits);
   }
 
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
