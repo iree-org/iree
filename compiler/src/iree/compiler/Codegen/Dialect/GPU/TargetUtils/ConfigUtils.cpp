@@ -622,7 +622,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   };
 
   // First try to see if we can use up all threads without any loss.
-  if (distributeToThreads(subgroupSize) != 1) {
+  int64_t newNumThreads = subgroupSize;
+  if (distributeToThreads(newNumThreads) != 1) {
     // Otherwise, allow larger and larger loss factor.
 
     // Threads for distribution. Use 32 at least.
@@ -633,22 +634,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     for (; lossFactor >= 1; lossFactor >>= 1) {
       if (distributeToThreads(numThreads, lossFactor) == 1)
         break;
-    }
-  }
-
-  // TODO(qedawkins): Currently scf.forall resolution only supports static
-  // trip counts, meaning the workgroup tile size must perfectly divide the
-  // loop bound (and thread tile size must perfectly divide the workgroup tile)
-  // so that the trip count won't be static. Remove this check once proper
-  // dynamic trip count resolution support is added.
-  for (auto [loopId, threadTile] : llvm::enumerate(threadTileSizes)) {
-    if (threadTile == 0) {
-      continue;
-    }
-    int64_t bound = loopBounds[loopId];
-    int64_t wkgpTile = workgroupTileSizes[loopId];
-    if (bound % wkgpTile != 0 || wkgpTile % threadTile != 0) {
-      return failure();
     }
   }
 

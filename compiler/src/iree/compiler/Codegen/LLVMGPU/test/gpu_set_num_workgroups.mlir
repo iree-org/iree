@@ -28,12 +28,11 @@ func.func @add_dispatch_0() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256]{{\]}}>
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32>
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CHECK: func.func @add_dispatch_0
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{thread = [4], workgroup = [128]}>
 
 // -----
 
@@ -153,14 +152,15 @@ func.func @reduction_aligned2() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CHECK: func.func @reduction_aligned2()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
-// CHECK-SAME:   lowering_config = #[[CONFIG]]
 //      CHECK: linalg.generic
-// CHECK-SAME:   lowering_config = #[[CONFIG]]
+// CHECK-SAME:   lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:     reduction = [0, 0, 4]
+// CHECK-SAME:     thread = [1, 4, 0]
+// CHECK-SAME:     workgroup = [1, 128, 0]
 
 // -----
 
@@ -436,7 +436,7 @@ func.func @contract_reduction() {
   return
 }
 
-//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32
 //      SM80: func.func @contract_reduction()
 // SM80-SAME:     translation_info = #[[TRANSLATION]]
 
@@ -563,12 +563,11 @@ func.func @inner_unit_dim() {
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CHECK: func.func @inner_unit_dim()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{thread = [1, 1], workgroup = [32, 1]}>
 
 // -----
 

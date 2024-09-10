@@ -386,8 +386,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
-      /*useWARForCooperativeMatrixCodegen=*/false));
 
   // Step 4. Tile and fuse tileable ops to subgroups/threads.
   {
@@ -403,6 +401,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
   funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
+  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
+      /*useWARForCooperativeMatrixCodegen=*/false));
 
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
