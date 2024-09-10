@@ -66,7 +66,7 @@ allocateVariable(OpBuilder builder, Location location, Type type,
 }
 
 std::pair<TypedValue<emitc::LValueType>, TypedValue<emitc::PointerType>>
-allocateZeroVariable(OpBuilder builder, Location location, Type type) {
+allocZeroInitializedVar(OpBuilder builder, Location location, Type type) {
   auto var = allocateVariable(builder, location, type);
   auto varPtr = addressOf(builder, location, var);
   auto size = sizeOf(builder, location, TypeAttr::get(type));

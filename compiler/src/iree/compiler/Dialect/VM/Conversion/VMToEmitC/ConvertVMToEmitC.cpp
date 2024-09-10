@@ -122,7 +122,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   builder.setInsertionPointToStart(&entryBlock);
 
   for (int i = 0; i < numLocalRefs; i++) {
-    auto [ref, refPtr] = emitc_builders::allocateZeroVariable(
+    auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
     auto refPtrOp = cast<emitc::ApplyOp>(refPtr.getDefiningOp());
@@ -294,7 +294,7 @@ LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
     assert(srcRef.getType() == emitc::PointerType::get(emitc::OpaqueType::get(
                                    ctx, "iree_vm_ref_t")));
 
-    auto [tmpRef, tmpPtr] = emitc_builders::allocateZeroVariable(
+    auto [tmpRef, tmpPtr] = emitc_builders::allocZeroInitializedVar(
         builder, location, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
     StringRef callee = isMove ? "iree_vm_ref_move" : "iree_vm_ref_retain";
@@ -2733,7 +2733,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
-    auto [ref, refPtr] = emitc_builders::allocateZeroVariable(
+    auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
     builder.create<emitc::CallOpaqueOp>(
