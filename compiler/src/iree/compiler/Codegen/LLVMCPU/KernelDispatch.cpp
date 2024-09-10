@@ -2915,6 +2915,26 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
+  // Make sure the innermost tile size times element size is multiple
+  // of byte bits. This is required for now because we do not fully
+  // support sub-byte vector stores. Once vector stores are supported
+  // then this can be eliminated. Note that emulating sub-byte sized vector
+  // loads and stores will have a performance impact.
+  auto resultTypes = rootOperation->getResultTypes();
+  if (commonVecTileSizes.size() != 0 && !resultTypes.empty()) {
+    auto elementTypeSize =
+        cast<ShapedType>(rootOperation->getResultTypes().front())
+            .getElementType()
+            .getIntOrFloatBitWidth();
+    // for now just enable for i1
+    if (elementTypeSize == 1) {
+      auto innermostTileSize = commonVecTileSizes.back();
+      commonVecTileSizes.back() =
+          llvm::alignTo(innermostTileSize * elementTypeSize, 8) /
+          elementTypeSize;
+    }
+  }
+
   // Set the lowering configs with new tile sizes.
   for (auto op : computeOps) {
     int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
