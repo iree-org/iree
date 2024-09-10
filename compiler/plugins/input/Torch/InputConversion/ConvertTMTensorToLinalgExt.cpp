@@ -84,12 +84,14 @@ getStandardAttentionIndexingMaps(MLIRContext *ctx) {
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   AffineMap vMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
+  AffineMap sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0,
+                                  SmallVector<AffineExpr>{}, ctx);
   AffineMap mMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
 
-  return {qMap, kMap, vMap, mMap, rMap};
+  return {qMap, kMap, vMap, sMap, mMap, rMap};
 }
 
 struct AttentionOpConversion
@@ -139,10 +141,13 @@ struct AttentionOpConversion
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(ctx);
     if (!optionalMask) {
-      indexingMaps.erase(indexingMaps.begin() + 3);
+      indexingMaps.erase(indexingMaps.begin() + 4);
     }
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
+      if (map.getNumResults() == 0) {
+        continue;
+      }
       map = map.shiftDims(numBatches);
       for (int batch : llvm::seq<int>(numBatches)) {
         map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);

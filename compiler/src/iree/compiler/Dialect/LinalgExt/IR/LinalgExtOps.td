@@ -543,16 +543,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       return cast<AffineMap>(getIndexingMapsArray()[2]);
     }
     std::optional<AffineMap> getMaskMap() {
-      if (getMask()) {
-        return cast<AffineMap>(getIndexingMapsArray()[3]);
-      }
-      return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[4]);
     }
     AffineMap getOutputMap() {
-      if (getMask()) {
-        return cast<AffineMap>(getIndexingMapsArray()[4]);
-      }
-      return cast<AffineMap>(getIndexingMapsArray()[3]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
     }
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
@@ -586,12 +580,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     std::optional<AffineMap> getMaxMap() {
       if (getNumResults() < 2)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 1]);
     }
     std::optional<AffineMap> getSumMap() {
       if (getNumResults() < 3)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[5]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
     }
     Value getOutput() {
       return getDpsInitOperand(0)->get();
