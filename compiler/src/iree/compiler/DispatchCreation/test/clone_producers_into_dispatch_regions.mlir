@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-enable-gather-fusion --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions))" %s | FileCheck %s
 
 util.func public @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
   %c4095 = arith.constant 4095 : i32
