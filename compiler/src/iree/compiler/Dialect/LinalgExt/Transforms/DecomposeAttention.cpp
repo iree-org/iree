@@ -202,9 +202,9 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice, Value ma
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
-  if (maskSlice) {
-    qkTranspose = maskQKTranspose(qkTranspose, maskSlice, loc, builder, ops);
-  }
+  // if (maskSlice) {
+  //   qkTranspose = maskQKTranspose(qkTranspose, maskSlice, loc, builder, ops);
+  // }
 
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaximumFOp>(

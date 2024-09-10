@@ -1901,12 +1901,10 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   }
   tiledOperands.emplace_back(scale);
 
-  int hasMask = 0;
   std::optional<Value> attnMask = getMask();
-  if (getMask()) {
+  if (attnMask) {
     SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
-    tiledOperands.emplace_back(getSlice(builder, loc, attnMask.value(), maskSlice));    
-    hasMask++;
+    tiledOperands.emplace_back(getSlice(builder, loc, *attnMask, maskSlice));    
   } else {
     tiledOperands.emplace_back(Value());
   }
