@@ -15,7 +15,12 @@ on:
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
-    runs-on: azure-linux-scale
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - environment=prod
+      - cpu
+      - os-family=Linux
     strategy:
       fail-fast: false
     env:
