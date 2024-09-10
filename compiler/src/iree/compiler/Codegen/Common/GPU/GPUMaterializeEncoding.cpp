@@ -36,15 +36,12 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-// Get the swizzle bringing a tile from row-major layout into the given
-// intrinsic's preferred layout, that is, the "subgroup-contiguous" layout where
-// each each thread `tid` accesses data at offset `tid`.
-// This is focusing only on the intrinsic and not on unrolling factors.
-// Separate code will transform this swizzle into the swizzled for an unrolled
-// kernel tile.
-static std::optional<MaterializeEncodingInfo::Swizzle>
-getSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
-  std::optional<MaterializeEncodingInfo::Swizzle> swizzle;
+// Returns the swizzle for a given intrinsic and operand index.
+// See the comment on MaterializeEncodingInfo::Swizzle for what that means.
+// This function is concerned with a single intrinsic, not a whole kernel tile.
+// TODO(bjacob): derive this automatically from the intrinsic layout getters.
+static MaterializeEncodingInfo::Swizzle
+getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
   switch (mma) {
   case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32:
     if (operandIdx == 2) {
@@ -71,8 +68,152 @@ getSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
                                               /*permutation=*/{1, 0, 2}};
     }
   default:
-    return std::nullopt;
+    assert(false && "should not get here.");
+    return {};
   }
+}
+
+// Given an `expandShape` vector-of-vectors describing the mapping from source
+// dimensions to expanded dimensions, returns the index of the first expanded
+// dimension corresponding to the given source dimension index.
+static int64_t
+getExpandedDimFirstIdx(const SmallVector<SmallVector<int64_t>> &expandShape,
+                       int64_t srcIndex) {
+  int dstIndexFirst = 0;
+  for (int i = 0; i < srcIndex; ++i) {
+    dstIndexFirst += expandShape[i].size();
+  }
+  return dstIndexFirst;
+}
+
+// Unroll the dimension given by `srcIndex` by the given `unrollFactor`.
+// This is not interleaving layouts. The layout will consist of multiple copies
+// of the input tile, side by side.
+//
+// Example:
+//    Input swizzle = { expandShape = [[16], [4]], permutation = [1, 0] }
+//    Input srcIndex = 1
+//    Input unrollFactor = 4
+// -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
+//
+static void unroll(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
+                   int unrollFactor) {
+  assert(unrollFactor > 1);
+  int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
+
+  // The new unrolling dimension is inserted at the start of the expandShape
+  // dimensions group corresponding to srcIndex.
+  swizzle.expandShape[srcIndex].insert(swizzle.expandShape[srcIndex].begin(),
+                                       unrollFactor);
+  // Since we are not interleaving here, generating side-by-side copies of the
+  // original layout, the new unrolling dimension is the new outermost
+  // dimension. Existing entries get shifted to make room for it.
+  for (auto &p : swizzle.permutation) {
+    p += (p >= dstIndexFirst);
+  }
+  swizzle.permutation.insert(swizzle.permutation.begin(), dstIndexFirst);
+}
+
+// Returns the index of the dimension whose flattened size (flattening inner
+// dimensions into it) matches the given `targetSize`.
+static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
+                                      int64_t targetSize) {
+  int interleaveAt = 0;
+  int size = shape[0];
+  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
+    assert(size <= targetSize);
+    assert((targetSize % size) == 0);
+    if (size == targetSize) {
+      break;
+    }
+    size *= shape[interleaveAt];
+  }
+  return interleaveAt;
+}
+
+// Interleave the layout in `swizzle` by mutating `swizzle.permutation` to
+// move permutation[0], the outer-most dimension (which the unroll() function
+// created to be the unrolling dimension), to the appropriate inner dimension
+// index to ensure that the layout is interleaved exactly so that
+// `targetInterleavedElements` are made contiguous in the new layout.
+//
+// Example:
+//    Input swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
+//    Input srcIndex = 1
+//    Input targetInterleavedElements = 4
+// -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [2, 0, 1] }
+//
+static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
+                       int targetInterleavedElements) {
+  // Compute which inner dimension to permute the current outer dimension into.
+  int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
+  int dstIndexToInterleaveAt =
+      dstIndexFirst + getDimIdxForTargetSize(swizzle.expandShape[srcIndex],
+                                             targetInterleavedElements);
+
+  SmallVector<int64_t> outPermutation(swizzle.permutation.size());
+  // The leading dimension, permutation[0], gets moved inwards to the
+  // position that we just computed, dstIndexToInterleaveAt.
+  outPermutation[dstIndexToInterleaveAt] = swizzle.permutation[0];
+  // Outer dimensions get shifted outwards to fill the gap.
+  for (int i = 0; i < dstIndexToInterleaveAt; ++i) {
+    outPermutation[i] = swizzle.permutation[i + 1];
+  }
+  // Inner dimensions don't change. That is to say that we only interleave
+  // at `targetInterleavedElements` granularity, we don't swizzle further
+  // internally to that.
+  for (int i = dstIndexToInterleaveAt + 1; i < outPermutation.size(); ++i) {
+    outPermutation[i] = swizzle.permutation[i];
+  }
+  swizzle.permutation = outPermutation;
+}
+
+// Generates the swizzle for the full data-tiled-mma tile, including all the
+// relevant unrolling factors.
+static MaterializeEncodingInfo::Swizzle
+getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
+  auto [AType, BType, CType] = mma.getABCElementTypes();
+  int ABits = AType.getIntOrFloatBitWidth();
+  int BBits = BType.getIntOrFloatBitWidth();
+  // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
+  const int targetPreferredLoadBitWidth = 128;
+  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), operandIdx);
+  switch (operandIdx) {
+  case 0:
+    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on M.
+    if (mma.getUnrollK() > 1) {
+      unroll(swizzle, 1, mma.getUnrollK());
+      interleave(swizzle, 1, targetPreferredLoadBitWidth / ABits);
+    }
+    if (mma.getUnrollM() > 1) {
+      unroll(swizzle, 0, mma.getUnrollM());
+    }
+    break;
+  case 1:
+    // B-matrix (RHS). Since the pack ops already took care of transposing B,
+    // source dimensions are N (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on N.
+    if (mma.getUnrollK() > 1) {
+      unroll(swizzle, 1, mma.getUnrollK());
+      interleave(swizzle, 1, targetPreferredLoadBitWidth / BBits);
+    }
+    if (mma.getUnrollN() > 1) {
+      unroll(swizzle, 0, mma.getUnrollN());
+    }
+    break;
+  case 2:
+    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
+    // 1). Unroll on N, then on M.
+    if (mma.getUnrollN() > 1) {
+      unroll(swizzle, 1, mma.getUnrollN());
+    }
+    if (mma.getUnrollM() > 1) {
+      unroll(swizzle, 0, mma.getUnrollM());
+    }
+    break;
+  }
+  return swizzle;
 }
 
 static bool hasIntrinsic(IREE::GPU::TargetAttr target,
@@ -107,13 +248,13 @@ chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
     }
     return candidate;
   };
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 1, 1, 1)) {
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 8, 8, 4)) {
     return m;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 1, 1, 1)) {
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 8, 8, 2)) {
     return m;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 1, 1, 1)) {
+  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 8, 8, 2)) {
     return m;
   }
   // Fallback - no architecture-optimized tile size for this case.
@@ -159,8 +300,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma->getMNKShape();
   auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
-  auto roleIdx = encoding.getOperandIndex().getInt();
-  encodingInfo.swizzle = getSwizzle(mma->getIntrinsic().getValue(), roleIdx);
+  auto operandIdx = encoding.getOperandIndex().getInt();
+  encodingInfo.swizzle = getSwizzle(*mma, operandIdx);
   return encodingInfo;
 }
 

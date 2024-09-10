@@ -865,7 +865,8 @@ std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
 std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
   MLIRContext *ctx = getContext();
   auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
-  return {opaqueLayout.mSize, opaqueLayout.nSize, opaqueLayout.kSize};
+  return {opaqueLayout.mSize * getUnrollM(), opaqueLayout.nSize * getUnrollN(),
+          opaqueLayout.kSize * getUnrollK()};
 }
 
 std::tuple<VectorType, VectorType, VectorType>
