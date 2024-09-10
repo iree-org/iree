@@ -100,10 +100,10 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
         // used by attention's exp2 who's value is always > 0.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value sel0 = b.create<arith::MinimumFOp>(loc, mx, args[0]);
+        Value clamp = b.create<arith::MinimumFOp>(loc, mx, args[0]);
 
         // Convert scale to the same datatype as input.
-        Value trunc = convertScalarToDtype(b, loc, sel0, dstTy,
+        Value trunc = convertScalarToDtype(b, loc, clamp, dstTy,
                                            /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, trunc);
       });
