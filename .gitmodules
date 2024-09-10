@@ -37,7 +37,7 @@
 	url = https://github.com/iree-org/stablehlo.git
 [submodule "third_party/torch-mlir"]
 	path = third_party/torch-mlir
-	url = https://github.com/rohan-tan-bhowmik/torch-mlir.git
+	url = https://github.com/iree-org/torch-mlir.git
 [submodule "third_party/hip-build-deps"]
 	path = third_party/hip-build-deps
 	url = https://github.com/iree-org/hip-build-deps.git
