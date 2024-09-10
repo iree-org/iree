@@ -13,6 +13,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Diagnostics.h"
@@ -34,7 +35,7 @@ public:
   explicit DistributionLayout(Value val) : AnalysisState(val) {}
 
   TypedValue<VectorType> getValue() const {
-    ProgramPoint point = getPoint();
+    LatticeAnchor point = getAnchor();
     assert(isa<Value>(point) && "expected program point to be a value");
     Value val = cast<Value>(point);
     assert(isa<VectorType>(val.getType()) &&
@@ -303,7 +304,7 @@ void DistributionLayout::print(raw_ostream &os) const {
 void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   AnalysisState::onUpdate(solver);
 
-  Value value = point.get<Value>();
+  Value value = anchor.get<Value>();
 
   if (propagation) {
     // Make propagation run again on all users of this value.
