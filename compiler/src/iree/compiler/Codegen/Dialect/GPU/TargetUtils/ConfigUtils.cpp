@@ -473,4 +473,73 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       workgroupSize, subgroupSize, DictionaryAttr());
 }
 
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptions
+getPipelineOptions(FunctionOpInterface funcOp,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
+  GPUPipelineOptions pipelineOptions = {};
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    std::optional<NamedAttribute> maybePipelineOptionsAttr =
+        config.getNamed(GPUPipelineOptionsAttr::getDictKeyName());
+    if (!maybePipelineOptionsAttr.has_value()) {
+      return pipelineOptions;
+    }
+    auto pipelineOptionsAttr =
+        cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
+    BoolAttr prefetchSharedMemory =
+        pipelineOptionsAttr.getPrefetchSharedMemory();
+    if (prefetchSharedMemory) {
+      pipelineOptions.prefetchSharedMemory = prefetchSharedMemory.getValue();
+    }
+    BoolAttr noReduceBankConflicts =
+        pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
+    if (noReduceBankConflicts) {
+      pipelineOptions.enableReduceSharedMemoryBankConflicts =
+          !noReduceBankConflicts.getValue();
+    }
+    ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
+        pipelineOptionsAttr.getReorderWorkgroupsStrategy();
+    if (reorderWorkgroupsStrategy) {
+      pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
+    }
+  }
+
+  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+
+  LLVM_DEBUG(llvm::dbgs() << "GPU Pipeline Options: " << pipelineOptions
+                          << "\n");
+  return pipelineOptions;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GPUPipelineOptions &options) {
+  StringRef reorderStr = "<not set>";
+  if (options.reorderStrategy) {
+    switch (options.reorderStrategy.value()) {
+    case ReorderWorkgroupsStrategy::Transpose:
+      reorderStr = "transpose";
+      break;
+    case ReorderWorkgroupsStrategy::Swizzle:
+      reorderStr = "swizzle";
+      break;
+    case ReorderWorkgroupsStrategy::None:
+      reorderStr = "none";
+      break;
+    default:
+      assert(false && "Unhandled reorder option");
+    }
+  }
+
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+            << options.enableReduceSharedMemoryBankConflicts << ", "
+            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", reorderWorkgroupsStrategy = " << reorderStr
+            << ", enableUkernels = " << options.enableUkernels << "}";
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

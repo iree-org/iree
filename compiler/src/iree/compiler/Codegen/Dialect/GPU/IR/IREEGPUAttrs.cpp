@@ -1353,6 +1353,25 @@ bool LaneIdAttr::isLinearMapping() const { return true; }
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 
 //===----------------------------------------------------------------------===//
+// GPU Pipeline Options
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
+    MLIRContext *context, bool prefetchSharedMemory,
+    bool noReduceSharedMemoryBankConflicts,
+    std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
+  auto strategyAttr = ReorderWorkgroupsStrategyAttr();
+  if (reorderWorkgroupsStrategy) {
+    strategyAttr =
+        ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
+  }
+  Builder b(context);
+  return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
+                   b.getBoolAttr(noReduceSharedMemoryBankConflicts),
+                   strategyAttr);
+}
+
+//===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
 

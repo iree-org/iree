@@ -430,4 +430,54 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Options
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_ReorderWorkgroupsStrategyAttr :
+    EnumAttr<IREEGPU_Dialect, IREEGPU_ReorderWorkgroupsStrategy, ""> {
+  let assemblyFormat = "``$value";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOptions"> {
+  let summary = "GPU pipeline options attribute.";
+  let description = [{
+    This attributes describes lowering pipeline specific configuration options:
+    * prefetch_shared_memory: Boolean option indicating whether or not to run
+      the loop prefetching pass in the lowering pipeline.
+    * no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
+      or not to skip the bank conflict reduction pass in the lowering pipeline.
+    * reorder_workgroups_strategy: Enum attribute indicating which strategy to
+      choose for the workgroup reordering pass. Options are `None`, `Swizzle`,
+      and `Transpose`.
+  }];
+
+  let mnemonic = "pipeline_options";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
+    OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
+    OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
+  );
+
+  let builders = [
+    AttrBuilder<(ins
+        CArg<"bool", "false">:$prefetch_shared_memory,
+        CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
+        CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>
+  ];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let extraClassDeclaration = [{
+    // Returns the key name for GPUPipelineOptionsAttr in the translation info
+    // config dictionary.
+    static StringRef getDictKeyName() {
+      return "gpu_pipeline_options";
+    }
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
