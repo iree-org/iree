@@ -1901,12 +1901,10 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   }
   tiledOperands.emplace_back(scale);
 
-  std::optional<Value> attnMask = getMask();
-  if (attnMask) {
+  Value attnMask = getMask();
+  if (attnMask != nullptr) {
     SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
-    tiledOperands.emplace_back(getSlice(builder, loc, *attnMask, maskSlice));    
-  } else {
-    tiledOperands.emplace_back(Value());
+    tiledOperands.emplace_back(getSlice(builder, loc, attnMask, maskSlice));    
   }
 
   SmallVector<Range> outputSlice = getPermutedSlice(getOutputMap(), offsets, sizes);
@@ -2042,6 +2040,7 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   std::optional<SmallVector<Range>> maskSlice = 
       getMaskMap() ? std::optional<SmallVector<Range>>(getPermutedSlice(*getMaskMap(), offsets, sizes))
                   : std::nullopt;
+
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
   SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
