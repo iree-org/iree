@@ -474,8 +474,8 @@ private:
         .Case([&](mlir::CallOpInterface callOp) {
           // Step into callees and get a coverage intersection of all return
           // sites.
-          auto callableOp =
-              callOp.resolveCallable(&solver.getExplorer().getSymbolTables());
+          auto callableOp = callOp.resolveCallableInTable(
+              &solver.getExplorer().getSymbolTables());
           unsigned resultIndex = llvm::cast<OpResult>(value).getResultNumber();
           gatherRegionReturns(callableOp, resultIndex);
         })
