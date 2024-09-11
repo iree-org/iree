@@ -1775,6 +1775,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datatiledmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DataTiledMMAAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#derivedthreadconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       DerivedThreadConfigAttr
@@ -4172,6 +4181,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datatiledmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      DataTiledMMAAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#derivedthreadconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       DerivedThreadConfigAttr
@@ -4596,6 +4614,7 @@ SPIR-V/LLVM are handled separately.</p>
 </li>
 <li><a href="#attributes_1">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
+<li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
 <li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
 <li><a href="#dotproductopsattr">DotProductOpsAttr</a></li>
 <li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
@@ -5015,6 +5034,62 @@ produces.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_mma_layout&lt;
+  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr,   # intrinsic
+  int64_t,   # unroll_m
+  int64_t,   # unroll_n
+  int64_t   # unroll_k
+&gt;
+</code></pre></div>
+<p>This mma variant represents MMA ops with data-tiling details. The
+|intrinsic| field specifies which particular MMA intrinsic is targeted by
+the data-tiling.</p>
+<p>The tile swizzling already happens, so the attribute does not need to
+implement materializeOperandConcreteShape interface method. E.g., if the
+target intrinsic is MFMA_F32_16x16x4_F32:
+  - The inner tile shape of LHS is 4x16.
+  - The inner tile shape of RHS is 4x16.
+  - The inner tile shape of ACC is 4x16x4.</p>
+<p>Furthermore, the unrolling and interleaving can be represented with the
+attribute. In the concept of data-tiling, we always unroll the parallel
+dimensions (i.e., M, N dimensions) to be outermost, and interleave the
+unrolled K dimension. I.e., the unrolled K dimension becomes the innermost
+dimension. The constraint can be relaxed based on data-tiling needs. The
+additional information can be added to <code>parameters</code>.</p>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">intrinsic</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">unroll_m</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">unroll_n</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">unroll_k</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="derivedthreadconfigattr">DerivedThreadConfigAttr<a class="headerlink" href="#derivedthreadconfigattr" title="Permanent link">link</a></h3>
 <pre><code>drive lowering of an operation by deriving thread distribution when needed.
 </code></pre>
@@ -5034,7 +5109,7 @@ tiling configs.</p>
 <p>Enum cases:
 * none (<code>None</code>)
 * dp4xi8toi32 (<code>DP4xI8ToI32</code>)</p>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5068,7 +5143,7 @@ tiling configs.</p>
 * reorder_workgroups_strategy: Enum attribute indicating which strategy to
   choose for the workgroup reordering pass. Options are <code>None</code>, <code>Swizzle</code>,
   and <code>Transpose</code>.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5105,7 +5180,7 @@ tiling configs.</p>
 <p>Enum cases:
 * parallel (<code>parallel</code>)
 * reduction (<code>reduction</code>)</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5129,7 +5204,7 @@ tiling configs.</p>
 &gt;
 </code></pre></div>
 <p>An attribute for mapping scf.forall ops to subgroup lanes.</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5156,7 +5231,7 @@ tiling configs.</p>
 <p>GPU specific implementation of a lowering config. This carries just a
 dictionary attribute to store any relevant fields. This is the simplest
 form of a lowering config, offering flexibility at the cost of structure.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5191,7 +5266,7 @@ and |cType| for matrices <code>A</code>, <code>B</code>, and <code>C</code> resp
 field specifies which particular MMA intrinsic this refers to, with each
 intrinsic implicating a specific MNK shape and operand types.
 See IREEGPUEnums.td for the definition of the intrinsics.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5257,7 +5332,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * WMMA_F32_16x16x16_F16 (<code>WMMA_F32_16x16x16_F16</code>)
 * WMMA_F16_16x16x16_F16 (<code>WMMA_F16_16x16x16_F16</code>)
 * WMMA_I32_16x16x16_I8 (<code>WMMA_I32_16x16x16_I8</code>)</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5280,7 +5355,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
   ::llvm::ArrayRef&lt;MMAAttr&gt;   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5307,7 +5382,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 </code></pre></div>
 <p>A schedule of MMA intrinsic instruction and various levels of tile sizes
 to solve a specific contraction problem.</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5345,7 +5420,7 @@ to solve a specific contraction problem.</p>
 * None (<code>None</code>)
 * Swizzle (<code>Swizzle</code>)
 * Transpose (<code>Transpose</code>)</p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5374,7 +5449,7 @@ to solve a specific contraction problem.</p>
 * b32 (<code>B32</code>)
 * b16 (<code>B16</code>)
 * b8 (<code>B8</code>)</p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5402,7 +5477,7 @@ to solve a specific contraction problem.</p>
 * none (<code>None</code>)
 * shuffle (<code>Shuffle</code>)
 * arithmetic (<code>Arithmetic</code>)</p>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5437,7 +5512,7 @@ to solve a specific contraction problem.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5481,7 +5556,7 @@ to solve a specific contraction problem.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5525,7 +5600,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
