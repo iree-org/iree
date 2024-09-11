@@ -114,42 +114,22 @@ static void unroll(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
   swizzle.permutation.insert(swizzle.permutation.begin(), dstIndexFirst);
 }
 
-// Returns the index of the dimension whose flattened size (flattening inner
-// dimensions into it) matches the given `targetSize`.
-static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
-                                      int64_t targetSize) {
-  int interleaveAt = 0;
-  int size = shape[0];
-  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
-    assert(size <= targetSize);
-    assert((targetSize % size) == 0);
-    if (size == targetSize) {
-      break;
-    }
-    size *= shape[interleaveAt];
-  }
-  return interleaveAt;
-}
-
 // Interleave the layout in `swizzle` by mutating `swizzle.permutation` to
 // move permutation[0], the outer-most dimension (which the unroll() function
-// created to be the unrolling dimension), to the appropriate inner dimension
-// index to ensure that the layout is interleaved exactly so that
-// `targetInterleavedElements` are made contiguous in the new layout.
+// created to be the unrolling dimension), to the inner dimension given by
+// `expandedDimIndexToInterleaveAt`.
 //
 // Example:
 //    Input swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
 //    Input srcIndex = 1
-//    Input targetInterleavedElements = 4
+//    Input expandedDimIndexToInterleaveAt = 1
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [2, 0, 1] }
 //
 static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
-                       int targetInterleavedElements) {
+                       int expandedDimIndexToInterleaveAt) {
   // Compute which inner dimension to permute the current outer dimension into.
   int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
-  int dstIndexToInterleaveAt =
-      dstIndexFirst + getDimIdxForTargetSize(swizzle.expandShape[srcIndex],
-                                             targetInterleavedElements);
+  int dstIndexToInterleaveAt = dstIndexFirst + expandedDimIndexToInterleaveAt;
 
   SmallVector<int64_t> outPermutation(swizzle.permutation.size());
   // The leading dimension, permutation[0], gets moved inwards to the
@@ -168,6 +148,30 @@ static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
   swizzle.permutation = outPermutation;
 }
 
+// Returns the index of the dimension whose flattened size (flattening inner
+// dimensions into it) matches the given `targetSize`. This is used to compute
+// interleaving indices.
+//
+// Example:
+//    Input shape = [16, 8, 4, 4]
+//    Input targetSize = 16
+// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
+//    whose product equals targetSize.
+static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
+                                      int64_t targetSize) {
+  int interleaveAt = 0;
+  int size = shape[0];
+  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
+    assert(size <= targetSize);
+    assert((targetSize % size) == 0);
+    if (size == targetSize) {
+      break;
+    }
+    size *= shape[interleaveAt];
+  }
+  return interleaveAt;
+}
+
 // Generates the swizzle for the full data-tiled-mma tile, including all the
 // relevant unrolling factors.
 static MaterializeEncodingInfo::Swizzle
@@ -184,7 +188,9 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
     // Unroll on K with interleaving, then on M.
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK());
-      interleave(swizzle, 1, targetPreferredLoadBitWidth / ABits);
+      int interleavingIdx = getDimIdxForTargetSize(
+          swizzle.expandShape[1], targetPreferredLoadBitWidth / ABits);
+      interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollM() > 1) {
       unroll(swizzle, 0, mma.getUnrollM());
@@ -196,7 +202,9 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
     // Unroll on K with interleaving, then on N.
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK());
-      interleave(swizzle, 1, targetPreferredLoadBitWidth / BBits);
+      int interleavingIdx = getDimIdxForTargetSize(
+          swizzle.expandShape[1], targetPreferredLoadBitWidth / BBits);
+      interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollN() > 1) {
       unroll(swizzle, 0, mma.getUnrollN());

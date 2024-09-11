@@ -29,7 +29,7 @@ struct MaterializeEncodingInfo {
   struct Swizzle {
     // This vector-of-vectors contains all the information needed to generate
     // a `tensor.expand_shape` creating additional internal dimensions into the
-    // tile. For example, expandShape = [ 16, [ 4, 2] ] means that the original
+    // tile. For example, expandShape = [[16], [4, 2]] means that the original
     // tile shape [16, 8] gets expanded such that the first dimension 16 is left
     // unchanged, and the second dimension 8 gets split into two internal dims
     // of size 4 and 2.
