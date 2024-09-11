@@ -22,7 +22,6 @@ BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
 
 CMAKE_ARGS=(
   "-G" "Ninja"
@@ -32,6 +31,8 @@ CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+  "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+  "-DCMAKE_C_COMPILER_LAUNCHER=sccache"
 )
 
 echo "::group::Configuring CMake"
@@ -45,10 +46,6 @@ echo "::endgroup::"
 echo "::group::Building test deps"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
 echo "::endgroup::"
-
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
-fi
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
