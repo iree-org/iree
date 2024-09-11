@@ -45,24 +45,17 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def load_onnx_model(raw_model: onnx.ModelProto,
+def load_onnx_model(model_path: IO[bytes] | str | os.PathLike,
                     data_prop: bool = True,
-                    data_dir: IO[bytes] | str | os.PathLike | None = None) -> onnx.ModelProto:
-    """Load an ONNX model with external data and perform shape inference.
+                    data_dir: str | os.PathLike | None = None) -> onnx.ModelProto:
+    input_dir = os.path.dirname(os.path.abspath(model_path))
 
-    Args:
-        raw_model (onnx.ModelProto): The ONNX model to load.
-        data_prop (bool, optional): Toggle data propagation for ONNX shape
-            inference. Defaults to True.
-        data_dir (IO[bytes] | str | os.PathLike | None, optional): Path to the
-            base directory of the model data. Defaults to None.
-
-    Returns:
-        onnx.ModelProto: The ONNX model with inferred shapes.
-    """
     # Load the model, with possible external data coming from the default
     # location, or the location specified on the command line.
-    if data_dir:
+    if data_dir is None:
+        raw_model = onnx.load(model_path)
+    else:
+        raw_model = onnx.load(model_path, load_external_data=False)
         onnx.load_external_data_for_model(raw_model, str(data_dir))
 
     # Do shape inference two ways.  First, attempt in-memory to avoid redundant
@@ -88,19 +81,17 @@ def load_onnx_model(raw_model: onnx.ModelProto,
     # Make a temp dir for all the temp files we'll be generating as a side
     # effect of infering shapes. For now, the only file is a new .onnx holding
     # the revised model with shapes.
-    with tempfile.TemporaryDirectory() as temp_dir_name:
+    with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
         temp_dir_path = Path(temp_dir_name)
-        temp_input_file = temp_dir_path / "temp.onnx"
         temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
-        onnx.save(raw_model, temp_input_file)
         onnx.shape_inference.infer_shapes_path(
-            temp_input_file, temp_inferred_file, data_prop=data_prop
+            model_path, temp_inferred_file, data_prop=data_prop
         )
 
         # Load the temp file and the external data.
         inferred_model = onnx.load(
             temp_inferred_file, load_external_data=False)
-        data_dir = Path(temp_input_file if data_dir is None else data_dir)
+        data_dir = Path(input_dir if data_dir is None else data_dir)
         onnx.load_external_data_for_model(inferred_model, str(data_dir))
 
         return inferred_model
@@ -141,7 +132,7 @@ class ImportOptions(CompilerOptions):
     data_dir: Optional[Path] = None
 
 
-def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
+def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
     """Import and compile an ONNX model.
 
     Args:
@@ -168,6 +159,9 @@ def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
             onnx_iree_input = os.path.join(tmpdir, "onnx-iree-input.mlirbc")
             # onnx_iree_input = io.BytesIO()
 
+        model = load_onnx_model(
+            model_path, options.data_prop, options.data_dir)
+
         # convert onnx model to version if needed 17
         opset_version = model.opset_import[0].version
         if opset_version < options.min_opset_version:
@@ -188,10 +182,6 @@ def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
 
         if options.entry_point_name:
             converted_model.graph.name = options.entry_point_name
-
-        # import onnx model
-        model_proto = load_onnx_model(
-            converted_model, options.data_prop, options.data_dir)
 
         logger.info("Importing graph: '%s' from onnx model",
                     model_proto.graph.name)
@@ -235,7 +225,7 @@ def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
         return result
 
 
-def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
     """Import and compile an ONNX model.
 
     Args:
@@ -246,5 +236,8 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
         None | str | IO[bytes]: If no output file is specified, the compiled
             model as a string or bytes depending on `output_format` and `use_bytecode`.
     """
-    model = onnx.load_model(model_path)
-    return compile_model(model, **kwargs)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_dir_path = Path(tmpdir)
+        temp_model_file = temp_dir_path / "temp.onnx"
+        onnx.save(model, temp_model_file)
+        return compile_saved_model(temp_model_file, **kwargs)
