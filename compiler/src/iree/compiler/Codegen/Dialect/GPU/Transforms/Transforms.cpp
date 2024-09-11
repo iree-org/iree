@@ -13,6 +13,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/MathExtras.h"
@@ -34,6 +35,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
@@ -128,8 +130,8 @@ static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
   }
   (*consumerChain.begin())
       ->replaceUsesOfWith(source, barrierRegionOp.getBody()->getArgument(0));
-  rewriter.replaceAllUsesExcept(extractSlice.getResult(), barrierRegionOp,
-                                terminator);
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(),
+                                barrierRegionOp.getResult(0), terminator);
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
@@ -975,20 +977,19 @@ struct LowerBarrierRegion
 
     // Step 1. Synchronize the workers on the shared dest.
     auto writeBarrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
-        loc, barrierRegionOp.getDest());
+        loc, barrierRegionOp.getInputs());
 
     // Step 2. Inline the barrier op region.
     auto terminator = barrierRegionOp.getBody()->getTerminator();
-    Value replacement = terminator->getOperand(0);
     rewriter.inlineBlockBefore(barrierRegionOp.getBody(), barrierRegionOp,
-                               {writeBarrier.getResult(0)});
-    rewriter.setInsertionPointAfterValue(replacement);
-    Value barrier;
+                               writeBarrier.getResults());
+    rewriter.setInsertionPoint(terminator);
 
     // Step 3. Synchronize the result value.
-    barrier = rewriter.create<IREE::GPU::ValueBarrierOp>(loc, replacement)
-                  .getResult(0);
-    rewriter.replaceAllUsesWith(barrierRegionOp.getResult(), barrier);
+    auto barrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
+        loc, terminator->getOperands());
+    rewriter.replaceAllUsesWith(barrierRegionOp.getResults(),
+                                barrier.getResults());
     rewriter.eraseOp(terminator);
     return success();
   }
@@ -1068,48 +1069,79 @@ struct VectorizeStaticMultiMmaOpPattern final
 static LogicalResult
 vectorizeStaticBarrierRegionResult(RewriterBase &rewriter,
                                    IREE::GPU::BarrierRegionOp barrier) {
-  auto tensorResultType =
-      dyn_cast<RankedTensorType>(barrier.getResult().getType());
-  if (!tensorResultType || !tensorResultType.hasStaticShape()) {
+  SmallVector<Type> newResultTypes(barrier->getResultTypes());
+  llvm::SmallBitVector vectorizationTargets(newResultTypes.size(), false);
+  for (auto [i, type] : llvm::enumerate(newResultTypes)) {
+    auto tensorResultType = dyn_cast<RankedTensorType>(type);
+    if (!tensorResultType || !tensorResultType.hasStaticShape()) {
+      continue;
+    }
+    vectorizationTargets[i] = true;
+    VectorType newResultType = VectorType::get(
+        tensorResultType.getShape(), tensorResultType.getElementType());
+    type = newResultType;
+  }
+
+  if (vectorizationTargets.none()) {
     return failure();
   }
 
-  VectorType newResultType = VectorType::get(tensorResultType.getShape(),
-                                             tensorResultType.getElementType());
-
-  auto paddingValue = rewriter.create<arith::ConstantOp>(
-      barrier.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
-
   auto newBarrier = rewriter.create<IREE::GPU::BarrierRegionOp>(
-      barrier.getLoc(), newResultType, barrier.getDest());
-
+      barrier.getLoc(), newResultTypes, barrier.getInputs());
   auto currentTerminator =
       cast<IREE::GPU::YieldOp>(barrier.getBody()->getTerminator());
+  rewriter.setInsertionPointToEnd(newBarrier.getBody());
   rewriter.mergeBlocks(barrier.getBody(), newBarrier.getBody(),
                        newBarrier.getBody()->getArguments());
-  rewriter.setInsertionPointToEnd(newBarrier.getBody());
 
-  auto innerRead = vector::createReadOrMaskedRead(
-      rewriter, currentTerminator.getLoc(), currentTerminator->getOperand(0),
-      newResultType.getShape(), paddingValue,
-      /*useInBoundsInsteadOfMasking=*/true);
-  rewriter.create<IREE::GPU::YieldOp>(currentTerminator->getLoc(), innerRead);
+  // Create the tensor -> vector conversions within the body of the new op.
+  SmallVector<Value> newYields = currentTerminator.getOperands();
+  for (auto [i, val] : llvm::enumerate(newYields)) {
+    if (!vectorizationTargets[i]) {
+      continue;
+    }
+
+    auto resultType = cast<VectorType>(newResultTypes[i]);
+    auto paddingValue = rewriter.create<arith::ConstantOp>(
+        barrier.getLoc(), rewriter.getZeroAttr(resultType.getElementType()));
+
+    auto innerRead =
+        vector::createReadOrMaskedRead(rewriter, currentTerminator.getLoc(),
+                                       val, resultType.getShape(), paddingValue,
+                                       /*useInBoundsInsteadOfMasking=*/true);
+    val = innerRead;
+  }
+
+  rewriter.create<IREE::GPU::YieldOp>(currentTerminator->getLoc(), newYields);
   rewriter.eraseOp(currentTerminator);
 
   rewriter.setInsertionPointAfter(newBarrier);
 
-  // Create the write back to a tensor.
-  auto empty = rewriter.create<tensor::EmptyOp>(
-      barrier.getLoc(), tensorResultType.getShape(),
-      tensorResultType.getElementType());
-  int64_t rank = tensorResultType.getRank();
-  auto zero = rewriter.create<arith::ConstantIndexOp>(barrier.getLoc(), 0);
-  rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      barrier,
-      /*vector=*/newBarrier,
-      /*source=*/empty,
-      /*indices=*/SmallVector<Value>(rank, zero),
-      /*inBounds=*/SmallVector<bool>(rank, true));
+  // Create the writes back to tensor types.
+  SmallVector<Value> replacements = newBarrier.getResults();
+  for (auto [i, val] : llvm::enumerate(replacements)) {
+    if (!vectorizationTargets[i]) {
+      continue;
+    }
+
+    auto tensorResultType =
+        cast<RankedTensorType>(barrier->getResultTypes()[i]);
+    auto empty = rewriter.create<tensor::EmptyOp>(
+        barrier.getLoc(), tensorResultType.getShape(),
+        tensorResultType.getElementType());
+    int64_t rank = tensorResultType.getRank();
+    auto zero = rewriter.create<arith::ConstantIndexOp>(barrier.getLoc(), 0);
+    auto write = rewriter.create<vector::TransferWriteOp>(
+        barrier.getLoc(),
+        /*vector=*/val,
+        /*dest=*/empty,
+        /*indices=*/SmallVector<Value>(rank, zero),
+        /*inBounds=*/SmallVector<bool>(rank, true));
+    val = write->getResult(0);
+  }
+
+  rewriter.replaceOp(barrier, replacements);
+
   return success();
 }
 
