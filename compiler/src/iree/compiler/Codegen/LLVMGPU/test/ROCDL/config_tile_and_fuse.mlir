@@ -59,9 +59,9 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 4 : index]
-//  CHECK-SAME:     subgroup = [2 : index, 4 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [64 : index, 128 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0 : index, 0 : index, 2 : index]
+//  CHECK-SAME:     subgroup = [4 : index, 4 : index, 0 : index]
+//  CHECK-SAME:     workgroup = [128 : index, 128 : index, 0 : index]
 
 // -----
 
