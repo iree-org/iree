@@ -73,13 +73,13 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
       // really needed.
       switch (params.size()) {
       case 0: {
-        os << formatv("failed({0})", formatv(expr.data()));
+        os << "failed(" << formatv(expr.data()) << ")";
         break;
       }
       case 1: {
         std::string param =
             "get" + llvm::convertToCamelFromSnakeCase(params.front(), true);
-        os << formatv("failed({0})", formatv(expr.data(), param));
+        os << "failed(" << formatv(expr.data(), param) << ")";
         break;
       }
       default: {

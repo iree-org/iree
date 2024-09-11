@@ -293,8 +293,8 @@ static void prettyPrintStreamInfo(const UsageInfo &usageInfo,
                                   llvm::raw_fd_ostream &os) {
   auto parentOp = executeOp->getParentOfType<mlir::FunctionOpInterface>();
 
-  prettyPrintItemHeader(llvm::formatv("stream.cmd.execute {0}",
-                                      parentOp->getName().getStringRef()),
+  prettyPrintItemHeader(llvm::Twine("stream.cmd.execute ") +
+                            parentOp->getName().getStringRef(),
                         os);
   os << "// ";
   prettyPrintOpBreadcrumb(executeOp, os);
