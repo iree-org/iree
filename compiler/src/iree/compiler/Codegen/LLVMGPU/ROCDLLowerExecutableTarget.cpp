@@ -51,6 +51,9 @@ public:
       return;
     }
 
+    IREE::GPU::GPUPipelineOptions pipelineOptions =
+        IREE::GPU::getPipelineOptions(funcOp, translationInfo);
+
     std::optional<OpPassManager> maybePipeline =
         getFunctionOpInterfacePassManager(funcOp);
     if (!maybePipeline) {
@@ -68,7 +71,7 @@ public:
       addGPUWarpReductionPassPipeline(pipeline);
       break;
     case CodeGenPipeline::LLVMGPUTileAndFuse:
-      addGPUTileAndFusePassPipeline(pipeline);
+      addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
       break;
     // If no pipeline specified, then nothing to do.
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
