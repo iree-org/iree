@@ -45,18 +45,22 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def load_onnx_model(model_path: IO[bytes] | str | os.PathLike,
+def load_onnx_model(model_path: str | os.PathLike,
                     data_prop: bool = True,
-                    data_dir: str | os.PathLike | None = None) -> onnx.ModelProto:
+                    data_dir: str | os.PathLike | None = None,
+                    preprocess_model: bool = True) -> onnx.ModelProto:
     input_dir = os.path.dirname(os.path.abspath(model_path))
 
     # Load the model, with possible external data coming from the default
     # location, or the location specified on the command line.
     if data_dir is None:
-        raw_model = onnx.load(model_path)
+        model = onnx.load(model_path)
     else:
-        raw_model = onnx.load(model_path, load_external_data=False)
-        onnx.load_external_data_for_model(raw_model, str(data_dir))
+        model = onnx.load(model_path, load_external_data=False)
+        onnx.load_external_data_for_model(model, str(data_dir))
+
+    if not preprocess_model:
+        return model
 
     # Do shape inference two ways.  First, attempt in-memory to avoid redundant
     # loading and the need for writing a temporary file somewhere.  If that
@@ -68,9 +72,9 @@ def load_onnx_model(model_path: IO[bytes] | str | os.PathLike,
     # Run the checker to test whether the file is above the threshold for
     # in-memory shape inference.  If not, go ahead and do the shape inference.
     try:
-        onnx.checker.check_model(raw_model)
+        onnx.checker.check_model(model)
         inferred_model = onnx.shape_inference.infer_shapes(
-            raw_model, data_prop=data_prop
+            model, data_prop=data_prop
         )
         return inferred_model
     except ValueError:
@@ -121,6 +125,7 @@ class ImportOptions(CompilerOptions):
             Default is None.
     """
     input_type: Union[InputType, str] = InputType.ONNX
+    preprocess_model: bool = True
     min_opset_version: int = 17
     entry_point_name: Optional[str] = None
     module_name: Optional[str] = None
@@ -132,11 +137,12 @@ class ImportOptions(CompilerOptions):
     data_dir: Optional[Path] = None
 
 
-def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+def compile_saved_model(model_path: str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
     """Import and compile an ONNX model.
 
     Args:
-        model_path onnx.ModelProto: The ONNX model to import and compile.
+        model_path onnx.ModelProto: The path for the ONNX model to
+            import and compile.
 
     Returns:
         None | str | IO[bytes]: If no output file is specified, the compiled
@@ -160,7 +166,7 @@ def compile_saved_model(model_path: IO[bytes] | str | os.PathLike, **kwargs) -> 
             # onnx_iree_input = io.BytesIO()
 
         model = load_onnx_model(
-            model_path, options.data_prop, options.data_dir)
+            model_path, options.data_prop, options.data_dir, options.preprocess_model)
 
         # convert onnx model to version if needed 17
         opset_version = model.opset_import[0].version
@@ -229,8 +235,7 @@ def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
     """Import and compile an ONNX model.
 
     Args:
-        model IO[bytes] | str | os.PathLike: The path for the ONNX model to
-            import and compile.
+        model str | os.PathLike: The ONNX model to import and compile.
 
     Returns:
         None | str | IO[bytes]: If no output file is specified, the compiled

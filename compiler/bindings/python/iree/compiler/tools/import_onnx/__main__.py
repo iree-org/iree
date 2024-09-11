@@ -26,6 +26,7 @@ def main(args: argparse.Namespace):
     compile_saved_model(args.input_file,
                         output_file=output_file,
                         min_opset_version=args.min_opset_version,
+                        preprocess_model=args.preprocess_model,
                         entry_point_name=args.entry_point_name,
                         module_name=args.module_name,
                         import_only=True,
@@ -65,6 +66,13 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         " be converted to this version",
         type=int,
         default=17,
+        required=False,
+    )
+    parser.add_argument(
+        "--preprocess-model",
+        help="Perform shape inference when importing the model.",
+        type=bool,
+        default=True,
         required=False,
     )
     parser.add_argument(
