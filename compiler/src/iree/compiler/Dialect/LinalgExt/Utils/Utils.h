@@ -139,6 +139,12 @@ bool isBitTruncateOp(Operation *op);
 ///     6. Has a body with only a linalg.yield op.
 bool isBroadcastingOp(linalg::LinalgOp op);
 
+/// Returns true if the operation is a `linalg.generic` that is similar in
+/// effect to a gather.
+/// This function checks that the genericOp:
+///     1. Has a single input and output.
+///     2. Has all parallel loops.
+///     2. `linalg.yield` consumes the result of a `tensor.extract_slice`
 bool isGatherlikeOp(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

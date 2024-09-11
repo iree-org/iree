@@ -45,7 +45,7 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
 
 // TODO(#18457, #18447): Remove once backends support gather fusion.
 static llvm::cl::opt<bool>
-    clEnableGatherFusion("iree-dispatch-creation-enable-gather-fusion",
+    clEnableGatherFusion("iree-flow-enable-gather-fusion",
                          llvm::cl::desc("Fuse gather-like ops with consumer."),
                          llvm::cl::init(false));
 
