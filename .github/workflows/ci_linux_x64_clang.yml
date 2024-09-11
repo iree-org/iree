@@ -47,9 +47,9 @@ jobs:
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      # TODO(#18238): add local or remote ccache
       - name: CMake - configure
         run: |
+          source ./build_tools/cmake/setup_sccache.sh
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
@@ -59,13 +59,9 @@ jobs:
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
             -DIREE_BUILD_DOCS=ON \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
       - name: CMake - build
         run: |
-          sccache --zero-stats
-          sccache --show-stats
           cmake --build ${BUILD_DIR} -- -k 0
           cmake --build ${BUILD_DIR} --target install -- -k 0
           cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
