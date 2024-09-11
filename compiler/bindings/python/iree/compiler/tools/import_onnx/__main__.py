@@ -17,13 +17,13 @@ Or from Python:
 import argparse
 from pathlib import Path
 import sys
-from ..onnx import compile_saved_model
+from ..onnx import compile_onnx_model
 
 
 def main(args: argparse.Namespace):
     output_file = None if args.output_file == "-" else args.output_file
 
-    compile_saved_model(args.input_file,
+    compile_onnx_model(args.input_file,
                         output_file=output_file,
                         min_opset_version=args.min_opset_version,
                         preprocess_model=args.preprocess_model,

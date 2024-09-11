@@ -45,19 +45,25 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def load_onnx_model(model_path: str | os.PathLike,
-                    data_prop: bool = True,
-                    data_dir: str | os.PathLike | None = None,
-                    preprocess_model: bool = True) -> onnx.ModelProto:
-    input_dir = os.path.dirname(os.path.abspath(model_path))
-
-    # Load the model, with possible external data coming from the default
-    # location, or the location specified on the command line.
-    if data_dir is None:
-        model = onnx.load(model_path)
+def preprocess_onnx_model(model_or_path: onnx.ModelProto | str | os.PathLike,
+                          data_prop: bool = True,
+                          data_dir: str | os.PathLike | None = None,
+                          load_external_data: bool = True,
+                          preprocess_model: bool = True,
+                          min_opset_version: int = 17) -> onnx.ModelProto:
+    if isinstance(model_or_path, onnx.ModelProto):
+        model_path = None
+        model = model_or_path
+    elif data_dir is None:
+        # Load the model, with possible external data coming from the default
+        # location, or the location specified on the command line.
+        model_path = model_or_path
+        model = onnx.load(model_path, load_external_data=load_external_data)
     else:
+        model_path = model_or_path
         model = onnx.load(model_path, load_external_data=False)
-        onnx.load_external_data_for_model(model, str(data_dir))
+        if load_external_data:
+            onnx.load_external_data_for_model(model, str(data_dir))
 
     if not preprocess_model:
         return model
@@ -76,29 +82,58 @@ def load_onnx_model(model_path: str | os.PathLike,
         inferred_model = onnx.shape_inference.infer_shapes(
             model, data_prop=data_prop
         )
-        return inferred_model
     except ValueError:
-        pass
+        # Model is too big for in-memory inference: do file-based shape inference
+        # to a temp file.
+        # Make a temp dir for all the temp files we'll be generating as a side
+        # effect of infering shapes. For now, the only file is a new .onnx holding
+        # the revised model with shapes.
+        if model_path:
+            input_dir = os.path.dirname(os.path.abspath(model_path))
+        else:
+            input_dir = None
 
-    # Model is too big for in-memory inference: do file-based shape inference
-    # to a temp file.
-    # Make a temp dir for all the temp files we'll be generating as a side
-    # effect of infering shapes. For now, the only file is a new .onnx holding
-    # the revised model with shapes.
-    with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
-        temp_dir_path = Path(temp_dir_name)
-        temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
-        onnx.shape_inference.infer_shapes_path(
-            model_path, temp_inferred_file, data_prop=data_prop
-        )
+        with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
+            temp_dir_path = Path(temp_dir_name)
+            temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
 
-        # Load the temp file and the external data.
-        inferred_model = onnx.load(
-            temp_inferred_file, load_external_data=False)
-        data_dir = Path(input_dir if data_dir is None else data_dir)
-        onnx.load_external_data_for_model(inferred_model, str(data_dir))
+            if model_path is None:
+                model_path = temp_dir_path / "temp-model.onnx"
+                # TODO: should we save_as_external_data?
+                onnx.save_model(model, model_path)
 
-        return inferred_model
+            onnx.shape_inference.infer_shapes_path(
+                model_path, temp_inferred_file, data_prop=data_prop
+            )
+
+            # Load the temp file and the external data.
+            inferred_model = onnx.load(
+                temp_inferred_file, load_external_data=False)
+
+            if load_external_data and not input_dir is None:
+                data_dir = Path(input_dir if data_dir is None else data_dir)
+                onnx.load_external_data_for_model(
+                    inferred_model, str(data_dir))
+
+    # convert onnx model to version if needed 17
+    opset_version = inferred_model.opset_import[0].version
+    if opset_version < min_opset_version:
+        logger.info("Converting onnx model opset version from %s to %s",
+                    opset_version, min_opset_version)
+        try:
+            converted_model = onnx.version_converter.convert_version(
+                inferred_model, min_opset_version)
+        except ValueError:
+            # Conversion failed. Do our best with the original file.
+            logger.warning("Converting onnx model opset version from %s "
+                           "to %s failed. Continuning without conversion.",
+                           opset_version, min_opset_version)
+            converted_model = inferred_model
+    else:
+        # No conversion needed.
+        converted_model = inferred_model
+
+    return converted_model
 
 
 @dataclass
@@ -137,11 +172,11 @@ class ImportOptions(CompilerOptions):
     data_dir: Optional[Path] = None
 
 
-def compile_saved_model(model_path: str | os.PathLike, **kwargs) -> None | str | IO[bytes]:
+def compile_onnx_model(model_or_path: onnx.ModelProto | str | os.PathLike, **kwargs) -> None | str | bytes:
     """Import and compile an ONNX model.
 
     Args:
-        model_path onnx.ModelProto: The path for the ONNX model to
+        model_or_path onnx.ModelProto: The path for the ONNX model to
             import and compile.
 
     Returns:
@@ -165,34 +200,20 @@ def compile_saved_model(model_path: str | os.PathLike, **kwargs) -> None | str |
             onnx_iree_input = os.path.join(tmpdir, "onnx-iree-input.mlirbc")
             # onnx_iree_input = io.BytesIO()
 
-        model = load_onnx_model(
-            model_path, options.data_prop, options.data_dir, options.preprocess_model)
-
-        # convert onnx model to version if needed 17
-        opset_version = model.opset_import[0].version
-        if opset_version < options.min_opset_version:
-            logger.info("Converting onnx model opset version from %s to %s",
-                        opset_version, options.min_opset_version)
-            try:
-                converted_model = onnx.version_converter.convert_version(
-                    model, options.min_opset_version)
-            except:
-                # Conversion failed. Do our best with the original file.
-                logger.warning("Converting onnx model opset version from %s "
-                               "to %s failed. Continuning without conversion.",
-                               opset_version, options.min_opset_version)
-                converted_model = model
-        else:
-            # No conversion needed.
-            converted_model = model
+        model = preprocess_onnx_model(model_or_path,
+                                      options.data_prop,
+                                      options.data_dir,
+                                      True,
+                                      options.preprocess_model,
+                                      options.min_opset_version)
 
         if options.entry_point_name:
-            converted_model.graph.name = options.entry_point_name
+            model.graph.name = options.entry_point_name
 
         logger.info("Importing graph: '%s' from onnx model",
-                    model_proto.graph.name)
+                    model.graph.name)
         context = Context()
-        model_info = onnx_importer.ModelInfo(model_proto)
+        model_info = onnx_importer.ModelInfo(model)
         module = model_info.create_module(context=context).operation
 
         if options.module_name:
@@ -229,20 +250,3 @@ def compile_saved_model(model_path: str | os.PathLike, **kwargs) -> None | str |
         if options.output_file:
             return None
         return result
-
-
-def compile_model(model: onnx.ModelProto, **kwargs) -> None | str | IO[bytes]:
-    """Import and compile an ONNX model.
-
-    Args:
-        model str | os.PathLike: The ONNX model to import and compile.
-
-    Returns:
-        None | str | IO[bytes]: If no output file is specified, the compiled
-            model as a string or bytes depending on `output_format` and `use_bytecode`.
-    """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        temp_dir_path = Path(tmpdir)
-        temp_model_file = temp_dir_path / "temp.onnx"
-        onnx.save(model, temp_model_file)
-        return compile_saved_model(temp_model_file, **kwargs)
