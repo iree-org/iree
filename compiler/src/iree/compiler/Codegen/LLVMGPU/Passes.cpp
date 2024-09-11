@@ -1110,7 +1110,10 @@ static LogicalResult igemmConfigFn(linalg::GenericOp genericOp,
   if (!target) {
     return funcOp.emitError("missing GPU target in parent funcOp");
   }
-  return IREE::GPU::setMatmulLoweringConfig(target, funcOp, genericOp);
+  if (failed(IREE::GPU::setMatmulLoweringConfig(target, funcOp, genericOp))) {
+    return IREE::GPU::setTileAndFuseLoweringConfig(target, funcOp, genericOp);
+  }
+  return success();
 }
 
 static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
