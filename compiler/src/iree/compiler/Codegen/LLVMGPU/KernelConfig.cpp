@@ -626,8 +626,10 @@ static LogicalResult
 setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      mlir::FunctionOpInterface entryPoint,
                                      IREE::LinalgExt::AttentionOp op) {
-  if (target.getWgp().getMma().empty())
+  if (target.getWgp().getMma().empty()) {
+    llvm::outs() << "Tragedy 0";
     return failure();
+  }
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
@@ -649,6 +651,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       ShapedType::isDynamic(bounds[k1Dim]) ||
       ShapedType::isDynamic(bounds[k2Dim]) ||
       ShapedType::isDynamic(bounds[nDim])) {
+    llvm::outs() << "Tragedy 1";
     return failure();
   }
 
@@ -668,8 +671,10 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
-  if (intrinsics.empty())
+  if (intrinsics.empty()) {
+    llvm::outs() << "Tragedy 2";
     return failure();
+  }
 
   // We assume that P uses the element type of V for input
   // and both matmuls have f32 as output. It is possible to use other element
@@ -721,6 +726,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
       targetSubgroupSize, transposedQ, transposedK, transposedV);
   if (!schedule) {
+    llvm::outs() << "sadness\n";
     // Then try again by allowing upcasting accumulator.
     schedule = deduceAttentionSchedule(
         qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
@@ -730,7 +736,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   if (!schedule) {
     LDBG("Failed to deduce Attention schedule");
-    return failure();
+    llvm::outs() << "Tragedy 3"; return failure();
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
