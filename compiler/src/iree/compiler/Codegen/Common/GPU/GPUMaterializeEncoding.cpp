@@ -160,7 +160,7 @@ static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
 static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
                                       int64_t targetSize) {
   int interleaveAt = 0;
-  int size = shape[0];
+  int size = 1;
   for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
     assert(size <= targetSize);
     assert((targetSize % size) == 0);
@@ -189,7 +189,8 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK());
       int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1], targetPreferredLoadBitWidth / ABits);
+          swizzle.expandShape[1],
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * ABits));
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollM() > 1) {
@@ -203,7 +204,8 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK());
       int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1], targetPreferredLoadBitWidth / BBits);
+          swizzle.expandShape[1],
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * BBits));
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollN() > 1) {
