@@ -83,7 +83,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
         break;
       }
       default: {
-        assert(0 && "unhandled parameter size");
+        assert(false && "unhandled parameter size");
         break;
       }
       }
