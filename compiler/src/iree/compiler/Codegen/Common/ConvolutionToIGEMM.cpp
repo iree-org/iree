@@ -5,10 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -24,8 +26,53 @@ namespace {
 
 using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
 
+struct SetIGEMMConfiguration : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  SetIGEMMConfiguration(MLIRContext *context, ConfigFn configFn)
+      : OpRewritePattern(context), configFn(configFn) {}
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalg::isaContractionOpInterface(genericOp)) {
+      return failure();
+    }
+
+    auto im2colOp =
+        genericOp.getOperand(0).getDefiningOp<IREE::LinalgExt::Im2colOp>();
+    if (!im2colOp) {
+      return rewriter.notifyMatchFailure(genericOp, "no im2colOp producer.");
+    }
+
+    if (getLoweringConfig(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "genericOp has a lowering config.");
+    }
+    if (getLoweringConfig(im2colOp)) {
+      return rewriter.notifyMatchFailure(im2colOp,
+                                         "im2colOp has a lowering config.");
+    }
+
+    if (failed(configFn(genericOp, im2colOp))) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "failed to set config on igemm_conv.");
+    }
+
+    return success();
+  }
+
+private:
+  ConfigFn configFn;
+};
+
 class ConvolutionToIGEMMPass final
     : public impl::ConvolutionToIGEMMPassBase<ConvolutionToIGEMMPass> {
+public:
+  using impl::ConvolutionToIGEMMPassBase<
+      ConvolutionToIGEMMPass>::ConvolutionToIGEMMPassBase;
+
+  explicit ConvolutionToIGEMMPass(ConfigFn configFn) : configFn(configFn) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<tensor::TensorDialect, IREELinalgExtDialect>();
   }
@@ -41,9 +88,11 @@ class ConvolutionToIGEMMPass final
         }
         return true;
       };
-      RewritePatternSet patterns(&getContext());
+      MLIRContext *context = &getContext();
+      RewritePatternSet patterns(context);
       iree_compiler::IREE::LinalgExt::populateConv2DToIm2colOpPatterns(
           patterns, conv2dToIm2colControlFn);
+      patterns.insert<SetIGEMMConfiguration>(context, configFn);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
@@ -94,7 +143,19 @@ class ConvolutionToIGEMMPass final
       }
     }
   }
+
+private:
+  ConfigFn configFn = [](linalg::GenericOp genericOp,
+                         IREE::LinalgExt::Im2colOp im2colOp) {
+    return success();
+  };
 };
 
 } // namespace
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConvolutionToIGEMMPass(ConfigFn configFn) {
+  return std::make_unique<ConvolutionToIGEMMPass>(configFn);
+}
+
 } // namespace mlir::iree_compiler
