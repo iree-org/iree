@@ -9,7 +9,6 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypes.h"
 
 #include <numeric>
 
@@ -123,10 +122,12 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
         tensorType, maybeEncodingInfo->innerTileSizes,
         maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
 
+    // There is no swizzle, we are already done. Typically the case on CPU.
     if (!encodingInfo.swizzle) {
       return packedType;
     }
 
+    // There is a swizzle, we need to handle it. Typically the case on GPU.
     auto swizzle = *encodingInfo.swizzle;
     SmallVector<int64_t> newShape(
         packedType.getShape().drop_back(encodingInfo.innerTileSizes.size()));

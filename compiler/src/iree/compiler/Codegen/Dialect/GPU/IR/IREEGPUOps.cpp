@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include <functional>
-#include <memory>
 #include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"

@@ -30,7 +30,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -525,8 +524,8 @@ int64_t MMAAttr::getBlockSize() const {
   return 0;
 }
 
-int64_t MMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic().getValue()) {
+static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+  switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
@@ -545,6 +544,10 @@ int64_t MMAAttr::getSubgroupSize() const {
   }
   // This should not happen but just to make GCC happy.
   return 0;
+}
+
+int64_t MMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
@@ -893,25 +896,7 @@ DataTiledMMAAttr::getABCVectorTypes() const {
 }
 
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F32_16x16x4_F32:
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
-  case MMAIntrinsic::MFMA_I32_32x32x16_I8:
-  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
-  case MMAIntrinsic::MFMA_I32_32x32x8_I8: {
-    return 64;
-  }
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_I32_16x16x16_I8: {
-    return 32;
-  }
-  }
-  // This should not happen but just to make GCC happy.
-  return 0;
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
 //===----------------------------------------------------------------------===//
