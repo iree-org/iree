@@ -39,6 +39,13 @@ llvm::SmallVector<linalg::ProcInfo, 2>
 getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
                         unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups);
 
+/// Indicates whether the given array of DeviceMappingAttrInterfaces is a
+/// descending relative mapping, for example:
+///  [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>]
+/// or
+///  [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+bool isDescendingRelativeMappingIndices(ArrayRef<Attribute> array);
+
 // Indicates whether the given `scf.forall` op has a processor ID mapping of
 // the template type(s).
 template <typename... Type>

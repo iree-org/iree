@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -59,24 +60,10 @@ getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
     return failure();
   }
 
-  auto isDescendingRelativeIndices = [&](ArrayRef<Attribute> array) {
-    int64_t prev =
-        llvm::cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
-    for (Attribute attr : array.drop_front()) {
-      int64_t relativeIndex =
-          llvm::cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
-      if (relativeIndex != prev - 1) {
-        return false;
-      }
-      prev = relativeIndex;
-    }
-    return true;
-  };
-
   // Require descending relative indices so that the linearization and
   // delinearization done in subsequent steps are valid.
-  if (!isDescendingRelativeIndices(producerMapping) ||
-      !isDescendingRelativeIndices(consumerMapping)) {
+  if (!isDescendingRelativeMappingIndices(producerMapping) ||
+      !isDescendingRelativeMappingIndices(consumerMapping)) {
     return failure();
   }
 
@@ -168,23 +155,12 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
     return failure();
   }
 
-  auto isAll = [](ArrayRef<OpFoldResult> array, int64_t cmp) {
-    return llvm::all_of(array, [cmp](OpFoldResult val) {
-      return isConstantIntValue(val, cmp);
-    });
-  };
-
-  // Verify that both loops are normalized.
-  if (!isAll(producer.getMixedStep(), 1) ||
-      !isAll(producer.getMixedLowerBound(), 0)) {
+  // Verify that all loops are normalized.
+  if (!producer.isNormalized() ||
+      !llvm::all_of(consumerLoopNest.value(), [](scf::ForallOp forall) {
+        return forall.isNormalized();
+      })) {
     return failure();
-  }
-
-  for (auto loop : *consumerLoopNest) {
-    if (!isAll(loop.getMixedStep(), 1) ||
-        !isAll(loop.getMixedLowerBound(), 0)) {
-      return failure();
-    }
   }
 
   rewriter.setInsertionPoint(slice);

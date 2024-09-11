@@ -589,15 +589,19 @@ hal.executable public @main {
   }
 }
 
-// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 * 8)>
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 8 + s2 * 32)>
+// CHECK: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 * 8 + s1)>
 
 // CHECK-LABEL: func @skinny_matmul_config
 
 //   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
-//       CHECK:   %[[LINID:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]]]
+//   CHECK-DAG:   %[[IDZ:.+]] = gpu.thread_id  z
+//       CHECK:   %[[LINID0:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]], %[[IDZ]]]
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c8, %c4) : index, index
+//       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#1, %[[IDS]]#0]
 //       CHECK:   scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
-//       CHECK:     scf.for %{{.*}} = %[[LINID]] to %c4 step %c32
+//       CHECK:     scf.for %{{.*}} = %[[LINID1]] to %c4 step %c32
 //       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}storage_buffer>>, vector<4xf32>
 //       CHECK:       vector.transfer_write %[[READ]], %{{.*}} : vector<4xf32>, memref<4x6xf32, #gpu.address_space<workgroup>>
 //       CHECK:     vector.contract

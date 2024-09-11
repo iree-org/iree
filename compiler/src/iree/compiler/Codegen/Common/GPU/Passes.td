@@ -31,9 +31,20 @@ def GPUCreateFastSlowPathPass :
   let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
+def GPUDistributeForallPass :
+    InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute scf.forall ops.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+}
+
 def GPUDistributePass :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to distribute scf.forall ops.";
+  let summary = "Pass to distribute scf.forall ops using upstream patterns.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
     "::mlir::gpu::GPUDialect",
