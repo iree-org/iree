@@ -57,14 +57,15 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   Operation *tilableOp = nullptr;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (getLoweringConfig(op)) {
-      if (!getLoweringConfig(op).hasWorkgroupTilingLevel()) {
-        continue;
-      }
-      if (tilableOp) {
-        return op->emitOpError("expected only one op with a workgroup tiling"
-                               "level.");
-      }
+      // if (!getLoweringConfig(op).hasWorkgroupTilingLevel()) {
+      //   continue;
+      // }
+      // if (tilableOp) {
+      //   return op->emitOpError("expected only one op with a workgroup tiling"
+      //                          "level.");
+      // }
       tilableOp = op;
+      break;
     }
   }
   if (!tilableOp) {

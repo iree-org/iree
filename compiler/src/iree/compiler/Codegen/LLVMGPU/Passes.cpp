@@ -79,6 +79,12 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clGPUTileDispatchUsingForall(
+    "iree-llvmgpu-tile-dispatch-using-forall",
+    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall "
+                   "in GPU pipeline"),
+    llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -193,15 +199,21 @@ static void tileAndDistributeToWorkgroup(
     OpPassManager &funcPassManager,
     std::optional<ConvertToDestinationPassingStylePassOptions>
         convertToDpsOptions = ConvertToDestinationPassingStylePassOptions{}) {
-  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
-      kNumMaxParallelDims,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters));
-  funcPassManager.addPass(createCSEPass());
-
-  if (convertToDpsOptions) {
+  if (clGPUTileDispatchUsingForall) {
     funcPassManager.addPass(
-        createConvertToDestinationPassingStylePass(*convertToDpsOptions));
+        createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  } else {
+    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
+        kNumMaxParallelDims,
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters));
+    funcPassManager.addPass(createCSEPass());
+
+    if (convertToDpsOptions) {
+      funcPassManager.addPass(
+          createConvertToDestinationPassingStylePass(*convertToDpsOptions));
+    }
   }
+
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
