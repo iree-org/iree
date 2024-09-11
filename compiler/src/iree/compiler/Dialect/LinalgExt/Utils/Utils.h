@@ -31,10 +31,12 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
 
 /// Returns a `memref.subview` or a `tensor.extract_slice` based on the type of
 /// `src`.
-Value getSlice(OpBuilder &b, Location loc, Value src, ArrayRef<Range> slice);
-Value getSlice(OpBuilder &b, Location loc, Value src,
-               ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-               ArrayRef<OpFoldResult> strides);
+Operation *getSlice(OpBuilder &b, Location loc, Value src,
+                    ArrayRef<Range> slice);
+Operation *getSlice(OpBuilder &b, Location loc, Value src,
+                    ArrayRef<OpFoldResult> offsets,
+                    ArrayRef<OpFoldResult> sizes,
+                    ArrayRef<OpFoldResult> strides);
 
 /// Returns a `memref.cast` or `tensor.cast` based on the type of `src`.
 Value castValue(OpBuilder &builder, Location loc, Value src, ShapedType type);

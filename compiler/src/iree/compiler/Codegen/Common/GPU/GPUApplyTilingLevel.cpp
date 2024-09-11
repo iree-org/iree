@@ -132,17 +132,22 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
 
     scf::SCFTileAndFuseOptions::ControlFnTy controlFn =
         [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
-            bool isDestinationOperand) {
-          Operation *owner = originalProducer.getOwner();
-          bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
-          bool shouldFuse = false;
-          if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
-            shouldFuse = !payloadOps.contains(tilingOwner);
-          }
-          // Do not fuse destination operands.
-          shouldFuse &= !isDestinationOperand;
-          return std::make_tuple(shouldFuse, yieldProducerReplacement);
-        };
+            bool isDestinationOperand)
+        -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
+      Operation *owner = originalProducer.getOwner();
+      bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
+      bool shouldFuse = false;
+      if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
+        shouldFuse = !payloadOps.contains(tilingOwner);
+      }
+      // Do not fuse destination operands.
+      shouldFuse &= !isDestinationOperand;
+      if (shouldFuse) {
+        return scf::SCFTileAndFuseOptions::ControlFnResult{
+            yieldProducerReplacement};
+      }
+      return std::nullopt;
+    };
     tileAndFuseOptions.setFusionControlFn(controlFn);
 
     FailureOr<scf::SCFTileAndFuseResult> tiledResults =
