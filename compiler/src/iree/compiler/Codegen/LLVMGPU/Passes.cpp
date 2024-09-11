@@ -25,6 +25,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -1071,6 +1072,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   if (forROCDL) {
     // convert to ROCDL.
     modulePassManager.addPass(createConvertToROCDLPass());
+    // Handle leftover math ops.
+    modulePassManager.addPass(createConvertMathToLLVMPass());
   } else {
     // convert to NVVM.
     modulePassManager.addPass(createConvertToNVVMPass());

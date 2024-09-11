@@ -188,7 +188,7 @@ static void annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   FailureOr<amdgpu::Chipset> chipset = getChipsetVersion(targetAttr);
   if (failed(chipset))
     return;
-  if (chipset->majorVersion != 9 && chipset->minorVersion < 0x40)
+  if (chipset->majorVersion != 9 || *chipset < amdgpu::Chipset(9, 4, 0))
     return;
 
   auto inRegAttrName =
