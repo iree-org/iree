@@ -228,10 +228,10 @@ def maybe_nuke_cmake_cache(cmake_build_dir, cmake_install_dir):
         f.write(expected_stamp_contents)
 
 
-def get_env_cmake_option(name: str, default_value: bool = False) -> str:
+def get_env_cmake_option(name: str, default_value: str = "OFF") -> str:
     svalue = os.getenv(name)
     if not svalue:
-        svalue = "ON" if default_value else "OFF"
+        svalue = default_value
     return f"-D{name}={svalue}"
 
 
