@@ -1117,7 +1117,7 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm, [&]() {
+    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm, []() {
       return createConvolutionToIGEMMPass(igemmConfigFn);
     });
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
