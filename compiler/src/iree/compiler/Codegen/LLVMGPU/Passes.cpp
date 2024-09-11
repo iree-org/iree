@@ -1072,10 +1072,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   if (forROCDL) {
     // convert to ROCDL.
     modulePassManager.addPass(createConvertToROCDLPass());
-    // Handle leftover math ops.
-    // TODO (nirvedhmeshram) : Remove this after
-    // https://github.com/llvm/llvm-project/pull/108266 is integrated in
-    modulePassManager.addPass(createConvertMathToLLVMPass());
   } else {
     // convert to NVVM.
     modulePassManager.addPass(createConvertToNVVMPass());
