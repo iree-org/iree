@@ -2773,3 +2773,27 @@ func.func @vector_barrier() -> vector<2xf32> {
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
 //  CHECK-NEXT:   %[[RD:.+]] = vector.transfer_read %[[ALLOC]]
 //  CHECK-NEXT:   iree_gpu.value_barrier %[[RD]]
+
+// -----
+
+func.func @multi_tensor_barrier() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %alloc_0 = bufferization.alloc_tensor() : tensor<2xf32>
+  %tmp = vector.transfer_write %cst, %alloc[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %tmp_0 = vector.transfer_write %cst, %alloc[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %barrier:2 = iree_gpu.value_barrier %tmp, %tmp_0 : tensor<2xf32>, tensor<2xf32>
+  %tmp_1 = vector.transfer_write %cst, %barrier#1[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %res = vector.transfer_read %barrier#0[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  return %res : vector<2xf32>
+}
+// CHECK-LABEL: func @multi_tensor_barrier()
+//       CHECK:   %[[ALLOC0:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   %[[ALLOC1:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC1]]
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC0]]
+//  CHECK-NEXT:   gpu.barrier
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC0]]
+//  CHECK-NEXT:   vector.transfer_read %[[ALLOC1]]
