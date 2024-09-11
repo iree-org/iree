@@ -524,8 +524,8 @@ int64_t MMAAttr::getBlockSize() const {
   return 0;
 }
 
-int64_t MMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic().getValue()) {
+static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+  switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
@@ -544,6 +544,10 @@ int64_t MMAAttr::getSubgroupSize() const {
   }
   // This should not happen but just to make GCC happy.
   return 0;
+}
+
+int64_t MMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
 MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
@@ -866,6 +870,33 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize * getUnrollM(), opaqueLayout.nSize * getUnrollN(),
+          opaqueLayout.kSize * getUnrollK()};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+DataTiledMMAAttr::getABCVectorTypes() const {
+  return MMAAttr::get(getContext(), getIntrinsic().getValue())
+      .getABCVectorTypes();
+}
+
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
 //===----------------------------------------------------------------------===//

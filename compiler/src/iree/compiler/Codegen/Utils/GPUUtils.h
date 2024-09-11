@@ -174,6 +174,10 @@ FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 
+/// Returns the GPU target attribute from `iree-gpu-test-target` if provided.
+/// Returns null TargetAttr othersise.
+IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context);
+
 /// Returns the GPU target attribute from executable |target| if found.
 /// Returns null TargetAttr othersise.
 IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target);

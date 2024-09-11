@@ -220,6 +220,53 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   }];
 }
 
+def IREEGPU_DataTiledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
+    "getABCElementTypes",
+    // TODO: Implement the interface method. The current implementation just
+    // returns {VectorType(), VectorType(), VectorType()} now because the dummy
+    // implementation is required by the MmaInterfaceAttr.
+    "getABCVectorTypes",
+    "getMNKShape",
+    "getSubgroupSize",
+    // TODO: Implement the interface method.
+    // "populateOperandOffsetsSizesStrides",
+  ]>
+]> {
+  let mnemonic = "data_tiled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This mma variant represents MMA ops with data-tiling details. The
+    |intrinsic| field specifies which particular MMA intrinsic is targeted by
+    the data-tiling.
+
+    The tile swizzling already happens, so the attribute does not need to
+    implement materializeOperandConcreteShape interface method. E.g., if the
+    target intrinsic is MFMA_F32_16x16x4_F32:
+      - The inner tile shape of LHS is 4x16.
+      - The inner tile shape of RHS is 4x16.
+      - The inner tile shape of ACC is 4x16x4.
+
+    Furthermore, the unrolling and interleaving can be represented with the
+    attribute. In the concept of data-tiling, we always unroll the parallel
+    dimensions (i.e., M, N dimensions) to be outermost, and interleave the
+    unrolled K dimension. I.e., the unrolled K dimension becomes the innermost
+    dimension. The constraint can be relaxed based on data-tiling needs. The
+    additional information can be added to `parameters`.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
+    "int64_t":$unroll_m,
+    "int64_t":$unroll_n,
+    "int64_t":$unroll_k
+  );
+}
+
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";

@@ -187,10 +187,12 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
 // to `pack` and `unpack` operations respectively.
 //===---------------------------------------------------------------------===//
 
-/// Utility method to convert from `set_encoding` op to `pack` operation with
-/// zero padding values. The source is also taken as input so that these could
-/// be used with `OpConversionPatterns`.
-static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
+/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. It is not
+/// moved because it needs some cleanup for this file. E.g., `getPaddingValue`
+/// is no longer needed. Ideally we should move CPU specific patterns (e.g.,
+/// lowerContractionOpWithEncoding, etc) to the CPUMaterializeEncoding file;
+/// move general patterns to EncodingUtils, and retire this file.
+FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
     Value source, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -231,10 +233,9 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       paddingValue, encodingInfo->outerDimsPerm);
 }
 
-/// Utility method to convert from `set_encoding` op to `pack` operation.
-/// The source is taken as input so that these could be used with
-/// `OpConversionPatterns`.
-static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
+/// TODO(hanchung): Move the implementation to EncodingUtils.cpp. See the reason
+/// in the implementation comment of lowerSetEncodingToPackOp method.
+FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -506,6 +507,33 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       .Default([](Operation *op) { return failure(); });
 }
 
+// Utility to apply a tile-swizzling to a packed shape.
+static SmallVector<OpFoldResult>
+getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
+                 MaterializeEncodingInfo encodingInfo) {
+  if (packedShape.empty() || !encodingInfo.swizzle) {
+    return SmallVector<OpFoldResult>(packedShape);
+  }
+
+  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
+  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
+  for (auto i : encodingInfo.swizzle->permutation) {
+    perm.push_back(i + srcRank);
+  }
+
+  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
+  SmallVector<int64_t> expandedTileShape =
+      getExpandedTileShape(encodingInfo.swizzle->expandShape);
+  MLIRContext *ctx = packedShape[0].getContext();
+  Builder b(ctx);
+  for (int64_t d : expandedTileShape) {
+    newShape.push_back(b.getIndexAttr(d));
+  }
+  applyPermutationToVector(newShape, perm);
+
+  return newShape;
+}
+
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the materialized shape of the `dispatchTensorType`. The
 /// dynamic dimensions of the `dispatchTensorType` are provided in
@@ -541,7 +569,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
       tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
                                      encodingInfo->innerDimsPos,
                                      encodingInfo->outerDimsPerm);
-  return convertedTargetShape;
+  return getSwizzledShape(convertedTargetShape, *encodingInfo);
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
@@ -882,11 +910,24 @@ protected:
 } // namespace
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingTypeConverter &typeConverter,
+    MaterializeEncodingValueFn materializeEncodingValueFn) {
+  MLIRContext *context = patterns.getContext();
+  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
+                  MaterializeDPSOperation<linalg::GenericOp>,
+                  MaterializeOperation<tensor::EmptyOp>,
+                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
+                  UnsetEncodingOpToUnPackOpConversion>(
+      context, typeConverter, materializeEncodingValueFn);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+}
+
+void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
-
   typeConverter.addConversion(
       [&typeConverter](IREE::Flow::DispatchTensorType dispatchTensorType) {
         Type boundType = dispatchTensorType.getBoundType();
@@ -908,20 +949,10 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
 
-  // Add all patterns for converting from encoded type to the materialized
-  // type.
-  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
-                  UnsetEncodingOpToUnPackOpConversion>(
-      patterns.getContext(), typeConverter, materializeEncodingValueFn);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-
   patterns.insert<MaterializeFlowDispatchTensorLoadOp,
                   MaterializeFlowDispatchTensorStoreOp,
                   MaterializeInterfaceBindingEncoding>(
       context, typeConverter, materializeEncodingValueFn);
-}
+};
 
 } // namespace mlir::iree_compiler
