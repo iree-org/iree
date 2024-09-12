@@ -114,10 +114,6 @@ target_compile_options(iree_runtime_bindings_python_PyExtRt
   # Default COPTS disable exceptions/rtti. Re-enable them.
   ${_RTTI_AND_EXCEPTION_COPTS}
 )
-target_compile_definitions(iree_runtime_bindings_python_PyExtRt
-  PRIVATE
-  IREE_TRACING_HOOK_CPP_NEW_DELETE=0
-)
 
 set_target_properties(
   iree_runtime_bindings_python_PyExtRt

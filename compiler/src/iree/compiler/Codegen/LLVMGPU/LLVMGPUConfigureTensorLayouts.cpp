@@ -160,6 +160,37 @@ LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   return success();
 }
 
+LogicalResult setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                                       RewriterBase &rewriter,
+                                       linalg::LinalgOp contract) {
+  // TODO: Add SIMT fallback.
+  if (!schedule) {
+    return contract->emitError("missing mma schedule for contraction");
+  }
+
+  if (contract->hasAttr("attention_qk_matmul")) {
+    // subgroup_n count for attention matmul is always 1, because it is the
+    // reduction dimension. The subgroup_n count is in reality, for the second
+    // matmul.
+    IREE::GPU::MMAScheduleAttr qkSchedule =
+        rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+            schedule.getIntrinsic(),
+            /*subgroup_m_count=*/schedule.getSubgroupMCount(),
+            /*subgroup_n_count=*/1);
+    return setContractionAnchor(qkSchedule, rewriter, contract);
+  }
+
+  if (contract->hasAttr("attention_pv_matmul")) {
+    // subgroup_n count for attention matmul is always 1, because it is the
+    // reduction dimension. The subgroup_n count is in reality, for the second
+    // matmul.
+    return setContractionAnchor(schedule, rewriter, contract);
+  }
+
+  return contract->emitError("attention matmul should have either "
+                             "attention_qk_matmul or attention_pv_matmul set");
+}
+
 struct LLVMGPUConfigureTensorLayoutsPass final
     : impl::LLVMGPUConfigureTensorLayoutsPassBase<
           LLVMGPUConfigureTensorLayoutsPass> {
@@ -181,10 +212,16 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     // now, layout setting for other problems like reductions is TODO.
     SmallVector<linalg::LinalgOp> contracts;
     SmallVector<linalg::LinalgOp> convs;
+    SmallVector<linalg::LinalgOp> attentionMatmuls;
 
     func->walk([&](linalg::LinalgOp linalgOp) {
       if (linalg::isaContractionOpInterface(linalgOp)) {
-        contracts.push_back(linalgOp);
+        if (linalgOp->hasAttr("attention_qk_matmul") ||
+            linalgOp->hasAttr("attention_pv_matmul")) {
+          attentionMatmuls.push_back(linalgOp);
+        } else {
+          contracts.push_back(linalgOp);
+        }
       } else if (succeeded(linalg::inferConvolutionDims(linalgOp))) {
         convs.push_back(linalgOp);
       }
@@ -200,6 +237,13 @@ struct LLVMGPUConfigureTensorLayoutsPass final
 
     for (linalg::LinalgOp conv : convs) {
       if (failed(setConvolutionAnchor(scheduleAttr, rewriter, conv))) {
+        return signalPassFailure();
+      }
+    }
+
+    for (linalg::LinalgOp attentionMatmul : attentionMatmuls) {
+      if (failed(setAttentionMatmulAnchor(scheduleAttr, rewriter,
+                                          attentionMatmul))) {
         return signalPassFailure();
       }
     }

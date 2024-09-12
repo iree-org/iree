@@ -27,6 +27,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
@@ -86,6 +88,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   GPUMMAHeuristicSeeds seeds;
+  int64_t inBitWidth = lhsElemType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -96,11 +99,14 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestMNTileCountPerSubgroup=*/16,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                 inBitWidth};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
@@ -196,11 +202,22 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/true,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      StringAttr::get(context,
+                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize);
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
@@ -466,6 +483,75 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       workgroupSize, subgroupSize, DictionaryAttr());
+}
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptions
+getPipelineOptions(FunctionOpInterface funcOp,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
+  GPUPipelineOptions pipelineOptions = {};
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    std::optional<NamedAttribute> maybePipelineOptionsAttr =
+        config.getNamed(GPUPipelineOptionsAttr::getDictKeyName());
+    if (!maybePipelineOptionsAttr.has_value()) {
+      return pipelineOptions;
+    }
+    auto pipelineOptionsAttr =
+        cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
+    BoolAttr prefetchSharedMemory =
+        pipelineOptionsAttr.getPrefetchSharedMemory();
+    if (prefetchSharedMemory) {
+      pipelineOptions.prefetchSharedMemory = prefetchSharedMemory.getValue();
+    }
+    BoolAttr noReduceBankConflicts =
+        pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
+    if (noReduceBankConflicts) {
+      pipelineOptions.enableReduceSharedMemoryBankConflicts =
+          !noReduceBankConflicts.getValue();
+    }
+    ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
+        pipelineOptionsAttr.getReorderWorkgroupsStrategy();
+    if (reorderWorkgroupsStrategy) {
+      pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
+    }
+  }
+
+  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+
+  LLVM_DEBUG(llvm::dbgs() << "GPU Pipeline Options: " << pipelineOptions
+                          << "\n");
+  return pipelineOptions;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GPUPipelineOptions &options) {
+  StringRef reorderStr = "<not set>";
+  if (options.reorderStrategy) {
+    switch (options.reorderStrategy.value()) {
+    case ReorderWorkgroupsStrategy::Transpose:
+      reorderStr = "transpose";
+      break;
+    case ReorderWorkgroupsStrategy::Swizzle:
+      reorderStr = "swizzle";
+      break;
+    case ReorderWorkgroupsStrategy::None:
+      reorderStr = "none";
+      break;
+    default:
+      assert(false && "Unhandled reorder option");
+    }
+  }
+
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+            << options.enableReduceSharedMemoryBankConflicts << ", "
+            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", reorderWorkgroupsStrategy = " << reorderStr
+            << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

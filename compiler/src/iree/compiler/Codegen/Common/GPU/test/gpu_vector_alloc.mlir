@@ -1,11 +1,11 @@
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-vector-alloc))" | FileCheck %s
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [1, 1],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [4, 16],
-  elements_per_thread = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [4, 16],
+  element_tile = [4, 1],
 
   subgroup_strides = [1, 1],
   thread_strides   = [0, 0]

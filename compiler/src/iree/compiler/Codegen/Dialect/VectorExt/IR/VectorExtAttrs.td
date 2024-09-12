@@ -139,10 +139,10 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     The subgroups are placed contiguously with their shape and ordering
     determined by:
-      - `subgroups_per_workgroup`: Sizes of this level of tiling
+      - `subgroup_tile`: Sizes of this level of tiling
       - `subgroup_order`: Ordering of dimensions, from outermost to innermost
 
-    For example, subgroups_per_workgroup=[4, 2], subgroup_order=[1, 0] will
+    For example, subgroup_tile=[4, 2], subgroup_order=[1, 0] will
     arrange the subgroups in the order:
 
     0 4
@@ -151,7 +151,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     3 7
 
     The total number of subgroups used (computed by multiplying each dim in
-    subgroups_per_workgroup) should be a multiple of number of subgroups in the
+    subgroup_tile) should be a multiple of number of subgroups in the
     harware. If the total number of subgroups used exceeds the number of
     subgroups of the hardware, then the subgroup used (say x) is
     x mod num_subgroups:
@@ -177,7 +177,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
       for b_1 in range(batch_1):
         ...
 
-    `batches_per_subgroup` represents the range of each loop.
+    `batch_tile` represents the range of each loop.
 
     The second level, outers, is a way to represent thread layout duplication
     required by a particular intrinsic. For example, some AMDGPU matrix
@@ -187,23 +187,23 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     0 1 2 3 4
     5 6 7 8 9
     --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5
-    0 1 2 3 4     outers_per_batch=[2, 1]
-    5 6 7 8 9     threads_per_outer=[2, 5]
+    0 1 2 3 4     outer_tile=[2, 1]
+    5 6 7 8 9     thread_tile=[2, 5]
 
-    `outers_per_batch` represents the number of outers in a batch.
+    `outer_tile` represents the number of outers in a batch.
 
     Finally, threads are distributed in a single outer. The thread
     distribution is represented by:
 
-      - threads_per_outer: Sizes of this level of tiling
+      - thread_tile: Sizes of this level of tiling
       - thread_order: Ordering of dimensions, from outermost to innermost
 
     Examples of thread distribution over a 8x4 shape:
 
     {
-      batches_per_subgroup = [2, 1]
-      outers_per_batch = [2, 2]
-      threads_per_outer = [2, 2]
+      batch_tile = [2, 1]
+      outer_tile = [2, 2]
+      thread_tile = [2, 2]
 
       thread_order = [1, 0]
     }
@@ -236,7 +236,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     [1 3 1 3]
 
     The total number of threads used (computed by multiplying each dim in
-    threads_per_outer) should be a multiple of subgroup size of the
+    thread_tile) should be a multiple of subgroup size of the
     harware. If the total number of threads used exceeds the subgroup size of
     the hardware, then the threads used (say tid) is tid mod subgroup_size:
 
@@ -252,26 +252,26 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     The final level of tiling, representing the minimum shape of vector that
     is treated as an atom.
 
-    `elements_per_thread` represents the native size of the vector.
+    `element_tile` represents the native size of the vector.
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t", "subgroups_per_workgroup">:$subgroupsPerWorkgroup,
-    ArrayRefParameter<"int64_t", "batches_per_subgroup">:$batchesPerSubgroup,
-    ArrayRefParameter<"int64_t", "outers_per_batch">:$outersPerBatch,
-    ArrayRefParameter<"int64_t", "threads_per_outer">:$threadsPerOuter,
-    ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
+    ArrayRefParameter<"int64_t", "subgroup_tile">:$subgroupTile,
+    ArrayRefParameter<"int64_t", "batch_tile">:$batchTile,
+    ArrayRefParameter<"int64_t", "outer_tile">:$outerTile,
+    ArrayRefParameter<"int64_t", "thread_tile">:$threadTile,
+    ArrayRefParameter<"int64_t", "element_tile">:$elementTile,
 
     ArrayRefParameter<"int64_t", "subgroup_strides">:$subgroupStrides,
     ArrayRefParameter<"int64_t", "thread_strides">:$threadStrides
   );
 
   let assemblyFormat = [{
-    `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
-        `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
-        `outers_per_batch`        `=` `[` $outersPerBatch `]` `,`
-        `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
-        `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
+    `<` `subgroup_tile` `=` `[` $subgroupTile `]` `,`
+        `batch_tile`    `=` `[` $batchTile `]` `,`
+        `outer_tile`        `=` `[` $outerTile `]` `,`
+        `thread_tile`       `=` `[` $threadTile `]` `,`
+        `element_tile`     `=` `[` $elementTile `]` `,`
 
         `subgroup_strides`        `=` `[` $subgroupStrides `]` `,`
         `thread_strides`          `=` `[` $threadStrides `]`
@@ -280,11 +280,11 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
   let skipDefaultBuilders = 1;
   let builders = [
-    AttrBuilder<(ins "ArrayRef<int64_t>":$subgroupsPerWorkgroup,
-                     "ArrayRef<int64_t>":$batchesPerSubgroup,
-                     "ArrayRef<int64_t>":$outersPerBatch,
-                     "ArrayRef<int64_t>":$threadsPerOuter,
-                     "ArrayRef<int64_t>":$elementsPerThread,
+    AttrBuilder<(ins "ArrayRef<int64_t>":$subgroupTile,
+                     "ArrayRef<int64_t>":$batchTile,
+                     "ArrayRef<int64_t>":$outerTile,
+                     "ArrayRef<int64_t>":$threadTile,
+                     "ArrayRef<int64_t>":$elementTile,
                      "ArrayRef<int64_t>":$subgroupStrides,
                      "ArrayRef<int64_t>":$threadStrides)>
   ];

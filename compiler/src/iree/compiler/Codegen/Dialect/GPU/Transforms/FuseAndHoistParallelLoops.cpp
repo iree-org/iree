@@ -20,6 +20,10 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-gpu-fuse-and-hoist-parallel-loops"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 #define GEN_PASS_DEF_FUSEANDHOISTPARALLELLOOPSPASS
@@ -192,6 +196,8 @@ struct FuseTilableForallConsumers final
 void FuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
+  FunctionOpInterface funcOp = getOperation();
+
   // First run the hoisting and fusion patterns.
   {
     RewritePatternSet patterns(context);
@@ -200,11 +206,12 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseForalls>(context);
     patterns.add<FuseTilableForallConsumers>(context);
     populateForallLoopHoistingPattern(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
+
+  LDBG("After fusing and hoisting loops\n" << funcOp);
 
   // After hoisting parallel loops, try to fuse in any newly revealed consumers
   // and destinations.
@@ -216,11 +223,12 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableForallConsumers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
+
+  LDBG("After fusing new consumers\n" << funcOp);
 
   // Finally try to do any new producer fusions.
   {
@@ -229,11 +237,12 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableSliceProducers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
+
+  LDBG("After fusing new producers\n" << funcOp);
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

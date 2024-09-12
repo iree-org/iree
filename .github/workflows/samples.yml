@@ -31,9 +31,9 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Setting up Python"
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.11"
       - name: "Testing Colab Notebooks"
@@ -41,19 +41,18 @@ jobs:
 
   samples:
     runs-on: ubuntu-20.04
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
       - name: "Setting up Python"
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.11"
       - name: "Testing Samples"
@@ -61,20 +60,23 @@ jobs:
 
   web:
     runs-on: ubuntu-20.04
-    container: gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
+      CC: clang
+      CXX: clang++
     defaults:
       run:
         shell: bash
     steps:
       - name: "Check out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Mark git safe.directory"
         run: git config --global --add safe.directory '*'
       - name: "Check out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - uses: actions/setup-python@v5.1.0
+      - name: "Installing build dependencies"
+        run: sudo apt update && sudo apt install -y ninja-build
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.11"
       - name: "Setup Python venv"
@@ -86,6 +88,10 @@ jobs:
             --upgrade \
             iree-compiler \
             iree-runtime
+      - name: "Setup emsdk"
+        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+        with:
+          version: 3.1.44
       - name: "Test experimental web samples"
         env:
           HOST_TOOLS_BINARY_DIR: ${{ env.VENV_DIR }}/bin

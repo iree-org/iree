@@ -17,8 +17,9 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/IR/StorageUniquerSupport.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "tile-and-distribute-to-workgroups-using-forall-op"
 
 namespace mlir::iree_compiler {
 
@@ -255,6 +256,50 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
 // Pass implementation.
 //===---------------------------------------------------------------------===//
 
+static void fuseConsumers(RewriterBase &rewriter, Operation *tiledOp) {
+
+  auto addCandidateSlices =
+      [](Operation *fusedOp,
+         std::queue<tensor::ParallelInsertSliceOp> &candidates) {
+        for (auto *userOp : fusedOp->getResults().getUsers()) {
+          if (auto sliceOp =
+                  llvm::dyn_cast<tensor::ParallelInsertSliceOp>(userOp)) {
+            candidates.push(sliceOp);
+          }
+        }
+      };
+
+  // Collect the candidate slices which can be potential consumers that can be
+  // fused.
+  std::queue<tensor::ParallelInsertSliceOp> candidates;
+  addCandidateSlices(tiledOp, candidates);
+
+  while (!candidates.empty()) {
+
+    // Traverse the slices in BFS fashion.
+    tensor::ParallelInsertSliceOp candidateSliceOp = candidates.front();
+    candidates.pop();
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
+        mlir::scf::tileAndFuseConsumerOfSlice(rewriter, candidateSliceOp);
+    if (failed(fusedResult)) {
+      LLVM_DEBUG(llvm::dbgs() << "failed to fuse consumer of slice: "
+                              << candidateSliceOp << "\n");
+      continue;
+    }
+
+    // Replace the original consumer operation with the tiled implementation.
+    rewriter.replaceOp(fusedResult->origConsumerOperand->getOwner(),
+                       fusedResult->tiledOps.front());
+
+    // The result of the fused conumers might themselved be slices of
+    // values produced by operations that implement the `TilingInterface`.
+    // Add these operations to the worklist.
+    addCandidateSlices(fusedResult->tiledAndFusedConsumerOperand->getOwner(),
+                       candidates);
+  }
+}
+
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   auto funcOp = getOperation();
   auto *context = &getContext();
@@ -279,8 +324,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
-          context, ::mlir::detail::getDefaultDiagnosticEmitFn(funcOp.getLoc()),
-          deviceMappingAttribute))) {
+          context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
   tilingOptions.setMapping(deviceMappingAttribute);
@@ -294,6 +338,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;
+  Operation *rootTiledOp = nullptr;
   if (tilableOp->getNumResults() == 0) {
     FailureOr<scf::SCFTilingResult> tilingResult =
         scf::tileUsingSCF(rewriter, tilableOp, tilingOptions);
@@ -315,6 +360,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       rewriter.replaceAllUsesWith(origValue, replacement);
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
+    rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
   }
   if (!tilingLoops.empty()) {
     if (tilingLoops.size() != 1 || !isa<scf::ForallOp>(tilingLoops[0])) {
@@ -327,6 +373,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     if (failed(dropUnitDistributedDims(rewriter, forallOp))) {
       forallOp.emitOpError("failed to drop unit dimensions");
       return signalPassFailure();
+    }
+
+    if (rootTiledOp) {
+      fuseConsumers(rewriter, rootTiledOp);
     }
   }
 

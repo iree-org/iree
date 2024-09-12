@@ -45,22 +45,6 @@ enum {
   CCONV_ARGUMENT_MODULE_STATE,
 };
 
-/// Create a call to memset to clear a struct
-LogicalResult clearStruct(OpBuilder builder, Value structValue) {
-  auto loc = structValue.getLoc();
-
-  if (auto ptrType =
-          llvm::dyn_cast<emitc::PointerType>(structValue.getType())) {
-    Value sizeValue = emitc_builders::sizeOf(
-        builder, loc, TypeAttr::get(ptrType.getPointee()));
-    emitc_builders::memset(builder, loc, structValue, 0, sizeValue);
-
-    return success();
-  }
-
-  return emitError(loc, "expected pointer type");
-}
-
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                             const IREE::VM::EmitCTypeConverter &typeConverter,
                             SmallVector<BlockArgument> &blockArgsToRemove) {
@@ -138,20 +122,15 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   builder.setInsertionPointToStart(&entryBlock);
 
   for (int i = 0; i < numLocalRefs; i++) {
-    auto ref = emitc_builders::allocateVariable(
+    auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
-    Value refPtr = emitc_builders::addressOf(builder, loc, ref);
     auto refPtrOp = cast<emitc::ApplyOp>(refPtr.getDefiningOp());
 
     // Cache local refs so that we can release them before a return operation.
     // Here we rely on the fact that the register allocation maps arguments in
     // the first slots.
     funcAnalysis.cacheLocalRef(i + numRefArgs, refPtrOp);
-
-    if (failed(clearStruct(builder, refPtr))) {
-      return failure();
-    }
   }
 
   for (Block &block : llvm::drop_begin(newFuncOp.getBlocks(), 1)) {
@@ -315,14 +294,8 @@ LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
     assert(srcRef.getType() == emitc::PointerType::get(emitc::OpaqueType::get(
                                    ctx, "iree_vm_ref_t")));
 
-    auto tmpRef = emitc_builders::allocateVariable(
+    auto [tmpRef, tmpPtr] = emitc_builders::allocZeroInitializedVar(
         builder, location, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-
-    Value tmpPtr = emitc_builders::addressOf(builder, location, tmpRef);
-
-    if (failed(clearStruct(builder, tmpPtr))) {
-      return failure();
-    }
 
     StringRef callee = isMove ? "iree_vm_ref_move" : "iree_vm_ref_retain";
     builder.create<emitc::CallOpaqueOp>(
@@ -733,35 +706,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                                    ctx, "IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE"),
                                builder.getIndexAttr(0), builder.getIndexAttr(1),
                                builder.getIndexAttr(2)}));
-    }
-
-    // Zero out refs from state struct.
-    auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
-    if (!ordinalCounts) {
-      return moduleOp.emitError()
-             << "ordinal_counts attribute not found. The OrdinalAllocationPass "
-                "must be run before.";
-    }
-    const int numGlobalRefs = ordinalCounts.getGlobalRefs();
-
-    if (numGlobalRefs > 0) {
-      auto refs =
-          cast<TypedValue<emitc::PointerType>>(emitc_builders::structPtrMember(
-              builder, loc,
-              /*type=*/
-              emitc::PointerType::get(
-                  emitc::OpaqueType::get(ctx, "iree_vm_ref_t")),
-              /*memberName=*/"refs",
-              /*operand=*/state));
-
-      for (int i = 0; i < numGlobalRefs; i++) {
-        auto refPtrOp = emitc_builders::arrayElementAddress(
-            builder, loc, /*index=*/i, /*operand=*/refs);
-
-        if (failed(clearStruct(builder, refPtrOp))) {
-          return failure();
-        }
-      }
     }
 
     auto baseStateOp = builder.create<emitc::CastOp>(
@@ -1483,19 +1427,6 @@ ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
       accessOp->getParentOfType<IREE::VM::ModuleOp>().lookupSymbol<ResultOpTy>(
           globalAttr.getValue());
   return globalOp;
-}
-
-void updateResultUses(Operation *op, ConversionPatternRewriter &rewriter,
-                      SmallVector<Value> &resultOperands) {
-  for (auto [result, resultOperand] :
-       llvm::zip(op->getResults(), resultOperands)) {
-    if (!llvm::isa<IREE::VM::RefType>(result.getType())) {
-      auto operand = cast<TypedValue<emitc::LValueType>>(resultOperand);
-      auto operandRValue =
-          emitc_builders::asRValue(rewriter, op->getLoc(), operand);
-      result.replaceAllUsesWith(operandRValue);
-    }
-  }
 }
 
 template <typename OpTy>
@@ -2647,9 +2578,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         /*rewriter=*/rewriter, /*location=*/loc, /*callee=*/funcOp,
         /*operands=*/updatedOperands, this->getModuleAnalysis());
 
-    updateResultUses(op, rewriter, resultOperands);
-
-    rewriter.eraseOp(op);
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+    rewriter.replaceOp(op, resultOperands);
 
     return success();
   }
@@ -2714,9 +2644,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     returnIfError(rewriter, loc, callee, updatedOperands,
                   this->getModuleAnalysis());
 
-    updateResultUses(op, rewriter, resultOperands);
-
-    rewriter.eraseOp(op);
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+    rewriter.replaceOp(op, resultOperands);
 
     return success();
   }
@@ -2804,14 +2733,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
-    auto ref = emitc_builders::allocateVariable(
+    auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-
-    Value refPtr = emitc_builders::addressOf(builder, loc, ref);
-
-    if (failed(clearStruct(builder, refPtr))) {
-      return failure();
-    }
 
     builder.create<emitc::CallOpaqueOp>(
         /*location=*/loc,
@@ -3833,9 +3756,8 @@ private:
           /*operands=*/ArrayRef<Value>(unwrappedOperands),
           this->getModuleAnalysis());
 
-      updateResultUses(op.getOperation(), rewriter, resultOperands);
-
-      rewriter.eraseOp(op);
+      emitc_builders::asRValues(rewriter, loc, resultOperands);
+      rewriter.replaceOp(op, resultOperands);
     } else {
       rewriter.replaceOpWithNewOp<emitc::CallOpaqueOp>(
           /*op=*/op,

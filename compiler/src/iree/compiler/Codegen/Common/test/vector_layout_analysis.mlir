@@ -274,11 +274,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [1, 1],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [4, 16],
-  elements_per_thread = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [4, 16],
+  element_tile = [4, 1],
 
   subgroup_strides = [1, 1],
   thread_strides   = [1, 4]
@@ -313,11 +313,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [1, 1],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [4, 16],
-  elements_per_thread = [4, 1],
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [4, 16],
+  element_tile = [4, 1],
 
   subgroup_strides = [1, 1],
   thread_strides   = [1, 4]
@@ -352,11 +352,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [2, 1, 1],
-  batches_per_subgroup = [1, 2, 4],
-  outers_per_batch = [1, 1, 1],
-  threads_per_outer = [4, 8, 2],
-  elements_per_thread = [4, 1, 2],
+  subgroup_tile = [2, 1, 1],
+  batch_tile = [1, 2, 4],
+  outer_tile = [1, 1, 1],
+  thread_tile = [4, 8, 2],
+  element_tile = [4, 1, 2],
 
   subgroup_strides = [1, 2, 2],
   thread_strides   = [1, 4, 32]
@@ -391,11 +391,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [4, 1],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [32, 4],
-  elements_per_thread = [1, 32],
+  subgroup_tile = [1, 1],
+  batch_tile = [4, 1],
+  outer_tile = [1, 1],
+  thread_tile = [32, 4],
+  element_tile = [1, 32],
 
   subgroup_strides = [1, 1],
   thread_strides = [1, 32]
@@ -438,11 +438,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [2, 1, 1],
-  batches_per_subgroup = [1, 2, 4],
-  outers_per_batch = [1, 1, 1],
-  threads_per_outer = [4, 8, 2],
-  elements_per_thread = [4, 1, 2],
+  subgroup_tile = [2, 1, 1],
+  batch_tile = [1, 2, 4],
+  outer_tile = [1, 1, 1],
+  thread_tile = [4, 8, 2],
+  element_tile = [4, 1, 2],
 
   subgroup_strides = [1, 2, 2],
   thread_strides   = [1, 4, 32]
@@ -469,11 +469,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout2 = #iree_vector_ext.nested_layout<
-  subgroups_per_workgroup = [1, 1],
-  batches_per_subgroup = [2, 4],
-  outers_per_batch = [1, 1],
-  threads_per_outer = [8, 2],
-  elements_per_thread = [2, 2],
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 4],
+  outer_tile = [1, 1],
+  thread_tile = [8, 2],
+  element_tile = [2, 2],
 
   subgroup_strides = [0, 0],
   thread_strides   = [1, 8]
@@ -484,7 +484,7 @@ builtin.module attributes { transform.with_named_sequence } {
   func.func @invalid_size_nested_layout_anchor(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
     %c = arith.addf %a, %b : vector<16x16xf16>
     %cl = iree_vector_ext.to_layout %c to #layout2 : vector<16x16xf16>
-    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [1, 1], threads_per_outer = [8, 2], elements_per_thread = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
+    // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [1, 1], thread_tile = [8, 2], element_tile = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
     func.return %cl : vector<16x16xf16>
   }
 

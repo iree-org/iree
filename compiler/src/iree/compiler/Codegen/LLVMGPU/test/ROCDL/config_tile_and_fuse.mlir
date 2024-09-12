@@ -27,14 +27,15 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 }
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b
-//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>
 
 // Verify that the fill does not have the lowering config propagated to it.
 //       CHECK:   linalg.fill ins
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 0 : index, 0 : index, 8 : index]
+//  CHECK-SAME:     reduction = [0 : index, 0 : index, 0 : index, 0 : index, 4 : index]
 //  CHECK-SAME:     subgroup = [0 : index, 0 : index, 4 : index, 1 : index, 0 : index]
 //  CHECK-SAME:     workgroup = [1 : index, 1 : index, 64 : index, 64 : index, 0 : index]
 
@@ -50,16 +51,17 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024
-//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>
 
 // Verify that the fill does not have the lowering config propagated to it.
 //       CHECK:   linalg.fill ins
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 4 : index]
-//  CHECK-SAME:     subgroup = [2 : index, 4 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [64 : index, 128 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0 : index, 0 : index, 2 : index]
+//  CHECK-SAME:     subgroup = [4 : index, 4 : index, 0 : index]
+//  CHECK-SAME:     workgroup = [128 : index, 128 : index, 0 : index]
 
 // -----
 

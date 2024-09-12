@@ -7,8 +7,8 @@
                                               subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
-// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 8], subgroup_strides = [0, 0], thread_strides = [4, 1]>
-// CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [8, 1], subgroup_strides = [0, 0], thread_strides = [1, 4]>
+// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1], thread_tile = [16, 4], element_tile = [1, 8], subgroup_strides = [0, 0], thread_strides = [4, 1]>
+// CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1], thread_tile = [4, 16], element_tile = [8, 1], subgroup_strides = [0, 0], thread_strides = [1, 4]>
 
 // CHECK-LABEL: func.func @transfer_read_permute
 func.func @transfer_read_permute(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
@@ -43,7 +43,7 @@ func.func @transfer_read_permute(%lhs: memref<16x256xf16, strided<[256, 1], offs
                                               subgroup_size = 32,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 4>}>
 
-// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_strides = [0, 0], thread_strides = [4, 1]>
+// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [4, 1], outer_tile = [1, 1], thread_tile = [32, 4], element_tile = [1, 32], subgroup_strides = [0, 0], thread_strides = [4, 1]>
 
 // CHECK-LABEL: func.func @dequant_anchors_on_quant_only
 func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,

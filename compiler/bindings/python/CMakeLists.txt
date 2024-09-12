@@ -128,7 +128,7 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
     tools/tflite.py
     tools/import_onnx/__main__.py
     tools/ir_tool/__main__.py
-    tools/scripts/ireec/__main__.py
+    tools/scripts/iree_compile/__main__.py
     tools/scripts/iree_opt/__main__.py
 )
 

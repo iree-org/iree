@@ -67,11 +67,15 @@ function run() {
 function build_iree_runtime() {
   param($python_version)
   $env:IREE_HAL_DRIVER_VULKAN = "ON"
+  $env:IREE_HAL_DRIVER_HIP = "ON"
+  $env:IREE_HAL_DRIVER_CUDA = "ON"
   & py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 
 function build_iree_compiler() {
   param($python_version)
+  $env:IREE_TARGET_BACKEND_CUDA = "ON"
+  $env:IREE_TARGET_BACKEND_ROCM = "ON"
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/compiler/
 }
 

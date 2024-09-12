@@ -13,4 +13,8 @@ void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes);
 
+void populateFuseLinalgExtOpsWithTransposes(
+    RewritePatternSet &patterns,
+    const linalg::ControlFusionFn &controlFusionFn);
+
 }; // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Test TensorFlow (CPU)
+name: PkgCI Test TensorFlow
 on:
   workflow_call:
     inputs:
@@ -27,14 +27,14 @@ jobs:
       IREE_VMVX_DISABLE: 0
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: false
-      - uses: actions/setup-python@v5.1.0
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - uses: actions/download-artifact@v4.1.7
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}

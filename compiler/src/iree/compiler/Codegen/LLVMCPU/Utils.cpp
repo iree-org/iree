@@ -74,7 +74,8 @@ bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp) {
   // Check that the two indexing maps are a permutation of each other.
   SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
   bool isTranspose =
-      indexingMaps[0].isPermutation() && indexingMaps[1].isIdentity();
+      (indexingMaps[0].isPermutation() && indexingMaps[1].isIdentity()) ||
+      (indexingMaps[1].isPermutation() && indexingMaps[0].isIdentity());
   if (!isTranspose)
     return false;
 

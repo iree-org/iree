@@ -31,28 +31,30 @@ permissions:
   contents: read
 
 jobs:
-  cross_compile:
+  android_arm64:
     runs-on: ubuntu-20.04
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       VENV_DIR: ${{ github.workspace }}/.venv
       IREE_TARGET_BUILD_DIR: build-android-arm_64
+      CC: clang
+      CXX: clang++
     steps:
       # General setup.
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - uses: actions/setup-python@v5.1.0
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
           key: ${{ github.job }}
           save: ${{ inputs.write-caches == 1 }}
-      - uses: actions/download-artifact@v4.1.7
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
@@ -62,13 +64,9 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Install build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
+        run: sudo apt update && sudo apt install -y ninja-build
 
-      - uses: nttld/setup-ndk@v1
+      - uses: nttld/setup-ndk@afb4c9964b521afb97c864b7d40b11e6911bd410 # v1.5.0
         with:
           ndk-version: r25b
       - name: Build for Android

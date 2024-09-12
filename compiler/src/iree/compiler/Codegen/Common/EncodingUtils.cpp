@@ -117,9 +117,29 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     if (failed(maybeEncodingInfo)) {
       return dropEncoding(type);
     }
-    return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+    auto encodingInfo = *maybeEncodingInfo;
+    auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
         tensorType, maybeEncodingInfo->innerTileSizes,
         maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
+
+    // There is no swizzle, we are already done. Typically the case on CPU.
+    if (!encodingInfo.swizzle) {
+      return packedType;
+    }
+
+    // There is a swizzle, we need to handle it. Typically the case on GPU.
+    auto swizzle = *encodingInfo.swizzle;
+    SmallVector<int64_t> newShape(
+        packedType.getShape().drop_back(encodingInfo.innerTileSizes.size()));
+    SmallVector<int64_t> swizzledTileShape;
+    for (auto expandedDimShape : swizzle.expandShape) {
+      for (int64_t d : expandedDimShape) {
+        swizzledTileShape.push_back(d);
+      }
+    }
+    applyPermutationToVector(swizzledTileShape, swizzle.permutation);
+    newShape.append(swizzledTileShape);
+    return RankedTensorType::get(newShape, packedType.getElementType());
   });
 }
 
@@ -141,19 +161,6 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
         llvm::any_of(op->getResultTypes(), typeHasEncoding);
     return !hasOperandOrResultsWithEncoding;
   });
-}
-
-RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
-  auto encoding = getEncodingAttr(type);
-  if (!encoding) {
-    return type;
-  }
-  RankedTensorType originalType = type;
-  if (auto originalTypeAttr = encoding.getOriginalType()) {
-    originalType = cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  return RankedTensorType::get(originalType.getShape(),
-                               originalType.getElementType(), encoding);
 }
 
 RankedTensorType dropEncoding(RankedTensorType type) {
@@ -211,6 +218,15 @@ bool isNarrowNResult(EncodingAttr encoding) {
   IntegerAttr narrowM = encoding.getMatmulNarrow_M();
   IntegerAttr narrowN = encoding.getMatmulNarrow_N();
   return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
+}
+
+SmallVector<int64_t>
+getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape) {
+  SmallVector<int64_t> result;
+  for (auto expandShapeDim : expandShape) {
+    result.append(expandShapeDim);
+  }
+  return result;
 }
 
 } // namespace mlir::iree_compiler

@@ -53,6 +53,11 @@ TypedValue<emitc::LValueType>
 allocateVariable(OpBuilder builder, Location location, Type type,
                  std::optional<StringRef> initializer = std::nullopt);
 
+/// Allocate a new zero initialized variable. This is done through a call to
+/// memset, as all variables are declared without initializer in the emitter.
+std::pair<TypedValue<emitc::LValueType>, TypedValue<emitc::PointerType>>
+allocZeroInitializedVar(OpBuilder builder, Location location, Type type);
+
 /// Convert a value to an EmitC LValue by allocating a new variable and
 /// assigning the operand to it. Note that the variable declaration and
 /// assignment are split into two separate statements, so that padding bytes for
@@ -61,6 +66,10 @@ TypedValue<emitc::LValueType> asLValue(OpBuilder builder, Location loc,
                                        Value value);
 Value asRValue(OpBuilder builder, Location loc,
                TypedValue<emitc::LValueType> value);
+
+/// Replace values of lvalue type with rvalues.
+void asRValues(OpBuilder builder, Location location,
+               SmallVector<Value> &values);
 
 TypedValue<emitc::PointerType> addressOf(OpBuilder builder, Location location,
                                          TypedValue<emitc::LValueType> operand);

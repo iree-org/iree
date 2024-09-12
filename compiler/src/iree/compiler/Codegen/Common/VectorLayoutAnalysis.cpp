@@ -598,7 +598,8 @@ static void enforceLayoutToLayoutOp(
   }
 
   // Enforce the result layout on init.
-  ChangeResult changed = input->resolve(toLayout.getLayout());
+  ChangeResult changed = input->resolveWithPossibleConflict(
+      toLayout.getLayout(), getOpOperand(toLayout, 0));
   update(input, changed);
 }
 

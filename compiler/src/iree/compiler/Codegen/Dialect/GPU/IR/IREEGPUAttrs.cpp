@@ -231,6 +231,12 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     return OpaqueMmaLayout{32, 32, 16, i8, i8, i32};
   }
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8: {
+    return OpaqueMmaLayout{32, 32, 8, i8, i8, i32};
+  }
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8: {
+    return OpaqueMmaLayout{16, 16, 16, i8, i8, i32};
+  }
   case MMAIntrinsic::WMMA_F32_16x16x16_F16: {
     return OpaqueMmaLayout{16, 16, 16, f16, f16, f32};
   }
@@ -445,12 +451,14 @@ MMAAttr::getABCVectorTypes() const {
     auto cType = VectorType::get({4}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
     auto cType = VectorType::get({4}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
@@ -500,7 +508,9 @@ int64_t MMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
@@ -514,11 +524,13 @@ int64_t MMAAttr::getBlockSize() const {
   return 0;
 }
 
-int64_t MMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic().getValue()) {
+static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+  switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
@@ -534,16 +546,22 @@ int64_t MMAAttr::getSubgroupSize() const {
   return 0;
 }
 
+int64_t MMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
+}
+
 MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
             /*element=*/{1, 1}};
   }
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
             /*element=*/{1, 4}};
   }
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*strides=*/{1, 32},
             /*element=*/{1, 4}};
@@ -573,10 +591,12 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{1, 1}};
   }
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{4, 1}};
   }
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
     return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
             /*element=*/{4, 1}};
@@ -603,12 +623,14 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
 MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{4, 1}};
   }
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
@@ -654,7 +676,9 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
                                 rhs, acc)
         .getResult();
   }
+  case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
@@ -846,6 +870,33 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
   reassociations = reInds;
   resultType = operandType.clone(resultShape);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize * getUnrollM(), opaqueLayout.nSize * getUnrollN(),
+          opaqueLayout.kSize * getUnrollK()};
+}
+
+std::tuple<VectorType, VectorType, VectorType>
+DataTiledMMAAttr::getABCVectorTypes() const {
+  return MMAAttr::get(getContext(), getIntrinsic().getValue())
+      .getABCVectorTypes();
+}
+
+int64_t DataTiledMMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1331,6 +1382,25 @@ int64_t LaneIdAttr::getMappingId() const { return getDim(); }
 bool LaneIdAttr::isLinearMapping() const { return true; }
 
 int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
+// GPU Pipeline Options
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
+    MLIRContext *context, bool prefetchSharedMemory,
+    bool noReduceSharedMemoryBankConflicts,
+    std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
+  auto strategyAttr = ReorderWorkgroupsStrategyAttr();
+  if (reorderWorkgroupsStrategy) {
+    strategyAttr =
+        ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
+  }
+  Builder b(context);
+  return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
+                   b.getBoolAttr(noReduceSharedMemoryBankConflicts),
+                   strategyAttr);
+}
 
 //===----------------------------------------------------------------------===//
 // Attribute Registration

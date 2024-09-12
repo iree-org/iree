@@ -46,16 +46,13 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1280 step %c4 {{.*}} -> (vector<8x4xf32>)
+//   CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2xf16>
+//   CHECK-DAG:     vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC:[A-Za-z0-9]+]]
+//   CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<2xf16>
+//   CHECK-DAG:     vector.transfer_write %[[RHS_RD]], %[[RHS_ALLOC:[A-Za-z0-9]+]]
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2xf16>
-//       CHECK:     vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC:[A-Za-z0-9]+]]
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<8x4xf16>
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<2xf16>
-//       CHECK:     vector.transfer_write %[[RHS_RD]], %[[RHS_ALLOC:[A-Za-z0-9]+]]
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[RHS_MM:.+]] = vector.transfer_read %[[RHS_ALLOC]]{{.*}} vector<4x4xf16>
+//   CHECK-DAG:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<8x4xf16>
+//   CHECK-DAG:     %[[RHS_MM:.+]] = vector.transfer_read %[[RHS_ALLOC]]{{.*}} vector<4x4xf16>
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[MM:.+]] = vector.contract {{.*}} %[[LHS_MM]], %[[RHS_MM]]
 //       CHECK:     scf.yield %[[MM]]
@@ -105,19 +102,16 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
-//       CHECK:     vector.transfer_write %[[LHS_RD]]
+//   CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
+//   CHECK-DAG:     vector.transfer_write %[[LHS_RD]]
+//   CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
+//   CHECK-DAG:     vector.transfer_write %[[RHS_RD]]
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
-//       CHECK:     gpu.barrier
-//       CHECK:     vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
-//       CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
-//       CHECK:     vector.transfer_write %[[RHS_RD]]
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
 //       CHECK:     gpu.barrier
-//       CHECK:     vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
+//   CHECK-DAG:     vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
+//   CHECK-DAG:     vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x4xf16>
 // CHECK-COUNT-4:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
 //       CHECK:     scf.yield
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
@@ -190,20 +184,17 @@ hal.executable private @main {
 //     CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //     CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //         CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x2x2x4x1xf32>)
-//         CHECK:     gpu.barrier
-//         CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
-//         CHECK:     vector.transfer_write %[[LHS_RD]]
+//     CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
+//     CHECK-DAG:     vector.transfer_write %[[LHS_RD]]
+//     CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
+//     CHECK-DAG:     vector.transfer_write %[[RHS_RD]]
 //         CHECK:     gpu.barrier
 //         CHECK:     %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<2x1x2x4xf16>
 //         CHECK:     %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<2x1x2x4xf16> to vector<1x2x1x2x4xf16>
-//         CHECK:     gpu.barrier
-//         CHECK:     vector.transpose %[[LHS_MM1]], [0, 1, 3, 2, 4] : vector<1x2x1x2x4xf16> to vector<1x2x2x1x4xf16>
-//         CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
-//         CHECK:     vector.transfer_write %[[RHS_RD]]
-//         CHECK:     gpu.barrier
 //         CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x2x1xf16>
 //         CHECK:     gpu.barrier
-//         CHECK:     vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x2x1xf16> to vector<2x2x1x4xf16>
+//     CHECK-DAG:     vector.transpose %[[LHS_MM1]], [0, 1, 3, 2, 4] : vector<1x2x1x2x4xf16> to vector<1x2x2x1x4xf16>
+//     CHECK-DAG:     vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x2x1xf16> to vector<2x2x1x4xf16>
 // CHECK-COUNT-4:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
 //         CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 3, 2, 4] : vector<1x2x2x4x1xf32> to vector<1x2x4x2x1xf32>
 //         CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<2x4x2x1xf32> from vector<1x2x4x2x1xf32>
@@ -257,19 +248,16 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
-//       CHECK:     gpu.barrier
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2x8xf16>
-//       CHECK:     vector.transfer_write %[[LHS_RD]]
+//   CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2x8xf16>
+//   CHECK-DAG:     vector.transfer_write %[[LHS_RD]]
+//   CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<2x8xf16>
+//   CHECK-DAG:     vector.transfer_write %[[RHS_RD]]
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[LHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x16xf16>
-//       CHECK:     gpu.barrier
-//       CHECK:     vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x16xf16>
-//       CHECK:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<2x8xf16>
-//       CHECK:     vector.transfer_write %[[RHS_RD]]
-//       CHECK:     gpu.barrier
 //       CHECK:     %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x1x2x16xf16>
 //       CHECK:     gpu.barrier
-//       CHECK:     vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x16xf16>
+//   CHECK-DAG:     vector.transpose %[[LHS_MM]], [0, 2, 1, 3] : vector<2x1x2x16xf16>
+//   CHECK-DAG:     vector.transpose %[[RHS_MM]], [0, 2, 1, 3] : vector<2x1x2x16xf16>
 // CHECK-COUNT-8:   amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
 //       CHECK:     scf.yield
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
@@ -601,15 +589,19 @@ hal.executable public @main {
   }
 }
 
-// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 * 8)>
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 8 + s2 * 32)>
+// CHECK: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 * 8 + s1)>
 
 // CHECK-LABEL: func @skinny_matmul_config
 
 //   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
-//       CHECK:   %[[LINID:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]]]
+//   CHECK-DAG:   %[[IDZ:.+]] = gpu.thread_id  z
+//       CHECK:   %[[LINID0:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]], %[[IDZ]]]
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c8, %c4) : index, index
+//       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#1, %[[IDS]]#0]
 //       CHECK:   scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
-//       CHECK:     scf.for %{{.*}} = %[[LINID]] to %c4 step %c32
+//       CHECK:     scf.for %{{.*}} = %[[LINID1]] to %c4 step %c32
 //       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}storage_buffer>>, vector<4xf32>
 //       CHECK:       vector.transfer_write %[[READ]], %{{.*}} : vector<4xf32>, memref<4x6xf32, #gpu.address_space<workgroup>>
 //       CHECK:     vector.contract

@@ -31,9 +31,20 @@ def GPUCreateFastSlowPathPass :
   let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
+def GPUDistributeForallPass :
+    InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute scf.forall ops.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+}
+
 def GPUDistributePass :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to distribute scf.forall ops.";
+  let summary = "Pass to distribute scf.forall ops using upstream patterns.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
     "::mlir::gpu::GPUDialect",
@@ -135,6 +146,14 @@ def GPUReduceBankConflictsPass :
   ];
 }
 
+def GPUReuseSharedMemoryAllocsPass :
+    InterfacePass<"iree-codegen-gpu-reuse-shared-memory-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to reuse shared memory allocations with no overlapping liveness.";
+  let dependentDialects = [
+    "::mlir::nvgpu::NVGPUDialect"
+  ];
+}
+
 def GPUTensorAllocPass :
     InterfacePass<"iree-codegen-gpu-tensor-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to create allocations for some tensor values to use"
@@ -176,6 +195,11 @@ def GPUApplyTilingLevelPass :
                          "Tile and fuse all annotated ops to threads")
            )}]>,
   ];
+}
+
+def GPUMaterializeDeviceEncodingPass :
+    InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
 }
 
 def GPUTensorTileToSerialLoopsPass :

@@ -45,7 +45,7 @@ setup(
     name=f"iree-tools-tf{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="The IREE Team",
-    author_email="iree-discuss@googlegroups.com",
+    author_email="iree-technical-discussion@lists.lfaidata.foundation",
     license="Apache-2.0",
     description="IREE TensorFlow Compiler Tools",
     long_description=README,

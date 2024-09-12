@@ -35,7 +35,7 @@ jobs:
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.9"
       - name: Install python packages
@@ -122,7 +122,7 @@ jobs:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. Otherwise the latest-snapshot branch can't be
@@ -130,7 +130,7 @@ jobs:
           fetch-depth: 0
 
       - name: Updating latest-snapshot branch
-        uses: ad-m/github-push-action@v0.8.0
+        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot

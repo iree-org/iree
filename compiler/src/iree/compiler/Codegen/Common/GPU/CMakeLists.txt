@@ -53,18 +53,21 @@ iree_cc_library(
     "GPUCombineValueBarriers.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
+    "GPUDistributeForall.cpp"
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPUInferMemorySpace.cpp"
     "GPULowerToUKernels.cpp"
+    "GPUMaterializeEncoding.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
     "GPUReduceBankConflicts.cpp"
+    "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTensorTileToSerialLoops.cpp"
@@ -88,6 +91,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRBufferizationDialect
+    MLIRControlFlowDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -127,6 +131,7 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

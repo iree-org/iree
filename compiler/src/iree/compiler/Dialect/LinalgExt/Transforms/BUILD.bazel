@@ -43,6 +43,7 @@ iree_compiler_cc_library(
         "SplitReduction.cpp",
         "TileAttention.cpp",
         "TilingInterfaceImpl.cpp",
+        "TransposeFusion.cpp",
     ],
     hdrs = [
         "Passes.h",

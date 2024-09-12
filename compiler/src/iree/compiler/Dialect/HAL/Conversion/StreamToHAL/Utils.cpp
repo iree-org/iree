@@ -251,15 +251,6 @@ BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
   auto resourceValues = executeOp.getResourceOperands();
   auto capturedValues = executeOp.getBody().getArguments();
 
-  // TODO(benvanik): support stream.cmd.call with indirect bindings; today the
-  // simple analysis that happens here can't handle generating binding tables
-  // for them as the target would need to know if it's taking a buffer or a
-  // binding table slot. A `variant<!hal.buffer, i32>` may let us do that.
-  executeOp->walk([&](IREE::Stream::CmdCallOp) { hasUnsupportedOps = true; });
-  if (hasUnsupportedOps) {
-    return;
-  }
-
   // Categorize each resource value and add it to the table.
   for (auto [resourceValue, capturedValue, bufferValue, bufferSize] :
        llvm::zip_equal(resourceValues, capturedValues, bufferValues,

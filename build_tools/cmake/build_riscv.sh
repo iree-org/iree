@@ -27,6 +27,7 @@ RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
 source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
 RISCV_PLATFORM_ARCH="${RISCV_PLATFORM}-${RISCV_ARCH}"
 echo "Build riscv target with the config of ${RISCV_PLATFORM_ARCH}"

@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -100,7 +101,7 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(bool expandSubgroupReduction = true);
 
-enum class ReorderWorkgroupsStrategy { None, Swizzle, Transpose };
+using IREE::GPU::ReorderWorkgroupsStrategy;
 
 /// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

@@ -245,8 +245,13 @@ LogicalResult MultiMmaOp::verify() {
   int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
 
   auto [m, n, k] = getKind().getMNKShape();
-  if (m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
-      m * n != accInnerElementCount) {
+  int64_t expectedNumLhsElem = m * k;
+  int64_t expectedNumRhsElem = n * k;
+  int64_t expectedNumAccElem = m * n;
+
+  if (expectedNumLhsElem != lhsInnerElementCount ||
+      expectedNumRhsElem != rhsInnerElementCount ||
+      expectedNumAccElem != accInnerElementCount) {
     auto [lhsThreadType, rhsThreadType, accThreadType] =
         getKind().getABCVectorTypes();
     int64_t lhsThreadElementCount = multiplyAcc(lhsThreadType.getShape());

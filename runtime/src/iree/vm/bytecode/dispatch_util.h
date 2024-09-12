@@ -106,10 +106,10 @@ static inline iree_vm_type_def_t iree_vm_map_type(
 #endif  // IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
 
 #if IREE_VM_EXECUTION_TRACING_ENABLE
-#define IREE_DISPATCH_TRACE_INSTRUCTION(pc_offset, op_name)  \
-  if (IREE_IS_DISPATCH_TRACING_ENABLED()) {                  \
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_trace_disassembly( \
-        current_frame, (pc - (pc_offset)), &regs, stderr));  \
+#define IREE_DISPATCH_TRACE_INSTRUCTION(pc_offset, op_name) \
+  if (IREE_IS_DISPATCH_TRACING_ENABLED()) {                 \
+    IREE_IGNORE_ERROR(iree_vm_bytecode_trace_disassembly(   \
+        current_frame, (pc - (pc_offset)), &regs, stderr)); \
   }
 
 #else

@@ -70,6 +70,8 @@ output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"
 toolchain_suffix="${toolchain_suffix:-release}"
+# Return ON if we are on a supported platform for CUDA.
+enable_cuda="$(uname -m | awk '{print ($1 == "x86_64" || $1 == "aarch64") ? "ON" : "OFF"}')"
 
 function run_on_host() {
   echo "Running on host"
@@ -157,10 +159,14 @@ function build_iree_runtime() {
   export IREE_RUNTIME_BUILD_TRACY=ON
   # We install the needed build deps below for the tools.
   export IREE_RUNTIME_BUILD_TRACY_TOOLS=ON
+  export IREE_HAL_DRIVER_CUDA="${enable_cuda}"
+  export IREE_HAL_DRIVER_HIP=ON
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
+  export IREE_TARGET_BACKEND_CUDA="${enable_cuda}"
+  export IREE_TARGET_BACKEND_ROCM=ON
   build_wheel compiler/
 }
 

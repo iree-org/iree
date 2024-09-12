@@ -6,22 +6,6 @@ util.func private @extern() -> index
 
 // CHECK: util.global private mutable @global0 : index
 util.global private mutable @global0 : index
-util.initializer {
-  %value0 = util.call @extern() : () -> index
-  util.global.store %value0, @global0 : index
-  util.return
-}
-// CHECK-NEXT: util.global private @global1 : index
-util.global private @global1 : index
-// CHECK-NEXT: util.global private @global2 : index
-util.global private @global2 : index
-util.initializer {
-  %value1 = util.call @extern() : () -> index
-  util.global.store %value1, @global1 : index
-  %value2 = util.call @extern() : () -> index
-  util.global.store %value2, @global2 : index
-  util.return
-}
 // CHECK-NEXT: util.initializer {
 // CHECK-NEXT: %[[VALUE0:.+]] = util.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE0]], @global0
@@ -30,6 +14,23 @@ util.initializer {
 // CHECK-NEXT: %[[VALUE2:.+]] = util.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE2]], @global2
 // CHECK-NEXT: util.return
+util.initializer {
+  %value0 = util.call @extern() : () -> index
+  util.global.store %value0, @global0 : index
+  util.return
+}
+// CHECK: util.global private @global1 : index
+util.global private @global1 : index
+// CHECK-NEXT: util.global private @global2 : index
+util.global private @global2 : index
+// CHECK-NOT: util.initializer
+util.initializer {
+  %value1 = util.call @extern() : () -> index
+  util.global.store %value1, @global1 : index
+  %value2 = util.call @extern() : () -> index
+  util.global.store %value2, @global2 : index
+  util.return
+}
 
 // CHECK-LABEL: @orderedCombining
 util.func @orderedCombining(%arg0: index) -> (index, index, index) {
@@ -47,6 +48,16 @@ util.func @orderedCombining(%arg0: index) -> (index, index, index) {
 
 // CHECK: util.global private mutable @globalA : index
 util.global private mutable @globalA : index
+// CHECK: util.initializer {
+// CHECK: ^bb1:
+// CHECK:   cf.br ^bb3
+// CHECK: ^bb2:
+// CHECK:   cf.br ^bb3
+// CHECK: ^bb3:
+// CHECK:   cf.br ^bb4
+// CHECK: ^bb4:
+// CHECK:   util.return
+// CHECK: }
 util.initializer {
   %cond = arith.constant 1 : i1
   cf.cond_br %cond, ^bb1, ^bb2
@@ -63,18 +74,9 @@ util.initializer {
 }
 // CHECK-NEXT: util.global private @globalB : index
 util.global private @globalB : index
+// CHECK-NOT: util.initializer
 util.initializer {
   %c300 = arith.constant 300 : index
   util.global.store %c300, @globalB : index
   util.return
 }
-// CHECK: util.initializer {
-// CHECK: ^bb1:
-// CHECK:   cf.br ^bb3
-// CHECK: ^bb2:
-// CHECK:   cf.br ^bb3
-// CHECK: ^bb3:
-// CHECK:   cf.br ^bb4
-// CHECK: ^bb4:
-// CHECK:   util.return
-// CHECK: }
