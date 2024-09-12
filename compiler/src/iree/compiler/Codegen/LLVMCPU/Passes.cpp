@@ -109,6 +109,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createConvertToDestinationPassingStylePass());
   funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
+  funcPassManager.addPass(createLinalgFoldUnitExtentDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
