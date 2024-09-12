@@ -164,6 +164,7 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
 
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
                             StringRef targetChip) {
+  // TODO: This should be updated to use `amdgpu::Chipset`.
   // Link target chip ISA version as global.
   const int kLenOfChipPrefix = 3;
   StringRef chipId = targetChip.substr(kLenOfChipPrefix);
