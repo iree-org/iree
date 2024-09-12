@@ -37,14 +37,14 @@ void BarrierRegionOp::build(OpBuilder &b, OperationState &result,
   result.addOperands(inputs);
   (void)result.addRegion();
   result.addTypes(resultTypes);
+  SmallVector<Location> blockArgLocs(inputs.size(), result.location);
 
   Region *region = result.regions[0].get();
 
   // `builder.createBlock` changes the insertion point within the block. Create
   // a guard to reset the insertion point of the builder after it is destroyed.
   OpBuilder::InsertionGuard guard(b);
-  b.createBlock(region, region->end(), inputs.getTypes(),
-                ArrayRef<Location>{result.location});
+  b.createBlock(region, region->end(), inputs.getTypes(), blockArgLocs);
 }
 
 LogicalResult BarrierRegionOp::verify() { return success(); }
