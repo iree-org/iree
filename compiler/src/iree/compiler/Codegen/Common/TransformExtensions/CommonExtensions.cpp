@@ -39,6 +39,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h" //FIXME
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -1128,9 +1129,18 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (getExperimental())
     populateGPULayoutResolutionDistributionPatterns(patterns);
+  // FIXME
+  RewritePatternSet patterns2(target.getContext());
+  populateGpuBreakDownSubgrupReducePatterns(patterns2, 32);
+  populateGpuLowerSubgroupReduceToShufflePattenrs(patterns2, 64, 32);
+  FrozenRewritePatternSet patterns2f(std::move(patterns2));
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }
+
+  (void)applyPatternsAndFoldGreedily(*target.getCallableRegion(), patterns2f);
+  // FIXME
+
   return DiagnosedSilenceableFailure::success();
 }
 
