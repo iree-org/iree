@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -58,6 +59,13 @@ void addEncodingToNopPasses(FunctionLikeNest &passManager);
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen);
+
+using ConfigFn =
+    std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
+/// Pass to convert Conv2D ops into IGEMM (Im2colOp + matmul). `configFn` is
+/// used to set lowering configurations on the resulting ops, if necessary.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createConvolutionToIGEMMPass(ConfigFn configFn);
 
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne);
