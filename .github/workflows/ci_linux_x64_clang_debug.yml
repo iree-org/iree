@@ -38,6 +38,10 @@ jobs:
         shell: bash
     env:
       BUILD_DIR: build-debug
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_debug"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -56,9 +60,15 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
-            -DIREE_ENABLE_ASSERTIONS=ON
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache
       - name: CMake - build
-        run: cmake --build ${BUILD_DIR} -- -k 0
+        run: |
+          sccache --zero-stats
+          sccache --show-stats
+          cmake --build ${BUILD_DIR} -- -k 0
+          sccache --show-stats
       # We could build `iree-test-deps` or run some unit tests here, but the
       # main thing we want coverage for is the build itself and those steps
       # would add 10+ minutes to the job.

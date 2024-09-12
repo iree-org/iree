@@ -46,4 +46,11 @@ jobs:
           # Use a modern clang explicitly.
           CC: clang-19
           CXX: clang++-19
-        run: ./build_tools/cmake/build_and_test_asan.sh
+          SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+          SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+          SCCACHE_CACHE_ZSTD_LEVEL: 10
+          SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_asan"
+        run: |
+          source build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_and_test_asan.sh
+          sccache --show-stats
