@@ -34,9 +34,9 @@ public:
   explicit DistributionLayout(Value val) : AnalysisState(val) {}
 
   TypedValue<VectorType> getValue() const {
-    ProgramPoint point = getPoint();
-    assert(isa<Value>(point) && "expected program point to be a value");
-    Value val = cast<Value>(point);
+    auto anchor = getAnchor();
+    assert(isa<Value>(anchor) && "expected anchor to be a value");
+    Value val = cast<Value>(anchor);
     assert(isa<VectorType>(val.getType()) &&
            "expected value to be of vector type");
     return cast<TypedValue<VectorType>>(val);
@@ -303,7 +303,7 @@ void DistributionLayout::print(raw_ostream &os) const {
 void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   AnalysisState::onUpdate(solver);
 
-  Value value = point.get<Value>();
+  Value value = anchor.get<Value>();
 
   if (propagation) {
     // Make propagation run again on all users of this value.

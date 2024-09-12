@@ -123,8 +123,12 @@ static LogicalResult tileAndDistributeToThreads(TilingInterface consumerOp,
   tileAndFuseOptions.setTilingOptions(tilingOptions);
   tileAndFuseOptions.setFusionControlFn(
       [](tensor::ExtractSliceOp sliceOp, OpResult origProducer,
-         bool isDestinationOperand) -> std::tuple<bool, bool> {
-        return {!isa<tensor::PadOp>(origProducer.getOwner()), false};
+         bool isDestinationOperand)
+          -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
+        if (isa<tensor::PadOp>(origProducer.getOwner())) {
+          return std::nullopt;
+        }
+        return scf::SCFTileAndFuseOptions::ControlFnResult{false};
       });
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, consumerOp,

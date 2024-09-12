@@ -77,9 +77,11 @@ static void populateSliceIndices(OpBuilder &b, Location loc, Value src,
   }
 }
 
-static Value extractSlice(OpBuilder &b, Location loc, Value src,
-                          ArrayRef<OpFoldResult> offsets,
-                          ArrayRef<OpFoldResult> sizes, AffineMap indexingMap) {
+static tensor::ExtractSliceOp extractSlice(OpBuilder &b, Location loc,
+                                           Value src,
+                                           ArrayRef<OpFoldResult> offsets,
+                                           ArrayRef<OpFoldResult> sizes,
+                                           AffineMap indexingMap) {
   assert(offsets.size() == indexingMap.getNumDims() &&
          offsets.size() == sizes.size() && "Invalid tile");
 
@@ -113,12 +115,40 @@ MultiMmaOp::getTiledImplementation(OpBuilder &builder,
 
   Location loc = getLoc();
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      extractSlice(builder, loc, getLhs(), offsets, sizes, indexingMaps[0]));
-  tiledOperands.emplace_back(
-      extractSlice(builder, loc, getRhs(), offsets, sizes, indexingMaps[1]));
-  tiledOperands.emplace_back(
-      extractSlice(builder, loc, getAcc(), offsets, sizes, indexingMaps[2]));
+  SmallVector<Operation *> slices;
+
+  // LHS
+  {
+    Operation *lhsSlice =
+        extractSlice(builder, loc, getLhs(), offsets, sizes, indexingMaps[0]);
+    if (!lhsSlice) {
+      return emitOpError("failed to get lhs slice");
+    }
+    tiledOperands.emplace_back(lhsSlice->getResult(0));
+    slices.push_back(lhsSlice);
+  }
+
+  // RHS
+  {
+    Operation *rhsSlice =
+        extractSlice(builder, loc, getRhs(), offsets, sizes, indexingMaps[1]);
+    if (!rhsSlice) {
+      return emitOpError("failed to get rhs slice");
+    }
+    tiledOperands.emplace_back(rhsSlice->getResult(0));
+    slices.push_back(rhsSlice);
+  }
+
+  // Acc
+  {
+    Operation *accSlice =
+        extractSlice(builder, loc, getAcc(), offsets, sizes, indexingMaps[2]);
+    if (!accSlice) {
+      return emitOpError("failed to get accumulator slice");
+    }
+    tiledOperands.emplace_back(accSlice->getResult(0));
+    slices.push_back(accSlice);
+  }
 
   SmallVector<Type, 4> resultTypes;
   resultTypes.push_back(tiledOperands.back().getType());
@@ -126,8 +156,8 @@ MultiMmaOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledMmaOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledMmaOp},
-                      SmallVector<Value>(tiledMmaOp->getResults())};
+  return TilingResult{
+      {tiledMmaOp}, SmallVector<Value>(tiledMmaOp->getResults()), slices};
 }
 
 LogicalResult MultiMmaOp::getResultTilePosition(
