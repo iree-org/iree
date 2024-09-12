@@ -120,6 +120,11 @@ static iree_zone_id_t iree_tracing_zone_begin(
   assert(_thread.depth + 1 < IREE_ARRAYSIZE(_thread.stack));
   iree_zone_id_t zone_id = ++_thread.depth;
 
+  // _console.file is not initialized, return.
+  if (!_console.file) {
+    return zone_id;
+  }
+
   // Use the function name for display if no override was provided.
   if (!name) {
     name = function_name;
@@ -173,6 +178,12 @@ void iree_tracing_zone_end(iree_zone_id_t zone_id) {
 
   assert(_thread.depth > 0);
 
+  // _console is not initialized, balance the thread depth and return.
+  if (!_console.file) {
+    --_thread.depth;
+    return;
+  }
+
 #if IREE_TRACING_CONSOLE_TIMING
   // Capture timestamp first so that we don't measure too much of ourselves.
   uint64_t end_timestamp_ns = iree_platform_time_now();
@@ -200,6 +211,8 @@ void iree_tracing_message_cstring(const char* value, const char* symbol,
 
 void iree_tracing_message_string_view(const char* value, size_t value_length,
                                       const char* symbol, uint32_t color) {
+  if (!_console.file) return;
+
   fprintf(_console.file, "[%08" PRIX64 "][%.*s%*s] %*s %s %.*s\n",
           iree_thread_id(), (int)_thread.name_length, _thread.name,
           (int)(IREE_TRACING_MAX_THREAD_LENGTH - _thread.name_length), "",
@@ -211,6 +224,8 @@ void iree_tracing_message_string_view(const char* value, size_t value_length,
 
 void iree_tracing_memory_alloc(const char* name, size_t name_length, void* ptr,
                                size_t size) {
+  if (!_console.file) return;
+
   fprintf(_console.file, "[%08" PRIX64 "][%.*s%*s] %*s● %.*s alloc %p (%zu)\n",
           iree_thread_id(), (int)_thread.name_length, _thread.name,
           (int)(IREE_TRACING_MAX_THREAD_LENGTH - _thread.name_length), "",
@@ -221,6 +236,8 @@ void iree_tracing_memory_alloc(const char* name, size_t name_length, void* ptr,
 }
 
 void iree_tracing_memory_free(const char* name, size_t name_length, void* ptr) {
+  if (!_console.file) return;
+
   fprintf(_console.file, "[%08" PRIX64 "][%.*s%*s] %*s◌ %.*s free %p\n",
           iree_thread_id(), (int)_thread.name_length, _thread.name,
           (int)(IREE_TRACING_MAX_THREAD_LENGTH - _thread.name_length), "",
