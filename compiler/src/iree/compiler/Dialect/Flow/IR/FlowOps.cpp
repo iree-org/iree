@@ -578,6 +578,25 @@ ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
                                shapedType ? shapedType.getNumDynamicDims() : 0);
 }
 
+LogicalResult DispatchRegionOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  SmallVector<Type> resultTypes(getResultTypes());
+  unsigned counter = 0;
+  for (Type resultType : resultTypes) {
+    auto shapedType = llvm::dyn_cast<ShapedType>(resultType);
+    if (!shapedType) {
+      reifiedReturnShapes.push_back({});
+      continue;
+    }
+    SmallVector<Value> dynamicDims =
+        getResultDims().slice(counter, shapedType.getNumDynamicDims());
+    reifiedReturnShapes.push_back(
+        mlir::getMixedValues(shapedType.getShape(), dynamicDims, b));
+    counter += shapedType.getNumDynamicDims();
+  }
+  return success();
+}
+
 /// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
 /// if the IR was modified.
 bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,

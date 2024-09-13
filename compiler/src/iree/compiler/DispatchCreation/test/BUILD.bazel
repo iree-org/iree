@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
             "form_scalar_dispatches.mlir",
+            "fuse_encoding_ops_into_dispatch_regions.mlir",
             "fuse_horizontal_contractions.mlir",
             "fuse_multiuse_elementwise_producer.mlir",
             "fusion_preprocessing.mlir",
