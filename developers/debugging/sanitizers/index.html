@@ -4048,6 +4048,31 @@ need.</p>
 </code></pre></div>
 </div>
 <h3 id="tsan-threadsanitizer">TSan (ThreadSanitizer)<a class="headerlink" href="#tsan-threadsanitizer" title="Permanent link">link</a></h3>
+<p>To enable TSan:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_TSAN<span class="o">=</span>ON<span class="w"> </span>...
+</code></pre></div>
+<p>You may also need:</p>
+<ul>
+<li>
+<p>Depending on your system (see
+  <a href="https://github.com/google/benchmark/issues/773#issuecomment-616067912">https://github.com/google/benchmark/issues/773#issuecomment-616067912</a>):</p>
+<div class="highlight"><pre><span></span><code>-DRUN_HAVE_STD_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+-DRUN_HAVE_POSIX_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+-DCOMPILE_HAVE_GNU_POSIX_REGEX<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+</code></pre></div>
+</li>
+<li>
+<p>For clang &lt; 18.1.0 on system with <code>vm.mmap_rnd_bits</code> &gt; 28 (see
+  <a href="https://stackoverflow.com/a/77856955">https://stackoverflow.com/a/77856955</a>):</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>sysctl<span class="w"> </span>vm.mmap_rnd_bits<span class="o">=</span><span class="m">28</span>
+</code></pre></div>
+<p>TSan in LLVM &gt;= 18.1.0 supports 30 bits of ASLR entropy. If the layout is
+unsupported, TSan will automatically re-execute without ASLR.</p>
+</li>
+<li>
+<p>If running under Docker, add <code>--privileged</code> to your <code>docker run</code> command</p>
+</li>
+</ul>
 <h4 id="c-standard-library-with-tsan-support">C++ Standard Library with TSan support<a class="headerlink" href="#c-standard-library-with-tsan-support" title="Permanent link">link</a></h4>
 <p>For best results to avoid false positives/negatives TSan needs all userspace
 code to be compiled with Tsan.
