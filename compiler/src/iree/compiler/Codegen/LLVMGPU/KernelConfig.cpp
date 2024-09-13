@@ -814,6 +814,126 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                                targetSubgroupSize, configDict);
 }
 
+static Operation *matchLinalgReduction(OpOperand *outputOperand) {
+  auto linalgOp = cast<linalg::LinalgOp>(outputOperand->getOwner());
+  unsigned outputPos =
+      outputOperand->getOperandNumber() - linalgOp.getNumDpsInputs();
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(linalgOp.getRegionOutputArgs(), outputPos, combinerOps) ||
+      combinerOps.size() != 1)
+    return nullptr;
+
+  // Return the combiner operation.
+  return combinerOps[0];
+}
+
+// WIP: clean this code later
+static LogicalResult reductionPreconditions(linalg::LinalgOp op) {
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+  if (reductionDims.empty())
+    return failure();
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+    if (dim < numParallelDims) {
+      LDBG("Not innermost ones");
+      return failure();
+    }
+  }
+
+  // Make sure parallel dimensions are static
+  for (unsigned dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+  }
+
+  for (OpOperand &opOperand : op.getDpsInitsMutable()) {
+    AffineMap indexingMap = op.getMatchingIndexingMap(&opOperand);
+    if (indexingMap.isPermutation())
+      continue;
+
+    Operation *reduceOp = matchLinalgReduction(&opOperand);
+    if (!reduceOp || !linalg::getCombinerOpKind(reduceOp)) {
+      LDBG("reduction precondition failed: reduction detection failed\n");
+      return failure();
+    }
+  }
+  return success();
+}
+
+// Bangtian-IMPL: Experiental try to support linalg op with reduction dim
+static LogicalResult
+setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
+                                     mlir::FunctionOpInterface entryPoint,
+                                     linalg::LinalgOp op) {
+  if (!target.supportsSubgroupShuffle())
+    return failure();
+
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+
+  int64_t reductionSize = 1;
+  for (int64_t dim : reductionDims)
+    reductionSize *= bounds[dim];
+
+  int64_t subgroupSize = 0;
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+    if (reductionSize % s == 0) {
+      subgroupSize = s;
+      break;
+    }
+  }
+  if (subgroupSize == 0)
+    return failure();
+
+  const Type elementType =
+      llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
+          .getElementType();
+  if (!elementType.isIntOrFloat())
+    return failure();
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
+  // Reduction distribution only supports 8/16/32 bit types now.
+  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
+    return failure();
+
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  const unsigned largestLoadSizeInBits = 128;
+  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
+  while ((reductionSize / vectorSize) % subgroupSize != 0)
+    vectorSize /= 2;
+
+  // Set pipeline
+  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
+
+  // Since the lowering for multi_reduction does not support reductions across
+  // warps, the current strategy is to use a single warp to perform the
+  // reduction.
+  std::array<int64_t, 3> workgroupSize{subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
+  for (int i = 0; i < reductionDims.size(); i++) {
+    int64_t dim = reductionDims[i];
+    workgroupTileSizes[dim] = 0;
+  }
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSizes);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, pipeline, workgroupSize, targetSubgroupSize);
+}
+
 static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
@@ -839,6 +959,11 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
       LDBG("VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
+    }
+    if (succeeded(reductionPreconditions(linalgOp))) {
+      LDBG("VectorDistribution: trying to find a suitable convolution config "
+           "for linalg op with reduction dim");
+      return setReductionVectorDistributionConfig(target, entryPoint, linalgOp);
     }
   }
 

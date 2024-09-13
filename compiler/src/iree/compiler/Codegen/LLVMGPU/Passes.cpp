@@ -227,6 +227,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
+  // used for supporting reduction along VectorDistribute pipeline
+  // disable conversion for reduction ops to contraction ops.
+  options.generateContract = false;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
