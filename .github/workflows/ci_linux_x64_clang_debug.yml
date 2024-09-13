@@ -49,8 +49,6 @@ jobs:
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      # Note: Not using ccache here. Debug builds need a lot of cache space
-      # and caching only provides marginal build time improvements.
       - name: CMake - configure
         run: |
           cmake \
