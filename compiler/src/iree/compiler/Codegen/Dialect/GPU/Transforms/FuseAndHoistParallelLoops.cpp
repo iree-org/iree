@@ -75,8 +75,8 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
       return failure();
     }
 
-    return fuseForallIntoSlice(rewriter, producerForall, sliceParent,
-                               consumerChain);
+    return fuseForallIntoConsumer(rewriter, producerForall, sliceParent,
+                                  consumerChain);
   }
 };
 

@@ -35,19 +35,19 @@ struct UnrollVectorOptions;
 namespace mlir::iree_compiler::IREE::GPU {
 
 /// Function to fuse the given producer-consumer pair of forall loops into
-/// the single consumer loop at the given |slice| within the consumer of the
-/// producer. This is managed by inserting an `iree_gpu.barrier_region` at the
-/// boundary to synchronize the workers at the fusion point.
+/// the single consumer loop. This is managed by inserting an
+/// `iree_gpu.barrier_region` at the boundary to synchronize the workers at
+/// the fusion point.
 ///
 /// The mapping attributes of both the producer and consumer `scf.forall` ops
 /// must be in a relative descending order, for example:
 ///  [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>]
 /// or
 ///  [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
-                                  scf::ForallOp producer,
-                                  scf::ForallOp consumer,
-                                  SmallVector<Operation *> consumerChain);
+LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
+                                     scf::ForallOp producer,
+                                     scf::ForallOp consumer,
+                                     SmallVector<Operation *> consumerChain);
 
 // Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
 FailureOr<IREE::GPU::MultiMmaOp>
