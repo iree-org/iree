@@ -125,12 +125,10 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
-    auto refPtrOp = cast<emitc::ApplyOp>(refPtr.getDefiningOp());
-
     // Cache local refs so that we can release them before a return operation.
     // Here we rely on the fact that the register allocation maps arguments in
     // the first slots.
-    funcAnalysis.cacheLocalRef(i + numRefArgs, refPtrOp);
+    funcAnalysis.cacheLocalRef(i + numRefArgs, refPtr);
   }
 
   for (Block &block : llvm::drop_begin(newFuncOp.getBlocks(), 1)) {
@@ -332,13 +330,7 @@ void releaseRefs(OpBuilder &builder, Location location,
 
   if (funcAnalysis.hasLocalRefs()) {
 
-    for (auto pair : funcAnalysis.localRefs()) {
-      Operation *op = pair.second;
-
-      assert(isa<emitc::ApplyOp>(op));
-
-      Value localRef = cast<emitc::ApplyOp>(op).getResult();
-
+    for (auto &[key, localRef] : funcAnalysis.localRefs()) {
       emitc_builders::ireeVmRefRelease(builder, location, localRef);
     }
   }
