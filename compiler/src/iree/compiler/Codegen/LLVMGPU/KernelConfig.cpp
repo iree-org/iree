@@ -638,7 +638,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      mlir::FunctionOpInterface entryPoint,
                                      IREE::LinalgExt::AttentionOp op) {
   if (target.getWgp().getMma().empty()) {
-    llvm::outs() << "Tragedy 0";
     return failure();
   }
 
@@ -662,7 +661,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       ShapedType::isDynamic(bounds[k1Dim]) ||
       ShapedType::isDynamic(bounds[k2Dim]) ||
       ShapedType::isDynamic(bounds[nDim])) {
-    llvm::outs() << "Tragedy 1";
     return failure();
   }
 
@@ -683,7 +681,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
   if (intrinsics.empty()) {
-    llvm::outs() << "Tragedy 2";
     return failure();
   }
 
@@ -737,7 +734,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
       targetSubgroupSize, transposedQ, transposedK, transposedV);
   if (!schedule) {
-    llvm::outs() << "sadness\n";
     // Then try again by allowing upcasting accumulator.
     schedule = deduceAttentionSchedule(
         qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
@@ -747,7 +743,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   if (!schedule) {
     LDBG("Failed to deduce Attention schedule");
-    llvm::outs() << "Tragedy 3"; return failure();
   }
 
   // TODO: Due to a bug in layout configuration, we cannot set warp count on
