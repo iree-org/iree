@@ -366,8 +366,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         // Never hoist empty and other pure metadata ops as a leaf. It's fine to
         // hoist them as a part of a larger constant tree that does actual work.
         HoistableNonLeafOpInterfaceHelper<
-            tensor::EmptyOp, tensor::ExpandShapeOp,
-            tensor::CollapseShapeOp>::registerOpInterface(context);
+            tensor::EmptyOp, tensor::ExpandShapeOp, tensor::CollapseShapeOp,
+            tensor::ExtractSliceOp>::registerOpInterface(context);
         // Cases of trivial pack/unpack should be handled as canonicalizations
         // before we get here, thus we're safe to always hoist.
         AlwaysHoistableOpInterfaceHelper<
