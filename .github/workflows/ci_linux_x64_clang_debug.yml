@@ -51,6 +51,7 @@ jobs:
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: CMake - configure
         run: |
+          source ./build_tools/cmake/setup_sccache.sh
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
@@ -58,13 +59,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
-            -DIREE_ENABLE_ASSERTIONS=ON \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache
+            -DIREE_ENABLE_ASSERTIONS=ON
       - name: CMake - build
         run: |
-          sccache --zero-stats
-          sccache --show-stats
           cmake --build ${BUILD_DIR} -- -k 0
           sccache --show-stats
       # We could build `iree-test-deps` or run some unit tests here, but the
