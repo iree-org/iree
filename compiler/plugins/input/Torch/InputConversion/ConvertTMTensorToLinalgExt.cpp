@@ -92,6 +92,9 @@ getStandardAttentionIndexingMaps(MLIRContext *ctx) {
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
 
   return {qMap, kMap, vMap, sMap, mMap, rMap};
+}
+
+struct AttentionOpConversion
     : public OpRewritePattern<mlir::torch::TMTensor::AttentionOp> {
   using OpRewritePattern<mlir::torch::TMTensor::AttentionOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::AttentionOp op,

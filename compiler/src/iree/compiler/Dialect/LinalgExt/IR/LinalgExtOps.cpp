@@ -1425,6 +1425,12 @@ MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
                              /*numInits=*/3);
 }
 
+LogicalResult OnlineAttentionOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());

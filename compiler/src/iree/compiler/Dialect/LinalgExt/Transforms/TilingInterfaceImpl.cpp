@@ -1841,16 +1841,10 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Location loc = getLoc();
 
-  SmallVector<Value> tiledOperands;
-
   SmallVector<Range> querySlice = getPermutedSlice(getQueryMap(), offsets, sizes);
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
-
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
-   tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
-
   SmallVector<Range> valueSlice = getPermutedSlice(getValueMap(), offsets, sizes);
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
+  SmallVector<Range> outputSlice = getPermutedSlice(getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
@@ -1890,6 +1884,18 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Scale
   tiledOperands.emplace_back(scale);
 
+  // Mask
+  Value attnMask = getMask();
+  if (attnMask != nullptr) {
+    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
+    Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
+    if (!maskSliceOp) {
+      return emitOpError("failed to get mask slice");
+    }
+    tiledOperands.emplace_back(maskSliceOp->getResult(0));
+    slices.push_back(maskSliceOp);
+  }
+  
   // Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
@@ -1899,16 +1905,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
-  tiledOperands.emplace_back(scale);
-
-  Value attnMask = getMask();
-  if (attnMask != nullptr) {
-    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
-    tiledOperands.emplace_back(getSlice(builder, loc, attnMask, maskSlice));    
-  }
-
-  SmallVector<Range> outputSlice = getPermutedSlice(getOutputMap(), offsets, sizes);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
 
   std::optional<Value> max = getMax();
   if (max) {

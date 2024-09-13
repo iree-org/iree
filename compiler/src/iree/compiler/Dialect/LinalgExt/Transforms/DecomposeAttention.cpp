@@ -305,6 +305,10 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              std::optional<uint64_t> tileSize) {
 
   Location loc = tiledAttnOp.getLoc();
+  Value keySlice = tiledAttnOp.getKey();
+  Value valueSlice = tiledAttnOp.getValue();
+  Value querySlice = tiledAttnOp.getQuery();
+  Value maskSlice = tiledAttnOp.getMask();
   Value tiledResult = tiledAttnOp.getOutput();
   Value max = *tiledAttnOp.getMax();
   Value sum = *tiledAttnOp.getSum();
