@@ -225,6 +225,9 @@ def GPUTileReductionPass :
 def GPUVerifyDistributionPass :
     InterfacePass<"iree-codegen-gpu-verify-distribution", "mlir::FunctionOpInterface"> {
   let summary = "Pass to verify writes before resolving distributed contexts.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect",
+  ];
 }
 
 def GPUVectorAllocPass :
