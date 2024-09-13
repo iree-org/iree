@@ -102,8 +102,24 @@ struct AttentionOpConversion
     Value value = op.getValue();
 
     ShapedType outputType = op.getOutputType();
+
+    SmallVector<int64_t> staticSizes;
+    SmallVector<Value> dynSizes;
+    for (int i = 0, s = outputType.getRank() - 1; i < s; ++i) {
+      staticSizes.push_back(outputType.getDimSize(i));
+      if (outputType.isDynamicDim(i)) {
+        dynSizes.push_back(rewriter.create<tensor::DimOp>(loc, query, i));
+      }
+    }
+
+    staticSizes.push_back(outputType.getDimSize(outputType.getRank() - 1));
+    if (staticSizes.back() == ShapedType::kDynamic) {
+      dynSizes.push_back(
+          rewriter.create<tensor::DimOp>(loc, value, outputType.getRank() - 1));
+    }
+
     Value result = rewriter.create<tensor::EmptyOp>(
-        loc, outputType.getShape(), outputType.getElementType());
+        loc, staticSizes, outputType.getElementType(), dynSizes);
 
     // TODO: This is a hack. This should be replaced with a simple getScale()
     // when support for scaling is plumbed to TMTensor on the torch-mlir side.
