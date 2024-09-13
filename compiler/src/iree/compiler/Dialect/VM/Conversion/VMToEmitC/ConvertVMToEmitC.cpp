@@ -46,8 +46,7 @@ enum {
 };
 
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
-                            const IREE::VM::EmitCTypeConverter &typeConverter,
-                            SmallVector<BlockArgument> &blockArgsToRemove) {
+                            const IREE::VM::EmitCTypeConverter &typeConverter) {
   auto ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
 
@@ -131,33 +130,9 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     funcAnalysis.cacheLocalRef(i + numRefArgs, refPtr);
   }
 
-  for (Block &block : llvm::drop_begin(newFuncOp.getBlocks(), 1)) {
-    for (BlockArgument blockArg : block.getArguments()) {
-      if (!llvm::isa<IREE::VM::RefType>(blockArg.getType())) {
-        continue;
-      }
-      blockArgsToRemove.push_back(blockArg);
-    }
-  }
-
   if (failed(
           funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp)))
     return funcOp.emitError() << "unable to update symbol name in module";
-
-  return success();
-}
-
-/// Remove block arguments
-LogicalResult
-removeBlockArguments(IREE::VM::ModuleOp moduleOp,
-                     SmallVector<BlockArgument> &blockArgsToRemove) {
-  for (auto &blockArg : blockArgsToRemove) {
-    assert(isa<IREE::VM::RefType>(blockArg.getType()));
-    assert(blockArg.use_empty());
-    Block *block = blockArg.getOwner();
-
-    block->eraseArgument(blockArg.getArgNumber());
-  }
 
   return success();
 }
@@ -1557,23 +1532,51 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
   LogicalResult
   matchAndRewrite(mlir::emitc::FuncOp funcOp, Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    TypeConverter::SignatureConversion signatureConverter(
-        funcOp.getFunctionType().getNumInputs());
-    for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
-      Type convertedType =
-          getTypeConverter()->convertType(arg.value().getType());
-      signatureConverter.addInputs(arg.index(), convertedType);
+    // Entry block
+    {
+      Block &block = funcOp.getBlocks().front();
+      TypeConverter::SignatureConversion signatureConversion(
+          block.getNumArguments());
+
+      for (const auto &[index, arg] : llvm::enumerate(block.getArguments())) {
+        Type convertedType = getTypeConverter()->convertType(arg.getType());
+        signatureConversion.addInputs(index, convertedType);
+      }
+
+      rewriter.applySignatureConversion(&block, signatureConversion);
+
+      rewriter.modifyOpInPlace(funcOp, [&] {
+        funcOp.setType(
+            rewriter.getFunctionType(signatureConversion.getConvertedTypes(),
+                                     funcOp.getFunctionType().getResults()));
+      });
     }
 
-    rewriter.applySignatureConversion(&funcOp.getFunctionBody().front(),
-                                      signatureConverter);
+    // other blocks: Remap ref arguments to replacement values from register
+    // allocation.
+    {
+      for (Block &block : llvm::make_early_inc_range(
+               llvm::drop_begin(funcOp.getBlocks(), 1))) {
+        TypeConverter::SignatureConversion signatureConversion(
+            block.getNumArguments());
 
-    // Creates a new function with the updated signature.
-    rewriter.modifyOpInPlace(funcOp, [&] {
-      funcOp.setType(
-          rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
-                                   funcOp.getFunctionType().getResults()));
-    });
+        for (const auto &[index, arg] : llvm::enumerate(block.getArguments())) {
+          if (isa<IREE::VM::RefType>(arg.getType())) {
+            Value ref = getModuleAnalysis().lookupRef(arg);
+            signatureConversion.remapInput(index, ref);
+          } else {
+            signatureConversion.addInputs(index, arg.getType());
+          }
+        }
+
+        Block *newBlock =
+            rewriter.applySignatureConversion(&block, signatureConversion);
+
+        getModuleAnalysis().lookupFunction(funcOp).cacheBlockConversion(
+            newBlock, signatureConversion);
+      }
+    }
+
     return success();
   }
 };
@@ -2084,8 +2087,8 @@ private:
     }
 
     builder.setInsertionPointToEnd(condBlock);
-    builder.create<IREE::VM::CondBranchOp>(location, conditionI1, failureBlock,
-                                           continuationBlock);
+    builder.create<cf::CondBranchOp>(location, conditionI1, failureBlock,
+                                     continuationBlock);
 
     builder.setInsertionPointToStart(continuationBlock);
   }
@@ -3142,21 +3145,27 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
 
     Block *destDispatch;
     {
+      auto funcOp =
+          op.getOperation()->template getParentOfType<mlir::emitc::FuncOp>();
+      auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
+      auto &signatureConversion = funcAnalysis.lookupBlockConversion(dest);
+
       OpBuilder::InsertionGuard guard(rewriter);
       destDispatch = rewriter.createBlock(dest);
 
       IRMapping refMapping;
-      for (auto [operand, blockArg] :
-           llvm::zip_equal(op.getOperands(), dest->getArguments())) {
+      for (auto [index, operand] : llvm::enumerate(op.getOperands())) {
         if (isNotRefOperand(operand)) {
           continue;
         }
 
+        Value blockArgRef =
+            signatureConversion.getInputMapping(index)->replacementValue;
+
         assert(isa<IREE::VM::RefType>(operand.getType()));
-        assert(isa<IREE::VM::RefType>(blockArg.getType()));
+        assert(isa<emitc::PointerType>(blockArgRef.getType()));
 
         Value operandRef = getModuleAnalysis().lookupRef(operand);
-        Value blockArgRef = getModuleAnalysis().lookupRef(blockArg);
 
         refMapping.map(operandRef, blockArgRef);
       }
@@ -4303,8 +4312,8 @@ class ListGetRefOpConversion
     }
 
     rewriter.setInsertionPointToEnd(condBlock);
-    rewriter.create<IREE::VM::CondBranchOp>(loc, invalidType, failureBlock,
-                                            continuationBlock);
+    rewriter.create<cf::CondBranchOp>(loc, invalidType, failureBlock,
+                                      continuationBlock);
 
     rewriter.replaceOp(getOp, ref);
 
@@ -4729,9 +4738,8 @@ public:
     // reference emitc.func ops with the correct calling convention during the
     // conversion.
     SmallVector<IREE::VM::FuncOp> funcsToRemove;
-    SmallVector<BlockArgument> blockArgsToRemove;
     for (auto funcOp : module.getOps<IREE::VM::FuncOp>()) {
-      if (failed(convertFuncOp(funcOp, typeConverter, blockArgsToRemove))) {
+      if (failed(convertFuncOp(funcOp, typeConverter))) {
         return signalPassFailure();
       }
       funcsToRemove.push_back(funcOp);
@@ -4761,7 +4769,8 @@ public:
 
     target.addDynamicallyLegalOp<mlir::emitc::FuncOp>(
         [&](mlir::emitc::FuncOp op) {
-          return typeConverter.isSignatureLegal(op.getFunctionType());
+          return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+                 typeConverter.isLegal(&op.getFunctionBody());
         });
 
     // Structural ops
@@ -4775,26 +4784,6 @@ public:
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       return signalPassFailure();
     }
-
-    // Remove unused block arguments from refs
-    if (failed(removeBlockArguments(module, blockArgsToRemove))) {
-      return signalPassFailure();
-    }
-
-    SetVector<Operation *> &materializations =
-        typeConverter.sourceMaterializations;
-
-    module.walk([&materializations](Operation *op) {
-      // Remove dead basic block arguments
-      if (materializations.contains(op)) {
-        assert(isa<emitc::VariableOp>(op));
-        assert(op->use_empty());
-
-        materializations.remove(op);
-        op->erase();
-        return;
-      }
-    });
 
     if (failed(createModuleStructure(module, typeConverter))) {
       return signalPassFailure();
