@@ -30,7 +30,10 @@ struct GPUVerifyDistributionPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    WalkResult res = funcOp.walk([](Operation *op) {
+    auto privateAddressSpace = gpu::AddressSpaceAttr::get(
+        &getContext(), gpu::GPUDialect::getPrivateAddressSpace());
+
+    WalkResult res = funcOp.walk([&](Operation *op) {
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         std::optional<ArrayAttr> mapping = forallOp.getMapping();
         if (!mapping || mapping.value().empty()) {
@@ -48,12 +51,25 @@ struct GPUVerifyDistributionPass final
         return WalkResult::advance();
       }
       if (auto memoryEffectOp = dyn_cast<MemoryEffectOpInterface>(op)) {
-        if (memoryEffectOp.hasEffect<MemoryEffects::Write>() &&
-            !operationHasParentForallOfMappingType<
+        if (!operationHasParentForallOfMappingType<
                 mlir::gpu::GPUThreadMappingAttr, IREE::GPU::LaneIdAttr>(op)) {
-          op->emitOpError("write affecting operations are restricted to lane "
-                          "or thread distributed contexts.");
-          return WalkResult::interrupt();
+          for (Value operand : memoryEffectOp->getOperands()) {
+            auto type = dyn_cast<MemRefType>(operand.getType());
+            if (!type || !memoryEffectOp.getEffectOnValue<MemoryEffects::Write>(
+                             operand)) {
+              continue;
+            }
+
+            // Writes to private memory are fine.
+            if (type.getMemorySpace() == privateAddressSpace) {
+              continue;
+            }
+
+            op->emitOpError(
+                "write affecting operations on shared resources are restricted "
+                "to lane or thread distributed contexts.");
+            return WalkResult::interrupt();
+          }
         }
       }
       return WalkResult::advance();
