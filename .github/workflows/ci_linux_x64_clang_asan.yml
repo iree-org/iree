@@ -40,7 +40,6 @@ jobs:
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      # TODO(#18238): add local or remote ccache
       - name: Build and test with ASan
         env:
           # Use a modern clang explicitly.
