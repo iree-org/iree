@@ -80,7 +80,6 @@ public:
 } // namespace
 
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
-  llvm::outs() << "Start here\n";
   FunctionOpInterface funcOp = getOperation();
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
@@ -146,13 +145,11 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     addGPUTransposePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
-    llvm::outs() << "Case 1\n";
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
                                        /*usePadToModelSharedMemcpy=*/false);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::
       LLVMGPUPadAndVectorDistribute:
-      llvm::outs() << "Case 2\n";
 
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
                                        /*usePadToModelSharedMemcpy=*/true);

@@ -465,7 +465,6 @@ void TileAttentionPass::runOnOperation() {
 }
 
 void ConvertAttentionToOnlineAttentionPass::runOnOperation() {
-  llvm::outs() << "I exist!\n";
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
   getOperation().walk([&](AttentionOp attnOp) {
