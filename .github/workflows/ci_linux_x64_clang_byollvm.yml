@@ -8,8 +8,6 @@ name: CI - Linux x64 clang BYO LLVM
 
 on:
   pull_request:
-    branches:
-      - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_byollvm.yml"
   schedule:
@@ -28,7 +26,7 @@ concurrency:
 jobs:
   linux_x64_clang_byollvm:
     runs-on: ubuntu-20.04
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:2b2ad51d7de988be13086bc618d89d2ba47fbf09eb5b38c60dce82b595fb1c74
     defaults:
       run:
         shell: bash

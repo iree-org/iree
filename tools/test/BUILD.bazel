@@ -16,6 +16,7 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
+    timeout = "moderate",
     srcs = enforce_glob(
         [
             "benchmark_flags.txt",

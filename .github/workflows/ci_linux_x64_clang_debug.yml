@@ -8,8 +8,6 @@ name: CI - Linux x64 clang debug
 
 on:
   pull_request:
-    branches:
-      - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_debug.yml"
   schedule:
@@ -34,12 +32,16 @@ jobs:
   linux_x64_clang_debug:
     needs: setup
     runs-on: azure-linux-scale
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:54d9d17a79caa083aeff1243b27e767df2629b533c26e0b65d41beb160f197e4
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:2b2ad51d7de988be13086bc618d89d2ba47fbf09eb5b38c60dce82b595fb1c74
     defaults:
       run:
         shell: bash
     env:
       BUILD_DIR: build-debug
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_debug"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -47,10 +49,9 @@ jobs:
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      # Note: Not using ccache here. Debug builds need a lot of cache space
-      # and caching only provides marginal build time improvements.
       - name: CMake - configure
         run: |
+          source ./build_tools/cmake/setup_sccache.sh
           cmake \
             -G Ninja \
             -B ${BUILD_DIR} \
@@ -60,7 +61,9 @@ jobs:
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON
       - name: CMake - build
-        run: cmake --build ${BUILD_DIR} -- -k 0
+        run: |
+          cmake --build ${BUILD_DIR} -- -k 0
+          sccache --show-stats
       # We could build `iree-test-deps` or run some unit tests here, but the
       # main thing we want coverage for is the build itself and those steps
       # would add 10+ minutes to the job.
