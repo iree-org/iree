@@ -8,8 +8,6 @@ name: CI - Linux x64 clang TSan
 
 on:
   pull_request:
-    branches:
-      - main
     paths:
       - ".github/workflows/ci_linux_x64_clang_tsan.yml"
   schedule:
@@ -32,21 +30,34 @@ jobs:
   linux_x64_clang_tsan:
     needs: setup
     runs-on: azure-linux-scale
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:2b2ad51d7de988be13086bc618d89d2ba47fbf09eb5b38c60dce82b595fb1c74
+      # TSan in particular needs some settings that this option includes:
+      #   * https://github.com/google/sanitizers/issues/1716
+      #   * https://security.stackexchange.com/q/214923
+      # Note that we are not using Docker for sandboxing. If we were, this
+      # would *not* be safe.
+      options: --privileged
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: "Building and testing with TSan"
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: Build and test with TSan
         env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          # Use a modern clang explicitly.
+          CC: clang-19
+          CXX: clang++-19
+          SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+          SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+          SCCACHE_CACHE_ZSTD_LEVEL: 10
+          SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_tsan"
         run: |
-          # Note that this uses the latest version of the clang compiler, etc.
-          # This gives us access to the latest features and validates that IREE
-          # builds using the latest versions.
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
-            ./build_tools/cmake/build_and_test_tsan.sh
+          source build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_and_test_tsan.sh
+          sccache --show-stats
