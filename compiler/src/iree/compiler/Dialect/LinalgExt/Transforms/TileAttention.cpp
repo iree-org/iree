@@ -161,8 +161,6 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   AffineMap vMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
-  AffineMap sMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
   AffineMap maxMap =
@@ -176,7 +174,7 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
     vMap = AffineMap::get(vMap.getNumDims(), vMap.getNumSymbols(), vDims, ctx);
   }
 
-  SmallVector<AffineMap> attentionMaps = {qMap, kMap,   vMap,  sMap,
+  SmallVector<AffineMap> attentionMaps = {qMap, kMap,   vMap,
                                           rMap, maxMap, sumMap};
   // Add batches to standard attention indexing maps.
   int64_t numBatches = tiledInputRank - 2;
