@@ -41,10 +41,11 @@ namespace mlir::iree_compiler {
 // This function is concerned with a single intrinsic, not a whole kernel tile.
 // TODO(bjacob): derive this automatically from the intrinsic layout getters.
 static MaterializeEncodingInfo::Swizzle
-getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
+getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma,
+                    IREE::GPU::MMAFragment fragment) {
   switch (mma) {
   case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32:
-    if (operandIdx == 2) {
+    if (fragment == IREE::GPU::MMAFragment::Acc) {
       return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
                                               /*permutation=*/{0, 2, 1}};
     } else {
@@ -52,7 +53,7 @@ getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
                                               /*permutation=*/{1, 0}};
     }
   case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    if (operandIdx == 2) {
+    if (fragment == IREE::GPU::MMAFragment::Acc) {
       return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
                                               /*permutation=*/{0, 2, 1}};
     } else {
@@ -60,7 +61,7 @@ getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma, int operandIdx) {
                                               /*permutation=*/{1, 0, 2}};
     }
   case IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8:
-    if (operandIdx == 2) {
+    if (fragment == IREE::GPU::MMAFragment::Acc) {
       return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
                                               /*permutation=*/{0, 2, 1}};
     } else {
@@ -175,15 +176,15 @@ static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
 // Generates the swizzle for the full data-tiled-mma tile, including all the
 // relevant unrolling factors.
 static MaterializeEncodingInfo::Swizzle
-getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
+getSwizzle(IREE::GPU::DataTiledMMAAttr mma, IREE::GPU::MMAFragment fragment) {
   auto [AType, BType, CType] = mma.getABCElementTypes();
   int ABits = AType.getIntOrFloatBitWidth();
   int BBits = BType.getIntOrFloatBitWidth();
   // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
   const int targetPreferredLoadBitWidth = 128;
-  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), operandIdx);
-  switch (operandIdx) {
-  case 0:
+  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs:
     // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
     // Unroll on K with interleaving, then on M.
     if (mma.getUnrollK() > 1) {
@@ -197,7 +198,7 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
       unroll(swizzle, 0, mma.getUnrollM());
     }
     break;
-  case 1:
+  case IREE::GPU::MMAFragment::Rhs:
     // B-matrix (RHS). Since the pack ops already took care of transposing B,
     // source dimensions are N (index 0) and K (index 1).
     // Unroll on K with interleaving, then on N.
@@ -212,7 +213,7 @@ getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIdx) {
       unroll(swizzle, 0, mma.getUnrollN());
     }
     break;
-  case 2:
+  case IREE::GPU::MMAFragment::Acc:
     // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
     // 1). Unroll on N, then on M.
     if (mma.getUnrollN() > 1) {
@@ -310,8 +311,9 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma->getMNKShape();
   auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
-  auto operandIdx = encoding.getOperandIndex().getInt();
-  encodingInfo.swizzle = getSwizzle(*mma, operandIdx);
+  auto fragment =
+      static_cast<IREE::GPU::MMAFragment>(encoding.getOperandIndex().getInt());
+  encodingInfo.swizzle = getSwizzle(*mma, fragment);
   return encodingInfo;
 }
 
