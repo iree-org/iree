@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/TileSwizzle.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -59,8 +60,7 @@ getExpandedDimFirstIdx(const SmallVector<SmallVector<int64_t>> &expandShape,
 //    Input unrollFactor = 4
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
 //
-static void unroll(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
-                   int unrollFactor) {
+static void unroll(TileSwizzle &swizzle, int srcIndex, int unrollFactor) {
   assert(unrollFactor > 1);
   int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
 
@@ -88,7 +88,7 @@ static void unroll(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
 //    Input expandedDimIndexToInterleaveAt = 1
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [2, 0, 1] }
 //
-static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
+static void interleave(TileSwizzle &swizzle, int srcIndex,
                        int expandedDimIndexToInterleaveAt) {
   // Compute which inner dimension to permute the current outer dimension into.
   int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
@@ -129,16 +129,15 @@ static SmallVector<int64_t> getSortingPermutation(ArrayRef<T> v) {
 }
 
 // Returns the swizzle for a given intrinsic and operand index.
-// See the comment on MaterializeEncodingInfo::Swizzle for what that means.
+// See the comment on TileSwizzle for what that means.
 // This function is concerned with a single intrinsic, not a whole kernel tile.
 // TODO(bjacob): derive this automatically from the intrinsic layout getters.
-static MaterializeEncodingInfo::Swizzle
-getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
-                    IREE::GPU::MMAFragment fragment) {
+static TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
+                                       IREE::GPU::MMAFragment fragment) {
   auto layout = IREE::GPU::getSingleSubgroupLayout(intrinsic, fragment);
 
   // MMASingleSubgroupLayout has non-transposed RHS.
-  // MaterializeEncodingInfo::Swizzle has transposed RHS.
+  // TileSwizzle has transposed RHS.
   if (fragment == IREE::GPU::MMAFragment::Rhs) {
     std::swap(layout.outer[0], layout.outer[1]);
     std::swap(layout.thread[0], layout.thread[1]);
@@ -148,7 +147,7 @@ getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
 
   // Initially populate swizzle.expandShape with just the thread sizes, no
   // shape expansion for now.
-  MaterializeEncodingInfo::Swizzle swizzle;
+  TileSwizzle swizzle;
   for (auto t : layout.thread) {
     swizzle.expandShape.push_back({t});
   }
@@ -206,8 +205,8 @@ static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
 
 // Generates the swizzle for the full data-tiled-mma tile, including all the
 // relevant unrolling factors.
-static MaterializeEncodingInfo::Swizzle
-getSwizzle(IREE::GPU::DataTiledMMAAttr mma, IREE::GPU::MMAFragment fragment) {
+static TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
+                              IREE::GPU::MMAFragment fragment) {
   auto [AType, BType, CType] = mma.getABCElementTypes();
   int ABits = AType.getIntOrFloatBitWidth();
   int BBits = BType.getIntOrFloatBitWidth();
