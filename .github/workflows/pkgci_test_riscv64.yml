@@ -69,7 +69,7 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Bootstrap
         env:
-          IREE_ARTIFACT_URL: "https://storage.googleapis.com/iree-shared-files"
+          IREE_ARTIFACT_URL: "https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files"
           RISCV_CLANG_TOOLCHAIN_FILE_NAME: "toolchain_iree_manylinux_2_28_20231012.tar.gz"
           QEMU_FILE_NAME: "qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
         run: |
