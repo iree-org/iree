@@ -294,7 +294,6 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
                              RewriterBase &rewriter,
                              std::optional<uint64_t> tileSize) {
-
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();

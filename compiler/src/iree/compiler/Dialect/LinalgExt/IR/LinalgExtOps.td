@@ -590,11 +590,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
-    // std::optional<Value> getMask() {
-    //   if (getNumDpsInputs() < 4)
-    //     return std::nullopt;
-    //   return getDpsInputOperand(4)->get();
-    // }
     std::optional<Value> getMax() {
       if (getNumResults() < 2)
         return std::nullopt;
