@@ -1207,10 +1207,7 @@ void AttentionOp::build(::mlir::OpBuilder &odsBuilder,
                         ::mlir::Value scale, ::mlir::ValueRange outputs,
                         ::mlir::ArrayAttr indexing_maps,
                         std::optional<::mlir::Value> mask) {
-  Value mask_in;
-  if (mask.has_value()) {
-    mask_in = mask.value();
-  }
+  Value mask_in = mask.has_value() ? mask.value() : Value();
   build(odsBuilder, odsState, results, query, key, value, scale, mask_in,
         outputs, indexing_maps);
 }
