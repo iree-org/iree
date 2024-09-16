@@ -36,44 +36,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-// Returns the swizzle for a given intrinsic and operand index.
-// See the comment on MaterializeEncodingInfo::Swizzle for what that means.
-// This function is concerned with a single intrinsic, not a whole kernel tile.
-// TODO(bjacob): derive this automatically from the intrinsic layout getters.
-static MaterializeEncodingInfo::Swizzle
-getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic mma,
-                    IREE::GPU::MMAFragment fragment) {
-  switch (mma) {
-  case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x4_F32:
-    if (fragment == IREE::GPU::MMAFragment::Acc) {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
-                                              /*permutation=*/{0, 2, 1}};
-    } else {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4}},
-                                              /*permutation=*/{1, 0}};
-    }
-  case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    if (fragment == IREE::GPU::MMAFragment::Acc) {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
-                                              /*permutation=*/{0, 2, 1}};
-    } else {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4, 4}},
-                                              /*permutation=*/{1, 0, 2}};
-    }
-  case IREE::GPU::MMAIntrinsic::MFMA_I32_16x16x32_I8:
-    if (fragment == IREE::GPU::MMAFragment::Acc) {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{4, 4}, {16}},
-                                              /*permutation=*/{0, 2, 1}};
-    } else {
-      return MaterializeEncodingInfo::Swizzle{/*expandShape=*/{{16}, {4, 8}},
-                                              /*permutation=*/{1, 0, 2}};
-    }
-  default:
-    assert(false && "should not get here.");
-    return {};
-  }
-}
-
 // Given an `expandShape` vector-of-vectors describing the mapping from source
 // dimensions to expanded dimensions, returns the index of the first expanded
 // dimension corresponding to the given source dimension index.
@@ -147,6 +109,75 @@ static void interleave(MaterializeEncodingInfo::Swizzle &swizzle, int srcIndex,
     outPermutation[i] = swizzle.permutation[i];
   }
   swizzle.permutation = outPermutation;
+}
+
+// Returns the permutation of indices that sorts `v` with the given comparator.
+template <template <typename U> class Comparator, typename T>
+static SmallVector<int64_t> getSortingPermutation(ArrayRef<T> v) {
+  using P = std::pair<int64_t, T>;
+  SmallVector<P> pairs;
+  for (auto x : v) {
+    pairs.push_back({pairs.size(), x});
+  }
+  std::sort(pairs.begin(), pairs.end(),
+            [](P p1, P p2) { return Comparator<T>{}(p1.second, p2.second); });
+  SmallVector<int64_t> indices;
+  for (auto p : pairs) {
+    indices.push_back(p.first);
+  }
+  return indices;
+}
+
+// Returns the swizzle for a given intrinsic and operand index.
+// See the comment on MaterializeEncodingInfo::Swizzle for what that means.
+// This function is concerned with a single intrinsic, not a whole kernel tile.
+// TODO(bjacob): derive this automatically from the intrinsic layout getters.
+static MaterializeEncodingInfo::Swizzle
+getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
+                    IREE::GPU::MMAFragment fragment) {
+  auto layout = IREE::GPU::getSingleSubgroupLayout(intrinsic, fragment);
+
+  // MMASingleSubgroupLayout has non-transposed RHS.
+  // MaterializeEncodingInfo::Swizzle has transposed RHS.
+  if (fragment == IREE::GPU::MMAFragment::Rhs) {
+    std::swap(layout.outer[0], layout.outer[1]);
+    std::swap(layout.thread[0], layout.thread[1]);
+    std::swap(layout.tstrides[0], layout.tstrides[1]);
+    std::swap(layout.element[0], layout.element[1]);
+  }
+
+  // Initially populate swizzle.expandShape with just the thread sizes, no
+  // shape expansion for now.
+  MaterializeEncodingInfo::Swizzle swizzle;
+  for (auto t : layout.thread) {
+    swizzle.expandShape.push_back({t});
+  }
+  // The layout strides decide the initial swizzle.permutation.
+  swizzle.permutation =
+      getSortingPermutation<std::greater, int64_t>(layout.tstrides);
+  // Deal with any element size greater than 1o by inserting it innermost.
+  // Notice that this is similar to the unroll() function, just creating an
+  // inner dimension instead of an outer dimension.
+  for (int i = 0; i < layout.element.size(); ++i) {
+    if (layout.element[i] != 1) {
+      swizzle.expandShape[i].push_back(layout.element[i]);
+      int newIndex = getExpandedDimFirstIdx(swizzle.expandShape, i + 1) - 1;
+      for (auto &p : swizzle.permutation) {
+        p += (p >= newIndex);
+      }
+      swizzle.permutation.push_back(newIndex);
+    }
+  }
+  // Deal with any outer size greater than 1 as just a call to unroll.
+  // Iterate over dims in reverse order because we are creating a new outermost
+  // dimension each time.
+  for (int i = layout.outer.size() - 1; i >= 0; --i) {
+    if (layout.outer[i] != 1) {
+      unroll(swizzle, i, layout.outer[i]);
+    }
+  }
+
+  return swizzle;
 }
 
 // Returns the index of the dimension whose flattened size (flattening inner
