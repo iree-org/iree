@@ -42,7 +42,15 @@ load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure")
 llvm_configure(
     name = "llvm-project",
     # Keep this in sync with the targets in iree_llvm.cmake.
-    targets=["AArch64", "ARM", "RISCV", "X86", "NVPTX", "AMDGPU", "WebAssembly"],
+    targets = [
+        "AArch64",
+        "ARM",
+        "RISCV",
+        "X86",
+        "NVPTX",
+        "AMDGPU",
+        "WebAssembly",
+    ],
 )
 
 ###############################################################################
