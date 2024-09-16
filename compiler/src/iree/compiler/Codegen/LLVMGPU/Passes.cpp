@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -272,7 +273,8 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
                                                        ValueRange dynamicSizes,
                                                        unsigned alignment) {
   Attribute memorySpace = memRefType.getMemorySpace();
-  // Bail out if the memref type does not specify a GPU memory space.
+  // Bail out if the memref type specifies a nonnull memory space that is not
+  // #gpu.address_space.
   if (memorySpace && !llvm::isa<gpu::AddressSpaceAttr>(memorySpace)) {
     return failure();
   }
