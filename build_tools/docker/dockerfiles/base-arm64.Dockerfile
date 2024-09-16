@@ -76,7 +76,7 @@ ENV PYTHON_BIN /usr/bin/python3
 
 WORKDIR /install-qemu
 
-RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/qemu-aarch64"
+RUN wget --no-verbose "https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files/qemu-aarch64"
 RUN chmod +x ./qemu-aarch64 && cp ./qemu-aarch64 /usr/bin/qemu-aarch64 && rm -rf /install-qemu
 
 ##############
