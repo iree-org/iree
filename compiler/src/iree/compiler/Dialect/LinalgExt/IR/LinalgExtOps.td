@@ -561,10 +561,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       return cast<ShapedType>(getValue().getType());
     }
     std::optional<ShapedType> getMaskType() {
-      if (std::optional<Value> mask = getMask()) {
-        return cast<ShapedType>((*mask).getType());
-      }
-      return std::nullopt;
+      std::optional<Value> mask = getMask();
+      if (!mask) return std::nullopt;
+      return cast<ShapedType>(mask->getType());
     }
     FloatType getScaleType() {
       return cast<FloatType>(cast<ShapedType>(getScale().getType()));
@@ -621,10 +620,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       return getValueType().getRank();
     }
     std::optional<int64_t> getMaskRank() {
-      if (auto maskType = getMaskType()) {
-        return (*maskType).getRank();
-      }
-      return std::nullopt;
+      std::optional<ShapedType> maskType = getMaskType();
+      if (!maskType) return std::nullopt;
+      return maskType->getRank();
     }
     int64_t getOutputRank() {
       return getOutputType().getRank();
