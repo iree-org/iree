@@ -42,24 +42,25 @@ jobs:
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
-          - name: nvidiagpu_cuda
-            config-file: onnx_ops_gpu_cuda.json
-            numprocesses: 4
-            runs-on:
-              - self-hosted # must come first
-              - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-              - environment=prod
-              - gpu # TODO(scotttodd): qualify further with vendor/model
-              - os-family=Linux
-          - name: nvidiagpu_vulkan
-            config-file: onnx_ops_gpu_vulkan.json
-            numprocesses: 4
-            runs-on:
-              - self-hosted # must come first
-              - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-              - environment=prod
-              - gpu # TODO(scotttodd): qualify further with vendor/model
-              - os-family=Linux
+          # TODO(#18238): migrate to new runner cluster
+          # - name: nvidiagpu_cuda
+          #   config-file: onnx_ops_gpu_cuda.json
+          #   numprocesses: 4
+          #   runs-on:
+          #     - self-hosted # must come first
+          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+          #     - environment=prod
+          #     - gpu # TODO(scotttodd): qualify further with vendor/model
+          #     - os-family=Linux
+          # - name: nvidiagpu_vulkan
+          #   config-file: onnx_ops_gpu_vulkan.json
+          #   numprocesses: 4
+          #   runs-on:
+          #     - self-hosted # must come first
+          #     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+          #     - environment=prod
+          #     - gpu # TODO(scotttodd): qualify further with vendor/model
+          #     - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       CONFIG_FILE_PATH: tests/external/iree-test-suites/onnx_ops/${{ matrix.config-file }}

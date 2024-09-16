@@ -19,6 +19,7 @@ on:
 
 jobs:
   test_t4:
+    # TODO(#18238): migrate to new runner cluster
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}

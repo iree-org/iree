@@ -24,8 +24,8 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  # TODO: Switch to GitHub-hosted arm64 runners when available?
-  # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
+  # TODO(#18238): migrate to new runner cluster
+  #   Or switch to GitHub-hosted arm64 runners when available?
   linux_arm64_clang:
     needs: setup
     runs-on:

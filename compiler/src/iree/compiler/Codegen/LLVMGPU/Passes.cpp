@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -271,18 +272,28 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
                                                        MemRefType memRefType,
                                                        ValueRange dynamicSizes,
                                                        unsigned alignment) {
-  // Bail out if the memref type does not specify a memory space.
-  if (!llvm::isa_and_nonnull<gpu::AddressSpaceAttr>(
-          memRefType.getMemorySpace())) {
+  Attribute memorySpace = memRefType.getMemorySpace();
+  // Bail out if the memref type specifies a nonnull memory space that is not
+  // #gpu.address_space.
+  if (memorySpace && !llvm::isa<gpu::AddressSpaceAttr>(memorySpace)) {
     return failure();
   }
+
+  MemRefType allocType = memRefType;
   auto privateSpace = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getPrivateAddressSpace());
-  if (memRefType.getMemorySpace() == privateSpace) {
-    return builder.create<memref::AllocaOp>(loc, memRefType, dynamicSizes)
+  if (!memorySpace) {
+    allocType =
+        MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                        AffineMap(), privateSpace);
+    memorySpace = privateSpace;
+  }
+
+  if (memorySpace == privateSpace) {
+    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
         .getResult();
   }
-  return builder.create<memref::AllocOp>(loc, memRefType, dynamicSizes)
+  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
       .getResult();
 }
 
