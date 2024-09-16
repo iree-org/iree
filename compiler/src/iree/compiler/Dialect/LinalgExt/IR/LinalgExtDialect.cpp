@@ -26,12 +26,11 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc" // IWYU pragma: keep
-
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc" // IWYU pragma: keep
 
 // Used to control inlining behavior.
+namespace {
 struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
@@ -105,7 +104,6 @@ public:
   }
 };
 
-namespace {
 struct SoftmaxFusionOpInterfaceAdapter
     : public LinalgFusionOpInterface::ExternalModel<
           SoftmaxFusionOpInterfaceAdapter, linalg::SoftmaxOp> {
@@ -148,6 +146,10 @@ public:
 };
 } // namespace
 
+struct IREELinalgExtDialectOpAsmInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+};
+
 template <typename... Args>
 static void registerOpsWithLinalgExtOpInterface(mlir::MLIRContext *context) {
   (Args::template attachInterface<LinalgFusionOpInterfaceAdapter<Args>>(
@@ -172,6 +174,7 @@ void IREELinalgExtDialect::initialize() {
 
   addInterfaces<IREELinalgExtInlinerInterface>();
 
+  addInterfaces<IREELinalgExtDialectOpAsmInterface>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc"

@@ -1570,4 +1570,100 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 
 } // OpGroupWinogradOps
 
+//===---------------------------------------------------------------------===//
+// Custom tilable op
+//===---------------------------------------------------------------------===//
+
+def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op"> {
+  let summary = "Custom operation for compiling with IREE";
+  let description = [{
+    This operation is meant to allow computation sequences that are fused at
+    tile level prescriptively. This is to account for cases where such fusion
+    cannot/is not yet discovered appropriately.
+
+    The operation implements all the interfaces needed to be able to
+    1. Compile e2e using IREE
+    2. Still be able to fuse with other operations that the compiler can
+       figure out automatically.
+
+    Similar to how `LinalgOp`s represent a perfectly nested loop computation
+    with
+    - `indexing_maps` representing how the `ins`/`outs` are accessed
+    - `region` representing the scalar computation performed
+    - `iterator_types` representing the dependence along each iteration space
+      dimension
+    this operation represent a tiled computation with perfectly nested
+    inter-tile loop nest.
+    - `indexing_maps` represent what slices slices of the `ins`/`outs` are
+      needed for each iteration of the tiled computation.
+    - `region` represents the tiled computation performed using these slices
+    - `iterator_types` represents the dependence between tiles along each
+      iteration space.
+
+    Some modifications required to handle the tile-level semantics are
+    - Some dimensions of operands might not be accessed by dimensions of the
+      inter-tile iteration space. This means that along these dimensions the
+      slice size matches the dimension size. This access pattern of operands
+      is captured in the respective indexing map using a `symbol` to represent
+      that the entire dimension needs to be sliced.
+    - The basic block arguments of the region represent the slice of the
+      operand. These are either scalar types (if the corresponding operand is a
+      scalar), or a `tensor` type with dynamic shapes (if the corresponding
+      operand is a `tensor` type).
+
+    For example, one could represent a prescriptively fused matmul computation
+    as follows
+
+    ```
+    %0:2 = iree_linalg_ext.custom_op {
+        indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (d0, s0)>,
+                         affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (s1, d1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (d0, s1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (d0, d1)],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%lhs1, %rhs1, %rhs2
+            : tensor<1000000x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+        outs(%outs1, %outs2 : tensor<1000000x?xf32>, tensor<1000000x?xf32>) {
+      ^bb0(%t0 : tensor<?x?xf32>, %t1 : tensor<?x?xf32>, %t2 : tensor<?x?xf32>,
+           %t3 : tensor<?x?xf32>, %t4 : tensor<?x?xf32>) :
+        %0 = linalg.matmul ins(%t0, %t1 : tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%t3 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %1 = linalg.matmul ins(%0, %t2 : tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%t4 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        iree_linalg_ext.yield %0, %1 : tensor<?x?xf32>, tensor<?x?xf32>
+    } -> tensor<1000000x?xf32>, tensor<x?xf32>
+    ```
+  }];
+  let arguments = (ins
+    Variadic<AnyRankedTensorOrScalarType>:$inputs,
+    Variadic<AnyRankedTensor>:$outputs,
+    AffineMapArrayAttr:$indexing_maps,
+    IREELinalgExt_IteratorTypeArrayAttr:$iterator_types);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+
+  let hasVerifier = 1;
+
+  let assemblyFormat = [{
+    `{` `indexing_maps` `=` $indexing_maps `,`
+    `iterator_types` `=` $iterator_types `}`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
+    $region
+    attr-dict (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration =[{
+    // Helper accessor methods.
+    unsigned getNumLoops();
+    int64_t getRank(Value);
+
+    // DestinationStyleOpInterface methods
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_OPS
