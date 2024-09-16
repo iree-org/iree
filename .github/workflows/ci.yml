@@ -70,12 +70,14 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e403ad507104847c3539436f64a9e9eecc73eeec # 0.8.5
+      # - name: Setup Bazel
+      #   uses: bazel-contrib/setup-bazel@e403ad507104847c3539436f64a9e9eecc73eeec # 0.8.5
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: Build and test with Bazel
-        run: ./build_tools/bazel/build_test_all.sh
+        run: |
+          ./build_tools/bazel/install_bazelisk.sh 1.21.0
+          ./build_tools/bazel/build_test_all.sh
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
