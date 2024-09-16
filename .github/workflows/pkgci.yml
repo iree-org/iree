@@ -73,11 +73,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
     uses: ./.github/workflows/pkgci_test_amd_w7900.yml
 
-  test_nvidia_t4:
-    name: Test NVIDIA T4
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
-    uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
+  # TODO(#18238): migrate to new runner cluster
+  # test_nvidia_t4:
+  #   name: Test NVIDIA T4
+  #   needs: [setup, build_packages]
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
+  #   uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
 
   test_android:
     name: Test Android
