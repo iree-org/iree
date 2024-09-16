@@ -207,6 +207,11 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         } else {
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
+
+          Value log2e = b.create<arith::ConstantOp>(
+              loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+          maskVal = b.create<arith::MulFOp>(
+              loc, maskVal, log2e); // Scaling to compensate for base-2 softmax
         }
         Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
         b.create<linalg::YieldOp>(loc, add);
@@ -315,6 +320,11 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // is extremely limited on its dynamic range therefore this would
   // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
+    Value log2e = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = b.create<arith::MulFOp>(
+        loc, scale, log2e); // Scaling to compensate for base-2 softmax
+
     AffineMap qMap = getQueryMap();
     query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
                                                    query, scale);
@@ -347,6 +357,10 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
+    Value log2e = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = b.create<arith::MulFOp>(
+        loc, scale, log2e); // Scaling to compensate for base-2 softmax
     s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
                                                scale);
 
@@ -368,10 +382,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   if (*mask) {
     s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
-
-  Value log2e = b.create<arith::ConstantOp>(
-      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, log2e);
 
   // newMax = max(oldMax, rowMax(S))
   AffineMap maxMap = getMaxMap();
