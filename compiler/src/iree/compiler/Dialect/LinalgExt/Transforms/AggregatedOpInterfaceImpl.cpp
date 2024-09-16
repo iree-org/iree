@@ -373,7 +373,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   }
 
   // S += mask
-  llvm::outs() << mask;
   if (mask.has_value() && mask.value() != nullptr) {
     s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
