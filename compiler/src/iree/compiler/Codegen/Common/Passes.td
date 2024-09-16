@@ -271,6 +271,15 @@ def FuseTensorPadWithConsumerPass :
   let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
 }
 
+def GeneralizeTensorPackPass :
+    Pass<"iree-codegen-generalize-tensor-pack", ""> {
+  let summary =
+      "Generalize tensor pack operations";
+  let description = [{
+    Pass that folds unit dims in tenosr.pack to convert to linalg.transpose when legal.
+  }];
+}
+
 def GenericVectorizationPass :
     InterfacePass<"iree-codegen-generic-vectorization", "mlir::FunctionOpInterface"> {
   let summary = "Pass to perform vectorization on tensor/linalg ops.";
