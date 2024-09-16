@@ -2078,6 +2078,18 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
 
   tiledOperands.emplace_back(scale);
 
+  // Mask
+  Value attnMask = getMask();
+  if (attnMask != nullptr) {
+    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
+    Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
+    if (!maskSliceOp) {
+      return emitOpError("failed to get mask slice");
+    }
+    tiledOperands.emplace_back(maskSliceOp->getResult(0));
+    slices.push_back(maskSliceOp);
+  }
+
   /// Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
@@ -2087,6 +2099,8 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
+
+  
 
   /// Max
   {
