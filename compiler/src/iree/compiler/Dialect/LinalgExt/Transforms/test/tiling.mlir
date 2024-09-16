@@ -1782,10 +1782,10 @@ module attributes { transform.with_named_sequence } {
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-func.func @online_attention_float_mask(%query: tensor<192x1024x64xf32>, 
-                            %key: tensor<192x1024x64xf32>, 
-                            %value: tensor<192x1024x64xf32>, 
-                            %mask: tensor<192x1024x1024xf32>) 
+func.func @online_attention_float_mask(%query: tensor<192x1024x64xf32>,
+                            %key: tensor<192x1024x64xf32>,
+                            %value: tensor<192x1024x64xf32>,
+                            %mask: tensor<192x1024x1024xf32>)
                             -> tensor<192x1024x64xf32> {
   %scale = arith.constant 1.0 : f32
 
@@ -1855,10 +1855,10 @@ module attributes { transform.with_named_sequence } {
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-func.func @online_attention_bool_mask(%query: tensor<192x1024x64xf32>, 
-                            %key: tensor<192x1024x64xf32>, 
-                            %value: tensor<192x1024x64xf32>, 
-                            %mask: tensor<192x1024x1024xi1>) 
+func.func @online_attention_bool_mask(%query: tensor<192x1024x64xf32>,
+                            %key: tensor<192x1024x64xf32>,
+                            %value: tensor<192x1024x64xf32>,
+                            %mask: tensor<192x1024x1024xi1>)
                             -> tensor<192x1024x64xf32> {
   %scale = arith.constant 1.0 : f32
 

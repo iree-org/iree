@@ -1841,10 +1841,13 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Location loc = getLoc();
 
-  SmallVector<Range> querySlice = getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Range> querySlice =
+      getPermutedSlice(getQueryMap(), offsets, sizes);
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
-  SmallVector<Range> valueSlice = getPermutedSlice(getValueMap(), offsets, sizes);
-  SmallVector<Range> outputSlice = getPermutedSlice(getOutputMap(), offsets, sizes);
+  SmallVector<Range> valueSlice =
+      getPermutedSlice(getValueMap(), offsets, sizes);
+  SmallVector<Range> outputSlice =
+      getPermutedSlice(getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
@@ -1887,7 +1890,8 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   // Mask
   Value attnMask = getMask();
   if (attnMask != nullptr) {
-    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
+    SmallVector<Range> maskSlice =
+        getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
     if (!maskSliceOp) {
       return emitOpError("failed to get mask slice");
@@ -1895,7 +1899,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(maskSliceOp->getResult(0));
     slices.push_back(maskSliceOp);
   }
-  
+
   // Output
   {
     Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
@@ -1936,7 +1940,8 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     if (max || sum) {
       resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
       if (max && sum) {
-        resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
+        resultTypes.push_back(
+            tiledOperands[tiledOperands.size() - 3].getType());
       }
     }
   }
@@ -2033,9 +2038,10 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
       getPermutedSlice(getValueMap(), offsets, sizes);
-  std::optional<SmallVector<Range>> maskSlice = 
-      getMaskMap() ? std::optional<SmallVector<Range>>(getPermutedSlice(*getMaskMap(), offsets, sizes))
-                  : std::nullopt;
+  std::optional<SmallVector<Range>> maskSlice =
+      getMaskMap() ? std::optional<SmallVector<Range>>(
+                         getPermutedSlice(*getMaskMap(), offsets, sizes))
+                   : std::nullopt;
 
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
@@ -2081,7 +2087,8 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   // Mask
   Value attnMask = getMask();
   if (attnMask != nullptr) {
-    SmallVector<Range> maskSlice = getPermutedSlice(*getMaskMap(), offsets, sizes);
+    SmallVector<Range> maskSlice =
+        getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
     if (!maskSliceOp) {
       return emitOpError("failed to get mask slice");
@@ -2099,8 +2106,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.emplace_back(outputSliceOp->getResult(0));
     slices.push_back(outputSliceOp);
   }
-
-  
 
   /// Max
   {

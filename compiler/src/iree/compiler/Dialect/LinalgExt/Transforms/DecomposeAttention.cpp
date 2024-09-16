@@ -161,7 +161,9 @@ static Value computeQKTranspose(Value query, Value key, Value output,
   return matmulOp.getResult(0);
 }
 
-static Value maskQKTranspose(Value qkResult, Value mask, Location loc, OpBuilder &builder, SmallVectorImpl<Operation *> &ops) {
+static Value maskQKTranspose(Value qkResult, Value mask, Location loc,
+                             OpBuilder &builder,
+                             SmallVectorImpl<Operation *> &ops) {
   auto addOp = builder.create<linalg::AddOp>(loc, qkResult, mask);
   ops.push_back(addOp);
   return addOp.getResult(0);
@@ -186,9 +188,9 @@ static Value truncateToF16(Value input, Value output,
 }
 
 static std::tuple<Value, Value, Value>
-createAttentionBody(Value keySlice, Value valueSlice, Value querySlice, Value maskSlice,
-                    Value outputSlice, Value maxSlice, Value sumSlice,
-                    OpFoldResult sequenceTileLength,
+createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
+                    Value maskSlice, Value outputSlice, Value maxSlice,
+                    Value sumSlice, OpFoldResult sequenceTileLength,
                     OpFoldResult keyValueTileLength, OpFoldResult headDimension,
                     Type elementType, SmallVectorImpl<Operation *> &ops,
                     bool transposeV, Location loc, OpBuilder &builder) {
@@ -345,7 +347,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       keySlice, valueSlice, querySlice, maskSlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
       tiledAttnOp.isTransposeV(), loc, rewriter);
-  
+
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
 

@@ -161,7 +161,7 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   AffineMap vMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
-  AffineMap sMap = 
+  AffineMap sMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
@@ -176,7 +176,7 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
     vMap = AffineMap::get(vMap.getNumDims(), vMap.getNumSymbols(), vDims, ctx);
   }
 
-  SmallVector<AffineMap> attentionMaps = {qMap, kMap, vMap, sMap,
+  SmallVector<AffineMap> attentionMaps = {qMap, kMap,   vMap,  sMap,
                                           rMap, maxMap, sumMap};
   // Add batches to standard attention indexing maps.
   int64_t numBatches = tiledInputRank - 2;
@@ -416,8 +416,9 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   indexingMaps.push_back(sumMap);
   OnlineAttentionOp onlineAttn = rewriter.create<OnlineAttentionOp>(
       loc, TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
-      attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(), attnOp.getMask() ? attnOp.getMask() : Value(),
-      accFill, maxFill, sumFill, rewriter.getAffineMapArrayAttr(indexingMaps));
+      attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
+      attnOp.getMask() ? attnOp.getMask() : Value(), accFill, maxFill, sumFill,
+      rewriter.getAffineMapArrayAttr(indexingMaps));
   onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
 

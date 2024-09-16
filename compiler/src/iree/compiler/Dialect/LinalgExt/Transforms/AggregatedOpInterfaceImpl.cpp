@@ -176,41 +176,44 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
 }
 
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
-                        AffineMap maskMap, Value qk,
-                        Value mask) {
+                       AffineMap maskMap, Value qk, Value mask) {
 
-    SmallVector<AffineMap> compressedMaps =
-        compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
-    qkMap = compressedMaps[0];
-    maskMap = compressedMaps[1];
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
+  qkMap = compressedMaps[0];
+  maskMap = compressedMaps[1];
 
-    SmallVector<utils::IteratorType> iteratorTypes(
-        qkMap.getNumDims(), utils::IteratorType::parallel);
+  SmallVector<utils::IteratorType> iteratorTypes(qkMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
 
-    Value zero = builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
-    Value negInf = builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), -INFINITY));
+  Value zero = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
+  Value negInf = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), -INFINITY));
 
-    auto genericOp = builder.create<linalg::GenericOp>(
-        loc, qk.getType(), SmallVector<Value>{mask}, qk,
-        SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
-        [&](OpBuilder &b, Location loc, ValueRange args) {
-          Value qkVal = args[1];
-          Value maskVal = args[0];
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, qk.getType(), SmallVector<Value>{mask}, qk,
+      SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value qkVal = args[1];
+        Value maskVal = args[0];
 
-          if (maskVal.getType().isInteger()) { // TODO: Replace boolean mask condition once treated as i1 (instead of i8)
-            maskVal = b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
-            maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
-          } else {
-            maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
-                                            /*isUnsignedCast=*/false);
-          }
-          Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
-          b.create<linalg::YieldOp>(loc, add);
-        });
+        if (maskVal.getType()
+                .isInteger()) { // TODO: Replace boolean mask condition once
+                                // treated as i1 (instead of i8)
+          maskVal =
+              b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
+          maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
+        } else {
+          maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
+                                         /*isUnsignedCast=*/false);
+        }
+        Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
+        b.create<linalg::YieldOp>(loc, add);
+      });
 
-    return genericOp.getResult(0);
-  }
-
+  return genericOp.getResult(0);
+}
 
 // Compute output = exp2(output - input)
 static Value computeSubAndExp2(OpBuilder &builder, Location loc,
@@ -313,7 +316,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
     AffineMap qMap = getQueryMap();
-    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap, query, scale);
+    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
+                                                   query, scale);
   }
 
   // ---- Matmul 1 ----
@@ -344,7 +348,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, getContext());
     s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
-                                                scale);
+                                               scale);
 
     // If we need to truncate to fp8 post softmax we apply a scaling to use the
     // full fp8 range. We can do this with a offset as post `exp2` this equates
@@ -362,10 +366,11 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // S += mask
   if (*mask) {
-      s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
+    s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
   }
 
-  Value log2e = b.create<arith::ConstantOp>(loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  Value log2e = b.create<arith::ConstantOp>(
+      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
   s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s, log2e);
 
   // newMax = max(oldMax, rowMax(S))
