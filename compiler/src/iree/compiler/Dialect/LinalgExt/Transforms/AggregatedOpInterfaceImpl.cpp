@@ -207,11 +207,10 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         } else {
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
-
+          // Scaling to compensate for base-2 softmax
           Value log2e = b.create<arith::ConstantOp>(
               loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
-          maskVal = b.create<arith::MulFOp>(
-              loc, maskVal, log2e); // Scaling to compensate for base-2 softmax
+          maskVal = b.create<arith::MulFOp>(loc, maskVal, log2e);
         }
         Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
         b.create<linalg::YieldOp>(loc, add);
@@ -304,10 +303,11 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
   Value scale = getScale();
+
+  // Scaling to compensate for base-2 softmax
   Value log2e = b.create<arith::ConstantOp>(
       loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = b.create<arith::MulFOp>(
-      loc, scale, log2e); // Scaling to compensate for base-2 softmax
+  scale = b.create<arith::MulFOp>(loc, scale, log2e);
 
   auto qETy = getElementTypeOrSelf(query.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
