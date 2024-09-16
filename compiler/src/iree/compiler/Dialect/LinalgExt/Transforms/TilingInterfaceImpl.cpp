@@ -1936,12 +1936,15 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[getMask() ? 5 : 4].getType());
+    resultTypes.push_back(
+        tiledOperands[(attnMask != nullptr) ? 5 : 4].getType());
     if (max) {
-      resultTypes.push_back(tiledOperands[getMask() ? 6 : 5].getType());
+      resultTypes.push_back(
+          tiledOperands[(attnMask != nullptr) ? 6 : 5].getType());
     }
     if (sum) {
-      resultTypes.push_back(tiledOperands[getMask() ? 7 : 6].getType());
+      resultTypes.push_back(
+          tiledOperands[(attnMask != nullptr) ? 7 : 6].getType());
     }
   }
 
