@@ -150,7 +150,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::
       LLVMGPUPadAndVectorDistribute:
-
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
                                        /*usePadToModelSharedMemcpy=*/true);
     break;

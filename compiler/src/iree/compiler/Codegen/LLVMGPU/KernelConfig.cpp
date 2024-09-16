@@ -637,9 +637,8 @@ static LogicalResult
 setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      mlir::FunctionOpInterface entryPoint,
                                      IREE::LinalgExt::AttentionOp op) {
-  if (target.getWgp().getMma().empty()) {
+  if (target.getWgp().getMma().empty())
     return failure();
-  }
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
@@ -743,6 +742,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   if (!schedule) {
     LDBG("Failed to deduce Attention schedule");
+    return failure();
   }
 
   // TODO: Due to a bug in layout configuration, we cannot set warp count on
