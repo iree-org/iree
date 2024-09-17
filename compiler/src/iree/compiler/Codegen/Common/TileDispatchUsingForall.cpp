@@ -53,10 +53,15 @@ struct TilingInfo {
 static FailureOr<TilingInfo>
 getTiledAndDistributionInfo(RewriterBase &rewriter,
                             ArrayRef<Operation *> computeOps) {
+  // TODO(Max191): We choose the root for tiling as the first op that has a
+  // lowering config with workgroup tile sizes. It is probably cleaner to
+  // reuse some logic for finding the root operation during lowering strategy
+  // selection, but root op selection logic would need to either be unified or
+  // passed as an option to this pass.
   Operation *tilableOp = nullptr;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (getLoweringConfig(op)) {
-      if (getLoweringConfig(op).getWorkgroupTileSizes().empty()) {
+      if (getLoweringConfig(op).hasWorkgroupTilingLevel()) {
         continue;
       }
       tilableOp = op;
