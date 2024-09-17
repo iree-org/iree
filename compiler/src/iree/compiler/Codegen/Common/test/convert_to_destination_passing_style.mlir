@@ -162,6 +162,71 @@ func.func @matmul_inplace() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<
+    bindings = [
+        #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+        #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+        #hal.pipeline.binding<storage_buffer, Indirect>],
+    flags = Indirect>
+func.func @matmul_forall() {
+  %c4 = arith.constant 4 : index
+  %c32 = arith.constant 32 : index
+  %c0_i32 = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<62x32x16x32xi8>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<126x32x16x32xi8>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<62x126x16x16xi32>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [62, 32, 16, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<62x32x16x32xi8>> -> tensor<62x32x16x32xi8>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [126, 32, 16, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<126x32x16x32xi8>> -> tensor<126x32x16x32xi8>
+  %5 = tensor.empty() : tensor<62x126x16x16xi32>
+  %6 = scf.forall (%arg0, %arg1) = (0, 0) to (62, 126) step (2, 2) shared_outs(%arg2 = %5) -> (tensor<62x126x16x16xi32>) {
+    %extracted_slice_1 = tensor.extract_slice %arg2[%arg0, %arg1, 0, 0] [2, 2, 16, 16] [1, 1, 1, 1] : tensor<62x126x16x16xi32> to tensor<2x2x16x16xi32>
+    %11 = linalg.fill ins(%c0_i32 : i32) outs(%extracted_slice_1 : tensor<2x2x16x16xi32>) -> tensor<2x2x16x16xi32>
+    %12 = scf.for %arg3 = %c0 to %c32 step %c4 iter_args(%arg4 = %11) -> (tensor<2x2x16x16xi32>) {
+      %extracted_slice_2 = tensor.extract_slice %3[%arg0, %arg3, 0, 0] [2, 4, 16, 32] [1, 1, 1, 1] : tensor<62x32x16x32xi8> to tensor<2x4x16x32xi8>
+      %13 = tensor.empty() : tensor<2x4x16x32xi8>
+      %14 = linalg.copy ins(%extracted_slice_2 : tensor<2x4x16x32xi8>) outs(%13 : tensor<2x4x16x32xi8>) -> tensor<2x4x16x32xi8>
+      %extracted_slice_3 = tensor.extract_slice %4[%arg1, %arg3, 0, 0] [2, 4, 16, 32] [1, 1, 1, 1] : tensor<126x32x16x32xi8> to tensor<2x4x16x32xi8>
+      %15 = linalg.copy ins(%extracted_slice_3 : tensor<2x4x16x32xi8>) outs(%13 : tensor<2x4x16x32xi8>) -> tensor<2x4x16x32xi8>
+      %16 = iree_gpu.multi_mma %14, %15, %arg4 {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>], kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>, rhs_permutation = array<i64: 1, 0>} : tensor<2x4x16x32xi8>, tensor<2x4x16x32xi8> into tensor<2x2x16x16xi32>
+      scf.yield %16 : tensor<2x2x16x16xi32>
+    }
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %12 into %arg2[%arg0, %arg1, 0, 0] [2, 2, 16, 16] [1, 1, 1, 1] : tensor<2x2x16x16xi32> into tensor<62x126x16x16xi32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0], sizes = [62, 126, 16, 16], strides = [1, 1, 1, 1] : tensor<62x126x16x16xi32> -> !flow.dispatch.tensor<readwrite:tensor<62x126x16x16xi32>>
+  return
+}
+
+//      CHECK: func.func @matmul_forall()
+//  CHECK-DAG:   %[[LHS_SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  CHECK-DAG:   %[[RHS_SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  CHECK-DAG:   %[[RESULT_SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//  CHECK-DAG:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_SUBSPAN]]
+//  CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_SUBSPAN]]
+//  CHECK-DAG:   %[[INIT:.+]] = flow.dispatch.tensor.load %[[RESULT_SUBSPAN]]
+//      CHECK:   %[[FORALL:.+]] = scf.forall {{.*}} shared_outs(%[[FORALL_ARG:.+]] = %[[INIT]])
+//      CHECK:     %[[INIT_TILE:.+]] = tensor.extract_slice %[[FORALL_ARG]]
+//      CHECK:     %[[FILL_TILE:.+]] = linalg.fill {{.*}} outs(%[[INIT_TILE]]
+//      CHECK:     %[[FOR:.+]] = scf.for {{.*}} iter_args(%[[FOR_ARG:.+]] = %[[FILL_TILE]])
+//  CHECK-DAG:       %[[LHS_TILE_0:.+]] = tensor.extract_slice %[[LHS]]
+//  CHECK-DAG:       %[[LHS_TILE_1:.+]] = linalg.copy ins(%[[LHS_TILE_0]]
+//  CHECK-DAG:       %[[RHS_TILE_0:.+]] = tensor.extract_slice %[[RHS]]
+//  CHECK-DAG:       %[[RHS_TILE_1:.+]] = linalg.copy ins(%[[RHS_TILE_0]]
+//      CHECK:       %[[MMA_TILE:.+]] = iree_gpu.multi_mma
+// CHECK-SAME:           %[[LHS_TILE_1]], %[[RHS_TILE_1]], %[[FOR_ARG]]
+// CHECK-SAME:           : tensor<2x4x16x32xi8>, tensor<2x4x16x32xi8> into tensor<2x2x16x16xi32>
+//      CHECK:       scf.yield %[[MMA_TILE]] : tensor<2x2x16x16xi32>
+//      CHECK:     }
+//      CHECK:     scf.forall.in_parallel {
+// CHECK-NEXT:       tensor.parallel_insert_slice %[[FOR]] into %[[FORALL_ARG]]
+//      CHECK:     }
+
+//      CHECK:   flow.dispatch.tensor.store %[[FORALL]], %[[RESULT_SUBSPAN]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
