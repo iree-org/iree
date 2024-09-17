@@ -56,6 +56,9 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   Operation *tilableOp = nullptr;
   for (Operation *op : llvm::reverse(computeOps)) {
     if (getLoweringConfig(op)) {
+      if (getLoweringConfig(op).getWorkgroupTileSizes().empty()) {
+        continue;
+      }
       tilableOp = op;
       break;
     }
