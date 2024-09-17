@@ -42,7 +42,7 @@
 // Match the interesting special registers.
 // CHECK-DAG: %[[TID_Y:.*]] = nvvm.read.ptx.sreg.tid.y : i32
 // CHECK-DAG: %[[TID_Y_EXT:.*]] = llvm.sext %[[TID_Y]] : i32 to i64
-// CHECK-DAG: %[[LANEID:.*]] = nvvm.read.ptx.sreg.laneid : i32
+// CHECK-DAG: %[[LANEID:.*]] = nvvm.read.ptx.sreg.laneid range <i32, 0, 32> : i32
 // CHECK-DAG: %[[LANEID_EXT:.*]] = llvm.sext %[[LANEID]] : i32 to i64
 // CHECK-DAG: %[[TID_Y_IDX:.*]] = llvm.mul %[[TID_Y_EXT]], %[[C64]]  : i64
 //
