@@ -67,8 +67,9 @@ template <template <typename U> class Comparator, typename T>
 static SmallVector<int64_t> getSortingPermutation(ArrayRef<T> v) {
   using P = std::pair<int64_t, T>;
   SmallVector<P> pairs;
-  for (auto x : v) {
-    pairs.push_back({pairs.size(), x});
+  pairs.reserve(v.size());
+  for (auto [i, x] : llvm::enumerate(v)) {
+    pairs.push_back({i, x});
   }
   std::sort(pairs.begin(), pairs.end(),
             [](P p1, P p2) { return Comparator<T>{}(p1.second, p2.second); });
@@ -99,9 +100,15 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
     swizzle.expandShape.push_back({t});
   }
   // The layout strides decide the initial swizzle.permutation.
+  // Some WMMA intrinsics have tstrides=0 values, assert on that as that
+  // would defeat this algorithm. We'll need to solve that if and when we want
+  // to support data tiling on WMMA intrinsics.
+  for (auto s : layout.tstrides) {
+    assert(s != 0);
+  }
   swizzle.permutation =
       getSortingPermutation<std::greater, int64_t>(layout.tstrides);
-  // Deal with any element size greater than 1o by inserting it innermost.
+  // Deal with any element size greater than 1 by inserting it innermost.
   // Notice that this is similar to the unroll() function, just creating an
   // inner dimension instead of an outer dimension.
   for (int i = 0; i < layout.element.size(); ++i) {

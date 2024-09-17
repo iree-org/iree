@@ -20,10 +20,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace GPU {
+namespace mlir::iree_compiler::IREE::GPU {
 
 // Partial nested layout for an MMA intrinsic's matrix input/output inside
 // a single subgroup.
@@ -37,10 +34,7 @@ struct MMASingleSubgroupLayout {
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);
 
-} // namespace GPU
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
