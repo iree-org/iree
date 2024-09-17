@@ -107,15 +107,19 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
   if (!enclosingForall) {
     enclosingForall = parent->getParentOfType<scf::ForallOp>();
   }
-  gpu::AddressSpaceAttr addressSpace;
   if (enclosingForall && hasThreadMapping(enclosingForall)) {
-    addressSpace = gpu::AddressSpaceAttr::get(
+    auto addressSpace = gpu::AddressSpaceAttr::get(
         builder.getContext(), gpu::GPUDialect::getPrivateAddressSpace());
-  } else {
-    addressSpace = gpu::AddressSpaceAttr::get(
-        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+    auto allocType =
+        MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                        AffineMap(), addressSpace);
+    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
+        .getResult();
   }
-  MemRefType allocType =
+
+  auto addressSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  auto allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpace);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
