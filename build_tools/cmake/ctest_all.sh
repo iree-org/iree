@@ -124,10 +124,6 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_matmul.mlir"
-    # TODO(#18428): Fix these tests failing on GitHub-hosted Windows runners
-    "iree/tests/e2e/stablehlo_models/mnist_fake_weights_llvm_cpu_static_c_test"
-    "iree/tests/e2e/stablehlo_models/simple_mul_llvm_cpu_static_c_test"
-    "iree/samples/static_library/static_library_demo_c_test"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
