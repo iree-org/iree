@@ -1200,16 +1200,13 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
-void AttentionOp::build(::mlir::OpBuilder &odsBuilder,
-                        ::mlir::OperationState &odsState,
-                        ::mlir::TypeRange results, ::mlir::Value query,
-                        ::mlir::Value key, ::mlir::Value value,
-                        ::mlir::Value scale, ::mlir::ValueRange outputs,
-                        ::mlir::ArrayAttr indexing_maps,
-                        std::optional<::mlir::Value> mask) {
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, Value query, Value key, Value value,
+                        Value scale, ValueRange outputs, ArrayAttr indexingMaps,
+                        std::optional<Value> mask) {
   Value mask_in = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, mask_in,
-        outputs, indexing_maps);
+        outputs, indexingMaps);
 }
 
 LogicalResult AttentionOp::verify() {
@@ -1271,11 +1268,15 @@ LogicalResult AttentionOp::verify() {
   if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
       failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
       failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
-      (getMaskMap().has_value() &&
-       failed(checkShape("Mask", getMaskType().value().getShape(),
-                         getMaskMap().value()))) ||
       failed(
           checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
+    return failure();
+  }
+
+  // Additional check case if mask exists
+  if (getMaskMap().has_value() &&
+      failed(checkShape("Mask", getMaskType()->getShape(),
+                        getMaskMap().value()))) {
     return failure();
   }
 
@@ -1295,9 +1296,13 @@ LogicalResult AttentionOp::verify() {
       failed(checkDomain("Key", getKeyMap())) ||
       failed(checkDomain("Value", getValueMap())) ||
       failed(checkDomain("Scale", getScaleMap())) ||
-      (getMaskMap().has_value() &&
-       failed(checkDomain("Mask", getMaskMap().value()))) ||
       failed(checkDomain("Output", getOutputMap()))) {
+    return failure();
+  }
+
+  // Additional check case if mask exists
+  if (getMaskMap().has_value() &&
+      failed(checkDomain("Mask", getMaskMap().value()))) {
     return failure();
   }
 
@@ -1380,11 +1385,11 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
 void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange results, Value query, Value key,
                               Value value, Value scale, Value output, Value max,
-                              Value sum, ArrayAttr indexing_maps,
+                              Value sum, ArrayAttr indexingMaps,
                               std::optional<Value> mask) {
-  Value mask_in = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, mask_in, scale,
-        output, max, sum, indexing_maps);
+  Value maskIn = mask.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
+        max, sum, indexingMaps);
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -1438,6 +1443,13 @@ LogicalResult OnlineAttentionOp::verify() {
     return failure();
   }
 
+  // Additional check case if mask exists
+  if (getMaskMap().has_value() &&
+      failed(checkShape("Mask", getMask().getType().getShape(),
+                        getMaskMap().value()))) {
+    return failure();
+  }
+
   int expectedSymbols = getQueryMap().getNumInputs();
   auto checkDomain =
       [&attnOp, &expectedSymbols](StringRef operandName,
@@ -1454,11 +1466,15 @@ LogicalResult OnlineAttentionOp::verify() {
       failed(checkDomain("Key", getKeyMap())) ||
       failed(checkDomain("Value", getValueMap())) ||
       failed(checkDomain("Scale", getScaleMap())) ||
-      (getMaskMap().has_value() &&
-       failed(checkDomain("Mask", getMaskMap().value()))) ||
       failed(checkDomain("Output", getOutputMap())) ||
       failed(checkDomain("Max", getMaxMap())) ||
       failed(checkDomain("Sum", getSumMap()))) {
+    return failure();
+  }
+
+  // Additional check case if mask exists
+  if (getMaskMap().has_value() &&
+      failed(checkDomain("Mask", getMaskMap().value()))) {
     return failure();
   }
 

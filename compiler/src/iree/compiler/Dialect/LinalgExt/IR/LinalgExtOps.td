@@ -752,13 +752,13 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
       return std::nullopt;
     }
     AffineMap getOutputMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[getMask() ? 5 : 4]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
     }
     AffineMap getMaxMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[getMask() ? 6 : 5]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 1]);
     }
     AffineMap getSumMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[getMask() ? 7 : 6]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
     }
 
     int64_t getIterationDomainRank() {
