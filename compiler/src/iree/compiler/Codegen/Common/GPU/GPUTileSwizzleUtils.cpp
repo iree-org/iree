@@ -104,6 +104,7 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   // would defeat this algorithm. We'll need to solve that if and when we want
   // to support data tiling on WMMA intrinsics.
   for (auto s : layout.tstrides) {
+    (void)s;
     assert(s != 0);
   }
   swizzle.permutation =
