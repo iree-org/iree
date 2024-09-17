@@ -32,7 +32,7 @@ func.func @bufferize_with_thread_private_memory(%arg0: index) {
 }
 // CHECK-LABEL: func.func @bufferize_with_thread_private_memory
 //       CHECK:   scf.forall {{.*}} in (2, 16) {
-//       CHECK:     %[[ALLOC:.+]] = memref.alloc() : memref<1x1x4x4xf16, #gpu.address_space<private>>
+//       CHECK:     %[[ALLOC:.+]] = memref.alloca() : memref<1x1x4x4xf16, #gpu.address_space<private>>
 //       CHECK:     memref.copy %{{.*}}, %[[ALLOC]]
 //  CHECK-SAME:       memref<1x1x4x4xf16, strided<[1310720, 4096, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //  CHECK-SAME:       to memref<1x1x4x4xf16, #gpu.address_space<private>>
