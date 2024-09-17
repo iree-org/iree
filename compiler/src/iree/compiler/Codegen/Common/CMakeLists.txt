@@ -73,6 +73,7 @@ iree_cc_library(
     "PassUtils.h"
     "Passes.h"
     "TileSizeSelection.h"
+    "TileSwizzle.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
