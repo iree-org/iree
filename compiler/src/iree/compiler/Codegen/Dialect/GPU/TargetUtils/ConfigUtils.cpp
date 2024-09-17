@@ -249,22 +249,8 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
   // Configurations we need to decide.
   std::array<int64_t, 3> workgroupSize;
-  SmallVector<int64_t> workgroupTileSizes;
-  SmallVector<int64_t> threadTileSizes;
-
-  // Initialize the configuration.
-  auto initConfiguration = [&]() {
-    workgroupSize = {subgroupSize, 1, 1};
-    workgroupTileSizes.resize(loopDepth, 0);
-    threadTileSizes.resize(loopDepth, 0);
-
-    // Initialize tiling along all partitioned loops with size 1.
-    for (int64_t loopIndex : partitionableLoops) {
-      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
-    }
-    // Override the innermost dimension to distribute to threads in a subgroup.
-    workgroupTileSizes[partitionableLoops.back()] = subgroupSize;
-  };
+  SmallVector<int64_t> workgroupTileSizes(loopDepth, 0);
+  SmallVector<int64_t> threadTileSizes(loopDepth, 0);
 
   // Common case for all linalg ops.
 
@@ -302,7 +288,15 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
     LDBG("Loss factor: " << lossFactor << "\n");
-    initConfiguration();
+    // Initialize the configuration.
+    workgroupSize = {subgroupSize, 1, 1};
+    // Initialize tiling along all partitioned loops with size 1.
+    for (int64_t loopIndex : partitionableLoops) {
+      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
+    }
+    // Override the innermost dimension to distribute to threads in a subgroup.
+    workgroupTileSizes[partitionableLoops.back()] = subgroupSize;
+
     // If there are more than 3 parallel dim try to tile the extra higher level
     // dimensions to 1 for extra dimensions.
     if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
