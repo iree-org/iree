@@ -107,7 +107,7 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
   SmallVector<AffineExpr> newExprs;
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned pos = cast<AffineDimExpr>(expr).getPosition();
-    SmallVector<AffineExpr, 6> expandedExprs = llvm::to_vector<6>(
+    auto expandedExprs = llvm::to_vector_of<AffineExpr, 6>(
         llvm::map_range(expansionInfo.getExpandedDims(pos), [&](int64_t v) {
           return builder.getAffineDimExpr(static_cast<unsigned>(v));
         }));
@@ -188,8 +188,7 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
                       : collapsingReshapeOp.getReassociationMaps(),
           expandedType.getShape(), collapsedType.getShape(), rewriter)))
     return std::nullopt;
-
-  SmallVector<AffineMap, 6> expandedOpIndexingMaps = llvm::to_vector<6>(
+  auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
       llvm::map_range(attentionOp.getIndexingMapsArray(), [&](AffineMap m) {
         return getIndexingMapInExpandedOp(rewriter, m, expansionInfo);
       }));

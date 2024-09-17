@@ -73,8 +73,8 @@ struct ScatterOpConversion
 };
 } // namespace
 
-static SmallVector<AffineMap>
-getStandardAttentionIndexingMaps(MLIRContext *ctx) {
+static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
+                                                               bool hasMask) {
   AffineExpr m, n, k1, k2;
   bindDims(ctx, m, n, k1, k2);
 
@@ -90,8 +90,11 @@ getStandardAttentionIndexingMaps(MLIRContext *ctx) {
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
-
-  return {qMap, kMap, vMap, sMap, mMap, rMap};
+  if (hasMask) {
+    // Add mask map only if it exists
+    return {qMap, kMap, vMap, sMap, mMap, rMap};
+  }
+  return {qMap, kMap, vMap, sMap, rMap};
 }
 
 struct AttentionOpConversion
@@ -152,19 +155,16 @@ struct AttentionOpConversion
         loc, targetType, rewriter.getFloatAttr(targetType, dk));
 
     // Add batches to standard attention indexing maps.
-    SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(ctx);
-    if (!optionalMask) {
-      // Remove mask map if there is no mask
-      indexingMaps.erase(indexingMaps.begin() + 4);
-    }
+    SmallVector<AffineMap> indexingMaps =
+        getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
+
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
-      if (map.getNumResults() == 0) {
-        continue;
-      }
       map = map.shiftDims(numBatches);
-      for (int batch : llvm::seq<int>(numBatches)) {
-        map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
+      if (map.getNumResults() > 0) {
+        for (int batch : llvm::seq<int>(numBatches)) {
+          map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
+        }
       }
     }
 

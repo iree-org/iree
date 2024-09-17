@@ -1889,7 +1889,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   // Mask
   Value attnMask = getMask();
-  if (attnMask != nullptr) {
+  if (attnMask) {
     SmallVector<Range> maskSlice =
         getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
@@ -1936,15 +1936,12 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(
-        tiledOperands[(attnMask != nullptr) ? 5 : 4].getType());
+    resultTypes.push_back(tiledOperands[(attnMask) ? 5 : 4].getType());
     if (max) {
-      resultTypes.push_back(
-          tiledOperands[(attnMask != nullptr) ? 6 : 5].getType());
+      resultTypes.push_back(tiledOperands[(attnMask) ? 6 : 5].getType());
     }
     if (sum) {
-      resultTypes.push_back(
-          tiledOperands[(attnMask != nullptr) ? 7 : 6].getType());
+      resultTypes.push_back(tiledOperands[(attnMask) ? 7 : 6].getType());
     }
   }
 
@@ -2088,7 +2085,7 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
 
   // Mask
   Value attnMask = getMask();
-  if (attnMask != nullptr) {
+  if (attnMask) {
     SmallVector<Range> maskSlice =
         getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);

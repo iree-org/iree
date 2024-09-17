@@ -373,8 +373,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   }
 
   // S += mask
-  if (mask.has_value() && mask.value() != nullptr) {
-    s = applyMask(b, loc, sMap, *getMaskMap(), s, *mask);
+  if (Value maskVal = mask.value_or(nullptr)) {
+    s = applyMask(b, loc, sMap, *getMaskMap(), s, maskVal);
   }
 
   // TODO: This decomposition should be in a seperate op called

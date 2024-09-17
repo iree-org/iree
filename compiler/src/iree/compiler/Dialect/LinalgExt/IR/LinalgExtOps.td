@@ -542,6 +542,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     AffineMap getValueMap() {
       return cast<AffineMap>(getIndexingMapsArray()[2]);
     }
+    AffineMap getScaleMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[3]);
+    }
     std::optional<AffineMap> getMaskMap() {
       return cast<AffineMap>(getIndexingMapsArray()[4]);
     }
@@ -621,7 +624,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
     std::optional<int64_t> getMaskRank() {
       std::optional<ShapedType> maskType = getMaskType();
-      if (!maskType) return std::nullopt;
+      if (!maskType)
+        return std::nullopt;
       return maskType->getRank();
     }
     int64_t getOutputRank() {
@@ -737,6 +741,9 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     }
     AffineMap getValueMap() {
       return getIndexingMapsArray()[2];
+    }
+    AffineMap getScaleMap() {
+      return getIndexingMapsArray()[3];
     }
     std::optional<AffineMap> getMaskMap() {
       if (getMask()) {

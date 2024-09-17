@@ -1207,7 +1207,7 @@ void AttentionOp::build(::mlir::OpBuilder &odsBuilder,
                         ::mlir::Value scale, ::mlir::ValueRange outputs,
                         ::mlir::ArrayAttr indexing_maps,
                         std::optional<::mlir::Value> mask) {
-  Value mask_in = mask.has_value() ? mask.value() : Value();
+  Value mask_in = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, mask_in,
         outputs, indexing_maps);
 }
@@ -1271,8 +1271,33 @@ LogicalResult AttentionOp::verify() {
   if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
       failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
       failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
+      (getMaskMap().has_value() &&
+       failed(checkShape("Mask", getMaskType().value().getShape(),
+                         getMaskMap().value()))) ||
       failed(
           checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
+    return failure();
+  }
+
+  int expectedSymbols = getQueryMap().getNumInputs();
+  auto checkDomain =
+      [&attnOp, &expectedSymbols](StringRef operandName,
+                                  AffineMap indexingMap) -> LogicalResult {
+    if (expectedSymbols != indexingMap.getNumInputs()) {
+      return attnOp->emitError("Mismatched map domain for ")
+             << operandName << ". Expected: " << expectedSymbols
+             << " Got: " << indexingMap.getNumInputs();
+    }
+    return success();
+  };
+
+  if (failed(checkDomain("Query", getQueryMap())) ||
+      failed(checkDomain("Key", getKeyMap())) ||
+      failed(checkDomain("Value", getValueMap())) ||
+      failed(checkDomain("Scale", getScaleMap())) ||
+      (getMaskMap().has_value() &&
+       failed(checkDomain("Mask", getMaskMap().value()))) ||
+      failed(checkDomain("Output", getOutputMap()))) {
     return failure();
   }
 
@@ -1339,7 +1364,8 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
   auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin(), maps.begin() + getNumDpsInputs());
+  maps.resize(getNumDpsInputs());
+  return maps;
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
@@ -1351,16 +1377,14 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
-void OnlineAttentionOp::build(::mlir::OpBuilder &odsBuilder,
-                              ::mlir::OperationState &odsState,
-                              ::mlir::TypeRange results, ::mlir::Value query,
-                              ::mlir::Value key, ::mlir::Value value,
-                              ::mlir::Value scale, ::mlir::Value output,
-                              ::mlir::Value max, ::mlir::Value sum,
-                              ::mlir::ArrayAttr indexing_maps,
-                              std::optional<::mlir::Value> mask) {
-  build(odsBuilder, odsState, results, query, key, value,
-        *mask ? *mask : Value(), scale, output, max, sum, indexing_maps);
+void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                              TypeRange results, Value query, Value key,
+                              Value value, Value scale, Value output, Value max,
+                              Value sum, ArrayAttr indexing_maps,
+                              std::optional<Value> mask) {
+  Value mask_in = mask.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, mask_in, scale,
+        output, max, sum, indexing_maps);
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -1411,6 +1435,30 @@ LogicalResult OnlineAttentionOp::verify() {
                         getOutputMap())) ||
       failed(checkShape("Max", getMax().getType().getShape(), getMaxMap())) ||
       failed(checkShape("Sum", getSum().getType().getShape(), getSumMap()))) {
+    return failure();
+  }
+
+  int expectedSymbols = getQueryMap().getNumInputs();
+  auto checkDomain =
+      [&attnOp, &expectedSymbols](StringRef operandName,
+                                  AffineMap indexingMap) -> LogicalResult {
+    if (expectedSymbols != indexingMap.getNumInputs()) {
+      return attnOp->emitError("Mismatched map domain for ")
+             << operandName << ". Expected: " << expectedSymbols
+             << " Got: " << indexingMap.getNumInputs();
+    }
+    return success();
+  };
+
+  if (failed(checkDomain("Query", getQueryMap())) ||
+      failed(checkDomain("Key", getKeyMap())) ||
+      failed(checkDomain("Value", getValueMap())) ||
+      failed(checkDomain("Scale", getScaleMap())) ||
+      (getMaskMap().has_value() &&
+       failed(checkDomain("Mask", getMaskMap().value()))) ||
+      failed(checkDomain("Output", getOutputMap())) ||
+      failed(checkDomain("Max", getMaxMap())) ||
+      failed(checkDomain("Sum", getSumMap()))) {
     return failure();
   }
 
