@@ -714,6 +714,13 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 
+// Make sure the Q matmul global read, shared memory write and shared memory
+// read is hoisted out.
+// CHECK: transfer_read
+// CHECK: transfer_write
+// CHECK: gpu.barrier
+// CHECK: transfer_read
+
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c64
 // CHECK-SAME: -> (vector<2x1x4xf32>, vector<2x1x4xf32>, vector<2x4x1x1x4x1xf32>)
 // CHECK-COUNT-48:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
