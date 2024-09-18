@@ -153,4 +153,4 @@ module @elementwise_large_rank {
 // Verify that a lowering config is set on large rank tensors with unaligned
 // shapes.
 // CHECK-LABEL: func.func @elementwise_large_rank
-//  CHECK-SAME:   #iree_codegen.translation_info
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [128, 1, 1] subgroup_size = 64>

@@ -248,7 +248,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   const unsigned loopDepth = linalgOp.getNumLoops();
 
   // Configurations we need to decide.
-  int64_t workgroupSize = 1;
+  int64_t flatWorkgroupSize = 1;
   SmallVector<int64_t> workgroupTileSizes(loopDepth, 0);
   SmallVector<int64_t> threadTileSizes(loopDepth, 0);
 
@@ -289,7 +289,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                      std::nullopt) {
     LDBG("Loss factor: " << lossFactor << "\n");
     // Initialize the configuration.
-    workgroupSize = 1;
+    flatWorkgroupSize = 1;
     // Initialize tiling along all partitioned loops with size 1.
     for (int64_t loopIndex : partitionableLoops) {
       workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
@@ -383,7 +383,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         break;
       }
 
-      workgroupSize *= candidateWorkgroupSize;
+      flatWorkgroupSize *= candidateWorkgroupSize;
 
       // Stop if we have distributed all threads.
       if (numThreads == 1)
@@ -479,7 +479,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      {workgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
+      {flatWorkgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
 }
 
 //===----------------------------------------------------------------------===//
