@@ -1333,6 +1333,13 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
     // ToDo: support int data type
     return;
   }
+  Value lhs = op.getDpsInputs()[0];
+  ShapedType lhsType = cast<ShapedType>(lhs.getType());
+  auto lhsShape = lhsType.getShape();
+  bool has_batch = isa<linalg::BatchMatmulOp, linalg::BatchMatmulTransposeBOp>(
+      op.getOperation());
+  char idx = (has_batch) ? 1 : 0;
+
   // Use 7 x lmul4 to fully utilize vector registers.
   sizes[0] = 7;
   // Calculate tile size for the main vector dimension (N).
@@ -1340,6 +1347,12 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
   int64_t maxNumberElementsForLMUL4 =
       (nativeVectorSize * 2 * byteSizeInBits) / elementSize;
   sizes[1] = maxNumberElementsForLMUL4;
+  sizes[2] = 1;
+  // If m = 1, set tile size to 1 x lmul8
+  if (lhsShape[idx] == 1) {
+    sizes[0] = 1;
+    sizes[1] *= 2;
+  }
 }
 
 /// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
