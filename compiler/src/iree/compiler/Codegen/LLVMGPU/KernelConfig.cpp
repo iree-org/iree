@@ -878,7 +878,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (!target.supportsSubgroupShuffle())
     return failure();
 
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
@@ -897,12 +899,29 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (subgroupSize == 0)
     return failure();
 
-  const Type elementType =
-      llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
-          .getElementType();
-  if (!elementType.isIntOrFloat())
+  Value init = op.getDpsInitOperand(0)->get();
+  Value src = op.getDpsInputOperand(0)->get();
+  Type initElemType = getElementTypeOrSelf(init);
+  Type srcElemType = getElementTypeOrSelf(src);
+
+  if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(initOp))
+      initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+  }
+
+  if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(srcOp))
+      srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
+  }
+
+  // const Type elementType =
+  //     llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
+  //         .getElementType();
+  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat())
     return failure();
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
+
+  unsigned bitWidth = std::min(initElemType.getIntOrFloatBitWidth(),
+                               srcElemType.getIntOrFloatBitWidth());
   // Reduction distribution only supports 8/16/32 bit types now.
   if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
     return failure();
@@ -911,8 +930,10 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((reductionSize / vectorSize) % subgroupSize != 0)
-    vectorSize /= 2;
+  if (reductionSize % vectorSize != 0)
+    return failure();
+  // while ((reductionSize / vectorSize) % subgroupSize != 0)
+  //   vectorSize /= 2;
 
   // Set pipeline
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
@@ -925,6 +946,32 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   for (int i = 0; i < reductionDims.size(); i++) {
     int64_t dim = reductionDims[i];
     workgroupTileSizes[dim] = 0;
+  }
+  if (reductionSize % (vectorSize * subgroupSize) != 0) {
+    int64_t remainingReductionSize = reductionSize / vectorSize;
+    int64_t threadSize = llvm::APIntOps::GreatestCommonDivisor(
+                             {64, uint64_t(subgroupSize)},
+                             {64, uint64_t(remainingReductionSize)})
+                             .getSExtValue();
+    int64_t remainingGroupSize = subgroupSize / threadSize;
+    for (int i = parallelDims.size() - 1; i >= 0; --i) {
+      int64_t dim = parallelDims[i];
+      int64_t bound = bounds[i];
+
+      int64_t tileSize =
+          llvm::APIntOps::GreatestCommonDivisor(
+              {64, uint64_t(bound)}, {64, uint64_t(remainingGroupSize)})
+              .getSExtValue();
+      workgroupTileSizes[dim] = tileSize;
+
+      remainingGroupSize /= tileSize;
+
+      if (remainingGroupSize == 1)
+        break;
+    }
+
+    if (remainingGroupSize != 1)
+      return failure();
   }
 
   TileSizesListType tileSizes;

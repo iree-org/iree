@@ -623,6 +623,8 @@ getPipelineOptions(FunctionOpInterface funcOp,
     if (reorderWorkgroupsStrategy) {
       pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
     }
+  } else {
+    pipelineOptions.generateContract = false;
   }
 
   pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);

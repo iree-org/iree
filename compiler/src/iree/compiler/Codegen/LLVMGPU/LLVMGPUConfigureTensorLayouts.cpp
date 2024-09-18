@@ -341,8 +341,12 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     llvm::StringLiteral scheduleAttrName =
         IREE::GPU::MMAScheduleAttr::getMnemonic();
     DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-        configDict.get(scheduleAttrName));
+    // auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+    //     configDict.get(scheduleAttrName));
+    IREE::GPU::MMAScheduleAttr scheduleAttr = nullptr;
+    if (configDict)
+      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+          configDict.get(scheduleAttrName));
 
     // Vector layout option setter aimed at contractions and convolutions. For
     // now, layout setting for other problems like reductions is TODO.

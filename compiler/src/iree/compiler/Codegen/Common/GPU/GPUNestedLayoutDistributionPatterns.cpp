@@ -413,12 +413,27 @@ struct DistributeMultiReduction final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue srcVector = multiReduceOp.getSource();
-    auto accVector = dyn_cast<VectorValue>(multiReduceOp.getAcc());
-    auto resVector = dyn_cast<VectorValue>(multiReduceOp.getResult());
-    Type accType = multiReduceOp.getAcc().getType();
-    Type resType = multiReduceOp.getResult().getType();
+    Value acc = multiReduceOp.getAcc();
+    Value res = multiReduceOp.getResult();
+    auto accVector = dyn_cast<VectorValue>(acc);
+    auto resVector = dyn_cast<VectorValue>(res);
+    Type accType = acc.getType();
+    Type resType = res.getType();
+    Type accElemTy;
+    if (accVector) {
+      accElemTy = accVector.getType().getElementType();
+    } else {
+      accElemTy = accType;
+    }
 
-    if (!accType.isIntOrFloat() || !resType.isIntOrFloat()) {
+    Type resElemTy;
+    if (resVector) {
+      resElemTy = resVector.getType().getElementType();
+    } else {
+      resElemTy = resType;
+    }
+
+    if (!accElemTy.isIntOrFloat() || !resElemTy.isIntOrFloat()) {
       return rewriter.notifyMatchFailure(multiReduceOp,
                                          "unsupported reduction type");
     }

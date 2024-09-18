@@ -216,7 +216,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
   addBufferizePasses(funcPassManager);
 }
 
-static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
+static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
+                                      bool generateContract = true) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(
@@ -227,9 +228,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
-  // used for supporting reduction along VectorDistribute pipeline
-  // disable conversion for reduction ops to contraction ops.
-  options.generateContract = false;
+  // // used for supporting reduction along VectorDistribute pipeline
+  // // disable conversion for reduction ops to contraction ops.
+  options.generateContract = generateContract;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -860,7 +861,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
-  addGPUVectorizationPasses(funcPassManager);
+  if (options.generateContract)
+    addGPUVectorizationPasses(funcPassManager);
+  else
+    addGPUVectorizationPasses(funcPassManager, options.generateContract);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
