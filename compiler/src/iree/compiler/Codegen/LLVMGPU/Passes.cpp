@@ -107,15 +107,19 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
   if (!enclosingForall) {
     enclosingForall = parent->getParentOfType<scf::ForallOp>();
   }
-  gpu::AddressSpaceAttr addressSpace;
   if (enclosingForall && hasThreadMapping(enclosingForall)) {
-    addressSpace = gpu::AddressSpaceAttr::get(
+    auto addressSpace = gpu::AddressSpaceAttr::get(
         builder.getContext(), gpu::GPUDialect::getPrivateAddressSpace());
-  } else {
-    addressSpace = gpu::AddressSpaceAttr::get(
-        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+    auto allocType =
+        MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                        AffineMap(), addressSpace);
+    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
+        .getResult();
   }
-  MemRefType allocType =
+
+  auto addressSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  auto allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpace);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
@@ -824,8 +828,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  // Set anchors at tensor level for vector distribution later.
+  // Set anchors at tensor level for vector distribution later and hoist out
+  // loop invariant anchors.
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
+  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can

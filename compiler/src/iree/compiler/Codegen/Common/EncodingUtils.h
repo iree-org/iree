@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
+#include "iree/compiler/Codegen/Common/TileSwizzle.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -15,32 +16,7 @@
 namespace mlir::iree_compiler {
 
 /// Container of information needed to materialize the layout transformations.
-///
-/// On CPU, these layout transformations consist of a single `temsor.pack`
-/// or `tensor.unpack` op, implementing a tiled layout where each tile is
-/// row-major.
-///
-/// On GPU, there is an additional `swizzle`, which changes the layout inside
-/// of the tile. See the comment on the nested Swizzle struct.
 struct MaterializeEncodingInfo {
-  // Metadata for a swizzle, that is, an (expand_shape -> transposition)
-  // pair of ops performing a change of layout within the tiles. This is used
-  // on GPU, where the tiles themselves can have an arbitrary layout.
-  struct Swizzle {
-    // This vector-of-vectors contains all the information needed to generate
-    // a `tensor.expand_shape` creating additional internal dimensions into the
-    // tile. For example, expandShape = [[16], [4, 2]] means that the original
-    // tile shape [16, 8] gets expanded such that the first dimension 16 is left
-    // unchanged, and the second dimension 8 gets split into two internal dims
-    // of size 4 and 2.
-    SmallVector<SmallVector<int64_t>> expandShape;
-    // This permutation vector applies to the expanded dimensions and is used
-    // to generate a `linalg.transpose` changing the layout of the tile. For
-    // example, permutation[0] dictates which of the expanded dimensions becomes
-    // the leading dimension of the layout.
-    SmallVector<int64_t> permutation;
-  };
-
   // The next 3 fields are used to create a `tensor.pack` or `tensor.unpack` op,
   // changing the overall layout between row-major and tiled (where each tile is
   // row-major).
@@ -48,8 +24,8 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
 
-  // The optional swizzle, see the above comment on Swizzle. Only used on GPU.
-  std::optional<Swizzle> swizzle;
+  // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
+  std::optional<TileSwizzle> swizzle;
 };
 
 using MaterializeEncodingFn = std::function<FailureOr<MaterializeEncodingInfo>(
@@ -164,7 +140,7 @@ void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
 // result of a matvec.
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
-// Concatenates the vectors.
+/// Concatenates the vectors.
 SmallVector<int64_t>
 getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape);
 

@@ -21,9 +21,10 @@ namespace {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-static LogicalResult isSubgroupLayoutCompatible(
-    IREE::GPU::MMAAttr::SingleSubgroupLayout subgroupLayout,
-    NestedLayoutAttr layout, int64_t dim1, int64_t dim2) {
+static LogicalResult
+isSubgroupLayoutCompatible(IREE::GPU::MMASingleSubgroupLayout subgroupLayout,
+                           NestedLayoutAttr layout, int64_t dim1,
+                           int64_t dim2) {
   SmallVector<int64_t> element = {layout.getElementTile()[dim1],
                                   layout.getElementTile()[dim2]};
   SmallVector<int64_t> thread = {layout.getThreadTile()[dim1],

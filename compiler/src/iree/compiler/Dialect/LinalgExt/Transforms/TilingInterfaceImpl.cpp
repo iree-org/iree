@@ -1765,7 +1765,7 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
         continue;
       }
       dimsFound[pos] = true;
-      loopBounds[pos].size = getDimValue(b, loc, val, idx);
+      loopBounds[pos].size = getDim(b, loc, val, idx);
     }
   };
 

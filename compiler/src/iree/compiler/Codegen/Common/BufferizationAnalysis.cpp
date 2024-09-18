@@ -543,6 +543,13 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
                   subTensorInsertOp.getDest(), subTensorInsertOp.getResult(),
                   plan);
             })
+        .Case<tensor::ParallelInsertSliceOp>(
+            [&](tensor::ParallelInsertSliceOp subTensorInsertOp) {
+              return analyseDestructiveUpdateOp(
+                  subTensorInsertOp, subTensorInsertOp.getSource(),
+                  subTensorInsertOp.getDest(),
+                  subTensorInsertOp.getTiedOpResult(), plan);
+            })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.getSource(),
                                               castOp.getDest(), plan);
