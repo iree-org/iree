@@ -140,7 +140,7 @@ void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
 // result of a matvec.
 bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
-// Concatenates the vectors.
+/// Concatenates the vectors.
 SmallVector<int64_t>
 getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape);
 
