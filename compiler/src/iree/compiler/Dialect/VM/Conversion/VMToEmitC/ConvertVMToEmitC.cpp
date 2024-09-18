@@ -1965,6 +1965,11 @@ public:
   }
 
 private:
+  struct MaybeZeroValue {
+    Value value;
+    bool isZero;
+  };
+
   LogicalResult createVariadicImportShims(IREE::VM::ImportOp &importOp,
                                           OpBuilder &builder) const {
     SetVector<const void *> arities;
@@ -2080,23 +2085,18 @@ private:
 
       builder.setInsertionPointToStart(block);
 
-      auto argumentSize = buildSizeExpression(
+      MaybeZeroValue argumentSize = buildSizeExpression(
           flattenInputTypes(importOp, segmentSizes, builder), builder, loc);
-      auto resultSize =
+      MaybeZeroValue resultSize =
           buildSizeExpression(importOp.getResultTypes(), builder, loc);
-
-      if (failed(argumentSize) || failed(resultSize)) {
-        return importOp.emitError()
-               << "Failed to build size expressions for call struct";
-      }
 
       const int importArgIndex = 1;
       const BlockArgument importArg = newFuncOp.getArgument(importArgIndex);
       auto importArgLValue = emitc_builders::asLValue(builder, loc, importArg);
       failIfImportUnresolved(builder, loc, importArgLValue);
 
-      auto call = buildIreeVmFunctionCallStruct(
-          importArg, argumentSize.value(), resultSize.value(), builder, loc);
+      auto call = buildIreeVmFunctionCallStruct(importArg, argumentSize,
+                                                resultSize, builder, loc);
 
       if (failed(call)) {
         return importOp.emitError() << "failed to create call struct";
@@ -2158,8 +2158,8 @@ private:
     return {result};
   }
 
-  FailureOr<Value> buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
-                                       Location loc) const {
+  MaybeZeroValue buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
+                                     Location loc) const {
     auto ctx = builder.getContext();
 
     Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
@@ -2170,7 +2170,7 @@ private:
                            /*resultType=*/hostSizeType,
                            /*value=*/emitc::OpaqueAttr::get(ctx, "0"))
                        .getResult();
-
+    bool isZero = true;
     for (Type type : types) {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
       Value size =
@@ -2182,14 +2182,15 @@ private:
                        /*type=*/hostSizeType,
                        /*operands=*/ArrayRef<Value>{result, size})
                    .getResult();
+      isZero = false;
     }
 
-    return {result};
+    return MaybeZeroValue{result, isZero};
   }
 
   FailureOr<TypedValue<emitc::LValueType>>
-  buildIreeVmFunctionCallStruct(Value import, Value argumentSize,
-                                Value resultSize, OpBuilder &builder,
+  buildIreeVmFunctionCallStruct(Value import, MaybeZeroValue argumentSize,
+                                MaybeZeroValue resultSize, OpBuilder &builder,
                                 Location loc) const {
     auto ctx = builder.getContext();
 
@@ -2212,9 +2213,10 @@ private:
     return {call};
   }
 
-  Value allocateByteSpan(TypedValue<emitc::LValueType> call, Value size,
-                         StringRef memberName, OpBuilder &builder,
-                         Location loc) const {
+  Value allocateByteSpan(TypedValue<emitc::LValueType> call,
+                         MaybeZeroValue size, StringRef memberName,
+                         OpBuilder &builder, Location loc) const {
+
     auto ctx = builder.getContext();
 
     // byteSpan = call.<memberName>;
@@ -2226,6 +2228,22 @@ private:
                             memberName, call)
                         .getResult();
 
+    // alloca_(0) returns NULL in some configurations on Windows. Make sure to
+    // allocate at least one byte to get valid pointer.
+    Value allocaSize;
+    if (size.isZero) {
+      Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+
+      allocaSize = builder
+                       .create<emitc::ConstantOp>(
+                           /*location=*/loc,
+                           /*resultType=*/hostSizeType,
+                           /*value=*/emitc::OpaqueAttr::get(ctx, "1"))
+                       .getResult();
+    } else {
+      allocaSize = size.value;
+    }
+
     // void *byteSpan_data_void = iree_alloca(size);
     auto byteSpanDataVoid =
         builder
@@ -2234,7 +2252,7 @@ private:
                 /*type=*/
                 emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
                 /*callee=*/"iree_alloca",
-                /*operands=*/ArrayRef<Value>{size})
+                /*operands=*/ArrayRef<Value>{allocaSize})
             .getResult(0);
 
     // uint8_t *byteSpan_data = (uint8_t*)byteSpan_data_void;
@@ -2250,7 +2268,7 @@ private:
     emitc_builders::structMemberAssign(builder, loc,
                                        /*memberName=*/"data_length",
                                        /*operand=*/byteSpan,
-                                       /*value=*/size);
+                                       /*value=*/size.value);
 
     // byteSpan.data = byteSpan_data
     emitc_builders::structMemberAssign(builder, loc,
@@ -2259,7 +2277,7 @@ private:
                                        /*value=*/byteSpanData);
 
     // memset(byteSpanData, 0, SIZE);
-    emitc_builders::memset(builder, loc, byteSpanData, 0, size);
+    emitc_builders::memset(builder, loc, byteSpanData, 0, allocaSize);
 
     return byteSpan;
   }
