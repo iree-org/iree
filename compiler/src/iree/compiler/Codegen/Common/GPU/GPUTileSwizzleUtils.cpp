@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUTileSwizzleUtils.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 namespace mlir::iree_compiler {
 
@@ -13,7 +12,7 @@ namespace mlir::iree_compiler {
 // dimensions to expanded dimensions, returns the index of the first expanded
 // dimension corresponding to the given source dimension index.
 static int64_t
-getExpandedDimFirstIdx(const SmallVector<SmallVector<int64_t>> &expandShape,
+getExpandedDimFirstIdx(const TileSwizzle::ExpandShapeType &expandShape,
                        int64_t srcIndex) {
   int dstIndexFirst = 0;
   for (int i = 0; i < srcIndex; ++i) {
@@ -22,14 +21,17 @@ getExpandedDimFirstIdx(const SmallVector<SmallVector<int64_t>> &expandShape,
   return dstIndexFirst;
 }
 
-void unroll(TileSwizzle &swizzle, int srcIndex, int unrollFactor) {
+void unroll(TileSwizzle &swizzle, int srcIndex, int unrollFactor,
+            TileSwizzle::Dim::Kind kind) {
   assert(unrollFactor > 1);
   int dstIndexFirst = getExpandedDimFirstIdx(swizzle.expandShape, srcIndex);
-
+  TileSwizzle::Dim unrollDim;
+  unrollDim.size = unrollFactor;
+  unrollDim.kind = kind;
   // The new unrolling dimension is inserted at the start of the expandShape
   // dimensions group corresponding to srcIndex.
   swizzle.expandShape[srcIndex].insert(swizzle.expandShape[srcIndex].begin(),
-                                       unrollFactor);
+                                       unrollDim);
   // Since we are not interleaving here, generating side-by-side copies of the
   // original layout, the new unrolling dimension is the new outermost
   // dimension. Existing entries get shifted to make room for it.
@@ -97,7 +99,10 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   // shape expansion for now.
   TileSwizzle swizzle;
   for (auto t : layout.thread) {
-    swizzle.expandShape.push_back({t});
+    TileSwizzle::Dim dim;
+    dim.size = t;
+    dim.kind = TileSwizzle::Dim::Kind::CrossThread; // Because `layout.thread`.
+    swizzle.expandShape.push_back({dim});
   }
   // The layout strides decide the initial swizzle.permutation.
   // Some WMMA intrinsics have tstrides=0 values, assert on that as that
@@ -112,9 +117,12 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   // Deal with any element size greater than 1 by inserting it innermost.
   // Notice that this is similar to the unroll() function, just creating an
   // inner dimension instead of an outer dimension.
-  for (int i = 0; i < layout.element.size(); ++i) {
-    if (layout.element[i] != 1) {
-      swizzle.expandShape[i].push_back(layout.element[i]);
+  for (auto [i, e] : llvm::enumerate(layout.element)) {
+    if (e != 1) {
+      TileSwizzle::Dim dim;
+      dim.size = e;
+      dim.kind = TileSwizzle::Dim::Kind::Internal; // Because `layout.element`.
+      swizzle.expandShape[i].push_back(dim);
       int newIndex = getExpandedDimFirstIdx(swizzle.expandShape, i + 1) - 1;
       for (auto &p : swizzle.permutation) {
         p += (p >= newIndex);
@@ -125,12 +133,106 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   // Deal with any outer size greater than 1 as just a call to unroll.
   // Iterate over dims in reverse order because we are creating a new outermost
   // dimension each time.
-  for (int i = layout.outer.size() - 1; i >= 0; --i) {
-    if (layout.outer[i] != 1) {
-      unroll(swizzle, i, layout.outer[i]);
+  for (auto [i, o] : llvm::enumerate(layout.outer)) {
+    if (o != 1) {
+      // `layout.outer` means additional Internal dimensions, just like
+      // `layout.element`, just swizzled outermost.
+      unroll(swizzle, i, o, TileSwizzle::Dim::Kind::Internal);
     }
   }
 
+  return swizzle;
+}
+
+// Returns the index of the dimension whose flattened size (flattening inner
+// dimensions into it) matches the given `targetSize`. This is used to compute
+// interleaving indices.
+//
+// Example:
+//    Input shape = [16, 8, 4, 4]
+//    Input targetSize = 16
+// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
+//    whose product equals targetSize.
+static int64_t
+getDimIdxForTargetSize(const TileSwizzle::ExpandShapeDimVectorType &shape,
+                       int64_t targetSize) {
+  int interleaveAt = 0;
+  int size = 1;
+  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
+    assert(size <= targetSize);
+    assert((targetSize % size) == 0);
+    if (size == targetSize) {
+      break;
+    }
+    size *= shape[interleaveAt].size;
+  }
+  return interleaveAt;
+}
+
+// Generates the swizzle for the full data-tiled-mma tile, including all the
+// relevant unrolling factors.
+TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
+                       IREE::GPU::MMAFragment fragment) {
+  auto [AType, BType, CType] = mma.getABCElementTypes();
+  int ABits = AType.getIntOrFloatBitWidth();
+  int BBits = BType.getIntOrFloatBitWidth();
+  // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
+  const int targetPreferredLoadBitWidth = 128;
+  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
+  using Kind = TileSwizzle::Dim::Kind;
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs:
+    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on M.
+    if (mma.getUnrollK() > 1) {
+      unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
+      int interleavingIdx = getDimIdxForTargetSize(
+          swizzle.expandShape[1],
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * ABits));
+      interleave(swizzle, 1, interleavingIdx);
+    }
+    if (mma.getUnrollM() > 1) {
+      unroll(swizzle, 0, mma.getUnrollM(), Kind::CrossIntrinsic);
+    }
+    if (mma.getUnrollMToSubgroups() > 1) {
+      unroll(swizzle, 0, mma.getUnrollMToSubgroups(), Kind::CrossThread);
+    }
+    break;
+  case IREE::GPU::MMAFragment::Rhs:
+    // B-matrix (RHS). Since the pack ops already took care of transposing B,
+    // source dimensions are N (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on N.
+    if (mma.getUnrollK() > 1) {
+      unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
+      int interleavingIdx = getDimIdxForTargetSize(
+          swizzle.expandShape[1],
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * BBits));
+      interleave(swizzle, 1, interleavingIdx);
+    }
+    if (mma.getUnrollN() > 1) {
+      unroll(swizzle, 0, mma.getUnrollN(), Kind::CrossIntrinsic);
+    }
+    if (mma.getUnrollNToSubgroups() > 1) {
+      unroll(swizzle, 0, mma.getUnrollNToSubgroups(), Kind::CrossThread);
+    }
+    break;
+  case IREE::GPU::MMAFragment::Acc:
+    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
+    // 1). Unroll on N, then on M.
+    if (mma.getUnrollN() > 1) {
+      unroll(swizzle, 1, mma.getUnrollN(), Kind::CrossIntrinsic);
+    }
+    if (mma.getUnrollNToSubgroups() > 1) {
+      unroll(swizzle, 1, mma.getUnrollNToSubgroups(), Kind::CrossThread);
+    }
+    if (mma.getUnrollM() > 1) {
+      unroll(swizzle, 0, mma.getUnrollM(), Kind::CrossIntrinsic);
+    }
+    if (mma.getUnrollMToSubgroups() > 1) {
+      unroll(swizzle, 0, mma.getUnrollMToSubgroups(), Kind::CrossThread);
+    }
+    break;
+  }
   return swizzle;
 }
 

@@ -135,6 +135,7 @@ iree_cc_library(
     "TileDispatchUsingForall.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
+    "TileSwizzle.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"

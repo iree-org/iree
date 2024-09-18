@@ -128,11 +128,11 @@ func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<5x16x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x8x16x4x4xf32>
+// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x4x2x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x8x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<5x16x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x4x2x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<5x16x4x2x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
@@ -161,11 +161,11 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<2x5x128x128xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x5x128x128xf32> into tensor<2x5x8x4x4x8x16xf32>
+// CHECK-SAME       : tensor<2x5x128x128xf32> into tensor<2x5x8x4x4x4x2x16xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x8x16xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 6, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x4x2x16xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x2x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 5, 6, 3, 7, 4]
 // CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
@@ -189,11 +189,11 @@ func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%{{.+}} : tensor<2x5x8x8x4x16x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x8x16xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 3, 5]
+// CHECK-SAME:       ins(%{{.+}} : tensor<2x5x8x4x2x4x16x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x4x2x16xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 5, 7, 3, 4, 6]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<2x5x8x4x4x8x16xf32> into tensor<2x5x128x128xf32>
+// CHECK-SAME:      : tensor<2x5x8x4x4x4x2x16xf32> into tensor<2x5x128x128xf32>
 // CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -295,12 +295,12 @@ func.func @matmul_lowering_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
 // CHECK-DAG:   %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
 // CHECK-DAG:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]{{.+}} -> tensor<?x?x8x4x16x4xf32>
-// CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]{{.+}} -> tensor<?x?x8x4x16x4xf32>
-// CHECK-DAG:   %[[ACC:.+]] = flow.dispatch.tensor.load %[[ACC_BINDING]]{{.+}} -> tensor<?x?x8x8x4x16x4xf32>
+// CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]{{.+}} -> tensor<?x?x4x2x4x16x4xf32>
+// CHECK-DAG:   %[[ACC:.+]] = flow.dispatch.tensor.load %[[ACC_BINDING]]{{.+}} -> tensor<?x?x8x4x2x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 8, unroll_n = 8, unroll_k = 4>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 4>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
 
 
@@ -365,11 +365,11 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK-SAME:      inner_tiles = [128, 64]
 // CHECK-SAME:      : tensor<255x513xi8> -> tensor<5x4x128x64xi8>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<5x4x128x64xi8> into tensor<5x4x8x16x2x4x8xi8>
+// CHECK-SAME       : tensor<5x4x128x64xi8> into tensor<5x4x4x2x16x2x4x8xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x4x8x16x2x4x8xi8>)
-// CHECK-SAME:       outs({{.*}} : tensor<5x4x8x4x16x2x8xi8>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4, 6]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x4x4x2x16x2x4x8xi8>)
+// CHECK-SAME:       outs({{.*}} : tensor<5x4x4x2x4x16x2x8xi8>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5, 7]
 // CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
@@ -398,11 +398,11 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<255x513xi32> -> tensor<2x5x128x128xi32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x5x128x128xi32> into tensor<2x5x8x4x4x8x16xi32>
+// CHECK-SAME       : tensor<2x5x128x128xi32> into tensor<2x5x8x4x4x4x2x16xi32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x8x16xi32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x8x4x16x4xi32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 6, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x4x2x16xi32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x2x4x16x4xi32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 5, 6, 3, 7, 4]
 // CHECK:         flow.dispatch.tensor.store %[[TRANSPOSE]]
 
 // -----
@@ -426,11 +426,11 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 
 // CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%{{.+}} : tensor<2x5x8x8x4x16x4xi32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x8x16xi32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 3, 5]
+// CHECK-SAME:       ins(%{{.+}} : tensor<2x5x8x4x2x4x16x4xi32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x4x2x16xi32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 5, 7, 3, 4, 6]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<2x5x8x4x4x8x16xi32> into tensor<2x5x128x128xi32>
+// CHECK-SAME:      : tensor<2x5x8x4x4x4x2x16xi32> into tensor<2x5x128x128xi32>
 // CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -490,10 +490,10 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
 // CHECK-DAG:   %[[ACC_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(2)
 // CHECK-DAG:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]{{.+}} -> tensor<?x?x8x4x16x2x8xi8>
-// CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]{{.+}} -> tensor<?x?x8x4x16x2x8xi8>
-// CHECK-DAG:   %[[ACC:.+]] = flow.dispatch.tensor.load %[[ACC_BINDING]]{{.+}} -> tensor<?x?x8x8x4x16x4xi32>
+// CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]{{.+}} -> tensor<?x?x4x2x4x16x2x8xi8>
+// CHECK-DAG:   %[[ACC:.+]] = flow.dispatch.tensor.load %[[ACC_BINDING]]{{.+}} -> tensor<?x?x8x4x2x4x16x4xi32>
 // CHECK:       %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 8, unroll_k = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 2>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
