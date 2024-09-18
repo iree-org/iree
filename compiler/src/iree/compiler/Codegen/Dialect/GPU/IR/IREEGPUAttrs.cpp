@@ -550,6 +550,10 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic().getValue());
 }
 
+FailureOr<IREE::GPU::MMAScope> MMAAttr::getMmaScope() const {
+  return IREE::GPU::MMAScope::Subgroup;
+}
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment) {
   switch (intrinsic) {
@@ -906,6 +910,10 @@ DataTiledMMAAttr::getABCVectorTypes() const {
 
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic().getValue());
+}
+
+FailureOr<IREE::GPU::MMAScope> DataTiledMMAAttr::getMmaScope() const {
+  return IREE::GPU::MMAScope::Workgroup;
 }
 
 //===----------------------------------------------------------------------===//
