@@ -131,12 +131,8 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     auto swizzle = *encodingInfo.swizzle;
     SmallVector<int64_t> newShape(
         packedType.getShape().drop_back(encodingInfo.innerTileSizes.size()));
-    SmallVector<int64_t> swizzledTileShape;
-    for (auto expandedDimShape : swizzle.expandShape) {
-      for (int64_t d : expandedDimShape) {
-        swizzledTileShape.push_back(d);
-      }
-    }
+    SmallVector<int64_t> swizzledTileShape =
+        getExpandedTileShape(swizzle.expandShape);
     applyPermutationToVector(swizzledTileShape, swizzle.permutation);
     newShape.append(swizzledTileShape);
     return RankedTensorType::get(newShape, packedType.getElementType());

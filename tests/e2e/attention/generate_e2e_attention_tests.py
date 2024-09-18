@@ -79,7 +79,7 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1024, k1=256, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=1024, k1=128, k2=128, n=64, scale=1.0),
         ]
 
     raise ValueError(shapes_id)

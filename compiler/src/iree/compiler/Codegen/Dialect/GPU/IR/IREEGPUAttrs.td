@@ -201,22 +201,13 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
-    // Partial nested layout for an MMA intrinsic's matrix input/output inside
-    // a single subgroup.
-    struct SingleSubgroupLayout {
-      SmallVector<int64_t, 2> outer;
-      SmallVector<int64_t, 2> thread;
-      SmallVector<int64_t, 2> tstrides;
-      SmallVector<int64_t, 2> element;
-    };
-
     // Returns the A/B/C matrix's partial nested layout shape inside a single
     // subgroup. Shape at each outer/thread/element level is a 2-D value,
     // following canonical matmul order--(M, K) for A, (K, N) for B, and
     // (M, N) for C.
-    SingleSubgroupLayout getASingleSubgroupLayout() const;
-    SingleSubgroupLayout getBSingleSubgroupLayout() const;
-    SingleSubgroupLayout getCSingleSubgroupLayout() const;
+    MMASingleSubgroupLayout getASingleSubgroupLayout() const;
+    MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
+    MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
   }];
 }
 
