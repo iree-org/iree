@@ -19,6 +19,9 @@ config.name = "IREE"
 config.suffixes = [".mlir", ".txt"]
 config.test_format = lit.formats.ShTest(execute_external=True)
 
+config.substitutions.append(("%lib_dir", config.lib_dir))
+config.substitutions.append(("%lib_ext", config.lib_ext))
+
 # Forward all IREE environment variables, as well as some passthroughs.
 # Note: env vars are case-insensitive on Windows, so check matches carefully.
 #     https://stackoverflow.com/q/7797269

@@ -297,22 +297,22 @@ public:
     pb.registerFunctionAnalyses(fam);
     pb.registerLoopAnalyses(lam);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
+    // Attempt to load pass plugins and register their callbacks with PB.
+    for (auto &PluginFN : passPlugins) {
+      auto PP = llvm::PassPlugin::Load(PluginFN);
+      if (PP) {
+        PP->registerPassBuilderCallbacks(pb);
+      } else {
+        llvm::errs() << "unable to load plugin " << PluginFN << ":"
+                     << toString(PP.takeError());
+      }
+    }
 
     llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
 
     mpm.addPass(llvm::VerifierPass());
     mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
     mpm.addPass(llvm::VerifierPass());
-    // Attempt to load pass plugins and register their callbacks with PB.
-    for (auto &PluginFN : passPlugins) {
-      auto PP = llvm::PassPlugin::Load(PluginFN);
-      if (PP) {
-        // PP->registerPassBuilderCallbacks(pb);
-      } else {
-        llvm::errs() << "unable to load plugin " << PluginFN << ":"
-                     << toString(PP.takeError());
-      }
-    }
 
     mpm.run(module, mam);
   }
