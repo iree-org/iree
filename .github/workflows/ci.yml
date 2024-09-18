@@ -62,6 +62,10 @@ jobs:
     runs-on: azure-linux-scale
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy_x86_64@sha256:2b2ad51d7de988be13086bc618d89d2ba47fbf09eb5b38c60dce82b595fb1c74
+      # Mount a RAM disk and point the Bazel sandbox at it using our custom environment variable.
+      options: --mount type=tmpfs,destination=/dev/shm
+      env:
+        SANDBOX_BASE: /dev/shm
     defaults:
       run:
         shell: bash
