@@ -70,7 +70,7 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return !getWorkgroupTileSizes().empty();
+        return false;
       }]
     >,
     InterfaceMethod<
