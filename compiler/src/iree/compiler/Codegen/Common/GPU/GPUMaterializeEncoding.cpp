@@ -37,16 +37,16 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-// Returns the index of the dimension whose flattened size (flattening inner
-// dimensions into it) matches the given `targetSize`. This is used to compute
-// interleaving indices.
-//
-// Example:
-//    Input shape = [16, 8, 4, 4]
-//    Input targetSize = 16
-// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
-//    whose product equals targetSize.
-static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
+/// Returns the index of the dimension whose flattened size (flattening inner
+/// dimensions into it) matches the given `targetSize`. This is used to compute
+/// interleaving indices.
+///
+/// Example:
+///    Input shape = [16, 8, 4, 4]
+///    Input targetSize = 16
+/// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
+///    whose product equals targetSize.
+static int64_t getDimIdxForTargetSize(ArrayRef<int64_t> shape,
                                       int64_t targetSize) {
   int interleaveAt = 0;
   int size = 1;
@@ -61,8 +61,8 @@ static int64_t getDimIdxForTargetSize(const SmallVector<int64_t> &shape,
   return interleaveAt;
 }
 
-// Generates the swizzle for the full data-tiled-mma tile, including all the
-// relevant unrolling factors.
+/// Generates the swizzle for the full data-tiled-mma tile, including all the
+/// relevant unrolling factors.
 static TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                               IREE::GPU::MMAFragment fragment) {
   auto [AType, BType, CType] = mma.getABCElementTypes();
@@ -194,7 +194,6 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
-  // TODO: Support unrolling.
   auto rank = tensorType.getRank();
   TileMxNxK innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) = mma->getMNKShape();
@@ -229,8 +228,7 @@ getReassociationIndices(int outerDims,
   }
   for (auto expandShapeDim : expandShape) {
     result.push_back({});
-    for (int64_t d : expandShapeDim) {
-      (void)d;
+    for (int i = 0, e = expandShapeDim.size(); i < e; ++i) {
       result.back().push_back(expandedIdx++);
     }
   }
@@ -274,33 +272,25 @@ struct GPUSetEncodingOpLoweringConversion
       rewriter.replaceOp(encodingOp, packOp->getResult());
       return success();
     }
-    SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
 
-    // TODO(hanchung): Add a util to the encoding attribute, so we don't need
-    // the map_to_vector method here.
-    auto loc = encodingOp.getLoc();
+    Location loc = encodingOp.getLoc();
 
     // Create expand_shape op to tile the innermost two dimensions.
     int origRank = encodingOp.getSourceType().getRank();
-    SmallVector<int64_t> expandShapeShape(packOp->getDestType().getShape());
-    expandShapeShape.truncate(origRank);
+    SmallVector<int64_t> expandShapeShape(
+        packOp->getDestType().getShape().take_front(origRank));
     expandShapeShape.append(
         getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
-
-    auto expandShapeType = RankedTensorType::get(
-        expandShapeShape, encodingOp.getSourceType().getElementType());
+    RankedTensorType expandShapeType =
+        encodingOp.getSourceType().clone(expandShapeShape);
 
     SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
         origRank, maybeEncodingInfo->swizzle->expandShape);
     auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
         loc, expandShapeType, packOp->getResult(), reassociation);
 
-    // create linalg.transpose on expandShapeShape
-
-    SmallVector<int64_t> transposePerm;
-    for (int i = 0; i < origRank; ++i) {
-      transposePerm.push_back(i);
-    }
+    SmallVector<int64_t> transposePerm =
+        llvm::to_vector(llvm::seq<int64_t>(0, origRank));
     for (auto perm : maybeEncodingInfo->swizzle->permutation) {
       transposePerm.push_back(origRank + perm);
     }
@@ -329,30 +319,26 @@ struct GPUUnsetEncodingOpLoweringConversion
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
 
-    Location loc = unsetEncodingOp.getLoc();
-
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (failed(maybeEncodingInfo)) {
       return rewriter.notifyMatchFailure(unsetEncodingOp,
                                          "unhandled result encoding");
     }
+
+    Location loc = unsetEncodingOp.getLoc();
     Value unpackSrc = adaptor.getSource();
     if (maybeEncodingInfo->swizzle) {
-      SmallVector<int64_t> innerTiles = maybeEncodingInfo->innerTileSizes;
-
       int targetRank = unsetEncodingOp.getResultType().getRank();
       auto srcConvertedType =
           cast<RankedTensorType>(adaptor.getSource().getType());
-      SmallVector<int64_t> expandShapeShape(srcConvertedType.getShape());
-      expandShapeShape.truncate(targetRank);
+      SmallVector<int64_t> expandShapeShape(
+          srcConvertedType.getShape().take_front(targetRank));
       expandShapeShape.append(
           getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
 
-      SmallVector<int64_t> transposePerm;
-      for (int i = 0; i < targetRank; ++i) {
-        transposePerm.push_back(i);
-      }
+      SmallVector<int64_t> transposePerm =
+          llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
       for (auto perm : maybeEncodingInfo->swizzle->permutation) {
         transposePerm.push_back(targetRank + perm);
       }
@@ -372,8 +358,8 @@ struct GPUUnsetEncodingOpLoweringConversion
           srcConvertedType.getShape().take_front(targetRank));
       unpackSrcShape.append(maybeEncodingInfo->innerTileSizes.begin(),
                             maybeEncodingInfo->innerTileSizes.end());
-      auto unpackSrcType = RankedTensorType::get(
-          unpackSrcShape, unsetEncodingOp.getSourceType().getElementType());
+      RankedTensorType unpackSrcType =
+          unsetEncodingOp.getResultType().clone(unpackSrcShape);
       unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
           loc, unpackSrcType, transposeOp->getResult(0), reassociation);
     }
@@ -386,8 +372,7 @@ struct GPUUnsetEncodingOpLoweringConversion
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());
       if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
-                                                 targetType, result);
+        result = rewriter.create<tensor::CastOp>(loc, targetType, result);
       }
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
@@ -463,8 +448,6 @@ public:
       return failure();
     }
 
-    // TODO(hanchung): Support unrolling cases. We likely need to teach
-    // multi_mma op about interleaving K dimension.
     MLIRContext *ctx = rewriter.getContext();
     AffineExpr mExpr = rewriter.getAffineDimExpr(0);
     AffineExpr nExpr = rewriter.getAffineDimExpr(1);
