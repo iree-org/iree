@@ -248,7 +248,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   const unsigned loopDepth = linalgOp.getNumLoops();
 
   // Configurations we need to decide.
-  std::array<int64_t, 3> workgroupSize;
+  int64_t workgroupSize = 1;
   SmallVector<int64_t> workgroupTileSizes(loopDepth, 0);
   SmallVector<int64_t> threadTileSizes(loopDepth, 0);
 
@@ -289,7 +289,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                      std::nullopt) {
     LDBG("Loss factor: " << lossFactor << "\n");
     // Initialize the configuration.
-    workgroupSize = {subgroupSize, 1, 1};
+    workgroupSize = 1;
     // Initialize tiling along all partitioned loops with size 1.
     for (int64_t loopIndex : partitionableLoops) {
       workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
@@ -335,6 +335,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         llvm::dbgs() << "]\n";
       });
 
+      int64_t candidateWorkgroupSize = 1;
       for (int64_t candidate : candidates) {
         int64_t scaledTileSize = candidate * scaleToByte;
         if (loopBound % scaledTileSize != 0) {
@@ -367,20 +368,22 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           int vectorSize = hasIdleThreads ? 1 : 4;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
-          workgroupSize[wgDim] = candidate / vectorSize;
+          candidateWorkgroupSize = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
           numThreads /= candidate / vectorSize;
         } else {
           if (wgDim == 0)
             vectorizable = false;
           threadTileSizes[shapeDim] = scaleToByte;
-          workgroupSize[wgDim] = candidate;
+          candidateWorkgroupSize = candidate;
           assert(numThreads % candidate == 0);
           numThreads /= candidate;
         }
         assert(numThreads >= 1);
         break;
       }
+
+      workgroupSize *= candidateWorkgroupSize;
 
       // Stop if we have distributed all threads.
       if (numThreads == 1)
@@ -476,7 +479,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, subgroupSize, DictionaryAttr());
+      {workgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
 }
 
 //===----------------------------------------------------------------------===//
