@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include <numeric>
 
+#include "iree/compiler/Codegen/Common/GPU/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -26,6 +27,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -903,10 +905,33 @@ std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
           opaqueLayout.kSize * getUnrollK()};
 }
 
+// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
+// `predicate` returns false.
+static SmallVector<int64_t>
+sliceSwizzledShape(const TileSwizzle &swizzle,
+                   std::function<bool(TileSwizzle::Dim)> predicate) {
+  SmallVector<int64_t> shape;
+  for (auto e : swizzle.expandShape) {
+    for (auto d : e) {
+      shape.push_back(predicate(d) ? d.size : 1);
+    }
+  }
+  applyPermutationToVector(shape, swizzle.permutation);
+  return shape;
+}
+
 std::tuple<VectorType, VectorType, VectorType>
 DataTiledMMAAttr::getABCVectorTypes() const {
-  return MMAAttr::get(getContext(), getIntrinsic().getValue())
-      .getABCVectorTypes();
+  auto [A, B, C] = getABCElementTypes();
+  auto getShape = [=](MMAFragment fragment) {
+    return sliceSwizzledShape(
+        getSwizzle(*this, fragment), [](TileSwizzle::Dim d) {
+          return d.kind != TileSwizzle::Dim::Kind::CrossThread;
+        });
+  };
+  return {VectorType::get(getShape(MMAFragment::Lhs), A),
+          VectorType::get(getShape(MMAFragment::Rhs), B),
+          VectorType::get(getShape(MMAFragment::Acc), C)};
 }
 
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
@@ -915,6 +940,169 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 
 FailureOr<IREE::GPU::MMAScope> DataTiledMMAAttr::getMmaScope() const {
   return IREE::GPU::MMAScope::Workgroup;
+}
+
+LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, IREE::GPU::MMAFragment fragment,
+    Value threadId, ArrayRef<int64_t> permutation,
+    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &strides) const {
+  // TODO(bjacob): Support WMMA intrinsics.
+
+  // Get the swizzle describing the internal layout of this fragment.
+  TileSwizzle swizzle = getSwizzle(*this, fragment);
+
+  // Populate tile sizes.
+  MLIRContext *ctx = builder.getContext();
+  SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
+      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+        return d.kind != TileSwizzle::Dim::Kind::CrossThread;
+      }));
+
+  // Populate tile offsets by delinearizing threadId over the CrossThread dims.
+  SmallVector<OpFoldResult> tileOffsetsBasis = getAsIndexOpFoldResult(
+      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
+      }));
+  SmallVector<OpFoldResult> tileOffsets =
+      builder
+          .create<affine::AffineDelinearizeIndexOp>(loc, threadId,
+                                                    tileOffsetsBasis)
+          ->getResults();
+
+  // Strides are trivial: each slice is contiguous along the *expanded* dims
+  // even if it may not be contiguous in the flattened layout.
+  SmallVector<OpFoldResult> tileStrides(tileSizes.size(),
+                                        builder.getIndexAttr(1));
+
+  offsets.append(tileOffsets);
+  sizes.append(tileSizes);
+  strides.append(tileStrides);
+
+  return success();
+}
+
+// Increment the mutable vector `indices` to traverse the index space below
+// `sizes`, with the last dimension moving fastest.
+static void incrementIndices(MutableArrayRef<int64_t> indices,
+                             ArrayRef<int64_t> sizes) {
+  int rank = indices.size();
+  for (int i = rank - 1; i >= 0; --i) {
+    ++indices[i];
+    if (indices[i] == sizes[i]) {
+      indices[i] = 0;
+    } else {
+      break;
+    }
+  }
+}
+
+// Flattens the input vector `value` to 1-D.
+static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
+  Type type = value.getType();
+  VectorType vectorType = llvm::dyn_cast<VectorType>(type);
+  assert(vectorType);
+  if (vectorType.getRank() <= 1) {
+    return value;
+  }
+  VectorType flatVectorType =
+      VectorType::get(SmallVector<int64_t>{vectorType.getNumElements()},
+                      vectorType.getElementType());
+  return builder.create<vector::ShapeCastOp>(loc, flatVectorType, value);
+}
+
+// Returns intrinsic-level slices tiling the input multi-MMA-level tile `value`.
+static SmallVector<Value>
+distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
+                                  const TileSwizzle &swizzle) {
+  auto internalShape = sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+    return dim.kind == TileSwizzle::Dim::Kind::Internal;
+  });
+  auto crossIntrinsicShape =
+      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      });
+  int rank = internalShape.size();
+  auto strides = SmallVector<int64_t>(rank, 1);
+  int64_t crossIntrinsicCount =
+      std::reduce(crossIntrinsicShape.begin(), crossIntrinsicShape.end(), 1,
+                  std::multiplies<int64_t>());
+  SmallVector<Value> distributedValues(crossIntrinsicCount);
+  SmallVector<int64_t> indices(rank, 0);
+  for (Value &distributedValue : distributedValues) {
+    Value extract = builder.create<vector::ExtractStridedSliceOp>(
+        loc, value, indices, internalShape, strides);
+    distributedValue = flattenVector(builder, loc, extract);
+    incrementIndices(indices, crossIntrinsicShape);
+  }
+  return distributedValues;
+}
+
+// Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
+// type.
+FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
+                                                     Location loc,
+                                                     Type resultType, Value lhs,
+                                                     Value rhs,
+                                                     Value acc) const {
+  // TODO(bjacob): Support WMMA intrinsics.
+
+  // Validation. Similar to MMAAttr::buildMmaOperation.
+  auto [aType, bType, cType] = getABCVectorTypes();
+  if (aType != lhs.getType() || bType != rhs.getType() ||
+      cType != acc.getType()) {
+    return failure();
+  }
+  // Fail if the result type does not match with the expected return type of
+  // the intrinsic. We expect the caller to handle type conversions externally.
+  if (cType != resultType) {
+    return failure();
+  }
+
+  // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
+  auto intrinsicsLhs = distributeMmaFragmentToIntrinsics(
+      builder, loc, lhs, getSwizzle(*this, MMAFragment::Lhs));
+  auto intrinsicsRhs = distributeMmaFragmentToIntrinsics(
+      builder, loc, rhs, getSwizzle(*this, MMAFragment::Rhs));
+  auto intrinsicsAcc = distributeMmaFragmentToIntrinsics(
+      builder, loc, acc, getSwizzle(*this, MMAFragment::Acc));
+
+  // Get a MMAAttr for the intrinsic itself, to reuse MMAAttr::buildMmaOperation
+  // to create the target intrinsics.
+  auto intrinsicMma = MMAAttr::get(getContext(), getIntrinsic().getValue());
+  auto [intrinsicAType, intrinsicBType, intrinsicCType] =
+      intrinsicMma.getABCVectorTypes();
+
+  // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
+  for (int mu = 0; mu < getUnrollM(); ++mu) {
+    for (int nu = 0; nu < getUnrollN(); ++nu) {
+      for (int ku = 0; ku < getUnrollK(); ++ku) {
+        // Assume intrinsicMma.buildMmaOperation() success: validation should be
+        // completed prior to mutating IR.
+        intrinsicsAcc[mu * getUnrollN() + nu] = *intrinsicMma.buildMmaOperation(
+            builder, loc, intrinsicCType, intrinsicsLhs[mu * getUnrollK() + ku],
+            intrinsicsRhs[nu * getUnrollK() + ku],
+            intrinsicsAcc[mu * getUnrollN() + nu]);
+      }
+    }
+  }
+
+  // Insert the results into the destination accumulator.
+  auto accSwizzle = getSwizzle(*this, MMAFragment::Acc);
+  auto accCrossIntrinsicShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      });
+  SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
+  SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
+  for (int mu = 0; mu < getUnrollM(); ++mu) {
+    for (int nu = 0; nu < getUnrollN(); ++nu) {
+      acc = builder.create<vector::InsertStridedSliceOp>(
+          loc, intrinsicsAcc[mu * getUnrollN() + nu], acc, indices, strides);
+      incrementIndices(indices, accCrossIntrinsicShape);
+    }
+  }
+  return acc;
 }
 
 //===----------------------------------------------------------------------===//
