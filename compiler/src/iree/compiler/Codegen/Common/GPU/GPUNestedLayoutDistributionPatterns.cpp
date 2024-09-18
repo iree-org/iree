@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/GPU/Transforms/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -512,10 +513,17 @@ struct DistributeMultiReduction final
       Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
 
       // Reduce across all reduction dimensions 1-by-1.
-      for (unsigned i = 0; i < reductionMask.size(); ++i) {
+      for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
-          extracted = doPackedThreadReductionOnDim(rewriter, layout, extracted,
-                                                   kind, i);
+          int64_t offset = getShuffleOffset(layout, i);
+          int64_t width = getShuffleWidth(layout, i);
+          assert(offset <= std::numeric_limits<uint32_t>::max() &&
+                 width <= std::numeric_limits<uint32_t>::max());
+
+          extracted = rewriter.create<gpu::SubgroupReduceOp>(
+              loc, extracted, combiningKindToAllReduce(kind),
+              /*uniform=*/false, /*cluster_size=*/width,
+              /*cluster_stride=*/offset);
         }
       }
 
@@ -523,25 +531,6 @@ struct DistributeMultiReduction final
     }
 
     return res;
-  }
-
-  Value doPackedThreadReductionOnDim(RewriterBase &rewriter,
-                                     NestedLayoutAttr layout, Value val,
-                                     vector::CombiningKind kind,
-                                     int64_t dim) const {
-    Location loc = val.getLoc();
-    int64_t offset = getShuffleOffset(layout, dim);
-    int64_t width = getShuffleWidth(layout, dim);
-
-    for (int i = offset; i < offset * width; i <<= 1) {
-      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
-          loc, val, i, subgroupSize, gpu::ShuffleMode::XOR);
-      val =
-          makeArithReduction(rewriter, loc, kind, shuffleOp.getShuffleResult(),
-                             val, nullptr, nullptr);
-    }
-
-    return val;
   }
 
   int64_t subgroupSize;
