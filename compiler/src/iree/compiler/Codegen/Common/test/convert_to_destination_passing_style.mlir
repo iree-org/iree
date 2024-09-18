@@ -162,6 +162,47 @@ func.func @matmul_inplace() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<
+    bindings = [
+        #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+        #hal.pipeline.binding<storage_buffer, Indirect>],
+    flags = Indirect>
+module {
+  func.func @convert_forall() {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<64xi32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<64xi32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:tensor<64xi32>> -> tensor<64xi32>
+    %3 = tensor.empty() : tensor<64xi32>
+    %4 = scf.forall (%arg0) = (0) to (64) step (16) shared_outs(%arg1 = %3) -> (tensor<64xi32>) {
+      %extracted_slice = tensor.extract_slice %arg1[%arg0] [16] [1] : tensor<64xi32> to tensor<16xi32>
+      %extracted_slice_0 = tensor.extract_slice %2[%arg0] [16] [1] : tensor<64xi32> to tensor<16xi32>
+      %5 = linalg.add ins(%extracted_slice_0, %extracted_slice_0 : tensor<16xi32>, tensor<16xi32>) outs(%extracted_slice : tensor<16xi32>) -> tensor<16xi32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %5 into %arg1[%arg0] [16] [1] : tensor<16xi32> into tensor<64xi32>
+      }
+    } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+    flow.dispatch.tensor.store %4, %1, offsets = [0], sizes = [64], strides = [1] : tensor<64xi32> -> !flow.dispatch.tensor<readwrite:tensor<64xi32>>
+    return
+  }
+}
+
+//      CHECK: func.func @convert_forall()
+//  CHECK-DAG:   %[[IN_SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//  CHECK-DAG:   %[[OUT_SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//  CHECK-DAG:   %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_SUBSPAN]]
+//  CHECK-DAG:   %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_SUBSPAN]]
+//      CHECK:   %[[FORALL:.+]] = scf.forall {{.*}} shared_outs(%[[FORALL_ARG:.+]] = %[[OUT]])
+//  CHECK-DAG:     %[[IN_TILE:.+]] = tensor.extract_slice %[[IN]]
+//  CHECK-DAG:     %[[OUT_TILE:.+]] = tensor.extract_slice %[[FORALL_ARG]]
+//      CHECK:     scf.forall.in_parallel {
+// CHECK-NEXT:       tensor.parallel_insert_slice {{.*}} into %[[FORALL_ARG]]
+//      CHECK:     }
+
+//      CHECK:   flow.dispatch.tensor.store %[[FORALL]], %[[OUT_SUBSPAN]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
