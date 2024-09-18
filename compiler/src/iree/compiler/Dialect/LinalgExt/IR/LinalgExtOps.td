@@ -546,7 +546,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       return cast<AffineMap>(getIndexingMapsArray()[3]);
     }
     std::optional<AffineMap> getMaskMap() {
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
+      if (getMask()) {
+        return cast<AffineMap>(getIndexingMapsArray()[4]);
+      }
+      return std::nullopt;
     }
     AffineMap getOutputMap() {
       return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
