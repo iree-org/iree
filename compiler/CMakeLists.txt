@@ -63,3 +63,7 @@ if(IREE_BUILD_COMPILER)
     add_dependencies(iree_compiler_API_StaticImpl ${_iree_compiler_depends})
   endif()
 endif()
+
+configure_lit_site_cfg(
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py)
