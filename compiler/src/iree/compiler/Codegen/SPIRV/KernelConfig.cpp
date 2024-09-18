@@ -1772,6 +1772,10 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
       succeeded(detail::setMaliCodeGenConfig(target, rootOp))) {
     return success();
   }
+  if (target.isBroadcom() &&
+      succeeded(detail::setVideoCoreCodeGenConfig(target, rootOp))) {
+    return success();
+  }
   if (target.isNVIDIA() &&
       succeeded(detail::setNVIDIACodeGenConfig(target, rootOp))) {
     return success();
