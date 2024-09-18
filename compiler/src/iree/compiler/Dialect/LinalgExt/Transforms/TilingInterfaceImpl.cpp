@@ -1893,9 +1893,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     SmallVector<Range> maskSlice =
         getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
-    if (!maskSliceOp) {
-      return emitOpError("failed to get mask slice");
-    }
     tiledOperands.emplace_back(maskSliceOp->getResult(0));
     slices.push_back(maskSliceOp);
   }
@@ -1936,12 +1933,13 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[(attnMask) ? 5 : 4].getType());
+    int64_t baseIdx = attnMask ? 5 : 4;
+    resultTypes.push_back(tiledOperands[baseIdx].getType());
     if (max) {
-      resultTypes.push_back(tiledOperands[(attnMask) ? 6 : 5].getType());
+      resultTypes.push_back(tiledOperands[baseIdx + 1].getType());
     }
     if (sum) {
-      resultTypes.push_back(tiledOperands[(attnMask) ? 7 : 6].getType());
+      resultTypes.push_back(tiledOperands[baseIdx + 2].getType());
     }
   }
 
@@ -2037,10 +2035,10 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
       getPermutedSlice(getValueMap(), offsets, sizes);
-  std::optional<SmallVector<Range>> maskSlice =
-      getMaskMap() ? std::optional<SmallVector<Range>>(
-                         getPermutedSlice(*getMaskMap(), offsets, sizes))
-                   : std::nullopt;
+  std::optional<SmallVector<Range>> maskSlice;
+  if (auto maskMap = getMaskMap()) {
+    maskSlice = getPermutedSlice(*maskMap, offsets, sizes);
+  }
 
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
@@ -2089,9 +2087,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
     SmallVector<Range> maskSlice =
         getPermutedSlice(*getMaskMap(), offsets, sizes);
     Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
-    if (!maskSliceOp) {
-      return emitOpError("failed to get mask slice");
-    }
     tiledOperands.emplace_back(maskSliceOp->getResult(0));
     slices.push_back(maskSliceOp);
   }

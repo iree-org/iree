@@ -1204,8 +1204,8 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, Value query, Value key, Value value,
                         Value scale, ValueRange outputs, ArrayAttr indexingMaps,
                         std::optional<Value> mask) {
-  Value mask_in = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, scale, mask_in,
+  Value maskIn = mask.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn,
         outputs, indexingMaps);
 }
 
@@ -1274,10 +1274,9 @@ LogicalResult AttentionOp::verify() {
   }
 
   // Additional check case if mask exists
-  if (getMaskMap().has_value() &&
-      failed(checkShape("Mask", getMaskType()->getShape(),
-                        getMaskMap().value()))) {
-    return failure();
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkShape("Mask", getMaskType()->getShape(), *maskMap)))
+      return failure();
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -1301,9 +1300,9 @@ LogicalResult AttentionOp::verify() {
   }
 
   // Additional check case if mask exists
-  if (getMaskMap().has_value() &&
-      failed(checkDomain("Mask", getMaskMap().value()))) {
-    return failure();
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkDomain("Mask", *maskMap)))
+      return failure();
   }
 
   if (isTiled) {
@@ -1444,10 +1443,9 @@ LogicalResult OnlineAttentionOp::verify() {
   }
 
   // Additional check case if mask exists
-  if (getMaskMap().has_value() &&
-      failed(checkShape("Mask", getMask().getType().getShape(),
-                        getMaskMap().value()))) {
-    return failure();
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+      return failure();
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -1473,9 +1471,9 @@ LogicalResult OnlineAttentionOp::verify() {
   }
 
   // Additional check case if mask exists
-  if (getMaskMap().has_value() &&
-      failed(checkDomain("Mask", getMaskMap().value()))) {
-    return failure();
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkDomain("Mask", *maskMap)))
+      return failure();
   }
 
   return success();

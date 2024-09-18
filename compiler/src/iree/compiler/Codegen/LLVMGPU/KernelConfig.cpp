@@ -679,9 +679,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
-  if (intrinsics.empty()) {
+  if (intrinsics.empty())
     return failure();
-  }
 
   // We assume that P uses the element type of V for input
   // and both matmuls have f32 as output. It is possible to use other element

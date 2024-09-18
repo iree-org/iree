@@ -78,20 +78,14 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
   AffineExpr m, n, k1, k2;
   bindDims(ctx, m, n, k1, k2);
 
-  AffineMap qMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
-  AffineMap kMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
-  AffineMap vMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
-  AffineMap sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0,
-                                  SmallVector<AffineExpr>{}, ctx);
-  AffineMap mMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
-  AffineMap rMap =
-      AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
+  auto qMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
+  auto kMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
+  auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
+  auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
+  auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
   if (hasMask) {
     // Add mask map only if it exists
+    auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
     return {qMap, kMap, vMap, sMap, mMap, rMap};
   }
   return {qMap, kMap, vMap, sMap, rMap};
@@ -161,10 +155,10 @@ struct AttentionOpConversion
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
-      if (map.getNumResults() > 0) {
-        for (int batch : llvm::seq<int>(numBatches)) {
-          map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
-        }
+      if (map.getNumResults() == 0)
+        continue;
+      for (int batch : llvm::seq<int>(numBatches)) {
+        map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
       }
     }
 

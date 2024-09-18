@@ -384,7 +384,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
 
-   Accepts an N-D tensor input consisting of values and an optional N-D tensor
+   Accepts an N-D tensor input consisting of values and an optioanl N-D tensor
    for indices of those values (i32 type). If input indices aren't provided, the
    index mapping is inferred based on the k dim.  Both input values/indices
    tensors and output values/indicies tensors must have the same shape. Top-K is
@@ -466,9 +466,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let description = [{
     Computes the scaled dot product attention function:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V
 
-    Here Q, K, V are given tensors and scale is a scalar value specifying
+    Here Q, K, V, M are given tensors and scale is a scalar value specifying
     the scale to use.
 
     For self-attention, all inputs and the result have the same shape BxNxd
@@ -488,7 +488,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
     and we can expect computation to look like:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
+    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V.T
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -671,13 +671,13 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let description = [{
     Traditional scaled dot product attention computes:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V
 
     Online Attention on the other hand, uses an online normalizer instead of
     softmax:
 
-    online_attention(Q, K, V, scale, running_max, running_sum)
-      = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
+    online_attention(Q, K, V, scale, M?, running_max, running_sum)
+      = online_normalizer(Q @ K.T * scale + M, running_max, running_sum) @ V
 
     The advantage of this online_normalizer is that it can be tiled along
     its reduction dimension, making the online_attention operator:

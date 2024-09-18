@@ -189,8 +189,8 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   Value zero = builder.create<arith::ConstantOp>(
       loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
   Value negInf = builder.create<arith::ConstantOp>(
-      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), -INFINITY));
-
+      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()),
+                                -std::numeric_limits<double>::infinity()));
   auto genericOp = builder.create<linalg::GenericOp>(
       loc, qk.getType(), SmallVector<Value>{mask}, qk,
       SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
@@ -211,6 +211,8 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
               loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
           maskVal = b.create<arith::MulFOp>(loc, maskVal, log2e);
         }
+        // Finally, set the returned value to the qk element plus the mask
+        // element (or 0/-infinity if bool mask)
         Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
         b.create<linalg::YieldOp>(loc, add);
       });
@@ -302,8 +304,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
   Value scale = getScale();
-
-  // Scaling to compensate for base-2 softmax
   Value log2e = b.create<arith::ConstantOp>(
       loc, b.getFloatAttr(scale.getType(), M_LOG2E));
   scale = b.create<arith::MulFOp>(loc, scale, log2e);
@@ -373,8 +373,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   }
 
   // S += mask
-  if (Value maskVal = mask.value_or(nullptr)) {
-    s = applyMask(b, loc, sMap, *getMaskMap(), s, maskVal);
+  if (mask != nullptr) {
+    s = applyMask(b, loc, sMap, *getMaskMap(), s, mask.value());
   }
 
   // TODO: This decomposition should be in a seperate op called

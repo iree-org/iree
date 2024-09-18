@@ -413,10 +413,13 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   indexingMaps.push_back(maxMap);
   indexingMaps.push_back(sumMap);
+
+  Value mask = attnOp.getMask() ? attnOp.getMask() : Value();
+
   OnlineAttentionOp onlineAttn = rewriter.create<OnlineAttentionOp>(
       loc, TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
-      attnOp.getMask() ? attnOp.getMask() : Value(), accFill, maxFill, sumFill,
+      mask, accFill, maxFill, sumFill,
       rewriter.getAffineMapArrayAttr(indexingMaps));
   onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
