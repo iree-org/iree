@@ -138,3 +138,19 @@ module @elementwise_unaligned {
 // dynamic scf.forall loops.
 // CHECK-LABEL: module @elementwise_unaligned
 //  CHECK-NOT:   LLVMGPUTileAndFuse
+
+// -----
+
+module @elementwise_large_rank {
+  func.func @elementwise_large_rank(%11: tensor<3x5x7x11x13x17x19x23xf16>, %12: tensor<3x5x7x11x13x17x19x23xf16>) -> tensor<3x5x7x11x13x17x19x23xf16> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %13 = tensor.empty() : tensor<3x5x7x11x13x17x19x23xf16>
+    %15 = linalg.add ins(%11, %12 : tensor<3x5x7x11x13x17x19x23xf16>, tensor<3x5x7x11x13x17x19x23xf16>) outs(%13 : tensor<3x5x7x11x13x17x19x23xf16>) -> tensor<3x5x7x11x13x17x19x23xf16>
+    return %15 : tensor<3x5x7x11x13x17x19x23xf16>
+  }
+}
+
+// Verify that a lowering config is set on large rank tensors with unaligned
+// shapes.
+// CHECK-LABEL: func.func @elementwise_large_rank
+//  CHECK-SAME:   #iree_codegen.translation_info
