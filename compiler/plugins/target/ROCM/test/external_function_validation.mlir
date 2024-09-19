@@ -1,4 +1,5 @@
-// RUN: iree-opt --iree-hal-post-configuration-transformation-pipeline --verify-diagnostics %s -o -
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{start=executable-configurations})' \
+// RUN:   --verify-diagnostics %s -o -
 
 // The final bitcode validation should error out on any external functions that
 // remain in the final bitcode (post device bitcode linking).
