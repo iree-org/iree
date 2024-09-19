@@ -62,6 +62,19 @@ def IREECodegen_LoweringConfigAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the lowering config specifies tile sizes for the
+        workgroup tiling level.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"hasWorkgroupTilingLevel",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the tile sizes for the specified tiling level. The
         interpretation of |level| is attribute and backend dependent. The
         |target| is the operation this lowering configuration annotates.
