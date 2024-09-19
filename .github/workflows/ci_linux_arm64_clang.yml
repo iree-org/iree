@@ -60,7 +60,7 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_NAMESPACE: ci_linux_arm64_clang
         run: |
-          export IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)"
+          export IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         env:
