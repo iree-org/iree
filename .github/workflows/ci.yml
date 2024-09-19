@@ -52,34 +52,6 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  ################################### Basic ####################################
-  # Jobs that build all of IREE "normally"
-  ##############################################################################
-
-  # TODO(#18238): migrate to new runner cluster
-  # build_test_all_bazel:
-  #   needs: setup
-  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_bazel')
-  #   runs-on:
-  #     - self-hosted # must come first
-  #     - runner-group=${{ needs.setup.outputs.runner-group }}
-  #     - environment=${{ needs.setup.outputs.runner-env }}
-  #     - cpu
-  #     - os-family=Linux
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-  #       with:
-  #         submodules: true
-  #     - name: "Building and testing with Bazel"
-  #       env:
-  #         IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
-  #       run: |
-  #         ./build_tools/github_actions/docker_run.sh \
-  #           --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-  #           gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
-  #           ./build_tools/bazel/build_test_all.sh
-
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -326,9 +298,6 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
-
-      # Toolchains
-      # - build_test_all_bazel  # Currently disabled.
 
       # Accelerators
       # - test_nvidia_a100

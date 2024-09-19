@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -32,18 +33,18 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 // Build a BarrierRegionOp with an empty.
 void BarrierRegionOp::build(OpBuilder &b, OperationState &result,
-                            Type resultType, Value dest) {
-  result.addOperands(dest);
+                            TypeRange resultTypes, ValueRange inputs) {
+  result.addOperands(inputs);
   (void)result.addRegion();
-  result.addTypes(resultType);
+  result.addTypes(resultTypes);
+  SmallVector<Location> blockArgLocs(inputs.size(), result.location);
 
   Region *region = result.regions[0].get();
 
   // `builder.createBlock` changes the insertion point within the block. Create
   // a guard to reset the insertion point of the builder after it is destroyed.
   OpBuilder::InsertionGuard guard(b);
-  b.createBlock(region, region->end(), ArrayRef<Type>{dest.getType()},
-                ArrayRef<Location>{result.location});
+  b.createBlock(region, region->end(), inputs.getTypes(), blockArgLocs);
 }
 
 LogicalResult BarrierRegionOp::verify() { return success(); }
@@ -51,19 +52,26 @@ LogicalResult BarrierRegionOp::verify() { return success(); }
 LogicalResult BarrierRegionOp::verifyRegions() {
   auto &region = getRegion();
   Block &block = region.front();
-  if (block.getNumArguments() != 1) {
-    return emitError("expected the block to have a single argument");
+  if (block.getNumArguments() != getNumOperands()) {
+    return emitError(
+        "expected the block argument count to match operand count");
   }
 
-  if (block.getArgumentTypes()[0] != getDestType()) {
-    return emitError("expected block to have single argument type of")
-           << getDestType();
+  if (!llvm::all_of_zip(block.getArgumentTypes(), getOperandTypes(),
+                        [](Type a, Type b) { return a == b; })) {
+    return emitError("expected block argument types to match operand types");
   }
 
   // Ensure that the region yields an element of the right type.
   auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
-  if (yieldOp.getValue().getType() != getResult().getType()) {
-    return emitOpError("expected yield type to match result type");
+  if (yieldOp->getNumOperands() != getNumResults()) {
+    return emitOpError(
+        "expected body to yield same number of values as results");
+  }
+
+  if (!llvm::all_of_zip(yieldOp->getOperandTypes(), getResultTypes(),
+                        [](Type a, Type b) { return a == b; })) {
+    return emitError("expected yielded value types to match result types");
   }
 
   return success();
