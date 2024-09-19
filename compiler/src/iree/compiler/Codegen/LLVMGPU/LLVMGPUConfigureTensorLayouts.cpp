@@ -245,16 +245,15 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
   bool transposeIntrinsic = false;
 
   auto intrinsic = cast<IREE::GPU::MMAAttr>(schedule.getIntrinsic());
-  IREE::GPU::MMAAttr::SingleSubgroupLayout lhsLayout =
+  IREE::GPU::MMASingleSubgroupLayout lhsLayout =
       intrinsic.getASingleSubgroupLayout();
-  IREE::GPU::MMAAttr::SingleSubgroupLayout rhsLayout =
+  IREE::GPU::MMASingleSubgroupLayout rhsLayout =
       intrinsic.getBSingleSubgroupLayout();
-  IREE::GPU::MMAAttr::SingleSubgroupLayout outLayout =
+  IREE::GPU::MMASingleSubgroupLayout outLayout =
       intrinsic.getCSingleSubgroupLayout();
 
-  auto matchLayout =
-      [](IREE::GPU::MMAAttr::SingleSubgroupLayout layoutA,
-         IREE::GPU::MMAAttr::SingleSubgroupLayout layoutB) -> bool {
+  auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
+                        IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
     return (layoutA.element == layoutB.element) &&
            (layoutA.thread == layoutB.thread) &&
            (layoutA.tstrides == layoutB.tstrides);
