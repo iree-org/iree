@@ -13,6 +13,8 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -113,6 +115,18 @@ bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
   };
   llvm::SetVector<Operation *> slice;
   getBackwardSlice(op, &slice, options);
+
+  // `getBackwardSlice` doesnt track uses from within an ops region, so make
+  // sure there are no values defined above.
+  for (Operation *sliceOp : slice) {
+    bool usesValuesFromAbove = false;
+    mlir::visitUsedValuesDefinedAbove(
+        sliceOp->getRegions(), [&](void *) { usesValuesFromAbove = true; });
+    if (usesValuesFromAbove) {
+      return false;
+    }
+  }
+
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
   });
