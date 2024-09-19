@@ -60,7 +60,6 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
-    MLIRAnalysis
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
