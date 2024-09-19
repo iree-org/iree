@@ -254,13 +254,20 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
     }
   }
 
+  Value maskOperand;
+  if (expandedOpOperands.size() > 4) {
+    maskOperand = expandedOpOperands[4];
+  } else {
+    maskOperand = Value();
+  }
+
   // Create a new `AttentionOp` that has the computed operands/indexing maps.
   TypeRange resultTypes = ValueRange(outputs).getTypes();
   auto fusedOp = rewriter.create<AttentionOp>(
       attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
       expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
       outputs, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
-      attentionOp.getMask());
+      maskOperand);
 
   // Reshape the result values to their original shape if this is a collapsing
   // reshape folded into its consumer.
