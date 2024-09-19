@@ -135,3 +135,27 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 //  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
 //       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (%c4, %c8, %c16) : index
 //       CHECK:     memref.store {{.*}}[%[[DELIN]]#2, %[[DELIN]]#1, %[[DELIN]]#0]
+
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [7, 1, 1] subgroup_size = 32>
+
+func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
+    attributes {translation_info = #translation_info} {
+  %c0 = arith.constant 0 : i32
+  scf.forall (%arg0) in (7) {
+    memref.store %c0, %out[%arg0] : memref<?xi32>
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// CHECK-LABEL: func @distribute_thread_forall_small_workgroup
+//   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
+//   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
+//       CHECK:   %[[LINID:.+]] = affine.apply
+//  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 7 + s2 * 7)>
+//  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
+//       CHECK:   %[[DELIN:.+]] = affine.delinearize_index %[[LINID]] into (%c7) : index
+//       CHECK:   memref.store {{.*}}[%[[DELIN]]]
