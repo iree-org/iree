@@ -19,7 +19,8 @@ iree_lit_test_suite(
     "config_vector_distribute.mlir"
     "lowering_scalar_dispatch.mlir"
     "pipeline_tile_and_fuse.mlir"
-    "pipeline_vector_distribute.mlir"
+    "pipeline_vector_distribute_gfx1100.mlir"
+    "pipeline_vector_distribute_gfx940.mlir"
     "pipeline_warp_reduction.mlir"
   TOOLS
     FileCheck
