@@ -49,7 +49,10 @@ jobs:
         with:
           submodules: true
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+        run: |
+          wget --no-verbose "https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files/qemu-aarch64"
+          chmod +x ./qemu-aarch64
+          cp ./qemu-aarch64 /usr/bin/qemu-aarch64
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Building IREE"
