@@ -389,6 +389,12 @@ runs.
     ci-exactly: build_packages,test_onnx
     ```
 
+* Only run Bazel builds, e.g. for changes only affecting Bazel rules:
+
+    ``` text
+    ci-exactly: linux_x64_bazel
+    ```
+
 For example, this PR opted in to running the `build_test_all_windows` job:
 
 ![ci-extra](./contributing-ci-extra.png)
