@@ -4480,6 +4480,11 @@ runs.</p>
 <div class="highlight"><pre><span></span><code>ci-exactly: build_packages,test_onnx
 </code></pre></div>
 </li>
+<li>
+<p>Only run Bazel builds, e.g. for changes only affecting Bazel rules:</p>
+<div class="highlight"><pre><span></span><code>ci-exactly: linux_x64_bazel
+</code></pre></div>
+</li>
 </ul>
 <p>For example, this PR opted in to running the <code>build_test_all_windows</code> job:</p>
 <p><img alt="ci-extra" src="../contributing-ci-extra.png" /></p>
