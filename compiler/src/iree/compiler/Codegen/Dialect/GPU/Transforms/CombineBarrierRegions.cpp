@@ -36,11 +36,8 @@ static LogicalResult
 combineBarrierRegionPair(RewriterBase &rewriter,
                          IREE::GPU::BarrierRegionOp barrierA,
                          IREE::GPU::BarrierRegionOp barrierB) {
-  // barrierB must immediately follow barrierA.
-  assert(barrierA->getBlock() == barrierB->getBlock());
-  if (barrierA->getNextNode() != barrierB) {
-    return failure();
-  }
+  assert(barrierA->getBlock() == barrierB->getBlock() &&
+         barrierA->getNextNode() == barrierB && "Expected adjacent barriers");
 
   // Fail if barrierA is used by barrierB, either directly or by implicit
   // capture.
