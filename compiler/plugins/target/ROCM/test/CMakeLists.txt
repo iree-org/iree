@@ -9,6 +9,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "external_function_validation.mlir"
     "smoketest.mlir"
     "target_device_features.mlir"
   TOOLS

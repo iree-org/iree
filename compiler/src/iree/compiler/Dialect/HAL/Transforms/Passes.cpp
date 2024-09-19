@@ -629,6 +629,16 @@ void registerHALPasses() {
                                       transformOptions, PipelineHooks{},
                                       PipelinePhase::Start, PipelinePhase::End);
       });
+  PassPipelineRegistration<TransformOptions>(
+      "iree-hal-post-configuration-transformation-pipeline",
+      "Runs the IREE HAL conversion/lowering pipeline starting from executable "
+      "configurations.",
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildHALTransformPassPipeline(
+            passManager, TargetRegistry::getGlobal(),
+            TargetOptions::FromFlags::get(), transformOptions, PipelineHooks{},
+            PipelinePhase::ExecutableConfigurations, PipelinePhase::End);
+      });
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
