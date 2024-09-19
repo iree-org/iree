@@ -257,8 +257,6 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   Value maskOperand;
   if (expandedOpOperands.size() > 4) {
     maskOperand = expandedOpOperands[4];
-  } else {
-    maskOperand = Value();
   }
 
   // Create a new `AttentionOp` that has the computed operands/indexing maps.
