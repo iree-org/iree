@@ -28,8 +28,8 @@ def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
     ]> {
   let summary = "Synchronizes uses of a shared tensor.";
   let description = [{
-    This op is designed to represent synchronization of workers on a
-    particular shared tensor. This operation naturally arises when combining
+    This op is designed to represent synchronization of workers on the operands
+    and results of the given region. This operation naturally arises when combining
     the regions of producer-consumer `scf.forall` operations that share a
     mapping type.
 
@@ -58,27 +58,26 @@ def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
 
     ```mlir
       %0 = scf.forall (%idy, %idx) in (8, 8) -> (tensor<4x128xf32>) {
-        %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
-        %in = ...
-        %2 = affine.apply #affine_map<(d0) -> (d0 * 2)> (%ids#0)
-        %3 = affine.apply #affine_map<(d0) -> (d0 * 4)> (%ids#1)
-        %4 = affine.apply #affine_map<(d0) -> (d0 * 16)> (%idx)
         %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space<workgroup>}
           : tensor<4x128xf32>
-        %inserted_slice = tensor.insert_slice %in into %alloc[%2, %3] [2, 4] [1, 1]
-          : tensor<2x4xf32> to tensor<4x128xf32>
-        %slice = iree_gpu.barrier_region %inserted_slice {
+        %barrier = iree_gpu.barrier_region %alloc {
         ^bb0(%shared: tensor<4x128xf32>):
-          %slice = tensor.extract_slice %shared[0, %4] [4, 16] [1, 1] : tensor<4x128xf32> to tensor<4x16xf32>
+          %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
+          %in = ...
+          %2 = affine.apply #affine_map<(d0) -> (d0 * 2)> (%ids#0)
+          %3 = affine.apply #affine_map<(d0) -> (d0 * 4)> (%ids#1)
+          %inserted_slice = tensor.insert_slice %in into %shared[%2, %3] [2, 4] [1, 1]
+            : tensor<2x4xf32> to tensor<4x128xf32>
           iree_gpu.yield %slice : tensor<4x16xf32>
         } : tensor<4x128xf32> -> tensor<4x16xf32>
+        %4 = affine.apply #affine_map<(d0) -> (d0 * 16)> (%idx)
+        %slice = tensor.extract_slice %barrier[0, %4] [4, 16] [1, 1] : tensor<4x128xf32> to tensor<4x16xf32>
         ...
       } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
     ```
 
-    A barrier_region can be lowered to two barriers, one on the |dest| input
-    operand, and a second one on the result. Note that the |dest| operand must
-    bufferize with memory space `#gpu.address_space<workgroup>`.
+    A barrier_region can be lowered to two barriers, one on the input operands
+    and a second one on the results.
 
     Movtivation and Intended Use Cases:
 
@@ -92,25 +91,19 @@ def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$dest
+    Variadic<AnyType>:$inputs
   );
   let regions = (region SizedRegion<1>:$region);
-  let results = (outs AnyRankedTensorOrVector:$result);
+  let results = (outs Variadic<AnyType>:$results);
 
   let assemblyFormat = [{
-    $dest $region attr-dict
-    `:` type($dest) `->` type($result)
+    (`ins` `(` $inputs^ `:` type($inputs) `)` )?
+    $region attr-dict `:` type($results)
   }];
 
   let builders = [
-    OpBuilder<(ins "Type":$result_type, "Value":$dest)>
+    OpBuilder<(ins "TypeRange":$result_types, "ValueRange":$inputs)>
   ];
-
-  let extraClassDeclaration = [{
-    RankedTensorType getDestType() {
-      return getDest().getType();
-    }
-  }];
 
   let skipDefaultBuilders = 1;
   let hasVerifier = 1;
@@ -448,14 +441,16 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
 def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
     Pure, ReturnLike, Terminator,
     HasParent<"::mlir::iree_compiler::IREE::GPU::BarrierRegionOp">]> {
-  let summary = "Yield a value from a region";
+  let summary = "Yield values from a region";
   let description = [{
-     This operation is used to yield a single value from a within a region.
+     This operation is used to yield values from a within a region.
   }];
 
-  let arguments = (ins AnyType:$value);
-  let assemblyFormat = "$value attr-dict `:` type($value)";
+  let arguments = (ins Variadic<AnyType>:$values);
   let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat =
+      [{  attr-dict ($values^ `:` type($values))? }];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
