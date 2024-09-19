@@ -654,9 +654,9 @@ struct DistributeBatchOuterToLayoutConversions final
     // Interleave batch and outer dims by transposing.
 
     // Build a permutation for interleaving.
-    SmallVector<int64_t> interleavePermutation(shapeA.size());
-    std::iota(interleavePermutation.begin(), interleavePermutation.end(), 0);
-    for (int i = 0; i < rank; i++) {
+    auto interleavePermutation =
+        llvm::to_vector(llvm::seq<int64_t>(shapeA.size()));
+    for (int i = 0; i < rank; ++i) {
       // Batch tile : [0...rank]
       // OuterTile : [rank+1...2*rank]
       // Interleave : [batch0, outer0, batch1, outer1,...]

@@ -602,7 +602,9 @@ hal.executable private @attention_20x4096x64x4096x64 {
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
+// MEMORY-LABEL: func.func @attention_20x4096x64x4096x64()
 // MEMORY-COUNT-3: memref.alloc
+// MEMORY-NOT: memref.alloc
 
 // -----
 
@@ -655,7 +657,9 @@ hal.executable private @attention_multiple_m_transpose {
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
+// MEMORY-LABEL: func.func @attention_multiple_m_transpose()
 // MEMORY-COUNT-3: memref.alloc
+// MEMORY-NOT: memref.alloc
 
 // -----
 
@@ -708,4 +712,6 @@ hal.executable private @attention_mfma_32x32x8 {
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
 // needed because the intrinsic layout mathes.
+// MEMORY-LABEL: func.func @attention_mfma_32x32x8()
 // MEMORY-COUNT-3: memref.alloc
+// MEMORY-NOT: memref.alloc
