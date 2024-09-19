@@ -4680,11 +4680,11 @@ SPIR-V/LLVM are handled separately.</p>
 <h3 id="iree_gpubarrier_region-gpubarrierregionop"><code>iree_gpu.barrier_region</code> (GPU::BarrierRegionOp)<a class="headerlink" href="#iree_gpubarrier_region-gpubarrierregionop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes uses of a shared tensor.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.barrier_region` $dest $region attr-dict
-              `:` type($dest) `-&gt;` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.barrier_region` (`ins` `(` $inputs^ `:` type($inputs) `)` )?
+              $region attr-dict `:` type($results)
 </code></pre></div>
-<p>This op is designed to represent synchronization of workers on a
-particular shared tensor. This operation naturally arises when combining
+<p>This op is designed to represent synchronization of workers on the operands
+and results of the given region. This operation naturally arises when combining
 the regions of producer-consumer <code>scf.forall</code> operations that share a
 mapping type.</p>
 <p>For example, consider the following pair of parallel loops.
@@ -4708,26 +4708,25 @@ mapping type.</p>
 of these two loops can be merged with a barrier an insert_slice and a
 shuffle where the boundary of the loops currently is.</p>
 <div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
-    %in = ...
-    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%ids#0)
-    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%ids#1)
-    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
     %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space&lt;workgroup&gt;}
       : tensor&lt;4x128xf32&gt;
-    %inserted_slice = tensor.insert_slice %in into %alloc[%2, %3] [2, 4] [1, 1]
-      : tensor&lt;2x4xf32&gt; to tensor&lt;4x128xf32&gt;
-    %slice = iree_gpu.barrier_region %inserted_slice {
+    %barrier = iree_gpu.barrier_region %alloc {
     ^bb0(%shared: tensor&lt;4x128xf32&gt;):
-      %slice = tensor.extract_slice %shared[0, %4] [4, 16] [1, 1] : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
+      %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
+      %in = ...
+      %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%ids#0)
+      %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%ids#1)
+      %inserted_slice = tensor.insert_slice %in into %shared[%2, %3] [2, 4] [1, 1]
+        : tensor&lt;2x4xf32&gt; to tensor&lt;4x128xf32&gt;
       iree_gpu.yield %slice : tensor&lt;4x16xf32&gt;
     } : tensor&lt;4x128xf32&gt; -&gt; tensor&lt;4x16xf32&gt;
+    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
+    %slice = tensor.extract_slice %barrier[0, %4] [4, 16] [1, 1] : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
     ...
   } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
 </code></pre></div>
-<p>A barrier_region can be lowered to two barriers, one on the |dest| input
-operand, and a second one on the result. Note that the |dest| operand must
-bufferize with memory space <code>#gpu.address_space&lt;workgroup&gt;</code>.</p>
+<p>A barrier_region can be lowered to two barriers, one on the input operands
+and a second one on the results.</p>
 <p>Movtivation and Intended Use Cases:</p>
 <p>The primary way this op is generated is when fusing parallel loops with
 tensor results. This operation helps to make lowerings more progressive
@@ -4749,8 +4748,8 @@ and flexible.
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>dest</code></td>
-<td>ranked tensor of any type values</td>
+<td style="text-align: center;"><code>inputs</code></td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -4764,8 +4763,8 @@ and flexible.
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor or vector of any type values</td>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -4978,11 +4977,11 @@ produces.</p>
 </tbody>
 </table>
 <h3 id="iree_gpuyield-gpuyieldop"><code>iree_gpu.yield</code> (GPU::YieldOp)<a class="headerlink" href="#iree_gpuyield-gpuyieldop" title="Permanent link">link</a></h3>
-<p><em>Yield a value from a region</em></p>
+<p><em>Yield values from a region</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` $value attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` attr-dict ($values^ `:` type($values))?
 </code></pre></div>
-<p>This operation is used to yield a single value from a within a region.</p>
+<p>This operation is used to yield values from a within a region.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -4996,8 +4995,8 @@ produces.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>value</code></td>
-<td>any type</td>
+<td style="text-align: center;"><code>values</code></td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
