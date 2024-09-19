@@ -4466,18 +4466,18 @@ who are working on the CI infrastructure itself.</p>
 runs.</p>
 <ul>
 <li>
-<p>Also run GPU tests (opt-in due to low availability):</p>
-<div class="highlight"><pre><span></span><code>ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
-</code></pre></div>
-</li>
-<li>
 <p>Skip all CI builds and tests, e.g. for comment-only changes:</p>
 <div class="highlight"><pre><span></span><code>skip-ci: Comment-only change.
 </code></pre></div>
 </li>
 <li>
-<p>Only run Bazel builds, e.g. for changes only affecting Bazel rules:</p>
-<div class="highlight"><pre><span></span><code>ci-exactly: build_test_all_bazel
+<p>Only run runtime builds:</p>
+<div class="highlight"><pre><span></span><code>ci-exactly: runtime
+</code></pre></div>
+</li>
+<li>
+<p>Only run ONNX tests:</p>
+<div class="highlight"><pre><span></span><code>ci-exactly: build_packages,test_onnx
 </code></pre></div>
 </li>
 </ul>
