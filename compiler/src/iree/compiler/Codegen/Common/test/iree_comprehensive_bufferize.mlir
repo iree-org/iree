@@ -2797,3 +2797,72 @@ func.func @multi_tensor_barrier() -> vector<2xf32> {
 //  CHECK-NEXT:   gpu.barrier
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC0]]
 //  CHECK-NEXT:   vector.transfer_read %[[ALLOC1]]
+
+// -----
+
+func.func @barrier_region(%x: index, %y: index) -> vector<3x2xf32> {
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %init = bufferization.alloc_tensor() : tensor<6x6xf32>
+  %0 = iree_gpu.barrier_region ins(%init : tensor<6x6xf32>) {
+  ^bb0(%intermediate: tensor<6x6xf32>):
+    %slice = tensor.extract_slice %intermediate[%x, %y] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
+    %read = vector.transfer_read %slice[%c0, %c0], %cst0 {in_bounds = [true, true]} : tensor<3x2xf32>, vector<3x2xf32>
+    iree_gpu.yield %read : vector<3x2xf32>
+  } : vector<3x2xf32>
+  return %0 : vector<3x2xf32>
+}
+
+// CHECK-LABEL: func @barrier_region
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc()
+//       CHECK:   gpu.barrier
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[SUBVIEW]]
+//       CHECK:   gpu.barrier
+//       CHECK:   return %[[READ]]
+
+// -----
+
+func.func @barrier_region_tensor_result(%x: index) -> vector<3xf32> {
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %init = bufferization.alloc_tensor() : tensor<6xf32>
+  %0 = iree_gpu.barrier_region ins(%init : tensor<6xf32>) {
+  ^bb0(%intermediate: tensor<6xf32>):
+    %slice = tensor.extract_slice %intermediate[%x] [3] [1] : tensor<6xf32> to tensor<3xf32>
+    iree_gpu.yield %slice : tensor<3xf32>
+  } : tensor<3xf32>
+  %read = vector.transfer_read %0[%c0], %cst0 {in_bounds = [true]} : tensor<3xf32>, vector<3xf32>
+  return %read : vector<3xf32>
+}
+
+// CHECK-LABEL: func @barrier_region_tensor_result
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc()
+//       CHECK:   gpu.barrier
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]]
+//       CHECK:   gpu.barrier
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[SUBVIEW]]
+//       CHECK:   return %[[READ]]
+
+// -----
+
+func.func @barrier_region_in_place() -> vector<2x3xf32> {
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %init = bufferization.alloc_tensor() : tensor<6xf32>
+  %0 = iree_gpu.barrier_region ins(%init : tensor<6xf32>) {
+  ^bb0(%intermediate: tensor<6xf32>):
+    %slice = tensor.expand_shape %intermediate [[0, 1]] output_shape [2, 3] : tensor<6xf32> into tensor<2x3xf32>
+    iree_gpu.yield %slice : tensor<2x3xf32>
+  } : tensor<2x3xf32>
+  %read = vector.transfer_read %0[%c0, %c0], %cst0 {in_bounds = [true, true]} : tensor<2x3xf32>, vector<2x3xf32>
+  return %read : vector<2x3xf32>
+}
+
+// CHECK-LABEL: func @barrier_region_in_place
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc()
+//       CHECK:   gpu.barrier
+//       CHECK:   %[[EXPAND:.+]] = memref.expand_shape %[[ALLOC]]
+//       CHECK:   gpu.barrier
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[EXPAND]]
+//       CHECK:   return %[[READ]]
