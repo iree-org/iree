@@ -182,9 +182,12 @@ void GPUDistributeForallPass::runOnOperation() {
                       std::multiplies<int64_t>());
   int64_t subgroupSize = *maybeSubgroupSize;
 
-  if (flatWorkgroupSize % subgroupSize != 0) {
-    funcOp.emitOpError(
-        "Invalid workgroup size is not divisible by subgroup size.");
+  if (flatWorkgroupSize % subgroupSize != 0 &&
+      llvm::any_of(forallOps, [](scf::ForallOp forall) {
+        return forallOpHasMappingType<gpu::GPUWarpMappingAttr>(forall);
+      })) {
+    funcOp.emitOpError("Invalid workgroup size is not divisible by subgroup "
+                       "size for warp distribution.");
     return signalPassFailure();
   }
 

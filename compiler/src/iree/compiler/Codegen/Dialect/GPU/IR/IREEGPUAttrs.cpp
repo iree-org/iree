@@ -1348,6 +1348,10 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
               .empty();
 }
 
+bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
+  return !getWorkgroupTileSizes().empty();
+}
+
 constexpr StringLiteral kMmaKindName = "mma_kind";
 
 IREE::GPU::MmaInterfaceAttr LoweringConfigAttr::getMmaKind() const {

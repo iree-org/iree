@@ -323,6 +323,10 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
   return !getTileSizeVals(level).empty();
 }
 
+bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
+  return !getWorkgroupTileSizes().empty();
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,
