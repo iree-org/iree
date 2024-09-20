@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -40,36 +39,6 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Whether to link hal.executable ops together."),
       llvm::cl::init(true),
   };
-  Option<PipelinePhase> start{
-      *this,
-      "start",
-      llvm::cl::desc("Start compilation from the specified phase."),
-      llvm::cl::values(
-          clEnumValN(PipelinePhase::Start, "start",
-                     "Start from pipeline entry point"),
-          clEnumValN(PipelinePhase::ExecutableSources, "executable-sources",
-                     "Start from executable sources"),
-          clEnumValN(PipelinePhase::ExecutableConfigurations,
-                     "executable-configurations",
-                     "Start from executable configurations"),
-          clEnumValN(PipelinePhase::ExecutableTargets, "executable-targets",
-                     "Start from executable targets")),
-      llvm::cl::init(PipelinePhase::Start),
-  };
-  Option<PipelinePhase> stop{
-      *this, "stop",
-      llvm::cl::desc("Start compilation after the specified phase."),
-      llvm::cl::values(
-          clEnumValN(PipelinePhase::ExecutableSources, "executable-sources",
-                     "Stop after executable sources"),
-          clEnumValN(PipelinePhase::ExecutableConfigurations,
-                     "executable-configurations",
-                     "Stop after executable configurations"),
-          clEnumValN(PipelinePhase::ExecutableTargets, "executable-targets",
-                     "Stop after executable targets"),
-          clEnumValN(PipelinePhase::End, "end",
-                     "Run until the end of the pipeline")),
-      llvm::cl::init(PipelinePhase::End)};
 };
 
 static llvm::cl::opt<bool> clMemoization{
@@ -322,9 +291,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TargetRegistry &targetRegistry,
                                    const TargetOptions &targetOptions,
                                    const TransformOptions &transformOptions,
-                                   PipelineHooks hooks) {
-  PipelinePhase compileFrom = transformOptions.start;
-  PipelinePhase compileTo = transformOptions.stop;
+                                   PipelineHooks hooks,
+                                   PipelinePhase compileFrom,
+                                   PipelinePhase compileTo) {
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
@@ -603,10 +572,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    PipelinePhase compileFrom,
                                    PipelinePhase compileTo) {
   TransformOptions transformOptions;
-  transformOptions.start = compileFrom;
-  transformOptions.stop = compileTo;
   buildHALTransformPassPipeline(passManager, targetRegistry, targetOptions,
-                                transformOptions, hooks);
+                                transformOptions, hooks, compileFrom,
+                                compileTo);
 }
 
 //===----------------------------------------------------------------------===//
@@ -654,11 +622,12 @@ void registerHALPasses() {
                              });
   PassPipelineRegistration<TransformOptions>(
       "iree-hal-transformation-pipeline",
-      "Runs the IREE HAL conversion/lowering pipeline.",
+      "Runs the full IREE HAL conversion/lowering pipeline.",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
         buildHALTransformPassPipeline(passManager, TargetRegistry::getGlobal(),
                                       TargetOptions::FromFlags::get(),
-                                      transformOptions, PipelineHooks{});
+                                      transformOptions, PipelineHooks{},
+                                      PipelinePhase::Start, PipelinePhase::End);
       });
 }
 
