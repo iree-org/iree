@@ -37,7 +37,7 @@ target_link_libraries(${_NAME}
 
 target_link_options(${_NAME} PRIVATE
   # https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html#interacting-with-code-ccall-cwrap
-  "-sEXPORTED_FUNCTIONS=['_setup_sample', '_cleanup_sample', '_load_program', '_inspect_program', '_unload_program', '_call_function', '_malloc']"
+  "-sEXPORTED_FUNCTIONS=['_setup_sample', '_cleanup_sample', '_load_program', '_inspect_program', '_unload_program', '_call_function', '_malloc', '_free']"
   "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString']"
   #
   "-sASSERTIONS=1"
