@@ -153,7 +153,9 @@ def DecomposePackUnPackOpsPass :
   let summary = "Decompose pack/unpack ops into vectorizable ops";
   let options = [
     Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
-           "Always apply tiling to make outer dimension be ones">
+           "Always apply tiling to make outer dimension be ones">,
+    Option<"useOnlyReshapes", "use-only-reshapes", "bool", "false",
+           "Use decomposition into reshape ops, even when packing unit dimensions.">
   ];
 }
 
