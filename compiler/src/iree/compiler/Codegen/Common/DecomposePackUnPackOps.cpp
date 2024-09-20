@@ -19,6 +19,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-decompose-pack-unpack-ops"
@@ -35,8 +36,15 @@ namespace {
 struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
 
+  explicit LowerPackPattern(MLIRContext *context,
+                            std::optional<PackUnPackControlFn> controlFn)
+      : OpRewritePattern(context), controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(tensor::PackOp op,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn && failed(controlFn.value()(op))) {
+      return failure();
+    }
     FailureOr<linalg::LowerPackResult> res = linalg::lowerPack(rewriter, op);
     if (failed(res)) {
       return rewriter.notifyMatchFailure(
@@ -44,6 +52,9 @@ struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
     }
     return success();
   }
+
+private:
+  std::optional<PackUnPackControlFn> controlFn;
 };
 
 /// A warpper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
@@ -52,8 +63,15 @@ struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
 struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
   using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
 
+  explicit LowerUnPackPattern(MLIRContext *context,
+                              std::optional<PackUnPackControlFn> controlFn)
+      : OpRewritePattern(context), controlFn(controlFn) {}
+
   LogicalResult matchAndRewrite(tensor::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
+    if (controlFn && failed(controlFn.value()(op))) {
+      return failure();
+    }
     FailureOr<linalg::LowerUnPackOpResult> res =
         linalg::lowerUnPack(rewriter, op);
     if (failed(res)) {
@@ -62,14 +80,21 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
     }
     return success();
   }
+
+private:
+  std::optional<PackUnPackControlFn> controlFn;
 };
 
 struct DecomposePackUnPackOpsPass final
     : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
   using impl::DecomposePackUnPackOpsPassBase<
       DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
-  explicit DecomposePackUnPackOpsPass(bool tileOuterToOne) {
+  explicit DecomposePackUnPackOpsPass(
+      bool tileOuterToOne, bool useOnlyReshapes,
+      std::optional<PackUnPackControlFn> controlFn) {
     this->tileOuterToOne = tileOuterToOne;
+    this->useOnlyReshapes = useOnlyReshapes;
+    this->controlFn = controlFn;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
@@ -77,6 +102,9 @@ struct DecomposePackUnPackOpsPass final
   }
 
   void runOnOperation() override;
+
+private:
+  std::optional<PackUnPackControlFn> controlFn;
 };
 
 } // namespace
@@ -86,7 +114,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   // Generalization patterns for outer unit dims have higher priority because
   // they do not generate reshape ops.
-  {
+  if (!useOnlyReshapes) {
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
@@ -102,7 +130,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   // tiled to one.
   if (!tileOuterToOne) {
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
+    patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx, controlFn);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
@@ -136,6 +164,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               return tileSizes;
             }));
     funcOp->walk([&](tensor::PackOp op) {
+      if (controlFn && failed(controlFn.value()(op))) {
+        return;
+      }
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
           scf::tileConsumerAndFuseProducersUsingSCF(
               rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
@@ -161,6 +192,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               return tileSizes;
             });
     funcOp->walk([&](tensor::UnPackOp op) {
+      if (controlFn && failed(controlFn.value()(op))) {
+        return;
+      }
       FailureOr<scf::SCFTilingResult> tilingResult =
           scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
                             unpackTilingOptions);
@@ -197,8 +231,12 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(ctx);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    if (useOnlyReshapes) {
+      patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx, controlFn);
+    } else {
+      patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
+                   linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -206,8 +244,10 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
-  return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
+createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
+                                 std::optional<PackUnPackControlFn> controlFn) {
+  return std::make_unique<DecomposePackUnPackOpsPass>(
+      tileOuterToOne, useOnlyReshapes, controlFn);
 }
 
 } // namespace mlir::iree_compiler

@@ -36,6 +36,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
@@ -369,6 +370,21 @@ public:
     mpm.run(module, mam);
   }
 
+  LogicalResult
+  validateFinalizedModule(IREE::HAL::ExecutableVariantOp variantOp,
+                          llvm::Module &module) {
+    for (llvm::Function &func : module.functions()) {
+      if (func.isDeclaration() && !func.isIntrinsic() && !func.use_empty()) {
+        llvm::User *liveUser = *func.user_begin();
+        return variantOp.emitError()
+               << "found an unresolved external function '" << func.getName()
+               << "' in the final bitcode. A remaining live user is\n"
+               << llvm::formatv("{0}", *liveUser);
+      }
+    }
+    return success();
+  }
+
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
@@ -577,6 +593,10 @@ public:
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),
                          ".optimized.ll", *llvmModule);
+      }
+
+      if (failed(validateFinalizedModule(variantOp, *llvmModule))) {
+        return failure();
       }
 
       // Dump the assembly output.

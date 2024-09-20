@@ -348,7 +348,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
   funcPassManager.addPass(
-      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false));
+      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false,
+                                       /*useOnlyReshapes=*/true,
+                                       /*controlFn=*/std::nullopt));
 
   // Step 3.5. Expand the inner dimensions of MultiMma ops in preparation for
   // distribution to lanes.
@@ -868,7 +870,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Preprocessing for vector distribution.
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
-  funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUConfigureVectorLayoutsPass());
@@ -945,7 +946,9 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(
-      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
+      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true,
+                                       /*useOnlyReshapes=*/false,
+                                       /*controlFn=*/std::nullopt));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   addGPUVectorizationPasses(funcPassManager);

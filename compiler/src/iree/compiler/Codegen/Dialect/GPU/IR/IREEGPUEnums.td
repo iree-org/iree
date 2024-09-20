@@ -144,6 +144,15 @@ def IREEGPU_MMAFragment : IREEGPU_I32MmaEnumAttr<"MMAFragment",
       MMA_ACC
     ]>;
 
+def MMA_Workgroup : I32EnumAttrCase<"Workgroup", 0>;
+def MMA_Subgroup : I32EnumAttrCase<"Subgroup", 1>;
+
+def IREEGPU_MMAScope : IREEGPU_I32MmaEnumAttr<"MMAScope",
+    "Descriptor for a particular scope of an MMA operation", [
+      MMA_Workgroup,
+      MMA_Subgroup
+    ]>;
+
 //===----------------------------------------------------------------------===//
 // Tiling levels
 
