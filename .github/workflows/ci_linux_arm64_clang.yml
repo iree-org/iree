@@ -37,10 +37,6 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - arm64
       - os-family=Linux
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:48654cf56d6ec28788ea35d80b0546b1ef57281d7998dbe94b78fd4a5f2d33f0
-    defaults:
-      run:
-        shell: bash
     env:
       BUILD_DIR: build-arm64
     steps:
@@ -48,21 +44,22 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: Set up QEMU
-        run: |
-          wget --no-verbose "https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files/qemu-aarch64"
-          chmod +x ./qemu-aarch64
-          cp ./qemu-aarch64 /usr/bin/qemu-aarch64
-      - name: Install Python requirements
-        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Building IREE"
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          CCACHE_NAMESPACE: ci_linux_arm64_clang
         run: |
-          export IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)
-          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=ci_linux_arm64_clang" \
+            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
       - name: "Testing IREE"
-        env:
-          IREE_ARM_SME_QEMU_AARCH64_BIN: /usr/bin/qemu-aarch64
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
