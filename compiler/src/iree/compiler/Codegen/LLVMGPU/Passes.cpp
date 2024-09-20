@@ -33,6 +33,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -1099,6 +1100,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   if (forROCDL) {
     // convert to ROCDL.
     modulePassManager.addPass(createConvertToROCDLPass());
+    modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
+        createROCDLAnnotateKernelForTranslationPass());
   } else {
     // convert to NVVM.
     modulePassManager.addPass(createConvertToNVVMPass());
