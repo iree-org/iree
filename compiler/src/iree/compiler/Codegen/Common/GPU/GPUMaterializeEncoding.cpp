@@ -489,7 +489,7 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,
            Location) -> FailureOr<MaterializeEncodingValueInfo> { return {}; };
-    populateIREEMaterializeEncodingIntoPackUnPackPatterns(
+    populateShapeLikeMaterializeEncodingPatterns(
         patterns, target, typeConverter, materializeEncodingValueFn);
 
     patterns.insert<GPUSetEncodingOpLoweringConversion,
