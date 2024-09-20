@@ -124,6 +124,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms

@@ -558,6 +558,7 @@ func.func @distribute_multi_result_generic(
 //  THREAD-SAME:       outs(%{{.*}}, %{{.*}}: tensor<1x1x?xf32>, tensor<1x1x?xf32>)
 //       THREAD:   return %[[FORALL]]#0, %[[FORALL]]#1
 
+<<<<<<< HEAD
 //  -----
 
 func.func @dont_yield_replacement_in_reduction_tiling(%arg0: tensor<4x77xbf16>, %arg1: tensor<4x77xf32>) -> (tensor<4x77xf32>, tensor<4xf32>) {
@@ -594,3 +595,108 @@ func.func @dont_yield_replacement_in_reduction_tiling(%arg0: tensor<4x77xbf16>, 
 // Note: if we yield replacement then we would see a large result of
 // tensor<4x77xf32> also being yielded which is not what we want in such a case.
 //   CHECK-SAME:  -> (tensor<4xf32>) {
+=======
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @cleanup_slices(%3: tensor<260x70xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32> {
+    %empty = tensor.empty() : tensor<70x260xf32>
+    %transpose = linalg.transpose ins(%3 : tensor<260x70xf32>) outs(%empty : tensor<70x260xf32>) permutation = [1, 0]
+    %slice = tensor.extract_slice %transpose [0, 0] [64, 256] [1, 1] : tensor<70x260xf32> to tensor<64x256xf32>
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%slice, %4 : tensor<64x256xf32>, tensor<64x256xf32>) outs(%5 : tensor<64x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<64x256xf32>
+    return %6 : tensor<64x256xf32>
+  }
+}
+
+// THREAD-LABEL: func.func @cleanup_slices
+//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (2, 16)
+//       THREAD:     linalg.transpose ins(%{{.*}}: tensor<16x2xf32>)
+//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [1, 1, 5]}>
+module {
+  func.func @swap_expand_shape_with_extract_slice(%0: tensor<60xf32>) -> tensor<2x3x10xf32> {
+    %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [2, 3, 10] : tensor<60xf32> into tensor<2x3x10xf32>
+    %empty = tensor.empty() : tensor<2x3x10xf32>
+    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<2x3x10xf32>) outs(%empty : tensor<2x3x10xf32>) -> tensor<2x3x10xf32>
+    return %exp : tensor<2x3x10xf32>
+  }
+}
+
+// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice
+//       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]], %[[Z:[A-Za-z0-9]+]])
+//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1, d2) -> (d0 + d1 * 30 + d2 * 10)>(%[[Z]], %[[X]], %[[Y]])
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
+//       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 1, 5]
+//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [1, 2, 0]}>
+module {
+  func.func @swap_expand_shape_with_extract_slice_full_inner_dim(%0: tensor<120xf32>) -> tensor<3x4x10xf32> {
+    %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [3, 4, 10] : tensor<120xf32> into tensor<3x4x10xf32>
+    %empty = tensor.empty() : tensor<3x4x10xf32>
+    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
+    return %exp : tensor<3x4x10xf32>
+  }
+}
+
+// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice
+//       THREAD:   scf.forall (%[[X:[A-Za-z0-9]+]], %[[Y:[A-Za-z0-9]+]])
+//       THREAD:     %[[APPLY:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[X]], %[[Y]])
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
+//       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 2, 10]
+//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [1, 2, 5]}>
+module {
+  func.func @no_swap_expand_shape_with_extract_slice_non_contiguous(%0: tensor<120xf32>) -> tensor<3x4x10xf32> {
+    %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [3, 4, 10] : tensor<120xf32> into tensor<3x4x10xf32>
+    %empty = tensor.empty() : tensor<3x4x10xf32>
+    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
+    return %exp : tensor<3x4x10xf32>
+  }
+}
+
+// THREAD-LABEL: func.func @no_swap_expand_shape_with_extract_slice_non_contiguous
+//       THREAD:   tensor.expand_shape
+//       THREAD:   scf.forall
+//       THREAD:     linalg.exp
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [1, 2, 0, 1, 4]}>
+module {
+  func.func @swap_expand_shape_with_extract_slice_multiple_groups(%0: tensor<120x56xf32>) -> tensor<3x4x10x7x8xf32> {
+    %expand = tensor.expand_shape %0 [[0, 1, 2], [3, 4]] output_shape [3, 4, 10, 7, 8] : tensor<120x56xf32> into tensor<3x4x10x7x8xf32>
+    %empty = tensor.empty() : tensor<3x4x10x7x8xf32>
+    %exp = linalg.exp {lowering_config = #config}
+      ins(%expand : tensor<3x4x10x7x8xf32>) outs(%empty : tensor<3x4x10x7x8xf32>) -> tensor<3x4x10x7x8xf32>
+    return %exp : tensor<3x4x10x7x8xf32>
+  }
+}
+
+// THREAD-LABEL: func.func @swap_expand_shape_with_extract_slice_multiple_groups
+//       THREAD:   scf.forall (%[[ID0:[A-Za-z0-9]+]], %[[ID1:[A-Za-z0-9]+]], %[[ID2:[A-Za-z0-9]+]], %[[ID3:[A-Za-z0-9]+]])
+//       THREAD:     %[[APPLY0:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 40 + d1 * 10)>(%[[ID0]], %[[ID1]])
+//       THREAD:     %[[APPLY1:.+]] = affine.apply affine_map<(d0, d1) -> (d0 * 8 + d1)>(%[[ID2]], %[[ID3]])
+//       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[APPLY0]], %[[APPLY1]]] [20, 4] [1, 1]
+//       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2], [3, 4]] output_shape [1, 2, 10, 1, 4]
+//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+>>>>>>> e6e562d39b ([Codegen][GPU] Add reshape fusion and cleanup to tiling pass)
