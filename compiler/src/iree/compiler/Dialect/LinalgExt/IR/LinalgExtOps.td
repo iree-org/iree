@@ -466,10 +466,14 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let description = [{
     Computes the scaled dot product attention function:
 
-    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V
+    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
 
-    Here Q, K, V, M are given tensors and scale is a scalar value specifying
+    Here Q, K, V are given tensors and scale is a scalar value specifying
     the scale to use.
+
+    If an additional mask argument M is included, the result of the first matmul is modified according to:
+
+    Q @ K.T += M
 
     For self-attention, all inputs and the result have the same shape BxNxd
     where B is the batch dimension, N is the sequence length and d is head
@@ -488,7 +492,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
     and we can expect computation to look like:
 
-    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V.T
+    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -674,13 +678,17 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let description = [{
     Traditional scaled dot product attention computes:
 
-    attention(Q, K, V, scale, M?) = softmax(Q @ K.T * scale + M) @ V
+    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
 
     Online Attention on the other hand, uses an online normalizer instead of
     softmax:
 
-    online_attention(Q, K, V, scale, M?, running_max, running_sum)
-      = online_normalizer(Q @ K.T * scale + M, running_max, running_sum) @ V
+    online_attention(Q, K, V, scale, running_max, running_sum)
+      = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
+
+    If an additional mask argument M is included, the result of the first matmul is modified according to:
+
+    Q @ K.T += M
 
     The advantage of this online_normalizer is that it can be tiled along
     its reduction dimension, making the online_attention operator:

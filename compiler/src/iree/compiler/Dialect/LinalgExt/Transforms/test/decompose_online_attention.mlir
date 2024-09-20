@@ -178,14 +178,14 @@ func.func @attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-func.func @attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
-                         %key: tensor<192x1024x64xf8E4M3FNUZ>,
-                         %value: tensor<192x1024x64xf8E4M3FNUZ>,
-                         %mask: tensor<192x1024x1024xf8E4M3FNUZ>,
-                         %output: tensor<192x1024x64xf32>,
-                         %max: tensor<192x1024xf32>,
-                         %sum: tensor<192x1024xf32>)
-                         -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+func.func @attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
+                              %key: tensor<192x1024x64xf8E4M3FNUZ>,
+                              %value: tensor<192x1024x64xf8E4M3FNUZ>,
+                              %mask: tensor<192x1024x1024xf8E4M3FNUZ>,
+                              %output: tensor<192x1024x64xf32>,
+                              %max: tensor<192x1024xf32>,
+                              %sum: tensor<192x1024xf32>)
+                              -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
   %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
@@ -196,7 +196,7 @@ func.func @attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 
   return %out#0, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
 }
-// CHECK-LABEL: @attention_f8
+// CHECK-LABEL: @attention_f8_masked
 // S = Q @ K
 // CHECK: linalg.generic
 // CHECK:   arith.extf %[[A:.+]] : f8E4M3FNUZ to f32

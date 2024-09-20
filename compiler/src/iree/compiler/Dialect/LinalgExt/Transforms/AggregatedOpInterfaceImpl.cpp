@@ -212,7 +212,9 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
           maskVal = b.create<arith::MulFOp>(loc, maskVal, log2e);
         }
         // Finally, set the returned value to the qk element plus the mask
-        // element (or 0/-infinity if bool mask)
+        // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
+        // of a SelectFOp to stay consistent with the additive definition of
+        // attention masking)
         Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
         b.create<linalg::YieldOp>(loc, add);
       });
