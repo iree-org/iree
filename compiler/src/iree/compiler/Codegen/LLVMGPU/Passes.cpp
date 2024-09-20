@@ -868,7 +868,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Preprocessing for vector distribution.
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
-  funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUConfigureVectorLayoutsPass());
