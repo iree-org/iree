@@ -104,7 +104,7 @@ struct DecomposePackUnPackOpsPass final
   void runOnOperation() override;
 
 private:
-  std::optional<PackUnPackControlFn> controlFn = std::nullopt;
+  std::optional<PackUnPackControlFn> controlFn;
 };
 
 } // namespace
