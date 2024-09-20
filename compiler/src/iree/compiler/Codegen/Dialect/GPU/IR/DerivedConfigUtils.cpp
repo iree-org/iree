@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -32,52 +33,69 @@ getVectorSizeTileSizes(int64_t rank, int64_t innerDimSize, int64_t vectorSize) {
   return tileSizes;
 }
 
+/// Derives the tiles sizes to use based on loop ranges, the number of threads,
+/// and the optimal vector size. If |allowMultiDimCollapse| is true then this
+/// will attempt to split the optimal vector size along multiple complete dims.
+///
+/// For example, with a vector size of 8 and loop ranges of [64 x 2 x 4] this
+/// would return tile sizes of [1, 2, 4] if |allowMultiDimCollapse| is true and
+/// [1, 1, 4] otherwise. If the loop ranges were instead [64 x 4 x 4] this
+/// would give tile sizes of [1, 1, 4] no matter what because we won't be able
+/// to collapse the vector.transfer_read that results from this choice of tile
+/// size.
 static SmallVector<int64_t>
-getThreadTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
-                                 int64_t numThreads, int64_t vectorSize) {
+getVectorTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
+                                 int64_t numThreads, int64_t vectorSize,
+                                 bool allowMultiDimCollapse = true) {
+  // If any loop ranges are dynamic, default to a simple vector size based
+  // tile size.
   if (llvm::any_of(loopRanges,
                    [](int64_t s) { return ShapedType::isDynamic(s); })) {
     return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
                                   vectorSize);
   }
 
+  // If the number of loop trips are indivisible by the number of threads then
+  // also default to just the vector size (i.e. [1, ..., 1, vector_size]).
   int64_t flatNumTrips = std::accumulate(loopRanges.begin(), loopRanges.end(),
                                          1, std::multiplies<int64_t>());
   if (flatNumTrips % numThreads != 0) {
     return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
                                   vectorSize);
   }
-  int64_t maxVectorSize = flatNumTrips / numThreads;
+  SmallVector<int64_t> tileSizes(loopRanges.size(), 1);
 
-  while (maxVectorSize % vectorSize != 0) {
-    vectorSize /= 2;
+  // Let the maximum possible vector size be the minimum between:
+  //   - The requested vector size
+  //   - The maximum vector size that avoids an exec mask
+  int64_t maxVectorSize = std::min(vectorSize, flatNumTrips / numThreads);
+
+  // Bail out to unit vector sizes if the inner most loop range is not divisible
+  // by the vector size or vice-versa.
+  int64_t innerMostRange = loopRanges.back();
+  if (innerMostRange % maxVectorSize != 0 &&
+      maxVectorSize % innerMostRange != 0) {
+    return tileSizes;
   }
 
-  SmallVector<int64_t> tileSizes(loopRanges.size(), 0);
-  int64_t residualNumThreads = numThreads;
-  int i = tileSizes.size() - 1;
-  // Set as many inner tile sizes to 0 as possible to use the full vectorSize.
-  while (i >= 0) {
-    if (loopRanges[i] > vectorSize) {
-      tileSizes[i] = vectorSize;
-      residualNumThreads = numThreads / (loopRanges.back() / vectorSize);
-      --i;
-      break;
-    }
-    tileSizes[i] = 0;
-    vectorSize /= loopRanges[i];
-    --i;
+  // Let the inner most tile size be the smaller of the target vector size
+  // and the inner most loop range. If |allowMultiDimCollapse| is false, return
+  // here.
+  tileSizes.back() = std::min(innerMostRange, maxVectorSize);
+  if (innerMostRange >= maxVectorSize || !allowMultiDimCollapse) {
+    return tileSizes;
   }
-  // Set as many remaining tile sizes to 1 as possible to use all threads.
-  while (i >= 0) {
-    if (loopRanges[i] >= residualNumThreads) {
-      tileSizes[i] = loopRanges[i] / residualNumThreads;
-      residualNumThreads = 1;
+
+  maxVectorSize = maxVectorSize / innerMostRange;
+  for (int64_t i = loopRanges.size() - 2, e = 0; i >= e; --i) {
+    // Only increase the tile size if the remaining vector size is divisible
+    // by the loop range (and thus range <= remaining vector size).
+    int64_t range = loopRanges[i];
+    if (maxVectorSize % range != 0) {
       break;
     }
-    tileSizes[i] = 1;
-    residualNumThreads /= loopRanges[i];
-    --i;
+    tileSizes[i] = range;
+    maxVectorSize = maxVectorSize / range;
   }
 
   return tileSizes;
@@ -96,7 +114,7 @@ SmallVector<int64_t> deriveLinalgOpThreadTileSizes(linalg::LinalgOp linalgOp,
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(linalgOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
-  return getThreadTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
+  return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
 }
 
 SmallVector<int64_t>
@@ -105,15 +123,14 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   if (!im2colOp.hasPureTensorSemantics()) {
     return {};
   }
-  // TODO(Max191): Add `getStaticLoopRanges` to TilingInterface, and use it
-  // here instead of `im2colOp.getOutputType().getShape()`. Then we can also
-  // get rid of the specialization for Im2colOp vs LinalgOp and just use
-  // TilingInterface ops.
   SmallVector<int64_t> loopRanges(im2colOp.getOutputType().getShape());
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(im2colOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
-  return getThreadTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
+  // Im2col cannot coalesce past the inner most dim so always default to only
+  // the inner most tile size being the vector size (or smaller).
+  return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize,
+                                          /*allowMultiDimCollapse=*/false);
 }
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {

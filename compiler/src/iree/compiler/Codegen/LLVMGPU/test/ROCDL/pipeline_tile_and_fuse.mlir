@@ -268,10 +268,10 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
 //       CHECK:     gpu.barrier
-//   CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<2x8xf16>
-//   CHECK-DAG:     vector.transfer_write %[[LHS_RD]]
-//   CHECK-DAG:     %[[RHS_RD:.+]] = vector.transfer_read %[[B1]]{{.*}} vector<2x8xf16>
-//   CHECK-DAG:     vector.transfer_write %[[RHS_RD]]
+//   CHECK-DAG:     vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
+//   CHECK-DAG:     vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
+//   CHECK-DAG:     vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
+//   CHECK-DAG:     vector.transfer_read %[[B1]]{{.*}} vector<8xf16>
 //       CHECK:     gpu.barrier
 //   CHECK-DAG:     vector.transfer_read {{.*}} vector<2x1x2x16xf16>
 //   CHECK-DAG:     vector.transfer_read {{.*}} vector<2x1x2x16xf16>

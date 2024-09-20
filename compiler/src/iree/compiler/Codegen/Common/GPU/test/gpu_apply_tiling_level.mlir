@@ -228,8 +228,8 @@ module {
 //   CHECK-NOT:   scf.for
 
 // THREAD-LABEL: func.func @inferred_add_tensor
-//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (8, 4)
-//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
+//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (1, 4)
+//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<1x4xf32>, tensor<1x4xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
@@ -307,10 +307,77 @@ module {
 }
 
 // THREAD-LABEL: func.func @inferred_small_inner_dim_fill_vector_sizes
-//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (16, 8, 4, 16) step (8, 1, 1, 1)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<4x8x1x1x1x2x4xf16>) outs({{.*}} : tensor<4x8x1x1x1x2x4xf16>)
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0, 0, 0, 0) to (4, 16, 8, 4, 16, 2, 4) step (1, 1, 1, 1, 1, 2, 4)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x1x1x2x4xf16>) outs({{.*}} : tensor<1x1x1x1x1x2x4xf16>)
 //       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, #gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_6>, {{.*}}, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_small_inner_dim_dont_fill_non_contiguous(
+    %0: tensor<4x16x4x4xf16>, %1: tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<4x16x4x4xf16>)
+        outs(%1 : tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
+    return %2 : tensor<4x16x4x4xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_small_inner_dim_dont_fill_non_contiguous
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (4, 16, 4, 4) step (1, 1, 1, 4)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x4xf16>) outs({{.*}} : tensor<1x1x1x4xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, {{.*}}, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_unaligned(%0: tensor<70xf16>, %1: tensor<70xf16>) -> tensor<70xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<70xf16>)
+        outs(%1 : tensor<70xf16>) -> tensor<70xf16>
+    return %2 : tensor<70xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_unaligned
+//       THREAD:   scf.forall ({{.*}}) = (0) to (70) step (8)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<?xf16>) outs({{.*}} : tensor<?xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_smaller_load(%0: tensor<128xf16>, %1: tensor<128xf16>) -> tensor<128xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<128xf16>)
+        outs(%1 : tensor<128xf16>) -> tensor<128xf16>
+    return %2 : tensor<128xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_smaller_load
+//       THREAD:   scf.forall ({{.*}}) = (0) to (128) step (2)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<2xf16>) outs({{.*}} : tensor<2xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
 
 // -----
 
