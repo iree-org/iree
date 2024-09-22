@@ -4267,7 +4267,7 @@ also supports permuting the tiled loops.</p>
 <p><em>Attention operator</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
-              `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+              `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)? `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )? `)`
               `outs` `(` $outputs `:` type($outputs) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
@@ -4275,6 +4275,8 @@ also supports permuting the tiled loops.</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V</p>
 <p>Here Q, K, V are given tensors and scale is a scalar value specifying
 the scale to use.</p>
+<p>If an additional mask argument M is included, the result of the first matmul is modified according to:</p>
+<p>Q @ K.T += M</p>
 <p>For self-attention, all inputs and the result have the same shape BxNxd
 where B is the batch dimension, N is the sequence length and d is head
 dimension. Typically N &gt;&gt;&gt; d. Usually, this operator also performs
@@ -4290,6 +4292,7 @@ for example, if V has indexing_map of (m, k1, k2, n) -&gt; (n, k2) instead
 of (m, k1, k2, n) -&gt; (k2, n), then we'd know that V is transposed (V.T),
 and we can expect computation to look like:</p>
 <p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
@@ -4321,6 +4324,10 @@ and we can expect computation to look like:</p>
 <tr>
 <td style="text-align: center;"><code>scale</code></td>
 <td>floating-point</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>mask</code></td>
+<td>shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
@@ -4520,7 +4527,7 @@ Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, 
 <p><em>Online Attention operator</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.online_attention` attr-dict
-              `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+              `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
               `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
@@ -4530,8 +4537,10 @@ Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, 
 softmax:</p>
 <p>online_attention(Q, K, V, scale, running_max, running_sum)
   = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V</p>
+<p>If an additional mask argument M is included, the result of the first matmul is modified according to:</p>
+<p>Q @ K.T += M</p>
 <p>The advantage of this online_normalizer is that it can be tiled along
-it's reduction dimension, making the online_attention operator:
+its reduction dimension, making the online_attention operator:
   - Tilable along softmax reduction dimension
   - Associative along softmax reduction dimension
   - Commutative along softmax associative dimension</p>
@@ -4570,6 +4579,10 @@ it over the entire softmax reduction dimension by:
 <tr>
 <td style="text-align: center;"><code>scale</code></td>
 <td>floating-point</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>mask</code></td>
+<td>shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
