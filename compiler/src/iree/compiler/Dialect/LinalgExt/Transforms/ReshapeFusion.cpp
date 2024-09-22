@@ -8,6 +8,7 @@
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
 // modified to work with LinalgExt ops, specifically `LinalgExt::AttentionOp`.
 
+#include <optional>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -106,7 +107,7 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
   SmallVector<AffineExpr> newExprs;
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned pos = cast<AffineDimExpr>(expr).getPosition();
-    SmallVector<AffineExpr, 4> expandedExprs = llvm::to_vector<4>(
+    auto expandedExprs = llvm::to_vector_of<AffineExpr, 6>(
         llvm::map_range(expansionInfo.getExpandedDims(pos), [&](int64_t v) {
           return builder.getAffineDimExpr(static_cast<unsigned>(v));
         }));
@@ -187,8 +188,7 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
                       : collapsingReshapeOp.getReassociationMaps(),
           expandedType.getShape(), collapsedType.getShape(), rewriter)))
     return std::nullopt;
-
-  SmallVector<AffineMap, 4> expandedOpIndexingMaps = llvm::to_vector<4>(
+  auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
       llvm::map_range(attentionOp.getIndexingMapsArray(), [&](AffineMap m) {
         return getIndexingMapInExpandedOp(rewriter, m, expansionInfo);
       }));
@@ -254,12 +254,18 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
     }
   }
 
+  Value maskOperand;
+  if (expandedOpOperands.size() > 4) {
+    maskOperand = expandedOpOperands[4];
+  }
+
   // Create a new `AttentionOp` that has the computed operands/indexing maps.
   TypeRange resultTypes = ValueRange(outputs).getTypes();
   auto fusedOp = rewriter.create<AttentionOp>(
       attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
       expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
-      outputs, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
+      outputs, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
+      maskOperand);
 
   // Reshape the result values to their original shape if this is a collapsing
   // reshape folded into its consumer.
