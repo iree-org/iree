@@ -59,6 +59,9 @@ def IREEGPU_LoweringConfigAttr :
   let extraClassDeclaration = [{
     /// Helper to retrieve a target mma intrinsic if present.
     ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
+
+    /// Helper to retrieve a list of operand indices to promote.
+    std::optional<SmallVector<int64_t>> getPromotedOperandList() const;
   }];
 }
 

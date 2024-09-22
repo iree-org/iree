@@ -1492,15 +1492,18 @@ static StringRef getTilingLevelName(GPU::TilingLevel level) {
   return StringAttr();
 }
 
-static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
-                                         GPU::TilingLevel level) {
-  auto sizes = config.getAs<ArrayAttr>(getTilingLevelName(level));
-  if (!sizes || !llvm::all_of(sizes.getValue(), llvm::IsaPred<IntegerAttr>)) {
+static SmallVector<int64_t> getIntegerList(ArrayAttr array) {
+  if (!array || !llvm::all_of(array.getValue(), llvm::IsaPred<IntegerAttr>)) {
     return {};
   }
-  return llvm::map_to_vector(sizes.getValue(), [](Attribute s) -> int64_t {
+  return llvm::map_to_vector(array.getValue(), [](Attribute s) -> int64_t {
     return cast<IntegerAttr>(s).getInt();
   });
+}
+
+static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
+                                         GPU::TilingLevel level) {
+  return getIntegerList(config.getAs<ArrayAttr>(getTilingLevelName(level)));
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
@@ -1544,6 +1547,17 @@ constexpr StringLiteral kMmaKindName = "mma_kind";
 
 IREE::GPU::MmaInterfaceAttr LoweringConfigAttr::getMmaKind() const {
   return getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(kMmaKindName);
+}
+
+constexpr StringLiteral kPromoteOperandsName = "promote_operands";
+
+std::optional<SmallVector<int64_t>>
+LoweringConfigAttr::getPromotedOperandList() const {
+  auto array = getAttributes().getAs<ArrayAttr>(kPromoteOperandsName);
+  if (!array) {
+    return std::nullopt;
+  }
+  return getIntegerList(array);
 }
 
 //===----------------------------------------------------------------------===//
