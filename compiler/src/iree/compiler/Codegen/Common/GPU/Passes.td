@@ -197,6 +197,11 @@ def GPUApplyTilingLevelPass :
   ];
 }
 
+def GPUMaterializeHostEncodingPass :
+    Pass<"iree-codegen-gpu-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
 def GPUMaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
