@@ -93,17 +93,19 @@ If no target is specified then we will default to `gfx908`.
 
 Here is a table of commonly used architectures:
 
-| AMD GPU       | Target Chip | Architecture Code Name
-| ------------- | ----------- | ----------------------
-| AMD MI100     | `gfx908`    | `cdna1`
-| AMD MI210     | `gfx90a`    | `cdna2`
-| AMD MI250     | `gfx90a`    | `cdna2`
-| AMD MI300A    | `gfx940`    | `cdna3`
-| AMD MI300X    | `gfx942`    | `cdna3`
-| AMD RX7900XTX | `gfx1100`   | `rdna3`
-| AMD RX7900XT  | `gfx1100`   | `rdna3`
-| AMD RX7800XT  | `gfx1101`   | `rdna3`
-| AMD RX7700XT  | `gfx1101`   | `rdna3`
+| AMD GPU                  | Target Chip | Architecture Code Name
+| ------------------------ | ----------- | ----------------------
+| AMD MI100                | `gfx908`    | `cdna1`
+| AMD MI210                | `gfx90a`    | `cdna2`
+| AMD MI250                | `gfx90a`    | `cdna2`
+| AMD MI300X (early units) | `gfx940`    | `cdna3`
+| AMD MI300A (early units) | `gfx941`    | `cdna3`
+| AMD MI300A               | `gfx942`    | `cdna3`
+| AMD MI300X               | `gfx942`    | `cdna3`
+| AMD RX7900XTX            | `gfx1100`   | `rdna3`
+| AMD RX7900XT             | `gfx1100`   | `rdna3`
+| AMD RX7800XT             | `gfx1101`   | `rdna3`
+| AMD RX7700XT             | `gfx1101`   | `rdna3`
 
 For a more comprehensive list of prior GPU generations, you can refer to the
 [LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).
