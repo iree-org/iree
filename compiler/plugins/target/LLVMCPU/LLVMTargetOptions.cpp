@@ -33,53 +33,60 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
                               llvm::StringRef inCpuFeatures,
                               const llvm::Triple &triple, std::string &outCpu,
                               std::string &outCpuFeatures) {
-  // llvm::StringRef cpu = inCpu;
-  // llvm::StringRef cpuFeatures = inCpuFeatures;
-
-  if (inCpu.empty()) {
-    // TODO(#18561): Require explicit "generic" and treat unset as an error?
-    llvm::errs() << "warning: LLVMTarget cpu unspecified, defaulting to "
-                    "`generic`. Performance may suffer. Use "
-                    "`--iree-llvmcpu-target-cpu=` or the target attribute to "
-                    "set the target cpu.\n";
-    inCpu = "generic";
-  }
+  // Note: only set out* variables right before returning if successful.
+  std::string cpu = inCpu.str();
+  std::string cpuFeatures = inCpuFeatures.str();
 
   // Resolve "host" cpu and cpu features.
   // Note: CPU feature detection in LLVM may be incomplete. Passing explicit
   // feature lists instead of "host" should be preferred when possible.
   if (inCpu == "host" || inCpuFeatures == "host") {
-    if (inCpu != inCpuFeatures) {
-      llvm::errs() << "error: If either Cpu or CpuFeatures is `host`, the "
-                      "other must also be `host`\n";
+    bool isCpuHostOrEmpty = inCpu.empty() || inCpu == "host";
+    bool isCpuFeaturesHostOrEmpty =
+        inCpuFeatures.empty() || inCpuFeatures == "host";
+    if (!(isCpuHostOrEmpty && isCpuFeaturesHostOrEmpty)) {
+      llvm::errs() << "error: If either Cpu or CpuFeatures is 'host', the "
+                      "other must also be 'host' or empty (Cpu: '"
+                   << inCpu << "', CpuFeatures: '" << inCpuFeatures << "')\n";
       return false;
     }
-    outCpu = llvm::sys::getHostCPUName().str();
+    cpu = llvm::sys::getHostCPUName().str();
     llvm::SubtargetFeatures features;
     for (auto &feature : llvm::sys::getHostCPUFeatures()) {
       features.AddFeature(feature.first(), feature.second);
     }
-    outCpuFeatures = features.getString();
+    cpuFeatures = features.getString();
   } else {
-    outCpu = inCpu;
-    outCpuFeatures = inCpuFeatures;
+    if (cpu.empty()) {
+      // TODO(#18561): Require explicit "generic" and treat unset as an error?
+      llvm::errs() << "warning: LLVMTarget cpu unspecified, defaulting to "
+                      "`generic`. Performance may suffer. Use "
+                      "`--iree-llvmcpu-target-cpu=` or the target attribute to "
+                      "set the target cpu.\n";
+      cpu = "generic";
+    }
   }
 
   // Target-specific CPU feature tweaks that we need unconditionally.
   if (triple.isAArch64()) {
-    llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
+    llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
     // x18 is platform-reserved per the Aarch64 procedure call specification.
     targetCpuFeatures.AddFeature("reserve-x18", true);
-    outCpuFeatures = targetCpuFeatures.getString();
+    cpuFeatures = targetCpuFeatures.getString();
   }
 
-  if (outCpu.empty() || inCpu == "host" || inCpu == "generic" ||
-      inCpu.starts_with("generic-")) {
+  // If features were already fully populated for "host", or compiling for a
+  // "generic" target (with no features), return now.
+  if (cpu == "host" || cpuFeatures == "host" || //
+      cpu == "generic" || inCpu.starts_with("generic-")) {
+    outCpu = cpu;
+    outCpuFeatures = cpuFeatures;
     return true;
   }
-  // If CPU is non-host and non-generic then we need to populate the
-  // corresponding features.
-  llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
+
+  // If CPU is non-host and non-generic then we can join the requested features
+  // with the target cpu's available features (if LLVM can determine them).
+  llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
   auto addCpuFeatures = [&](const auto &getFeaturesForCPU,
                             auto &cpuFeatureList) {
     getFeaturesForCPU(outCpu, cpuFeatureList, false);
@@ -94,13 +101,11 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
     llvm::SmallVector<std::string> cpuFeatureList;
     addCpuFeatures(llvm::RISCV::getFeaturesForCPU, cpuFeatureList);
   } else {
-    llvm::errs()
-        << "error: Resolution of target CPU to target CPU features is not "
-           "implemented on this target architecture. Pass explicit CPU "
-           "features instead of a CPU on this architecture ("
-        << triple.getArchName() << "), or implement that.\n";
-    return false;
+    // No `getFeaturesForCPU` function for this arch. Just use the explicit
+    // features that we were provided, if any.
+    // TODO(#18561): We could log a warning here if cpuFeatures is non-empty.
   }
+  outCpu = cpu;
   outCpuFeatures = targetCpuFeatures.getString();
   return true;
 }
@@ -163,9 +168,8 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
     // Something bad happened, and our target might not be what the user expects
     // but we need to continue to avoid breaking existing users. Hopefully
     // resolveCPUAndCPUFeatures logged a helpful error already.
-
     // TODO(#18561): propagate the error and fail to compile - stderr output is
-    //               not enough
+    //               not enough. Could return std::nullopt here.
   }
 
   return target;
@@ -682,14 +686,6 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   targetOptions.embeddedLinkerPath = embeddedLinkerPath;
   targetOptions.wasmLinkerPath = wasmLinkerPath;
   targetOptions.keepLinkerArtifacts = keepLinkerArtifacts;
-
-  // TODO(scotttodd): warning here?
-
-  // TODO(scotttodd): remove this default? expand "host" to this?
-  //     LLVMTarget::create already forces this to a value when embedded linking
-  // if (targetTriple.empty()) {
-  //   targetTriple = llvm::sys::getProcessTriple();
-  // }
 
   std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
       targetTriple, targetCPU, targetCPUFeatures, linkEmbedded);
