@@ -35,6 +35,11 @@
 
 namespace mlir::iree_compiler {
 
+static bool isAllConstantValue(SmallVector<OpFoldResult> ofrs, int64_t v) {
+  return llvm::all_of(
+      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, v); });
+}
+
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
   for (auto val : nonIndexComputationOperands) {
@@ -531,9 +536,14 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!loadOp.offsets().empty() || !loadOp.sizes().empty() ||
-        !loadOp.strides().empty())
+    std::optional<SmallVector<int64_t>> constSizes =
+        getConstantIntValues(loadOp.getMixedSizes());
+    ArrayRef<int64_t> sourceShape = loadOp.getSourceType().getShape();
+    if (!isAllConstantValue(loadOp.getMixedOffsets(), 0) ||
+        !isAllConstantValue(loadOp.getMixedStrides(), 1) || !constSizes ||
+        !llvm::equal(sourceShape, *constSizes)) {
       return failure();
+    }
 
     auto subspanOp =
         loadOp.getSource()
@@ -588,9 +598,14 @@ struct FoldExpandShapeIntoInterfaceTensorStore
                                 PatternRewriter &rewriter) const override {
     // Make sure we are storing the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!storeOp.offsets().empty() || !storeOp.sizes().empty() ||
-        !storeOp.strides().empty())
+    std::optional<SmallVector<int64_t>> constSizes =
+        getConstantIntValues(storeOp.getMixedSizes());
+    ArrayRef<int64_t> targetShape = storeOp.getTargetType().getShape();
+    if (!isAllConstantValue(storeOp.getMixedOffsets(), 0) ||
+        !isAllConstantValue(storeOp.getMixedStrides(), 1) || !constSizes ||
+        !llvm::equal(targetShape, *constSizes)) {
       return failure();
+    }
 
     auto reshapeOp = storeOp.getValue().getDefiningOp<tensor::ExpandShapeOp>();
     if (!reshapeOp) {
