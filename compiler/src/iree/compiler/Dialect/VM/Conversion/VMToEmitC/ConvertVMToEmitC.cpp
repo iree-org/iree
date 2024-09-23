@@ -2229,7 +2229,7 @@ private:
                         .getResult();
 
     // alloca_(0) returns NULL in some configurations on Windows. Make sure to
-    // allocate at least one byte to get valid pointer.
+    // allocate at least one byte to get a valid pointer.
     Value allocaSize;
     if (size.isZero) {
       Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");

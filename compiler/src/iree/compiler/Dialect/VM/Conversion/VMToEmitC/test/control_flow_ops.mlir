@@ -398,7 +398,7 @@ vm.module @my_module {
 
   // Allocate space for the arguments.
   // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
-  // alloca(0) can return NULL on Windows. So we always allocate at least one byte
+  // alloca_(0) can return NULL on Windows. So we always allocate at least one byte
   // CHECK-NEXT: %[[ARGALLOCASIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"1">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGALLOCASIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
@@ -410,7 +410,7 @@ vm.module @my_module {
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
-  // alloca(0) can return NULL on Windows. So we always allocate at least one byte
+  // alloca_(0) can return NULL on Windows. So we always allocate at least one byte
   // CHECK-NEXT: %[[RESALLOCASIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"1">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESALLOCASIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
