@@ -466,9 +466,9 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-  populateShapeLikeMaterializeEncodingPatterns(materializeEncodingPattern,
-                                               target, typeConverter,
-                                               materializeEncodingValueFn);
+  populateShapeIndependentMaterializeEncodingPatterns(
+      materializeEncodingPattern, target, typeConverter,
+      materializeEncodingValueFn);
 
   if (failed(applyPartialConversion(funcOp, target,
                                     std::move(materializeEncodingPattern)))) {

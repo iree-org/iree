@@ -927,7 +927,7 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
 }
 
-void populateShapeLikeMaterializeEncodingPatterns(
+void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {

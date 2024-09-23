@@ -49,9 +49,9 @@ struct MaterializeEncodingIntoNopPass final
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-    populateShapeLikeMaterializeEncodingPatterns(materializeEncodingPattern,
-                                                 target, typeConverter,
-                                                 materializeEncodingValueFn);
+    populateShapeIndependentMaterializeEncodingPatterns(
+        materializeEncodingPattern, target, typeConverter,
+        materializeEncodingValueFn);
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
