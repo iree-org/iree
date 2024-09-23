@@ -50,6 +50,6 @@ jobs:
           IREE_CUDA_DEPS_DIR: /usr/local/iree_cuda_deps
         run: |
           ./build_tools/bazel/install_bazelisk.sh 1.21.0
-          cp ./build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
+          cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh

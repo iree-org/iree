@@ -187,11 +187,6 @@ def LLVMCPUUnfuseFMAOpsPass :
   let summary = "Convert llvm.fma into unfused mulf and addf ops";
 }
 
-def LLVMCPUDropVectorUnitDimsPass :
-    InterfacePass<"iree-llvmcpu-drop-vector-unit-dims", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to drop vector unit dims.";
-}
-
 def LLVMCPUVirtualVectorLoweringPass :
     InterfacePass<"iree-llvmcpu-virtual-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower high level vector operations like contract or multidim reduce ops to lower level vector ops.";

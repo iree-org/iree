@@ -79,6 +79,12 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvolutionToIGEMMPass :
+    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Transforms convolution operations into an implicit GEMM format.";
+}
+
 def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
   let description = [{
@@ -123,12 +129,6 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   ];
 }
 
-def ConvolutionToIGEMMPass :
-    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Transforms convolution operations into an implicit GEMM format.";
-}
-
 def DecomposeConvolutionToLowerDimOpsPass :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
@@ -168,6 +168,11 @@ def DecomposeSoftmaxPass :
            "bool", /*default=*/"true",
            "Whether to use the internal pass fusion logic for the exp function. See #15862.">
   ];
+}
+
+def DropVectorUnitDimsPass :
+    InterfacePass<"iree-codegen-drop-vector-unit-dims", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to drop vector unit dims.";
 }
 
 def ReconcileTranslationInfoPass
