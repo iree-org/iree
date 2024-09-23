@@ -133,6 +133,7 @@ iree_cc_library(
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
+    MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMathDialect
