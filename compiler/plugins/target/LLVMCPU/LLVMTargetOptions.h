@@ -177,7 +177,7 @@ struct LLVMCPUTargetCLOptions {
 
   // Default device options.
   std::string targetTriple = "";
-  std::string targetCPU = "generic";
+  std::string targetCPU = "";
   std::string targetCPUFeatures = "";
   bool linkEmbedded = LLVMTarget::DEFAULT_LINK_EMBEDDED;
   bool linkStatic = LLVMTarget::DEFAULT_LINK_STATIC;

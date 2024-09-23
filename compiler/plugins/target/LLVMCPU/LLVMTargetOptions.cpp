@@ -33,21 +33,28 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
                               llvm::StringRef inCpuFeatures,
                               const llvm::Triple &triple, std::string &outCpu,
                               std::string &outCpuFeatures) {
-  // Resolve "host"
+  // llvm::StringRef cpu = inCpu;
+  // llvm::StringRef cpuFeatures = inCpuFeatures;
+
+  if (inCpu.empty()) {
+    // TODO(#18561): Require explicit "generic" and treat unset as an error?
+    llvm::errs() << "warning: LLVMTarget cpu unspecified, defaulting to "
+                    "`generic`. Performance may suffer. Use "
+                    "`--iree-llvmcpu-target-cpu=` or the target attribute to "
+                    "set the target cpu.\n";
+    inCpu = "generic";
+  }
+
+  // Resolve "host" cpu and cpu features.
+  // Note: CPU feature detection in LLVM may be incomplete. Passing explicit
+  // feature lists instead of "host" should be preferred when possible.
   if (inCpu == "host" || inCpuFeatures == "host") {
-    // If either Cpu or CpuFeatures is "host", the other must be either also
-    // host or the default value.
-    bool isCpuHostOrDefault =
-        inCpu.empty() || inCpu == "host" || inCpu == "generic";
-    bool isCpuFeaturesHostOrDefault =
-        inCpuFeatures.empty() || inCpuFeatures == "host";
-    if (!(isCpuHostOrDefault && isCpuFeaturesHostOrDefault)) {
-      llvm::errs()
-          << "error: If either cpu or CpuFeatures is `host`, the other must "
-             "be either also `host` or the default value\n";
+    if (inCpu != inCpuFeatures) {
+      llvm::errs() << "error: If either Cpu or CpuFeatures is `host`, the "
+                      "other must also be `host`\n";
       return false;
     }
-    outCpu = triple.isX86() ? llvm::sys::getHostCPUName().str() : "";
+    outCpu = llvm::sys::getHostCPUName().str();
     llvm::SubtargetFeatures features;
     for (auto &feature : llvm::sys::getHostCPUFeatures()) {
       features.AddFeature(feature.first(), feature.second);
@@ -89,10 +96,9 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
   } else {
     llvm::errs()
         << "error: Resolution of target CPU to target CPU features is not "
-           "implemented on "
-           "this target architecture. Pass explicit CPU features "
-           "instead of a CPU "
-           "on this architecture, or implement that.\n";
+           "implemented on this target architecture. Pass explicit CPU "
+           "features instead of a CPU on this architecture ("
+        << triple.getArchName() << "), or implement that.\n";
     return false;
   }
   outCpuFeatures = targetCpuFeatures.getString();
@@ -129,8 +135,12 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
   LLVMTarget target;
   target.linkEmbedded = requestLinkEmbedded;
 
-  target.triple = triple;
-  llvm::Triple targetTriple(target.triple);
+  // TODO(#18561): Require this be set to "host" explicitly?
+  if (triple.empty() || triple == "host") {
+    triple = llvm::sys::getProcessTriple();
+  }
+  llvm::Triple targetTriple(triple);
+
   // Special casing if linkEmbedded.
   if (targetTriple.isWasm()) {
     // The embedded ELF loader is not supported on WebAssembly, so force it off.
@@ -138,17 +148,24 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
   }
   if (target.linkEmbedded) {
     // Force the triple to something compatible with embedded linking.
+    // Note: this leaves the ArchType and SubArchType unchanged.
+    // Embedded linking is portable across OS (e.g. Win32 to Linux) but it
+    // _is not_ portable across architectures (e.g. x86_64 to arch64).
     targetTriple.setVendor(llvm::Triple::VendorType::UnknownVendor);
-    targetTriple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
     targetTriple.setOS(llvm::Triple::OSType::UnknownOS);
+    targetTriple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
     targetTriple.setObjectFormat(llvm::Triple::ObjectFormatType::ELF);
-    target.triple = targetTriple.str();
   }
-  if (!resolveCPUAndCPUFeatures(cpu, cpuFeatures, llvm::Triple(triple),
-                                target.cpu, target.cpuFeatures)) {
+  target.triple = targetTriple.str();
+
+  if (!resolveCPUAndCPUFeatures(cpu, cpuFeatures, targetTriple, target.cpu,
+                                target.cpuFeatures)) {
     // Something bad happened, and our target might not be what the user expects
     // but we need to continue to avoid breaking existing users. Hopefully
     // resolveCPUAndCPUFeatures logged a helpful error already.
+
+    // TODO(#18561): propagate the error and fail to compile - stderr output is
+    //               not enough
   }
 
   return target;
@@ -333,9 +350,9 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
                         "accompanied by 'target_triple'";
       return {};
     }
-    std::optional<LLVMTarget> maybeTarget =
-        LLVMTarget::create(*triple, cpu ? *cpu : "generic",
-                           cpuFeatures ? *cpuFeatures : "", linkEmbedded);
+
+    std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
+        *triple, cpu.value_or(""), cpuFeatures.value_or(""), linkEmbedded);
     if (!maybeTarget) {
       return {};
     }
@@ -666,9 +683,13 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   targetOptions.wasmLinkerPath = wasmLinkerPath;
   targetOptions.keepLinkerArtifacts = keepLinkerArtifacts;
 
-  if (targetTriple.empty()) {
-    targetTriple = llvm::sys::getProcessTriple();
-  }
+  // TODO(scotttodd): warning here?
+
+  // TODO(scotttodd): remove this default? expand "host" to this?
+  //     LLVMTarget::create already forces this to a value when embedded linking
+  // if (targetTriple.empty()) {
+  //   targetTriple = llvm::sys::getProcessTriple();
+  // }
 
   std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
       targetTriple, targetCPU, targetCPUFeatures, linkEmbedded);
