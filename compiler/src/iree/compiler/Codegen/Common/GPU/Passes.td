@@ -266,4 +266,12 @@ def VectorReductionToGPUPass :
   ];
 }
 
+def ExpandGPUOpsPass :
+    InterfacePass<"iree-codegen-expand-gpu-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_COMMON_GPU_PASSES

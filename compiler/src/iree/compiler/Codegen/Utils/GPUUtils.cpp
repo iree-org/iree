@@ -535,9 +535,8 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   return identity;
 }
 
-/// Return a matching GPU reduction operations.
-static gpu::AllReduceOperation
-combiningKindToAllReduce(vector::CombiningKind kind) {
+/// Returns the matching GPU reduction operation.
+gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
   switch (kind) {
 #define MAP_CASE(X)                                                            \
   case vector::CombiningKind::X:                                               \
