@@ -30,13 +30,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     return tensorType;
   }
   auto newIndex = encoding.getOperandIndex();
-  TypeAttr originalTypeAttr = encoding.getOriginalType();
-  RankedTensorType originalType = tensorType;
-  if (originalTypeAttr) {
-    originalType =
-        llvm::dyn_cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  SmallVector<int64_t> newOriginalShape(originalType.getShape());
+  SmallVector<int64_t> newOriginalShape(tensorType.getShape());
   auto userIndexingMaps = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> maps;
   for (auto a : userIndexingMaps) {
@@ -92,7 +86,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
-      TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, encoding.getBcastMap(),
       DenseI64ArrayAttr::get(context, newRoundDimsTo));

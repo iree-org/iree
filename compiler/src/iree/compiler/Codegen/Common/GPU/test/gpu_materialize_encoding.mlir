@@ -6,7 +6,7 @@
 // 1. MFMA_F32_16x16x4_F32
 //-----------------------------------------------------------------------------
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -28,7 +28,7 @@ func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -61,7 +61,7 @@ func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
@@ -104,7 +104,7 @@ func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -137,7 +137,7 @@ func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -170,7 +170,7 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -203,7 +203,7 @@ func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>,
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 16>>
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
@@ -308,7 +308,7 @@ func.func @matmul_lowering_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // 2. MFMA_I32_16x16x32_I8
 //-----------------------------------------------------------------------------
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi8>,
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 32>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -341,7 +341,7 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi8>,
+#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 32>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -374,7 +374,7 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi32>,
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 32>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -407,7 +407,7 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 
 // -----
 
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], original_type = tensor<255x513xi32>,
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     round_dims_to = array<i64: 16, 16, 32>>
 #pipeline_layout = #hal.pipeline.layout<bindings = [

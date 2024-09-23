@@ -98,7 +98,6 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
 
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
-                               Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
                                ArrayRef<AffineMap> maps,
@@ -109,7 +108,6 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
     return x ? b.getIndexAttr(*x) : IntegerAttr();
   };
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
-  auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
@@ -117,9 +115,9 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                           ? AffineMapAttr::get(bcastMap.value())
                           : AffineMapAttr();
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), origTypeAttr,
-             optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps), bcastMapAttr, roundDimsToAttr);
+             b.getTypeArrayAttr(elemTypes), optionalToAttr(matmulNarrowM),
+             optionalToAttr(matmulNarrowN), b.getAffineMapArrayAttr(maps),
+             bcastMapAttr, roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() {
@@ -155,9 +153,9 @@ ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
 
 EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
-             getElementTypes(), getOriginalType(), getMatmulNarrow_M(),
-             getMatmulNarrow_N(), getUserIndexingMaps(),
-             AffineMapAttr::get(bcastMap), getRoundDimsTo());
+             getElementTypes(), getMatmulNarrow_M(), getMatmulNarrow_N(),
+             getUserIndexingMaps(), AffineMapAttr::get(bcastMap),
+             getRoundDimsTo());
 }
 
 //===---------------------------------------------------------------------===//

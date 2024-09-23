@@ -78,7 +78,6 @@ def EncodingAttr :
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
-    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
     OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
     OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
@@ -91,7 +90,7 @@ def EncodingAttr :
   let builders = [
     AttrBuilder<(ins "int64_t":$operandIndex,
         "EncodingOpType":$opType,
-        "ArrayRef<Type>":$elemTypes, "Type":$origType,
+        "ArrayRef<Type>":$elemTypes,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
