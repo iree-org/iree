@@ -4,26 +4,25 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-drop-vector-unit-dims"
+#define DEBUG_TYPE "iree-codegen-drop-vector-unit-dims"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMCPUDROPVECTORUNITDIMSPASS
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+#define GEN_PASS_DEF_DROPVECTORUNITDIMSPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-class LLVMCPUDropVectorUnitDimsPass
-    : public impl::LLVMCPUDropVectorUnitDimsPassBase<
-          LLVMCPUDropVectorUnitDimsPass> {
+class DropVectorUnitDimsPass
+    : public impl::DropVectorUnitDimsPassBase<DropVectorUnitDimsPass> {
 public:
-  using impl::LLVMCPUDropVectorUnitDimsPassBase<
-      LLVMCPUDropVectorUnitDimsPass>::LLVMCPUDropVectorUnitDimsPassBase;
+  using impl::DropVectorUnitDimsPassBase<
+      DropVectorUnitDimsPass>::DropVectorUnitDimsPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, vector::VectorDialect>();
@@ -31,7 +30,7 @@ public:
   void runOnOperation() override;
 };
 
-void LLVMCPUDropVectorUnitDimsPass::runOnOperation() {
+void DropVectorUnitDimsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
 

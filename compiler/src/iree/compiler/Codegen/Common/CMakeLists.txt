@@ -92,6 +92,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "DecomposeSoftmax.cpp"
+    "DropVectorUnitDims.cpp"
     "EmulateNarrowType.cpp"
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
