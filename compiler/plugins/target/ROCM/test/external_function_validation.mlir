@@ -31,7 +31,7 @@ builtin.module {
       }
       builtin.module {
         llvm.func @external_func() attributes {sym_visibility = "private"}
-        llvm.func @test() {
+        llvm.func @test() attributes { rocdl.kernel } {
           llvm.call @external_func() : () -> ()
           llvm.return
         }

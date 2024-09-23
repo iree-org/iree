@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_kernel_for_translation.mlir"
     "config_tile_and_fuse.mlir"
     "config_user_vector_distribute.mlir"
     "config_vector_distribute.mlir"
