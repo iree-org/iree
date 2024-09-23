@@ -1,4 +1,0 @@
-gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
-gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a
-gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59
-gcr.io/iree-oss/riscv-toolchain-builder@sha256:4240a374d35e5ea9037051559aaae4a8b6414ad5872501d4e240baccaacfff11
