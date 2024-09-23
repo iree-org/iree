@@ -106,9 +106,9 @@ graph LR
       -o model_cpu.vmfb
 
     iree-run-module \
-      model_cpu.vmfb \
+      --module=model_cpu.vmfb \
       --device=local-task \
-      --entry_function=... \
+      --function=... \
       --input=... \
       ...
     ```
