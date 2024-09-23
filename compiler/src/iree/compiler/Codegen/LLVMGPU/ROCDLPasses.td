@@ -13,6 +13,12 @@ include "mlir/Pass/PassBase.td"
 // ROCDL Passes (keep alphabetical)
 //===----------------------------------------------------------------------===//
 
+def ROCDLAnnotateKernelForTranslationPass : Pass<
+    "iree-rocdl-annotate-kernel-for-translation", "LLVM::LLVMFuncOp"> {
+  let summary = "Set function attributes before translating to LLVM IR";
+  let dependentDialects = ["ROCDL::ROCDLDialect"];
+}
+
 def ROCDLLowerExecutableTargetPass : InterfacePass<
     "iree-rocdl-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Lower an IREE hal.executable.variant op using a suitable "
@@ -24,6 +30,5 @@ def ROCDLSelectLoweringStrategyPass :
   let summary = "Select a suitable lowering strategy for an IREE "
                 "hal.executable.variant op";
 }
-
 
 #endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES

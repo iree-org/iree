@@ -133,8 +133,10 @@ Workflow file | Build status | Event triggers
 [`ci_linux_x64_clang_tsan.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_tsan.yml) | [![CI - Linux x64 clang TSan](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_tsan.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
 [`ci_linux_x64_clang_debug.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_debug.yml) | [![CI - Linux x64 clang debug](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_debug.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
 [`ci_linux_x64_gcc.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_gcc.yml) | [![CI - Linux x64 gcc](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_gcc.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_linux_x64_clang_byollvm.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_clang_byollvm.yml) | [![CI - Linux x64 clang_byollvm](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml/badge.svg?query=branch%3Amain+event%3Aschedule)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_clang_byollvm.yml?query=branch%3Amain+event%3Aschedule) | `schedule`
+[`ci_linux_x64_bazel.yml`](https://github.com/iree-org/iree/blob/main/.github/workflows/ci_linux_x64_bazel.yml) | [![CI - Linux x64 bazel](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci_linux_x64_bazel.yml?query=branch%3Amain+event%3Apush) | `pull_request`, `push`
 
-<!-- TODO(scotttodd): the remains of ci.yml (bazel, runtime builds, etc.) -->
+<!-- TODO(scotttodd): the remains of ci.yml (runtime builds, etc.) -->
 <!-- TODO(scotttodd): cross-compilation jobs -->
 
 ### Other workflows

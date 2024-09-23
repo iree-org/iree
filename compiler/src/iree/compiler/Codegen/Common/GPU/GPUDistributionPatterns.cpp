@@ -1020,10 +1020,16 @@ struct DistributeTrivialLayoutConversions final
                                 PatternRewriter &rewriter) const override {
     auto input = cast<VectorValue>(toLayoutOp.getInput());
     auto output = cast<VectorValue>(toLayoutOp.getOutput());
-    VectorLayoutInterface currentLayout =
-        dyn_cast<LayoutAttr>(signature[input]);
-    VectorLayoutInterface targetLayout =
-        dyn_cast<LayoutAttr>(signature[output]);
+    VectorLayoutInterface currentLayout = signature[input];
+    VectorLayoutInterface targetLayout = signature[output];
+
+    if (!currentLayout) {
+      return rewriter.notifyMatchFailure(toLayoutOp, "No layout set on input");
+    }
+
+    if (!targetLayout) {
+      return rewriter.notifyMatchFailure(toLayoutOp, "No layout set on output");
+    }
 
     if (currentLayout != targetLayout) {
       return rewriter.notifyMatchFailure(toLayoutOp,

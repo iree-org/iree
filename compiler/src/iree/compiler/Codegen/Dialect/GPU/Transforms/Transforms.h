@@ -55,8 +55,9 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                              IREE::GPU::MmaInterfaceAttr mmaKind);
 
 // Helper to distribute a multi_mma op to lanes.
-FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
-                                            IREE::GPU::MultiMmaOp mmaOp);
+FailureOr<Operation *> distributeMultiMmaOp(
+    RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
+    std::optional<SmallVector<int64_t>> workgroupSize = std::nullopt);
 
 // Helper to map all scf.forall ops on lanes.
 void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
