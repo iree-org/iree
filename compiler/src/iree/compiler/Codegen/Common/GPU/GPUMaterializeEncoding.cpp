@@ -294,7 +294,8 @@ struct GPUSetEncodingOpLoweringConversion
     for (auto perm : maybeEncodingInfo->swizzle->permutation) {
       transposePerm.push_back(origRank + perm);
     }
-    SmallVector<int64_t> transposeResultDims = expandShapeShape;
+    SmallVector<OpFoldResult> transposeResultDims =
+        tensor::getMixedSizes(rewriter, loc, expandShapeOp.getResult());
     applyPermutationToVector(transposeResultDims, transposePerm);
 
     auto emptyTensor = rewriter.create<tensor::EmptyOp>(
@@ -332,23 +333,22 @@ struct GPUUnsetEncodingOpLoweringConversion
       int targetRank = unsetEncodingOp.getResultType().getRank();
       auto srcConvertedType =
           cast<RankedTensorType>(adaptor.getSource().getType());
-      SmallVector<int64_t> expandShapeShape(
-          srcConvertedType.getShape().take_front(targetRank));
-      expandShapeShape.append(
-          getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape));
+      SmallVector<OpFoldResult> emptyShape =
+          tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
+      emptyShape.resize(targetRank);
+      for (auto i :
+           getExpandedTileShape(maybeEncodingInfo->swizzle->expandShape)) {
+        emptyShape.push_back(rewriter.getIndexAttr(i));
+      }
+      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
+          loc, emptyShape, unsetEncodingOp.getSourceType().getElementType());
 
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
       for (auto perm : maybeEncodingInfo->swizzle->permutation) {
         transposePerm.push_back(targetRank + perm);
       }
-      SmallVector<int64_t> expandShapeResultDims = expandShapeShape;
-      applyPermutationToVector(expandShapeResultDims, transposePerm);
       auto invertedTransposePerm = invertPermutationVector(transposePerm);
-
-      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-          loc, expandShapeShape,
-          unsetEncodingOp.getSourceType().getElementType());
       auto transposeOp = rewriter.create<linalg::TransposeOp>(
           loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
 
@@ -496,6 +496,7 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
                     GPUUnsetEncodingOpLoweringConversion, GPUConvertToMultiMma>(
         ctx, typeConverter, materializeEncodingValueFn);
 
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       funcOp.emitOpError("materialization failed");
       return signalPassFailure();
