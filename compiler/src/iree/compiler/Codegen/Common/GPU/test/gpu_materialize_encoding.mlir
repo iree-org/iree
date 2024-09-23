@@ -13,6 +13,28 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
+func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
+  %cst = arith.constant 0.0 : f32
+  %1 = tensor.empty() : tensor<255x513xf32, #encoding>
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<255x513xf32, #encoding>) -> tensor<255x513xf32, #encoding>
+  flow.dispatch.tensor.store %2, %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32, #encoding> -> !flow.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
+  return
+}
+// CHECK-LABEL: func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<2x33x8x4x16x4xf32>
+// CHECK:         %{{.+}} = linalg.fill ins({{.+}}) outs(%[[EMPTY]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<255x513xf32>,
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    round_dims_to = array<i64: 16, 16, 16>>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
 func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<255x513xf32>>

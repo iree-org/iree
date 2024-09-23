@@ -129,9 +129,10 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);
 
-/// Pouplates the set of patterns that lowers IREE dialect (e.g., Flow, Hal,
-/// etc) ops with encoding types to pack/unpack ops.
-void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
+/// Pouplates the set of patterns that lowers shape-like operations (e.g., Flow
+/// ops, Hal ops, tensor.empty, linalg.fill, etc) with encoding types to the
+/// same op with materialized shapes.
+void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn);

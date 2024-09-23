@@ -49,7 +49,7 @@ struct MaterializeEncodingIntoNopPass final
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-    populateIREEMaterializeEncodingIntoPackUnPackPatterns(
+    populateShapeIndependentMaterializeEncodingPatterns(
         materializeEncodingPattern, target, typeConverter,
         materializeEncodingValueFn);
 
