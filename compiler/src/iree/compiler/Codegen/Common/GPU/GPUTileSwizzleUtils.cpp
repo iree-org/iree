@@ -169,8 +169,6 @@ getDimIdxForTargetSize(const TileSwizzle::ExpandShapeDimVectorType &shape,
   return interleaveAt;
 }
 
-// Generates the swizzle for the full data-tiled-mma tile, including all the
-// relevant unrolling factors.
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                        IREE::GPU::MMAFragment fragment) {
   auto [AType, BType, CType] = mma.getABCElementTypes();

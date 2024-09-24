@@ -38,10 +38,10 @@ struct TileSwizzle {
       // "unrolled" across subgroups. Such dimensions are cross-subgroup, so in
       // particular they are cross-thread.
       CrossThread,
-      // This dimensions is across intrinsics. By definition, this only occurs
-      // in kernels that have unrolling dimensions, so each thread executes
-      // multiple intrinsics. The 'CrossIntrinsic' dimensions then index over
-      // the intrinsics to be executed by each thread.
+      // This dimensions is across intrinsics, as in, actual instructions in the
+      // generated code. In other words, it is an actual unrolling factor,
+      // resulting in this many more instructions being generated and executed
+      // on each thread/subgroup.
       CrossIntrinsic
     };
 
@@ -50,7 +50,6 @@ struct TileSwizzle {
     // The size of the dimension.
     int16_t size = 0;
   };
-  static_assert(sizeof(Dim) == 4);
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
   using ExpandShapeType = llvm::SmallVector<ExpandShapeDimVectorType>;

@@ -27,8 +27,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
 // This is not interleaving layouts. The layout will consist of multiple copies
 // of the input tile, side by side.
 //
-// The bool parameters `cross_thread` and `cross_intrinsic` initialize the
-// corresponding members on the newly created TileSwizzle::Dim.
+// The enum parameter `kind` initializes the corresponding member on the newly
+// created TileSwizzle::Dim.
 //
 // Example:
 //    Input swizzle = { expandShape = [[16], [4]], permutation = [1, 0] }

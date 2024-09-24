@@ -25,29 +25,20 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
   return os << dim.size << "(" << dim.kind << ")";
 }
 
+static llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const TileSwizzle::ExpandShapeDimVectorType &expandShapeDimVector) {
+  os << "[";
+  llvm::interleaveComma(expandShapeDimVector, os);
+  return os << "]";
+}
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle) {
   os << "{expandShape = [";
-  for (auto [i, e] : llvm::enumerate(swizzle.expandShape)) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << "[";
-    for (auto [j, d] : llvm::enumerate(e)) {
-      if (j > 0) {
-        os << ", ";
-      }
-      os << d;
-    }
-    os << "]";
-  }
+  llvm::interleaveComma(swizzle.expandShape, os);
   os << "], swizzle = [";
-  for (auto [i, p] : llvm::enumerate(swizzle.permutation)) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << p;
-  }
+  llvm::interleaveComma(swizzle.permutation, os);
   os << "]}";
   return os;
 }
