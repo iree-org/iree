@@ -232,11 +232,11 @@ func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 }
 // CHECK-LABEL: func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%{{.+}} : tensor<?x?x8x8x4x16x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<?x?x8x4x4x8x16xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 3, 5]
+// CHECK-SAME:       ins(%{{.+}} : tensor<?x?x8x4x2x4x16x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x?x8x4x4x4x2x16xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 5, 7, 3, 4, 6]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<?x?x8x4x4x8x16xf32> into tensor<?x?x128x128xf32>
+// CHECK-SAME:      : tensor<?x?x8x4x4x4x2x16xf32> into tensor<?x?x128x128xf32>
 // CHECK:         %[[UNPACK:.*]] = tensor.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
