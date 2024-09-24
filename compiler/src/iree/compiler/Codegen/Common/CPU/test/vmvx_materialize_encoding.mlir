@@ -89,9 +89,9 @@ func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x2xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
-#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<2x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
-#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<1x3xf32>, user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map2, #map3, #map4], round_dims_to = array<i64: 16, 16, 16>>
 func.func @fill_matmul(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index) attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {

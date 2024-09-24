@@ -79,7 +79,7 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 
 // ----
 
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], original_type = tensor<512x1024xf32>>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
