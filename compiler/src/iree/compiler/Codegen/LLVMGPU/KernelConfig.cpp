@@ -914,14 +914,12 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
   }
 
-  // const Type elementType =
-  //     llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
-  //         .getElementType();
   if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat())
     return failure();
 
   unsigned bitWidth = std::min(initElemType.getIntOrFloatBitWidth(),
                                srcElemType.getIntOrFloatBitWidth());
+
   // Reduction distribution only supports 8/16/32 bit types now.
   if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
     return failure();
@@ -932,8 +930,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
   if (reductionSize % vectorSize != 0)
     return failure();
-  // while ((reductionSize / vectorSize) % subgroupSize != 0)
-  //   vectorSize /= 2;
 
   // Set pipeline
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
@@ -943,36 +939,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // reduction.
   std::array<int64_t, 3> workgroupSize{subgroupSize, 1, 1};
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
-  for (int i = 0; i < reductionDims.size(); i++) {
-    int64_t dim = reductionDims[i];
-    workgroupTileSizes[dim] = 0;
+  int lastDim = reductionDims.back();
+  int numElements = bounds[lastDim];
+
+  if (numElements % subgroupSize != 0)
+    return failure();
+
+  int64_t tileSize = subgroupSize * vectorSize;
+  while (numElements % tileSize != 0) {
+    tileSize >>= 1;
   }
-  if (reductionSize % (vectorSize * subgroupSize) != 0) {
-    int64_t remainingReductionSize = reductionSize / vectorSize;
-    int64_t threadSize = llvm::APIntOps::GreatestCommonDivisor(
-                             {64, uint64_t(subgroupSize)},
-                             {64, uint64_t(remainingReductionSize)})
-                             .getSExtValue();
-    int64_t remainingGroupSize = subgroupSize / threadSize;
-    for (int i = parallelDims.size() - 1; i >= 0; --i) {
-      int64_t dim = parallelDims[i];
-      int64_t bound = bounds[i];
 
-      int64_t tileSize =
-          llvm::APIntOps::GreatestCommonDivisor(
-              {64, uint64_t(bound)}, {64, uint64_t(remainingGroupSize)})
-              .getSExtValue();
-      workgroupTileSizes[dim] = tileSize;
+  if (tileSize < subgroupSize)
+    return failure();
 
-      remainingGroupSize /= tileSize;
-
-      if (remainingGroupSize == 1)
-        break;
-    }
-
-    if (remainingGroupSize != 1)
-      return failure();
-  }
+  workgroupTileSizes[lastDim] = tileSize;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);

@@ -107,11 +107,24 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
     Type elementType = constant.getType().getElementType();
     auto vectorType =
         VectorType::get(layout.getDistributedShape(), elementType);
-    Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), vectorType,
-        SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
-    replaceOpWithDistributedValues(rewriter, constantOp,
-                                   distirbutedOp->getResult(0));
+
+    //@Bangtian: will revisit this part later
+    bool isScalar = cast<ShapedType>(vectorType).getRank() == 0;
+    if (!isScalar) {
+      Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
+          constantOp.getLoc(), vectorType,
+          SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
+      replaceOpWithDistributedValues(rewriter, constantOp,
+                                     distirbutedOp->getResult(0));
+    } else {
+      Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
+          constantOp.getLoc(), vectorType,
+          SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
+
+      replaceOpWithDistributedValues(rewriter, constantOp,
+                                     distirbutedOp->getResult(0));
+    }
+
     return success();
   }
 };
@@ -536,8 +549,11 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> newInitArgs;
     for (Value initArg : forOp.getInitArgs()) {
       if (auto vectorInitArg = dyn_cast<VectorValue>(initArg)) {
-        initArg =
-            getDistributed(rewriter, vectorInitArg, signature[vectorInitArg]);
+        //@Bangtian: rank check to gurantee it is vector value.
+        if (vectorInitArg.getType().getRank() != 0) {
+          initArg =
+              getDistributed(rewriter, vectorInitArg, signature[vectorInitArg]);
+        }
       }
       newInitArgs.push_back(initArg);
     }
@@ -606,8 +622,11 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
       Value val = bbArg;
       if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
-        val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-            oldVectorInit.getLoc(), oldVectorInit.getType(), val);
+        //@Bangtian: same rank check here.
+        if (oldVectorInit.getType().getRank() != 0) {
+          val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+              oldVectorInit.getLoc(), oldVectorInit.getType(), val);
+        }
       }
       replacements.push_back(val);
     }
