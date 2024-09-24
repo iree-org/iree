@@ -267,8 +267,15 @@ struct GPUUnsetEncodingOpLoweringConversion
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (failed(maybeEncodingInfo)) {
-      return rewriter.notifyMatchFailure(unsetEncodingOp,
-                                         "unhandled result encoding");
+      Value result = adaptor.getSource();
+      Type targetType =
+          getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
+      if (targetType != result.getType()) {
+        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
+                                                 targetType, result);
+      }
+      rewriter.replaceOp(unsetEncodingOp, result);
+      return success();
     }
 
     Location loc = unsetEncodingOp.getLoc();

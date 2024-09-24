@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -876,6 +877,32 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
   }
 };
 
+struct MaterializeOptimizationBarrierOp
+    : public OpMaterializeEncodingPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpMaterializeEncodingPattern<
+      IREE::Util::OptimizationBarrierOp>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op,
+                  IREE::Util::OptimizationBarrierOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    bool hasEncoding = false;
+    for (auto operand : op.getOperands()) {
+      auto type = cast<RankedTensorType>(operand.getType());
+      if (type.getEncoding()) {
+        hasEncoding = true;
+        break;
+      }
+    }
+    if (!hasEncoding) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
 /// Pattern to convert contraction operations.
 class MaterializeContractionOp : public OpInterfaceConversionPattern<
                                      mlir::linalg::ContractionOpInterface> {
@@ -953,12 +980,12 @@ void populateShapeIndependentMaterializeEncodingPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
 
-  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeFlowDispatchTensorLoadOp,
-                  MaterializeFlowDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding>(
-      context, typeConverter, materializeEncodingValueFn);
+  patterns.insert<
+      MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
+      MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
+      MaterializeInterfaceBindingEncoding>(context, typeConverter,
+                                           materializeEncodingValueFn);
 };
 
 } // namespace mlir::iree_compiler
