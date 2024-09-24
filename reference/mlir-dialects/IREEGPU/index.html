@@ -5090,7 +5090,9 @@ produces.</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_mma_layout&lt;
   ::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr,   # intrinsic
   int64_t,   # unroll_m
+  int64_t,   # unroll_m_to_subgroups
   int64_t,   # unroll_n
+  int64_t,   # unroll_n_to_subgroups
   int64_t   # unroll_k
 &gt;
 </code></pre></div>
@@ -5127,17 +5129,27 @@ additional information can be added to <code>parameters</code>.</p>
 <tr>
 <td style="text-align: center;">unroll_m</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
+<td>Unrolling along the M dimension, on the same thread.</td>
+</tr>
+<tr>
+<td style="text-align: center;">unroll_m_to_subgroups</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Unrolling along the M dimension, distributed across this many more threads.</td>
 </tr>
 <tr>
 <td style="text-align: center;">unroll_n</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
+<td>Unrolling along the N dimension, on the same thread.</td>
+</tr>
+<tr>
+<td style="text-align: center;">unroll_n_to_subgroups</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Unrolling along the N dimension, distributed across this many more threads.</td>
 </tr>
 <tr>
 <td style="text-align: center;">unroll_k</td>
 <td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
+<td>Unrolling along the K dimension, on the same thread, with interleaved layout.</td>
 </tr>
 </tbody>
 </table>
