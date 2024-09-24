@@ -13,7 +13,7 @@
         {
             "name": "turbine",
             "displayName": "Minimal Turbine Dev",
-            "description": "Enable minimal development of SHARK-Turbine with a CPU backend",
+            "description": "Enable minimal development of iree-turbine with a CPU backend",
             "inherits": [
                 "minimal",
                 "python-bindings"

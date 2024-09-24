@@ -9,9 +9,10 @@ icon: octicons/bug-16
 
 Bringing up new models or diagnosing regressions in existing models written
 using one of IREE's supported [ML frameworks](../../guides/ml-frameworks/index.md)
-or downstream projects like [sharktank](https://github.com/nod-ai/sharktank) can
-involve debugging up and down the tech stack. Here are some tips to make that
-process easier.
+or downstream projects like
+[SHARK-Platform](https://github.com/nod-ai/SHARK-Platform) can involve
+debugging up and down the tech stack. Here are some tips to make that process
+easier.
 
 ## Helpful build settings
 

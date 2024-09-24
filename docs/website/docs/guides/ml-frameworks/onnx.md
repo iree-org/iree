@@ -16,7 +16,7 @@ status: new
     Support for a broad set of [ONNX operators](https://onnx.ai/onnx/operators/)
     and [data types](https://onnx.ai/onnx/intro/concepts.html#supported-types)
     is an active investment area. See the
-    [ONNX Op Support tracking issue](https://github.com/nod-ai/SHARK-Turbine/issues/215)
+    [ONNX Op Support tracking issue](https://github.com/nod-ai/SHARK-ModelDev/issues/215)
     for the latest status.
 
 ## :octicons-book-16: Overview
@@ -140,7 +140,7 @@ There are several possible scenarios:
 1. The operator is not implemented, or the implementation is missing a case.
    Search for a matching issue in one of these places:
      * <https://github.com/llvm/torch-mlir/issues>
-     * <https://github.com/nod-ai/SHARK-Turbine/issues>
+     * <https://github.com/nod-ai/SHARK-ModelDev/issues>
 2. The operator is implemented but only for a more recent ONNX version. You can
    try upgrading your .onnx file using the
    [ONNX Version Converter](https://github.com/onnx/onnx/blob/main/docs/VersionConverter.md):
