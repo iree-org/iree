@@ -143,7 +143,7 @@ bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
 
 /// Concatenates the vectors.
 SmallVector<int64_t>
-getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape);
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
 
 } // namespace mlir::iree_compiler
 

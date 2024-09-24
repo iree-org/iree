@@ -210,10 +210,12 @@ bool isNarrowNResult(EncodingAttr encoding) {
 }
 
 SmallVector<int64_t>
-getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape) {
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   SmallVector<int64_t> result;
-  for (auto expandShapeDim : expandShape) {
-    result.append(expandShapeDim);
+  for (auto e : expandShape) {
+    for (auto d : e) {
+      result.push_back(d.size);
+    }
   }
   return result;
 }

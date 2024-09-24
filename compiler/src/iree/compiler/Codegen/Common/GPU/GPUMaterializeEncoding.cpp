@@ -37,84 +37,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-/// Returns the index of the dimension whose flattened size (flattening inner
-/// dimensions into it) matches the given `targetSize`. This is used to compute
-/// interleaving indices.
-///
-/// Example:
-///    Input shape = [16, 8, 4, 4]
-///    Input targetSize = 16
-/// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
-///    whose product equals targetSize.
-static int64_t getDimIdxForTargetSize(ArrayRef<int64_t> shape,
-                                      int64_t targetSize) {
-  int interleaveAt = 0;
-  int size = 1;
-  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
-    assert(size <= targetSize);
-    assert((targetSize % size) == 0);
-    if (size == targetSize) {
-      break;
-    }
-    size *= shape[interleaveAt];
-  }
-  return interleaveAt;
-}
-
-/// Generates the swizzle for the full data-tiled-mma tile, including all the
-/// relevant unrolling factors.
-static TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
-                              IREE::GPU::MMAFragment fragment) {
-  auto [AType, BType, CType] = mma.getABCElementTypes();
-  int ABits = AType.getIntOrFloatBitWidth();
-  int BBits = BType.getIntOrFloatBitWidth();
-  // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
-  const int targetPreferredLoadBitWidth = 128;
-  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
-  switch (fragment) {
-  case IREE::GPU::MMAFragment::Lhs:
-    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
-    // Unroll on K with interleaving, then on M.
-    if (mma.getUnrollK() > 1) {
-      unroll(swizzle, 1, mma.getUnrollK());
-      int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * ABits));
-      interleave(swizzle, 1, interleavingIdx);
-    }
-    if (mma.getUnrollM() > 1) {
-      unroll(swizzle, 0, mma.getUnrollM());
-    }
-    break;
-  case IREE::GPU::MMAFragment::Rhs:
-    // B-matrix (RHS). Since the pack ops already took care of transposing B,
-    // source dimensions are N (index 0) and K (index 1).
-    // Unroll on K with interleaving, then on N.
-    if (mma.getUnrollK() > 1) {
-      unroll(swizzle, 1, mma.getUnrollK());
-      int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * BBits));
-      interleave(swizzle, 1, interleavingIdx);
-    }
-    if (mma.getUnrollN() > 1) {
-      unroll(swizzle, 0, mma.getUnrollN());
-    }
-    break;
-  case IREE::GPU::MMAFragment::Acc:
-    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
-    // 1). Unroll on N, then on M.
-    if (mma.getUnrollN() > 1) {
-      unroll(swizzle, 1, mma.getUnrollN());
-    }
-    if (mma.getUnrollM() > 1) {
-      unroll(swizzle, 0, mma.getUnrollM());
-    }
-    break;
-  }
-  return swizzle;
-}
-
 static bool hasIntrinsic(IREE::GPU::TargetAttr target,
                          IREE::GPU::MMAIntrinsic intrinsic) {
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
@@ -133,13 +55,16 @@ chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
-  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollN,
+  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollMToThreads,
+                   int unrollN, int unrollNToThreads,
                    int unrollK) -> std::optional<DataTiledMMAAttr> {
     if (!hasIntrinsic(target, intrinsic)) {
       return std::nullopt;
     }
     auto candidate = DataTiledMMAAttr::get(
-        ctx, MMAIntrinsicAttr::get(ctx, intrinsic), unrollM, unrollN, unrollK);
+        ctx, MMAIntrinsicAttr::get(ctx, intrinsic), /*unroll_m=*/unrollM,
+        /*unroll_m_to_subgroups=*/unrollMToThreads, /*unroll_n=*/unrollN,
+        /*unroll_n_to_subgroups=*/unrollNToThreads, /*unroll_k=*/unrollK);
     auto [candidateLhs, candidateRhs, candidateOut] =
         candidate.getABCElementTypes();
     if (candidateLhs != lhs || candidateRhs != rhs || candidateOut != out) {
@@ -147,13 +72,13 @@ chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
     }
     return candidate;
   };
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 8, 8, 4)) {
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 8, 1, 2, 4, 4)) {
     return m;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 8, 8, 2)) {
+  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 8, 1, 2, 4, 2)) {
     return m;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 8, 8, 2)) {
+  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 8, 1, 2, 4, 2)) {
     return m;
   }
   // Fallback - no architecture-optimized tile size for this case.
@@ -220,7 +145,7 @@ struct GPUMaterializeDeviceEncodingPass final
 
 SmallVector<ReassociationIndices>
 getReassociationIndices(int outerDims,
-                        SmallVector<SmallVector<int64_t>> expandShape) {
+                        const TileSwizzle::ExpandShapeType &expandShape) {
   SmallVector<ReassociationIndices> result;
   int expandedIdx = 0;
   for (int i = 0; i < outerDims; ++i) {

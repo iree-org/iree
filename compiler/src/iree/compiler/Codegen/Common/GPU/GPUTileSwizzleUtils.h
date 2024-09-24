@@ -8,6 +8,7 @@
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_GPU_GPUTILESWIZZLEUTILS_H_
 
 #include "iree/compiler/Codegen/Common/TileSwizzle.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 
 namespace mlir::iree_compiler {
@@ -17,9 +18,17 @@ namespace mlir::iree_compiler {
 TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
                                 IREE::GPU::MMAFragment fragment);
 
+// Returns the swizzle for the full data-tiled-mma tile, including all the
+// relevant unrolling factors.
+TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
+                       IREE::GPU::MMAFragment fragment);
+
 // Unrolls the dimension given by `srcIndex` by the given `unrollFactor`.
 // This is not interleaving layouts. The layout will consist of multiple copies
 // of the input tile, side by side.
+//
+// The enum parameter `kind` initializes the corresponding member on the newly
+// created TileSwizzle::Dim.
 //
 // Example:
 //    Input swizzle = { expandShape = [[16], [4]], permutation = [1, 0] }
@@ -27,7 +36,8 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
 //    Input unrollFactor = 4
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
 //
-void unroll(TileSwizzle &swizzle, int srcIndex, int unrollFactor);
+void unroll(TileSwizzle &swizzle, int srcIndex, int unrollFactor,
+            TileSwizzle::Dim::Kind kind);
 
 // Interleaves the layout in `swizzle` by mutating `swizzle.permutation` to
 // move permutation[0], the outer-most dimension (which the unroll() function
