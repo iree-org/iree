@@ -40,14 +40,15 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
   // Resolve "host" cpu and cpu features.
   // Note: CPU feature detection in LLVM may be incomplete. Passing explicit
   // feature lists instead of "host" should be preferred when possible.
-  if (inCpu == "host" || inCpuFeatures == "host") {
-    bool isCpuHostOrEmpty = inCpu.empty() || inCpu == "host";
+  if (cpu == "host" || cpuFeatures == "host") {
+    bool isCpuHostOrEmpty = cpu.empty() || cpu == "host";
     bool isCpuFeaturesHostOrEmpty =
-        inCpuFeatures.empty() || inCpuFeatures == "host";
+        cpuFeatures.empty() || cpuFeatures == "host";
     if (!(isCpuHostOrEmpty && isCpuFeaturesHostOrEmpty)) {
       llvm::errs() << "error: If either Cpu or CpuFeatures is 'host', the "
                       "other must also be 'host' or empty (Cpu: '"
-                   << inCpu << "', CpuFeatures: '" << inCpuFeatures << "')\n";
+                   << cpu << "', CpuFeatures: '" << cpuFeatures << "')\n";
+      // Note: not populating outCpu or outCpuFeatures here! Fatal error later.
       return false;
     }
     cpu = llvm::sys::getHostCPUName().str();
@@ -133,9 +134,9 @@ LLVMTarget::LLVMTarget() {
   llvmTargetOptions.UniqueSectionNames = true;
 }
 
-std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
-                                             std::string_view cpu,
-                                             std::string_view cpuFeatures,
+std::optional<LLVMTarget> LLVMTarget::create(std::string triple,
+                                             std::string cpu,
+                                             std::string cpuFeatures,
                                              bool requestLinkEmbedded) {
   LLVMTarget target;
   target.linkEmbedded = requestLinkEmbedded;
@@ -355,8 +356,9 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
       return {};
     }
 
-    std::optional<LLVMTarget> maybeTarget = LLVMTarget::create(
-        *triple, cpu.value_or(""), cpuFeatures.value_or(""), linkEmbedded);
+    std::optional<LLVMTarget> maybeTarget =
+        LLVMTarget::create(triple->str(), cpu.value_or("").str(),
+                           cpuFeatures.value_or("").str(), linkEmbedded);
     if (!maybeTarget) {
       return {};
     }

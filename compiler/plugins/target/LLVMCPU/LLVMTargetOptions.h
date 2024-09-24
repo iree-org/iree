@@ -66,9 +66,8 @@ struct LLVMTarget {
   void storeToConfigAttrs(MLIRContext *context,
                           SmallVector<NamedAttribute> &config) const;
 
-  static std::optional<LLVMTarget> create(std::string_view triple,
-                                          std::string_view cpu,
-                                          std::string_view cpuFeatures,
+  static std::optional<LLVMTarget> create(std::string triple, std::string cpu,
+                                          std::string cpuFeatures,
                                           bool requestLinkEmbedded);
 
   static std::optional<LLVMTarget> createForHost();
