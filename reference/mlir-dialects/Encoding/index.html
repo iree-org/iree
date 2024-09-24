@@ -3975,7 +3975,6 @@ For now in IREE the default layout is row-major.</p>
   IntegerAttr,   # operand_index
   EncodingOpTypeAttr,   # op_type
   ArrayAttr,   # element_types
-  TypeAttr,   # original_type
   IntegerAttr,   # matmul_narrow_M
   IntegerAttr,   # matmul_narrow_N
   ArrayAttr,   # user_indexing_maps
@@ -4015,11 +4014,6 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">element_types</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>element types of the user's operands</td>
-</tr>
-<tr>
-<td style="text-align: center;">original_type</td>
-<td style="text-align: center;"><code>TypeAttr</code></td>
-<td>type of the original tensor type before padding</td>
 </tr>
 <tr>
 <td style="text-align: center;">matmul_narrow_M</td>
