@@ -204,9 +204,19 @@ bool isNarrowNResult(EncodingAttr encoding) {
   if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
     return false;
   }
-  IntegerAttr narrowM = encoding.getMatmulNarrow_M();
-  IntegerAttr narrowN = encoding.getMatmulNarrow_N();
-  return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
+
+  ArrayRef<int64_t> hostDefinedUpperBound = encoding.getRoundDimsToArray();
+  if (hostDefinedUpperBound.empty()) {
+    return false;
+  }
+
+  int64_t narrowM = hostDefinedUpperBound[0] < IREE::Encoding::kNarrowThreshold
+                        ? hostDefinedUpperBound[0]
+                        : 0;
+  int64_t narrowN = hostDefinedUpperBound[1] < IREE::Encoding::kNarrowThreshold
+                        ? hostDefinedUpperBound[1]
+                        : 0;
+  return narrowN && (!narrowM || narrowM > narrowN);
 }
 
 SmallVector<int64_t>

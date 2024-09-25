@@ -295,8 +295,10 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
+    SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
+    std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
     TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
-                                      hostDefinedUpperBound);
+                                      newHostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -363,6 +365,11 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
+
+    LLVM_DEBUG(llvm::dbgs() << "candidate: "; llvm::interleaveComma(
+                   ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+               llvm::dbgs() << " penalty:" << ratedTile.paddingPenalty << "\n");
+
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
