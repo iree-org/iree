@@ -61,6 +61,8 @@ struct ROCmOptions {
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
+  // Optional pass plugins
+  std::vector<std::string> passPlugins;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -96,6 +98,13 @@ struct ROCmOptions {
     binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
+    binder.list<std::string>(
+      "iree-hip-pass-plugins", passPlugins, 
+      cl::desc("Pass plugins to be pass to the target backend during "
+                     "executable serialization"),
+      cl::ZeroOrMore, cl::cat(category));
+
+    
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -534,7 +543,7 @@ public:
       }
 
       // Run LLVM optimization passes.
-      optimizeModule(*llvmModule, *targetMachine, serOptions.passPlugins);
+      optimizeModule(*llvmModule, *targetMachine, options.passPlugins);
       if (!serOptions.dumpIntermediatesPath.empty()) {
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),
@@ -549,7 +558,7 @@ public:
       if (!serOptions.dumpIntermediatesPath.empty()) {
         auto moduleCopy = llvm::CloneModule(*llvmModule);
         if (!moduleCopy) {
-          llvm::errs() << "Error: cloning LLVM IR failed\n";
+          llvm::report_fatal_error("Error: cloning LLVM IR failed");
           return failure();
         }
         std::string targetISA =
