@@ -99,12 +99,10 @@ struct ROCmOptions {
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
     binder.list<std::string>(
-      "iree-hip-pass-plugins", passPlugins, 
-      cl::desc("Pass plugins to be pass to the target backend during "
-                     "executable serialization"),
-      cl::ZeroOrMore, cl::cat(category));
-
-    
+        "iree-hip-pass-plugins", passPlugins,
+        cl::desc("Pass plugins to be pass to the target backend during "
+                 "executable serialization"),
+        cl::ZeroOrMore, cl::cat(category));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {

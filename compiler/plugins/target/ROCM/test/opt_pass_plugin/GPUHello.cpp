@@ -47,8 +47,8 @@ bool GpuHello::runOnModule(llvm::Module &module) {
             sourceInfo = (function.getName()).str();
           } else {
             sourceInfo =
-                (function.getName() + "\t" + debugLocation->getFilename() + ":" +
-                 Twine(debugLocation->getLine()) + ":" +
+                (function.getName() + "\t" + debugLocation->getFilename() +
+                 ":" + Twine(debugLocation->getLine()) + ":" +
                  Twine(debugLocation->getColumn()))
                     .str();
           }
