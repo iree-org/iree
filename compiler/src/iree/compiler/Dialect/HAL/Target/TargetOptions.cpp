@@ -30,7 +30,6 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
                            llvm::cl::desc("Target device specifications."),
                            llvm::cl::ZeroOrMore,
                            llvm::cl::cat(halTargetOptionsCategory));
-
   binder.opt<std::string>(
       "iree-hal-default-device", defaultDevice,
       llvm::cl::desc("Which device is considered the default when no device "
