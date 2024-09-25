@@ -39,6 +39,7 @@ def IREEGPU_LoweringConfigAttr :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
+        "hasWorkgroupTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -129,6 +130,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getContractionLayout",
     "getMNKShape",
     "getSubgroupSize",
+    "getMmaScope",
     "buildMmaOperation",
     "populateOperandOffsetsSizesStrides",
     "materializeOperandConcreteShape",
@@ -221,8 +223,9 @@ def IREEGPU_DataTiledMMAAttr :
     "getABCVectorTypes",
     "getMNKShape",
     "getSubgroupSize",
-    // TODO: Implement the interface method.
-    // "populateOperandOffsetsSizesStrides",
+    "getMmaScope",
+    "populateOperandOffsetsSizesStrides",
+    "buildMmaOperation",
   ]>
 ]> {
   let mnemonic = "data_tiled_mma_layout";
@@ -252,9 +255,11 @@ def IREEGPU_DataTiledMMAAttr :
 
   let parameters = (ins
     "::mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr":$intrinsic,
-    "int64_t":$unroll_m,
-    "int64_t":$unroll_n,
-    "int64_t":$unroll_k
+    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, on the same thread.">:$unroll_m,
+    DefaultValuedParameter<"int64_t", "1", "Unrolling along the M dimension, distributed across this many more threads.">:$unroll_m_to_subgroups,
+    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, on the same thread.">:$unroll_n,
+    DefaultValuedParameter<"int64_t", "1", "Unrolling along the N dimension, distributed across this many more threads.">:$unroll_n_to_subgroups,
+    DefaultValuedParameter<"int64_t", "1", "Unrolling along the K dimension, on the same thread, with interleaved layout.">:$unroll_k
   );
 }
 

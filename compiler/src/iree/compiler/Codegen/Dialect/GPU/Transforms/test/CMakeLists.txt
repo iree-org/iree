@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "combine_barrier_regions.mlir"
     "concretize_mma_shapes.mlir"
     "distribute_mma_to_lanes.mlir"
     "fuse_and_hoist_forall.mlir"

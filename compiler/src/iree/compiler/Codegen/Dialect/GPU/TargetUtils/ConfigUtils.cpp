@@ -193,11 +193,11 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getIndexArrayAttr(workgroupTileSizes));
+                     b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getIndexArrayAttr(reductionTileSizes));
+                     b.getI64ArrayAttr(reductionTileSizes));
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
-                     b.getIndexArrayAttr(subgroupTileSizes));
+                     b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -434,10 +434,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getIndexArrayAttr(workgroupTileSizes));
+                     b.getI64ArrayAttr(workgroupTileSizes));
 
   attrs.emplace_back(StringAttr::get(context, "thread"),
-                     b.getIndexArrayAttr(threadTileSizes));
+                     b.getI64ArrayAttr(threadTileSizes));
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
   const unsigned maxVectorSize = 32;
@@ -467,7 +467,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   }
   if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
     attrs.emplace_back(StringAttr::get(context, "reduction"),
-                       b.getIndexArrayAttr(loopTileSizes));
+                       b.getI64ArrayAttr(loopTileSizes));
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);

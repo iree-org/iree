@@ -466,7 +466,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
-  populateIREEMaterializeEncodingIntoPackUnPackPatterns(
+  populateShapeIndependentMaterializeEncodingPatterns(
       materializeEncodingPattern, target, typeConverter,
       materializeEncodingValueFn);
 

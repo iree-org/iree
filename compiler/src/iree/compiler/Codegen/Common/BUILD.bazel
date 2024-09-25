@@ -100,6 +100,7 @@ iree_compiler_cc_library(
         "DecomposeLinalgGeneric.cpp",
         "DecomposePackUnPackOps.cpp",
         "DecomposeSoftmax.cpp",
+        "DropVectorUnitDims.cpp",
         "EmulateNarrowType.cpp",
         "EncodingUtils.cpp",
         "EraseDeadAllocAndStores.cpp",
@@ -153,7 +154,6 @@ iree_compiler_cc_library(
         "PassUtils.h",
         "Passes.h",
         "TileSizeSelection.h",
-        "TileSwizzle.h",
         "Transforms.h",
         "UserConfig.h",
     ],
@@ -161,6 +161,7 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
+        "//compiler/src/iree/compiler/Codegen/Common:TileSwizzle",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
@@ -225,6 +226,13 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorTransforms",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
+)
+
+iree_compiler_cc_library(
+    name = "TileSwizzle",
+    srcs = ["TileSwizzle.cpp"],
+    hdrs = ["TileSwizzle.h"],
+    deps = ["@llvm-project//llvm:Support"],
 )
 
 # TODO: If the layering causes concerns then the transform dialect interpreter

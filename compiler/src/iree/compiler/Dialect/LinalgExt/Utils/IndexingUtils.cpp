@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -83,10 +84,6 @@ void AttentionOpDetail::inferFromIndexingMaps(
 
 FailureOr<AttentionOpDetail>
 AttentionOpDetail::get(ArrayRef<AffineMap> indexingMaps) {
-  if (indexingMaps.size() != 4 && indexingMaps.size() != 6) {
-    return failure();
-  }
-
   AttentionOpDetail opInfo;
   opInfo.inferFromIndexingMaps(indexingMaps);
   opInfo.maps = SmallVector<AffineMap>(indexingMaps);

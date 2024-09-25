@@ -197,6 +197,11 @@ def GPUApplyTilingLevelPass :
   ];
 }
 
+def GPUMaterializeHostEncodingPass :
+    Pass<"iree-codegen-gpu-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
 def GPUMaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
@@ -263,6 +268,14 @@ def VectorReductionToGPUPass :
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+}
+
+def ExpandGPUOpsPass :
+    InterfacePass<"iree-codegen-expand-gpu-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect"
   ];
 }
 

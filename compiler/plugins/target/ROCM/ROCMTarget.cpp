@@ -22,7 +22,6 @@
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/hip_executable_def_builder.h"
 #include "llvm/ADT/StringExtras.h"
@@ -36,17 +35,13 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/LogicalResult.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -134,68 +129,6 @@ private:
     return mlir::iree_compiler::findPlatformLibDirectory("rocm");
   }
 };
-
-// Extracts the amdgpu chipset version from the chip architecture in the
-// executable target attribute.
-static FailureOr<amdgpu::Chipset>
-getChipsetVersion(ExecutableTargetAttr targetAttr) {
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(targetAttr);
-  if (!gpuTarget)
-    return failure();
-
-  return amdgpu::Chipset::parse(gpuTarget.getArch());
-}
-
-// Set attributes on `funcOp` in order to use upstream's translation of
-// ROCDL dialect attributes to LLVM. Primarily this is `rocdl.kernel`
-// (sets the calling convention and workgroup size uniformity) but this will
-// also set both forms of workgroup size metadata from `exportOp` (if it is set)
-// and will set the waves_per_eq flag where relevant. Finally, it will mark
-// kernel arguments `inreg` to enable argument preloading on supported
-// architectures.
-static void annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
-                                         ExecutableExportOp exportOp,
-                                         ExecutableTargetAttr targetAttr,
-                                         OpBuilder &builder) {
-  auto *rocdlDialect =
-      funcOp.getContext()->getLoadedDialect<ROCDL::ROCDLDialect>();
-  UnitAttr unitAttr = builder.getUnitAttr();
-  rocdlDialect->getKernelAttrHelper().setAttr(funcOp, unitAttr);
-  std::optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
-  if (workgroupSizeAttr && workgroupSizeAttr->size() <= 3) {
-    std::array<int32_t, 3> wgSizes;
-    int32_t flatWgSize = 1;
-    for (auto [value, attr] : llvm::zip_equal(
-             wgSizes, workgroupSizeAttr->getAsRange<IntegerAttr>())) {
-      value = attr.getInt();
-      flatWgSize *= value;
-    }
-    rocdlDialect->getReqdWorkGroupSizeAttrHelper().setAttr(
-        funcOp, builder.getDenseI32ArrayAttr(wgSizes));
-    rocdlDialect->getFlatWorkGroupSizeAttrHelper().setAttr(
-        funcOp,
-        builder.getStringAttr(Twine(flatWgSize) + "," + Twine(flatWgSize)));
-  }
-
-  if (std::optional<IntegerAttr> attr =
-          getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
-    rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, *attr);
-  }
-
-  // Kernel argument preloading is only supported on gfx940 and newer targets
-  // from the CDNA family. This is enabled using the `inreg` function argument
-  // attribute.
-  FailureOr<amdgpu::Chipset> chipset = getChipsetVersion(targetAttr);
-  if (failed(chipset))
-    return;
-  if (chipset->majorVersion != 9 || *chipset < amdgpu::Chipset(9, 4, 0))
-    return;
-
-  auto inRegAttrName =
-      builder.getStringAttr(LLVM::LLVMDialect::getInRegAttrName());
-  for (unsigned i = 0, e = funcOp.getNumArguments(); i < e; ++i)
-    funcOp.setArgAttr(i, inRegAttrName, unitAttr);
-}
 
 static void dumpModuleToPath(StringRef path, StringRef baseName,
                              StringRef suffix, StringRef extension,
@@ -317,8 +250,6 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
-    registry.insert<amdgpu::AMDGPUDialect>();
-    registry.insert<ROCDL::ROCDLDialect>();
   }
 
   void
@@ -369,6 +300,21 @@ public:
     mpm.run(module, mam);
   }
 
+  LogicalResult
+  validateFinalizedModule(IREE::HAL::ExecutableVariantOp variantOp,
+                          llvm::Module &module) {
+    for (llvm::Function &func : module.functions()) {
+      if (func.isDeclaration() && !func.isIntrinsic() && !func.use_empty()) {
+        llvm::User *liveUser = *func.user_begin();
+        return variantOp.emitError()
+               << "found an unresolved external function '" << func.getName()
+               << "' in the final bitcode. A remaining live user is\n"
+               << llvm::formatv("{0}", *liveUser);
+      }
+    }
+    return success();
+  }
+
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
@@ -391,11 +337,8 @@ public:
     // Collect all the entry point names.
     auto exportOps = llvm::to_vector_of<IREE::HAL::ExecutableExportOp>(
         variantOp.getExportOps());
-    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
     std::optional<uint32_t> subgroupSize;
     for (IREE::HAL::ExecutableExportOp exportOp : exportOps) {
-      exportOpMap[exportOp.getSymName()] = exportOp;
-
       // TODO: put this either on the variant or propagate as a function
       // attribute instead - today this *must* be consistent across all exports
       // and it shouldn't need to be.
@@ -420,7 +363,9 @@ public:
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()
                << "no objects defined for external variant";
-      } else if (variantOp.getObjects()->getValue().size() != 1) {
+      }
+
+      if (variantOp.getObjects()->getValue().size() != 1) {
         // For now we assume there will be exactly one object file.
         // In the future we will want to perform a linking step here and ideally
         // support _also_ linking in the codegen results.
@@ -441,17 +386,6 @@ public:
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
-
-      // Set up attributes so upstream's conversions work right.
-      for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-        // Un-exported functions are library functions or otherwise
-        // not kernels, so don't need these annotations.
-        if (!exportOpMap.contains(func.getName()))
-          continue;
-        annotateKernelForTranslation(func, exportOpMap[func.getName()],
-                                     targetAttr, executableBuilder);
-      }
-
       std::unique_ptr<llvm::Module> llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
       if (!llvmModule) {
@@ -470,10 +404,10 @@ public:
           for (NamedAttribute funcAttr : funcAttrs) {
             auto value = dyn_cast<StringAttr>(funcAttr.getValue());
             if (!value) {
-              return variantOp->emitError("llvm_func_attrs attribute must be "
-                                          "adictionary of strings. Attribute " +
-                                          llvm::Twine(funcAttr.getName()) +
-                                          " is not a StringAttr.");
+              return variantOp->emitError()
+                     << "llvm_func_attrs attribute must be a dictionary of "
+                        "strings. Attribute "
+                     << funcAttr.getName() << " is not a StringAttr.";
             }
             llvmFunc->addFnAttr(funcAttr.getName(), value.getValue());
           }
@@ -577,6 +511,10 @@ public:
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),
                          ".optimized.ll", *llvmModule);
+      }
+
+      if (failed(validateFinalizedModule(variantOp, *llvmModule))) {
+        return failure();
       }
 
       // Dump the assembly output.

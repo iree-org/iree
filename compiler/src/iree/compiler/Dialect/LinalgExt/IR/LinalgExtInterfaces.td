@@ -149,11 +149,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert(opOperand->getOwner() == $_op);
-        if(opOperand->getOperandNumber() >= $_op.getNumDpsInputs()){
-          return $_op.getIndexingMapsForResults()[opOperand->getOperandNumber() - $_op.getNumDpsInputs()];
-        }else {
-          return $_op.getIndexingMapsForOperands()[opOperand->getOperandNumber()];
-        }
+        return getIndexingMapsArray()[opOperand->getOperandNumber()];
       }]
     >,
 

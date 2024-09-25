@@ -369,6 +369,7 @@ func.func @attention_20x4096x64x4096x64() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
                      ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>
   flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
@@ -407,6 +408,7 @@ func.func @attention_large_head_dim_shared_mem() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d1, d2, d3, d4) -> (d1, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d4)>,
+                     affine_map<(d1, d2, d3, d4) -> ()>,
                      affine_map<(d1, d2, d3, d4) -> (d1, d4)>]}
                      ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%7 : tensor<1024x512xf16>) -> tensor<1024x512xf16>
   flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>

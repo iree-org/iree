@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -30,6 +31,33 @@ namespace mlir::iree_compiler {
 //===---------------------------------------------------------------------===//
 // Utility methods
 //===---------------------------------------------------------------------===//
+
+// Utility to apply a tile-swizzling to a packed shape.
+static SmallVector<OpFoldResult>
+getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
+                 MaterializeEncodingInfo encodingInfo) {
+  if (packedShape.empty() || !encodingInfo.swizzle) {
+    return SmallVector<OpFoldResult>(packedShape);
+  }
+
+  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
+  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
+  for (auto i : encodingInfo.swizzle->permutation) {
+    perm.push_back(i + srcRank);
+  }
+
+  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
+  SmallVector<int64_t> expandedTileShape =
+      getExpandedTileShape(encodingInfo.swizzle->expandShape);
+  MLIRContext *ctx = packedShape[0].getContext();
+  Builder b(ctx);
+  for (int64_t d : expandedTileShape) {
+    newShape.push_back(b.getIndexAttr(d));
+  }
+  applyPermutationToVector(newShape, perm);
+
+  return newShape;
+}
 
 static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                          ValueRange convertedInputOperands,
@@ -368,6 +396,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   SmallVector<OpFoldResult> newShape = tensor::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo->innerDimsPos,
       encodingInfo->outerDimsPerm);
+  newShape = getSwizzledShape(newShape, *encodingInfo);
   Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
       loc, newShape, emptyType.getElementType());
   return newEmptyOp;
@@ -505,33 +534,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                 convertedOutputOperands, typeConverter);
           })
       .Default([](Operation *op) { return failure(); });
-}
-
-// Utility to apply a tile-swizzling to a packed shape.
-static SmallVector<OpFoldResult>
-getSwizzledShape(ArrayRef<OpFoldResult> packedShape,
-                 MaterializeEncodingInfo encodingInfo) {
-  if (packedShape.empty() || !encodingInfo.swizzle) {
-    return SmallVector<OpFoldResult>(packedShape);
-  }
-
-  int64_t srcRank = packedShape.size() - encodingInfo.innerTileSizes.size();
-  SmallVector<int64_t> perm = llvm::to_vector(llvm::seq<int64_t>(0, srcRank));
-  for (auto i : encodingInfo.swizzle->permutation) {
-    perm.push_back(i + srcRank);
-  }
-
-  SmallVector<OpFoldResult> newShape(packedShape.take_front(srcRank));
-  SmallVector<int64_t> expandedTileShape =
-      getExpandedTileShape(encodingInfo.swizzle->expandShape);
-  MLIRContext *ctx = packedShape[0].getContext();
-  Builder b(ctx);
-  for (int64_t d : expandedTileShape) {
-    newShape.push_back(b.getIndexAttr(d));
-  }
-  applyPermutationToVector(newShape, perm);
-
-  return newShape;
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
@@ -818,6 +820,11 @@ struct UnsetEncodingOpToUnPackOpConversion
 };
 
 /// Generic pattern to convert operation that is in Destination Passing Style.
+/// TODO(hanchung): Implement a different pattern for non-elementwise
+/// operations. Because they should implement their own patterns based on
+/// backends. The elementwise operations are just like shape-like op in
+/// data-tiling concept. They still have the same computation but with different
+/// shapes.
 template <typename OpTy>
 struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
   using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
@@ -870,6 +877,27 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
   }
 };
 
+struct MaterializeOptimizationBarrierOp
+    : public OpMaterializeEncodingPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpMaterializeEncodingPattern<
+      IREE::Util::OptimizationBarrierOp>::OpMaterializeEncodingPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op,
+                  IREE::Util::OptimizationBarrierOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (llvm::none_of(op.getOperandTypes(), [](Type type) -> bool {
+          auto tensorType = dyn_cast<RankedTensorType>(type);
+          return tensorType && tensorType.getEncoding();
+        })) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
 /// Pattern to convert contraction operations.
 class MaterializeContractionOp : public OpInterfaceConversionPattern<
                                      mlir::linalg::ContractionOpInterface> {
@@ -914,16 +942,14 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   MLIRContext *context = patterns.getContext();
-  patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
+  patterns.insert<MaterializeDPSOperation<linalg::GenericOp>,
                   MaterializeContractionOp, SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToUnPackOpConversion>(
       context, typeConverter, materializeEncodingValueFn);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
 }
 
-void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
+void populateShapeIndependentMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -949,10 +975,12 @@ void populateIREEMaterializeEncodingIntoPackUnPackPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
 
-  patterns.insert<MaterializeFlowDispatchTensorLoadOp,
-                  MaterializeFlowDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding>(
-      context, typeConverter, materializeEncodingValueFn);
+  patterns.insert<
+      MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
+      MaterializeFlowDispatchTensorLoadOp, MaterializeFlowDispatchTensorStoreOp,
+      MaterializeInterfaceBindingEncoding>(context, typeConverter,
+                                           materializeEncodingValueFn);
 };
 
 } // namespace mlir::iree_compiler

@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -156,6 +157,11 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// Emit identity constant based on combiningKind and type.
 Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
                                 vector::CombiningKind kind, Type identityType);
+
+/// Returns the matching GPU reduction operation.
+mlir::gpu::AllReduceOperation
+combiningKindToAllReduce(vector::CombiningKind kind);
+
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//

@@ -100,10 +100,10 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
         // used by attention's exp2 who's value is always > 0.
         Value mx = builder.create<arith::ConstantOp>(
             loc, builder.getFloatAttr(srcTy, mxDbl));
-        Value clamped = b.create<arith::MinimumFOp>(loc, mx, args[0]);
+        Value clamp = b.create<arith::MinimumFOp>(loc, mx, args[0]);
 
         // Convert scale to the same datatype as input.
-        Value trunc = convertScalarToDtype(b, loc, clamped, dstTy,
+        Value trunc = convertScalarToDtype(b, loc, clamp, dstTy,
                                            /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, trunc);
       });
@@ -175,6 +175,53 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
+static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
+                       AffineMap maskMap, Value qk, Value mask) {
+
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
+  qkMap = compressedMaps[0];
+  maskMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(qkMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+
+  Value zero = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
+  Value negInf = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()),
+                                -std::numeric_limits<double>::infinity()));
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, qk.getType(), SmallVector<Value>{mask}, qk,
+      SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value qkVal = args[1];
+        Value maskVal = args[0];
+
+        // TODO: Replace bool mask condition once treated as i1 (instead of i8)
+        if (maskVal.getType().isInteger()) {
+          maskVal =
+              b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
+          maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
+        } else {
+          maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
+                                         /*isUnsignedCast=*/false);
+          // Scaling to compensate for base-2 softmax
+          Value log2e = b.create<arith::ConstantOp>(
+              loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+          maskVal = b.create<arith::MulFOp>(loc, maskVal, log2e);
+        }
+        // Finally, set the returned value to the qk element plus the mask
+        // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
+        // of a SelectFOp to stay consistent with the additive definition of
+        // attention masking)
+        Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
+        b.create<linalg::YieldOp>(loc, add);
+      });
+
+  return genericOp.getResult(0);
+}
+
 // Compute output = exp2(output - input)
 static Value computeSubAndExp2(OpBuilder &builder, Location loc,
                                AffineMap inputMap, AffineMap outputMap,
@@ -240,6 +287,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value query = getQuery();
   Value key = getKey();
   Value value = getValue();
+  std::optional<Value> mask = getMask();
   Value oldAcc = getOutput();
   Value oldMax = getMax();
   Value oldSum = getSum();
@@ -265,6 +313,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   auto qETy = getElementTypeOrSelf(query.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
 
+  AffineMap scaleMap = AffineMap::get(/*dimCount=*/getQueryMap().getNumInputs(),
+                                      /*symbolCount=*/0, getContext());
+
   // In the original algorithm, the scaling is done after the softmax:
   //        softmax(Q @ K.T * scale) @ V
   //
@@ -275,8 +326,6 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // significantly affect numerics.
   if (qETy.getIntOrFloatBitWidth() > 8) {
     AffineMap qMap = getQueryMap();
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
     query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
                                                    query, scale);
   }
@@ -323,6 +372,11 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
         loc, b.getFloatAttr(elementType, clAttentionSoftmaxMax / mx));
     s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
                                                offset);
+  }
+
+  // S += mask
+  if (mask != nullptr) {
+    s = applyMask(b, loc, sMap, *getMaskMap(), s, mask.value());
   }
 
   // TODO: This decomposition should be in a seperate op called

@@ -3,14 +3,15 @@
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d3)>
-#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
 func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16>, %v: tensor<2x10x4096x128xf16>)
                      -> tensor<2x10x4096x128xf16> {
   %scale = arith.constant 0.125 : f16
   %acc = tensor.empty() : tensor<2x10x4096x128xf16>
   %out = iree_linalg_ext.attention
-         {indexing_maps = [#map, #map1, #map2, #map3]}
+         {indexing_maps = [#map, #map1, #map2, #map3, #map4]}
          ins(%q, %k, %v, %scale : tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, f16)
          outs(%acc : tensor<2x10x4096x128xf16>) -> tensor<2x10x4096x128xf16>
   func.return %out : tensor<2x10x4096x128xf16>

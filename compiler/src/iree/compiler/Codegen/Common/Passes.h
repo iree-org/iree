@@ -67,8 +67,16 @@ using ConfigFn =
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvolutionToIGEMMPass(ConfigFn configFn);
 
+using PackUnPackControlFn = std::function<LogicalResult(Operation *)>;
+/// Pass to decompose pack and unpack ops into pad/extract_slice and reshape
+/// ops. If specified, `controlFn` controls which ops get decomposed. The
+/// `controlFn` should be used with `useOnlyReshapes` set to true.
+/// TODO(Max191): Add a controlFn upstream for `GeneralizeOuterUnitDim*`
+/// patterns and remove the need to have `useOnlyReshapes = true` when using
+/// `controlFn`.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne);
+createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
+                                 std::optional<PackUnPackControlFn> controlFn);
 
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
