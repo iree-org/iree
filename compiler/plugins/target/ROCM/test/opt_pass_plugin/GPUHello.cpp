@@ -1,23 +1,22 @@
-#include <iostream>
-#include <vector>
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
-using namespace llvm;
-using namespace std;
 
 namespace {
 
-struct GpuHello : public PassInfoMixin<GpuHello> {
-  PreservedAnalyses run(Module &module, ModuleAnalysisManager &) {
+struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
+  llvm::PreservedAnalyses run(llvm::Module &module,
+                              llvm::ModuleAnalysisManager &) {
     bool modifiedCodeGen = runOnModule(module);
+    if (!modifiedCodeGen)
+      return llvm::PreservedAnalyses::all();
 
-    return (modifiedCodeGen ? llvm::PreservedAnalyses::none()
-                            : llvm::PreservedAnalyses::all());
+    return llvm::PreservedAnalyses::all();
   }
   bool runOnModule(llvm::Module &module);
   // isRequired being set to true keeps this pass from being skipped
@@ -25,47 +24,47 @@ struct GpuHello : public PassInfoMixin<GpuHello> {
   static bool isRequired() { return true; }
 };
 
-} // end anonymous namespace
-
 bool GpuHello::runOnModule(llvm::Module &module) {
   bool modifiedCodeGen = false;
-  for (auto &function : module) {
+  for (llvm::Function &function : module) {
     if (function.isIntrinsic())
       continue;
-    StringRef functionName = function.getName();
-    if (function.getCallingConv() == CallingConv::AMDGPU_KERNEL ||
-        function.getCallingConv() == CallingConv::PTX_Kernel ||
+
+    llvm::StringRef functionName = function.getName();
+    if (function.getCallingConv() == llvm::CallingConv::AMDGPU_KERNEL ||
+        function.getCallingConv() == llvm::CallingConv::PTX_Kernel ||
         functionName.contains("kernel")) {
-      for (Function::iterator basicBlock = function.begin();
-           basicBlock != function.end(); basicBlock++) {
-        for (BasicBlock::iterator inst = basicBlock->begin();
-             inst != basicBlock->end(); inst++) {
-          DILocation *debugLocation =
-              dyn_cast<Instruction>(inst)->getDebugLoc();
+
+      for (llvm::BasicBlock &basicBlock : function) {
+        for (llvm::Instruction &inst : basicBlock) {
+          llvm::DILocation *debugLocation = inst.getDebugLoc();
           std::string sourceInfo;
           if (!debugLocation) {
-            sourceInfo = (function.getName()).str();
+            sourceInfo = function.getName().str();
           } else {
-            sourceInfo =
-                (function.getName() + "\t" + debugLocation->getFilename() +
-                 ":" + Twine(debugLocation->getLine()) + ":" +
-                 Twine(debugLocation->getColumn()))
-                    .str();
+            // Using formatv
+            sourceInfo = llvm::formatv("{0}\t{1}:{2}:{3}", function.getName(),
+                                       debugLocation->getFilename(),
+                                       debugLocation->getLine(),
+                                       debugLocation->getColumn())
+                             .str();
           }
 
-          errs() << "Hello From First Instruction of GPU Kernel: " << sourceInfo
-                 << "\n";
+          llvm::errs() << "Hello From First Instruction of GPU Kernel: "
+                       << sourceInfo << "\n";
           return modifiedCodeGen;
         }
       }
     }
   }
-  return modifiedCodeGen;
+  return false;
 }
 
-PassPluginLibraryInfo getPassPluginInfo() {
-  const auto callback = [](PassBuilder &pb) {
-    pb.registerOptimizerLastEPCallback([&](ModulePassManager &mpm, auto) {
+} // end anonymous namespace
+
+llvm::PassPluginLibraryInfo getPassPluginInfo() {
+  const auto callback = [](llvm::PassBuilder &pb) {
+    pb.registerOptimizerLastEPCallback([&](llvm::ModulePassManager &mpm, auto) {
       mpm.addPass(GpuHello());
       return true;
     });
