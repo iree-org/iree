@@ -18,6 +18,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os << "CrossThread";
   case TileSwizzle::Dim::Kind::CrossIntrinsic:
     return os << "CrossIntrinsic";
+  default:
+    // Required by GCC.
+    assert(false);
+    return os;
   }
 }
 
