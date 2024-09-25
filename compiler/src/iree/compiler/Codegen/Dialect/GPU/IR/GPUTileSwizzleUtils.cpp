@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 
 namespace mlir::iree_compiler {
 
@@ -106,8 +106,8 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   }
   // The layout strides decide the initial swizzle.permutation.
   // Some WMMA intrinsics have tstrides=0 values, assert on that as that
-  // would defeat this algorithm. We'll need to solve that if and when we want
-  // to support data tiling on WMMA intrinsics.
+  // would defeat this algorithm.
+  // TODO(bjacob): Resolve that to support WMMA intrinsics.
   for (auto s : layout.tstrides) {
     (void)s;
     assert(s != 0);

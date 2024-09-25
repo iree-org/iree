@@ -224,8 +224,8 @@ def IREEGPU_DataTiledMMAAttr :
     "getMNKShape",
     "getSubgroupSize",
     "getMmaScope",
-    // TODO: Implement the interface method.
-    // "populateOperandOffsetsSizesStrides",
+    "populateOperandOffsetsSizesStrides",
+    "buildMmaOperation",
   ]>
 ]> {
   let mnemonic = "data_tiled_mma_layout";
