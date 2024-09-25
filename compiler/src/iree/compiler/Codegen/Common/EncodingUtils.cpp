@@ -156,10 +156,6 @@ RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
-int64_t getIntOrZero(IntegerAttr a) {
-  return a == IntegerAttr() ? 0 : a.getInt();
-}
-
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {
@@ -205,17 +201,8 @@ bool isNarrowNResult(EncodingAttr encoding) {
     return false;
   }
 
-  ArrayRef<int64_t> hostDefinedUpperBound = encoding.getRoundDimsToArray();
-  if (hostDefinedUpperBound.empty()) {
-    return false;
-  }
-
-  int64_t narrowM = hostDefinedUpperBound[0] < IREE::Encoding::kNarrowThreshold
-                        ? hostDefinedUpperBound[0]
-                        : 0;
-  int64_t narrowN = hostDefinedUpperBound[1] < IREE::Encoding::kNarrowThreshold
-                        ? hostDefinedUpperBound[1]
-                        : 0;
+  int64_t narrowM = encoding.getMatmulNarrowM();
+  int64_t narrowN = encoding.getMatmulNarrowN();
   return narrowN && (!narrowM || narrowM > narrowN);
 }
 

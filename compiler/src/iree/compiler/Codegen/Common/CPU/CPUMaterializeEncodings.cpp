@@ -430,8 +430,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = getIntOrZero(encoding.getMatmulNarrow_N());
+  int64_t matmulNarrowM = encoding.getMatmulNarrowM();
+  int64_t matmulNarrowN = encoding.getMatmulNarrowN();
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =

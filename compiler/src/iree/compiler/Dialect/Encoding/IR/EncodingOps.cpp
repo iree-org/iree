@@ -158,6 +158,28 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              getRoundDimsTo());
 }
 
+int64_t EncodingAttr::getMatmulNarrowM() {
+  if (getOpType().getValue() != EncodingOpType::matmul) {
+    return 0;
+  }
+  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
+  if (roundDimsTo.empty()) {
+    return 0;
+  }
+  return roundDimsTo[0] < kNarrowThreshold ? roundDimsTo[0] : 0;
+}
+
+int64_t EncodingAttr::getMatmulNarrowN() {
+  if (getOpType().getValue() != EncodingOpType::matmul) {
+    return 0;
+  }
+  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
+  if (roundDimsTo.empty()) {
+    return 0;
+  }
+  return roundDimsTo[1] < kNarrowThreshold ? roundDimsTo[1] : 0;
+}
+
 //===---------------------------------------------------------------------===//
 // Encoding Dialect Helpers
 //===---------------------------------------------------------------------===//
