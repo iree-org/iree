@@ -903,14 +903,14 @@ std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
           opaqueLayout.kSize * getUnrollK()};
 }
 
-// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
-// `predicate` returns false.
+/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
+/// `predicate` returns false.
 static SmallVector<int64_t>
 sliceSwizzledShape(const TileSwizzle &swizzle,
                    std::function<bool(TileSwizzle::Dim)> predicate) {
   SmallVector<int64_t> shape;
-  for (auto e : swizzle.expandShape) {
-    for (auto d : e) {
+  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
+    for (TileSwizzle::Dim d : e) {
       shape.push_back(predicate(d) ? d.size : 1);
     }
   }
@@ -980,8 +980,8 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   return success();
 }
 
-// Increment the mutable vector `indices` to traverse the index space below
-// `sizes`, with the last dimension moving fastest.
+/// Increment the mutable vector `indices` to traverse the index space below
+/// `sizes`, with the last dimension moving fastest.
 static void incrementIndices(MutableArrayRef<int64_t> indices,
                              ArrayRef<int64_t> sizes) {
   int rank = indices.size();
@@ -995,7 +995,7 @@ static void incrementIndices(MutableArrayRef<int64_t> indices,
   }
 }
 
-// Flattens the input vector `value` to 1-D.
+/// Flattens the input vector `value` to 1-D.
 static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   Type type = value.getType();
   VectorType vectorType = llvm::dyn_cast<VectorType>(type);
@@ -1009,7 +1009,8 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   return builder.create<vector::ShapeCastOp>(loc, flatVectorType, value);
 }
 
-// Returns intrinsic-level slices tiling the input multi-MMA-level tile `value`.
+/// Returns intrinsic-level slices tiling the input multi-MMA-level tile
+/// `value`.
 static SmallVector<Value>
 distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
                                   const TileSwizzle &swizzle) {
@@ -1036,8 +1037,6 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
   return distributedValues;
 }
 
-// Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
-// type.
 FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
                                                      Location loc,
                                                      Type resultType, Value lhs,
@@ -1087,7 +1086,7 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
 
   // Insert the results into the destination accumulator.
   auto accSwizzle = getSwizzle(*this, MMAFragment::Acc);
-  auto accCrossIntrinsicShape =
+  SmallVector<int64_t> accCrossIntrinsicShape =
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
