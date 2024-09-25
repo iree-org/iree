@@ -66,6 +66,7 @@ public:
       if (failed(runPipeline(passManager, moduleOp))) {
         return signalPassFailure();
       }
+      return;
     }
 
     // TODO: vmvx has its own logic about supporting dynamic tile
