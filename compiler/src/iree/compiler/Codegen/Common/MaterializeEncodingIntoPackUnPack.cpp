@@ -886,15 +886,10 @@ struct MaterializeOptimizationBarrierOp
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op,
                   IREE::Util::OptimizationBarrierOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    bool hasEncoding = false;
-    for (auto operand : op.getOperands()) {
-      auto type = cast<RankedTensorType>(operand.getType());
-      if (type.getEncoding()) {
-        hasEncoding = true;
-        break;
-      }
-    }
-    if (!hasEncoding) {
+    if (llvm::none_of(op.getOperandTypes(), [](Type type) -> bool {
+          auto tensorType = dyn_cast<RankedTensorType>(type);
+          return tensorType && tensorType.getEncoding();
+        })) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
