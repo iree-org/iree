@@ -1088,13 +1088,11 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       });
   SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
   SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
-  for (int mu = 0; mu < getUnrollM(); ++mu) {
-    for (int nu = 0; nu < getUnrollN(); ++nu) {
-      acc = builder.create<vector::InsertStridedSliceOp>(
-          loc, intrinsicsAcc[mu * getUnrollN() + nu], acc, indices, strides);
-      incrementIndices(indices, accCrossIntrinsicShape);
-    }
-  }
+  int intrinsicsAccIndex = 0;
+  do {
+    acc = builder.create<vector::InsertStridedSliceOp>(
+        loc, intrinsicsAcc[intrinsicsAccIndex++], acc, indices, strides);
+  } while (incrementIndices(indices, accCrossIntrinsicShape));
   return acc;
 }
 
