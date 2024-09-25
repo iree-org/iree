@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/GPU/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -55,16 +55,16 @@ chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
-  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollMToThreads,
-                   int unrollN, int unrollNToThreads,
+  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollMToSubgroups,
+                   int unrollN, int unrollNToSubgroups,
                    int unrollK) -> std::optional<DataTiledMMAAttr> {
     if (!hasIntrinsic(target, intrinsic)) {
       return std::nullopt;
     }
     auto candidate = DataTiledMMAAttr::get(
         ctx, MMAIntrinsicAttr::get(ctx, intrinsic), /*unroll_m=*/unrollM,
-        /*unroll_m_to_subgroups=*/unrollMToThreads, /*unroll_n=*/unrollN,
-        /*unroll_n_to_subgroups=*/unrollNToThreads, /*unroll_k=*/unrollK);
+        /*unroll_m_to_subgroups=*/unrollMToSubgroups, /*unroll_n=*/unrollN,
+        /*unroll_n_to_subgroups=*/unrollNToSubgroups, /*unroll_k=*/unrollK);
     auto [candidateLhs, candidateRhs, candidateOut] =
         candidate.getABCElementTypes();
     if (candidateLhs != lhs || candidateRhs != rhs || candidateOut != out) {

@@ -44,7 +44,6 @@ iree_cc_library(
     CommonGPUPasses
   HDRS
     "GPUPatterns.h"
-    "GPUTileSwizzleUtils.h"
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
@@ -75,7 +74,6 @@ iree_cc_library(
     "GPUTensorTileToSerialLoops.cpp"
     "GPUTile.cpp"
     "GPUTileReduction.cpp"
-    "GPUTileSwizzleUtils.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
     "GPUVerifyDistribution.cpp"
