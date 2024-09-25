@@ -27,7 +27,7 @@ struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
 bool GpuHello::runOnModule(llvm::Module &module) {
   bool modifiedCodeGen = false;
   for (llvm::Function &function : module) {
-    if (function.isIntrinsic())
+    if (function.isIntrinsic() || function.isDeclaration())
       continue;
 
     llvm::StringRef functionName = function.getName();
