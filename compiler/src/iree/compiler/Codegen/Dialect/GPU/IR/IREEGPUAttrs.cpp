@@ -1053,11 +1053,11 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   }
 
   // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
-  auto intrinsicsLhs = distributeMmaFragmentToIntrinsics(
+  SmallVector<Value> intrinsicsLhs = distributeMmaFragmentToIntrinsics(
       builder, loc, lhs, getSwizzle(*this, MMAFragment::Lhs));
-  auto intrinsicsRhs = distributeMmaFragmentToIntrinsics(
+  SmallVector<Value> intrinsicsRhs = distributeMmaFragmentToIntrinsics(
       builder, loc, rhs, getSwizzle(*this, MMAFragment::Rhs));
-  auto intrinsicsAcc = distributeMmaFragmentToIntrinsics(
+  SmallVector<Value> intrinsicsAcc = distributeMmaFragmentToIntrinsics(
       builder, loc, acc, getSwizzle(*this, MMAFragment::Acc));
 
   // Get a MMAAttr for the intrinsic itself, to reuse MMAAttr::buildMmaOperation
@@ -1088,11 +1088,11 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       });
   SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
   SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
-  int intrinsicsAccIndex = 0;
-  do {
-    acc = builder.create<vector::InsertStridedSliceOp>(
-        loc, intrinsicsAcc[intrinsicsAccIndex++], acc, indices, strides);
-  } while (incrementIndices(indices, accCrossIntrinsicShape));
+  for (Value intrAcc : intrinsicsAcc) {
+    acc = builder.create<vector::InsertStridedSliceOp>(loc, intrAcc, acc,
+                                                       indices, strides);
+    incrementIndices(indices, accCrossIntrinsicShape);
+  }
   return acc;
 }
 
