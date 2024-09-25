@@ -16,7 +16,9 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -35,6 +37,7 @@
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_GPUMATERIALIZEDEVICEENCODINGPASS
+#define GEN_PASS_DEF_GPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 static bool hasIntrinsic(IREE::GPU::TargetAttr target,
@@ -130,6 +133,22 @@ materializeEncodingForTarget(RankedTensorType tensorType,
 }
 
 namespace {
+
+// TODO(hanchung): Delete this pass and rely on tensor-based analysis to
+// materialize encodings based on where tensors are used. This pass is not able
+// to handle that.
+struct GPUMaterializeHostEncodingPass
+    : public impl::GPUMaterializeHostEncodingPassBase<
+          GPUMaterializeHostEncodingPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, tensor::TensorDialect,
+                    linalg::LinalgDialect, IREE::Encoding::IREEEncodingDialect,
+                    IREE::GPU::IREEGPUDialect>();
+  }
+
+  void runOnOperation() override;
+};
+
 struct GPUMaterializeDeviceEncodingPass final
     : impl::GPUMaterializeDeviceEncodingPassBase<
           GPUMaterializeDeviceEncodingPass> {
@@ -248,8 +267,15 @@ struct GPUUnsetEncodingOpLoweringConversion
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (failed(maybeEncodingInfo)) {
-      return rewriter.notifyMatchFailure(unsetEncodingOp,
-                                         "unhandled result encoding");
+      Value result = adaptor.getSource();
+      Type targetType =
+          getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
+      if (targetType != result.getType()) {
+        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
+                                                 targetType, result);
+      }
+      rewriter.replaceOp(unsetEncodingOp, result);
+      return success();
     }
 
     Location loc = unsetEncodingOp.getLoc();
@@ -400,12 +426,10 @@ protected:
   const MaterializeEncodingValueFn materializeEncodingValueFn;
 };
 
-} // namespace
-
-void GPUMaterializeDeviceEncodingPass::runOnOperation() {
-  MLIRContext *ctx = &getContext();
-  FunctionOpInterface funcOp = getOperation();
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+static LogicalResult
+materializeFuncOpEncodings(FunctionOpInterface funcOp,
+                           IREE::HAL::ExecutableTargetAttr targetAttr) {
+  MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
     MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
@@ -424,7 +448,7 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       funcOp.emitOpError("materialization failed");
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -436,8 +460,91 @@ void GPUMaterializeDeviceEncodingPass::runOnOperation() {
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
+      return failure();
+    }
+  }
+
+  return success();
+}
+
+static std::optional<SetVector<IREE::HAL::ExecutableTargetAttr>>
+getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
+                             IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                             IREE::HAL::DeviceAnalysis &deviceAnalysis) {
+  // Get a set of all unique affinities used by resources within the function.
+  SetVector<IREE::Stream::AffinityAttr> uniqueAffinityAttrs;
+  SmallVector<IREE::Stream::AffinityAttr> lookupAffinityAttrs;
+  funcOp.walk([&](Operation *op) {
+    if (affinityAnalysis.tryLookupExecutionAffinity(op, lookupAffinityAttrs)) {
+      uniqueAffinityAttrs.insert(lookupAffinityAttrs.begin(),
+                                 lookupAffinityAttrs.end());
+    }
+    lookupAffinityAttrs.clear();
+  });
+
+  // Resolve affinities to executable targets.
+  SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+  for (auto affinityAttr : uniqueAffinityAttrs) {
+    deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, funcOp,
+                                                   executableTargetAttrs);
+  }
+  return executableTargetAttrs;
+}
+
+} // namespace
+
+void GPUMaterializeHostEncodingPass::runOnOperation() {
+  auto moduleOp = getOperation();
+
+  // Run required analysis passes.
+  IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+  if (failed(affinityAnalysis.run())) {
+    return signalPassFailure();
+  }
+  IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+  if (failed(deviceAnalysis.run())) {
+    return signalPassFailure();
+  }
+
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    // Gather the required executable targets for the function. Note that it's
+    // possible there are more required for ops nested within the function but
+    // this pass is a hack and can't handle that :shrug:.
+    auto executableTargets =
+        getFuncExecutableTargetAttrs(funcOp, affinityAnalysis, deviceAnalysis);
+    if (!executableTargets) {
+      funcOp.emitOpError()
+          << "could not determine executable targets for the function";
+      return signalPassFailure();
+    } else if (executableTargets->empty()) {
+      // Probably no tensors.
+      continue;
+    }
+
+    // HACK: this pass is run on the host _but shouldn't be_. Because it's
+    // run on the host and IREE is a compiler capable of multi-targeting there
+    // may be multiple executable targets at any point in the host program.
+    // This pass can't handle that and assumes it's been checked earlier by
+    // spooky action at a distance. This needs to be fixed.
+    if (executableTargets->size() != 1) {
+      funcOp.emitOpError() << "has multiple executable targets and CPU data "
+                              "tiling isn't built to support that";
       return signalPassFailure();
     }
+
+    // Materialize encodings within the function.
+    if (failed(
+            materializeFuncOpEncodings(funcOp, executableTargets->front()))) {
+      return signalPassFailure();
+    }
+  }
+}
+
+void GPUMaterializeDeviceEncodingPass::runOnOperation() {
+  FunctionOpInterface funcOp = getOperation();
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  if (failed(materializeFuncOpEncodings(funcOp, targetAttr))) {
+    return signalPassFailure();
   }
 }
 
