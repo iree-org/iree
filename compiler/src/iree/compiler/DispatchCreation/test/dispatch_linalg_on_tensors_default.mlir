@@ -122,3 +122,26 @@ util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x32
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   util.return %[[DISPATCH1]]
+
+util.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf16> {
+  %empty0 = tensor.empty() : tensor<2x16x32xf32>
+  %empty1 = tensor.empty() : tensor<2x16x32xf16>
+  %1 = linalg.softmax dimension(2) ins(%arg0 : tensor<2x16x32xf32>) outs(%empty0 : tensor<2x16x32xf32>) -> tensor<2x16x32xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%1 : tensor<2x16x32xf32>) outs(%empty1 : tensor<2x16x32xf16>){
+    ^bb0(%in : f32, %out : f16):
+      %3 = arith.truncf %in : f32 to f16
+      linalg.yield %3 : f16
+    } -> tensor<2x16x32xf16>
+    util.return %2 : tensor<2x16x32xf16>
+}
+
+// CHECK-LABEL: util.func public @softmax
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[SOFTMAX:.+]] = linalg.softmax
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[SOFTMAX]]
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH1]]
