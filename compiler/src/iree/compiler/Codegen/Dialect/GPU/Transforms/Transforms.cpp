@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -234,6 +235,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
   auto newProducer = rewriter.create<scf::ForOp>(
       loc, lb, ub, step, barrierOp.getBody()->getArgument(0));
+  setLoopUnrollMarker(newProducer);
   Block *loopBody = newProducer.getBody();
 
   // Get the replacement IDs for the producer loop.
