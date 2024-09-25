@@ -62,7 +62,7 @@ struct ROCmOptions {
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
   // Optional pass plugins
-  std::vector<std::string> passPlugins;
+  llvm::SmallVector<std::string> passPlugins;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -98,11 +98,11 @@ struct ROCmOptions {
     binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
-    binder.list<std::string>(
-        "iree-hip-pass-plugins", passPlugins,
-        cl::desc("Pass plugins to be pass to the target backend during "
-                 "executable serialization"),
-        cl::ZeroOrMore, cl::cat(category));
+    binder.list<std::string>("iree-hip-pass-plugins", passPlugins,
+                             cl::desc("LLVM pass plugins to be passed to the "
+                                      "target backend compiler during "
+                                      "executable serialization"),
+                             cl::ZeroOrMore, cl::cat(category));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -281,7 +281,7 @@ public:
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
-                             const std::vector<std::string> &passPlugins) {
+                             const llvm::ArrayRef<std::string> &passPlugins) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -304,14 +304,14 @@ public:
     pb.registerFunctionAnalyses(fam);
     pb.registerLoopAnalyses(lam);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
-    // Attempt to load pass plugins and register their callbacks with PB.
-    for (auto &PluginFN : passPlugins) {
-      auto PP = llvm::PassPlugin::Load(PluginFN);
-      if (PP) {
-        PP->registerPassBuilderCallbacks(pb);
+
+    for (std::string pluginFN : passPlugins) {
+      llvm::Expected<llvm::PassPlugin> pp = llvm::PassPlugin::Load(pluginFN);
+      if (pp) {
+        pp->registerPassBuilderCallbacks(pb);
       } else {
-        llvm::errs() << "unable to load plugin " << PluginFN << ":"
-                     << toString(PP.takeError());
+        llvm::errs() << "unable to load plugin " << pluginFN << ":"
+                     << toString(pp.takeError());
       }
     }
 
