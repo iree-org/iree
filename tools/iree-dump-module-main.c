@@ -171,7 +171,7 @@ static iree_status_t iree_tooling_print_cconv_fragment(
         IREE_RETURN_IF_ERROR(iree_tooling_print_cconv_fragment(
             iree_string_view_substr(cconv_fragment, i + 1, end_pos - i - 1)));
         fprintf(stdout, ">...");
-        i = end_pos + 1;
+        i = end_pos;  // +1 from the for-loop
       } break;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
