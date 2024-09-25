@@ -507,11 +507,6 @@ def SerializeExecutablesPass :
       "dumpBinariesPath", "dump-binaries-path",
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
-    >,
-    ListOption<
-      "passPlugins", "pass-plugins",
-      "std::string",
-      "List of plugins to be passed to the executable serialization optimization pipeline"
     >
   ];
 }
@@ -549,11 +544,6 @@ def SerializeTargetExecutablesPass :
       "dumpBinariesPath", "dump-binaries-path",
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
-    >,
-    ListOption<
-      "passPlugins", "pass-plugins",
-      "std::string", 
-      "List of plugins to be passed to the executable serialization optimization pipeline"
     >
   ];
 }

@@ -250,8 +250,6 @@ public:
     std::string dumpIntermediatesPath;
     // Optional path to write serialized binary results into.
     std::string dumpBinariesPath;
-    // Optional pass plugins
-    std::vector<std::string> passPlugins;
   };
 
   // Serializes the given |variantOp| executable produced by this backend to one
