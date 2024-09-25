@@ -49,36 +49,6 @@ static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
     llvm::cl::desc("Maximum number of elements to try to constant fold."),
     llvm::cl::init(0));
 
-template <typename T>
-static LogicalResult
-moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
-                Operation *insertionPoint, const DominanceInfo &dominanceInfo,
-                ArrayRef<linalg::LinalgOp> ignoreOperations = {}) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.inclusive = true;
-
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
-    }
-  }
-
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
-  }
-  return success();
-}
-
 static Operation *getMostDominantUse(Operation *op,
                                      const DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();

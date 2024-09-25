@@ -329,40 +329,6 @@ static AffineMap getConcatenatedIndexingMap(RewriterBase &rewriter,
   return newIndexingMap.insertResult(rewriter.getAffineDimExpr(0), 0);
 }
 
-/// During horizontal fusion, there might be operands of the fused operations
-/// whose definitions are interspersed between the fused operations. For groups
-/// chosen to fuse horizontally, such operations can be moved before the
-/// seed contraction operation (where the fused operation is generated).
-template <typename T>
-static LogicalResult
-moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
-                Operation *insertionPoint, DominanceInfo &dominanceInfo,
-                ArrayRef<linalg::LinalgOp> ignoreOperations = {}) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.inclusive = true;
-
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
-    }
-  }
-
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
-  }
-  return success();
-}
-
 /// On finding this pattern
 /// ```
 /// %0 = linalg.matmul ins(%arg0, %arg1)
