@@ -507,7 +507,7 @@ def SerializeExecutablesPass :
       "dumpBinariesPath", "dump-binaries-path",
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
-    >
+    >,
   ];
 }
 
@@ -544,7 +544,7 @@ def SerializeTargetExecutablesPass :
       "dumpBinariesPath", "dump-binaries-path",
       "std::string", "",
       "Path to write translated and serialized executable binaries into for debugging."
-    >
+    >,
   ];
 }
 

@@ -68,7 +68,6 @@ struct SerializeTargetExecutablesPass
     serializationOptions.debugLevel = debugLevel;
     serializationOptions.dumpIntermediatesPath = dumpIntermediatesPath;
     serializationOptions.dumpBinariesPath = dumpBinariesPath;
-
     if (!dumpIntermediatesPath.empty()) {
       llvm::sys::fs::create_directories(dumpIntermediatesPath);
     }
