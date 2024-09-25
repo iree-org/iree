@@ -981,18 +981,18 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
-/// `sizes`, with the last dimension moving fastest.
-static void incrementIndices(MutableArrayRef<int64_t> indices,
+/// `sizes`, with the last dimension moving fastest, or returns false if that
+/// index space was exhausted.
+static bool incrementIndices(MutableArrayRef<int64_t> indices,
                              ArrayRef<int64_t> sizes) {
-  int rank = indices.size();
-  for (int i = rank - 1; i >= 0; --i) {
-    ++indices[i];
-    if (indices[i] == sizes[i]) {
+  for (int i = indices.size() - 1; i >= 0; --i) {
+    if (++indices[i] == sizes[i]) {
       indices[i] = 0;
     } else {
-      break;
+      return true; // Found an index that we could increment without wrapping.
     }
   }
+  return false; // All indices wrapped around.
 }
 
 /// Flattens the input vector `value` to 1-D.
@@ -1023,17 +1023,13 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
       });
   int rank = internalShape.size();
   auto strides = SmallVector<int64_t>(rank, 1);
-  int64_t crossIntrinsicCount =
-      std::reduce(crossIntrinsicShape.begin(), crossIntrinsicShape.end(), 1,
-                  std::multiplies<int64_t>());
-  SmallVector<Value> distributedValues(crossIntrinsicCount);
+  SmallVector<Value> distributedValues;
   SmallVector<int64_t> indices(rank, 0);
-  for (Value &distributedValue : distributedValues) {
+  do {
     Value extract = builder.create<vector::ExtractStridedSliceOp>(
         loc, value, indices, internalShape, strides);
-    distributedValue = flattenVector(builder, loc, extract);
-    incrementIndices(indices, crossIntrinsicShape);
-  }
+    distributedValues.push_back(flattenVector(builder, loc, extract));
+  } while (incrementIndices(indices, crossIntrinsicShape));
   return distributedValues;
 }
 
