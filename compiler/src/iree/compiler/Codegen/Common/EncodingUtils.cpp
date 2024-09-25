@@ -59,7 +59,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     std::swap(maps[0], maps[1]);
   }
 
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
   SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
   assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() >= 3);
   if (newRoundDimsTo.size() != 0) {
@@ -86,7 +85,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
-      encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, encoding.getBcastMap(),
       DenseI64ArrayAttr::get(context, newRoundDimsTo));
   return RankedTensorType::get(newShape, elemType, newEncoding);

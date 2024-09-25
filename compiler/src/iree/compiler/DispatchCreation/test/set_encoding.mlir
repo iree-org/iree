@@ -392,11 +392,11 @@ util.func public @vecmat_f32f32f32(%arg0 : tensor<250xf32>, %arg1 : tensor<250x5
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<250x500xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<500xf32>
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// CHECK-SAME:       tensor<250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// CHECK-SAME:       tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// CHECK-SAME:       tensor<500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[VECMAT:.+]] = linalg.vecmat
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
@@ -419,11 +419,11 @@ util.func public @matvec_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<2
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<250xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<100xf32>
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// CHECK-SAME:       tensor<100x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<100x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// CHECK-SAME:       tensor<250xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<250xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// CHECK-SAME:       tensor<100xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<100xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[MATVEC:.+]] = linalg.matvec
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
@@ -446,11 +446,11 @@ util.func public @batch_vecmat_f32f32f32(%arg0 : tensor<3x250xf32>, %arg1 : tens
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<3x250x500xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<3x500xf32>
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// CHECK-SAME:       tensor<3x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<3x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// CHECK-SAME:       tensor<3x250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<3x250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// CHECK-SAME:       tensor<3x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<3x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[VECMAT:.+]] = linalg.batch_vecmat
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
@@ -471,11 +471,11 @@ util.func public @batch_matvec_f32f32f32_dynamic(%arg0 : tensor<?x?x?xf32>, %arg
 //      CHECK: util.func public @batch_matvec_f32f32f32_dynamic(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>, %[[ARG1:.+]]: tensor<?x?xf32>, %[[ARG2:.+]]: tensor<?x?xf32>
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// CHECK-SAME:       tensor<?x?x?xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<?x?x?xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// CHECK-SAME:       tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<?x?xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// CHECK-SAME:       tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
+// CHECK-SAME:       tensor<?x?xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 32, 1, 32>>>
 //      CHECK:   %[[BATCH_MATVEC:.+]] = linalg.batch_matvec
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
@@ -640,11 +640,11 @@ util.func public @matmul_f32f32f32_narrow_M(%arg0 : tensor<2x250xf32>, %arg1 : t
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 //      CHECK: util.func public @matmul_f32f32f32_narrow_M(
 //      CHECK:  iree_encoding.set_encoding
-// CHECK-SAME:    tensor<2x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
+// CHECK-SAME:    tensor<2x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
 //      CHECK:  iree_encoding.set_encoding
-// CHECK-SAME:    tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
+// CHECK-SAME:    tensor<250x500xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
 //      CHECK:  iree_encoding.set_encoding
-// CHECK-SAME:    tensor<2x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
+// CHECK-SAME:    tensor<2x500xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 2, 32, 32>>>
 //      CHECK:   linalg.matmul
 
 // -----
@@ -660,11 +660,11 @@ util.func public @batch_matmul_f32f32f32_narrow_MN(%arg0 : tensor<64x4x250xf32>,
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 //      CHECK: util.func public @batch_matmul_f32f32f32_narrow_MN(
 //      CHECK:   iree_encoding.set_encoding
-// CHECK-SAME:     tensor<64x4x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
+// CHECK-SAME:     tensor<64x4x250xf32, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
 //      CHECK:   iree_encoding.set_encoding
-// CHECK-SAME:     tensor<64x250x2xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
+// CHECK-SAME:     tensor<64x250x2xf32, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
 //      CHECK:   iree_encoding.set_encoding
-// CHECK-SAME:     tensor<64x4x2xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
+// CHECK-SAME:     tensor<64x4x2xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]], round_dims_to = array<i64: 32, 2, 32>>>
 //      CHECK:   linalg.batch_matmul
 
 // -----
@@ -799,11 +799,11 @@ util.func public @generic_batch_vecmat_transposed_i16u4i32(%arg0 : tensor<32x128
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<4096x32x128xi4>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<4096x32xi32>
 //      CHECK:   %[[LHS:.+]] = iree_encoding.set_encoding %[[ARG0]]
-// CHECK-SAME:       tensor<32x128xi16, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<32x128xi16, #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[RHS:.+]] = iree_encoding.set_encoding %[[ARG1]]
-// CHECK-SAME:       tensor<4096x32x128xi4, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<4096x32x128xi4, #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
-// CHECK-SAME:       tensor<4096x32xi32> -> tensor<4096x32xi32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
+// CHECK-SAME:       tensor<4096x32xi32> -> tensor<4096x32xi32, #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [i16, ui4, i32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 1, 32, 32>>>
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]
 // CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]

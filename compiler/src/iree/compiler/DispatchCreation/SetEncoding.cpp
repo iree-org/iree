@@ -263,10 +263,9 @@ public:
         roundDimsTo[1] = llvm::PowerOf2Ceil(narrowSizes.N.value());
       }
 
-      auto encoding =
-          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
-                            elemTypes, narrowSizes.M, narrowSizes.N, maps,
-                            /*bcastMap=*/std::nullopt, roundDimsTo);
+      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
+                                        opType, elemTypes, maps,
+                                        /*bcastMap=*/std::nullopt, roundDimsTo);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
