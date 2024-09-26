@@ -431,35 +431,20 @@ bool CollapseInfo::updateCollapseViaSubtract(
 }
 
 void CollapseInfo::print(raw_ostream &os) const {
-  os << "[CollapseDimensions] CollapseInfo:\n";
+  os << "[CollapseDims] CollapseInfo:\n";
 
   os << "Reassociation: ";
   os << "[";
   for (auto &vec : reassociation) {
     os << "[";
-    bool first = true;
-    for (auto elem : vec) {
-      if (!first) {
-        os << ", ";
-      }
-      first = false;
-      os << elem;
-    }
+    llvm::interleaveComma(vec, os);
     os << "]";
   }
   os << "]";
   os << "\n";
 
-  os << "Collapsable: ";
-  os << "{";
-  bool first = true;
-  for (auto elem : collapsableLoops) {
-    if (!first) {
-      os << ", ";
-    }
-    first = false;
-    os << elem;
-  }
+  os << "Collapsable: {";
+  llvm::interleaveComma(collapsableLoops, os);
   os << "}";
 }
 
