@@ -62,7 +62,7 @@ struct ROCmOptions {
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
   // Optional pass plugins
-  llvm::SmallVector<std::string> passPlugins;
+  SmallVector<std::string> passPlugins;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -281,7 +281,7 @@ public:
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
-                             const llvm::ArrayRef<std::string> &passPlugins) {
+                             ArrayRef<std::string> passPlugins) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -305,13 +305,15 @@ public:
     pb.registerLoopAnalyses(lam);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
 
-    for (std::string pluginFN : passPlugins) {
-      llvm::Expected<llvm::PassPlugin> pp = llvm::PassPlugin::Load(pluginFN);
+    for (const std::string &pluginFileName : passPlugins) {
+      llvm::Expected<llvm::PassPlugin> pp =
+          llvm::PassPlugin::Load(pluginFileName);
       if (pp) {
         pp->registerPassBuilderCallbacks(pb);
       } else {
-        llvm::errs() << "unable to load plugin " << pluginFN << ":"
-                     << toString(pp.takeError());
+        std::string error = "unable to load plugin " + pluginFileName + ": " +
+                            llvm::toString(pp.takeError());
+        llvm::report_fatal_error(error.c_str());
       }
     }
 
@@ -556,7 +558,7 @@ public:
       if (!serOptions.dumpIntermediatesPath.empty()) {
         auto moduleCopy = llvm::CloneModule(*llvmModule);
         if (!moduleCopy) {
-          llvm::report_fatal_error("Error: cloning LLVM IR failed");
+          llvm::errs() << "Error: cloning LLVM IR failed\n";
           return failure();
         }
         std::string targetISA =
