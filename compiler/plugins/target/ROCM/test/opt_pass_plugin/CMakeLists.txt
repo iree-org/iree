@@ -5,6 +5,7 @@ iree_cc_library(
     "GPUHello.cpp"
   DEPS
     LLVMSupport
+  SHARED
 )
 
 iree_lit_test_suite(
