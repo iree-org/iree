@@ -98,11 +98,13 @@ struct ROCmOptions {
     binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
-    binder.list<std::string>("iree-hip-pass-plugins", passPlugins,
-                             cl::desc("LLVM pass plugins to be passed to the "
-                                      "target backend compiler during "
-                                      "executable serialization"),
-                             cl::ZeroOrMore, cl::cat(category));
+    binder.list<std::string>(
+        "iree-hip-pass-plugin-paths", passPlugins,
+        cl::desc("LLVM pass plugins are out of tree libraries that implement "
+                 "LLVM opt passes. The library paths passed in this flag are "
+                 "to be passed to the target backend compiler during HIP "
+                 "executable serialization"),
+        cl::ZeroOrMore, cl::cat(category));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
