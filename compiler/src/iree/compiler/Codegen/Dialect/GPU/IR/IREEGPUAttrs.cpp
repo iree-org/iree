@@ -23,6 +23,7 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -958,14 +959,26 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
       }));
 
   // Populate tile offsets by delinearizing threadId over the CrossThread dims.
-  SmallVector<OpFoldResult> tileOffsetsBasis = getAsIndexOpFoldResult(
-      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+  // Since the AffineDelinearizeIndexOp does not bound the input index, we
+  // must bound the threadId by the product of the offset ranges.
+  SmallVector<int64_t> tileOffsetsBasis =
+      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
-      }));
+      });
+
+  // Bound for threadId is the product of tileOffsetsBasis.
+  OpFoldResult threadIdBound =
+      builder.getIndexAttr(ShapedType::getNumElements(tileOffsetsBasis));
+  AffineExpr d0 = builder.getAffineDimExpr(0), d1 = builder.getAffineDimExpr(1);
+  OpFoldResult boundedThreadId = affine::makeComposedFoldedAffineApply(
+      builder, loc, {d0 % d1}, {threadId, threadIdBound});
+
   SmallVector<OpFoldResult> tileOffsets =
       builder
-          .create<affine::AffineDelinearizeIndexOp>(loc, threadId,
-                                                    tileOffsetsBasis)
+          .create<affine::AffineDelinearizeIndexOp>(
+              loc,
+              getValueOrCreateConstantIndexOp(builder, loc, boundedThreadId),
+              getAsIndexOpFoldResult(ctx, tileOffsetsBasis))
           ->getResults();
 
   // Strides are trivial: each slice is contiguous along the *expanded* dims
