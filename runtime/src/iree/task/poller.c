@@ -130,8 +130,8 @@ void iree_task_poller_await_exit(iree_task_poller_t* poller) {
 void iree_task_poller_deinitialize(iree_task_poller_t* poller) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Must have called request_exit/await_exit.
-  IREE_ASSERT_TRUE(iree_task_poller_is_zombie(poller));
+  // Must have not been fully initialized or called request_exit/await_exit.
+  IREE_ASSERT_TRUE(!poller->thread || iree_task_poller_is_zombie(poller));
 
   iree_thread_release(poller->thread);
   poller->thread = NULL;
