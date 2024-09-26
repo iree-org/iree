@@ -1981,6 +1981,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
+  if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
+                                                   computeOp))) {
+    LDBG("Tile and fuse data tiled multi_mma config");
+    return success();
+  }
   if (clGPUTestTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {

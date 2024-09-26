@@ -272,6 +272,10 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+  if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
+                                                   computeOp))) {
+    return success();
+  }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      linalgOp))) {

@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -28,6 +29,77 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
+LogicalResult
+setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op) {
+  auto multiMmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(op);
+  if (!multiMmaOp) {
+    return failure();
+  }
+  auto dataTiledMmaAttr = dyn_cast<DataTiledMMAAttr>(multiMmaOp.getKind());
+  if (!dataTiledMmaAttr) {
+    return failure();
+  }
+
+  LDBG("MultiMMA TileAndFuse Config");
+
+  // Compute workgroup size, which is given by the subgroup size times the
+  // number of subgroups. The number of subgroups is found by the product of
+  // subgroup unrolling factors, since the non-unrolled inner kernel takes a
+  // single subgroup.
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  int64_t flatWorkgroupSize = targetSubgroupSize *
+                              dataTiledMmaAttr.getUnrollMToSubgroups() *
+                              dataTiledMmaAttr.getUnrollNToSubgroups();
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
+
+  // Set all workgroup and reduction tile sizes to 1, since the data tiled
+  // kernel has the scope of an entire workgroup, and the reduction tiling is
+  // already baked into the "opaque" data tiled inner layout of the multi_mma.
+  SmallVector<AffineMap> indexingMaps = multiMmaOp.getIndexingMapsArray();
+  mlir::linalg::ContractionDimensions contractionDims =
+      mlir::linalg::inferContractionDims(indexingMaps).value();
+
+  int64_t iterationRank = indexingMaps.front().getNumDims();
+  SmallVector<int64_t> workgroupTileSizes(iterationRank, 1);
+  SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
+  for (int64_t kDim : contractionDims.k) {
+    workgroupTileSizes[kDim] = 0;
+    reductionTileSizes[kDim] = 1;
+  }
+
+  // Set tile sizes
+  MLIRContext *context = multiMmaOp.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  // Don't add any special padding or prefetching, since the data-tiled layout
+  // is already what we want.
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      StringAttr::get(context,
+                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
+}
 
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
