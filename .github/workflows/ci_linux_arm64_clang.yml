@@ -53,13 +53,13 @@ jobs:
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=ci_linux_arm64_clang" \
             --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:f3e2c56680b6007f29c8e191d93dfcb4f8800802e3caeb4851da90f2a1a0b5a5
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:f3e2c56680b6007f29c8e191d93dfcb4f8800802e3caeb4851da90f2a1a0b5a5 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
-            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:f3e2c56680b6007f29c8e191d93dfcb4f8800802e3caeb4851da90f2a1a0b5a5
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:f3e2c56680b6007f29c8e191d93dfcb4f8800802e3caeb4851da90f2a1a0b5a5 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
