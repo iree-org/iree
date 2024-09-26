@@ -199,9 +199,7 @@ bool isNarrowNResult(EncodingAttr encoding) {
     return false;
   }
 
-  int64_t narrowM = encoding.getMatmulNarrowM();
-  int64_t narrowN = encoding.getMatmulNarrowN();
-  return narrowN && (!narrowM || narrowM > narrowN);
+  return IREE::Encoding::getMatmulNarrowDim(encoding).isN();
 }
 
 SmallVector<int64_t>

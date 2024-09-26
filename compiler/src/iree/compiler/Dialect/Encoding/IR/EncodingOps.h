@@ -35,9 +35,6 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
-/// Threadshold that determines if a dimension is considered "narrow" or not.
-constexpr int64_t kNarrowThreshold = 32;
-
 /// Returns the encoding attribute from the type if there is an encoding.
 /// Otherwise, returns null.
 EncodingAttr getEncodingAttr(RankedTensorType type);
@@ -46,12 +43,49 @@ EncodingAttr getEncodingAttr(RankedTensorType type);
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);
 
-// Assign a name to operand indices for clarity
+/// Assign a name to operand indices for clarity
 const int64_t MATMUL_LHS = 0;
 const int64_t MATMUL_RHS = 1;
 const int64_t MATMUL_RESULT = 2;
+
 /// Convert operand index to strings for printing
 std::string stringifyOperandIndex(IntegerAttr);
+
+/// Designates a dimension in a matmul (either the M or the N dimension) as
+/// being "narrow", i.e. small enough that we bother lowering the amount of
+/// padding along that dimension compared to how padding we apply to
+/// sufficiently large dimensions.
+struct MatmulNarrowDim {
+  // Enumerates dimensions of a matmul that may be labelled as narrow.
+  enum class Dim {
+    None,
+    M,
+    N,
+  };
+  Dim dim = Dim::None; // Which dimension is designated by *this.
+  int64_t size = 0;    // Size of the designated dimension, or kDynamic.
+
+  explicit operator bool() const { return dim != Dim::None; }
+  bool isM() const { return dim == Dim::M; }
+  bool isN() const { return dim == Dim::N; }
+};
+
+/// Returns the narrow dim in a given `linalgOp`, with respect to the given
+/// `narrowThreshold` below which a dimension is eligible to be considered
+/// narrow. If both M and N are narrow, M is returned. If neither M nor N are
+/// narrow, this returns a default-constructed falsish value.
+MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
+                                   int narrowThreshold);
+
+/// Returns the narrow dim in a given `encoding`. This works by inspecting
+/// the `round_dims_to` array attribute in the `encoding`. If the
+/// `round_dims_to` of one dimension (M or N) is smaller than the other, then
+/// that's the narrow dimension, because the only way it would have been set
+/// to be smaller in the first place, is if we previously flagged that dimension
+/// as narrow. If the `round_dims_to` of the M and N dimensions agree, then
+/// neither is a narrow dimension and this returns a default-constructed falsish
+/// value.
+MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 

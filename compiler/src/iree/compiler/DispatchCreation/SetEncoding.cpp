@@ -45,47 +45,6 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
-struct MatmulNarrowSizes {
-  std::optional<int64_t> M, N;
-};
-
-// Returns the minimum of static sizes of the M/N-dimensions in the types of the
-// Ouput.
-static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
-                                              linalg::LinalgOp linalgOp) {
-  linalg::ContractionDimensions cDims =
-      linalg::inferContractionDims(linalgOp).value();
-  auto map = linalgOp.getIndexingMapsArray().back();
-  auto getOutputSizeAtDimPos = [&](unsigned dimPos) -> int64_t {
-    return outType.getDimSize(
-        map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
-            .value());
-  };
-  // M or N can be empty instead of having an explicit dim size of 1 for matvec
-  // and vecmat, so set to 1 if empty.
-  int64_t M = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
-  int64_t N = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
-
-  MatmulNarrowSizes narrow;
-  if (!ShapedType::isDynamic(M) && M < IREE::Encoding::kNarrowThreshold) {
-    narrow.M = M;
-  }
-  if (!ShapedType::isDynamic(N) && N < IREE::Encoding::kNarrowThreshold) {
-    narrow.N = N;
-  }
-
-  // Only pick 1 if both are present
-  if (narrow.M && narrow.N) {
-    if (*narrow.M <= *narrow.N) {
-      narrow.N.reset();
-    } else {
-      narrow.M.reset();
-    }
-  }
-
-  return narrow;
-}
-
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                           Value source,
                                           SmallVector<OpFoldResult> sizes) {
@@ -247,8 +206,7 @@ public:
     }
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
-    MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(cast<ShapedType>(out.getType()), linalgOp);
+    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(linalgOp, padFactor);
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
@@ -256,13 +214,12 @@ public:
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
       SmallVector<int64_t> roundDimsTo(3, padFactor);
-      if (narrowSizes.M) {
-        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowSizes.M.value());
+      if (narrowDim.isM()) {
+        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowDim.size);
       }
-      if (narrowSizes.N) {
-        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowSizes.N.value());
+      if (narrowDim.isN()) {
+        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
       }
-
       auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
                                         opType, elemTypes, maps,
                                         /*bcastMap=*/std::nullopt, roundDimsTo);

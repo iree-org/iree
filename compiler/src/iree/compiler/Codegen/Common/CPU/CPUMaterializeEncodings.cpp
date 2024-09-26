@@ -47,8 +47,7 @@ enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
   // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
   // disabled when it is the case.
-  if (!cDims.batch.empty() || encoding.getMatmulNarrowM() ||
-      encoding.getMatmulNarrowN()) {
+  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
     hasUkernelSupport = false;
   }
   if (hasUkernelSupport) {
@@ -294,19 +293,20 @@ enumerateMatmulTileX86_64(TypeRange elementTypes,
 /// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
 /// information to host. For now, they are defined by host.
 static TileMxNxK
-chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
-                 int64_t matmulNarrowN,
+chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                 IREE::Encoding::MatmulNarrowDim narrowDim,
                  ArrayRef<int64_t> hostDefinedUpperBound = {}) {
   assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
          "expected hostDefinedUpperBound is empty or has upper bound for {M, "
          "N, K}");
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
-  if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
+  if (narrowDim.isN()) {
     SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
     std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
-    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
-                                      newHostDefinedUpperBound);
+    narrowDim.dim = IREE::Encoding::MatmulNarrowDim::Dim::M;
+    TileMxNxK tile =
+        chooseMatmulTile(enumeratedTiles, narrowDim, newHostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -367,9 +367,9 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
     // are OK with the tile that has M==8 even though it requires some padding.
     // Otherwise, we would be penalizing the tiles with M==8,4,2 and we would
     // end up selecting the vecmat tile (M==1) for that case!
-    if (matmulNarrowM) {
+    if (narrowDim) {
       ratedTile.paddingPenalty =
-          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(matmulNarrowM), 0);
+          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(narrowDim.size), 0);
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
@@ -438,13 +438,11 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  int64_t matmulNarrowM = encoding.getMatmulNarrowM();
-  int64_t matmulNarrowN = encoding.getMatmulNarrowN();
+  auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
-  TileMxNxK chosenTileMxNxK =
-      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
-                       encoding.getRoundDimsToArray());
+  TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim,
+                                               encoding.getRoundDimsToArray());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
