@@ -406,6 +406,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(IREE::GPU::createCombineBarrierRegionsPass());
 
   // Step 6. Lower special ops and vectorize.
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
