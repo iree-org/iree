@@ -175,7 +175,7 @@ struct LinalgOpTiedOpInterfaceHelper {
 // workgroups are created, which only happens with early materialization.
 struct MultiMmaOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
-          MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp>{
+          MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<IREE::GPU::MultiMmaOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(linalgOp.getAcc());
@@ -328,11 +328,10 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             *context);
       });
 
-  registry.addExtension(
-      +[](MLIRContext *context, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::MultiMmaOp::attachInterface<MultiMmaOpTiedOpInterface>(
-            *context);
-      });
+  registry.addExtension(+[](MLIRContext *context,
+                            IREE::GPU::IREEGPUDialect *dialect) {
+    IREE::GPU::MultiMmaOp::attachInterface<MultiMmaOpTiedOpInterface>(*context);
+  });
 
   registry.addExtension(
       +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
@@ -405,7 +404,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 #include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
             >::registerOpInterface(context);
       });
-  
+
   registry.addExtension(
       +[](MLIRContext *context, IREE::GPU::IREEGPUDialect *dialect) {
         IREE::GPU::MultiMmaOp::attachInterface<HoistableMultiMmaOpInterface>(
