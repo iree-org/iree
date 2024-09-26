@@ -67,18 +67,10 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   int64_t N = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
 
   MatmulNarrowSizes narrow;
-  // Threshold below which a M/N size is considered "narrow", making it
-  // eligible for a narrow tile size during materialization. This value should
-  // be at least as large as the actual M/N tile sizes that we choose on any
-  // target in CPUMaterializeEncodingPass. If it is smaller, we will miss
-  // opportunities to select optimized narrow tiles for narrow matmuls.
-  // If it is larger, everything will work fine, but the IR will be a bit more
-  // verbose as more narrow_matmul_{M,N} optional parameters will be specified.
-  const int64_t kNarrowThreshold = 16;
-  if (!ShapedType::isDynamic(M) && M < kNarrowThreshold) {
+  if (!ShapedType::isDynamic(M) && M < IREE::Encoding::kNarrowThreshold) {
     narrow.M = M;
   }
-  if (!ShapedType::isDynamic(N) && N < kNarrowThreshold) {
+  if (!ShapedType::isDynamic(N) && N < IREE::Encoding::kNarrowThreshold) {
     narrow.N = N;
   }
 
@@ -264,9 +256,15 @@ public:
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
       SmallVector<int64_t> roundDimsTo(3, padFactor);
+      if (narrowSizes.M) {
+        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowSizes.M.value());
+      }
+      if (narrowSizes.N) {
+        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowSizes.N.value());
+      }
+
       auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
-                                        opType, elemTypes, src.getType(),
-                                        narrowSizes.M, narrowSizes.N, maps,
+                                        opType, elemTypes, maps,
                                         /*bcastMap=*/std::nullopt, roundDimsTo);
       return setEncoding(rewriter, loc, src, encoding);
     };

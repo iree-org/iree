@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_LLVMGPU_ROCDLPASSES_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {

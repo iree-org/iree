@@ -297,7 +297,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
 void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
-  funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
+  funcPassManager.addPass(createDropVectorUnitDimsPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
       LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
                                               options.enableArmI8mm}));

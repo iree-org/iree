@@ -7,13 +7,11 @@
 name: CI - Linux x64 bazel
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/ci_linux_x64_bazel.yml"
-  schedule:
-    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
-    - cron: "15 9 * * 1-5"
   workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -24,7 +22,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
   linux_x64_bazel:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
     runs-on: azure-linux-scale
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:b9d3f66a582fb48ee36cc3b855054f3c40d591fea5d838641ca327ea60efc099
@@ -47,6 +50,6 @@ jobs:
           IREE_CUDA_DEPS_DIR: /usr/local/iree_cuda_deps
         run: |
           ./build_tools/bazel/install_bazelisk.sh 1.21.0
-          cp ./build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
+          cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh

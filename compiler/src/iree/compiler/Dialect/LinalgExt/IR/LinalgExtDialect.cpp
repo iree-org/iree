@@ -8,12 +8,14 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
@@ -52,7 +54,6 @@ struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
 };
 
 // Used to register the LinalgFusionOpInterface with the linalg ops.
-namespace {
 template <typename ConcreteType>
 struct LinalgFusionOpInterfaceAdapter
     : public LinalgFusionOpInterface::ExternalModel<
@@ -103,6 +104,48 @@ public:
     return inputMaps;
   }
 };
+
+namespace {
+struct SoftmaxFusionOpInterfaceAdapter
+    : public LinalgFusionOpInterface::ExternalModel<
+          SoftmaxFusionOpInterfaceAdapter, linalg::SoftmaxOp> {
+public:
+  SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
+    Builder b(op->getContext());
+    return llvm::to_vector(llvm::map_range(
+        llvm::cast<linalg::SoftmaxOp>(op).getDpsInputs(),
+        [&b](Value operand) -> AffineMap {
+          auto rank = cast<ShapedType>(operand.getType()).getRank();
+          return b.getMultiDimIdentityMap(rank);
+        }));
+  }
+
+  SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
+    Builder b(op->getContext());
+    return llvm::to_vector(llvm::map_range(
+        llvm::cast<linalg::SoftmaxOp>(op).getDpsInits(),
+        [&b](Value operand) -> AffineMap {
+          auto rank = cast<ShapedType>(operand.getType()).getRank();
+          return b.getMultiDimIdentityMap(rank);
+        }));
+  }
+
+  AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
+                                         OpResult result) const {
+    return getIndexingMapsForResults(op)[result.getResultNumber()];
+  }
+
+  AffineMap getMatchingIndexingMap(mlir::Operation *op,
+                                   OpOperand *operand) const {
+    return getIndexingMapsForOperands(op)[operand->getOperandNumber()];
+  }
+
+  SmallVector<AffineMap> getIndexingMapsArray(mlir::Operation *op) const {
+    auto inputMaps = getIndexingMapsForOperands(op);
+    llvm::append_range(inputMaps, getIndexingMapsForResults(op));
+    return inputMaps;
+  }
+};
 } // namespace
 
 template <typename... Args>
@@ -125,6 +168,8 @@ void IREELinalgExtDialect::initialize() {
   registerOpsWithLinalgExtOpInterface<
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
       >(context);
+  linalg::SoftmaxOp::attachInterface<SoftmaxFusionOpInterfaceAdapter>(*context);
+
   addInterfaces<IREELinalgExtInlinerInterface>();
 
   addAttributes<

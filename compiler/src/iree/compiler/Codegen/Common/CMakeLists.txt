@@ -73,7 +73,6 @@ iree_cc_library(
     "PassUtils.h"
     "Passes.h"
     "TileSizeSelection.h"
-    "TileSwizzle.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
@@ -92,6 +91,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "DecomposeSoftmax.cpp"
+    "DropVectorUnitDims.cpp"
     "EmulateNarrowType.cpp"
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
@@ -188,6 +188,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
+    iree::compiler::Codegen::Common::TileSwizzle
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
@@ -202,6 +203,18 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    TileSwizzle
+  HDRS
+    "TileSwizzle.h"
+  SRCS
+    "TileSwizzle.cpp"
+  DEPS
+    LLVMSupport
   PUBLIC
 )
 

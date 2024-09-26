@@ -30,13 +30,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     return tensorType;
   }
   auto newIndex = encoding.getOperandIndex();
-  TypeAttr originalTypeAttr = encoding.getOriginalType();
-  RankedTensorType originalType = tensorType;
-  if (originalTypeAttr) {
-    originalType =
-        llvm::dyn_cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  SmallVector<int64_t> newOriginalShape(originalType.getShape());
+  SmallVector<int64_t> newOriginalShape(tensorType.getShape());
   auto userIndexingMaps = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> maps;
   for (auto a : userIndexingMaps) {
@@ -65,7 +59,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     std::swap(maps[0], maps[1]);
   }
 
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
   SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
   assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() >= 3);
   if (newRoundDimsTo.size() != 0) {
@@ -92,8 +85,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
-      TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
-      encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, encoding.getBcastMap(),
       DenseI64ArrayAttr::get(context, newRoundDimsTo));
   return RankedTensorType::get(newShape, elemType, newEncoding);
@@ -163,10 +154,6 @@ RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
-int64_t getIntOrZero(IntegerAttr a) {
-  return a == IntegerAttr() ? 0 : a.getInt();
-}
-
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {
@@ -211,16 +198,19 @@ bool isNarrowNResult(EncodingAttr encoding) {
   if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
     return false;
   }
-  IntegerAttr narrowM = encoding.getMatmulNarrow_M();
-  IntegerAttr narrowN = encoding.getMatmulNarrow_N();
-  return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
+
+  int64_t narrowM = encoding.getMatmulNarrowM();
+  int64_t narrowN = encoding.getMatmulNarrowN();
+  return narrowN && (!narrowM || narrowM > narrowN);
 }
 
 SmallVector<int64_t>
-getExpandedTileShape(SmallVector<SmallVector<int64_t>> expandShape) {
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   SmallVector<int64_t> result;
-  for (auto expandShapeDim : expandShape) {
-    result.append(expandShapeDim);
+  for (auto e : expandShape) {
+    for (auto d : e) {
+      result.push_back(d.size);
+    }
   }
   return result;
 }

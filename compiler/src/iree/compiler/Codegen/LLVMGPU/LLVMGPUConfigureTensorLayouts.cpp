@@ -23,9 +23,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                                   RewriterBase &rewriter,
-                                   linalg::LinalgOp contract) {
+static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                                          RewriterBase &rewriter,
+                                          linalg::LinalgOp contract,
+                                          bool promoteLhs = true,
+                                          bool promoteRhs = true) {
   // TODO: Add SIMT fallback.
   if (!schedule) {
     return contract->emitError("missing mma schedule for contraction");
@@ -65,8 +67,13 @@ LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // TODO: We should read this from the lowering_config on the operation.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
   // should decide where to put these shared memory conversions.
-  layoutedLhs.setSharedMemoryConversion(true);
-  layoutedRhs.setSharedMemoryConversion(true);
+  if (promoteLhs) {
+    layoutedLhs.setSharedMemoryConversion(true);
+  }
+
+  if (promoteRhs) {
+    layoutedRhs.setSharedMemoryConversion(true);
+  }
 
   contract->setOperand(0, layoutedLhs.getResult());
   contract->setOperand(1, layoutedRhs.getResult());
@@ -82,9 +89,9 @@ LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   return success();
 }
 
-LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                                   RewriterBase &rewriter,
-                                   linalg::LinalgOp conv) {
+static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                                          RewriterBase &rewriter,
+                                          linalg::LinalgOp conv) {
   // TODO: Add SIMT fallback.
   if (!schedule) {
     return conv->emitError("missing mma schedule for convolution");
@@ -160,35 +167,164 @@ LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   return success();
 }
 
-LogicalResult setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                                       RewriterBase &rewriter,
-                                       linalg::LinalgOp contract) {
+/// Let's assume we have an matmul intrinsic (@) doing a matmul
+/// ((M, K) X (K, N)) which produces a particular layout:
+///
+/// C = A @ B
+///
+/// If we transpose and swap the operands, we can keep the same matmul
+/// intrinsic, but transpose the layout of the output intrinsic:
+///
+/// A.T = transpose(A)
+/// B.T = transpose(B)
+/// C.T = B.T @ A.T
+/// C = transpose(C.T)
+///
+/// This is useful when the "@" instruction that the hardware lowers to
+/// has a specific thread layout but the further uses of C expects a transposed
+/// layout to the produced layout.
+///
+/// For example, for "@" lowering to AMDGPU MFMA instructions, the operands
+/// have layout L and L.T and the result has the layout L.T .
+/// So if you have a chain of matmuls:
+///
+/// C (L.T) = A (L) @ B (L.T)
+/// E (L.T) = C (L.T)  @ D (L.T)
+///            ^^^^^^^
+///            Expected layout by instruction is L
+///
+/// To fix this, we can apply this transformation on the first matrix:
+///
+/// C.T (L.T) = B.T (L) @ A (L.T)
+/// C   (L)   = transpose C.T (L.T)
+/// E   (L.T) = C (L)  @ D (L.T)
+///            ^^^^^
+///            Layout matches the instruction!
+///
+/// Note that the mathematical formula
+///   C = A @ B --> C.T = B.T @ A.T
+/// is only defined on standard "@" function, it may be a different
+/// transformation for other indexing maps.
+///
+/// For linalg operands, since the indexing maps are part of the op defination,
+/// we can achieve the same transformation by simply swapping the operands.
+static void swapOperandsToTransposeIntrinsic(RewriterBase &rewriter,
+                                             linalg::GenericOp contractOp) {
+  Value lhs = contractOp->getOperand(0);
+  Value rhs = contractOp->getOperand(1);
+
+  SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
+  std::swap(indexingMaps[0], indexingMaps[1]);
+
+  contractOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(indexingMaps));
+  contractOp->setOperand(0, rhs);
+  contractOp->setOperand(1, lhs);
+}
+
+static IREE::GPU::MMAScheduleAttr
+transposeSchedule(RewriterBase &rewriter, IREE::GPU::MMAScheduleAttr schedule) {
+  return rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+      schedule.getIntrinsic(), schedule.getSubgroupNCount(),
+      schedule.getSubgroupMCount());
+}
+
+static LogicalResult
+setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                         RewriterBase &rewriter, linalg::LinalgOp qkMatmul,
+                         linalg::LinalgOp pvMatmul) {
   // TODO: Add SIMT fallback.
   if (!schedule) {
-    return contract->emitError("missing mma schedule for contraction");
+    return pvMatmul->emitError("missing mma schedule for contraction");
   }
 
-  if (contract->hasAttr("attention_qk_matmul")) {
-    // subgroup_n count for attention matmul is always 1, because it is the
-    // reduction dimension. The subgroup_n count is in reality, for the second
-    // matmul.
-    IREE::GPU::MMAScheduleAttr qkSchedule =
-        rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
-            schedule.getIntrinsic(),
-            /*subgroup_m_count=*/schedule.getSubgroupMCount(),
-            /*subgroup_n_count=*/1);
-    return setContractionAnchor(qkSchedule, rewriter, contract);
+  // Check if the intrinsic output for qkMatmul can be reused for pvMatmul.
+  // We know that pvMatmul takes result of qkMatmul as it's lhs.
+  // If the intrinsic output of pvMatmul can be used as rhs of pvMatmul,
+  // we swap operands of both contracts to get output as transposed intrinsic.
+  bool reuseIntrinsicOutput = false;
+  bool transposeIntrinsic = false;
+
+  auto intrinsic = cast<IREE::GPU::MMAAttr>(schedule.getIntrinsic());
+  IREE::GPU::MMASingleSubgroupLayout lhsLayout =
+      intrinsic.getASingleSubgroupLayout();
+  IREE::GPU::MMASingleSubgroupLayout rhsLayout =
+      intrinsic.getBSingleSubgroupLayout();
+  IREE::GPU::MMASingleSubgroupLayout outLayout =
+      intrinsic.getCSingleSubgroupLayout();
+
+  auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
+                        IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
+    return (layoutA.element == layoutB.element) &&
+           (layoutA.thread == layoutB.thread) &&
+           (layoutA.tstrides == layoutB.tstrides);
+  };
+
+  // TODO: Move this check to KernelConfig and set appropriate attributes
+  // in lowering_config for the operation. This allows us to check shared
+  // memory usage and decide what kind of pipelining we can do.
+  if (matchLayout(outLayout, lhsLayout)) {
+    reuseIntrinsicOutput = true;
+  } else if (matchLayout(outLayout, rhsLayout)) {
+    reuseIntrinsicOutput = true;
+    transposeIntrinsic = true;
   }
 
-  if (contract->hasAttr("attention_pv_matmul")) {
-    // subgroup_n count for attention matmul is always 1, because it is the
-    // reduction dimension. The subgroup_n count is in reality, for the second
-    // matmul.
-    return setContractionAnchor(schedule, rewriter, contract);
+  // subgroup_n count for attention matmul is always 1, because it is the
+  // reduction dimension. The subgroup_n count is in reality, for the pvMatmul.
+  IREE::GPU::MMAScheduleAttr qkSchedule =
+      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+          schedule.getIntrinsic(),
+          /*subgroup_m_count=*/schedule.getSubgroupMCount(),
+          /*subgroup_n_count=*/1);
+  IREE::GPU::MMAScheduleAttr pvSchedule = schedule;
+
+  // Transpose the intrinsic if requested. See docs for
+  // swapOperandsToTransposeIntrinsic for more information on why this is done.
+  if (transposeIntrinsic) {
+    auto qkGeneric = dyn_cast<linalg::GenericOp>(qkMatmul.getOperation());
+    auto pvGeneric = dyn_cast<linalg::GenericOp>(pvMatmul.getOperation());
+    if (!qkGeneric || !pvGeneric) {
+      pvMatmul->emitOpError("Non generic qkMatmul/pvMatmul transpose intrinsic "
+                            "not yet implemented");
+      return failure();
+    }
+    swapOperandsToTransposeIntrinsic(rewriter, qkGeneric);
+    swapOperandsToTransposeIntrinsic(rewriter, pvGeneric);
+    qkSchedule = transposeSchedule(rewriter, qkSchedule);
+    pvSchedule = transposeSchedule(rewriter, pvSchedule);
   }
 
-  return contract->emitError("attention matmul should have either "
-                             "attention_qk_matmul or attention_pv_matmul set");
+  if (failed(setContractionAnchor(qkSchedule, rewriter, qkMatmul))) {
+    return failure();
+  }
+
+  // Do not promote lhs of pvMatmul if we are reusing the intrinsic output.
+  bool promoteLhs = !reuseIntrinsicOutput;
+  bool promoteRhs = true;
+  if (transposeIntrinsic) {
+    std::swap(promoteLhs, promoteRhs);
+  }
+
+  return setContractionAnchor(pvSchedule, rewriter, pvMatmul, promoteLhs,
+                              promoteRhs);
+}
+
+static Operation *getOpWithAttr(Operation *root, StringRef attr) {
+  Operation *result = nullptr;
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    if (op->hasAttr(attr)) {
+      if (result) {
+        return WalkResult::interrupt();
+      }
+      result = op;
+    }
+    return WalkResult::advance();
+  });
+
+  if (walkResult.wasInterrupted()) {
+    return nullptr;
+  }
+  return result;
 }
 
 struct LLVMGPUConfigureTensorLayoutsPass final
@@ -212,19 +348,33 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     // now, layout setting for other problems like reductions is TODO.
     SmallVector<linalg::LinalgOp> contracts;
     SmallVector<linalg::LinalgOp> convs;
-    SmallVector<linalg::LinalgOp> attentionMatmuls;
+
+    auto attentionQKMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+        getOpWithAttr(func, "attention_qk_matmul"));
+    auto attentionPVMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+        getOpWithAttr(func, "attention_pv_matmul"));
+
+    if (attentionQKMatmul && !attentionPVMatmul) {
+      func->emitError("Expected attention attributes to be set properly");
+      return signalPassFailure();
+    }
+
+    if (!attentionQKMatmul && attentionPVMatmul) {
+      func->emitError("Expected attention attributes to be set properly");
+      return signalPassFailure();
+    }
 
     func->walk([&](linalg::LinalgOp linalgOp) {
+      if (linalgOp == attentionQKMatmul || linalgOp == attentionPVMatmul) {
+        return WalkResult::advance();
+      }
+
       if (linalg::isaContractionOpInterface(linalgOp)) {
-        if (linalgOp->hasAttr("attention_qk_matmul") ||
-            linalgOp->hasAttr("attention_pv_matmul")) {
-          attentionMatmuls.push_back(linalgOp);
-        } else {
-          contracts.push_back(linalgOp);
-        }
+        contracts.push_back(linalgOp);
       } else if (succeeded(linalg::inferConvolutionDims(linalgOp))) {
         convs.push_back(linalgOp);
       }
+      return WalkResult::advance();
     });
 
     IRRewriter rewriter(func);
@@ -241,9 +391,9 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       }
     }
 
-    for (linalg::LinalgOp attentionMatmul : attentionMatmuls) {
-      if (failed(setAttentionMatmulAnchor(scheduleAttr, rewriter,
-                                          attentionMatmul))) {
+    if (attentionQKMatmul && attentionPVMatmul) {
+      if (failed(setAttentionMatmulAnchor(
+              scheduleAttr, rewriter, attentionQKMatmul, attentionPVMatmul))) {
         return signalPassFailure();
       }
     }

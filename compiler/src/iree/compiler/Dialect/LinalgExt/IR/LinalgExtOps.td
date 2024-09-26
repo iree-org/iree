@@ -461,7 +461,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation",
-       "generateResultTileValue"]>]> {
+       "generateResultTileValue"]>, AttrSizedOperandSegments]> {
   let summary = "Attention operator";
   let description = [{
     Computes the scaled dot product attention function:
@@ -470,6 +470,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 
     Here Q, K, V are given tensors and scale is a scalar value specifying
     the scale to use.
+
+    If an additional mask argument M is included, the result of the first matmul is modified according to:
+
+    Q @ K.T += M
 
     For self-attention, all inputs and the result have the same shape BxNxd
     where B is the batch dimension, N is the sequence length and d is head
@@ -495,6 +499,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyShaped:$key,
                        AnyShaped:$value,
                        AnyFloat:$scale,
+                       Optional<AnyShaped>:$mask,
                        Variadic<AnyShaped>:$outputs,
                        AffineMapArrayAttr:$indexing_maps
   );
@@ -505,10 +510,21 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)? `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )? `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($results)^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins "TypeRange":$results,
+    "Value":$query,
+    "Value":$key,
+    "Value":$value,
+    "Value":$scale,
+    "ValueRange":$outputs,
+    "ArrayAttr":$indexing_maps,
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+  ];
 
   let extraClassDeclaration = [{
     // Method to implement for specifying output range for
@@ -530,8 +546,17 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     AffineMap getValueMap() {
       return cast<AffineMap>(getIndexingMapsArray()[2]);
     }
-    AffineMap getOutputMap() {
+    AffineMap getScaleMap() {
       return cast<AffineMap>(getIndexingMapsArray()[3]);
+    }
+    std::optional<AffineMap> getMaskMap() {
+      if (getMask()) {
+        return cast<AffineMap>(getIndexingMapsArray()[4]);
+      }
+      return std::nullopt;
+    }
+    AffineMap getOutputMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
     }
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
@@ -544,6 +569,11 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
     ShapedType getValueType() {
       return cast<ShapedType>(getValue().getType());
+    }
+    std::optional<ShapedType> getMaskType() {
+      std::optional<Value> mask = getMask();
+      if (!mask) return std::nullopt;
+      return cast<ShapedType>(mask->getType());
     }
     FloatType getScaleType() {
       return cast<FloatType>(cast<ShapedType>(getScale().getType()));
@@ -559,12 +589,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     std::optional<AffineMap> getMaxMap() {
       if (getNumResults() < 2)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 1]);
     }
     std::optional<AffineMap> getSumMap() {
       if (getNumResults() < 3)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[5]);
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
     }
     Value getOutput() {
       return getDpsInitOperand(0)->get();
@@ -598,6 +628,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
     int64_t getValueRank() {
       return getValueType().getRank();
+    }
+    std::optional<int64_t> getMaskRank() {
+      std::optional<ShapedType> maskType = getMaskType();
+      if (!maskType)
+        return std::nullopt;
+      return maskType->getRank();
     }
     int64_t getOutputRank() {
       return getOutputType().getRank();
@@ -650,8 +686,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     online_attention(Q, K, V, scale, running_max, running_sum)
       = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
 
+    If an additional mask argument M is included, the result of the first matmul is modified according to:
+
+    Q @ K.T += M
+
     The advantage of this online_normalizer is that it can be tiled along
-    it's reduction dimension, making the online_attention operator:
+    its reduction dimension, making the online_attention operator:
       - Tilable along softmax reduction dimension
       - Associative along softmax reduction dimension
       - Commutative along softmax associative dimension
@@ -666,6 +706,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
                        AnyShaped:$key,
                        AnyShaped:$value,
                        AnyFloat:$scale,
+                       Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
                        AnyShaped:$max,
                        AnyShaped:$sum,
@@ -677,10 +718,24 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
     `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
     (`->` type($results)^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins "TypeRange":$results,
+    "Value":$query,
+    "Value":$key,
+    "Value":$value,
+    "Value":$scale,
+    "Value":$output,
+    "Value":$max,
+    "Value":$sum,
+    "ArrayAttr":$indexing_maps,
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+  ];
+
 
   let extraClassDeclaration = [{
     // Method to implement for specifying output range for
@@ -698,14 +753,23 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     AffineMap getValueMap() {
       return getIndexingMapsArray()[2];
     }
-    AffineMap getOutputMap() {
+    AffineMap getScaleMap() {
       return getIndexingMapsArray()[3];
     }
+    std::optional<AffineMap> getMaskMap() {
+      if (getMask()) {
+        return cast<AffineMap>(getIndexingMapsArray()[4]);
+      }
+      return std::nullopt;
+    }
+    AffineMap getOutputMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs()]);
+    }
     AffineMap getMaxMap() {
-      return getIndexingMapsArray()[4];
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 1]);
     }
     AffineMap getSumMap() {
-      return getIndexingMapsArray()[5];
+      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
     }
 
     int64_t getIterationDomainRank() {

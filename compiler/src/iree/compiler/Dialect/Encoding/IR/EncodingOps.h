@@ -35,6 +35,9 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+/// Threadshold that determines if a dimension is considered "narrow" or not.
+constexpr int64_t kNarrowThreshold = 32;
+
 /// Returns the encoding attribute from the type if there is an encoding.
 /// Otherwise, returns null.
 EncodingAttr getEncodingAttr(RankedTensorType type);

@@ -35,9 +35,9 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 0 : index, 0 : index, 4 : index]
-//  CHECK-SAME:     subgroup = [0 : index, 0 : index, 4 : index, 1 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [1 : index, 1 : index, 64 : index, 64 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 4]
+//  CHECK-SAME:     subgroup = [0, 0, 4, 1, 0]
+//  CHECK-SAME:     workgroup = [1, 1, 64, 64, 0]
 
 // -----
 
@@ -59,9 +59,9 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 2 : index]
-//  CHECK-SAME:     subgroup = [4 : index, 4 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [128 : index, 128 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0, 0, 2]
+//  CHECK-SAME:     subgroup = [4, 4, 0]
+//  CHECK-SAME:     workgroup = [128, 128, 0]
 
 // -----
 
@@ -79,9 +79,9 @@ module {
 // CHECK-LABEL: func.func @conv_nhwc
 //  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 0 : index, 0 : index, 1 : index, 3 : index, 4 : index]
-//  CHECK-SAME:     thread = [1 : index, 1 : index, 1 : index, 1 : index, 0 : index, 0 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [1 : index, 1 : index, 1 : index, 64 : index, 0 : index, 0 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 3, 4]
+//  CHECK-SAME:     thread = [1, 1, 1, 1, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 1, 1, 64, 0, 0, 0]
 
 // -----
 
@@ -100,9 +100,9 @@ module {
 // CHECK-LABEL: func.func @matmul_dynamic_dim
 //  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     reduction = [0 : index, 0 : index, 4 : index]
-//  CHECK-SAME:     thread = [1 : index, 1 : index, 0 : index]
-//  CHECK-SAME:     workgroup = [1 : index, 64 : index, 0 : index]
+//  CHECK-SAME:     reduction = [0, 0, 4]
+//  CHECK-SAME:     thread = [1, 1, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 0]
 
 // -----
 
@@ -120,8 +120,8 @@ module {
 // CHECK-LABEL: func.func @elementwise_dynamic_dim
 //  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.add {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     thread = [1 : index, 1 : index]
-//  CHECK-SAME:     workgroup = [1 : index, 64 : index]
+//  CHECK-SAME:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [1, 64]
 
 // -----
 

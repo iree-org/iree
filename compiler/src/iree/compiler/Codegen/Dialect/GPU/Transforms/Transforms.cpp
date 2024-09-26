@@ -512,8 +512,9 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 // MultiMmaOp Distribution
 //===----------------------------------------------------------------------===//
 
-FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
-                                            IREE::GPU::MultiMmaOp mmaOp) {
+FailureOr<Operation *>
+distributeMultiMmaOp(RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
+                     std::optional<SmallVector<int64_t>> workgroupSize) {
   if (!mmaOp.hasTensorSemantics() || mmaOp.hasThreadSemantics()) {
     return rewriter.notifyMatchFailure(
         mmaOp, "mmaOp must have vector and subgroup for distribution.");
@@ -528,12 +529,31 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   OpFoldResult one = rewriter.getIndexAttr(1);
 
   // Step 1. Create the new scf.forall op with a lane id mapping.
+  OpFoldResult ub;
+  Attribute mappingType;
+  FailureOr<IREE::GPU::MMAScope> mmaScope = mmaOp.getKind().getMmaScope();
+  if (failed(mmaScope)) {
+    return failure();
+  }
+  switch (mmaScope.value()) {
+  case IREE::GPU::MMAScope::Workgroup:
+    if (!workgroupSize) {
+      mmaOp.emitOpError("Mma op with workgroup scope needs workgroup size.");
+      return failure();
+    }
+    mappingType =
+        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
+    ub = rewriter.getIndexAttr(
+        ShapedType::getNumElements(workgroupSize.value()));
+    break;
+  case IREE::GPU::MMAScope::Subgroup:
+    ub = rewriter.getIndexAttr(mmaOp.getKind().getSubgroupSize());
+    mappingType = IREE::GPU::LaneIdAttr::get(context, 0);
+  }
   auto newForallOp = rewriter.create<scf::ForallOp>(
-      loc, ArrayRef<OpFoldResult>{zero},
-      ArrayRef<OpFoldResult>{
-          rewriter.getIndexAttr(mmaOp.getKind().getSubgroupSize())},
+      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, mmaOp.getAcc(),
-      ArrayAttr::get(context, {IREE::GPU::LaneIdAttr::get(context, 0)}));
+      ArrayAttr::get(context, {mappingType}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
 
@@ -546,7 +566,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
     }
     return llvm::to_vector(llvm::seq(static_cast<int64_t>(0), rank));
   };
-  Value laneId = newForallOp.getInductionVar(0);
+  Value id = newForallOp.getInductionVar(0);
 
   // LHS slice offsets.
   int64_t lhsOuterRank = mmaOp.getLhsOuterRank();
@@ -559,7 +579,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> lhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getLhsPermutation(), mmaOp.getLhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Lhs, laneId, lhsPermutation,
+          rewriter, loc, IREE::GPU::MMAFragment::Lhs, id, lhsPermutation,
           lhsOffsets, lhsSizes, lhsStrides))) {
     return mmaOp->emitOpError("failed to populate lhs offsets");
   }
@@ -579,7 +599,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> rhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getRhsPermutation(), mmaOp.getRhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Rhs, laneId, rhsPermutation,
+          rewriter, loc, IREE::GPU::MMAFragment::Rhs, id, rhsPermutation,
           rhsOffsets, rhsSizes, rhsStrides))) {
     return mmaOp->emitOpError("failed to populate rhs offsets");
   }
@@ -599,7 +619,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> accPermutation = getOrInferPermutationOfRank(
       mmaOp.getAccPermutation(), mmaOp.getAccInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Acc, laneId, accPermutation,
+          rewriter, loc, IREE::GPU::MMAFragment::Acc, id, accPermutation,
           accOffsets, accSizes, accStrides))) {
     return mmaOp->emitOpError("failed to populate acc offsets");
   }

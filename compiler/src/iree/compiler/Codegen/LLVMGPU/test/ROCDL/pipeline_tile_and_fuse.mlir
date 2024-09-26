@@ -718,3 +718,109 @@ hal.executable public @main {
 //       CHECK:   %[[B:.+]] = hal.interface.binding.subspan layout({{.*}}) binding(2)
 //       CHECK:   %[[ADD:.+]] = arith.addf %{{.*}}, %{{.*}} : vector<1xf32>
 //       CHECK:   vector.transfer_write %[[ADD]], %[[B]]
+
+// -----
+
+#map = affine_map<()[s0] -> (s0 ceildiv 128)>
+#map1 = affine_map<()[s0] -> (s0 ceildiv 16)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, Indirect>],
+  flags = Indirect
+>
+#config = #iree_gpu.lowering_config<{workgroup = [1, 1, 0], reduction = [0, 0, 1]}>
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @matmul_transpose_b_mfma ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32()
+        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+        %c0 = arith.constant 0 : index
+        %c65536 = arith.constant 65536 : index
+        %c131072 = arith.constant 131072 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x1x8x4x16x4xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c65536) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x1x4x2x4x16x4xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1x8x4x16x4xf32>> -> tensor<1x1x8x4x16x4xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1x4x2x4x16x4xf32>> -> tensor<1x1x4x2x4x16x4xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>> -> tensor<1x1x8x4x2x4x16x4xf32>
+        %6 = iree_gpu.multi_mma %3, %4, %5 {
+          lowering_config = #config,
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>],
+          iterator_types = [
+            #iree_gpu.iterator_type<parallel>,
+            #iree_gpu.iterator_type<parallel>,
+            #iree_gpu.iterator_type<reduction>],
+          kind = #iree_gpu.data_tiled_mma_layout<
+            intrinsic = MFMA_F32_16x16x4_F32,
+            unroll_m = 8,
+            unroll_n = 2,
+            unroll_n_to_subgroups = 4,
+            unroll_k = 4>}
+          : tensor<1x1x8x4x16x4xf32>, tensor<1x1x4x2x4x16x4xf32> into tensor<1x1x8x4x2x4x16x4xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<1x1x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32()
+// CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read {{.+}}, vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[B_READ:.+]] = vector.transfer_read {{.+}}, vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read {{.+}}, vector<8x1x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_SLICE00:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [0, 0, 0, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
+// CHECK-DAG:  %[[C_SLICE01:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [0, 0, 1, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
+// CHECK-DAG:  %[[C_SLICE70:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
+// CHECK-DAG:  %[[C_SLICE71:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
+// CHECK-DAG:  %[[C_00_0:.+]] = vector.shape_cast %[[C_SLICE00]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
+// CHECK-DAG:  %[[C_01_0:.+]] = vector.shape_cast %[[C_SLICE01]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
+// CHECK-DAG:  %[[C_70_0:.+]] = vector.shape_cast %[[C_SLICE70]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
+// CHECK-DAG:  %[[C_71_0:.+]] = vector.shape_cast %[[C_SLICE71]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
+// CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT03:.+]] = vector.extract %[[A_READ]][0, 0, 0, 3] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT70:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT71:.+]] = vector.extract %[[A_READ]][7, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT72:.+]] = vector.extract %[[A_READ]][7, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[A_EXTRACT73:.+]] = vector.extract %[[A_READ]][7, 0, 0, 3] : f32 from vector<8x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT00:.+]] = vector.extract %[[B_READ]][0, 0, 0, 0] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT01:.+]] = vector.extract %[[B_READ]][0, 0, 0, 1] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT02:.+]] = vector.extract %[[B_READ]][0, 0, 0, 2] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT03:.+]] = vector.extract %[[B_READ]][0, 0, 0, 3] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT10:.+]] = vector.extract %[[B_READ]][1, 0, 0, 0] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT11:.+]] = vector.extract %[[B_READ]][1, 0, 0, 1] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT12:.+]] = vector.extract %[[B_READ]][1, 0, 0, 2] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[B_EXTRACT13:.+]] = vector.extract %[[B_READ]][1, 0, 0, 3] : f32 from vector<2x1x1x4xf32>
+// CHECK-DAG:  %[[C_00_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT00]] + %[[C_00_0]]
+// CHECK-DAG:  %[[C_00_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT01]] + %[[C_00_1]]
+// CHECK-DAG:  %[[C_00_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT02]] + %[[C_00_2]]
+// CHECK-DAG:  %[[C_00_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT03]] + %[[C_00_3]]
+// CHECK-DAG:  %[[C_01_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT10]] + %[[C_01_0]]
+// CHECK-DAG:  %[[C_01_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT11]] + %[[C_01_1]]
+// CHECK-DAG:  %[[C_01_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT12]] + %[[C_01_2]]
+// CHECK-DAG:  %[[C_01_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT13]] + %[[C_01_3]]
+// CHECK-DAG:  %[[C_70_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT00]] + %[[C_70_0]]
+// CHECK-DAG:  %[[C_70_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT01]] + %[[C_70_1]]
+// CHECK-DAG:  %[[C_70_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT02]] + %[[C_70_2]]
+// CHECK-DAG:  %[[C_70_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT03]] + %[[C_70_3]]
+// CHECK-DAG:  %[[C_71_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT10]] + %[[C_71_0]]
+// CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
+// CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
+// CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
+// CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
+// CHECK:  vector.transfer_write

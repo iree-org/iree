@@ -44,11 +44,11 @@ iree_cc_library(
     CommonGPUPasses
   HDRS
     "GPUPatterns.h"
-    "GPUTileSwizzleUtils.h"
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "ExpandGPUOps.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineValueBarriers.cpp"
@@ -74,7 +74,6 @@ iree_cc_library(
     "GPUTensorTileToSerialLoops.cpp"
     "GPUTile.cpp"
     "GPUTileReduction.cpp"
-    "GPUTileSwizzleUtils.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
     "GPUVerifyDistribution.cpp"
@@ -134,7 +133,10 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Stream::Analysis
+    iree::compiler::Utils
   PUBLIC
 )
 

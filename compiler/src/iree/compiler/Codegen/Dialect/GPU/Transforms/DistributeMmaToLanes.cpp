@@ -83,11 +83,17 @@ void DistributeMmaToLanesPass::runOnOperation() {
   // Distribute multi_mma ops to lanes and greedily fuse producers.
   SmallVector<IREE::GPU::MultiMmaOp> mmaOps;
   funcOp.walk([&](IREE::GPU::MultiMmaOp mmaOp) { mmaOps.push_back(mmaOp); });
+  if (mmaOps.empty()) {
+    return;
+  }
+
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+
   IRRewriter rewriter(funcOp);
   for (auto mmaOp : mmaOps) {
     rewriter.setInsertionPoint(mmaOp);
     FailureOr<scf::ForallOp> maybeLaneForall =
-        distributeMultiMmaOp(rewriter, mmaOp);
+        distributeMultiMmaOp(rewriter, mmaOp, workgroupSize);
     if (failed(maybeLaneForall)) {
       funcOp.emitError() << "failed to distribute multi_mma ops to lanes";
       return signalPassFailure();
