@@ -163,7 +163,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       producer.getLoc(), sharedDest.getType(), sharedDest);
   rewriter.setInsertionPointToStart(barrierOp.getBody());
 
-  // Step 2. Compute the producer IDs in terms of the consumer IDs.
+  // Step 4. Compute the producer IDs in terms of the consumer IDs.
   // The producer IDs are computed as follows:
   //
   // producer = [p0, ..., pn] ∈ [0, ..., 0] to [P0, ..., Pn]
@@ -223,7 +223,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       staticConsumerCount && staticProducerCount &&
       staticProducerCount.value() % staticConsumerCount.value() == 0;
 
-  // Step 3. Create the `scf.for` loop for the producer.
+  // Step 5. Create the `scf.for` loop for the producer.
   // If the consumer worker count perfectly divides the producer worker count,
   // then we can use a lower bound of 0 and keep the loop bounds static.
   Value lb = perfectlyDivides ? rewriter.create<arith::ConstantIndexOp>(loc, 0)
@@ -255,7 +255,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   newBlockArgs.append(newProducer.getRegionIterArgs().begin(),
                       newProducer.getRegionIterArgs().end());
 
-  // Step 4. Inline the region of the producer and replace the terminator.
+  // Step 6. Inline the region of the producer and replace the terminator.
   scf::InParallelOp terminator = producer.getTerminator();
   rewriter.mergeBlocks(producer.getBody(), loopBody, newBlockArgs);
 
@@ -275,7 +275,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
 
-  // Step 5. Yield the result of the loop from the barrier op and replace the
+  // Step 7. Yield the result of the loop from the barrier op and replace the
   // producer.
   rewriter.setInsertionPointToEnd(barrierOp.getBody());
   rewriter.create<IREE::GPU::YieldOp>(loc, newProducer.getResults());

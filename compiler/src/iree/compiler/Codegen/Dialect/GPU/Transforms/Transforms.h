@@ -39,6 +39,13 @@ namespace mlir::iree_compiler::IREE::GPU {
 /// `iree_gpu.barrier_region` at the boundary to synchronize the workers at
 /// the fusion point.
 ///
+/// Copy semantics of tensors means that having multiple threads (i.e. in an
+/// scf.forall) inserting into a tensor has unclear semantics without an op
+/// to separate contexts with different levels of parallelism. scf.forall
+/// does this through its terminator and `iree_gpu.barrier_region` does this
+/// by keeping code writing to shared memory in a distinct region. This allows
+/// us to always default to private memory when bufferizing.
+///
 /// The mapping attributes of both the producer and consumer `scf.forall` ops
 /// must be in a relative descending order, for example:
 ///  [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>]
