@@ -93,9 +93,6 @@ protected:
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
-/// Returns the integer contained in an IntegerAttr, or zero if it has none.
-int64_t getIntOrZero(IntegerAttr a);
-
 struct TileMxNxK {
   int64_t M = 1;
   int64_t N = 1;
