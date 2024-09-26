@@ -30,7 +30,7 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
     runs-on: azure-linux-scale
     container:
-      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:1c86adf3e8494559e923155ab44920d222290c0b5257d70783afa5674e6a2e50
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
       # Mount a RAM disk and point the Bazel sandbox at it using our custom environment variable.
       options: --mount type=tmpfs,destination=/dev/shm
       env:

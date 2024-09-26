@@ -26,7 +26,7 @@ concurrency:
 jobs:
   linux_x64_gcc:
     runs-on: ubuntu-20.04
-    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:1c86adf3e8494559e923155ab44920d222290c0b5257d70783afa5674e6a2e50
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
     defaults:
       run:
         shell: bash
