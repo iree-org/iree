@@ -39,11 +39,19 @@ namespace mlir::iree_compiler {
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+                         IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  bool hasUkernelSupport = hasUkernel(target);
+
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
-  // batch_matmul.
-  if (hasUkernel(target) && cDims.batch.empty()) {
+  // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
+  // disabled when it is the case.
+  if (!cDims.batch.empty() || encoding.getMatmulNarrowM() ||
+      encoding.getMatmulNarrowN()) {
+    hasUkernelSupport = false;
+  }
+  if (hasUkernelSupport) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -388,11 +396,21 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
 }
 
 static SmallVector<TileMxNxK>
-enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
-                         TypeRange elementTypes,
+enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
+    return {};
+  }
+  // Enumerate available tile shapes for the given encoding and target.
+  auto elementTypes = llvm::to_vector(
+      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
+        return cast<TypeAttr>(a).getValue();
+      }));
   if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(cDims, target);
+    return enumerateMatmulTilesVMVX(*cDims, encoding, target);
   }
   if (isAArch64(target)) {
     return enumerateMatmulTileArm64(elementTypes, target);
@@ -414,19 +432,9 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (!encoding) {
     return failure();
   }
-  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
-  auto cDims = getEncodingContractionDims(encoding);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
-    return failure();
-  }
-  // Enumerate available tile shapes for the given encoding and target.
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
+
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
+      enumerateMatmulTileMxNxK(encoding, targetAttr);
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
