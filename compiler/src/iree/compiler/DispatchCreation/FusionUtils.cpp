@@ -101,8 +101,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   return true;
 }
 
-// Returns true when an operation `op` is horizontal to `currGroup` when
-// considering the program slice between `seedOp` and `op`.
 bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
                          const DominanceInfo &dominanceInfo,
                          Operation *seedOp) {
