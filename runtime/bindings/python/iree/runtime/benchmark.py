@@ -37,6 +37,7 @@ DTYPE_TO_ABI_TYPE = {
     numpy.dtype(numpy.int64): "i64",
     numpy.dtype(numpy.float64): "f64",
     numpy.dtype(numpy.int16): "i16",
+    numpy.dtype(numpy.float16): "f16",
     numpy.dtype(numpy.int8): "i8",
     numpy.dtype(numpy.bool_): "i1",
 }

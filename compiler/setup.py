@@ -218,10 +218,10 @@ def maybe_nuke_cmake_cache():
         f.write(expected_stamp_contents)
 
 
-def get_env_cmake_option(name: str, default_value: bool = False) -> str:
+def get_env_cmake_option(name: str, default_value: str = "OFF") -> str:
     svalue = os.getenv(name)
     if not svalue:
-        svalue = "ON" if default_value else "OFF"
+        svalue = default_value
     return f"-D{name}={svalue}"
 
 
@@ -454,10 +454,7 @@ setup(
     packages=packages,
     entry_points={
         "console_scripts": [
-            "iree-compile = iree.compiler.tools.scripts.ireec.__main__:main",
-            # TODO: We have renamed to iree-compile on 2022-03-18. Remove
-            # this alias once no longer needed.
-            "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-compile = iree.compiler.tools.scripts.iree_compile.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
             "iree-opt = iree.compiler.tools.scripts.iree_opt.__main__:main",

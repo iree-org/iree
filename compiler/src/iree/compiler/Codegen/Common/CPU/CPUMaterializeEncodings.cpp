@@ -39,11 +39,19 @@ namespace mlir::iree_compiler {
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+                         IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  bool hasUkernelSupport = hasUkernel(target);
+
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
-  // batch_matmul.
-  if (hasUkernel(target) && cDims.batch.empty()) {
+  // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
+  // disabled when it is the case.
+  if (!cDims.batch.empty() || encoding.getMatmulNarrowM() ||
+      encoding.getMatmulNarrowN()) {
+    hasUkernelSupport = false;
+  }
+  if (hasUkernelSupport) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -295,8 +303,10 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
+    SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
+    std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
     TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
-                                      hostDefinedUpperBound);
+                                      newHostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -363,6 +373,11 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
+
+    LLVM_DEBUG(llvm::dbgs() << "candidate: "; llvm::interleaveComma(
+                   ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+               llvm::dbgs() << " penalty:" << ratedTile.paddingPenalty << "\n");
+
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -381,11 +396,21 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
 }
 
 static SmallVector<TileMxNxK>
-enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
-                         TypeRange elementTypes,
+enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
+    return {};
+  }
+  // Enumerate available tile shapes for the given encoding and target.
+  auto elementTypes = llvm::to_vector(
+      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
+        return cast<TypeAttr>(a).getValue();
+      }));
   if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(cDims, target);
+    return enumerateMatmulTilesVMVX(*cDims, encoding, target);
   }
   if (isAArch64(target)) {
     return enumerateMatmulTileArm64(elementTypes, target);
@@ -407,24 +432,14 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (!encoding) {
     return failure();
   }
-  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
-  auto cDims = getEncodingContractionDims(encoding);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
-    return failure();
-  }
-  // Enumerate available tile shapes for the given encoding and target.
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
+
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
+      enumerateMatmulTileMxNxK(encoding, targetAttr);
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = getIntOrZero(encoding.getMatmulNarrow_N());
+  int64_t matmulNarrowM = encoding.getMatmulNarrowM();
+  int64_t matmulNarrowN = encoding.getMatmulNarrowN();
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
@@ -464,9 +479,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                                                  targetAttr);
   MaterializeEncodingConversionTarget target(*funcOp.getContext());
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
-  populateMaterializeEncodingIntoPackUnPackPatterns(materializeEncodingPattern,
-                                                    target, typeConverter,
-                                                    materializeEncodingValueFn);
+  populateMaterializeEncodingIntoPackUnPackPatterns(
+      materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
+  populateShapeIndependentMaterializeEncodingPatterns(
+      materializeEncodingPattern, target, typeConverter,
+      materializeEncodingValueFn);
 
   if (failed(applyPartialConversion(funcOp, target,
                                     std::move(materializeEncodingPattern)))) {

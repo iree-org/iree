@@ -94,13 +94,18 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<Operation *> slices;
 
   // Slice of the updates.
   auto updateRank = getUpdateType().getRank();
   SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
-  Value tiledUpdate =
+  Operation *updateSlice =
       getSlice(builder, loc, getUpdates(), offsets, sizes, updateStrides);
-  assert(tiledUpdate && "failed to get slice of update");
+  if (!updateSlice) {
+    return emitOpError("failed to get updates slice");
+  }
+  Value tiledUpdate = updateSlice->getResult(0);
+  slices.push_back(updateSlice);
 
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
@@ -112,9 +117,13 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
     indicesSizes[dim] = getDim(builder, loc, getIndices(), dim);
   }
   SmallVector<OpFoldResult> indicesStrides(indicesRank, oneAttr);
-  Value tiledIndices = getSlice(builder, loc, getIndices(), indicesOffsets,
-                                indicesSizes, indicesStrides);
-  assert(tiledIndices && "failed to get slice of indices");
+  Operation *indicesSlice = getSlice(builder, loc, getIndices(), indicesOffsets,
+                                     indicesSizes, indicesStrides);
+  if (!indicesSlice) {
+    return emitOpError("failed to get indices slices");
+  }
+  Value tiledIndices = indicesSlice->getResult(0);
+  slices.push_back(indicesSlice);
 
   // Slice of the original.
   SmallVector<OpFoldResult> originalOffsets, originalSizes;
@@ -124,9 +133,14 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   }
   auto originalRank = getOriginalType().getRank();
   SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
-  Value tiledOriginal = getSlice(builder, loc, getOriginal(), originalOffsets,
-                                 originalSizes, originalStrides);
-  assert(tiledOriginal && "failed to get slice of original tensor");
+  Operation *originalSlice =
+      getSlice(builder, loc, getOriginal(), originalOffsets, originalSizes,
+               originalStrides);
+  if (!originalSlice) {
+    return emitOpError("failed to get original tensor slice");
+  }
+  Value tiledOriginal = originalSlice->getResult(0);
+  slices.push_back(originalSlice);
 
   SmallVector<Type> resultTypes;
   if (getNumResults()) {
@@ -136,7 +150,8 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
       mlir::clone(builder, getOperation(), resultTypes,
                   ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
   return TilingResult{{tiledScatterOp},
-                      SmallVector<Value>(tiledScatterOp->getResults())};
+                      SmallVector<Value>(tiledScatterOp->getResults()),
+                      slices};
 }
 
 LogicalResult ScatterOp::getResultTilePosition(
@@ -249,11 +264,16 @@ SortOp::getTiledImplementation(OpBuilder &builder,
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
+  SmallVector<Operation *> slices;
   SmallVector<Value> tiledOperands(getOutputs().size());
   for (auto [idx, output] : llvm::enumerate(getOutputs())) {
-    tiledOperands[idx] =
+    Operation *slice =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
-    assert(tiledOperands[idx] && "failed to get slice of operand");
+    if (!slice) {
+      return emitOpError("failed to get slice of operand ") << idx;
+    }
+    tiledOperands[idx] = slice->getResult(0);
+    slices.push_back(slice);
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
@@ -262,8 +282,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledSortOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return TilingResult{{tiledSortOp},
-                      SmallVector<Value>{tiledSortOp->getResults()}};
+  return TilingResult{
+      {tiledSortOp}, SmallVector<Value>{tiledSortOp->getResults()}, slices};
 }
 
 LogicalResult SortOp::getResultTilePosition(
@@ -532,23 +552,29 @@ FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  SmallVector<Operation *> slices;
   SmallVector<Value> tiledOperands(3);
   tiledOperands[0] = getStage();
   tiledOperands[1] = getRealCoeff();
   tiledOperands[2] = getImagCoeff();
   SmallVector<Type, 4> resultTypes;
 
-  for (auto out : getOutputs()) {
-    tiledOperands.push_back(
-        getSlice(builder, getLoc(), out, offsets, sizes, strides));
+  for (auto [index, out] : llvm::enumerate(getOutputs())) {
+    Operation *slice =
+        getSlice(builder, getLoc(), out, offsets, sizes, strides);
+    if (!slice) {
+      return emitOpError("failed to get slice of output ") << index;
+    }
+    tiledOperands.push_back(slice->getResult(0));
+    slices.push_back(slice);
     if (hasPureTensorSemantics()) {
       resultTypes.push_back(tiledOperands.back().getType());
     }
   }
   Operation *tiledFftOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return TilingResult{{tiledFftOp},
-                      SmallVector<Value>(tiledFftOp->getResults())};
+  return TilingResult{
+      {tiledFftOp}, SmallVector<Value>(tiledFftOp->getResults()), slices};
 }
 
 LogicalResult FftOp::getResultTilePosition(
@@ -675,10 +701,30 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), getInput(), offsets, sizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides));
+  SmallVector<Operation *> slices;
+
+  // Input
+  {
+    Operation *inputSlice =
+        getSlice(builder, getLoc(), getInput(), offsets, sizes, strides);
+    if (!inputSlice) {
+      return emitOpError("failed to get input slice");
+    }
+    tiledOperands.emplace_back(inputSlice->getResult(0));
+    slices.push_back(inputSlice);
+  }
+
+  // Output 0
+  {
+    Operation *output0Slice =
+        getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides);
+    if (!output0Slice) {
+      return emitOpError("failed to get slice of output 0");
+    }
+    tiledOperands.emplace_back(output0Slice->getResult(0));
+    slices.push_back(output0Slice);
+  }
+
   if (rank > 1) {
     SmallVector<OpFoldResult> accumOffsets, accumSizes;
     if (failed(getResultTilePosition(builder, 1, offsets, sizes, accumOffsets,
@@ -686,9 +732,13 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
       return {};
     }
     SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
-    tiledOperands.emplace_back(getSlice(builder, getLoc(), getOutputs()[1],
-                                        accumOffsets, accumSizes,
-                                        accumStrides));
+    Operation *output1Slice = getSlice(builder, getLoc(), getOutputs()[1],
+                                       accumOffsets, accumSizes, accumStrides);
+    if (!output1Slice) {
+      return emitOpError("failed to get output1 slice");
+    }
+    tiledOperands.emplace_back(output1Slice->getResult(0));
+    slices.push_back(output1Slice);
   } else {
     tiledOperands.emplace_back(getOutputs()[1]);
   }
@@ -701,8 +751,8 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledScanOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return TilingResult{{tiledScanOp},
-                      SmallVector<Value>(tiledScanOp->getResults())};
+  return TilingResult{
+      {tiledScanOp}, SmallVector<Value>(tiledScanOp->getResults()), slices};
 }
 
 LogicalResult ScanOp::getResultTilePosition(
@@ -868,11 +918,27 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getValues(), offsets, sizes, strides));
+  SmallVector<Operation *> slices;
+
+  // Values
+  {
+    Operation *valuesSlice =
+        getSlice(builder, loc, getValues(), offsets, sizes, strides);
+    if (!valuesSlice) {
+      return emitOpError("failed to get values slice");
+    }
+    tiledOperands.emplace_back(valuesSlice->getResult(0));
+    slices.push_back(valuesSlice);
+  }
+
   if (getIndices()) {
-    tiledOperands.emplace_back(
-        getSlice(builder, loc, *getIndices(), offsets, sizes, strides));
+    Operation *indicesSlice =
+        getSlice(builder, loc, *getIndices(), offsets, sizes, strides);
+    if (!indicesSlice) {
+      return emitOpError("failed to get slices of indices");
+    }
+    tiledOperands.emplace_back(indicesSlice->getResult(0));
+    slices.push_back(indicesSlice);
   }
 
   // Replace the tile size for the K dimension to use the output size instead of
@@ -880,10 +946,28 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   Value kSize = getDimValue(builder, getLoc(), outputValues(), getDimension());
   outputSizes[getDimension()] = getAsOpFoldResult(kSize);
 
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides));
+  // Output 0
+  {
+    Operation *output0Slice =
+        getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides);
+    if (!output0Slice) {
+      return emitOpError("failed to get output 0 slice");
+    }
+    tiledOperands.emplace_back(output0Slice->getResult(0));
+    slices.push_back(output0Slice);
+  }
+
+  // Output 1
+  {
+    Operation *output1Slice =
+        getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides);
+    if (!output1Slice) {
+      return emitOpError("failed to get output1 slice");
+    }
+    tiledOperands.emplace_back(output1Slice->getResult(0));
+    slices.push_back(output1Slice);
+  }
+
   SmallVector<Type, 2> resultTypes;
   if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
@@ -892,8 +976,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledTopkOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return TilingResult{{tiledTopkOp},
-                      SmallVector<Value>(tiledTopkOp->getResults())};
+  return TilingResult{
+      {tiledTopkOp}, SmallVector<Value>(tiledTopkOp->getResults()), slices};
 }
 
 LogicalResult TopkOp::getResultTilePosition(
@@ -1183,15 +1267,25 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-  Value inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
-                              inputSizes, inputStrides);
+
+  // Input
+  Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
+                                   inputSizes, inputStrides);
+  if (!inputSlice) {
+    return emitOpError("failed to get slice of input");
+  }
+
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-  Value outputSlice =
+  Operation *outputSlice =
       getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
+  if (!outputSlice) {
+    return emitOpError("failed to get outputSlice");
+  }
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(outputSlice.getType());
+    resultTypes.append(outputSlice->result_type_begin(),
+                       outputSlice->result_type_end());
   }
 
   AffineExpr d0, d1;
@@ -1206,15 +1300,18 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   OpFoldResult mOffset = affine::makeComposedFoldedAffineApply(
       builder, loc, map, {mTileOffset, mOpOffset});
 
-  SmallVector<Value> operands = {inputSlice, outputSlice};
+  SmallVector<Value> operands = {inputSlice->getResult(0),
+                                 outputSlice->getResult(0)};
   operands.append(getOperation()->getOperands().begin() + 2,
                   getOperation()->getOperands().end());
   Im2colOp tiledOp =
-      mlir::clone(builder, *this, TypeRange{outputSlice.getType()}, operands);
+      mlir::clone(builder, *this, outputSlice->getResultTypes(), operands);
   tiledOp.setMixedKOffset({kOffset});
   tiledOp.setMixedMOffset({mOffset});
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  return TilingResult{{tiledOp},
+                      SmallVector<Value>(tiledOp->getResults()),
+                      {inputSlice, outputSlice}};
 }
 
 FailureOr<TilingResult>
@@ -1313,10 +1410,28 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   inputOffsets[wDim] = wSizeAndOffset.second;
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
-                                      inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  SmallVector<Operation *> slices;
+  // Input
+  {
+    Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
+                                     inputSizes, inputStrides);
+    if (!inputSlice) {
+      return emitOpError("failed to get input slice");
+    }
+    tiledOperands.emplace_back(inputSlice->getResult(0));
+    slices.push_back(inputSlice);
+  }
+
+  // Output
+  {
+    Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
+                                      outputSizes, outputStrides);
+    if (!outputSlice) {
+      return emitOpError("failed to get output slice");
+    }
+    tiledOperands.emplace_back(outputSlice->getResult(0));
+    slices.push_back(outputSlice);
+  }
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1326,7 +1441,8 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
 }
 
 LogicalResult WinogradInputTransformOp::getResultTilePosition(
@@ -1409,10 +1525,29 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   outputSizes[3] = inputSizes[fDim] = sizes[1];
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
-                                      inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  SmallVector<Operation *> slices;
+
+  // Input
+  {
+    Operation *inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
+                                     inputSizes, inputStrides);
+    if (!inputSlice) {
+      return emitOpError("failed to get input slice");
+    }
+    tiledOperands.emplace_back(inputSlice->getResult(0));
+    slices.push_back(inputSlice);
+  }
+
+  // Output
+  {
+    Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
+                                      outputSizes, outputStrides);
+    if (!outputSlice) {
+      return emitOpError("failed to get output slice");
+    }
+    tiledOperands.emplace_back(outputSlice->getResult(0));
+    slices.push_back(outputSlice);
+  }
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1422,7 +1557,8 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
 }
 
 LogicalResult WinogradFilterTransformOp::getResultTilePosition(
@@ -1526,12 +1662,12 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   outputOffsets[hDim] = hSizeAndOffset.second;
   outputOffsets[wDim] = wSizeAndOffset.second;
 
-  Value outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
-                               outputSizes, outputStrides);
+  Operation *outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
+                                    outputSizes, outputStrides);
   // The image dims of the winograd.output_transform result will always be a
   // multiple of the static output_tile_size, so insert a tensor.cast op to
   // maintain more static information in the IR.
-  auto outSliceType = cast<ShapedType>(outputSlice.getType());
+  auto outSliceType = cast<ShapedType>(outputSlice->getResultTypes().front());
   SmallVector<int64_t> staticOutShape(outSliceType.getShape());
   auto constSizeH = getConstantIntValue(sizes[1]);
   if (constSizeH.has_value()) {
@@ -1541,12 +1677,13 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
-  Value staticOutputSlice =
-      castValue(builder, loc, outputSlice, outSliceType.clone(staticOutShape));
+  Value staticOutputSlice = castValue(builder, loc, outputSlice->getResult(0),
+                                      outSliceType.clone(staticOutShape));
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
-                                      inputSizes, inputStrides));
+  auto inputSlice = getSlice(builder, loc, getInput(), inputOffsets, inputSizes,
+                             inputStrides);
+  tiledOperands.emplace_back(inputSlice->getResult(0));
   tiledOperands.emplace_back(staticOutputSlice);
 
   SmallVector<Type, 4> resultTypes;
@@ -1561,7 +1698,7 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   if (!results.empty()) {
     results.front() = castValue(builder, loc, results.front(), outSliceType);
   }
-  return TilingResult{{tiledOp}, results};
+  return TilingResult{{tiledOp}, results, {inputSlice, outputSlice}};
 }
 
 LogicalResult WinogradOutputTransformOp::getResultTilePosition(
@@ -1628,7 +1765,7 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
         continue;
       }
       dimsFound[pos] = true;
-      loopBounds[pos].size = getDimValue(b, loc, val, idx);
+      loopBounds[pos].size = getDim(b, loc, val, idx);
     }
   };
 
@@ -1715,41 +1852,102 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   Value scale = getScale();
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
+  SmallVector<Operation *> slices;
+
+  // Query
+  {
+    Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
+    if (!querySliceOp) {
+      return emitOpError("failed to get query slice");
+    }
+    tiledOperands.emplace_back(querySliceOp->getResult(0));
+    slices.push_back(querySliceOp);
+  }
+
+  // Key
+  {
+    Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
+    if (!keySliceOp) {
+      return emitOpError("failed to get key slice");
+    }
+    tiledOperands.emplace_back(keySliceOp->getResult(0));
+    slices.push_back(keySliceOp);
+  }
+
+  // Value
+  {
+    Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
+    if (!valueSliceOp) {
+      return emitOpError("failed to get value slice");
+    }
+    tiledOperands.emplace_back(valueSliceOp->getResult(0));
+    slices.push_back(valueSliceOp);
+  }
+
+  // Scale
   tiledOperands.emplace_back(scale);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
+
+  // Mask
+  Value attnMask = getMask();
+  if (attnMask) {
+    SmallVector<Range> maskSlice =
+        getPermutedSlice(*getMaskMap(), offsets, sizes);
+    Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
+    tiledOperands.emplace_back(maskSliceOp->getResult(0));
+    slices.push_back(maskSliceOp);
+  }
+
+  // Output
+  {
+    Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
+    if (!outputSliceOp) {
+      return emitOpError("failed to get output slice");
+    }
+    tiledOperands.emplace_back(outputSliceOp->getResult(0));
+    slices.push_back(outputSliceOp);
+  }
 
   std::optional<Value> max = getMax();
   if (max) {
     SmallVector<Range> maxSlice =
         getPermutedSlice(*getMaxMap(), offsets, sizes);
-    tiledOperands.emplace_back(getSlice(builder, loc, max.value(), maxSlice));
+    Operation *maxSliceOp = getSlice(builder, loc, max.value(), maxSlice);
+    if (!maxSliceOp) {
+      return emitOpError("failed to get max slice");
+    }
+    tiledOperands.emplace_back(maxSliceOp->getResult(0));
+    slices.push_back(maxSliceOp);
   }
 
-  std::optional<Value> sum = getMax();
+  std::optional<Value> sum = getSum();
   if (sum) {
     SmallVector<Range> sumSlice =
         getPermutedSlice(*getSumMap(), offsets, sizes);
-    tiledOperands.emplace_back(getSlice(builder, loc, sum.value(), sumSlice));
+    Operation *sumSliceOp = getSlice(builder, loc, sum.value(), sumSlice);
+    if (!sumSliceOp) {
+      return emitOpError("failed to get sum slice");
+    }
+    tiledOperands.emplace_back(sumSliceOp->getResult(0));
+    slices.push_back(sumSliceOp);
   }
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[4].getType());
+    int64_t baseIdx = attnMask ? 5 : 4;
+    resultTypes.push_back(tiledOperands[baseIdx].getType());
     if (max) {
-      resultTypes.push_back(tiledOperands[5].getType());
+      resultTypes.push_back(tiledOperands[baseIdx + 1].getType());
     }
     if (sum) {
-      resultTypes.push_back(tiledOperands[6].getType());
+      resultTypes.push_back(tiledOperands[baseIdx + 2].getType());
     }
   }
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
 }
 
 LogicalResult AttentionOp::getResultTilePosition(
@@ -1837,6 +2035,11 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
   SmallVector<Range> valueSlice =
       getPermutedSlice(getValueMap(), offsets, sizes);
+  std::optional<SmallVector<Range>> maskSlice;
+  if (auto maskMap = getMaskMap()) {
+    maskSlice = getPermutedSlice(*maskMap, offsets, sizes);
+  }
+
   SmallVector<Range> outputSlice =
       getPermutedSlice(getOutputMap(), offsets, sizes);
   SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
@@ -1845,23 +2048,89 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   Value scale = getScale();
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
+  SmallVector<Operation *> slices;
+  /// Query
+  {
+    Operation *querySliceOp = getSlice(builder, loc, getQuery(), querySlice);
+    if (!querySliceOp) {
+      return emitOpError("failed to get query slice");
+    }
+    tiledOperands.emplace_back(querySliceOp->getResult(0));
+    slices.push_back(querySliceOp);
+  }
+
+  /// Key
+  {
+    Operation *keySliceOp = getSlice(builder, loc, getKey(), keySlice);
+    if (!keySliceOp) {
+      return emitOpError("failed to get key slice");
+    }
+    tiledOperands.emplace_back(keySliceOp->getResult(0));
+    slices.push_back(keySliceOp);
+  }
+
+  /// Value
+  {
+    Operation *valueSliceOp = getSlice(builder, loc, getValue(), valueSlice);
+    if (!valueSliceOp) {
+      return emitOpError("failed to get value slice");
+    }
+    tiledOperands.emplace_back(valueSliceOp->getResult(0));
+    slices.push_back(valueSliceOp);
+  }
+
   tiledOperands.emplace_back(scale);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getMax(), maxSlice));
-  tiledOperands.emplace_back(getSlice(builder, loc, getSum(), sumSlice));
+
+  // Mask
+  Value attnMask = getMask();
+  if (attnMask) {
+    SmallVector<Range> maskSlice =
+        getPermutedSlice(*getMaskMap(), offsets, sizes);
+    Operation *maskSliceOp = getSlice(builder, loc, attnMask, maskSlice);
+    tiledOperands.emplace_back(maskSliceOp->getResult(0));
+    slices.push_back(maskSliceOp);
+  }
+
+  /// Output
+  {
+    Operation *outputSliceOp = getSlice(builder, loc, getOutput(), outputSlice);
+    if (!outputSliceOp) {
+      return emitOpError("failed to get output slice");
+    }
+    tiledOperands.emplace_back(outputSliceOp->getResult(0));
+    slices.push_back(outputSliceOp);
+  }
+
+  /// Max
+  {
+    Operation *maxSliceOp = getSlice(builder, loc, getMax(), maxSlice);
+    if (!maxSliceOp) {
+      return emitOpError("failed to get max slice");
+    }
+    tiledOperands.emplace_back(maxSliceOp->getResult(0));
+    slices.push_back(maxSliceOp);
+  }
+
+  /// Sum
+  {
+    Operation *sumSliceOp = getSlice(builder, loc, getSum(), sumSlice);
+    if (!sumSliceOp) {
+      return emitOpError("failed to get sum slice");
+    }
+    tiledOperands.emplace_back(sumSliceOp->getResult(0));
+    slices.push_back(sumSliceOp);
+  }
 
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[4].getType());
-  resultTypes.push_back(tiledOperands[5].getType());
-  resultTypes.push_back(tiledOperands[6].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
+  resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
 }
 
 LogicalResult OnlineAttentionOp::getResultTilePosition(

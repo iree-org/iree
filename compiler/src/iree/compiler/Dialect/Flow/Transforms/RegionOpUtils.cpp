@@ -43,6 +43,12 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
+// TODO(#18457, #18447): Remove once backends support gather fusion.
+static llvm::cl::opt<bool>
+    clEnableGatherFusion("iree-flow-enable-gather-fusion",
+                         llvm::cl::desc("Fuse gather-like ops with consumer."),
+                         llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
@@ -497,6 +503,82 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   return newRegionOp.value();
 }
 
+// Move a `target` op that is following the given dispatch region op into the
+// dispatch region.
+FailureOr<IREE::Flow::DispatchRegionOp>
+moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                  IREE::Flow::DispatchRegionOp regionOp) {
+  // Fail if any of the `target` operands do not dominate the dispatch region.
+  mlir::DominanceInfo dominanceInfo(regionOp);
+  for (Value operand : target->getOperands()) {
+    Operation *definingOp = operand.getDefiningOp();
+    if (definingOp && !dominanceInfo.dominates(definingOp, regionOp)) {
+      return rewriter.notifyMatchFailure(
+          target, "target operands do not dominate the dispatch region op.");
+    }
+  }
+
+  // Values replaced by moving the `target` into the dispatch region.
+  SmallVector<Value> replacedValues;
+
+  // List of dynamic dimensions for each new results added to the dispatch
+  // region.
+  SmallVector<SmallVector<Value>> dispatchOpNewResultsDynamicDims;
+
+  // New values that are yielded from dispatch.
+  SmallVector<Value> yieldedResults;
+
+  Block &body = regionOp.getBody().front();
+  // Clone op into dispatch region.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(body.getTerminator());
+  Operation *clonedTarget = rewriter.clone(*target);
+
+  // Replace any operands returned by the `regionOp` with the results yielded
+  // inside of the `regionOp`.
+  for (OpOperand &operand : clonedTarget->getOpOperands()) {
+    if (operand.get().getDefiningOp() != regionOp) {
+      continue;
+    }
+    auto returnOp =
+        cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+    auto opResult = cast<OpResult>(operand.get());
+    Value yieldedValue = returnOp->getOperand(opResult.getResultNumber());
+    rewriter.modifyOpInPlace(clonedTarget, [&]() {
+      clonedTarget->setOperand(operand.getOperandNumber(), yieldedValue);
+    });
+  }
+
+  // Gather all uses of `target`.
+  for (auto [index, result] : llvm::enumerate(target->getResults())) {
+    replacedValues.push_back(result);
+    yieldedResults.push_back(clonedTarget->getResult(index));
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dispatchOpNewResultsDynamicDims.emplace_back();
+    if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+      return target->emitOpError(
+          "failed to reify dynamic dims of result to be yielded from "
+          "dispatch region");
+    }
+  }
+
+  FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =
+      appendDispatchRegionResults(rewriter, regionOp, yieldedResults,
+                                  dispatchOpNewResultsDynamicDims);
+
+  if (failed(newRegionOp)) {
+    return regionOp->emitOpError("failed to append results to op");
+  }
+
+  ValueRange replacements =
+      newRegionOp->getResults().take_back(replacedValues.size());
+  for (auto [index, replacedVal] : llvm::enumerate(replacedValues)) {
+    rewriter.replaceAllUsesWith(replacedVal, replacements[index]);
+  }
+  rewriter.eraseOp(target);
+  return newRegionOp.value();
+}
+
 FailureOr<IREE::Flow::DispatchRegionOp>
 wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
@@ -720,6 +802,9 @@ bool isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (LinalgExt::isBitExtendOp(op)) {
+    return true;
+  }
+  if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {

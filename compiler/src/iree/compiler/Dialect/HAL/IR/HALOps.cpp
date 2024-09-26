@@ -48,10 +48,10 @@ static void printDescriptorType(OpAsmPrinter &p, Operation *,
 
 //===----------------------------------------------------------------------===//
 // custom<PipelineBindings>($binding_ordinals,
-//                               $binding_buffers,
-//                               type($binding_buffers),
-//                               $binding_offsets,
-//                               $binding_lengths)
+//                          $binding_buffers,
+//                          type($binding_buffers),
+//                          $binding_offsets,
+//                          $binding_lengths)
 //===----------------------------------------------------------------------===//
 
 static ParseResult parsePipelineBindings(
@@ -240,8 +240,9 @@ static FunctionType getTargetConditionRegionType(MLIRContext *context) {
 static LogicalResult verifyTargetConditionRegion(Operation *op,
                                                  Region &region) {
   // Ignore if empty.
-  if (region.empty())
+  if (region.empty()) {
     return success();
+  }
 
   // Verify region takes a !hal.device.
   if (region.getNumArguments() != 1 ||

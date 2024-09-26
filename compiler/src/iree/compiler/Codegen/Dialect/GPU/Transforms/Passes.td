@@ -9,15 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
-def DistributeMmaToLanesPass :
-    InterfacePass<"iree-gpu-distribute-mma-to-lanes", "mlir::FunctionOpInterface"> {
-  let summary = "Distributes iree_gpu.multi_mma ops to lanes";
-  let dependentDialects = [
-    "::mlir::arith::ArithDialect",
-    "::mlir::affine::AffineDialect",
-    "::mlir::scf::SCFDialect",
-    "::mlir::tensor::TensorDialect",
-  ];
+def CombineBarrierRegionsPass :
+    Pass<"iree-gpu-combine-barrier-regions", ""> {
+  let summary = "Combines `iree_gpu.barrier_region` ops";
+  let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
 def ConcretizeMmaShapesPass :
@@ -34,6 +29,17 @@ def ConcretizeMmaShapesPass :
     Option<"concretizeResult", "concretize-result",
       "bool", /*default=*/"true",
       "Expand the inner dimensions for the acc operand of the multi_mma ops.">,
+  ];
+}
+
+def DistributeMmaToLanesPass :
+    InterfacePass<"iree-gpu-distribute-mma-to-lanes", "mlir::FunctionOpInterface"> {
+  let summary = "Distributes iree_gpu.multi_mma ops to lanes";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect",
   ];
 }
 

@@ -27,6 +27,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+constexpr int64_t kCacheLineSizeBits = 128 * 8;
+
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
@@ -86,6 +88,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   GPUMMAHeuristicSeeds seeds;
+  int64_t inBitWidth = lhsElemType.getIntOrFloatBitWidth();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -96,11 +99,14 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // and a larger bestKTileCountPerSubgroup.
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8};
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/4};
+             /*bestMNTileCountPerSubgroup=*/16,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                 inBitWidth};
   }
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
@@ -187,20 +193,31 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getIndexArrayAttr(workgroupTileSizes));
+                     b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
-                     b.getIndexArrayAttr(reductionTileSizes));
+                     b.getI64ArrayAttr(reductionTileSizes));
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
-                     b.getIndexArrayAttr(subgroupTileSizes));
+                     b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/true,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      StringAttr::get(context,
+                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize);
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
@@ -231,23 +248,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   const unsigned loopDepth = linalgOp.getNumLoops();
 
   // Configurations we need to decide.
-  std::array<int64_t, 3> workgroupSize;
-  SmallVector<int64_t> workgroupTileSizes;
-  SmallVector<int64_t> threadTileSizes;
-
-  // Initialize the configuration.
-  auto initConfiguration = [&]() {
-    workgroupSize = {subgroupSize, 1, 1};
-    workgroupTileSizes.resize(loopDepth, 0);
-    threadTileSizes.resize(loopDepth, 0);
-
-    // Initialize tiling along all partitioned loops with size 1.
-    for (int64_t loopIndex : partitionableLoops) {
-      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
-    }
-    // Override the innermost dimension to distribute to threads in a subgroup.
-    workgroupTileSizes[partitionableLoops.back()] = subgroupSize;
-  };
+  int64_t flatWorkgroupSize = 1;
+  SmallVector<int64_t> workgroupTileSizes(loopDepth, 0);
+  SmallVector<int64_t> threadTileSizes(loopDepth, 0);
 
   // Common case for all linalg ops.
 
@@ -285,7 +288,15 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
     LDBG("Loss factor: " << lossFactor << "\n");
-    initConfiguration();
+    // Initialize the configuration.
+    flatWorkgroupSize = 1;
+    // Initialize tiling along all partitioned loops with size 1.
+    for (int64_t loopIndex : partitionableLoops) {
+      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
+    }
+    // Override the innermost dimension to distribute to threads in a subgroup.
+    workgroupTileSizes[partitionableLoops.back()] = subgroupSize;
+
     // If there are more than 3 parallel dim try to tile the extra higher level
     // dimensions to 1 for extra dimensions.
     if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
@@ -324,6 +335,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
         llvm::dbgs() << "]\n";
       });
 
+      int64_t candidateWorkgroupSize = 1;
       for (int64_t candidate : candidates) {
         int64_t scaledTileSize = candidate * scaleToByte;
         if (loopBound % scaledTileSize != 0) {
@@ -356,20 +368,22 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
           int vectorSize = hasIdleThreads ? 1 : 4;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
           threadTileSizes[shapeDim] = vectorSize * scaleToByte;
-          workgroupSize[wgDim] = candidate / vectorSize;
+          candidateWorkgroupSize = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
           numThreads /= candidate / vectorSize;
         } else {
           if (wgDim == 0)
             vectorizable = false;
           threadTileSizes[shapeDim] = scaleToByte;
-          workgroupSize[wgDim] = candidate;
+          candidateWorkgroupSize = candidate;
           assert(numThreads % candidate == 0);
           numThreads /= candidate;
         }
         assert(numThreads >= 1);
         break;
       }
+
+      flatWorkgroupSize *= candidateWorkgroupSize;
 
       // Stop if we have distributed all threads.
       if (numThreads == 1)
@@ -420,10 +434,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getIndexArrayAttr(workgroupTileSizes));
+                     b.getI64ArrayAttr(workgroupTileSizes));
 
   attrs.emplace_back(StringAttr::get(context, "thread"),
-                     b.getIndexArrayAttr(threadTileSizes));
+                     b.getI64ArrayAttr(threadTileSizes));
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
   const unsigned maxVectorSize = 32;
@@ -453,7 +467,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   }
   if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
     attrs.emplace_back(StringAttr::get(context, "reduction"),
-                       b.getIndexArrayAttr(loopTileSizes));
+                       b.getI64ArrayAttr(loopTileSizes));
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -465,7 +479,76 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, subgroupSize, DictionaryAttr());
+      {flatWorkgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
+}
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+GPUPipelineOptions
+getPipelineOptions(FunctionOpInterface funcOp,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
+  GPUPipelineOptions pipelineOptions = {};
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    std::optional<NamedAttribute> maybePipelineOptionsAttr =
+        config.getNamed(GPUPipelineOptionsAttr::getDictKeyName());
+    if (!maybePipelineOptionsAttr.has_value()) {
+      return pipelineOptions;
+    }
+    auto pipelineOptionsAttr =
+        cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
+    BoolAttr prefetchSharedMemory =
+        pipelineOptionsAttr.getPrefetchSharedMemory();
+    if (prefetchSharedMemory) {
+      pipelineOptions.prefetchSharedMemory = prefetchSharedMemory.getValue();
+    }
+    BoolAttr noReduceBankConflicts =
+        pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
+    if (noReduceBankConflicts) {
+      pipelineOptions.enableReduceSharedMemoryBankConflicts =
+          !noReduceBankConflicts.getValue();
+    }
+    ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
+        pipelineOptionsAttr.getReorderWorkgroupsStrategy();
+    if (reorderWorkgroupsStrategy) {
+      pipelineOptions.reorderStrategy = reorderWorkgroupsStrategy.getValue();
+    }
+  }
+
+  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+
+  LLVM_DEBUG(llvm::dbgs() << "GPU Pipeline Options: " << pipelineOptions
+                          << "\n");
+  return pipelineOptions;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const GPUPipelineOptions &options) {
+  StringRef reorderStr = "<not set>";
+  if (options.reorderStrategy) {
+    switch (options.reorderStrategy.value()) {
+    case ReorderWorkgroupsStrategy::Transpose:
+      reorderStr = "transpose";
+      break;
+    case ReorderWorkgroupsStrategy::Swizzle:
+      reorderStr = "swizzle";
+      break;
+    case ReorderWorkgroupsStrategy::None:
+      reorderStr = "none";
+      break;
+    default:
+      assert(false && "Unhandled reorder option");
+    }
+  }
+
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+            << options.enableReduceSharedMemoryBankConflicts << ", "
+            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", reorderWorkgroupsStrategy = " << reorderStr
+            << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

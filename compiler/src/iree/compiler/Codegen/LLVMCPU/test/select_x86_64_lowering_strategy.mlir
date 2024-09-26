@@ -1747,6 +1747,7 @@ func.func @attention() attributes {hal.executable.target = #executable_target_em
   %8 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+    affine_map<(d0, d1, d2, d3, d4) -> ()>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
     ins(%4, %5, %6, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
     outs(%7 : tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>

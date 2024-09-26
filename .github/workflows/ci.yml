@@ -52,33 +52,6 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  ################################### Basic ####################################
-  # Jobs that build all of IREE "normally"
-  ##############################################################################
-
-  build_test_all_bazel:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_bazel')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
-        with:
-          submodules: true
-      - name: "Building and testing with Bazel"
-        env:
-          IREE_WRITE_REMOTE_BAZEL_CACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
-            ./build_tools/bazel/build_test_all.sh
-
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -107,8 +80,8 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@v4.1.7
-      - uses: actions/setup-python@v5.1.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.11"
 
@@ -121,7 +94,7 @@ jobs:
           echo "CXX=clang++" >> $GITHUB_ENV
       - name: (Windows) Configure MSVC
         if: contains(matrix.name, 'windows')
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: (macOS) Install requirements
         if: contains(matrix.name, 'macos')
         run: brew install ninja ccache coreutils bash
@@ -131,7 +104,7 @@ jobs:
       - name: Install Python requirements
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -163,13 +136,13 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -206,13 +179,13 @@ jobs:
       CXX: clang++
       TRACING_PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: hendrikmuhs/ccache-action@ed74d11c0b343532753ecead8a951bb09bb34bc9 # v1.2.14
         with:
           key: ${{ github.job }}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -283,7 +256,7 @@ jobs:
   #     IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
   #   steps:
   #     - name: "Checking out repository"
-  #       uses: actions/checkout@v4.1.7
+  #       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
   #     - name: "Checking out runtime submodules"
   #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
   #     - name: "Downloading install dir archive"
@@ -326,9 +299,6 @@ jobs:
     needs:
       - setup
 
-      # Toolchains
-      - build_test_all_bazel
-
       # Accelerators
       # - test_nvidia_a100
 
@@ -341,7 +311,7 @@ jobs:
       # - cross_compile_and_test
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Getting failed jobs
         id: failed_jobs
         run: |
@@ -356,7 +326,7 @@ jobs:
             exit 1
           fi
       - name: Posting to Discord
-        uses: sarisia/actions-status-discord@v1.14.3
+        uses: sarisia/actions-status-discord@ce8cc68e4e626000136b3c702d049a154243e490 # v1.14.7
         if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

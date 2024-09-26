@@ -161,6 +161,7 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   AffineMap vMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
+  AffineMap sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {}, ctx);
   AffineMap rMap =
       AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
   AffineMap maxMap =
@@ -174,7 +175,7 @@ getTileAttentionIndexingMaps(RewriterBase &rewriter, int64_t tiledInputRank,
     vMap = AffineMap::get(vMap.getNumDims(), vMap.getNumSymbols(), vDims, ctx);
   }
 
-  SmallVector<AffineMap> attentionMaps = {qMap, kMap,   vMap,
+  SmallVector<AffineMap> attentionMaps = {qMap, kMap,   vMap,  sMap,
                                           rMap, maxMap, sumMap};
   // Add batches to standard attention indexing maps.
   int64_t numBatches = tiledInputRank - 2;
@@ -375,32 +376,37 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   }
   AffineMap sumMap = maxMap;
 
-  SmallVector<Range> sizes = attnOp.getIterationDomain(rewriter);
+  AffineMap accMap = attnOp.getOutputMap();
+
+  SmallVector<Range> domain = attnOp.getIterationDomain(rewriter);
 
   // Create fill for acc, max and sum.
   // TODO: Acc should not need a fill. The attention op should get a filled
   // input instead of an empty input.
-  Value zeroAcc = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(attnOp.getOutputType().getElementType()));
-  Value accFill =
-      rewriter
-          .create<linalg::FillOp>(loc, ValueRange{zeroAcc}, attnOp.getOutput())
-          .result();
 
+  SmallVector<OpFoldResult> sizes =
+      llvm::map_to_vector(domain, [](Range x) { return x.size; });
+  SmallVector<OpFoldResult> accSize =
+      applyPermutationMap<OpFoldResult>(accMap, sizes);
   SmallVector<OpFoldResult> rowRedSize =
-      llvm::map_to_vector(sizes, [](Range x) { return x.size; });
-  rowRedSize = applyPermutationMap<OpFoldResult>(maxMap, rowRedSize);
+      applyPermutationMap<OpFoldResult>(maxMap, sizes);
 
   Type f32Type = rewriter.getF32Type();
+  Value acc = rewriter.create<tensor::EmptyOp>(loc, accSize, f32Type);
   Value rowRedEmpty =
       rewriter.create<tensor::EmptyOp>(loc, rowRedSize, f32Type);
 
+  Value accInit =
+      arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type, rewriter,
+                              loc, /*useOnlyFiniteValue=*/true);
   Value maxInit =
       arith::getIdentityValue(arith::AtomicRMWKind::maximumf, f32Type, rewriter,
                               loc, /*useOnlyFiniteValue=*/true);
   Value sumInit = arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type,
                                           rewriter, loc);
 
+  Value accFill = rewriter.create<linalg::FillOp>(loc, ValueRange{accInit}, acc)
+                      .getResult(0);
   Value maxFill =
       rewriter.create<linalg::FillOp>(loc, ValueRange{maxInit}, rowRedEmpty)
           .getResult(0);
@@ -412,10 +418,14 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   indexingMaps.push_back(maxMap);
   indexingMaps.push_back(sumMap);
+
+  Value mask = attnOp.getMask() ? attnOp.getMask() : Value();
+
   OnlineAttentionOp onlineAttn = rewriter.create<OnlineAttentionOp>(
       loc, TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
-      accFill, maxFill, sumFill, rewriter.getAffineMapArrayAttr(indexingMaps));
+      mask, accFill, maxFill, sumFill,
+      rewriter.getAffineMapArrayAttr(indexingMaps));
   onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
 
@@ -427,21 +437,24 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{sumMap, attnOp.getOutputMap()});
+      compressUnusedDims(SmallVector<AffineMap>{sumMap, accMap, accMap});
 
   SmallVector<utils::IteratorType> iteratorTypes(compressedMaps[0].getNumDims(),
                                                  utils::IteratorType::parallel);
 
   auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, x.getType(), sum, x, compressedMaps, iteratorTypes,
+      loc, attnOp.getOutputType(), ValueRange{sum, x}, attnOp.getOutput(),
+      compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value one = b.create<arith::ConstantOp>(
             loc, b.getFloatAttr(args[0].getType(), 1.0));
         Value reciprocal = b.create<arith::DivFOp>(loc, one, args[0]);
-        // Convert sum to the same datatype as x.
-        reciprocal = convertScalarToDtype(b, loc, reciprocal, args[1].getType(),
-                                          /*isUnsignedCast=*/false);
+        // Both sum and x are in fp32, as created earlier, so we only need
+        // to cast after the mul.
         Value result = b.create<arith::MulFOp>(loc, reciprocal, args[1]);
+        // Cast result to the required type by attention output.
+        result = convertScalarToDtype(b, loc, result, args[2].getType(),
+                                      /*isUnsignedCast=*/false);
         b.create<linalg::YieldOp>(loc, result);
       });
   ops.push_back(genericOp);
@@ -465,7 +478,7 @@ void TileAttentionPass::runOnOperation() {
 void ConvertAttentionToOnlineAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
-  getOperation().walk([&](AttentionOp attnOp) {
+  getOperation()->walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
     convertToOnlineAttention(attnOp, ops, rewriter);
   });

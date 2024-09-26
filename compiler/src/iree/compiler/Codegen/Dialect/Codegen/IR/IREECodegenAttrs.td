@@ -188,8 +188,7 @@ def WorkgroupMappingAttr :
   let extraClassDeclaration = [{
     // Checks that a list of attributes is well-defined.
     static LogicalResult verifyAttrList(::mlir::MLIRContext *context,
-      ::llvm::function_ref<::mlir::InFlightDiagnostic ()> emitError,
-      ArrayRef<Attribute> attrs);
+      Location loc, ArrayRef<Attribute> attrs);
 
     // Convert from mapping ID to attribute.
     static ::mlir::iree_compiler::IREE::Codegen::WorkgroupMappingAttr
@@ -297,6 +296,7 @@ def IREECodegen_LoweringConfigAttr :
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
         "hasTilingLevel",
+        "hasWorkgroupTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";

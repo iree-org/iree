@@ -130,9 +130,9 @@ LogicalResult ScatterOp::verify() {
 
   auto indicesType = getIndicesType();
   if (indicesType.getRank() != 2 ||
-      !indicesType.getElementType().isInteger(32)) {
+      !isa<IntegerType>(indicesType.getElementType())) {
     return op->emitOpError(
-        "expected indices to be of rank 2 of i32 element type");
+        "expected indices to be of rank 2 of integer element type");
   }
   auto indexDepth = getIndexDepth();
   if (ShapedType::isDynamic(indexDepth)) {
@@ -1200,6 +1200,15 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, Value query, Value key, Value value,
+                        Value scale, ValueRange outputs, ArrayAttr indexingMaps,
+                        std::optional<Value> mask) {
+  Value maskIn = mask.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn,
+        outputs, indexingMaps);
+}
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
@@ -1212,6 +1221,9 @@ LogicalResult AttentionOp::verify() {
 
   // Check if indexing maps can represent attention.
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+  if (indexingMaps.size() != getOperation()->getNumOperands()) {
+    return attnOp->emitOpError("expected an indexing map for each operand");
+  }
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
   if (failed(maybeOpInfo)) {
@@ -1246,8 +1258,8 @@ LogicalResult AttentionOp::verify() {
       }
       if (shape[pos] != valShape[i]) {
         return attnOp->emitError("Shape Mismatch for ")
-               << operandName << ". Expected: " << shape[pos]
-               << " Got: " << valShape[i];
+               << operandName << " at position " << i
+               << ". Expected: " << shape[pos] << " Got: " << valShape[i];
       }
     }
     return success();
@@ -1259,6 +1271,38 @@ LogicalResult AttentionOp::verify() {
       failed(
           checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
     return failure();
+  }
+
+  // Additional check case if mask exists
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkShape("Mask", getMaskType()->getShape(), *maskMap)))
+      return failure();
+  }
+
+  int expectedSymbols = getQueryMap().getNumInputs();
+  auto checkDomain =
+      [&attnOp, &expectedSymbols](StringRef operandName,
+                                  AffineMap indexingMap) -> LogicalResult {
+    if (expectedSymbols != indexingMap.getNumInputs()) {
+      return attnOp->emitError("Mismatched map domain for ")
+             << operandName << ". Expected: " << expectedSymbols
+             << " Got: " << indexingMap.getNumInputs();
+    }
+    return success();
+  };
+
+  if (failed(checkDomain("Query", getQueryMap())) ||
+      failed(checkDomain("Key", getKeyMap())) ||
+      failed(checkDomain("Value", getValueMap())) ||
+      failed(checkDomain("Scale", getScaleMap())) ||
+      failed(checkDomain("Output", getOutputMap()))) {
+    return failure();
+  }
+
+  // Additional check case if mask exists
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkDomain("Mask", *maskMap)))
+      return failure();
   }
 
   if (isTiled) {
@@ -1324,19 +1368,28 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
   auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin(),
-                                maps.begin() + getNumDpsInputs() - 1);
+  maps.resize(getNumDpsInputs());
+  return maps;
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
   auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs() - 1,
-                                maps.end());
+  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
 }
 
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
+
+void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                              TypeRange results, Value query, Value key,
+                              Value value, Value scale, Value output, Value max,
+                              Value sum, ArrayAttr indexingMaps,
+                              std::optional<Value> mask) {
+  Value maskIn = mask.value_or(Value());
+  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
+        max, sum, indexingMaps);
+}
 
 LogicalResult OnlineAttentionOp::verify() {
   OnlineAttentionOp attnOp = *this;
@@ -1389,11 +1442,46 @@ LogicalResult OnlineAttentionOp::verify() {
     return failure();
   }
 
+  // Additional check case if mask exists
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+      return failure();
+  }
+
+  int expectedSymbols = getQueryMap().getNumInputs();
+  auto checkDomain =
+      [&attnOp, &expectedSymbols](StringRef operandName,
+                                  AffineMap indexingMap) -> LogicalResult {
+    if (expectedSymbols != indexingMap.getNumInputs()) {
+      return attnOp->emitError("Mismatched map domain for ")
+             << operandName << ". Expected: " << expectedSymbols
+             << " Got: " << indexingMap.getNumInputs();
+    }
+    return success();
+  };
+
+  if (failed(checkDomain("Query", getQueryMap())) ||
+      failed(checkDomain("Key", getKeyMap())) ||
+      failed(checkDomain("Value", getValueMap())) ||
+      failed(checkDomain("Scale", getScaleMap())) ||
+      failed(checkDomain("Output", getOutputMap())) ||
+      failed(checkDomain("Max", getMaxMap())) ||
+      failed(checkDomain("Sum", getSumMap()))) {
+    return failure();
+  }
+
+  // Additional check case if mask exists
+  if (auto maskMap = getMaskMap()) {
+    if (failed(checkDomain("Mask", *maskMap)))
+      return failure();
+  }
+
   return success();
 }
 
 MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/4, /*numInits=*/3);
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+                             /*numInits=*/3);
 }
 
 LogicalResult OnlineAttentionOp::reifyResultShapes(

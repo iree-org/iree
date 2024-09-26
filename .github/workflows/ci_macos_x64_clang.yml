@@ -30,7 +30,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       # There may be multiple versions of Xcode and SDKs installed.
@@ -41,7 +41,7 @@ jobs:
           xcrun metal --version
           xcrun metallib --version
       - name: "Setting up Python"
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
           python-version: "3.10"
           cache: "pip"

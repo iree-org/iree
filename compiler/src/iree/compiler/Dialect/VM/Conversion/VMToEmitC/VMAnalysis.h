@@ -33,7 +33,7 @@ struct FuncAnalysis {
     valueLiveness = ValueLiveness(op);
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
-    refs = DenseMap<int64_t, Operation *>{};
+    refs = DenseMap<int64_t, Value>{};
   }
   FuncAnalysis(mlir::emitc::FuncOp funcOp) {
     originalFunctionType = funcOp.getFunctionType();
@@ -101,22 +101,21 @@ struct FuncAnalysis {
     return lastUse && false;
   }
 
-  void cacheLocalRef(int64_t ordinal, emitc::ApplyOp applyOp) {
+  void cacheLocalRef(int64_t ordinal, Value ref) {
     assert(refs.has_value());
     assert(!refs.value().count(ordinal) && "ref was already cached");
-    refs.value()[ordinal] = applyOp.getOperation();
+    refs.value()[ordinal] = ref;
   }
 
-  emitc::ApplyOp lookupLocalRef(int64_t ordinal) {
+  Value lookupLocalRef(int64_t ordinal) {
     assert(refs.has_value());
     assert(refs.value().count(ordinal) && "ref not found in cache");
-    Operation *op = refs.value()[ordinal];
-    return cast<emitc::ApplyOp>(op);
+    return refs.value()[ordinal];
   }
 
   bool hasLocalRefs() { return refs.has_value(); }
 
-  DenseMap<int64_t, Operation *> &localRefs() {
+  DenseMap<int64_t, Value> &localRefs() {
     assert(refs.has_value());
     return refs.value();
   }
@@ -124,7 +123,7 @@ struct FuncAnalysis {
 private:
   std::optional<RegisterAllocation> registerAllocation;
   std::optional<ValueLiveness> valueLiveness;
-  std::optional<DenseMap<int64_t, Operation *>> refs;
+  std::optional<DenseMap<int64_t, Value>> refs;
   std::optional<FunctionType> originalFunctionType;
   std::optional<std::string> callingConvention;
   std::optional<std::string> exportName;
@@ -233,8 +232,7 @@ struct ModuleAnalysis {
       }
     }
 
-    emitc::ApplyOp applyOp = analysis.lookupLocalRef(ordinal);
-    return applyOp.getResult();
+    return analysis.lookupLocalRef(ordinal);
   }
 
   std::vector<TypeDef> typeTable;

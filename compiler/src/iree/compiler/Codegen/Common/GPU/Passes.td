@@ -31,9 +31,20 @@ def GPUCreateFastSlowPathPass :
   let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
+def GPUDistributeForallPass :
+    InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute scf.forall ops.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+}
+
 def GPUDistributePass :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to distribute scf.forall ops.";
+  let summary = "Pass to distribute scf.forall ops using upstream patterns.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
     "::mlir::gpu::GPUDialect",
@@ -186,6 +197,16 @@ def GPUApplyTilingLevelPass :
   ];
 }
 
+def GPUMaterializeHostEncodingPass :
+    Pass<"iree-codegen-gpu-materialize-host-encoding", "mlir::ModuleOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
+def GPUMaterializeDeviceEncodingPass :
+    InterfacePass<"iree-codegen-gpu-materialize-device-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend.";
+}
+
 def GPUTensorTileToSerialLoopsPass :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
@@ -209,6 +230,9 @@ def GPUTileReductionPass :
 def GPUVerifyDistributionPass :
     InterfacePass<"iree-codegen-gpu-verify-distribution", "mlir::FunctionOpInterface"> {
   let summary = "Pass to verify writes before resolving distributed contexts.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect",
+  ];
 }
 
 def GPUVectorAllocPass :
@@ -244,6 +268,14 @@ def VectorReductionToGPUPass :
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+}
+
+def ExpandGPUOpsPass :
+    InterfacePass<"iree-codegen-expand-gpu-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect"
   ];
 }
 

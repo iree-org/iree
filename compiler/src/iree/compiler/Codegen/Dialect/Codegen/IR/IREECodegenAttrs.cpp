@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/StorageUniquerSupport.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
@@ -322,6 +323,10 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
   return !getTileSizeVals(level).empty();
 }
 
+bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
+  return !getWorkgroupTileSizes().empty();
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,
@@ -395,14 +400,15 @@ bool WorkgroupMappingAttr::operator<(const WorkgroupMappingAttr &rhs) const {
   return getMappingId() < rhs.getMappingId();
 }
 
-LogicalResult WorkgroupMappingAttr::verifyAttrList(
-    MLIRContext *context, function_ref<InFlightDiagnostic()> emitError,
-    ArrayRef<Attribute> attrs) {
+LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
+                                                   Location loc,
+                                                   ArrayRef<Attribute> attrs) {
   if (attrs.empty()) {
     return success();
   }
   SmallVector<IREE::Codegen::WorkgroupMappingAttr> mappingAttrs;
   llvm::SmallDenseSet<IREE::Codegen::WorkgroupMappingAttr, 4> attrSet;
+  auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(loc);
   for (auto attr : attrs) {
     auto typedAttr =
         ::mlir::dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);

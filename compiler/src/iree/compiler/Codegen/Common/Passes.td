@@ -79,6 +79,12 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvolutionToIGEMMPass :
+    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Transforms convolution operations into an implicit GEMM format.";
+}
+
 def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
   let description = [{
@@ -123,12 +129,6 @@ def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
   ];
 }
 
-def ConvolutionToIGEMMPass :
-    InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Transforms convolution operations into an implicit GEMM format.";
-}
-
 def DecomposeConvolutionToLowerDimOpsPass :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
@@ -153,7 +153,9 @@ def DecomposePackUnPackOpsPass :
   let summary = "Decompose pack/unpack ops into vectorizable ops";
   let options = [
     Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
-           "Always apply tiling to make outer dimension be ones">
+           "Always apply tiling to make outer dimension be ones">,
+    Option<"useOnlyReshapes", "use-only-reshapes", "bool", "false",
+           "Use decomposition into reshape ops, even when packing unit dimensions.">
   ];
 }
 
@@ -166,6 +168,11 @@ def DecomposeSoftmaxPass :
            "bool", /*default=*/"true",
            "Whether to use the internal pass fusion logic for the exp function. See #15862.">
   ];
+}
+
+def DropVectorUnitDimsPass :
+    InterfacePass<"iree-codegen-drop-vector-unit-dims", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to drop vector unit dims.";
 }
 
 def ReconcileTranslationInfoPass
@@ -301,6 +308,10 @@ def OptimizeTensorInsertExtractSlicesPass
                     "mlir::FunctionOpInterface"> {
   let summary = "Optimize tensor.insert_slice/tensor.extract_slice operations "
                 "(e.g. hoist and fold)";
+  let options = [
+    Option<"foldIdentitySlices", "fold-identity-slices", "bool", "false",
+           "Enable folding of identity tensor.*_slice ops.">
+  ];
 }
 
 def HoistUnrolledVectorExtractInsertSlicePass :

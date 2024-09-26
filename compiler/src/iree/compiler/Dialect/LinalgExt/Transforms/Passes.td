@@ -54,6 +54,10 @@ def DecomposeIm2colPass :
     InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes im2col ops into insert and extract slice ops";
+  let options = [
+    Option<"unroll", "unroll", "bool", /*default=*/"true",
+           "Unroll the resulting loop nest after decomposition.">,
+  ];
 }
 
 def DecomposeWinogradTransformPass :
@@ -100,8 +104,7 @@ def DecomposeAttentionPass :
 }
 
 def ConvertAttentionToOnlineAttentionPass :
-    InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
-    "mlir::FunctionOpInterface"> {
+    Pass<"iree-linalg-ext-convert-attention-to-online-attention", ""> {
   let summary = "Converts attention op to online_attention op";
 }
 

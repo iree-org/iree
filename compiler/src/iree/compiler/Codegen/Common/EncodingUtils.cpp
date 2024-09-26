@@ -30,13 +30,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     return tensorType;
   }
   auto newIndex = encoding.getOperandIndex();
-  TypeAttr originalTypeAttr = encoding.getOriginalType();
-  RankedTensorType originalType = tensorType;
-  if (originalTypeAttr) {
-    originalType =
-        llvm::dyn_cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  SmallVector<int64_t> newOriginalShape(originalType.getShape());
+  SmallVector<int64_t> newOriginalShape(tensorType.getShape());
   auto userIndexingMaps = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> maps;
   for (auto a : userIndexingMaps) {
@@ -65,7 +59,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     std::swap(maps[0], maps[1]);
   }
 
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
   SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
   assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() >= 3);
   if (newRoundDimsTo.size() != 0) {
@@ -92,8 +85,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   // just use the original map for the new encoding.
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
       context, newIndex, opTypeAttr, encoding.getElementTypes(),
-      TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
-      encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, encoding.getBcastMap(),
       DenseI64ArrayAttr::get(context, newRoundDimsTo));
   return RankedTensorType::get(newShape, elemType, newEncoding);
@@ -117,9 +108,25 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     if (failed(maybeEncodingInfo)) {
       return dropEncoding(type);
     }
-    return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
+    auto encodingInfo = *maybeEncodingInfo;
+    auto packedType = cast<RankedTensorType>(tensor::PackOp::inferPackedType(
         tensorType, maybeEncodingInfo->innerTileSizes,
         maybeEncodingInfo->innerDimsPos, maybeEncodingInfo->outerDimsPerm));
+
+    // There is no swizzle, we are already done. Typically the case on CPU.
+    if (!encodingInfo.swizzle) {
+      return packedType;
+    }
+
+    // There is a swizzle, we need to handle it. Typically the case on GPU.
+    auto swizzle = *encodingInfo.swizzle;
+    SmallVector<int64_t> newShape(
+        packedType.getShape().drop_back(encodingInfo.innerTileSizes.size()));
+    SmallVector<int64_t> swizzledTileShape =
+        getExpandedTileShape(swizzle.expandShape);
+    applyPermutationToVector(swizzledTileShape, swizzle.permutation);
+    newShape.append(swizzledTileShape);
+    return RankedTensorType::get(newShape, packedType.getElementType());
   });
 }
 
@@ -143,25 +150,8 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
-RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
-  auto encoding = getEncodingAttr(type);
-  if (!encoding) {
-    return type;
-  }
-  RankedTensorType originalType = type;
-  if (auto originalTypeAttr = encoding.getOriginalType()) {
-    originalType = cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  return RankedTensorType::get(originalType.getShape(),
-                               originalType.getElementType(), encoding);
-}
-
 RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
-}
-
-int64_t getIntOrZero(IntegerAttr a) {
-  return a == IntegerAttr() ? 0 : a.getInt();
 }
 
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
@@ -208,9 +198,21 @@ bool isNarrowNResult(EncodingAttr encoding) {
   if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
     return false;
   }
-  IntegerAttr narrowM = encoding.getMatmulNarrow_M();
-  IntegerAttr narrowN = encoding.getMatmulNarrow_N();
-  return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
+
+  int64_t narrowM = encoding.getMatmulNarrowM();
+  int64_t narrowN = encoding.getMatmulNarrowN();
+  return narrowN && (!narrowM || narrowM > narrowN);
+}
+
+SmallVector<int64_t>
+getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
+  SmallVector<int64_t> result;
+  for (auto e : expandShape) {
+    for (auto d : e) {
+      result.push_back(d.size);
+    }
+  }
+  return result;
 }
 
 } // namespace mlir::iree_compiler

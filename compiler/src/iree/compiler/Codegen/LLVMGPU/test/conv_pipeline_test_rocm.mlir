@@ -49,5 +49,5 @@ hal.executable private @conv_nchw_dispatch_1 {
 // eliminated.
 
 //   CHECK-LABEL:  func @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16
-// CHECK-COUNT-3:    memref.alloc() : memref<1x1x1x4xf16, #gpu.address_space<private>>
+// CHECK-COUNT-3:    memref.alloca() : memref<1x1x1x4xf16, #gpu.address_space<private>>
 // CHECK-COUNT-3:    memref.copy %{{.*}}, %{{.*}} : memref<1x1x1x4xf16, #gpu.address_space<private>> to memref<{{.*}} #hal.descriptor_type<storage_buffer>>

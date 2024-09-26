@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -380,9 +381,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
+    auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+        context, /*prefetchSharedMemory=*/true,
+        /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*reorder_workgroups_strategy=*/std::nullopt);
     attrs.emplace_back(
-        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
-        UnitAttr::get(context));
+        StringAttr::get(context,
+                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -610,9 +616,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
+    auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+        context, /*prefetchSharedMemory=*/true,
+        /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*reorder_workgroups_strategy=*/std::nullopt);
     attrs.emplace_back(
-        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
-        UnitAttr::get(context));
+        StringAttr::get(context,
+                        IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -655,6 +666,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // TODO: Do we need a matvec-like attention pipeline? Probably not,
   // considering M is generally the largest dimension.
 
+  Value qMatrix = op.getQuery();
+  Value kMatrix = op.getKey();
   Value vMatrix = op.getValue();
 
   SmallVector<GPUMatmulShapeType> intrinsics;
@@ -669,58 +682,74 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (intrinsics.empty())
     return failure();
 
-  // We select the tile sizes based on the second matmul. We can probably
-  // use a better heuristic, but all tile sizes can be determined from the
-  // second matmul.
-  //
-  // We assume that the second matmul uses the element type of V for input
-  // and f32 as output. It is possible to use other element types also.
+  // We assume that P uses the element type of V for input
+  // and both matmuls have f32 as output. It is possible to use other element
+  // types also.
+  Type qElementType = getElementTypeOrSelf(qMatrix);
+  Type kElementType = getElementTypeOrSelf(kMatrix);
   Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
-  GPUMatmulShapeType problem{bounds[mDim],
-                             bounds[nDim],
-                             bounds[k2Dim],
-                             /*lhsType=*/vElementType,
-                             /*rhsType=*/vElementType,
-                             /*accType=*/f32Type};
+  GPUMatmulShapeType qkMatmul{
+      /*m=*/bounds[mDim],
+      /*n=*/bounds[k2Dim],
+      /*k=*/bounds[k1Dim],
+      /*lhsType=*/qElementType,
+      /*rhsType=*/kElementType,
+      /*accType=*/f32Type,
+  };
+  GPUMatmulShapeType pvMatmul{/*m=*/bounds[mDim],
+                              /*n=*/bounds[nDim],
+                              /*k=*/bounds[k2Dim],
+                              /*lhsType=*/vElementType,
+                              /*rhsType=*/vElementType,
+                              /*accType=*/f32Type};
 
   // TODO: Currently, we are forcing number of subgroups to be 1. This can be
   // fixed by teaching vector distribution chained matmul.
-  GPUMMAHeuristicSeeds seeds = {/*bestSubgroupCountPerWorkgroup=*/1,
-                                /*bestMNTileCountPerSubgroup=*/8,
-                                /*bestKTileCountPerSubgroup=*/4};
+  GPUMMAHeuristicSeeds pvMatmulSeeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+                                        /*bestMNTileCountPerSubgroup=*/4,
+                                        /*bestKTileCountPerSubgroup=*/4};
 
   LDBG("Attention Vector Distribution Config");
 
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
 
-  // Infer if lhs or rhs is transposed to help generate better schedule.
-  AffineMap sMap = opInfo.getSMap();
-  AffineMap vMap = op.getValueMap();
-
-  bool transposedLhs =
-      (k2Dim !=
-       llvm::cast<AffineDimExpr>(sMap.getResults().back()).getPosition());
-  bool transposedRhs =
-      (nDim !=
-       llvm::cast<AffineDimExpr>(vMap.getResults().back()).getPosition());
+  // Infer if Q, K and V are transposed to help generate better schedule.
+  bool transposedQ =
+      k1Dim != llvm::cast<AffineDimExpr>(op.getQueryMap().getResults().back())
+                   .getPosition();
+  bool transposedK =
+      k1Dim != llvm::cast<AffineDimExpr>(op.getKeyMap().getResults().back())
+                   .getPosition();
+  bool transposedV =
+      k2Dim != llvm::cast<AffineDimExpr>(op.getValueMap().getResults().back())
+                   .getPosition();
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
+  std::optional<GPUMMASchedule> schedule = deduceAttentionSchedule(
+      qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
+      targetSubgroupSize, transposedQ, transposedK, transposedV);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, transposedLhs, transposedRhs,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceAttentionSchedule(
+        qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
+        targetSubgroupSize, transposedQ, transposedK, transposedV,
+        /*canUpcastAcc=*/true);
   }
 
   if (!schedule) {
     LDBG("Failed to deduce Attention schedule");
     return failure();
+  }
+
+  // TODO: Due to a bug in layout configuration, we cannot set warp count on
+  // the N dimension. This is however ok, because we generally do not want to
+  // distribute subgroups on N dimension anyway.
+  if (schedule->nWarpCount != 1) {
+    schedule->nTileCount *= schedule->nWarpCount;
+    schedule->nWarpCount = 1;
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);

@@ -218,8 +218,8 @@ util.global private @constant_resource : !stream.resource<constant>
 util.global private @constant_size : index
 
 // CHECK-LABEL: @cmdDispatch
-//  CHECK-SAME: (%[[ARG_RESOURCE:.+]]: !hal.buffer, %[[ARG_SIZE:.+]]: index)
-util.func public @cmdDispatch(%arg_resource: !stream.resource<external>, %arg_size: index) -> !stream.timepoint {
+//  CHECK-SAME: (%[[ARG_RESOURCE:.+]]: !hal.buffer)
+util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -230,6 +230,8 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>, %arg_si
   // CHECK-DAG: %[[CONSTANT_RESOURCE:.+]] = util.global.load immutable @constant_resource
   %constant_resource = util.global.load immutable @constant_resource : !stream.resource<constant>
   %constant_size = util.global.load immutable @constant_size : index
+  // CHECK: %[[ARG_SIZE:.+]] = arith.constant 200
+  %arg_size = arith.constant 200 : index
   // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK: %[[MEMOIZED_CMD:.+]] = hal.device.memoize
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -288,28 +290,65 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>, %arg_si
 // -----
 
 // Tests conversion of streamable calls and function declarations.
-// Expect a command buffer and a buffer + offset + length for each resource.
+// Expect a command buffer and a (binding table ordinal, buffer) + offset +
+// length for each resource. Here we have one constant global that gets baked
+// into the memoized command buffer and the two arguments are treated as
+// indirect bindings.
 
 util.global private @device : !hal.device
 
-// CHECK: util.func private @cmdFunc(%arg0: !hal.command_buffer, %arg1: !hal.buffer, %arg2: index, %arg3: index, %arg4: i32, %arg5: !hal.buffer, %arg6: index, %arg7: index, %arg8: !custom.type, %arg9: !hal.buffer, %arg10: index, %arg11: index)
-stream.cmd.func private @cmdFunc(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: i32, %arg4[%arg5 for %arg6]: !stream.resource<*>, %arg7: !custom.type, %arg8[%arg9 for %arg10]: !stream.resource<*>)
+util.global private @global : !stream.resource<constant>
+
+// CHECK: util.func private @cmdFunc(
+// CHECK-SAME: %arg0: !hal.command_buffer,
+stream.cmd.func private @cmdFunc(
+    // CHECK-SAME: %arg1: index, %arg2: !hal.buffer, %arg3: index, %arg4: index,
+    %arg0[%arg1 for %arg2]: !stream.resource<*>,
+    // CHECK-SAME: %arg5: i32,
+    %arg3: i32,
+    // CHECK-SAME: %arg6: index, %arg7: !hal.buffer, %arg8: index, %arg9: index,
+    %arg4[%arg5 for %arg6]: !stream.resource<*>,
+    // CHECK-SAME: %arg10: !custom.type,
+    %arg7: !custom.type,
+    // CHECK-SAME: %arg11: index, %arg12: !hal.buffer, %arg13: index, %arg14: index
+    %arg8[%arg9 for %arg10]: !stream.resource<*>)
 
 // CHECK-LABEL: @cmdCall
-util.func public @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream.resource<external>, %arg3: !custom.type, %arg4: !stream.resource<external>) -> !stream.timepoint {
+util.func public @cmdCall(
+    // CHECK-SAME: (%[[ARG_I32:.+]]: i32, %[[ARG_CUSTOM:.+]]: !custom.type,
+    %arg_i32: i32, %arg_custom: !custom.type,
+    // CHECK-SAME:  %[[ARG_RESOURCE0:.+]]: !hal.buffer, %[[ARG_RESOURCE1:.+]]: !hal.buffer)
+    %arg_resource0: !stream.resource<transient>, %arg_resource1: !stream.resource<external>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100
-  %size0 = arith.constant 100 : index
-  // CHECK-DAG: %[[SIZE1:.+]] = arith.constant 101
-  %size1 = arith.constant 101 : index
-  // CHECK-DAG: %[[SIZE2:.+]] = arith.constant 102
-  %size2 = arith.constant 102 : index
+  // CHECK-DAG: %[[GLOBAL_RESOURCE:.+]] = util.global.load immutable @global
+  %global_resource = util.global.load immutable @global : !stream.resource<constant>
+  // CHECK-DAG: %[[GLOBAL_SIZE:.+]] = arith.constant 100
+  %global_size = arith.constant 100 : index
+  // CHECK-DAG: %[[ARG_SIZE0:.+]] = arith.constant 101
+  %arg_size0 = arith.constant 101 : index
+  // CHECK-DAG: %[[ARG_SIZE1:.+]] = arith.constant 102
+  %arg_size1 = arith.constant 102 : index
+  // CHECK: hal.device.memoize
   // CHECK: %[[COMMAND_BUFFER:.+]] = hal.command_buffer.create
-  %timepoint = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %stream0: !stream.resource<external>{%size0}, %arg2 as %stream1: !stream.resource<external>{%size1}, %arg4 as %stream2: !stream.resource<external>{%size2}) {
-    // CHECK: util.call @cmdFunc(%[[COMMAND_BUFFER]], %arg0, %c0, %[[SIZE0]], %arg1, %arg2, %c0, %[[SIZE1]], %arg3, %arg4, %c0, %[[SIZE2]]) :
-    // CHECK-SAME: (!hal.command_buffer, !hal.buffer, index, index, i32, !hal.buffer, index, index, !custom.type, !hal.buffer, index, index) -> ()
-    stream.cmd.call @cmdFunc(ro %stream0[%c0 for %size0], %arg1, rw %stream1[%c0 for %size1], %arg3, wo %stream2[%c0 for %size2]) : (!stream.resource<external>{%size0}, i32, !stream.resource<external>{%size1}, !custom.type, !stream.resource<external>{%size2}) -> ()
+  %timepoint = stream.cmd.execute on(#hal.device.affinity<@device>)
+      with(%global_resource as %stream0: !stream.resource<constant>{%global_size}, %arg_resource0 as %stream1: !stream.resource<transient>{%arg_size0}, %arg_resource1 as %stream2: !stream.resource<external>{%arg_size1}) {
+    // CHECK-DAG: %[[NULL_BUFFER:.+]] = util.null : !hal.buffer
+    // CHECK: util.call @cmdFunc(%[[COMMAND_BUFFER]],
+    stream.cmd.call @cmdFunc(
+        // CHECK-SAME: %c0, %[[GLOBAL_RESOURCE]], %c0, %[[GLOBAL_SIZE]], %[[ARG_I32]],
+        ro %stream0[%c0 for %global_size], %arg_i32,
+        // CHECK-SAME: %c0, %[[NULL_BUFFER]], %c0, %[[ARG_SIZE0]], %[[ARG_CUSTOM]],
+        rw %stream1[%c0 for %arg_size0], %arg_custom,
+        // CHECK-SAME: %c1, %[[NULL_BUFFER]], %c0, %[[ARG_SIZE1]]
+        wo %stream2[%c0 for %arg_size1]) :
+        // CHECK-SAME: (!hal.command_buffer, index, !hal.buffer, index, index, i32, index, !hal.buffer, index, index, !custom.type, index, !hal.buffer, index, index) -> ()
+        (!stream.resource<constant>{%global_size}, i32, !stream.resource<transient>{%arg_size0}, !custom.type, !stream.resource<external>{%arg_size1}) -> ()
   } => !stream.timepoint
+  // CHECK: hal.device.queue.execute.indirect
+  // CHECK-SAME: bindings([
+  // CHECK-NEXT:   (%[[ARG_RESOURCE0]] : !hal.buffer)[%c0, %[[ARG_SIZE0]]],
+  // CHECK-NEXT:   (%[[ARG_RESOURCE1]] : !hal.buffer)[%c0, %[[ARG_SIZE1]]]
+  // CHECK-NEXT: ])
   util.return %timepoint : !stream.timepoint
 }
 

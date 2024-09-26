@@ -7,6 +7,9 @@
 name: CI - Linux arm64 clang
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/ci_linux_arm64_clang.yml"
   schedule:
     # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
     - cron: "15 9 * * 1-5"
@@ -24,8 +27,8 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  # TODO: Switch to GitHub-hosted arm64 runners when available?
-  # TODO: Switch runs-on labels to use different (non-GCP) self-hosted runners?
+  # TODO(#18238): migrate to new runner cluster
+  #   Or switch to GitHub-hosted arm64 runners when available?
   linux_arm64_clang:
     needs: setup
     runs-on:
@@ -38,7 +41,7 @@ jobs:
       BUILD_DIR: build-arm64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
       - name: "Building IREE"
@@ -48,15 +51,15 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59" \
+            --env "CCACHE_NAMESPACE=ci_linux_arm64_clang" \
             --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
+            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"

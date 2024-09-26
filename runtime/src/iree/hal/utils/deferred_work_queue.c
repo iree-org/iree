@@ -598,10 +598,7 @@ void iree_hal_deferred_work_queue_destroy(
   // Request the workers to exit.
   iree_hal_deferred_work_queue_request_exit(work_queue);
 
-  iree_thread_join(work_queue->worker_thread);
   iree_thread_release(work_queue->worker_thread);
-
-  iree_thread_join(work_queue->completion_thread);
   iree_thread_release(work_queue->completion_thread);
 
   iree_hal_deferred_work_queue_working_area_deinitialize(
@@ -981,7 +978,6 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
       iree_hal_command_buffer_mode_t mode =
           iree_hal_command_buffer_mode(command_buffer) |
           IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
-          IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
           // NOTE: we need to validate if a binding table is provided as the
           // bindings were not known when it was originally recorded.
           (iree_hal_buffer_binding_table_is_empty(binding_table)

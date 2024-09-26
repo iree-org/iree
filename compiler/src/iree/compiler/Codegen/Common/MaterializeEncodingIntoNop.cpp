@@ -48,6 +48,8 @@ struct MaterializeEncodingIntoNopPass final
         materializeEncodingFn, IREE::HAL::ExecutableTargetAttr());
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
+        materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
+    populateShapeIndependentMaterializeEncodingPatterns(
         materializeEncodingPattern, target, typeConverter,
         materializeEncodingValueFn);
 

@@ -398,23 +398,27 @@ vm.module @my_module {
 
   // Allocate space for the arguments.
   // CHECK-NEXT: %[[ARGBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "arguments"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // alloca_(0) can return NULL on Windows. So we always allocate at least one byte
+  // CHECK-NEXT: %[[ARGALLOCASIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"1">}> : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[ARGALLOCASIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: %[[ARGSDATALENGTH:.+]] = "emitc.member"(%[[ARGBYTESPAN_MEMBER]]) <{member = "data_length"}> : (!emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_host_size_t">>
   // CHECK-NEXT: emitc.assign %[[ARGSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[ARGSDATALENGTH]] : <!emitc.opaque<"iree_host_size_t">>
   // CHECK-NEXT: %[[ARGSDATA:.+]] = "emitc.member"(%[[ARGBYTESPAN_MEMBER]]) <{member = "data"}> : (!emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.lvalue<!emitc.ptr<ui8>>
   // CHECK-NEXT: emitc.assign %[[ARGBYTESPANDATA]] : !emitc.ptr<ui8> to %[[ARGSDATA]] : <!emitc.ptr<ui8>>
-  // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
+  // CHECK-NEXT: emitc.call_opaque "memset"(%[[ARGBYTESPANDATA]], %[[ARGALLOCASIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
-  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // alloca_(0) can return NULL on Windows. So we always allocate at least one byte
+  // CHECK-NEXT: %[[RESALLOCASIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"1">}> : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call_opaque "iree_alloca"(%[[RESALLOCASIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: %[[RESSDATALENGTH:.+]] = "emitc.member"(%[[RESBYTESPAN_MEMBER]]) <{member = "data_length"}> : (!emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_host_size_t">>
   // CHECK-NEXT: emitc.assign %[[RESULTSIZE]] : !emitc.opaque<"iree_host_size_t"> to %[[RESSDATALENGTH]] : <!emitc.opaque<"iree_host_size_t">>
   // CHECK-NEXT: %[[RESSDATA:.+]] = "emitc.member"(%[[RESBYTESPAN_MEMBER]]) <{member = "data"}> : (!emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>) -> !emitc.lvalue<!emitc.ptr<ui8>>
   // CHECK-NEXT: emitc.assign %[[RESBYTESPANDATA]] : !emitc.ptr<ui8> to %[[RESSDATA]] : <!emitc.ptr<ui8>>
-  // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
+  // CHECK-NEXT: emitc.call_opaque "memset"(%[[RESBYTESPANDATA]], %[[RESALLOCASIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Check that we don't pack anything into the argument struct.
   // CHECK-NOT: "emitc.member"(%{{.+}}) <{member = "arguments"}>

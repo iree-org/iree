@@ -144,6 +144,15 @@ def IREEGPU_MMAFragment : IREEGPU_I32MmaEnumAttr<"MMAFragment",
       MMA_ACC
     ]>;
 
+def MMA_Workgroup : I32EnumAttrCase<"Workgroup", 0>;
+def MMA_Subgroup : I32EnumAttrCase<"Subgroup", 1>;
+
+def IREEGPU_MMAScope : IREEGPU_I32MmaEnumAttr<"MMAScope",
+    "Descriptor for a particular scope of an MMA operation", [
+      MMA_Workgroup,
+      MMA_Subgroup
+    ]>;
+
 //===----------------------------------------------------------------------===//
 // Tiling levels
 
@@ -167,5 +176,29 @@ def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
       Subgroup,
       Lane
     ]>;
+
+//===----------------------------------------------------------------------===//
+// Pipeline options
+//===----------------------------------------------------------------------===//
+
+class IREEGPU_I32PipelineEnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, summary, cases> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+// ReorderWorkgroups EnumAttrCases.
+def ReorderWorkgroupsNone : I32EnumAttrCase<"None", 0>;
+def ReorderWorkgroupsSwizzle : I32EnumAttrCase<"Swizzle", 1>;
+def ReorderWorkgroupsTranspose : I32EnumAttrCase<"Transpose", 2>;
+
+// EnumAttr for workgroup reordering strategy enums.
+def IREEGPU_ReorderWorkgroupsStrategy : IREEGPU_I32PipelineEnumAttr<"ReorderWorkgroupsStrategy",
+    "Strategy for workgroup reordering", [
+      ReorderWorkgroupsNone,
+      ReorderWorkgroupsSwizzle,
+      ReorderWorkgroupsTranspose
+    ]> {
+}
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS

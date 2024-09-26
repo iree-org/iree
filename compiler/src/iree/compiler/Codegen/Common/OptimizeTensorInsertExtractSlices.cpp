@@ -8,6 +8,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
@@ -29,6 +31,10 @@ namespace {
 class OptimizeTensorInsertExtractSlicesPass final
     : public impl::OptimizeTensorInsertExtractSlicesPassBase<
           OptimizeTensorInsertExtractSlicesPass> {
+  using impl::OptimizeTensorInsertExtractSlicesPassBase<
+      OptimizeTensorInsertExtractSlicesPass>::
+      OptimizeTensorInsertExtractSlicesPassBase;
+
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
@@ -200,6 +206,38 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
   }
 }
 
+namespace {
+struct CastLikeExtractSliceOpFolder final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tensor::isCastLikeExtractSliceOp(sliceOp) ||
+        sliceOp.getSourceType() != sliceOp.getResultType()) {
+      return failure();
+    }
+    rewriter.replaceOp(sliceOp, sliceOp.getSource());
+    return success();
+  }
+};
+
+struct CastLikeInsertSliceOpFolder final
+    : OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    if (!tensor::isCastLikeInsertSliceOp(sliceOp) ||
+        sliceOp.getSourceType() != sliceOp.getResultType()) {
+      return failure();
+    }
+    rewriter.replaceOp(sliceOp, sliceOp.getSource());
+    return success();
+  }
+};
+} // namespace
+
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   auto funcOp = getOperation();
   linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
@@ -223,6 +261,10 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   populateVectorTransferTensorSliceTransforms(patterns);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+  if (foldIdentitySlices) {
+    patterns.add<CastLikeExtractSliceOpFolder>(context);
+    patterns.add<CastLikeInsertSliceOpFolder>(context);
+  }
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

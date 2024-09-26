@@ -257,6 +257,7 @@ func.func @conv() attributes {translation_info = #iree_codegen.translation_info<
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
@@ -272,7 +273,7 @@ func.func @online_attention(%query: tensor<192x1024x64xf16>,
   %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR],
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR],
           lowering_config = #config }
         ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)

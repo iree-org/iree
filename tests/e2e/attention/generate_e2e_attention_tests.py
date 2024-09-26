@@ -79,7 +79,7 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1024, k1=256, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(batch=2, m=1024, k1=128, k2=128, n=64, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
@@ -217,6 +217,7 @@ def generate_function(
         f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
+        f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
         f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
         f"      outs(%result0: {result_tensor_type}) -> {result_tensor_type}\n"

@@ -78,10 +78,6 @@ def EncodingAttr :
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
-    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
-    // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
-    OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
-    OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"AffineMapAttr", "Indexing map that represents the broadcasting dims in the producer">:$bcast_map,
     // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
@@ -91,9 +87,7 @@ def EncodingAttr :
   let builders = [
     AttrBuilder<(ins "int64_t":$operandIndex,
         "EncodingOpType":$opType,
-        "ArrayRef<Type>":$elemTypes, "Type":$origType,
-        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
-        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
+        "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
         CArg<"std::optional<AffineMap>", "{}">:$bcastMap,
         CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
@@ -116,6 +110,14 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
+
+    /// Returns the M size from `round_dims_to` if the value is less than
+    /// kNarrowThreshold. Otherwise, returns zero.
+    int64_t getMatmulNarrowM();
+
+    /// Returns the N size from `round_dims_to` if the value is less than
+    /// kNarrowThreshold. Otherwise, returns zero.
+    int64_t getMatmulNarrowN();
   }];
 
   let genVerifyDecl = 0;

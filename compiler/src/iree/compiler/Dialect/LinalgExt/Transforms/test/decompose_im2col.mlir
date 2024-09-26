@@ -1,4 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col{unroll=false}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-im2col{unroll=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-UNROLL
 
 #map = affine_map<(d0) -> (d0 * 4)>
 module {
@@ -71,3 +72,65 @@ module {
 //      CHECK:     scf.yield %[[mLOOP]] : tensor<2x?x?xf32>
 //      CHECK:   }
 //      CHECK:   return %[[bLOOP]] : tensor<2x?x?xf32>
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 4)>
+module {
+  func.func @im2col_unrolled(%arg0: tensor<2x34x34x640xf32>, %m_off: index, %k: index) -> tensor<2x2x4xf32> {
+    %0 = tensor.empty() : tensor<2x2x4xf32>
+    %k_off = affine.apply #map(%k)
+    %7 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3] m_offset = [%m_off] k_offset = [%k_off] batch_pos = [0] m_pos = [1, 2] k_pos = [3] ins(%arg0 : tensor<2x34x34x640xf32>) outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+    return %7 : tensor<2x2x4xf32>
+  }
+}
+//  CHECK-UNROLL-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 160) * 640)>
+//  CHECK-UNROLL-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> ((d0 + s0) floordiv 32 + s1 floordiv 480)>
+//  CHECK-UNROLL-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> ((d0 + s0) mod 32 + s1 floordiv 160 - (s1 floordiv 480) * 3)>
+//      CHECK-UNROLL: func.func @im2col_unrolled(%[[ARG0:.+]]: tensor<2x34x34x640xf32>
+// CHECK-UNROLL-SAME:   %[[mOFF:.+]]: index, %[[K:.+]]: index)
+//  CHECK-UNROLL-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-UNROLL-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//      CHECK-UNROLL:   %[[OUT_TILE:.+]] = tensor.empty() : tensor<2x2x4xf32>
+
+//  First iteration
+//
+//  CHECK-UNROLL-DAG:   %[[kIDX:.+]] = affine.apply #[[MAP]]()[%[[K]]]
+//  CHECK-UNROLL-DAG:   %[[hIDX:.+]] = affine.apply #[[MAP1]](%[[C0]])[%[[mOFF]], %[[K]]]
+//  CHECK-UNROLL-DAG:   %[[wIDX:.+]] = affine.apply #[[MAP2]](%[[C0]])[%[[mOFF]], %[[K]]]
+//      CHECK-UNROLL:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[C0]], %[[hIDX]], %[[wIDX]], %[[kIDX]]] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<2x34x34x640xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT_TILE]][%[[C0]], %[[C0]], 0] [1, 1, 4] [1, 1, 1] : tensor<2x2x4xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>) -> tensor<4xf32>
+//      CHECK-UNROLL:   %[[INSERT0:.+]] = tensor.insert_slice %[[COPY]] into %[[OUT_TILE]][%[[C0]], %[[C0]], 0] [1, 1, 4] [1, 1, 1] : tensor<4xf32> into tensor<2x2x4xf32>
+
+//  Second iteration
+//
+//  CHECK-UNROLL-DAG:   %[[kIDX:.+]] = affine.apply #[[MAP]]()[%[[K]]]
+//  CHECK-UNROLL-DAG:   %[[hIDX:.+]] = affine.apply #[[MAP1]](%[[C1]])[%[[mOFF]], %[[K]]]
+//  CHECK-UNROLL-DAG:   %[[wIDX:.+]] = affine.apply #[[MAP2]](%[[C1]])[%[[mOFF]], %[[K]]]
+//      CHECK-UNROLL:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[C0]], %[[hIDX]], %[[wIDX]], %[[kIDX]]] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<2x34x34x640xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INSERT0]][%[[C0]], %[[C1]], 0] [1, 1, 4] [1, 1, 1] : tensor<2x2x4xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>) -> tensor<4xf32>
+//      CHECK-UNROLL:   %[[INSERT1:.+]] = tensor.insert_slice %[[COPY]] into %[[INSERT0]][%[[C0]], %[[C1]], 0] [1, 1, 4] [1, 1, 1] : tensor<4xf32> into tensor<2x2x4xf32>
+
+//  Third iteration
+//
+//  CHECK-UNROLL-DAG:   %[[kIDX:.+]] = affine.apply #[[MAP]]()[%[[K]]]
+//  CHECK-UNROLL-DAG:   %[[hIDX:.+]] = affine.apply #[[MAP1]](%[[C0]])[%[[mOFF]], %[[K]]]
+//  CHECK-UNROLL-DAG:   %[[wIDX:.+]] = affine.apply #[[MAP2]](%[[C0]])[%[[mOFF]], %[[K]]]
+//      CHECK-UNROLL:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[C1]], %[[hIDX]], %[[wIDX]], %[[kIDX]]] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<2x34x34x640xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INSERT1]][%[[C1]], %[[C0]], 0] [1, 1, 4] [1, 1, 1] : tensor<2x2x4xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>) -> tensor<4xf32>
+//      CHECK-UNROLL:   %[[INSERT2:.+]] = tensor.insert_slice %[[COPY]] into %[[INSERT1]][%[[C1]], %[[C0]], 0] [1, 1, 4] [1, 1, 1] : tensor<4xf32> into tensor<2x2x4xf32>
+
+//  Fourth iteration
+//
+//  CHECK-UNROLL-DAG:   %[[kIDX:.+]] = affine.apply #[[MAP]]()[%[[K]]]
+//  CHECK-UNROLL-DAG:   %[[hIDX:.+]] = affine.apply #[[MAP1]](%[[C1]])[%[[mOFF]], %[[K]]]
+//  CHECK-UNROLL-DAG:   %[[wIDX:.+]] = affine.apply #[[MAP2]](%[[C1]])[%[[mOFF]], %[[K]]]
+//      CHECK-UNROLL:   %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[C1]], %[[hIDX]], %[[wIDX]], %[[kIDX]]] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<2x34x34x640xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INSERT2]][%[[C1]], %[[C1]], 0] [1, 1, 4] [1, 1, 1] : tensor<2x2x4xf32> to tensor<4xf32>
+//      CHECK-UNROLL:   %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<4xf32>) outs(%[[OUT_SLICE]] : tensor<4xf32>) -> tensor<4xf32>
+//      CHECK-UNROLL:   %[[INSERT3:.+]] = tensor.insert_slice %[[COPY]] into %[[INSERT2]][%[[C1]], %[[C1]], 0] [1, 1, 4] [1, 1, 1] : tensor<4xf32> into tensor<2x2x4xf32>
+
+//      CHECK-UNROLL:   return %[[INSERT3]] : tensor<2x2x4xf32>

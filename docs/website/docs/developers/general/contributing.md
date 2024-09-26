@@ -371,22 +371,28 @@ runner-env: [testing|prod]
 Copy/paste any of these at the bottom of a PR description to change what the CI
 runs.
 
-* Also run GPU tests (opt-in due to low availability):
-
-    ``` text
-    ci-extra: test_nvidia_t4,test_amd_mi250,test_amd_mi300,test_amd_w7900
-    ```
-
 * Skip all CI builds and tests, e.g. for comment-only changes:
 
     ``` text
     skip-ci: Comment-only change.
     ```
 
+* Only run runtime builds:
+
+    ``` text
+    ci-exactly: runtime
+    ```
+
+* Only run ONNX tests:
+
+    ``` text
+    ci-exactly: build_packages,test_onnx
+    ```
+
 * Only run Bazel builds, e.g. for changes only affecting Bazel rules:
 
     ``` text
-    ci-exactly: build_test_all_bazel
+    ci-exactly: linux_x64_bazel
     ```
 
 For example, this PR opted in to running the `build_test_all_windows` job:

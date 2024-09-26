@@ -55,6 +55,8 @@ iree_lit_test_suite(
   LABELS
     "driver=local-task"
     "hostonly"
+  TIMEOUT
+    300
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

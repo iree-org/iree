@@ -96,6 +96,20 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   return procInfo;
 }
 
+bool isDescendingRelativeMappingIndices(ArrayRef<Attribute> array) {
+  int64_t prev =
+      llvm::cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
+  for (Attribute attr : array.drop_front()) {
+    int64_t relativeIndex =
+        llvm::cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
+    if (relativeIndex != prev - 1) {
+      return false;
+    }
+    prev = relativeIndex;
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -521,29 +535,31 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   return identity;
 }
 
-/// Return a matching GPU reduction operations.
-static std::optional<gpu::AllReduceOperation>
-combiningKindToAllReduce(vector::CombiningKind kind) {
-  using gpu::AllReduceOperation;
-  using vector::CombiningKind;
-
+/// Returns the matching GPU reduction operation.
+gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
   switch (kind) {
-  case CombiningKind::ADD:
-    return AllReduceOperation::ADD;
-  case CombiningKind::AND:
-    return AllReduceOperation::AND;
-  case CombiningKind::MUL:
-    return AllReduceOperation::MUL;
-  case CombiningKind::OR:
-    return AllReduceOperation::OR;
-  case CombiningKind::XOR:
-    return AllReduceOperation::XOR;
-  // Currently, the min/max reductions are not well-defined in the gpu dialect.
-  // See https://github.com/llvm/llvm-project/issues/72354.
-  default:
-    break;
+#define MAP_CASE(X)                                                            \
+  case vector::CombiningKind::X:                                               \
+    return gpu::AllReduceOperation::X
+
+    MAP_CASE(ADD);
+    MAP_CASE(MUL);
+    MAP_CASE(MINUI);
+    MAP_CASE(MINSI);
+    MAP_CASE(MINNUMF);
+    MAP_CASE(MAXSI);
+    MAP_CASE(MAXUI);
+    MAP_CASE(MAXNUMF);
+    MAP_CASE(AND);
+    MAP_CASE(OR);
+    MAP_CASE(XOR);
+    MAP_CASE(MINIMUMF);
+    MAP_CASE(MAXIMUMF);
+#undef MAP_CASE
   }
-  return std::nullopt;
+  // Upstream LLVM has the same assertion for the reverse direction (see
+  // mlir::gpu::convertReductionKind).
+  llvm_unreachable("Vector and GPU reduction kinds should match 1:1");
 }
 
 /// Emit reduction across a group for a given input.
@@ -555,12 +571,11 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       "Group reduction only support for sizes aligned on warp size for now.");
 
   if (!expandSubgroupReduce && size == warpSize) {
-    if (auto gpuReduceKind = combiningKindToAllReduce(kind)) {
-      // Simple case -- emit `gpu.subgroup_reduce` directly.
-      Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
-      return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, *gpuReduceKind,
-                                                   /*uniform=*/false);
-    }
+    auto gpuReduceKind = combiningKindToAllReduce(kind);
+    // Simple case -- emit `gpu.subgroup_reduce` directly.
+    Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+    return builder.create<gpu::SubgroupReduceOp>(loc, laneVal, gpuReduceKind,
+                                                 /*uniform=*/false);
   }
 
   // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
@@ -957,7 +972,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
-static IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
+IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   if (clTestTarget.empty())
     return nullptr;
 

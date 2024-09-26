@@ -29,7 +29,7 @@
 
 set -xeuo pipefail
 
-IREE_READ_REMOTE_BAZEL_CACHE="${IREE_READ_REMOTE_BAZEL_CACHE:-1}"
+IREE_READ_REMOTE_BAZEL_CACHE="${IREE_READ_REMOTE_BAZEL_CACHE:-0}"
 IREE_WRITE_REMOTE_BAZEL_CACHE="${IREE_WRITE_REMOTE_BAZEL_CACHE:-0}"
 BAZEL_BIN="${BAZEL_BIN:-$(which bazel)}"
 SANDBOX_BASE="${SANDBOX_BASE:-}"
@@ -147,6 +147,7 @@ fi
 
 if (( IREE_READ_REMOTE_BAZEL_CACHE == 1 )); then
   BAZEL_TEST_CMD+=(--config=remote_cache_bazel_ci)
+  BAZEL_TEST_CMD+=(--config=rs)
 fi
 
 if (( IREE_WRITE_REMOTE_BAZEL_CACHE != 1 )); then
@@ -160,7 +161,6 @@ BAZEL_TEST_CMD+=(
   --test_tag_filters="${TEST_TAG_FILTERS?}"
   --keep_going
   --test_output=errors
-  --config=rs
   --config=generic_clang
 )
 

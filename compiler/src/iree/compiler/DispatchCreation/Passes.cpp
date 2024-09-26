@@ -248,7 +248,11 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
         // op, so hoist them out of their current dispatch regions. Also, bubble
         // SetEncodingOps through special operations like bit-extending ops and
         // broadcasting ops.
-        .addPass(DispatchCreation::createHoistEncodingOpsPass);
+        .addPass(DispatchCreation::createHoistEncodingOpsPass)
+        // After SetEncodingOps are hoisted, try to fuse them with their
+        // producer dispatches to try to hide packing costs.
+        .addPass(
+            DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
   FunctionLikeNest(passManager)
       // Collapse dimensions of linalg Ops.
