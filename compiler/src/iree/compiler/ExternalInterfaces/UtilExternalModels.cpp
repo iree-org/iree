@@ -247,6 +247,19 @@ struct HoistableLinalgOpInterface
   }
 };
 
+struct HoistableMultiMmaOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          HoistableMultiMmaOpInterface, IREE::GPU::MultiMmaOp> {
+  bool isHoistableOp(Operation *) const { return true; }
+  bool isHoistableLeafOp(Operation *op) const { return true; }
+  bool isAtomicallyHoistableOp(Operation *) const { return true; }
+  bool isOperandHoistable(Operation *op, OpOperand *operand) const {
+    auto multiMmaOp = llvm::cast<IREE::GPU::MultiMmaOp>(op);
+    // For linalg ops, we only want to hoist inputs.
+    return operand->getOperandNumber() < multiMmaOp.getNumDpsInputs();
+  }
+};
+
 /// Helper structures that iterates over all Op types in `OpTys` and registers
 /// the associated Hoistable___OpInterface.
 template <typename... Ops>
@@ -386,6 +399,13 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 #include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
             >::registerOpInterface(context);
       });
+  
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::GPU::IREEGPUDialect *dialect) {
+        IREE::GPU::MultiMmaOp::attachInterface<HoistableMultiMmaOpInterface>(
+            *context);
+      });
+
   // Register hoistable type interfaces for tensor ops.
   registry.addExtension(
       +[](MLIRContext *context, tensor::TensorDialect *dialect) {
