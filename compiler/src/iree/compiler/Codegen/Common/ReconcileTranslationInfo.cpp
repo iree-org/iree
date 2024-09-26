@@ -211,6 +211,14 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
   Block *parentBlock = forallOp->getBlock();
   Block *remainingBlock =
       rewriter.splitBlock(parentBlock, Block::iterator(forallOp));
+  for (auto [id, step] : llvm::zip_equal(procId, mixedStep)) {
+    rewriter.setInsertionPointToEnd(parentBlock);
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineExpr expr = s1 * s0;
+    id = affine::makeComposedFoldedAffineApply(rewriter, forallOp.getLoc(),
+                                               expr, {id, step});
+  }
   auto argReplacements =
       getValueOrCreateConstantIndexOp(rewriter, forallOp.getLoc(), procId);
   Block *loopBody = forallOp.getBody();
