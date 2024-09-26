@@ -170,6 +170,9 @@ struct LinalgOpTiedOpInterfaceHelper {
   }
 };
 
+// TODO(Max191): Remove this interface once GPU data tiling stops using early
+// materialization. This only exists for handling multi_mma ops before dispatch
+// workgroups are created, which only happens with early materialization.
 struct MultiMmaOpTiedOpInterface
     : public IREE::Util::TiedOpInterface::ExternalModel<
           MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp>{
@@ -247,6 +250,9 @@ struct HoistableLinalgOpInterface
   }
 };
 
+// TODO(Max191): Remove this interface once GPU data tiling stops using early
+// materialization. This only exists for handling multi_mma ops before dispatch
+// workgroups are created, which only happens with early materialization.
 struct HoistableMultiMmaOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableMultiMmaOpInterface, IREE::GPU::MultiMmaOp> {
