@@ -1,3 +1,9 @@
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -14,46 +20,43 @@ struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
                               llvm::ModuleAnalysisManager &) {
     bool modifiedCodeGen = runOnModule(module);
     if (!modifiedCodeGen)
-      return llvm::PreservedAnalyses::all();
+      return llvm::PreservedAnalyses::none();
 
     return llvm::PreservedAnalyses::all();
   }
+
   bool runOnModule(llvm::Module &module);
-  // isRequired being set to true keeps this pass from being skipped
+  // `isRequired` being set to true keeps this pass from being skipped
   // if it has the optnone LLVM attribute
   static bool isRequired() { return true; }
 };
 
 bool GpuHello::runOnModule(llvm::Module &module) {
-  bool modifiedCodeGen = false;
   for (llvm::Function &function : module) {
     if (function.isIntrinsic() || function.isDeclaration())
       continue;
 
-    llvm::StringRef functionName = function.getName();
-    if (function.getCallingConv() == llvm::CallingConv::AMDGPU_KERNEL ||
-        function.getCallingConv() == llvm::CallingConv::PTX_Kernel ||
-        functionName.contains("kernel")) {
+    if (function.getCallingConv() != llvm::CallingConv::AMDGPU_KERNEL &&
+        function.getCallingConv() != llvm::CallingConv::PTX_Kernel)
+      continue;
 
-      for (llvm::BasicBlock &basicBlock : function) {
-        for (llvm::Instruction &inst : basicBlock) {
-          llvm::DILocation *debugLocation = inst.getDebugLoc();
-          std::string sourceInfo;
-          if (!debugLocation) {
-            sourceInfo = function.getName().str();
-          } else {
-            // Using formatv
-            sourceInfo = llvm::formatv("{0}\t{1}:{2}:{3}", function.getName(),
-                                       debugLocation->getFilename(),
-                                       debugLocation->getLine(),
-                                       debugLocation->getColumn())
-                             .str();
-          }
-
-          llvm::errs() << "Hello From First Instruction of GPU Kernel: "
-                       << sourceInfo << "\n";
-          return modifiedCodeGen;
+    for (llvm::BasicBlock &basicBlock : function) {
+      for (llvm::Instruction &inst : basicBlock) {
+        llvm::DILocation *debugLocation = inst.getDebugLoc();
+        std::string sourceInfo;
+        if (!debugLocation) {
+          sourceInfo = function.getName().str();
+        } else {
+          sourceInfo = llvm::formatv("{0}\t{1}:{2}:{3}", function.getName(),
+                                     debugLocation->getFilename(),
+                                     debugLocation->getLine(),
+                                     debugLocation->getColumn())
+                           .str();
         }
+
+        llvm::errs() << "Hello From First Instruction of GPU Kernel: "
+                     << sourceInfo << "\n";
+        return false;
       }
     }
   }
