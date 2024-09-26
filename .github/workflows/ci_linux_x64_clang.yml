@@ -30,7 +30,7 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     runs-on: azure-linux-scale
     container:
-      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:b9d3f66a582fb48ee36cc3b855054f3c40d591fea5d838641ca327ea60efc099
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:1c86adf3e8494559e923155ab44920d222290c0b5257d70783afa5674e6a2e50
     defaults:
       run:
         shell: bash
