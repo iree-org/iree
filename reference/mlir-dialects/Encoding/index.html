@@ -3975,8 +3975,6 @@ For now in IREE the default layout is row-major.</p>
   IntegerAttr,   # operand_index
   EncodingOpTypeAttr,   # op_type
   ArrayAttr,   # element_types
-  IntegerAttr,   # matmul_narrow_M
-  IntegerAttr,   # matmul_narrow_N
   ArrayAttr,   # user_indexing_maps
   AffineMapAttr,   # bcast_map
   DenseArrayAttr   # round_dims_to
@@ -4014,16 +4012,6 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">element_types</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>element types of the user's operands</td>
-</tr>
-<tr>
-<td style="text-align: center;">matmul_narrow_M</td>
-<td style="text-align: center;"><code>IntegerAttr</code></td>
-<td>optional M narrow dimension size (only for contraction op user_indexing_maps)</td>
-</tr>
-<tr>
-<td style="text-align: center;">matmul_narrow_N</td>
-<td style="text-align: center;"><code>IntegerAttr</code></td>
-<td>optional N narrow dimension size (only for contraction op user_indexing_maps)</td>
 </tr>
 <tr>
 <td style="text-align: center;">user_indexing_maps</td>
