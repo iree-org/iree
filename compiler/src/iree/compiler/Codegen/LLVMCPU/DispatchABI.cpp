@@ -1120,7 +1120,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
 
   Value nullPtrValue = builder.create<LLVM::ZeroOp>(
       loc, LLVM::LLVMPointerType::get(builder.getContext()));
-  ValueRange args = {
+  SmallVector<Value> args = {
       /*thunk_func_ptr=*/thunkPtrValue,
       /*import_func_ptr=*/importFunc.first,
       /*params=*/params,
