@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -1492,7 +1493,7 @@ static StringRef getTilingLevelName(GPU::TilingLevel level) {
   return StringAttr();
 }
 
-static SmallVector<int64_t> getIntegerList(ArrayAttr array) {
+static SmallVector<int64_t> getIntegerVector(ArrayAttr array) {
   if (!array || !llvm::all_of(array.getValue(), llvm::IsaPred<IntegerAttr>)) {
     return {};
   }
@@ -1503,7 +1504,7 @@ static SmallVector<int64_t> getIntegerList(ArrayAttr array) {
 
 static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
                                          GPU::TilingLevel level) {
-  return getIntegerList(config.getAs<ArrayAttr>(getTilingLevelName(level)));
+  return getIntegerVector(config.getAs<ArrayAttr>(getTilingLevelName(level)));
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
@@ -1557,7 +1558,15 @@ LoweringConfigAttr::getPromotedOperandList() const {
   if (!array) {
     return std::nullopt;
   }
-  return getIntegerList(array);
+  return getIntegerVector(array);
+}
+
+void LoweringConfigAttr::setPromotedOperandList(
+    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
+    ArrayRef<int64_t> operands) {
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, kPromoteOperandsName),
+                     b.getI64ArrayAttr(operands));
 }
 
 //===----------------------------------------------------------------------===//

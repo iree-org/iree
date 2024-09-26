@@ -199,8 +199,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
-  attrs.emplace_back(StringAttr::get(context, "promote_operands"),
-                     b.getI64ArrayAttr({0, 1}));
+  GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -471,8 +470,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(threadTileSizes));
 
   if (isNonMatvecContraction(linalgOp)) {
-    attrs.emplace_back(StringAttr::get(context, "promote_operands"),
-                       b.getI64ArrayAttr({0, 1}));
+    GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
   }
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
