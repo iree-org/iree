@@ -245,13 +245,13 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
                 {newProducer.getInductionVar(), linearConsumerIdVal})
           : newProducer.getInductionVar();
 
-  // We require a descending relative mapping, so delinearize in reverse order.
+  // We require a descending relative mapping and scf.forall loop ranges are
+  // listed from outer most to inner most, so we can use the ranges directly
+  // for the delinearization basis.
   auto delinearize = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, newFlatProducerId, llvm::to_vector(llvm::reverse(producerRanges)));
+      loc, newFlatProducerId, llvm::to_vector(producerRanges));
 
-  SmallVector<Value> newBlockArgs =
-      llvm::map_to_vector(llvm::reverse(delinearize.getResults()),
-                          [](OpResult r) -> Value { return r; });
+  SmallVector<Value> newBlockArgs = delinearize.getResults();
   newBlockArgs.append(newProducer.getRegionIterArgs().begin(),
                       newProducer.getRegionIterArgs().end());
 
