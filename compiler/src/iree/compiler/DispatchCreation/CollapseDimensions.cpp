@@ -12,6 +12,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -282,7 +283,12 @@ public:
   void dump() const;
 
   // Update CollapseInfo to ensure that all dimensions collapsable in `this` are
-  // also collapsable in `consumerInfo`.
+  // also collapsable in `otherInfo`. This means:
+  // 1. Any dimension not collapsable in `otherInfo` should not be collapsable
+  // in `this`
+  // 2. For any pair of dimensions in `this`, if they are collapsable in
+  // `consumerInfo`, they must be collapsable into the same dimension in
+  // `consumerInfo` to be collapsable into the same dimension in `this`.
   bool updateFromConsumer(OpOperand *operand, const CollapseInfo &consumerInfo);
 
   // Update `collapsableLoops` by subtracting `uncollapsable` and update the
@@ -296,6 +302,7 @@ public:
   FailureOr<CollapsableLoopsSet>
   getTransformedCollapsableLoops(AffineMap map) const;
 
+  // Get `reassociation` after applying the transformation provided by `map`.
   FailureOr<SmallVector<ReassociationIndices>>
   getTransformedReassociation(AffineMap map) const;
 
@@ -414,27 +421,20 @@ CollapseInfo::getTransformedReassociation(AffineMap map) const {
     return failure();
   }
 
-  SmallVector<ReassociationIndices> transformedReassociation(reassociation);
-  for (const auto &[idxOne, indicies] : llvm::enumerate(reassociation)) {
-    for (auto [idxTwo, elem] : llvm::enumerate(indicies)) {
-      assert(elem < map.getNumResults() && "index has no valid mapping");
+  SmallVector<ReassociationIndices> transformedReassociation(
+      reassociation.size());
+  for (const auto &[i, indicies] : llvm::enumerate(reassociation)) {
+    for (auto elem : indicies) {
       auto dimExpr = dyn_cast<AffineDimExpr>(map.getResult(elem));
       if (!dimExpr) {
-        continue;
+        break;
       }
-      transformedReassociation[idxOne][idxTwo] = dimExpr.getPosition();
+      transformedReassociation[i].push_back(dimExpr.getPosition());
     }
   }
   return transformedReassociation;
 }
 
-// Update CollapseInfo to ensure that all dimensions collapsable in `this` are
-// also collapsable in `otherInfo`. This means:
-// 1. Any dimension not collapsable in `otherInfo` should not be collapsable in
-// `this`
-// 2. For any pair of dimensions in `this`, if they are collapsable in
-// `consumerInfo`, they must be collapsable into the same dimension in
-// `consumerInfo` to be collapsable into the same dimension in `this`.
 bool CollapseInfo::updateFromConsumer(OpOperand *operand,
                                       const CollapseInfo &consumerInfo) {
   bool didChange = false;
@@ -489,10 +489,11 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
   // [0, 1] and [2, 3] get collapsed into different loops
   //
   // (3) Otherwise, keep the index
+  constexpr long kUninitialized = -1;
   SmallVector<ReassociationIndices> newReassociation;
   for (ReassociationIndicesRef indicies : reassociation) {
     // Track the loop index that `indicies` get collapsed into.
-    long collapseIntoIdx = -1;
+    long collapseIntoIdx = kUninitialized;
 
     // Holds dimensions that should be collapsed together
     ReassociationIndices newIndicies;
@@ -506,15 +507,15 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
           newReassociation.push_back(std::move(newIndicies));
         }
         newIndicies.clear();
-        collapseIntoIdx = -1;
+        collapseIntoIdx = kUninitialized;
         continue;
       }
 
-      if (collapseIntoIdx == -1) {
+      if (collapseIntoIdx == kUninitialized) {
         collapseIntoIdx = consumerCollapseMap.at(index);
       }
 
-      if (collapseIntoIdx != -1 &&
+      if (collapseIntoIdx != kUninitialized &&
           consumerCollapseMap.at(index) != collapseIntoIdx) {
         didChange = true;
         if (newIndicies.size() > 1) {
