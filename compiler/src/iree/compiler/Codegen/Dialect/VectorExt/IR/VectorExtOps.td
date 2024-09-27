@@ -61,7 +61,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
       return isa<RankedTensorType>(getOutput().getType());
     }
   }];
-  let assemblyFormat = "$input `to` $layout attr-dict `:` type($input)";
+  let assemblyFormat = "$input `to` `layout` `(` $layout `)` attr-dict `:` type($input)";
   let hasVerifier = 1;
 }
 

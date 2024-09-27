@@ -7,13 +7,13 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   %cst_0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %result = vector.transfer_read %lhs[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<32x32xf16>, vector<32x32xf16>
-  %2 = iree_vector_ext.to_layout %result to #layout2 : vector<32x32xf16>
+  %2 = iree_vector_ext.to_layout %result to layout(#layout2) : vector<32x32xf16>
   return %2 : vector<32x32xf16>
 }
 
 // CHECK-DAG: #[[$LAYOUT0:.+]] = #iree_vector_ext.layout<<[ BATCHY,  LANEY,  VECTORX], [4, 2, 4]>, <[ BATCHX,  LANEX,  VECTORY], [2, 4, 4]>>
 // CHECK-LABEL: func.func @specify_layout
-// CHECK:      iree_vector_ext.to_layout {{.*}} to #[[$LAYOUT0]]
+// CHECK:      iree_vector_ext.to_layout {{.*}} to layout(#[[$LAYOUT0]])
 
 // -----
 
