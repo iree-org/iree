@@ -34,6 +34,9 @@ struct iree_thread_t {
   void* entry_arg;
 
   iree_atomic_int32_t is_suspended;
+
+  iree_mutex_t join_mutex;
+  bool joined;
 };
 
 // Maps an IREE iree_thread_priority_class_t value to a QoS type.
@@ -106,6 +109,9 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   thread->allocator = allocator;
   thread->entry = entry;
   thread->entry_arg = entry_arg;
+  thread->joined = false;
+  iree_mutex_initialize(&thread->join_mutex);
+
   iree_strncpy_s(thread->name, IREE_ARRAYSIZE(thread->name), params.name.data,
                  iree_min(params.name.size, IREE_ARRAYSIZE(thread->name) - 1));
   iree_atomic_store_int32(&thread->is_suspended,
@@ -169,7 +175,12 @@ static void iree_thread_delete(iree_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_thread_resume(thread);
-  pthread_join(thread->handle, NULL);
+  // We don't need to lock around this check for
+  // joined, as there are now zero references to this
+  // thread floating around when we delete.
+  if (!thread->joined) {
+    pthread_join(thread->handle, NULL);
+  }
 
   iree_allocator_free(thread->allocator, thread);
 
@@ -258,7 +269,12 @@ void iree_thread_resume(iree_thread_t* thread) {
 
 void iree_thread_join(iree_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  pthread_join(thread->handle, NULL);
+  iree_mutex_lock(&thread->join_mutex);
+  if (!thread->joined) {
+    pthread_join(thread->handle, NULL);
+    thread->joined = true;
+  }
+  iree_mutex_unlock(&thread->join_mutex);
   IREE_TRACE_ZONE_END(z0);
 }
 
