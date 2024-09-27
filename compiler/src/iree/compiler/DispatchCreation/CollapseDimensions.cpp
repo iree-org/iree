@@ -283,12 +283,13 @@ public:
   void dump() const;
 
   // Update CollapseInfo to ensure that all dimensions collapsable in `this` are
-  // also collapsable in `otherInfo`. This means:
-  // 1. Any dimension not collapsable in `otherInfo` should not be collapsable
-  // in `this`
+  // also collapsable in `consumerInfo`. This means:
+  // 1. Any dimension not collapsable in `consumerInfo` should not be
+  // collapsable in `this`
   // 2. For any pair of dimensions in `this`, if they are collapsable in
   // `consumerInfo`, they must be collapsable into the same dimension in
   // `consumerInfo` to be collapsable into the same dimension in `this`.
+  // Returns true if the operation modified the number of collapsable loops.
   bool updateFromConsumer(OpOperand *operand, const CollapseInfo &consumerInfo);
 
   // Update `collapsableLoops` by subtracting `uncollapsable` and update the
@@ -299,17 +300,18 @@ public:
   // Get `collapsableLoops` after applying the transformation provided by `map`.
   // Note: doesn't modify `collapsableLoops`, the tranformation is applied to a
   // copy.
-  FailureOr<CollapsableLoopsSet>
-  getTransformedCollapsableLoops(AffineMap map) const;
+  CollapsableLoopsSet getTransformedCollapsableLoops(AffineMap map) const;
 
   // Get `reassociation` after applying the transformation provided by `map`.
-  FailureOr<SmallVector<ReassociationIndices>>
+  SmallVector<ReassociationIndices>
   getTransformedReassociation(AffineMap map) const;
 
-  // Clear internal data
-  void clear() {
+  // Clear internal data and returns if anything changed.
+  bool clear() {
+    bool isNotEmpty = reassociation.empty() || collapsableLoops.empty();
     reassociation.clear();
     collapsableLoops.clear();
+    return isNotEmpty;
   }
 
   const CollapsableLoopsSet &getCollapsibleLoops() const {
@@ -396,12 +398,8 @@ void CollapseInfo::updateReassociation() {
 // map = affine_map<(d0, d1, d2) -> (d1, d2, d5)>
 //
 // Therefore, the collapsable loops with respect to the consumer is {1, 2, 5}.
-FailureOr<CollapseInfo::CollapsableLoopsSet>
+CollapseInfo::CollapsableLoopsSet
 CollapseInfo::getTransformedCollapsableLoops(AffineMap map) const {
-  if (!map) {
-    return failure();
-  }
-
   CollapsableLoopsSet transformedLoops;
   for (auto index : collapsableLoops) {
     assert(index < map.getNumResults() && "index has no valid mapping");
@@ -415,12 +413,8 @@ CollapseInfo::getTransformedCollapsableLoops(AffineMap map) const {
   return transformedLoops;
 }
 
-FailureOr<SmallVector<ReassociationIndices>>
+SmallVector<ReassociationIndices>
 CollapseInfo::getTransformedReassociation(AffineMap map) const {
-  if (!map) {
-    return failure();
-  }
-
   SmallVector<ReassociationIndices> transformedReassociation(
       reassociation.size());
   for (const auto &[i, indicies] : llvm::enumerate(reassociation)) {
@@ -437,21 +431,17 @@ CollapseInfo::getTransformedReassociation(AffineMap map) const {
 
 bool CollapseInfo::updateFromConsumer(OpOperand *operand,
                                       const CollapseInfo &consumerInfo) {
-  bool didChange = false;
   FailureOr<AffineMap> consumerToProducerMap =
       getConsumerLoopToProducerLoopsMap(*operand);
   if (failed(consumerToProducerMap)) {
-    this->clear();
-    return !consumerInfo.getCollapsibleLoops().empty();
+    return this->clear();
   }
 
   FailureOr<CollapsableLoopsSet> consumerCollapsable =
       consumerInfo.getTransformedCollapsableLoops(
           consumerToProducerMap.value());
   if (failed(consumerCollapsable)) {
-    didChange = collapsableLoops.size();
-    this->clear();
-    return didChange;
+    return clear();
   }
 
   FailureOr<SmallVector<ReassociationIndices>> consumerReassoc =
@@ -468,7 +458,7 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
 
   // Remove all collapsable loops in `producer` that are not collapsable in
   // `consumer` (set intersect)
-  didChange = collapsableLoops.remove_if([&](long elem) -> bool {
+  bool didChange = collapsableLoops.remove_if([&](long elem) -> bool {
     return !consumerCollapsable.value().contains(elem);
   });
 
@@ -509,14 +499,9 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
         continue;
-      }
-
-      if (collapseIntoIdx == kUninitialized) {
+      } else if (collapseIntoIdx == kUninitialized) {
         collapseIntoIdx = consumerCollapseMap.at(index);
-      }
-
-      if (collapseIntoIdx != kUninitialized &&
-          consumerCollapseMap.at(index) != collapseIntoIdx) {
+      } else if (consumerCollapseMap.at(index) != collapseIntoIdx) {
         didChange = true;
         if (newIndicies.size() > 1) {
           newReassociation.push_back(std::move(newIndicies));
