@@ -3990,9 +3990,10 @@ integration between compatible versions of IREE,
 
   aot -.-&gt; binary</code></pre>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>Install a recent version of PyTorch (<code>2.3.0+</code>, prerelease as of April 2024):</p>
+<p>Install a recent version of PyTorch
+(<code>2.4.1</code>, latest stable release as of September 2024):</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--pre<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/test/cpu<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.3.0
+<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/test/cpu<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.4.1
 </code></pre></div>
 <p>Install iree-turbine:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-turbine
@@ -4131,7 +4132,7 @@ Python and then export deployment-ready artifacts that can be used in IREE's
 <span class="c1"># Use the IREE runtime API to test the compiled program.</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
 <span class="n">vm_module</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">load_vm_module</span><span class="p">(</span>
-    <span class="n">ireert</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">wrap_buffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">binary</span><span class="o">.</span><span class="n">map_memory</span><span class="p">()),</span>
+    <span class="n">ireert</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">copy_buffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">binary</span><span class="o">.</span><span class="n">map_memory</span><span class="p">()),</span>
     <span class="n">config</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nb">input</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
@@ -4213,58 +4214,6 @@ class to define and constrain the structure of a program prior to compiling it.<
 exported function (typically called "forward"), while more complex programs can
 have multiple computation functions, initialization functions, "backward"
 methods for training, state management functions, debugging functions, etc.</p>
-<ul>
-<li>
-<p>Each instance method on a <code>aot.CompiledModule</code>-derived class is exported.
-  These instance methods can include calls to other <code>aot</code> components, such as
-  <code>aot.jittable</code> compute functions:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">GetOnesModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
-  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
-  <span class="k">def</span> <span class="nf">compute_ones</span><span class="p">():</span>
-    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-
-  <span class="k">def</span> <span class="nf">get_ones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_ones</span><span class="p">()</span>
-</code></pre></div>
-</li>
-<li>
-<p>Instance methods can use <code>aot.AbstractTensor</code> to specify data types:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">IntSumModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
-  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
-  <span class="k">def</span> <span class="nf">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
-
-  <span class="k">def</span> <span class="nf">sum_int32</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-<span class="hll">    <span class="n">a</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
-</span><span class="hll">    <span class="n">b</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
-</span>  <span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
-</code></pre></div>
-</li>
-<li>
-<p>Shapes can be made dynamic using <code>aot.AbstractTensor</code> and <code>aot.jittable</code>
-  constraints:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">DynamicSumModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
-  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
-  <span class="k">def</span> <span class="nf">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
-
-  <span class="k">def</span> <span class="nf">sum_dynamic</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-<span class="hll">    <span class="n">a</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-</span><span class="hll">    <span class="n">b</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-</span>  <span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_sum</span><span class="p">(</span>
-        <span class="n">a</span><span class="p">,</span>
-        <span class="n">b</span><span class="p">,</span>
-<span class="hll">        <span class="n">constraints</span><span class="o">=</span><span class="p">[</span>
-</span><span class="hll">            <span class="n">a</span><span class="o">.</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
-</span><span class="hll">        <span class="p">],</span>
-</span>    <span class="p">)</span>
-</code></pre></div>
-</li>
-</ul>
 <h4 id="global-variables"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.41 3c1.39 2.71 1.94 5.84 1.59 9-.2 3.16-1.3 6.29-3.17 9l-1.53-1c1.61-2.43 2.55-5.2 2.7-8 .34-2.8-.11-5.57-1.3-8l1.71-1M5.17 3 6.7 4C5.09 6.43 4.15 9.2 4 12c-.34 2.8.12 5.57 1.3 8l-1.69 1c-1.4-2.71-1.96-5.83-1.61-9 .2-3.16 1.3-6.29 3.17-9m6.91 7.68 2.32-3.23h2.53l-3.78 5 2.2 4.92h-2.26L11.71 14l-2.43 3.33H6.76l3.9-5.12-2.13-4.76h2.27l1.28 3.23Z"/></svg></span> Global variables<a class="headerlink" href="#global-variables" title="Permanent link">link</a></h4>
 <p><em>Global variables</em> are used to represent persistent state within a program
 instance.</p>
@@ -4285,37 +4234,6 @@ their values independently at runtime.</p>
   <span class="k">def</span> <span class="nf">update_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">abstractify</span><span class="p">(</span><span class="n">value</span><span class="p">)):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">new_value</span>
 </code></pre></div>
-</li>
-<li>
-<p>All named parameters on a <code>nn.Module</code> can be exported using
-  <code>export_parameters()</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">SimpleParams</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
-
-  <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-
-<span class="n">m</span> <span class="o">=</span> <span class="n">SimpleParams</span><span class="p">()</span>
-
-<span class="k">class</span> <span class="nc">SimpleParamsModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
-<span class="hll">  <span class="n">params</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">export_parameters</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
-</span>  <span class="n">compute</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">jittable</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">forward</span><span class="p">)</span>
-
-  <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">20</span><span class="p">)):</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-
-<span class="hll">  <span class="c1"># torch.nn.Linear has &#39;weight&#39; and &#39;bias&#39; variables:</span>
-</span><span class="hll">  <span class="c1">#   https://pytorch.org/docs/stable/generated/torch.nn.Linear.html</span>
-</span><span class="hll">  <span class="c1"># Add getters for both exported parameters.</span>
-</span><span class="hll">
-</span><span class="hll">  <span class="k">def</span> <span class="nf">get_weight</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span class="hll">    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;classifier.weight&quot;</span><span class="p">]</span>
-</span><span class="hll">
-</span><span class="hll">  <span class="k">def</span> <span class="nf">get_bias</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span class="hll">    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;classifier.bias&quot;</span><span class="p">]</span>
-</span></code></pre></div>
 </li>
 </ul>
 <h4 id="samples_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples_2" title="Permanent link">link</a></h4>
