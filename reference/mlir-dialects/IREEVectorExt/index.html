@@ -3944,7 +3944,7 @@ beyond what is currently available in the Vector Dialect.</p>
 <h3 id="iree_vector_extto_layout-vectorexttolayoutop"><code>iree_vector_ext.to_layout</code> (VectorExt::ToLayoutOp)<a class="headerlink" href="#iree_vector_extto_layout-vectorexttolayoutop" title="Permanent link">link</a></h3>
 <p><em>Layout conversion operator</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` $layout attr-dict `:` type($input)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` `layout` `(` $layout `)` attr-dict `:` type($input)
 </code></pre></div>
 <p>The layout conversion operator takes a shaped value and a layout and
 transforms the value to have that layout.</p>
