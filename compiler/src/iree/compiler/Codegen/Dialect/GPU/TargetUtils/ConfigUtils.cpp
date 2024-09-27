@@ -49,7 +49,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   // number of subgroups. The number of subgroups is found by the product of
   // subgroup unrolling factors, since the non-unrolled inner kernel takes a
   // single subgroup.
-  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  const int64_t targetSubgroupSize = dataTiledMmaAttr.getSubgroupSize();
   int64_t flatWorkgroupSize = targetSubgroupSize *
                               dataTiledMmaAttr.getUnrollMToSubgroups() *
                               dataTiledMmaAttr.getUnrollNToSubgroups();
@@ -70,7 +70,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[kDim] = 1;
   }
 
-  // Set tile sizes
+  // Set tile sizes.
   MLIRContext *context = multiMmaOp.getContext();
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);

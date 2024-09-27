@@ -61,12 +61,12 @@ getThreadTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
     if (loopRanges[i] > vectorSize) {
       tileSizes[i] = vectorSize;
       residualNumThreads = numThreads / (loopRanges.back() / vectorSize);
-      i--;
+      --i;
       break;
     }
     tileSizes[i] = 0;
     vectorSize /= loopRanges[i];
-    i--;
+    --i;
   }
   // Set as many remaining tile sizes to 1 as possible to use all threads.
   while (i >= 0) {
@@ -77,7 +77,7 @@ getThreadTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
     }
     tileSizes[i] = 1;
     residualNumThreads /= loopRanges[i];
-    i--;
+    --i;
   }
 
   return tileSizes;
