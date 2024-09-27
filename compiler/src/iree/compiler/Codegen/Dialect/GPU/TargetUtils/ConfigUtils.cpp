@@ -199,6 +199,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), mmaKind);
+  GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -218,6 +219,35 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       entryPoint, op, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       workgroupSize, targetSubgroupSize, pipelineConfig);
+}
+
+/// Helper to identify contraction like operations for operand promotiong.
+static bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  if (failed(contractionDims)) {
+    return false;
+  }
+
+  if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
+      contractionDims->n.size() < 1) {
+    return false;
+  }
+
+  auto getElementCount = [&](ArrayRef<unsigned> dims) {
+    int64_t acc = 1;
+    for (auto mDim : dims) {
+      int64_t size = bounds[mDim];
+      if (ShapedType::isDynamic(size)) {
+        return size;
+      }
+      acc *= size;
+    }
+    return acc;
+  };
+  return getElementCount(contractionDims->m) != 1 &&
+         getElementCount(contractionDims->n) != 1;
 }
 
 LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
@@ -438,6 +468,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
 
   attrs.emplace_back(StringAttr::get(context, "thread"),
                      b.getI64ArrayAttr(threadTileSizes));
+
+  if (isNonMatvecContraction(linalgOp)) {
+    GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+  }
 
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
   const unsigned maxVectorSize = 32;

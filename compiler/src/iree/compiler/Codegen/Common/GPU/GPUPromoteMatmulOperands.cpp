@@ -64,47 +64,29 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
   op->setOperand(index, copy.getResult(0));
 }
 
-bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
-      mlir::linalg::inferContractionDims(linalgOp);
-  if (failed(contractionDims)) {
-    return false;
-  }
-
-  if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
-      contractionDims->n.size() < 1) {
-    return false;
-  }
-
-  auto getElementCount = [&](ArrayRef<unsigned> dims) {
-    int64_t acc = 1;
-    for (auto mDim : dims) {
-      int64_t size = bounds[mDim];
-      if (ShapedType::isDynamic(size)) {
-        return size;
-      }
-      acc *= size;
-    }
-    return acc;
-  };
-  return getElementCount(contractionDims->m) != 1 &&
-         getElementCount(contractionDims->n) != 1;
-}
-
 struct GPUPromoteMatmulOperandsPass final
     : impl::GPUPromoteMatmulOperandsPassBase<GPUPromoteMatmulOperandsPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
     OpBuilder builder(funcOp);
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (!isNonMatvecContraction(linalgOp)) {
+    funcOp.walk([&](Operation *op) {
+      auto loweringConfig =
+          getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+      if (!loweringConfig) {
         return;
       }
-      builder.setInsertionPoint(linalgOp);
-      promoteOperand(builder, linalgOp, 0);
-      promoteOperand(builder, linalgOp, 1);
+
+      std::optional<SmallVector<int64_t>> promotedOperands =
+          loweringConfig.getPromotedOperandList();
+      if (!promotedOperands) {
+        return;
+      }
+
+      builder.setInsertionPoint(op);
+      for (auto operand : promotedOperands.value()) {
+        promoteOperand(builder, op, operand);
+      }
     });
   }
 };
