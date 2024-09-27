@@ -437,20 +437,16 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
     return this->clear();
   }
 
-  FailureOr<CollapsableLoopsSet> consumerCollapsable =
+  CollapsableLoopsSet consumerCollapsable =
       consumerInfo.getTransformedCollapsableLoops(
           consumerToProducerMap.value());
-  if (failed(consumerCollapsable)) {
-    return clear();
-  }
 
-  FailureOr<SmallVector<ReassociationIndices>> consumerReassoc =
+  SmallVector<ReassociationIndices> consumerReassoc =
       consumerInfo.getTransformedReassociation(consumerToProducerMap.value());
-  assert(succeeded(consumerReassoc));
 
   // Get a map from original index to the index it gets collapsed into
   llvm::DenseMap<long, long> consumerCollapseMap;
-  for (const auto &[idx, indicies] : llvm::enumerate(consumerReassoc.value())) {
+  for (const auto &[idx, indicies] : llvm::enumerate(consumerReassoc)) {
     for (const auto elem : indicies) {
       consumerCollapseMap[elem] = idx;
     }
@@ -458,9 +454,8 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
 
   // Remove all collapsable loops in `producer` that are not collapsable in
   // `consumer` (set intersect)
-  bool didChange = collapsableLoops.remove_if([&](long elem) -> bool {
-    return !consumerCollapsable.value().contains(elem);
-  });
+  bool didChange = collapsableLoops.remove_if(
+      [&](long elem) -> bool { return !consumerCollapsable.contains(elem); });
 
   // Now update the reassociation indicies given the updated `collapsableLoops`
   // and `consumerCollapsableMap`.
@@ -488,30 +483,36 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
     // Holds dimensions that should be collapsed together
     ReassociationIndices newIndicies;
     for (int64_t index : indicies) {
-      // (1) Because `index` isn't collapsable, the indicies in `newIndicies`
-      // are no longer adjacent to the upcoming indicies. If there is >1 index
-      // to collapse, add it to the new reassociation. Otherwise, discard it
-      // because there is no dimension to collapse with.
       if (!collapsableLoops.contains(index)) {
+        // (1) Because `index` isn't collapsable, the indicies in `newIndicies`
+        // are no longer adjacent to the upcoming indicies. If there is >1 index
+        // to collapse, add it to the new reassociation. Otherwise, discard it
+        // because there is no dimension to collapse with.
+        didChange = true;
         if (newIndicies.size() > 1) {
           newReassociation.push_back(std::move(newIndicies));
         }
         newIndicies.clear();
         collapseIntoIdx = kUninitialized;
-        continue;
       } else if (collapseIntoIdx == kUninitialized) {
+        // (2) First occurance of collapsable loop, set collapseIntoIdx.
         collapseIntoIdx = consumerCollapseMap.at(index);
+        newIndicies.push_back(index);
       } else if (consumerCollapseMap.at(index) != collapseIntoIdx) {
+        // (3) `index` is collapsable but not collapsable into the other loops.
+        // So, split them and look for other loops to collapse `index` into.
         didChange = true;
         if (newIndicies.size() > 1) {
           newReassociation.push_back(std::move(newIndicies));
         }
         newIndicies.clear();
         collapseIntoIdx = consumerCollapseMap[index];
+        newIndicies.push_back(index);
+      } else {
+        // (4) `index` is collapsable and can be collapsed into
+        // `collapseIntoIndex`.
+        newIndicies.push_back(index);
       }
-
-      newIndicies.push_back(index);
-      continue;
     }
 
     if (newIndicies.size() > 1) {
@@ -519,7 +520,6 @@ bool CollapseInfo::updateFromConsumer(OpOperand *operand,
     }
   }
   reassociation = std::move(newReassociation);
-
   return didChange;
 }
 
@@ -798,11 +798,9 @@ static bool updateConsumersFromProducers(
       }
 
       const CollapseInfo &producerInfo = opMap.at(producerOp);
-      FailureOr<CollapseInfo::CollapsableLoopsSet> producerCollapsable =
+      CollapseInfo::CollapsableLoopsSet producerCollapsable =
           producerInfo.getTransformedCollapsableLoops(mapping.value());
-      if (!failed(producerCollapsable)) {
-        producerUncollapsable.set_subtract(producerCollapsable.value());
-      }
+      producerUncollapsable.set_subtract(producerCollapsable);
 
       didChange |=
           consumerInfo.updateCollapseViaSubtract(producerUncollapsable);
