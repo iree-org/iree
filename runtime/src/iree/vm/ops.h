@@ -605,8 +605,17 @@ static inline float vm_cast_ui32f32(int32_t operand) {
 static inline int32_t vm_cast_f32si32(float operand) {
   return (int32_t)lroundf(operand);
 }
+static inline int64_t vm_cast_f32si64(float operand) {
+  return (int64_t)llroundf(operand);
+}
 static inline int32_t vm_cast_f32ui32(float operand) {
   return (uint32_t)llroundf(operand);
+}
+static inline int64_t vm_cast_f32ui64(float operand) {
+  // `llroundf` used in other casts above only has a range from INT64_MIN
+  // to INT64_MAX however here we need a range of 0 to UINT64_MAX, hence we do
+  // rounding in `float` with `roundf` and then cast to `uint64_t`.
+  return (uint64_t)roundf(operand);
 }
 static inline float vm_bitcast_i32f32(int32_t operand) {
   float result;

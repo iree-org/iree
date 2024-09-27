@@ -96,6 +96,54 @@ vm.module @conversion_ops_f32 {
     vm.return
   }
 
+  vm.export @test_cast_f32_si64_int_max
+  vm.func @test_cast_f32_si64_int_max() {
+    // This is the maximum value that is representable precisely as both i64
+    // and f32. An exponent of 62 with all mantissa bits set.
+    %c1 = vm.const.f32 0x5effffff
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.si64 %c1dno : f32 -> i64
+    %c2 = vm.const.i64 0x7FFFFF8000000000
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i64
+    vm.return
+  }
+
+  vm.export @test_cast_f32_si64_int_min
+  vm.func @test_cast_f32_si64_int_min() {
+    %c1 = vm.const.f32 -9223372036854775808.0
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.si64 %c1dno : f32 -> i64
+    // Directly providing the true INT64_MIN of -9223372036854775808
+    // gives an error so we do -(INT64_MAX) - 1
+    // See: https://stackoverflow.com/a/65008288
+    %c2 = vm.const.i64 -9223372036854775807
+    %c2dno = util.optimization_barrier %c2 : i64
+    %c3 = vm.const.i64 1
+    %c4 = vm.sub.i64 %c2dno, %c3 : i64
+    vm.check.eq %v, %c4, "cast floating-point value to a signed integer" : i64
+    vm.return
+  }
+
+  vm.export @test_cast_f32_si64_away_from_zero_pos
+  vm.func @test_cast_f32_si64_away_from_zero_pos() {
+    %c1 = vm.const.f32 2.5
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.si64 %c1dno : f32 -> i64
+    %c2 = vm.const.i64 3
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i64
+    vm.return
+  }
+
+  vm.export @test_cast_f32_si64_away_from_zero_neg
+  vm.func @test_cast_f32_si64_away_from_zero_neg() {
+    %c1 = vm.const.f32 -2.5
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.si64 %c1dno : f32 -> i64
+    %c2 = vm.const.i64 -3
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i64
+    vm.return
+  }
+
   vm.export @test_cast_f32_ui32_int_big
   vm.func @test_cast_f32_ui32_int_big() {
     // This is the maximum value that is representable precisely as both ui32
@@ -115,6 +163,28 @@ vm.module @conversion_ops_f32 {
     %v = vm.cast.f32.ui32 %c1dno : f32 -> i32
     %c2 = vm.const.i32 3
     vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i32
+    vm.return
+  }
+
+  vm.export @test_cast_f32_ui64_int_big
+  vm.func @test_cast_f32_ui64_int_big() {
+    // This is the maximum value that is representable precisely as both ui64
+    // and f32. An exponent of 63 with all mantissa bits set.
+    %c1 = vm.const.f32 0x5F7FFFFF
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.ui64 %c1dno : f32 -> i64
+    %c2 = vm.const.i64 0xFFFFFF0000000000
+    vm.check.eq %v, %c2, "cast floating-point value to an unsigned integer" : i64
+    vm.return
+  }
+
+  vm.export @test_cast_f32_ui64_away_from_zero
+  vm.func @test_cast_f32_ui64_away_from_zero() {
+    %c1 = vm.const.f32 2.5
+    %c1dno = util.optimization_barrier %c1 : f32
+    %v = vm.cast.f32.ui64 %c1dno : f32 -> i64
+    %c2 = vm.const.i64 3
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i64
     vm.return
   }
 

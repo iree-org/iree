@@ -570,6 +570,11 @@ struct FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
                                                              adaptor.getIn());
         return success();
       }
+      if (resultType.isSignlessInteger(64) || resultType.isSignedInteger(64)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32SI64Op>(srcOp, resultType,
+                                                             adaptor.getIn());
+        return success();
+      }
     }
     return rewriter.notifyMatchFailure(srcOp, "unsupported type");
   }
@@ -586,6 +591,11 @@ struct FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
     if (srcType.isF32()) {
       if (dstType.isSignlessInteger(32) || dstType.isUnsignedInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI32Op>(srcOp, resultType,
+                                                             adaptor.getIn());
+        return success();
+      }
+      if (dstType.isSignlessInteger(64) || dstType.isUnsignedInteger(64)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::CastF32UI64Op>(srcOp, resultType,
                                                              adaptor.getIn());
         return success();
       }
