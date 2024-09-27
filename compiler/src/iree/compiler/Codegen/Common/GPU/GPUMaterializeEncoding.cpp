@@ -51,41 +51,108 @@ static bool hasIntrinsic(IREE::GPU::TargetAttr target,
 }
 
 static std::optional<IREE::GPU::DataTiledMMAAttr>
-chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
-  assert(elementTypes.size() == 3);
+chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
+                       IREE::Encoding::EncodingAttr encoding) {
   using namespace IREE::GPU;
   MLIRContext *ctx = target.getContext();
-  Type lhs = elementTypes[0];
-  Type rhs = elementTypes[1];
-  Type out = elementTypes[2];
-  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollMToSubgroups,
-                   int unrollN, int unrollNToSubgroups,
-                   int unrollK) -> std::optional<DataTiledMMAAttr> {
-    if (!hasIntrinsic(target, intrinsic)) {
-      return std::nullopt;
-    }
-    auto candidate = DataTiledMMAAttr::get(
-        ctx, MMAIntrinsicAttr::get(ctx, intrinsic), /*unroll_m=*/unrollM,
-        /*unroll_m_to_subgroups=*/unrollMToSubgroups, /*unroll_n=*/unrollN,
-        /*unroll_n_to_subgroups=*/unrollNToSubgroups, /*unroll_k=*/unrollK);
-    auto [candidateLhs, candidateRhs, candidateOut] =
-        candidate.getABCElementTypes();
-    if (candidateLhs != lhs || candidateRhs != rhs || candidateOut != out) {
-      return std::nullopt;
-    }
-    return candidate;
+
+  //
+  // Step 1: select a MMAIntrinsic.
+  //
+  SmallVector<MMAIntrinsic> candidateIntrinsics = {
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_I32_16x16x32_I8,
   };
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 8, 1, 2, 4, 4)) {
-    return m;
+  std::optional<MMAIntrinsic> intrinsic;
+  for (MMAIntrinsic candidateIntrinsic : candidateIntrinsics) {
+    if (!hasIntrinsic(target, candidateIntrinsic)) {
+      continue;
+    }
+    auto [et0, et1, et2] =
+        MMAAttr::get(ctx, candidateIntrinsic).getABCElementTypes();
+    if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
+      continue;
+    }
+    intrinsic = candidateIntrinsic;
+    break;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 8, 1, 2, 4, 2)) {
-    return m;
+  if (!intrinsic) {
+    return std::nullopt;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 8, 1, 2, 4, 2)) {
-    return m;
+
+  //
+  // Step 2: Select the unrolling factors for the generic case where there is no
+  //         narrow dimension.
+  //
+  // These hardcoded constants should become functions querying `target`.
+  //
+  // Target ISA preferred load instruction size, in bits.
+  const int kLoadInstructionBits = 128;
+  // Target ISA preferred number of subgroups per block to get full utilization.
+  const int kMaxSubgroups = 4;
+  // Number of register space bits to use for accumulators. Should typically be
+  // between 50% and 80% of total available register space, as the accumulator
+  // tends to be larger than the A and B matrix tiles.
+  const int kMaxAccumulatorRegisterBits = 256 * 32;
+
+  MMAAttr intrinsicMma = MMAAttr::get(ctx, *intrinsic);
+  auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
+  // The unrollK factor serves to allow loads from the A and B matrices to use
+  // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
+  // and each intrinsic consumes only 32 bits from A and B, then we want to set
+  // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
+  const int unrollK =
+      kLoadInstructionBits /
+      std::min(
+          intrinsicA.getElementTypeBitWidth() * intrinsicA.getNumElements(),
+          intrinsicB.getElementTypeBitWidth() * intrinsicB.getNumElements());
+  // The total amount of unrolling along the M and N dimensions is normally
+  // limited only by the number of available registers, since larger M and N
+  // yields higher arithmetic intensity. Here, we do not yet distinguish between
+  // plain unrolling (more instructions on each thread) and
+  // unrolling-to-subgroups (more threads).
+  const int totalUnrollMN =
+      kMaxAccumulatorRegisterBits /
+      (intrinsicC.getElementTypeBitWidth() * intrinsicC.getNumElements());
+  const int totalUnrollM = static_cast<int>(
+      std::floor(std::sqrt(static_cast<float>(totalUnrollMN))));
+  const int totalUnrollN = totalUnrollMN / totalUnrollM;
+  // Now we introduce unroll-to-subgroups. It doesn't change the overall tile
+  // size, as it increases the number of subgroups but correspondingly decreases
+  // the number of registers available to each subgroups. In other words, the
+  // overall tile size determined above only needed to be concerned with the
+  // overall number of registers, not with how they are split between subgroups.
+  //
+  // For now for simplicity we put all the unroll-to-subgroups in the N
+  // dimension. That might be suboptimal, revisit later. That does simplify the
+  // below adjustments for narrow M/N, as we don't need to think about
+  // unroll-to-subgroups when making the narrowing adjustment.
+  int unrollMToSubgroups = 1;
+  int unrollNToSubgroups = kMaxSubgroups;
+  int unrollM = totalUnrollM / unrollMToSubgroups;
+  int unrollN = totalUnrollN / unrollNToSubgroups;
+
+  //
+  // Step 3: Adjust the unrolling factors when there is a narrow dimension.
+  //
+  IREE::Encoding::MatmulNarrowDim narrowDim =
+      IREE::Encoding::getMatmulNarrowDim(encoding);
+  if (narrowDim.isM()) {
+    unrollM = std::min<int>(
+        unrollM, llvm::divideCeil(narrowDim.size, intrinsicMma.getMSize()));
   }
-  // Fallback - no architecture-optimized tile size for this case.
-  return std::nullopt;
+  if (narrowDim.isN()) {
+    std::swap(unrollM, unrollN);
+    std::swap(unrollMToSubgroups, unrollNToSubgroups);
+    assert(unrollNToSubgroups == 1);
+    unrollN = std::min<int>(
+        unrollN, llvm::divideCeil(narrowDim.size, intrinsicMma.getNSize()));
+  }
+
+  return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
+                               unrollMToSubgroups, unrollN, unrollNToSubgroups,
+                               unrollK);
 }
 
 static FailureOr<MaterializeEncodingInfo>
@@ -110,8 +177,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   } else {
     gpuTargetAttr = getCLGPUTarget(tensorType.getContext());
   }
-  std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-      chooseDataTiledMMAAttr(encoding.getElementTypesArray(), gpuTargetAttr);
+  std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+      encoding.getElementTypesArray(), gpuTargetAttr, encoding);
   if (!mma) {
     return failure();
   }
@@ -366,7 +433,7 @@ public:
       gpuTargetAttr = getCLGPUTarget(op.getContext());
     }
     std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
-        resultEncoding.getElementTypesArray(), gpuTargetAttr);
+        resultEncoding.getElementTypesArray(), gpuTargetAttr, resultEncoding);
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();
