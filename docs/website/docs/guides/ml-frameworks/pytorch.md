@@ -218,7 +218,7 @@ binary = export_output.compile(save_to=None)
 # Use the IREE runtime API to test the compiled program.
 config = ireert.Config("local-task")
 vm_module = ireert.load_vm_module(
-    ireert.VmModule.wrap_buffer(config.vm_instance, binary.map_memory()),
+    ireert.VmModule.copy_buffer(config.vm_instance, binary.map_memory()),
     config,
 )
 input = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
