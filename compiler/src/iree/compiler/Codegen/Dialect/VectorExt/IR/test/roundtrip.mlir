@@ -17,6 +17,19 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 
 // -----
 
+func.func @specify_inline_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
+  %cst_0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %result = vector.transfer_read %lhs[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<32x32xf16>, vector<32x32xf16>
+  %2 = iree_vector_ext.to_layout %result to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [4, 1], thread_tile = [4, 2], element_tile = [1, 4], subgroup_strides = [0, 0], thread_strides = [1, 4]>) : vector<32x32xf16>
+  return %2 : vector<32x32xf16>
+}
+
+// CHECK-LABEL: func.func @specify_inline_layout
+// CHECK:      iree_vector_ext.to_layout {{.*}} to layout({{.*}})
+
+// -----
+
 #nested_0 = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile = [2, 4],
