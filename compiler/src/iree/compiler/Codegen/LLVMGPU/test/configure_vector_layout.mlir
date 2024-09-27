@@ -26,9 +26,9 @@ func.func @transfer_read_permute(%lhs: memref<16x256xf16, strided<[256, 1], offs
   %6 = vector.transfer_read %lhs[%c0, %c0], %cst {in_bounds = [true, true]} : memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<16x32xf16>
   %7 = vector.transfer_read %rhs[%c0, %c0], %cst {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>} : memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<32x16xf16>
   // CHECK: %[[READ0:.+]] = vector.transfer_read
-  // CHECK: to_layout %[[READ0]] to #[[$NESTED]]
+  // CHECK: to_layout %[[READ0]] to layout(#[[$NESTED]])
   // CHECK: %[[READ1:.+]] = vector.transfer_read
-  // CHECK: to_layout %[[READ1]] to #[[$NESTED1]]
+  // CHECK: to_layout %[[READ1]] to layout(#[[$NESTED1]])
   vector.transfer_write %6, %alloc_0[%c0, %c0] {in_bounds = [true, true]} : vector<16x32xf16>, memref<16x32xf16, #gpu.address_space<workgroup>>
   vector.transfer_write %7, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<32x16xf16>, memref<32x16xf16, #gpu.address_space<workgroup>>
   memref.dealloc %alloc_0 : memref<16x32xf16, #gpu.address_space<workgroup>>
@@ -59,7 +59,7 @@ func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[409
   %c0 = arith.constant 0 : index
   %0 = vector.transfer_read %quant[%c0, %c0], %c0_i4 {in_bounds = [true, true]} : memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<128x128xi4>
   // CHECK: %[[READ:.+]] = vector.transfer_read
-  // CHECK: to_layout %[[READ]] to #[[$NESTED]]
+  // CHECK: to_layout %[[READ]] to layout(#[[$NESTED]])
   %1 = vector.transfer_read %scale[%c0], %cst {in_bounds = [true]} : memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<128xf16>
   %2 = vector.broadcast %1 : vector<128xf16> to vector<128x128xf16>
   %3 = vector.transpose %2, [1, 0] : vector<128x128xf16> to vector<128x128xf16>
