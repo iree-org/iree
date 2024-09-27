@@ -38,6 +38,7 @@ def DistributeMmaToLanesPass :
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
     "::mlir::tensor::TensorDialect",
   ];
