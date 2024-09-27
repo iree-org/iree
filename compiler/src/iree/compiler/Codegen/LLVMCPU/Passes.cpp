@@ -93,7 +93,7 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
 
 static llvm::cl::opt<bool> clTileDispatchUsingForall(
     "iree-llvmcpu-tile-dispatch-using-forall",
-    llvm::cl::desc("Eanble tile and distribute to workgroups using scf.forall"),
+    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
     llvm::cl::init(false));
 
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
@@ -109,8 +109,11 @@ static llvm::cl::opt<bool> clForceArmStreaming(
         "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false));
 
-static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
-  if (clTileDispatchUsingForall) {
+// TODO: Enable `TileDispatchUsingForall` for every pipeline.
+static void
+addTileAndDistributePasses(OpPassManager &funcPassManager,
+                           bool enableTileDispatchUsingForall = false) {
+  if (enableTileDispatchUsingForall || clTileDispatchUsingForall) {
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
   } else {
@@ -459,7 +462,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/true);
 
   // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -522,7 +526,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/true);
 
   funcPassManager.addPass(createLLVMCPUTileAndFusePass(
       static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
