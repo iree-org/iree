@@ -235,6 +235,37 @@ add_mlir_python_modules(IREECompilerPythonModules
 
 
 ################################################################################
+# iree.build package
+# This is a pure Python part of the namespace, not rooted under iree.compiler
+# like the above. It is only using the same build support for compatibility
+# with the existing development flow.
+# If the build system for Python code is ever redone, this can just be
+# source namespace in the project definition.
+################################################################################
+
+# The iree.build package.
+declare_mlir_python_sources(IREECompilerBuildPythonPackage
+ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/build"
+SOURCES
+  __init__.py
+  __main__.py
+  executor.py
+  lang.py
+  main.py
+  net_actions.py
+  onnx_actions.py
+)
+
+add_mlir_python_modules(IREECompilerBuildPythonModules
+  ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/build"
+  INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/build"
+  DECLARED_SOURCES
+    IREECompilerBuildPythonPackage
+)
+
+add_dependencies(IREECompilerPythonModules IREECompilerBuildPythonModules)
+
+################################################################################
 # Tools linked against the shared CAPI library
 ################################################################################
 
