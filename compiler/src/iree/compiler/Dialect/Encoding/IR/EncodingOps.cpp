@@ -137,6 +137,33 @@ std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
       getAffineDimExpr(dimPos, getContext()));
 }
 
+MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
+                                   int narrowThreshold) {
+  linalg::ContractionDimensions cDims =
+      linalg::inferContractionDims(linalgOp).value();
+  auto map = linalgOp.getIndexingMapsArray().back();
+  auto outType = llvm::cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
+  auto getOutputSizeAtDimPos = [=](unsigned dimPos) -> int64_t {
+    return outType.getDimSize(
+        map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
+            .value());
+  };
+  // M or N can be empty instead of having an explicit dim size of 1 for matvec
+  // and vecmat, so set to 1 if empty.
+  int64_t mSize = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
+  int64_t nSize = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
+
+  MatmulNarrowDim narrowM, narrowN;
+  if (!ShapedType::isDynamic(mSize) && mSize < narrowThreshold) {
+    narrowM = {/*dim=*/MatmulNarrowDim::Dim::M, /*size=*/mSize};
+  }
+  if (!ShapedType::isDynamic(nSize) && nSize < narrowThreshold) {
+    narrowN = {/*dim=*/MatmulNarrowDim::Dim::N, /*size=*/nSize};
+  }
+
+  return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
+}
+
 ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
   auto roundDimsTo = getRoundDimsTo();
   if (!roundDimsTo) {
@@ -151,26 +178,23 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo());
 }
 
-int64_t EncodingAttr::getMatmulNarrowM() {
-  if (getOpType().getValue() != EncodingOpType::matmul) {
-    return 0;
+MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
+  if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
+    return {};
   }
-  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
+  ArrayRef<int64_t> roundDimsTo = encoding.getRoundDimsToArray();
   if (roundDimsTo.empty()) {
-    return 0;
+    return {};
   }
-  return roundDimsTo[0] < kNarrowThreshold ? roundDimsTo[0] : 0;
-}
-
-int64_t EncodingAttr::getMatmulNarrowN() {
-  if (getOpType().getValue() != EncodingOpType::matmul) {
-    return 0;
+  int m = roundDimsTo[0];
+  int n = roundDimsTo[1];
+  if (m < n) {
+    return {MatmulNarrowDim::Dim::M, m};
   }
-  ArrayRef<int64_t> roundDimsTo = getRoundDimsToArray();
-  if (roundDimsTo.empty()) {
-    return 0;
+  if (n < m) {
+    return {MatmulNarrowDim::Dim::N, n};
   }
-  return roundDimsTo[1] < kNarrowThreshold ? roundDimsTo[1] : 0;
+  return {};
 }
 
 //===---------------------------------------------------------------------===//

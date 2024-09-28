@@ -110,14 +110,6 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
-
-    /// Returns the M size from `round_dims_to` if the value is less than
-    /// kNarrowThreshold. Otherwise, returns zero.
-    int64_t getMatmulNarrowM();
-
-    /// Returns the N size from `round_dims_to` if the value is less than
-    /// kNarrowThreshold. Otherwise, returns zero.
-    int64_t getMatmulNarrowN();
   }];
 
   let genVerifyDecl = 0;
