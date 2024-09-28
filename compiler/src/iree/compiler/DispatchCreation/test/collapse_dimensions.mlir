@@ -518,3 +518,44 @@ util.func public @propagate_uncollapsable(%arg0: tensor<2x320x128x128xf32>) -> t
 //  CHECK-SAME:      ins(%[[VAL2]], %[[VAL1]] : tensor<2x320x128x128xf32>, tensor<2x320x128x128xf32>)
 //  CHECK-SAME:      outs(%{{.*}} : tensor<2x320x128x128xf32>)
 //       CHECK:    flow.return %[[VAL3]]
+
+// -----
+
+util.func public @dequant_contraction(%arg0: tensor<2x32xf32>, %arg1: tensor<2x32x10x16384xf16>) -> tensor<2x32xf32> {
+  %0 = flow.dispatch.region -> (tensor<2x32xf32>) {
+    %1 = tensor.empty() : tensor<2x32xf32>
+    %cst = arith.constant 0.000000e+00 : f32
+    %2 = tensor.empty() : tensor<2x32x10x16384xf32>
+    %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<2x32x10x16384xf16>) outs(%2 : tensor<2x32x10x16384xf32>) {
+    ^bb0(%in: f16, %out: f32):
+      %6 = arith.extf %in : f16 to f32
+      linalg.yield %6 : f32
+    } -> tensor<2x32x10x16384xf32>
+    %4 = linalg.fill ins(%cst : f32) outs(%1 : tensor<2x32xf32>) -> tensor<2x32xf32>
+    %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%3, %arg0 : tensor<2x32x10x16384xf32>, tensor<2x32xf32>) outs(%4 : tensor<2x32xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %6 = arith.subf %in, %in_0 : f32
+      %7 = arith.mulf %6, %6 : f32
+      %8 = arith.addf %7, %out : f32
+      linalg.yield %8 : f32
+    } -> tensor<2x32xf32>
+    flow.return %5 : tensor<2x32xf32>
+  }
+  util.return %0 : tensor<2x32xf32>
+}
+
+// CHECK-LABEL: util.func public @dequant_contraction
+//  CHECK-SAME:    %[[ARG0:.*]]: tensor<2x32xf32>
+//  CHECK-SAME:    %[[ARG1:.+]]: tensor<2x32x10x16384xf16>
+//   CHECK-DAG:     %[[COLLAPSED_ARG0:.+]] = tensor.collapse_shape %[[ARG0]]
+//   CHECK-DAG:     %[[COLLAPSED_ARG1:.+]] = tensor.collapse_shape %[[ARG1]]
+//       CHECK:    flow.dispatch.region
+//       CHECK:    %[[VAL0:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "parallel"]
+//  CHECK-SAME:      ins(%[[COLLAPSED_ARG1]] : tensor<64x163840xf16>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<64x163840xf32>)
+//       CHECK:    %[[VAL1:.*]] = linalg.generic
+//  CHECK-SAME:      iterator_types = ["parallel", "reduction"]
+//  CHECK-SAME:      ins(%[[VAL0]], %[[COLLAPSED_ARG0]] : tensor<64x163840xf32>, tensor<64xf32>)
+//  CHECK-SAME:      outs(%{{.*}} : tensor<64xf32>)
+//       CHECK:    flow.return %[[VAL1]]

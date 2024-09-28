@@ -74,7 +74,10 @@ void BubbleUpExpandShapesPass::runOnOperation() {
         if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
           return isa<linalg::GenericOp>(consumerLinalgOp) &&
                  llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
-                              linalg::isParallelIterator);
+                              linalg::isParallelIterator) &&
+                 !llvm::any_of(consumerLinalgOp->getUsers(), [](Operation *op) {
+                   return llvm::isa<tensor::InsertSliceOp>(op);
+                 });
         }
         // Fuse in all other cases.
         return true;
@@ -83,6 +86,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
                                                     bubbleUpExpansionControlFn);
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
       bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
+  tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
 
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
