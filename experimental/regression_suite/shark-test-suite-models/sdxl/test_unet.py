@@ -328,12 +328,13 @@ def test_compile_punet_int8_fp16_rocm(sdxl_punet_int8_fp16_mlir):
 
 @pytest.mark.depends(on=["test_compile_punet_int8_fp16_rocm"])
 def test_run_punet_int8_fp16_rocm(
+    request,
     SDXL_PUNET_INT8_COMMON_RUN_FLAGS,
     SDXL_PUNET_INT8_FP16_OUT,
     sdxl_punet_int8_fp16_real_weights,
 ):
     if rocm_chip == "gfx90a":
-        pytest.xfail("Expected punet_int8_fp16 run on mi250 to fail", strict=True)
+        request.node.add_marker(pytest.mark.xfail(reason="Expected punet_int8_fp16 run on mi250 to fail", strict=True))
     return iree_run_module(
         VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb,
         device="hip",
@@ -346,11 +347,9 @@ def test_run_punet_int8_fp16_rocm(
     )
 
 
-def test_compile_punet_int8_fp8_rocm(sdxl_punet_int8_fp8_mlir):
+def test_compile_punet_int8_fp8_rocm(request, sdxl_punet_int8_fp8_mlir):
     if rocm_chip == "gfx90a":
-        pytest.xfail(
-            "Expected punet_int8_fp8 compilation on mi250 to fail", strict=True
-        )
+        request.node.add_marker(pytest.mark.xfail(reason="Expected punet_int8_fp8 compilation on mi250 to fail", strict=True))
     VmfbManager.sdxl_punet_int8_fp8_rocm_vmfb = iree_compile(
         sdxl_punet_int8_fp8_mlir,
         ROCM_COMPILE_FLAGS + INT8_PUNET_FLAGS,
