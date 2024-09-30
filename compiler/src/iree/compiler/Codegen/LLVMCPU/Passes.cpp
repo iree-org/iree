@@ -110,9 +110,8 @@ static llvm::cl::opt<bool> clForceArmStreaming(
     llvm::cl::init(false));
 
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
-static void
-addTileAndDistributePasses(OpPassManager &funcPassManager,
-                           bool enableTileDispatchUsingForall = false) {
+static void addTileAndDistributePasses(OpPassManager &funcPassManager,
+                                       bool enableTileDispatchUsingForall) {
   if (enableTileDispatchUsingForall || clTileDispatchUsingForall) {
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
@@ -346,7 +345,8 @@ void buildLLVMCPUVectorLoweringPipeline(
 void addCPUBufferOpsTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/false);
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
@@ -383,7 +383,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(
 void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/false);
 
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
@@ -575,7 +576,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/false);
 
   // The below two passes are nop if pack/unpack is not specified in ukernels
   // attribute. By default, they are disabled.
@@ -618,7 +620,8 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/false);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   // TODO: Remove the pass once we have PartialReductionOpInterface implemented
@@ -657,7 +660,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager) {
-  addTileAndDistributePasses(funcPassManager);
+  addTileAndDistributePasses(funcPassManager,
+                             /*enableTileDispatchUsingForall=*/false);
   addCPUBufferizePasses(funcPassManager);
 }
 
