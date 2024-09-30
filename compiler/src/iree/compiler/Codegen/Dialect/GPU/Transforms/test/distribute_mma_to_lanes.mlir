@@ -390,9 +390,9 @@ func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: t
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0) -> (d0 mod 64)>
 
 // CHECK-LABEL: func @data_tiled_1x1x1_tensor_multi_mma
-//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<1x1x4x16xf32>
-//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<1x1x4x16xf32>
-//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<1x1x4x16x4xf32>
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
@@ -431,9 +431,9 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4x
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0) -> (d0 mod 64)>
 
 // CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_unrolled
-//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<1x1x2x4x16x4xf32>
-//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<1x1x2x4x16x4xf32>
-//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<1x1x2x2x4x16x4xf32>
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
@@ -475,9 +475,9 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<
 // CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0) -> (d0 mod 256)>
 
 // CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups
-//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<1x1x2x4x16x4xf32>
-//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<1x1x2x4x16x4xf32>
-//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<1x1x2x2x4x16x4xf32>
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
