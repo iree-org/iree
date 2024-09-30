@@ -2,17 +2,17 @@
 
 Projects built by community members:
 
-* The [SHARK](https://github.com/nod-ai/SHARK) project offers user interfaces
-  for running a large corpus of machine learning programs.
+* The [SHARK-Studio](https://github.com/nod-ai/SHARK-Studio) project offers user
+  interfaces for running a large corpus of machine learning programs.
 
-* The [sharktank](https://github.com/nod-ai/sharktank) project contains
-  modeling and serving libraries for popular genai applications.
+* The [SHARK-Platform](https://github.com/nod-ai/SHARK-Platform) project
+  contains modeling and serving libraries.
 
-* The [SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) project is an
+* The [SHARK-ModelDev](https://github.com/nod-ai/SHARK-ModelDev) project is an
   integration repository for various model bringup activities. Several parts
-  of SHARK-Turbine graduated to
+  of SHARK-ModelDev graduated to
   [iree-turbine](https://github.com/iree-org/iree-turbine) and
-  [sharktank](https://github.com/nod-ai/sharktank).
+  [SHARK-Platform](https://github.com/nod-ai/SHARK-Platform).
 
 * The [IREE C++ Template](https://github.com/iml130/iree-template-cpp) *(archived)*
   showed one way to integrate IREE's runtime into a project with CMake.

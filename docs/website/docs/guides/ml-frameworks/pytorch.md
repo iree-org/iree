@@ -23,8 +23,7 @@ status: new
 ## :octicons-book-16: Overview
 
 [iree-turbine](https://pypi.org/project/iree-turbine/) (rebrand pending from
-[SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine)) offers a tight
-integration between compatible versions of IREE,
+"shark-turbine") offers a tight integration between compatible versions of IREE,
 [torch-mlir](https://github.com/llvm/torch-mlir), and
 [PyTorch](https://pytorch.org/).
 
@@ -85,7 +84,7 @@ Just-in-time integration allows for Python code using TorchDynamo to optimize
 PyTorch models/functions using IREE, all within an interactive Python session.
 
 <!-- TODO(scotttodd): mention targets like AMD GPUs when supported
-                      https://github.com/nod-ai/SHARK-Turbine/issues/94 -->
+                      https://github.com/iree-org/iree-turbine/issues/78 -->
 
 ``` mermaid
 graph TD
@@ -269,7 +268,7 @@ Advanced export workflows can use the
 class to define and constrain the structure of a program prior to compiling it.
 
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
-                      https://github.com/nod-ai/SHARK-Turbine/issues/106
+                      https://github.com/iree-org/iree-turbine/issues/77
 -->
 
 ```python
@@ -330,4 +329,4 @@ Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.c
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
 AOT unit tests | [`tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
 Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_dynamic.py)
-stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py)
+stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-ModelDev/blob/main/models/turbine_models/custom_models/stateless_llama.py)
