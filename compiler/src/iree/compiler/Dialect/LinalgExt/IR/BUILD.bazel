@@ -28,6 +28,7 @@ iree_td_library(
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
+        "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:LinalgOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -45,7 +46,6 @@ iree_compiler_cc_library(
         "LinalgExtAttrs.cpp.inc",
         "LinalgExtDialect.cpp",
         "LinalgExtDialect.cpp.inc",
-        "LinalgExtEnums.cpp.inc",
         "LinalgExtInterfaces.cpp",
         "LinalgExtInterfaces.cpp.inc",
         "LinalgExtOps.cpp",
@@ -56,7 +56,6 @@ iree_compiler_cc_library(
         "LinalgExtAttrs.h.inc",
         "LinalgExtDialect.h",
         "LinalgExtDialect.h.inc",
-        "LinalgExtEnums.h.inc",
         "LinalgExtInterfaces.h",
         "LinalgExtInterfaces.h.inc",
         "LinalgExtOps.h",
@@ -64,7 +63,6 @@ iree_compiler_cc_library(
         "LinalgExtTypes.h.inc",
     ],
     deps = [
-        ":LinalgExtEnumsGen",
         ":LinalgExtInterfacesIncGen",
         ":LinalgExtOpsIncGen",
         ":LinalgExtTypesGen",
@@ -96,23 +94,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
-)
-
-iree_gentbl_cc_library(
-    name = "LinalgExtEnumsGen",
-    tbl_outs = [
-        (
-            ["--gen-enum-decls"],
-            "LinalgExtEnums.h.inc",
-        ),
-        (
-            ["--gen-enum-defs"],
-            "LinalgExtEnums.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LinalgExtBase.td",
-    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(

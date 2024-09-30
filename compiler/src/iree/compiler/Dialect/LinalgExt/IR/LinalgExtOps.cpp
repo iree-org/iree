@@ -1637,6 +1637,135 @@ Im2colOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+//===---------------------------------------------------------------------===//
+// Custom Op
+//===---------------------------------------------------------------------===//
+
+unsigned CustomOp::getNumLoops() { return getIteratorTypesAttr().size(); }
+
+int64_t CustomOp::getRank(Value v) {
+  Type type = v.getType();
+  if (type.isIntOrIndexOrFloat()) {
+    return 0;
+  }
+  return cast<RankedTensorType>(type).getRank();
+}
+
+LogicalResult CustomOp::verify() {
+  // All inputs/outputs must have indexing maps.
+  if (static_cast<int64_t>(getIndexingMapsAttr().size()) != getNumOperands()) {
+    return emitOpError("expected number of indexing maps (")
+           << getIndexingMapsAttr().size()
+           << ") to be same as the "
+              "number of input/output operands ("
+           << getNumOperands() << ")";
+  }
+
+  // Check the form of the indexing maps.
+  std::optional<unsigned> numSymbolDims;
+  for (auto [index, indexingMapAttr, operand] :
+       llvm::enumerate(getIndexingMapsAttr(), getOperands())) {
+    auto indexingMap = cast<AffineMapAttr>(indexingMapAttr).getValue();
+    if (indexingMap.isEmpty()) {
+      continue;
+    }
+
+    // Domain must be consistent.
+    unsigned numLoops = getNumLoops();
+    if (indexingMap.getNumDims() != numLoops) {
+      return emitOpError("expected indexing_map #")
+             << index << " to have " << numLoops
+             << " dim(s) to match the number of loops or be zero";
+    }
+
+    // Check that number of symbols is consistent.
+    if (numSymbolDims) {
+      if (indexingMap.getNumSymbols() != numSymbolDims.value()) {
+        return emitOpError(
+                   "inconsistent number of symbol dimensions in indexing_map #")
+               << index << ", expected " << numSymbolDims.value()
+               << " instead of " << indexingMap.getNumSymbols();
+      }
+    } else {
+      numSymbolDims = indexingMap.getNumSymbols();
+    }
+
+    // Range must match the rank of the operands.
+    int64_t rank = getRank(operand);
+    if (indexingMap.getNumResults() != rank) {
+      return emitOpError("expected operand rank(")
+             << rank << ") to match the result rank of indexing map #" << index;
+    }
+  }
+
+  // Check that number of basic block arguments is same as number of operands
+  Block *body = getBody();
+  if (body->getNumArguments() != getNumOperands()) {
+    return emitOpError("expected as many basic block arguments (")
+           << body->getNumArguments() << ") as the number of operands ("
+           << getNumOperands() << ")";
+  }
+
+  // Check that type of the basic block argument matches the type of the
+  // operands.
+  for (auto [index, bbArg, operand] :
+       llvm::enumerate(body->getArguments(), getOperands())) {
+    Type operandType = operand.getType();
+    Type bbArgType = bbArg.getType();
+
+    if (operandType.isIntOrIndexOrFloat()) {
+      if (operandType != bbArgType) {
+        return emitOpError("for (scalar) operand #")
+               << index
+               << " expected corresponding basic block argument to be of the "
+                  "same type";
+      }
+      continue;
+    }
+
+    auto operandTensorType = cast<RankedTensorType>(operandType);
+    auto bbArgTensorType = dyn_cast<RankedTensorType>(bbArgType);
+    if (!bbArgTensorType) {
+      return emitOpError("for (tensor) operand #")
+             << index
+             << " expected corresponding basic block argument to be tensor as "
+                "well";
+    }
+
+    // Check that the basic block arg has same rank/element type, but all shapes
+    // dynamic.
+    auto expectedBBArgType = RankedTensorType::get(
+        SmallVector<int64_t>(operandTensorType.getRank(), ShapedType::kDynamic),
+        operandTensorType.getElementType(), operandTensorType.getEncoding());
+    if (bbArgTensorType != expectedBBArgType) {
+      return emitOpError("expected basic block argument corresponding to "
+                         "(tensor) operand #")
+             << index << " to be " << expectedBBArgType << " instead of "
+             << bbArgTensorType;
+    }
+  }
+
+  // Check yield operation operand types.
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body->getTerminator());
+  if (yieldOp->getNumOperands() != getOutputs().size()) {
+    return emitOpError(
+        "expected as many yields as the numbers of `outs` operand");
+  }
+
+  for (auto [index, yieldVal, bbOperand] :
+       llvm::enumerate(yieldOp.getOperands(),
+                       body->getArguments().take_back(getOutputs().size()))) {
+    if (yieldVal.getType() != bbOperand.getType()) {
+      return emitOpError("expected type of ")
+             << index
+             << "-th operand of yield to match the corresponding output basic "
+                "block argument";
+    }
+  }
+
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1657,6 +1786,7 @@ DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
 DEFINE_OP_GET_EFFECTS(Im2colOp)
+DEFINE_OP_GET_EFFECTS(CustomOp)
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 
