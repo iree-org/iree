@@ -102,6 +102,7 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_single_thread
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //   CHECK-DAG:   %[[TZ:.+]] = gpu.thread_id z
@@ -109,8 +110,7 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 //  CHECK-SAME:     affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 128)>
 //  CHECK-SAME:     [%[[TX]], %[[TY]], %[[TZ]]]
 //       CHECK:   scf.for %[[I:.+]] = %[[LINID]] to %c1 step %c128 {
-//       CHECK:     %[[DELIN:.+]] = affine.delinearize_index %[[I]] into (%c1) : index
-//       CHECK:     memref.store {{.*}}[%[[DELIN]]]
+//       CHECK:     memref.store {{.*}}[%[[C0]]]
 
 // -----
 
