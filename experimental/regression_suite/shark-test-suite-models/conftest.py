@@ -12,6 +12,8 @@ class VmfbManager:
     sdxl_clip_rocm_vmfb = None
     sdxl_vae_rocm_vmfb = None
     sdxl_unet_rocm_vmfb = None
+    sdxl_punet_rocm_vmfb = None
+    sdxl_punet_fp8_rocm_vmfb = None
     sdxl_unet_cpu_pipeline_vmfb = None
     sdxl_unet_rocm_pipeline_vmfb = None
     sd3_clip_cpu_vmfb = None
