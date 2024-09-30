@@ -74,11 +74,11 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = multiMmaOp.getContext();
   SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+  attrs.emplace_back(b.getStringAttr("workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "reduction"),
+  attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
-  auto configDict = DictionaryAttr::get(context, attrs);
+  auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // Don't add any special padding or prefetching, since the data-tiled layout
@@ -89,10 +89,9 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
-      StringAttr::get(context,
-                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
       pipelineOptions);
-  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
