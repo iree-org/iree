@@ -818,10 +818,11 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Problem specific (reduction) tiling.
   {
-    GPUTensorTileToSerialLoopsPassOptions tensorTileToSerialLoopsPassOptions;
-    tensorTileToSerialLoopsPassOptions.coalesceLoops = true;
-    funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass(
-        tensorTileToSerialLoopsPassOptions));
+    GPUApplyTilingLevelPassOptions options;
+    options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
   }
 
   if (usePadToModelSharedMemcpy) {
