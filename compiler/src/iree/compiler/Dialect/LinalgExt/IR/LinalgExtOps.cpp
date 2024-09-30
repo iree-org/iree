@@ -1766,6 +1766,35 @@ LogicalResult CustomOp::verify() {
   return success();
 }
 
+SmallVector<AffineMap> CustomOp::getIndexingMapsForOperands() {
+  return llvm::map_to_vector(
+      getIndexingMaps().getValue().take_front(getNumDpsInputs()),
+      [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
+}
+
+SmallVector<AffineMap> CustomOp::getIndexingMapsForResults() {
+  return llvm::map_to_vector(
+      getIndexingMaps().getValue().take_back(getNumDpsInits()),
+      [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
+}
+
+SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
+LogicalResult
+CustomOp::reifyResultShapes(OpBuilder &builder,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  for (auto init : getOutputs()) {
+    SmallVector<OpFoldResult> sizes =
+        tensor::getMixedSizes(builder, getLoc(), init);
+    reifiedReturnShapes.emplace_back(std::move(sizes));
+  }
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
