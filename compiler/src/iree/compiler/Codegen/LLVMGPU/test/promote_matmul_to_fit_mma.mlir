@@ -12,7 +12,8 @@
 #map3 = affine_map<()[s0] -> (s0 * -128 + 1281, 128)>
 #map4 = affine_map<()[s0] -> (-s0 + 64)>
 #map5 = affine_map<()[s0] -> (-s0 + 128)>
-func.func @batch_matmul_f16() {
+#translation = #iree_codegen.translation_info<None, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
+func.func @batch_matmul_f16() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>>
@@ -48,14 +49,14 @@ func.func @batch_matmul_f16() {
 // PARALLEL-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
 // PARALLEL-SAME:     outs(%[[FILL]]
 
-// The reduction dim is not tiled in the test case, so it pads it to the same
-// shape.
+// The reduction dim is not tiled in the test case, so it pads it to the
+// matmul intrinsic k.
 // REDUCTION-DAG:   %[[FILL_DEST:.+]] = flow.dispatch.tensor.load %[[OUT_HANDLE]]
 // REDUCTION:       %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[FILL_DEST]]
 // REDUCTION:       %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
-// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1281xf16>
+// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1296xf16>
 // REDUCTION:       %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
-// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1281x?xf16>
+// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1296x?xf16>
 // REDUCTION:       %[[GEMM:.+]] = linalg.batch_matmul
 // REDUCTION-SAME:    ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
 // REDUCTION-SAME:    outs(%[[FILL]]
@@ -77,7 +78,8 @@ func.func @batch_matmul_f16() {
 #map4 = affine_map<()[s0] -> (-s0 + 64)>
 #map5 = affine_map<()[s0] -> (-s0 + 128)>
 #map6 = affine_map<(d0) -> (-d0 + 1281, 64)>
-func.func @batch_matmul_pad_reduction_after_tiling() {
+#translation = #iree_codegen.translation_info<None, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
+func.func @batch_matmul_pad_reduction_after_tiling() attributes {translation_info = #translation} {
   %c64 = arith.constant 64 : index
   %c1281 = arith.constant 1281 : index
   %c2 = arith.constant 2 : index

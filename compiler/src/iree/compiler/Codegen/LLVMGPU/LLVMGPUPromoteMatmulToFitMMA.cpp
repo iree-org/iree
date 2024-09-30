@@ -36,23 +36,14 @@ public:
   }
 
   void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
-                        utils::IteratorType targetIterType, bool nofold) const {
+                        ArrayRef<int64_t> paddingDims,
+                        ArrayRef<int64_t> padToMultipleOf, bool nofold) const {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
 
-    SmallVector<int64_t> paddingDims;
-    for (auto [index, iterType] : llvm::enumerate(op.getIteratorTypesArray())) {
-      if (iterType == targetIterType) {
-        paddingDims.push_back(index);
-      }
-    }
-
     SmallVector<bool> packPaddings(op.getNumDpsInputs(), nofold);
 
-    // One is enough because they will essentially be padded to corresponding
-    // tile sizes, which should be multiple of MMA shapes.
-    SmallVector<int64_t> padToMultipleOf(paddingDims.size(), 1);
     SmallVector<Attribute> paddingValueAttributes;
     for (auto &operand : op->getOpOperands()) {
       auto elemType = getElementTypeOrSelf(operand.get().getType());
@@ -77,6 +68,12 @@ public:
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     auto funcOp = getOperation();
+
+    llvm::StringLiteral scheduleAttrName =
+        IREE::GPU::MMAScheduleAttr::getMnemonic();
+    DictionaryAttr configDict = getTranslationInfo(funcOp).getConfiguration();
+    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+        configDict.get(scheduleAttrName));
 
     // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so
     // we can kick canonicalization patterns to fold outer tensor.pad ops away.
@@ -107,7 +104,40 @@ public:
 
     IRRewriter rewriter(ctx);
     for (auto op : candidates) {
-      padWithZeroValue(rewriter, op, targetIterType, nofold);
+      FailureOr<linalg::ContractionDimensions> dims =
+          linalg::inferContractionDims(op);
+      assert(succeeded(dims) && "expected contraction op interface");
+
+      // Populate padding dimensions.
+      SmallVector<int64_t> paddingDimensions;
+      for (auto [idx, iter] : llvm::enumerate(op.getIteratorTypesArray())) {
+        if (iter == targetIterType) {
+          paddingDimensions.push_back(idx);
+        }
+      }
+
+      // Populate tile sizes. All tile sizes are one, except mma tile sizes.
+      SmallVector<int64_t> padToMultipleOf(paddingDimensions.size(), 1);
+      if (scheduleAttr) {
+        auto [padM, padN, padK] = scheduleAttr.getIntrinsic().getMNKShape();
+        padM *= scheduleAttr.getSubgroupMCount();
+        padN *= scheduleAttr.getSubgroupNCount();
+        for (auto [dim, multiple] :
+             llvm::zip(paddingDimensions, padToMultipleOf)) {
+          if (dim == dims->m.back()) {
+            multiple = padM;
+          }
+          if (dim == dims->n.back()) {
+            multiple = padN;
+          }
+          if (dim == dims->k.back()) {
+            multiple = padK;
+          }
+        }
+      }
+
+      padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf,
+                       nofold);
     }
 
     {
