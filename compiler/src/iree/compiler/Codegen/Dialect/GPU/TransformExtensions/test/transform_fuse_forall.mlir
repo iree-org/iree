@@ -52,12 +52,12 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
 //       CHECK:       %[[LOOP:.+]] = scf.for %[[I:.+]] = %c0 to %c64{{.*}} step %c64{{.*}} iter_args(%[[ITER:.+]] = %[[INTERMEDIATE]]) -> (tensor<128x128xf32>)
 //       CHECK:         %[[LINEARID:.+]] = affine.apply #[[$MAP2]](%[[I]], %[[IDX]], %[[IDY]])
-//       CHECK:         %[[IDS:.+]]:2 = affine.delinearize_index %[[LINEARID]] into (%c1, %c64) : index, index
-//       CHECK:         %[[INID0:.+]] = affine.apply #[[$MAP3]](%[[IDS]]#1)
-//       CHECK:         %[[INSLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[INID0]], %[[IDS]]#0] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
-//       CHECK:         %[[INSLICE1:.+]] = tensor.extract_slice %[[ITER]][%[[INID0]], %[[IDS]]#0] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
+//       CHECK:         %[[IDS:.+]]:2 = affine.delinearize_index %[[LINEARID]] into (%c64, %c1) : index, index
+//       CHECK:         %[[INID0:.+]] = affine.apply #[[$MAP3]](%[[IDS]]#0)
+//       CHECK:         %[[INSLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
+//       CHECK:         %[[INSLICE1:.+]] = tensor.extract_slice %[[ITER]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
 //       CHECK:         %[[COPY:.+]] = linalg.copy ins(%[[INSLICE0]] : tensor<2x128xf32>) outs(%[[INSLICE1]] : tensor<2x128xf32>) -> tensor<2x128xf32>
-//       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[INID0]], %[[IDS]]#0] [2, 128] [1, 1]
+//       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1]
 //       CHECK:         scf.yield %[[INSERT]]
 //       CHECK:       iree_gpu.yield %[[LOOP]]
 //       CHECK:     } : tensor<128x128xf32>
@@ -248,10 +248,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:       %[[BARRIER:.+]] = iree_gpu.barrier_region ins(%[[ALLOC]] : tensor<128x128xf32>)
 //       CHECK:       %[[LOOP:.+]] = scf.for %[[I:.+]] = %c0 to %c64{{.*}} step %c64{{.*}} iter_args(%[[ITER:.+]] = %{{.*}}) -> (tensor<128x128xf32>)
 //       CHECK:         %[[FLAT_ID:.+]] = affine.apply #[[$MAP4]](%[[I]], %[[L_IDY]], %[[L_IDX]], %[[W_IDX]], %[[W_IDY]])
-//       CHECK:         %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (%c1, %c64) : index, index
-//       CHECK:         %[[IDX:.+]] = affine.apply #[[$MAP5]](%[[IDS]]#1)
+//       CHECK:         %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (%c64, %c1) : index, index
+//       CHECK:         %[[IDX:.+]] = affine.apply #[[$MAP5]](%[[IDS]]#0)
 //       CHECK:         %[[COPY:.+]] = linalg.copy
-//       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[IDX]], %[[IDS]]#0] [2, 128]
+//       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[IDX]], %[[IDS]]#1] [2, 128]
 //       CHECK:         scf.yield %[[INSERT]]
 //       CHECK:       } : tensor<128x128xf32>
 
@@ -318,7 +318,7 @@ module attributes { transform.with_named_sequence } {
 module {
   func.func @fuse_forall_dynamic_thread_count(%arg0: tensor<128x128xf32>, %x: index, %y: index, %z: index) -> tensor<128x128xf32> {
     %0 = tensor.empty() : tensor<128x128xf32>
-    %2 = scf.forall (%arg5, %arg6, %arg7) in (%x, %y, %z) shared_outs(%arg8 = %0) -> (tensor<128x128xf32>) {
+    %2 = scf.forall (%arg5, %arg6, %arg7) in (%z, %y, %x) shared_outs(%arg8 = %0) -> (tensor<128x128xf32>) {
       %slice = tensor.extract_slice %arg0[%arg5, %arg6] [4, 128] [1, 1] : tensor<128x128xf32> to tensor<4x128xf32>
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %slice into %arg8[%arg7, 0] [4, 128] [1, 1] : tensor<4x128xf32> into tensor<128x128xf32>
@@ -360,7 +360,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) {{.*}} -> (tensor<128x128xf32>) {
 //       CHECK:     iree_gpu.barrier_region ins(%[[ALLOC]]
 //   CHECK-DAG:       %[[LINEARID:.+]] = affine.apply #[[$MAP1]](%[[IDX]], %[[IDY]])
-//   CHECK-DAG:       %[[PRODCOUNT:.+]] = affine.apply #[[$MAP3]]()[%[[X]], %[[Y]], %[[Z]]]
+//   CHECK-DAG:       %[[PRODCOUNT:.+]] = affine.apply #[[$MAP3]]()[%[[Z]], %[[Y]], %[[X]]]
 //       CHECK:       %[[LOOP:.+]] = scf.for %[[I:.+]] = %[[LINEARID]] to %[[PRODCOUNT]] step %c64{{.*}}
 //       CHECK:         %[[IDS:.+]] = affine.delinearize_index %[[I]] into (%[[Z]], %[[Y]], %[[X]]) : index
 //       CHECK:         scf.yield
