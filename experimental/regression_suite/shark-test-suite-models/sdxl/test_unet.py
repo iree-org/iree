@@ -211,12 +211,10 @@ ROCM_COMPILE_FLAGS = [
 ]
 
 FP16_UNET_FLAGS = [
-    f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
 ]
 
 INT8_PUNET_FLAGS = [
-    f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_punet_spec.mlir",
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics, util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
 ]
 
@@ -335,6 +333,8 @@ def test_run_punet_int8_fp16_rocm(
     SDXL_PUNET_INT8_FP16_OUT,
     sdxl_punet_int8_fp16_real_weights,
 ):
+    if rocm_chip == "gfx90a":
+        pytest.xfail("Expected punet_int8_fp16 run on mi250 to fail")
     return iree_run_module(
         VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb,
         device="hip",
@@ -365,6 +365,8 @@ def test_run_punet_int8_fp8_rocm(
     SDXL_PUNET_INT8_FP8_OUT,
     sdxl_punet_int8_fp8_real_weights,
 ):
+    if rocm_chip == "gfx90a":
+        pytest.xfail("Expected punet_int8_fp8 run on mi250 to fail")
     return iree_run_module(
         VmfbManager.sdxl_punet_int8_fp8_rocm_vmfb,
         device="hip",

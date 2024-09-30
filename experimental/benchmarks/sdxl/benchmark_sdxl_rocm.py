@@ -19,10 +19,10 @@ benchmark_dir = os.path.dirname(os.path.realpath(__file__))
 artifacts_dir = os.getenv("IREE_TEST_FILES", default=Path.cwd()) + "/artifacts"
 artifacts_dir = Path(os.path.expanduser(artifacts_dir)).resolve()
 prompt_encoder_dir = f"{artifacts_dir}/sdxl_clip"
-scheduled_unet_dir = f"{artifacts_dir}/sdxl_unet"
+scheduled_unet_dir = f"{artifacts_dir}/sdxl_unet_fp16"
 vae_decode_dir = f"{artifacts_dir}/sdxl_vae"
 prompt_encoder_dir_compile = f"{vmfb_dir}/sdxl_clip_vmfbs"
-scheduled_unet_dir_compile = f"{vmfb_dir}/sdxl_unet_vmfbs"
+scheduled_unet_dir_compile = f"{vmfb_dir}/sdxl_unet_fp16_vmfbs"
 vae_decode_dir_compile = f"{vmfb_dir}/sdxl_vae_vmfbs"
 
 
