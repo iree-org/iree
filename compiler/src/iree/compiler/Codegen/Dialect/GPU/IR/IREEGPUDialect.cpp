@@ -11,8 +11,20 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+struct IREEGPUDialectOpAsmInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+  AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
+    if (llvm::isa<LoweringConfigAttr>(attr)) {
+      os << "config";
+      return AliasResult::OverridableAlias;
+    }
+    return AliasResult::NoAlias;
+  }
+};
+
 void IREEGPUDialect::initialize() {
   registerAttributes();
+  addInterfaces<IREEGPUDialectOpAsmInterface>();
 
   addOperations<
 #define GET_OP_LIST
