@@ -3953,8 +3953,7 @@ with us.</p>
 </div>
 <h2 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
 <p><a href="https://pypi.org/project/iree-turbine/">iree-turbine</a> (rebrand pending from
-<a href="https://github.com/nod-ai/SHARK-Turbine">SHARK-Turbine</a>) offers a tight
-integration between compatible versions of IREE,
+"shark-turbine") offers a tight integration between compatible versions of IREE,
 <a href="https://github.com/llvm/torch-mlir">torch-mlir</a>, and
 <a href="https://pytorch.org/">PyTorch</a>.</p>
 <ul class="task-list">
@@ -4002,7 +4001,7 @@ integration between compatible versions of IREE,
 <p>Just-in-time integration allows for Python code using TorchDynamo to optimize
 PyTorch models/functions using IREE, all within an interactive Python session.</p>
 <!-- TODO(scotttodd): mention targets like AMD GPUs when supported
-                      https://github.com/nod-ai/SHARK-Turbine/issues/94 -->
+                      https://github.com/iree-org/iree-turbine/issues/78 -->
 
 <pre class="mermaid"><code>graph TD
   accTitle: PyTorch JIT workflow overview
@@ -4190,7 +4189,7 @@ access to more features.</p>
 <a href="https://github.com/iree-org/iree-turbine/tree/main/shark_turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
 class to define and constrain the structure of a program prior to compiling it.</p>
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
-                      https://github.com/nod-ai/SHARK-Turbine/issues/106
+                      https://github.com/iree-org/iree-turbine/issues/77
 -->
 
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
@@ -4263,7 +4262,7 @@ their values independently at runtime.</p>
 </tr>
 <tr>
 <td>stateless llama2</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py"><code>models/turbine_models/custom_models/stateless_llama.py</code></a></td>
+<td><a href="https://github.com/nod-ai/SHARK-ModelDev/blob/main/models/turbine_models/custom_models/stateless_llama.py"><code>models/turbine_models/custom_models/stateless_llama.py</code></a></td>
 </tr>
 </tbody>
 </table>
