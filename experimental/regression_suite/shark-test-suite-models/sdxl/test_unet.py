@@ -21,108 +21,108 @@ rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
 # FP16 Model
 
-sdxl_unet_inference_input_0 = fetch_source_fixture(
+sdxl_unet_fp16_inference_input_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_inference_input_1 = fetch_source_fixture(
+sdxl_unet_fp16_inference_input_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_inference_input_2 = fetch_source_fixture(
+sdxl_unet_fp16_inference_input_2 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_inference_input_3 = fetch_source_fixture(
+sdxl_unet_fp16_inference_input_3 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_inference_output_0 = fetch_source_fixture(
+sdxl_unet_fp16_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_real_weights = fetch_source_fixture(
+sdxl_unet_fp16_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_mlir = fetch_source_fixture(
+sdxl_unet_fp16_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlirbc",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
-sdxl_unet_pipeline_mlir = fetch_source_fixture(
+sdxl_unet_fp16_pipeline_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
-    group="sdxl_unet",
+    group="sdxl_unet_fp16",
 )
 
 # INT8 Punet + FP16 Attention
 
-sdxl_punet_inference_input_0 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.0.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_input_1 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_1 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.1.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_input_2 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_2 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.2.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_input_3 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_3 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.3.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_input_4 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_4 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.4.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_input_5 = fetch_source_fixture(
+sdxl_punet_int8_inference_input_5 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.5.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8",
 )
 
-sdxl_punet_inference_output_0 = fetch_source_fixture(
+sdxl_punet_int8_fp16_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_out.0.bin",
-    group="sdxl_punet",
+    group="sdxl_punet_int8_fp16",
 )
 
-sdxl_punet_real_weights = fetch_source_fixture(
+sdxl_punet_int8_fp16_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_weights.irpa",
-    group="sdxl_punet",
+    group="sdxl_punet_int8_fp16",
 )
 
-sdxl_punet_mlir = fetch_source_fixture(
+sdxl_punet_int8_fp16_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet.mlir",
-    group="sdxl_punet",
+    group="sdxl_punet_int8_fp16",
 )
 
 # INT8 Punet + FP8 Attention
 
-sdxl_punet_fp8_inference_output_0 = fetch_source_fixture(
+sdxl_punet_int8_fp8_inference_output_0 = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8_out.0.bin",
-    group="sdxl_punet_fp8",
+    group="sdxl_punet_int8_fp8",
 )
 
-sdxl_punet_fp8_real_weights = fetch_source_fixture(
+sdxl_punet_int8_fp8_real_weights = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8_weights.irpa",
-    group="sdxl_punet_fp8",
+    group="sdxl_punet_int8_fp8",
 )
 
-sdxl_punet_fp8_mlir = fetch_source_fixture(
+sdxl_punet_int8_fp8_mlir = fetch_source_fixture(
     "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8.mlir",
-    group="sdxl_punet_fp8",
+    group="sdxl_punet_int8_fp8",
 )
 
 CPU_COMPILE_FLAGS = [
@@ -137,56 +137,56 @@ CPU_COMPILE_FLAGS = [
 
 
 @pytest.fixture
-def SDXL_UNET_COMMON_RUN_FLAGS(
-    sdxl_unet_inference_input_0,
-    sdxl_unet_inference_input_1,
-    sdxl_unet_inference_input_2,
-    sdxl_unet_inference_input_3,
-    sdxl_unet_inference_output_0,
+def SDXL_UNET_FP16_COMMON_RUN_FLAGS(
+    sdxl_unet_fp16_inference_input_0,
+    sdxl_unet_fp16_inference_input_1,
+    sdxl_unet_fp16_inference_input_2,
+    sdxl_unet_fp16_inference_input_3,
+    sdxl_unet_fp16_inference_output_0,
 ):
     return [
-        f"--input=1x4x128x128xf16=@{sdxl_unet_inference_input_0.path}",
-        f"--input=2x64x2048xf16=@{sdxl_unet_inference_input_1.path}",
-        f"--input=2x1280xf16=@{sdxl_unet_inference_input_2.path}",
-        f"--input=1xf16=@{sdxl_unet_inference_input_3.path}",
-        f"--expected_output=1x4x128x128xf16=@{sdxl_unet_inference_output_0.path}",
+        f"--input=1x4x128x128xf16=@{sdxl_unet_fp16_inference_input_0.path}",
+        f"--input=2x64x2048xf16=@{sdxl_unet_fp16_inference_input_1.path}",
+        f"--input=2x1280xf16=@{sdxl_unet_fp16_inference_input_2.path}",
+        f"--input=1xf16=@{sdxl_unet_fp16_inference_input_3.path}",
+        f"--expected_output=1x4x128x128xf16=@{sdxl_unet_fp16_inference_output_0.path}",
     ]
 
 
 @pytest.fixture
-def SDXL_PUNET_COMMON_RUN_FLAGS(
-    sdxl_punet_inference_input_0,
-    sdxl_punet_inference_input_1,
-    sdxl_punet_inference_input_2,
-    sdxl_punet_inference_input_3,
-    sdxl_punet_inference_input_4,
-    sdxl_punet_inference_input_5,
+def SDXL_PUNET_INT8_COMMON_RUN_FLAGS(
+    sdxl_punet_int8_inference_input_0,
+    sdxl_punet_int8_inference_input_1,
+    sdxl_punet_int8_inference_input_2,
+    sdxl_punet_int8_inference_input_3,
+    sdxl_punet_int8_inference_input_4,
+    sdxl_punet_int8_inference_input_5,
 ):
     return [
-        f"--input=1x4x128x128xf16=@{sdxl_punet_inference_input_0.path}",
-        f"--input=1xf16=@{sdxl_punet_inference_input_1.path}",
-        f"--input=2x64x2048xf16=@{sdxl_punet_inference_input_2.path}",
-        f"--input=2x1280xf16=@{sdxl_punet_inference_input_3.path}",
-        f"--input=2x6xf16=@{sdxl_punet_inference_input_4.path}",
-        f"--input=1xf16=@{sdxl_punet_inference_input_5.path}",
+        f"--input=1x4x128x128xf16=@{sdxl_punet_int8_inference_input_0.path}",
+        f"--input=1xf16=@{sdxl_punet_int8_inference_input_1.path}",
+        f"--input=2x64x2048xf16=@{sdxl_punet_int8_inference_input_2.path}",
+        f"--input=2x1280xf16=@{sdxl_punet_int8_inference_input_3.path}",
+        f"--input=2x6xf16=@{sdxl_punet_int8_inference_input_4.path}",
+        f"--input=1xf16=@{sdxl_punet_int8_inference_input_5.path}",
     ]
 
 
 @pytest.fixture
-def SDXL_PUNET_OUT(
-    sdxl_punet_inference_output_0,
+def SDXL_PUNET_INT8_FP16_OUT(
+    sdxl_punet_int8_fp16_inference_output_0,
 ):
     return [
-        f"--expected_output=1x4x128x128xf16=@{sdxl_punet_inference_output_0.path}",
+        f"--expected_output=1x4x128x128xf16=@{sdxl_punet_int8_fp16_inference_output_0.path}",
     ]
 
 
 @pytest.fixture
-def SDXL_PUNET_FP8_OUT(
-    sdxl_punet_fp8_inference_output_0,
+def SDXL_PUNET_INT8_FP8_OUT(
+    sdxl_punet_int8_fp8_inference_output_0,
 ):
     return [
-        f"--expected_output=1x4x128x128xf16=@{sdxl_punet_fp8_inference_output_0.path}",
+        f"--expected_output=1x4x128x128xf16=@{sdxl_punet_int8_fp8_inference_output_0.path}",
     ]
 
 
@@ -220,7 +220,7 @@ INT8_PUNET_FLAGS = [
     "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics, util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
 ]
 
-ROCM_PIPELINE_COMPILE_FLAGS = [
+ROCM_UNET_PIPELINE_FP16_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-hip-target={rocm_chip}",
     "--verify=false",
@@ -232,38 +232,42 @@ ROCM_PIPELINE_COMPILE_FLAGS = [
 ###############################################################################
 
 
-def test_compile_unet_pipeline_cpu(sdxl_unet_pipeline_mlir):
-    VmfbManager.sdxl_unet_cpu_pipeline_vmfb = iree_compile(
-        sdxl_unet_pipeline_mlir,
+def test_compile_unet_fp16_pipeline_cpu(sdxl_unet_fp16_pipeline_mlir):
+    VmfbManager.sdxl_unet_fp16_cpu_pipeline_vmfb = iree_compile(
+        sdxl_unet_fp16_pipeline_mlir,
         CPU_COMPILE_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_unet_vmfbs")
-        / Path(sdxl_unet_pipeline_mlir.path.name).with_suffix(f".cpu.vmfb"),
+        / Path("sdxl_unet_fp16_vmfbs")
+        / Path(sdxl_unet_fp16_pipeline_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
-def test_compile_unet_cpu(sdxl_unet_mlir):
-    VmfbManager.sdxl_unet_cpu_vmfb = iree_compile(
-        sdxl_unet_mlir,
+def test_compile_unet_fp16_cpu(sdxl_unet_fp16_mlir):
+    VmfbManager.sdxl_unet_fp16_cpu_vmfb = iree_compile(
+        sdxl_unet_fp16_mlir,
         CPU_COMPILE_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_unet_vmfbs")
-        / Path(sdxl_unet_mlir.path.name).with_suffix(f".cpu.vmfb"),
+        / Path("sdxl_unet_fp16_vmfbs")
+        / Path(sdxl_unet_fp16_mlir.path.name).with_suffix(f".cpu.vmfb"),
     )
 
 
-@pytest.mark.depends(on=["test_compile_unet_pipeline_cpu", "test_compile_unet_cpu"])
-def test_run_unet_cpu(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
+@pytest.mark.depends(
+    on=["test_compile_unet_fp16_pipeline_cpu", "test_compile_unet_fp16_cpu"]
+)
+def test_run_unet_fp16_cpu(
+    SDXL_UNET_FP16_COMMON_RUN_FLAGS, sdxl_unet_fp16_real_weights
+):
     return iree_run_module(
-        VmfbManager.sdxl_unet_cpu_vmfb,
+        VmfbManager.sdxl_unet_fp16_cpu_vmfb,
         device="local-task",
         function="produce_image_latents",
         args=[
-            f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.sdxl_unet_cpu_pipeline_vmfb}",
+            f"--parameters=model={sdxl_unet_fp16_real_weights.path}",
+            f"--module={VmfbManager.sdxl_unet_fp16_cpu_pipeline_vmfb}",
             "--expected_f16_threshold=0.8f",
         ]
-        + SDXL_UNET_COMMON_RUN_FLAGS,
+        + SDXL_UNET_FP16_COMMON_RUN_FLAGS,
     )
 
 
@@ -272,90 +276,102 @@ def test_run_unet_cpu(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
 ###############################################################################
 
 
-def test_compile_unet_pipeline_rocm(sdxl_unet_pipeline_mlir):
-    VmfbManager.sdxl_unet_rocm_pipeline_vmfb = iree_compile(
-        sdxl_unet_pipeline_mlir,
-        ROCM_PIPELINE_COMPILE_FLAGS,
+def test_compile_unet_fp16_pipeline_rocm(sdxl_unet_fp16_pipeline_mlir):
+    VmfbManager.sdxl_unet_fp16_rocm_pipeline_vmfb = iree_compile(
+        sdxl_unet_fp16_pipeline_mlir,
+        ROCM_UNET_PIPELINE_FP16_COMPILE_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_unet_vmfbs")
-        / Path(sdxl_unet_pipeline_mlir.path.name).with_suffix(
+        / Path("sdxl_unet_fp16_vmfbs")
+        / Path(sdxl_unet_fp16_pipeline_mlir.path.name).with_suffix(
             f".rocm_{rocm_chip}.vmfb"
         ),
     )
 
 
-def test_compile_unet_rocm(sdxl_unet_mlir):
-    VmfbManager.sdxl_unet_rocm_vmfb = iree_compile(
-        sdxl_unet_mlir,
+def test_compile_unet_fp16_rocm(sdxl_unet_fp16_mlir):
+    VmfbManager.sdxl_unet_fp16_rocm_vmfb = iree_compile(
+        sdxl_unet_fp16_mlir,
         ROCM_COMPILE_FLAGS + FP16_UNET_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_unet_vmfbs")
-        / Path(sdxl_unet_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
+        / Path("sdxl_unet_fp16_vmfbs")
+        / Path(sdxl_unet_fp16_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
     )
 
 
-@pytest.mark.depends(on=["test_compile_unet_pipeline_rocm", "test_compile_unet_rocm"])
-def test_run_unet_rocm(SDXL_UNET_COMMON_RUN_FLAGS, sdxl_unet_real_weights):
+@pytest.mark.depends(
+    on=["test_compile_unet_fp16_pipeline_rocm", "test_compile_unet_fp16_rocm"]
+)
+def test_run_unet_fp16_rocm(
+    SDXL_UNET_FP16_COMMON_RUN_FLAGS, sdxl_unet_fp16_real_weights
+):
     return iree_run_module(
-        VmfbManager.sdxl_unet_rocm_vmfb,
+        VmfbManager.sdxl_unet_fp16_rocm_vmfb,
         device="hip",
         function="produce_image_latents",
         args=[
-            f"--parameters=model={sdxl_unet_real_weights.path}",
-            f"--module={VmfbManager.sdxl_unet_rocm_pipeline_vmfb}",
+            f"--parameters=model={sdxl_unet_fp16_real_weights.path}",
+            f"--module={VmfbManager.sdxl_unet_fp16_rocm_pipeline_vmfb}",
             "--expected_f16_threshold=0.705f",
         ]
-        + SDXL_UNET_COMMON_RUN_FLAGS,
+        + SDXL_UNET_FP16_COMMON_RUN_FLAGS,
     )
 
 
-def test_compile_punet_rocm(sdxl_punet_mlir):
-    VmfbManager.sdxl_punet_rocm_vmfb = iree_compile(
-        sdxl_punet_mlir,
+def test_compile_punet_int8_fp16_rocm(sdxl_punet_int8_fp16_mlir):
+    VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb = iree_compile(
+        sdxl_punet_int8_fp16_mlir,
         ROCM_COMPILE_FLAGS + INT8_PUNET_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_punet_vmfbs")
-        / Path(sdxl_punet_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
+        / Path("sdxl_punet_int8_fp16_vmfbs")
+        / Path(sdxl_punet_int8_fp16_mlir.path.name).with_suffix(
+            f".rocm_{rocm_chip}.vmfb"
+        ),
     )
 
 
-@pytest.mark.depends(on=["test_compile_punet_rocm"])
-def test_run_punet_rocm(
-    SDXL_PUNET_COMMON_RUN_FLAGS, SDXL_PUNET_OUT, sdxl_punet_real_weights
+@pytest.mark.depends(on=["test_compile_punet_int8_fp16_rocm"])
+def test_run_punet_int8_fp16_rocm(
+    SDXL_PUNET_INT8_COMMON_RUN_FLAGS,
+    SDXL_PUNET_INT8_FP16_OUT,
+    sdxl_punet_int8_fp16_real_weights,
 ):
     return iree_run_module(
-        VmfbManager.sdxl_punet_rocm_vmfb,
+        VmfbManager.sdxl_punet_int8_fp16_rocm_vmfb,
         device="hip",
         function="main",
         args=[
-            f"--parameters=model={sdxl_punet_real_weights.path}",
+            f"--parameters=model={sdxl_punet_int8_fp16_real_weights.path}",
         ]
-        + SDXL_PUNET_COMMON_RUN_FLAGS
-        + SDXL_PUNET_OUT,
+        + SDXL_PUNET_INT8_COMMON_RUN_FLAGS
+        + SDXL_PUNET_INT8_FP16_OUT,
     )
 
 
-def test_compile_punet_fp8_rocm(sdxl_punet_fp8_mlir):
-    VmfbManager.sdxl_punet_fp8_rocm_vmfb = iree_compile(
-        sdxl_punet_fp8_mlir,
+def test_compile_punet_int8_fp8_rocm(sdxl_punet_int8_fp8_mlir):
+    VmfbManager.sdxl_punet_int8_fp8_rocm_vmfb = iree_compile(
+        sdxl_punet_int8_fp8_mlir,
         ROCM_COMPILE_FLAGS + INT8_PUNET_FLAGS,
         Path(vmfb_dir)
-        / Path("sdxl_punet_fp8_vmfbs")
-        / Path(sdxl_punet_fp8_mlir.path.name).with_suffix(f".rocm_{rocm_chip}.vmfb"),
+        / Path("sdxl_punet_int8_fp8_vmfbs")
+        / Path(sdxl_punet_int8_fp8_mlir.path.name).with_suffix(
+            f".rocm_{rocm_chip}.vmfb"
+        ),
     )
 
 
-@pytest.mark.depends(on=["test_compile_punet_fp8_rocm"])
-def test_run_punet_fp8_rocm(
-    SDXL_PUNET_COMMON_RUN_FLAGS, SDXL_PUNET_FP8_OUT, sdxl_punet_fp8_real_weights
+@pytest.mark.depends(on=["test_compile_punet_int8_fp8_rocm"])
+def test_run_punet_int8_fp8_rocm(
+    SDXL_PUNET_INT8_COMMON_RUN_FLAGS,
+    SDXL_PUNET_INT8_FP8_OUT,
+    sdxl_punet_int8_fp8_real_weights,
 ):
     return iree_run_module(
-        VmfbManager.sdxl_punet_fp8_rocm_vmfb,
+        VmfbManager.sdxl_punet_int8_fp8_rocm_vmfb,
         device="hip",
         function="main",
         args=[
-            f"--parameters=model={sdxl_punet_fp8_real_weights.path}",
+            f"--parameters=model={sdxl_punet_int8_fp8_real_weights.path}",
         ]
-        + SDXL_PUNET_COMMON_RUN_FLAGS
-        + SDXL_PUNET_FP8_OUT,
+        + SDXL_PUNET_INT8_COMMON_RUN_FLAGS
+        + SDXL_PUNET_INT8_FP8_OUT,
     )
