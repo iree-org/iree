@@ -47,3 +47,40 @@ util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: te
   //      CHECK: util.return %[[r0]], %[[r1]]
   util.return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>
 }
+
+// -----
+
+// TODO(Max191): Remove this test once GPU data tiling stops using early
+// materialization.
+util.func public @multi_mma(
+    %arg0: tensor<4x16x8x4x16x2x4xf16>,
+    %arg1: tensor<4x16x4x2x4x16x2x4xf16>,
+    %arg2: tensor<4x4x8x4x2x4x16x4xf32>) -> (tensor<4x4x8x4x2x4x16x4xf32>) {
+  %9 = flow.dispatch.region -> (tensor<4x4x8x4x2x4x16x4xf32>) {
+    %13 = iree_gpu.multi_mma %arg0, %arg1, %arg2 {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                         affine_map<(d0, d1, d2) -> (d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+        kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x16_F16, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 2>}
+        : tensor<4x16x8x4x16x2x4xf16>, tensor<4x16x4x2x4x16x2x4xf16> into tensor<4x4x8x4x2x4x16x4xf32>
+    flow.return %13 : tensor<4x4x8x4x2x4x16x4xf32>
+  }
+  util.return %9 : tensor<4x4x8x4x2x4x16x4xf32>
+}
+
+// CHECK-LABEL: util.func public @multi_mma(
+//       CHECK:     %[[arg0:.*]]: tensor<4x16x8x4x16x2x4xf16>, %[[arg1:.*]]: tensor<4x16x4x2x4x16x2x4xf16>, %[[arg2:.*]]: tensor<4x4x8x4x2x4x16x4xf32>
+//       CHECK:   %[[r0:.*]] = flow.dispatch.workgroups(%[[arg0]], %[[arg1]], %[[arg2]])
+//  CHECK-SAME:       : (tensor<4x16x8x4x16x2x4xf16>, tensor<4x16x4x2x4x16x2x4xf16>, tensor<4x4x8x4x2x4x16x4xf32>)
+//  CHECK-NEXT:       (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:tensor<4x16x8x4x16x2x4xf16>>,
+//  CHECK-SAME:        %[[arg4:.*]]: !flow.dispatch.tensor<readonly:tensor<4x16x4x2x4x16x2x4xf16>>,
+//  CHECK-SAME:        %[[arg5:.*]]: !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>)
+//   CHECK-DAG:     %[[loadLHS:.*]] = flow.dispatch.tensor.load %[[arg3]]
+//   CHECK-DAG:     %[[loadRHS:.*]] = flow.dispatch.tensor.load %[[arg4]]
+//   CHECK-DAG:     %[[loadACC:.*]] = flow.dispatch.tensor.load %[[arg5]]
+//       CHECK:     %[[MULTI_MMA:.*]] = iree_gpu.multi_mma %[[loadLHS]], %[[loadRHS]], %[[loadACC]]
+//       CHECK:     flow.dispatch.tensor.store %[[MULTI_MMA]], %[[arg5]]
+//       CHECK:     flow.return
+//       CHECK:   }
+//       CHECK:   util.return %[[r0]]
