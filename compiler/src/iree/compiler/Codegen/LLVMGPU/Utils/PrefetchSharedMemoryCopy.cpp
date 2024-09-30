@@ -34,28 +34,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Returns true if the given `memrefType` has a memory space meant for global
-/// memory, that is, the default numeric address space 0 or a HAL descriptor
-/// type address space.
-bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
-  using IREE::HAL::DescriptorType;
-
-  Attribute addrSpace = memrefType.getMemorySpace();
-  if (!addrSpace)
-    return true;
-
-  if (auto intAttr = dyn_cast<IntegerAttr>(memrefType.getMemorySpace())) {
-    return intAttr.getInt() == 0;
-  }
-
-  if (auto dtAttr = dyn_cast<IREE::HAL::DescriptorTypeAttr>(addrSpace)) {
-    return dtAttr.getValue() == DescriptorType::StorageBuffer ||
-           dtAttr.getValue() == DescriptorType::UniformBuffer;
-  }
-
-  return false;
-}
-
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value) {
   if (!isa<IndexType>(value.getType()))
@@ -96,29 +74,19 @@ public:
     return prefetcher;
   }
 
-  // Emits the prologue before the main pipelined loop and returns the read
-  // results to be passed to the main loop as initial loop carried values, and
-  // their usages by corresponding writes in the main loop.
-  std::tuple<SmallVector<Value>, SmallVector<Value>>
-  emitPrologue(RewriterBase &rewriter) {
+  // Emits the prologue before the main pipelined loop.
+  void emitPrologue(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, lb);
-    SmallVector<Value> iterArgs;
-    SmallVector<Value> readResults;
-    SmallVector<Value> writeArgs;
-
     // Directly write in the prologue and use the shared memory to communicate
     // data instead of the loop carried values. Read (0)
     emitRead(mapping[0], rewriter, zero);
     // Write(0)
     emitWrite(mapping[0], rewriter, zero);
-    return {iterArgs, writeArgs};
   }
 
   /// Emits the main pipelined loop structure.
-  scf::ForOp createKernelLoop(RewriterBase &rewriter,
-                              SmallVector<Value> &newIterArgs,
-                              SmallVector<Value> &writeArgs) {
+  scf::ForOp createKernelLoop(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
     int64_t newUpperBound = ub - step;
     auto newUb = rewriter.create<arith::ConstantIndexOp>(loc, newUpperBound);
@@ -126,11 +94,8 @@ public:
     // Keep original iter args and then add some for what's being loaded to
     // registers.
     auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
-    llvm::append_range(iterArgs, newIterArgs);
-
-    Value newStep = forOp.getStep();
-    auto newForOp = rewriter.create<scf::ForOp>(loc, forOp.getLowerBound(),
-                                                newUb, newStep, iterArgs);
+    auto newForOp = rewriter.create<scf::ForOp>(
+        loc, forOp.getLowerBound(), newUb, forOp.getStep(), iterArgs);
 
     // When there are no iter args, the loop body terminator will be created.
     // Since we always create it below, remove the terminator if it was created.
@@ -154,20 +119,18 @@ public:
       }
     }
 
-    SmallVector<Value> readRegisters, moreRegisters;
     emitRead(mapping[1], rewriter, iPlusOne);
     emitBarrier(loc, rewriter);
     emitCompute(mapping[0], rewriter, indVar);
     emitBarrier(loc, rewriter);
     emitWrite(mapping[1], rewriter, iPlusOne);
-    updateYield(mapping[0], readRegisters, rewriter);
+    updateYield(mapping[0], rewriter);
     return;
   }
 
   // Emits the epilogue after the main pipelined loop and returns the final
   // results to replace the original loop results main loop.
-  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp,
-                                  SmallVector<Value> &writeArgs) {
+  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp) {
     rewriter.setInsertionPointAfter(newForOp);
     Location loc = forOp.getLoc();
     Value nMinusOne =
@@ -395,17 +358,7 @@ private:
     return results;
   }
 
-  /// Maps values in |srcValues| to |targetValues| in |mapping|.
-  static void createWriteMappings(SmallVector<Value> &srcValues,
-                                  SmallVector<Value> &targetValues,
-                                  IRMapping &mapping) {
-    for (auto [src, tgt] : llvm::zip_equal(srcValues, targetValues)) {
-      mapping.map(src, tgt);
-    }
-  }
-
-  void updateYield(IRMapping &mapping, SmallVector<Value> &readValues,
-                   RewriterBase &rewriter) {
+  void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
     for (Operation *op : computeStage) {
       if (auto yield = dyn_cast<scf::YieldOp>(op)) {
         cloneAndUpdateOperands(rewriter, yield, [&](OpOperand *newOperand) {
@@ -444,13 +397,11 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return failure();
   LoopPrefetcher &prefetcher = *prefetcherOr;
 
-  auto [iterArgs, writeArgs] = prefetcher.emitPrologue(rewriter);
-  scf::ForOp newForOp =
-      prefetcher.createKernelLoop(rewriter, iterArgs, writeArgs);
+  prefetcher.emitPrologue(rewriter);
+  scf::ForOp newForOp = prefetcher.createKernelLoop(rewriter);
   prefetcher.createKernel(rewriter, newForOp);
 
-  SmallVector<Value> results =
-      prefetcher.emitEpilogue(rewriter, newForOp, writeArgs);
+  SmallVector<Value> results = prefetcher.emitEpilogue(rewriter, newForOp);
   rewriter.replaceOp(forOp, results);
   return newForOp;
 }
