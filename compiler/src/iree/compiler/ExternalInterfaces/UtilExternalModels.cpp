@@ -223,10 +223,12 @@ struct HoistableLinalgOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
+  /// FillOp and broadcasting ops are not hoistableLeaf ops, since it is
+  /// typically better to fuse them with their consumers.
   bool isHoistableLeafOp(Operation *op) const {
     auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
     if (!genericOp)
-      return true;
+      return !isa<linalg::FillOp>(op);
     // Generally, we prefer to not hoist broadcasts.
     // Detect op that only broadcast input as fusing them makes the new
     // op cheaper.
@@ -243,11 +245,7 @@ struct HoistableLinalgOpInterface
     return true;
   }
   bool isAtomicallyHoistableOp(Operation *) const { return true; }
-  bool isOperandHoistable(Operation *op, OpOperand *operand) const {
-    linalg::LinalgOp linalgOp = llvm::cast<linalg::LinalgOp>(op);
-    // For linalg ops, we only want to hoist inputs.
-    return operand->getOperandNumber() < linalgOp.getNumDpsInputs();
-  }
+  bool isOperandHoistable(Operation *, OpOperand *) const { return true; }
 };
 
 /// Helper structures that iterates over all Op types in `OpTys` and registers
