@@ -11,7 +11,6 @@ import setuptools
 from conftest import VmfbManager
 from pathlib import Path
 
-iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 
