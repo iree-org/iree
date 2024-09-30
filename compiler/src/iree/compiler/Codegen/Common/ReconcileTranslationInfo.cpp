@@ -263,10 +263,6 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
     return success();
   }
 
-  if (!llvm::hasSingleElement(body)) {
-    return funcOp.emitOpError("unhandled function with multiple blocks");
-  }
-
   auto forAllOps = body.getOps<scf::ForallOp>();
   SmallVector<scf::ForallOp> workgroupForAllOps = llvm::to_vector(
       llvm::make_filter_range(forAllOps, [&](scf::ForallOp forAllOp) {
@@ -293,6 +289,10 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
   if (!llvm::hasSingleElement(workgroupForAllOps)) {
     return funcOp.emitOpError("unhandled resolution of zero/multiple "
                               "scf.forall ops withing the function");
+  }
+
+  if (!llvm::hasSingleElement(body)) {
+    return funcOp.emitOpError("unhandled function with multiple blocks");
   }
 
   scf::ForallOp forallOp = *forAllOps.begin();
