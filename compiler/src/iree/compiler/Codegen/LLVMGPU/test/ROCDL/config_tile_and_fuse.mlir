@@ -157,3 +157,35 @@ module @elementwise_large_rank {
 // shapes.
 // CHECK-LABEL: func.func @elementwise_large_rank
 //  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [128, 1, 1] subgroup_size = 64>
+
+// -----
+
+module {
+  func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
+        %3: tensor<1x8x8x4x16x4xf32>, %4: tensor<1x8x4x2x4x16x4xf32>, %5: tensor<1x1x8x4x2x4x16x4xf32>) -> tensor<1x1x8x4x2x4x16x4xf32> {
+    %c0 = arith.constant 0 : index
+    %c65536 = arith.constant 65536 : index
+    %c131072 = arith.constant 131072 : index
+    %6 = iree_gpu.multi_mma %3, %4, %5 {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                         affine_map<(d0, d1, d2) -> (d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = [#iree_gpu.iterator_type<parallel>,
+                          #iree_gpu.iterator_type<parallel>,
+                          #iree_gpu.iterator_type<reduction>],
+        kind = #iree_gpu.data_tiled_mma_layout<
+                          intrinsic =  MFMA_F32_16x16x4_F32,
+                          unroll_m = 8, unroll_n = 2,
+                          unroll_n_to_subgroups = 4,
+                          unroll_k = 4>}
+        : tensor<1x8x8x4x16x4xf32>, tensor<1x8x4x2x4x16x4xf32> into tensor<1x1x8x4x2x4x16x4xf32>
+    return %6 : tensor<1x1x8x4x2x4x16x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>}
+//       CHECK:   iree_gpu.multi_mma {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     reduction = [0, 0, 1]
+//  CHECK-SAME:     workgroup = [1, 1, 0]

@@ -269,6 +269,28 @@ module {
 // -----
 
 #config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_small_inner_dim_fill_vector_sizes(%0: tensor<4x16x8x4x16x2x4xf16>, %1: tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<4x16x8x4x16x2x4xf16>)
+        outs(%1 : tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
+    return %2 : tensor<4x16x8x4x16x2x4xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_small_inner_dim_fill_vector_sizes
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (16, 8, 4, 16) step (8, 1, 1, 1)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<4x8x1x1x1x2x4xf16>) outs({{.*}} : tensor<4x8x1x1x1x2x4xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, #gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
 module {
   func.func @inferred_im2col(%2: tensor<2x34x34x128xf16>, %3: tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
       attributes {
