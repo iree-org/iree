@@ -1574,7 +1574,12 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 // Custom tilable op
 //===---------------------------------------------------------------------===//
 
-def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op"> {
+def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
+  DeclareOpInterfaceMethods<LinalgFusionInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getLoopIteratorTypes"]>
+  ]> {
   let summary = "Custom operation for compiling with IREE";
   let description = [{
     This operation is meant to allow computation sequences that are fused at
