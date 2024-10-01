@@ -397,10 +397,9 @@ import iree.runtime as ireert
 # To load the parameters, we need to define ParameterIndex for each
 # parameter class.
 
-idx_w = ireert.ParameterIndex()
-idx_b = ireert.ParameterIndex()
-idx_w.add_buffer("weight", wt.numpy().tobytes())
-idx_w.add_buffer("bias", bias.numpy().tobytes())
+idx = ireert.ParameterIndex()
+idx.add_buffer("weight", wt.numpy().tobytes())
+idx.add_buffer("bias", bias.numpy().tobytes())
 
 
 # Create the runtime instance, and load the runtime.
@@ -409,7 +408,7 @@ config = ireert.Config(driver_name="local-task")
 instance = config.vm_instance
 
 param_module = ireert.create_io_parameters_module(
-    instance, idx_w.create_provider(scope="model"),
+    instance, idx.create_provider(scope="model"),
 )
 
 # Load the runtime. There are essentially two modules to load,
