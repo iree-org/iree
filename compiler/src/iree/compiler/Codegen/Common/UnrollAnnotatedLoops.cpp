@@ -25,27 +25,25 @@ static std::optional<int64_t> getConstantTripCount(scf::ForOp forOp) {
   std::optional<int64_t> lbCstOp = getConstantIntValue(forOp.getLowerBound());
   std::optional<int64_t> ubCstOp = getConstantIntValue(forOp.getUpperBound());
   std::optional<int64_t> stepCstOp = getConstantIntValue(forOp.getStep());
-  if (!lbCstOp.has_value() || !ubCstOp.has_value() || !stepCstOp.has_value())
-    return std::nullopt;
-
-  // Constant loop bounds computation.
-  int64_t lbCst = lbCstOp.value();
-  int64_t ubCst = ubCstOp.value();
-  int64_t stepCst = stepCstOp.value();
-  if (lbCst < 0 || ubCst < 0 || stepCst <= 0) {
+  if (!lbCstOp.has_value() || !ubCstOp.has_value() || !stepCstOp.has_value()) {
     return std::nullopt;
   }
-  return llvm::divideCeil(ubCst - lbCst, stepCst);
+
+  // Constant loop bounds computation.
+  if (lbCstOp < 0 || ubCstOp < 0 || stepCstOp <= 0) {
+    return std::nullopt;
+  }
+  return llvm::divideCeil(*ubCstOp - *lbCstOp, *stepCstOp);
 }
 
 struct UnrollAnnotatedLoopsPass final
     : impl::UnrollAnnotatedLoopsPassBase<UnrollAnnotatedLoopsPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     // Get the list of operations to unroll in post-order so that the inner
     // most loops get unrolled before the outer most loops.
-    // (this is default but set explicitly here because it's required).
+    // (This is the default but set explicitly here because it's required).
     SmallVector<scf::ForOp> unrollTargets;
     funcOp.walk<WalkOrder::PostOrder>([&](scf::ForOp forOp) {
       if (getLoopUnrollMarker(forOp)) {
@@ -53,15 +51,15 @@ struct UnrollAnnotatedLoopsPass final
       }
     });
 
-    for (auto forOp : unrollTargets) {
+    for (scf::ForOp forOp : unrollTargets) {
       removeLoopUnrollMarker(forOp);
 
       std::optional<int64_t> maybeTripCount = getConstantTripCount(forOp);
-      if (!maybeTripCount || maybeTripCount.value() <= 0) {
+      if (maybeTripCount.value_or(0) <= 0) {
         continue;
       }
 
-      (void)loopUnrollByFactor(forOp, maybeTripCount.value());
+      (void)loopUnrollByFactor(forOp, *maybeTripCount);
     }
 
     // Cleanup unrolled loops.
