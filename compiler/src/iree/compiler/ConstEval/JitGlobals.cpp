@@ -6,7 +6,9 @@
 
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -21,7 +23,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <cstdlib>
 
@@ -448,6 +452,53 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
   return success();
 }
 
+struct StripFlowTensorTransferPattern
+    : public OpRewritePattern<IREE::Flow::TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Flow::TensorTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceAllUsesWith(op.getResult(), op.getOperand());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+// If an op that implements AffinityOpInterface has an optional stream affinity
+// attribute, remove it.
+struct StripStreamAffinityOptionalAttributePattern
+    : public OpInterfaceRewritePattern<IREE::Stream::AffinityOpInterface> {
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Stream::AffinityOpInterface op,
+                                PatternRewriter &rewriter) const override {
+    // Shouldn't we reject ops for which `op.requiresAffinity() == true`?
+    // For example there are a lot of ops in the Flow dialect that
+    // have this property, but do they really require an affinity?
+    // See
+    // compiler/src/iree/compiler/ExternalInterfaces/StreamExternalModels.cpp
+    if (op.getAffinityAttr() == nullptr) {
+      return failure();
+    }
+    op.setAffinityAttr(nullptr);
+    return success();
+  }
+};
+
+// Remove device/queue affinities for the IR.
+// E.g. remove `flow.tensor.transfer` ops.
+static LogicalResult stripExecutionContextAffinities(ModuleOp moduleOp) {
+  RewritePatternSet patterns(moduleOp->getContext());
+  patterns.add<StripFlowTensorTransferPattern,
+               StripStreamAffinityOptionalAttributePattern>(
+      moduleOp.getContext());
+  if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+    return emitError(moduleOp->getLoc())
+           << "Stripping execution context affinities failed";
+  }
+  return success();
+}
+
 class ProgramBuilder {
 public:
   ProgramBuilder(ModuleOp sourceModuleOp,
@@ -830,6 +881,10 @@ public:
     if (programBuilder.getJitFunctions().empty()) {
       programBuilder.getTargetModule()->erase();
       return;
+    }
+    if (failed(stripExecutionContextAffinities(
+            programBuilder.getTargetModule()))) {
+      return signalPassFailure();
     }
 
     std::optional<llvm::Timer> compileTimer;
