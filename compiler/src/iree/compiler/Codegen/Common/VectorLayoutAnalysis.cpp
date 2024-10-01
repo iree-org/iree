@@ -765,8 +765,6 @@ void enforcementTransferFunction(
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
 
-  llvm::dbgs() << "*op " << *op << "\n";
-
   if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
     enforceLayoutToLayoutOp(toLayout, operandLattices, resultLattices, update);
   }
