@@ -577,7 +577,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/false);
+                             /*enableTileDispatchUsingForall=*/true);
 
   // The below two passes are nop if pack/unpack is not specified in ukernels
   // attribute. By default, they are disabled.
