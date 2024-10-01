@@ -832,15 +832,6 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
   return bitwidth;
 };
 
-constexpr StringLiteral kUnrollLoopName = "unroll_loop";
-void setLoopUnrollMarker(Operation *op) {
-  op->setAttr(kUnrollLoopName, UnitAttr::get(op->getContext()));
-}
-
-bool getLoopUnrollMarker(Operation *op) { return op->hasAttr(kUnrollLoopName); }
-
-void removeLoopUnrollMarker(Operation *op) { op->removeAttr(kUnrollLoopName); }
-
 //===---------------------------------------------------------------------===//
 // Misc. utility functions
 //===---------------------------------------------------------------------===//

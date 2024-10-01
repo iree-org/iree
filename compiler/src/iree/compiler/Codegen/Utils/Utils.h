@@ -206,11 +206,6 @@ int getReductionTilingFactor(int64_t dimSize);
 // given Linalg op.
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 
-// Getter/setter for marking a loop for unrolling.
-void setLoopUnrollMarker(Operation *op);
-bool getLoopUnrollMarker(Operation *op);
-void removeLoopUnrollMarker(Operation *op);
-
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//

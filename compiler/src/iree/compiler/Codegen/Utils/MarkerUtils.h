@@ -4,10 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- MarkerUtils.h - Methods for manipulating markers on Linalg op ------===//
+//===- MarkerUtils.h - Methods for manipulating transformation markers ----===//
 //
-// Method that set markers on Linalg operations that determine which processor
-// heirarchy to use for partitioning
+// Method that set markers on various operations that affect later transforms.
 //
 //===----------------------------------------------------------------------===//
 
@@ -120,6 +119,13 @@ bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
 
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
+
+/// Markers for other operations.
+
+// Getter/setter for marking a loop for unrolling.
+void setLoopUnrollMarker(Operation *op);
+Attribute getLoopUnrollMarker(Operation *op);
+void removeLoopUnrollMarker(Operation *op);
 
 } // namespace mlir::iree_compiler
 
