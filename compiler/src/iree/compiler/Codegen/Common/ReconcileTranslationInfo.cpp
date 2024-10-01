@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_RECONCILETRANSLATIONINFOPASS
@@ -360,8 +361,8 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
   if (!llvm::hasSingleElement(exportOps)) {
-    variantOp.emitOpError("reconciliation for multiple export ops unsupported");
-    return signalPassFailure();
+    variantOp.emitWarning("reconciliation for multiple export ops unsupported");
+    return;
   }
   auto exportOp = *exportOps.begin();
   IRRewriter rewriter(&getContext());
