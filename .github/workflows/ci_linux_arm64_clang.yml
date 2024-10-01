@@ -65,6 +65,9 @@ jobs:
           cmake --build ${BUILD_DIR} --target install -- -k 0
           cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
       - name: Run CTest
+        env:
+          # (For now) QEMU is required to run tests with SME
+          IREE_ARM_SME_QEMU_AARCH64_BIN: /usr/bin/qemu-aarch64
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: Test iree-dialects
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
