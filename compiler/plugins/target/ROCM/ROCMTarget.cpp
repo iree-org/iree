@@ -54,7 +54,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct ROCmOptions {
-  std::string target = "gfx908";
+  std::string target = "";
   std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
@@ -98,6 +98,11 @@ struct ROCmOptions {
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
+    if (target.empty()) {
+      return emitError(builder.getUnknownLoc())
+             << "HIP target not set; did you forget to pass "
+                "'--iree-hip-target'?";
+    }
     if (GPU::normalizeHIPTarget(target).empty()) {
       return emitError(builder.getUnknownLoc(), "Unknown HIP target '")
              << target << "'";
