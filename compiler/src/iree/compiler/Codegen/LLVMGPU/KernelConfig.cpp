@@ -375,7 +375,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
-    workgroupTileSizes[filterDim] = 1;
+    reductionTileSizes[filterDim] = 1;
   }
 
   MLIRContext *context = op.getContext();
