@@ -58,6 +58,16 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 }
 
 //===----------------------------------------------------------------------===//
+// encoding.encoding_solver
+//===----------------------------------------------------------------------===//
+
+SmallVector<OpFoldResult> EncodingSolverAttr::reifyTensorShape(
+    OpBuilder &builder, RankedTensorType type, ValueRange dynamicDims,
+    IREE::HAL::ExecutableTargetAttr executableTarget) const {
+  return getMixedValues(type.getShape(), dynamicDims, builder);
+}
+
+//===----------------------------------------------------------------------===//
 // iree_codegen.translation_info
 //===----------------------------------------------------------------------===//
 

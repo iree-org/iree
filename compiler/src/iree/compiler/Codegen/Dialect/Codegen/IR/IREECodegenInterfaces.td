@@ -116,4 +116,32 @@ def IREECodegen_LoweringConfigAttrInterface :
   ];
 }
 
+def IREECodegen_EncodingSolverInterfaceAttr :
+  AttrInterface<"EncodingSolverInterfaceAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Interface used to resolve encoding data from backends.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the materailized shape of the type.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::OpFoldResult>",
+      /*methodName=*/"reifyTensorShape",
+      /*args=*/(ins
+        "::mlir::OpBuilder &":$builder,
+        "RankedTensorType":$type,
+        "ValueRange":$dynamicDims,
+        "::mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr":$executableTarget
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES
