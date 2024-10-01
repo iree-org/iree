@@ -223,6 +223,7 @@ struct HoistableLinalgOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
           HoistableLinalgOpInterface<OpTy>, OpTy> {
   bool isHoistableOp(Operation *) const { return true; }
+
   /// FillOp and broadcasting ops are not hoistableLeaf ops, since it is
   /// typically better to fuse them with their consumers.
   bool isHoistableLeafOp(Operation *op) const {
@@ -242,7 +243,7 @@ struct HoistableLinalgOpInterface
         }
       }
     }
-    return true;
+    return !linalg::isaFillOpInterface(genericOp).has_value();
   }
   bool isAtomicallyHoistableOp(Operation *) const { return true; }
   bool isOperandHoistable(Operation *, OpOperand *) const { return true; }
