@@ -59,6 +59,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:         %[[COPY:.+]] = linalg.copy ins(%[[INSLICE0]] : tensor<2x128xf32>) outs(%[[INSLICE1]] : tensor<2x128xf32>) -> tensor<2x128xf32>
 //       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1]
 //       CHECK:         scf.yield %[[INSERT]]
+//       CHECK:       } {unroll_loop}
 //       CHECK:       iree_gpu.yield %[[LOOP]]
 //       CHECK:     } : tensor<128x128xf32>
 
@@ -125,6 +126,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.barrier_region ins(%[[ALLOC]] : tensor<128x128xf32>)
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[INIT:.+]] = %{{.*}})
 //       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %{{.*}} into %[[INIT]]
+//       CHECK:       unroll_loop
 //       CHECK:     } : tensor<128x128xf32>
 //       CHECK:   } {mapping = [#gpu.warp<y>, #gpu.warp<x>]}
 
@@ -182,6 +184,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[INIT:.+]] = %[[INTERMEDIATE]])
 //       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %{{.*}} into %[[INIT]]
+//       CHECK:       unroll_loop
 //       CHECK:       iree_gpu.yield %[[LOOP]]
 //       CHECK:     } : tensor<128x128xf32>
 //       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[BARRIER]] {{\[}}[0, 1], [2]{{\]}} output_shape [2, 64, 128]
@@ -253,6 +256,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:         %[[COPY:.+]] = linalg.copy
 //       CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ITER]][%[[IDX]], %[[IDS]]#1] [2, 128]
 //       CHECK:         scf.yield %[[INSERT]]
+//       CHECK:       unroll_loop
 //       CHECK:       } : tensor<128x128xf32>
 
 //       CHECK:     } {mapping = [#iree_gpu.lane_id<1>, #iree_gpu.lane_id<0>]}
@@ -309,6 +313,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:       scf.for %[[I:.+]] = %[[LINEARID]] to %c32{{.*}} step %c64{{.*}}
 //       CHECK:         %[[IDS:.+]] = affine.delinearize_index %[[I]] into (%c32) : index
 //       CHECK:         scf.yield
+//       CHECK:       unroll_loop
 //       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
 
 // -----
@@ -364,4 +369,5 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:       %[[LOOP:.+]] = scf.for %[[I:.+]] = %[[LINEARID]] to %[[PRODCOUNT]] step %c64{{.*}}
 //       CHECK:         %[[IDS:.+]] = affine.delinearize_index %[[I]] into (%[[Z]], %[[Y]], %[[X]]) : index
 //       CHECK:         scf.yield
+//       CHECK:       unroll_loop
 //       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}

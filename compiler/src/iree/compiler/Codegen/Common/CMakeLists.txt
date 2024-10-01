@@ -135,6 +135,7 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
+    "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
   DEPS

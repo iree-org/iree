@@ -544,6 +544,11 @@ def TypePropagationPass :
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
 }
 
+def UnrollAnnotatedLoopsPass :
+    InterfacePass<"iree-codegen-unroll-annotated-loops", "mlir::FunctionOpInterface"> {
+  let summary = "Unrolls all scf.for loops marked with `unroll_loop`";
+}
+
 def VectorizeMemrefCopyPass :
     Pass<"iree-codegen-vectorize-memref-copy", ""> {
   let summary = "Vectorizes memref copy operations.";
