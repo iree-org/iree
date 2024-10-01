@@ -977,3 +977,34 @@ func.func @custom_op_yield_type_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<1
   } -> tensor<?xf32>, tensor<?xf32>
   return %0#0, %0#1 : tensor<?xf32>, tensor<?xf32>
 }
+
+// -----
+
+func.func @index_op_outside_custom_op() -> index {
+  // expected-error @+1 {{expected parent op to be `iree_linalg_ext.custom_op`}}
+  %0 = iree_linalg_ext.index 0 : index
+  return %0 : index
+}
+
+// -----
+
+func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      outs(%arg0: tensor<?xindex>) {
+    ^bb0(%b0 : tensor<?xindex>):
+      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing CustomOp}}
+      %1 = iree_linalg_ext.index 1 : index
+      %2 = linalg.generic {
+          indexing_maps = [affine_map<(d0) -> (d0)>],
+          iterator_types = ["parallel"]}
+          outs(%b0 : tensor<?xindex>) {
+        ^bb1(%bb0 : index):
+          %3 = arith.addi %bb0, %1 : index
+          linalg.yield %3 : index
+      } -> tensor<?xindex>
+      iree_linalg_ext.yield %2 : tensor<?xindex>
+  } -> tensor<?xindex>
+  return %0 : tensor<?xindex>
+}

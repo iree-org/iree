@@ -1384,3 +1384,33 @@ func.func @custom_op_symbolic_dims(%lhs1 : tensor<1000000x?xf32>,
 //      CHECK: func @custom_op_symbolic_dims
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]]
+
+// -----
+
+func.func @custom_op_index(%arg0 : tensor<?x?xindex>) -> tensor<?x?xindex> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>,
+                        #iree_linalg_ext.iterator_type<parallel>]}
+      outs(%arg0: tensor<?x?xindex>) {
+    ^bb0(%b0 : tensor<?x?xindex>):
+      %1 = iree_linalg_ext.index 0 : index
+      %2 = iree_linalg_ext.index 1 : index
+      %3 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel"]}
+          outs(%b0 : tensor<?x?xindex>) {
+        ^bb1(%bb0 : index):
+          %4 = arith.addi %bb0, %1 : index
+          %5 = arith.addi %4, %2 : index
+          linalg.yield %5 : index
+      } -> tensor<?x?xindex>
+      iree_linalg_ext.yield %3 : tensor<?x?xindex>
+  } -> tensor<?x?xindex>
+  return %0 : tensor<?x?xindex>
+}
+// CHECK-LABEL: func @custom_op_index
+//       CHECK:   iree_linalg_ext.custom_op
+//       CHECK:     iree_linalg_ext.index 0
+//       CHECK:     iree_linalg_ext.index 1
+//       CHECK:     iree_linalg_ext.yield
