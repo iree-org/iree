@@ -739,10 +739,33 @@ static void enforceLayoutToContractionOp(
   update(value, changed);
 }
 
+static void enforceLayoutToGatherOp(
+    vector::GatherOp gather, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Gather has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+
+  if (result->hasLayout()) {
+    // Note that the operand lattice is not updated. So using the operand
+    // lattice again can cause bugs.
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          result, getOpOperand(gather, index));
+      update(operandLattice, changed);
+    }
+  } else {
+    // Enforce the same layout on all operands.
+    enforceSameLayoutForOperands(gather, operandLattices, update);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  llvm::dbgs() << "*op " << *op << "\n";
 
   if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
     enforceLayoutToLayoutOp(toLayout, operandLattices, resultLattices, update);
@@ -769,6 +792,11 @@ void enforcementTransferFunction(
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op)) {
     enforceLayoutToBroadcastOp(broadcast, operandLattices, resultLattices,
                                update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<vector::GatherOp>(op)) {
+    enforceLayoutToGatherOp(gather, operandLattices, resultLattices, update);
     return;
   }
 
