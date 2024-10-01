@@ -816,7 +816,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
   }
 
-  // Problem specific (reduction) tiling.
+  // Tile to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
