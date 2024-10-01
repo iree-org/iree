@@ -1257,8 +1257,17 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
         // Step 5. Inline the body of the original forall into the new for loop.
         OpBuilder::InsertionGuard g2(rewriter);
         SmallVector<Value> argReplacements(newForallOp.getInductionVars());
-        argReplacements.append(newForallOp.getRegionIterArgs().begin(),
-                               newForallOp.getRegionIterArgs().end());
+        // If there is no paired slice (for a single trip count loop) then
+        // replace the iter arg of the forall op directly.
+        for (auto [forallIterArg, forIterArg, maybeSlice] :
+             llvm::zip_equal(newForallOp.getRegionIterArgs(),
+                             newLoop.getRegionIterArgs(), pairedSlices)) {
+          if (maybeSlice) {
+            argReplacements.push_back(forallIterArg);
+          } else {
+            argReplacements.push_back(forIterArg);
+          }
+        }
         rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
                              argReplacements);
         rewriter.replaceAllUsesWith(loop.getInductionVar(),
