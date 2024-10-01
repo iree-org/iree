@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -645,10 +646,14 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // ```
   //
   // Extract a slice from the input tensor.
+
   ShapedType outputType = getOutputType();
+  SmallVector<OpFoldResult> kTileSizes(outputType.getRank(), b.getIndexAttr(1));
+  kTileSizes.back() = kTileSize;
+
   SmallVector<int64_t> kTileSizeStatic;
   SmallVector<Value> kTileSizeDynamic;
-  dispatchIndexOpFoldResult(kTileSize, kTileSizeDynamic, kTileSizeStatic);
+  dispatchIndexOpFoldResults(kTileSizes, kTileSizeDynamic, kTileSizeStatic);
   auto extractType = cast<RankedTensorType>(outputType.clone(kTileSizeStatic));
   auto extract =
       b.create<tensor::ExtractSliceOp>(nestedLoc, extractType, inputSlice,
