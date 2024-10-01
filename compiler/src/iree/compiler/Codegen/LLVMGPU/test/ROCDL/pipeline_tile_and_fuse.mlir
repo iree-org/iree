@@ -787,12 +787,12 @@ hal.executable public @main {
       func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32()
         attributes {translation_info = #translation_info} {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x1x8x4x16x4xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x1x4x2x4x16x4xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1x8x4x16x4xf32>> -> tensor<1x1x8x4x16x4xf32>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1x4x2x4x16x4xf32>> -> tensor<1x1x4x2x4x16x4xf32>
-        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>> -> tensor<1x1x8x4x2x4x16x4xf32>
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x16x4xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1x4x2x4x16x4xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [4, 1, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1x8x4x16x4xf32>> -> tensor<4x1x8x4x16x4xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [4, 1, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1x4x2x4x16x4xf32>> -> tensor<4x1x4x2x4x16x4xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>> -> tensor<4x4x8x4x2x4x16x4xf32>
         %6 = iree_gpu.multi_mma %3, %4, %5 {
           lowering_config = #config,
           indexing_maps = [
@@ -809,8 +809,8 @@ hal.executable public @main {
             unroll_n = 2,
             unroll_n_to_subgroups = 4,
             unroll_k = 4>}
-          : tensor<1x1x8x4x16x4xf32>, tensor<1x1x4x2x4x16x4xf32> into tensor<1x1x8x4x2x4x16x4xf32>
-        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [1, 1, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<1x1x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<1x1x8x4x2x4x16x4xf32>>
+          : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x8x4x2x4x16x4xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 8, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x8x4x2x4x16x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x4x8x4x2x4x16x4xf32>>
         return
       }
     }
