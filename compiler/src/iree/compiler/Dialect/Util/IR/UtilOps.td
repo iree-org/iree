@@ -458,6 +458,80 @@ def OpGroupCompilerHintOps : OpDocGroup {
 
 let opDocGroup = OpGroupCompilerHintOps in {
 
+def Util_AssumeDivisibleOp :
+    Util_PureOp<"assume.divisible", [SameOperandsAndResultType]> {
+  let summary = "Memorializes knowledge that an index/integer value is divisible by some constant.";
+
+  let arguments = (ins
+    Util_Range:$operand,
+    Util_IndexAttr:$divisor
+  );
+  let results = (outs
+    Util_Range:$result
+  );
+  let assemblyFormat = [{
+    $operand `by` $divisor attr-dict `:` type($operand)
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "Value":$operand,
+      "uint64_t":$divisor
+    ),
+    [{
+      IntegerAttr divisorAttr = $_builder.getIntegerAttr(
+          $_builder.getIndexType(), divisor);
+      build($_builder, $_state, operand.getType(), operand, divisorAttr);
+    }]>,
+  ];
+}
+
+def Util_AssumeNarrowOp :
+    Util_PureOp<"assume.narrow", [SameOperandsAndResultType]> {
+  let summary = "Memorializes knowledge that an index/integer value can be narrowed to a type.";
+
+  let arguments = (ins
+    Util_Range:$operand,
+    TypeAttr:$narrow_type
+  );
+  let results = (outs
+    Util_Range:$result
+  );
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `to` $narrow_type
+  }];
+}
+
+def Util_AssumeRangeOp :
+    Util_PureOp<"assume.range", [SameOperandsAndResultType]> {
+  let summary = "Memorializes knowledge that an index/integer value is always within some range.";
+
+  let arguments = (ins
+    Util_Range:$operand,
+    Util_IndexAttr:$min_value,
+    Util_IndexAttr:$max_value
+  );
+  let results = (outs
+    Util_Range:$result
+  );
+  let assemblyFormat = [{
+    $operand `in` ` ` `[` $min_value `,` $max_value `]` `:` type($operand) attr-dict
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "Value":$operand,
+      "uint64_t":$minValue,
+      "uint64_t":$maxValue
+    ),
+    [{
+      IntegerAttr minAttr = $_builder.getIntegerAttr(
+          $_builder.getIndexType(), minValue);
+      IntegerAttr maxAttr = $_builder.getIntegerAttr(
+          $_builder.getIndexType(), maxValue);
+      build($_builder, $_state, operand.getType(), operand, minAttr, maxAttr);
+    }]>,
+  ];
+}
+
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
   SameOperandsAndResultType,
 ]> {
