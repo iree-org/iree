@@ -140,8 +140,11 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       if (auto tilingOwner = dyn_cast<TilingInterface>(owner)) {
         shouldFuse = !payloadOps.contains(tilingOwner);
       }
-      // Do not fuse destination operands.
-      shouldFuse &= !isDestinationOperand;
+      // Do not fuse destination operands for reduction tiling.
+      if (isDestinationOperand &&
+          tilingLevel == IREE::GPU::TilingLevel::Reduction) {
+        shouldFuse = false;
+      }
       if (shouldFuse) {
         return scf::SCFTileAndFuseOptions::ControlFnResult{
             yieldProducerReplacement};
