@@ -2,7 +2,7 @@
 
 Documentation for the Python API is built with Sphinx under this directory.
 When new versions are released, the documentation is generated and published
-to the website.
+to [Read the Docs](https://readthedocs.org/projects/iree-python-api/).
 
 ## Building Docs
 
