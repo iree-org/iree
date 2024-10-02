@@ -497,7 +497,7 @@ def Util_AssumeNarrowOp :
     Util_Range:$result
   );
   let assemblyFormat = [{
-    $operand `:` type($operand) `to` $narrow_type attr-dict
+    $operand attr-dict `:` type($operand) `to` $narrow_type
   }];
 }
 
