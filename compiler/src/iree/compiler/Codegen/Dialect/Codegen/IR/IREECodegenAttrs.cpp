@@ -8,13 +8,18 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/StorageUniquerSupport.h"
+#include "mlir/Support/LLVM.h"
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
@@ -65,6 +70,54 @@ SmallVector<OpFoldResult> EncodingSolverAttr::reifyTensorShape(
     OpBuilder &builder, RankedTensorType type, ValueRange dynamicDims,
     IREE::HAL::ExecutableTargetAttr executableTarget) const {
   return getMixedValues(type.getShape(), dynamicDims, builder);
+}
+
+SmallVector<OpFoldResult> VMVXEncodingSolverAttr::reifyTensorShape(
+    OpBuilder &builder, RankedTensorType type, ValueRange dynamicDims,
+    IREE::HAL::ExecutableTargetAttr executableTarget) const {
+  auto encoding =
+      llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+
+  SmallVector<OpFoldResult> shape =
+      getMixedValues(type.getShape(), dynamicDims, builder);
+  if (!encoding) {
+    return shape;
+  }
+  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
+    return shape;
+  }
+
+  bool hasUkernelSupport =
+      executableTarget.hasConfigurationAttr(builder.getStringAttr("ukernels"));
+
+  if (hasUkernelSupport) {
+    AffineExpr expr = builder.getAffineDimExpr(0);
+    Location loc = builder.getUnknownLoc();
+    auto padTo16 = [&](int64_t dim) -> void {
+      std::optional<unsigned> maybeMappedDim =
+          encoding.mapDimToOperandIndex(dim);
+      if (!maybeMappedDim) {
+        return;
+      }
+      unsigned mappedDim = maybeMappedDim.value();
+      shape[mappedDim] = affine::makeComposedFoldedAffineApply(
+          builder, loc, expr.ceilDiv(16) * 16, {shape[mappedDim]});
+    };
+    for (auto m : cDims->m) {
+      padTo16(m);
+    }
+    for (auto n : cDims->n) {
+      padTo16(n);
+    }
+    for (auto k : cDims->k) {
+      padTo16(k);
+    }
+  }
+
+  return shape;
 }
 
 //===----------------------------------------------------------------------===//

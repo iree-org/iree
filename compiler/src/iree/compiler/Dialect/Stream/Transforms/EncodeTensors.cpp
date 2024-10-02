@@ -6,6 +6,7 @@
 
 #include <memory>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -197,15 +198,16 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
   return pattern;
 }
 
-static IREE::Codegen::EncodingSolverAttr
+static IREE::Codegen::EncodingSolverInterfaceAttr
 getEncodingSolverOrDefault(Builder &b, IREE::HAL::ExecutableTargetAttr target) {
   if (target.hasConfigurationAttr(b.getStringAttr("encoding_solver"))) {
     auto config = target.getConfiguration();
     std::optional<NamedAttribute> attr =
         config.getNamed(b.getStringAttr("encoding_solver"));
-    return cast<IREE::Codegen::EncodingSolverAttr>(attr->getValue());
+    return cast<IREE::Codegen::EncodingSolverInterfaceAttr>(attr->getValue());
   }
-  return IREE::Codegen::EncodingSolverAttr::get(b.getContext());
+  return cast<IREE::Codegen::EncodingSolverInterfaceAttr>(
+      IREE::Codegen::EncodingSolverAttr::get(b.getContext()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -280,7 +282,7 @@ public:
     SmallVector<OpFoldResult> resolvedDims =
         getMixedValues(encodingType.getShape(), encodingDims, rewriter);
     for (auto targetAttr : executableTargetAttrs) {
-      IREE::Codegen::EncodingSolverAttr solver =
+      IREE::Codegen::EncodingSolverInterfaceAttr solver =
           getEncodingSolverOrDefault(rewriter, targetAttr);
       resolvedDims = solver.reifyTensorShape(rewriter, encodingType,
                                              encodingDims, targetAttr);
@@ -632,10 +634,13 @@ struct EncodeTensorStoreOp
 // --iree-stream-encode-host-tensors
 //===----------------------------------------------------------------------===//
 
+static std::mutex libraryMutex;
 struct EncodeHostTensorsPass
     : public IREE::Stream::impl::EncodeHostTensorsPassBase<
           EncodeHostTensorsPass> {
   void runOnOperation() override {
+    std::lock_guard<std::mutex> guard(libraryMutex);
+
     auto funcOp = getOperation();
 
     // Run required analysis passes.

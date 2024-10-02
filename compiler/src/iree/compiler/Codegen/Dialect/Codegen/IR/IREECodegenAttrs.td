@@ -434,4 +434,14 @@ def IREECodegen_EncodingSolverAttr :
   let summary = "The default encoding solver which behaves dropping encodings.";
 }
 
+def IREECodegen_VMVXEncodingSolverAttr :
+    AttrDef<IREECodegen_Dialect, "VMVXEncodingSolver", [
+  DeclareAttrInterfaceMethods<IREECodegen_EncodingSolverInterfaceAttr, [
+    "reifyTensorShape",
+  ]>
+]> {
+  let mnemonic = "vmvx_encoding_solver";
+  let summary = "The default encoding solver which behaves dropping encodings.";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

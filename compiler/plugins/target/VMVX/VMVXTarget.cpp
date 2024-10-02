@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
@@ -48,6 +49,8 @@ getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
   configItems.emplace_back(
       b.getStringAttr("ukernels"),
       b.getStringAttr(enableMicrokernels ? "all" : "none"));
+  configItems.emplace_back(b.getStringAttr("encoding_solver"),
+                           IREE::Codegen::VMVXEncodingSolverAttr::get(context));
 
   return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
       b.getStringAttr(backend), b.getStringAttr(format),
