@@ -260,7 +260,7 @@ func.func @pack() attributes {hal.executable.target = #executable_target_system_
   return
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @pack()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   tensor.pack
@@ -293,8 +293,42 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
   return
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 16]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling, {enable_decomposition}>
 //       CHECK: func.func @unpack_outer_dynamic()
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   tensor.unpack
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
+func.func @unpack_fully_dynamic() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c131072 = arith.constant 131072 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
+  %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+  %5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : i32
+  %6 = arith.index_castui %0 : i32 to index
+  %7 = arith.index_castui %1 : i32 to index
+  %8 = arith.index_castui %2 : i32 to index
+  %9 = arith.index_castui %3 : i32 to index
+  %10 = arith.index_castui %4 : i32 to index
+  %11 = arith.index_castui %5 : i32 to index
+  %12 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %10, %11}
+  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%8, %9}
+  %14 = flow.dispatch.tensor.load %12, offsets = [0, 0, 0, 0], sizes = [%6, %7, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%6, %7, %10, %11} -> tensor<?x?x?x?xi32>
+  %15 = tensor.empty(%8, %9) : tensor<?x?xi32>
+  %unpack = tensor.unpack %14 inner_dims_pos = [0, 1] inner_tiles = [%10, %11] into %15 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
+  flow.dispatch.tensor.store %unpack, %13, offsets = [0, 0], sizes = [%8, %9], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%8, %9}
+  return
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 1]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//       CHECK: func.func @unpack_fully_dynamic()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   tensor.unpack
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]

@@ -20,6 +20,7 @@
 namespace mlir::iree_compiler {
 
 static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
+static const char kDecompositionAttrName[] = "enable_decomposition";
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
@@ -64,6 +65,16 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   }
 
   return rootOperation;
+}
+
+StringAttr getEnableDecompositionAttrName(MLIRContext *ctx) {
+  return StringAttr::get(ctx, kDecompositionAttrName);
+}
+
+bool isDecompositionEnabled(FunctionOpInterface funcOp) {
+  DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
+
+  return config && config.contains(kDecompositionAttrName);
 }
 
 StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
