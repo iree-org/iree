@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE                                                             \
   "iree-dispatch-creation-clone-producers-into-dispatch-regions"
@@ -34,6 +35,9 @@ struct CloneProducersIntoDispatchRegionsPass final
     });
 
     funcOp->walk([&](Operation *op) {
+      if (isOpTriviallyDead(op)) {
+        return rewriter.eraseOp(op);
+      }
       if (!IREE::Flow::isNonNullAndOutsideDispatch(op) ||
           !isa<linalg::GenericOp>(op)) {
         return;
