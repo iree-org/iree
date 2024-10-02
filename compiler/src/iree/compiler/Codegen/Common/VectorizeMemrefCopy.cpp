@@ -17,6 +17,21 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    if (copyOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+    rewriter.create<memref::CopyOp>(copyOp.getLoc(),
+                                    copyOp.getDpsInputOperand(0)->get(),
+                                    copyOp.getDpsInitOperand(0)->get());
+    rewriter.eraseOp(copyOp);
+    return success();
+  }
+};
+
 struct VectorizeMemrefCopyPass final
     : impl::VectorizeMemrefCopyPassBase<VectorizeMemrefCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -28,6 +43,7 @@ struct VectorizeMemrefCopyPass final
 
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::CopyVectorizationPattern>(&getContext());
+    patterns.add<ConvertLinalgCopyToMemrefCopy>(&getContext());
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 };
