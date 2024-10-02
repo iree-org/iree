@@ -449,3 +449,40 @@ func.func @fuse_direct_forall_use(%arg0: tensor<128x128xf32>, %arg1: tensor<16x1
 //       CHECK:     %[[BARRIER:.+]] = iree_gpu.barrier_region
 //       CHECK:     linalg.matmul ins(%[[BARRIER]]
 //       CHECK:   return %[[FUSED_LOOP]]
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+func.func @forall_hoist_unit_loop_with_fill(%3: tensor<1x128xf16>, %4: tensor<128x1xf16>) -> tensor<1x1xf32>
+    attributes {translation_info = #translation_info} {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<1x1xf32>
+  %cst = arith.constant 0.0 : f32
+  %5 = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %5) -> (tensor<1x1xf32>) {
+    %11 = scf.forall (%arg2, %arg3) in (1, 1) shared_outs(%arg4 = %arg1) -> (tensor<1x1xf32>) {
+      %12 = affine.apply affine_map<(d0) -> (d0 * 4)>(%arg0)
+      %extracted_slice = tensor.extract_slice %3[0, %12] [1, 4] [1, 1] : tensor<1x128xf16> to tensor<1x4xf16>
+      %extracted_slice_0 = tensor.extract_slice %4[%12, 0] [4, 1] [1, 1] : tensor<128x1xf16> to tensor<4x1xf16>
+      %14 = linalg.matmul ins(%extracted_slice, %extracted_slice_0 : tensor<1x4xf16>, tensor<4x1xf16>) outs(%arg4 : tensor<1x1xf32>) -> tensor<1x1xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %14 into %arg4[%arg2, %arg3] [1, 1] [1, 1] : tensor<1x1xf32> into tensor<1x1xf32>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    scf.yield %11 : tensor<1x1xf32>
+  }
+  return %8 : tensor<1x1xf32>
+}
+
+// CHECK-LABEL: func @forall_hoist_unit_loop_with_fill
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x1xf32>
+//       CHECK:   %[[OUTER_PARALLEL:.+]] = scf.forall {{.*}}shared_outs(%[[ITER:.+]] = %[[EMPTY]])
+//       CHECK:     %[[FILL:.+]] = linalg.fill {{.*}} outs(%[[ITER]]
+//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} iter_args(%{{.*}} = %[[FILL]])
+//       CHECK:     scf.yield {{.*}} : tensor<1x1xf32>
+//       CHECK:   scf.forall.in_parallel
+//  CHECK-NEXT:     tensor.parallel_insert_slice %[[LOOP]] into %[[ITER]]
+//       CHECK:   return %[[OUTER_PARALLEL]]
