@@ -16,7 +16,7 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp39-cp39 cp310-310" \
+#   override_python_versions="cp39-cp39 cp310-cp310" \
 #   packages="iree-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
@@ -64,6 +64,7 @@ function find_git_dir_parent() {
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
+# TODO(#18652): bump these versions to include python 3.13
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399" }')}"
 python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
