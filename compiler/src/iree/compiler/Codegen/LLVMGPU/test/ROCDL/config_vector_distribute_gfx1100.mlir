@@ -5,9 +5,6 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// WMMA:      #[[$TILE_SIZES:.+]] = #iree_gpu.lowering_config
-// WMMA-SAME:                           reduction =  [0, 0, 64]
-// WMMA-SAME:                           workgroup =  [64, 128, 0]
 // WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // WMMA-SAME: mma_schedule = #iree_gpu.mma_schedule
 // WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
@@ -34,4 +31,6 @@ func.func @wmma_matmul_1024x1024x1024() {
 }
 
 // WMMA-LABEL: func.func @wmma_matmul_1024x1024x1024()
-// WMMA: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
+// WMMA: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// WMMA-SAME:                           reduction =  [0, 0, 64]
+// WMMA-SAME:                           workgroup =  [64, 128, 0]
