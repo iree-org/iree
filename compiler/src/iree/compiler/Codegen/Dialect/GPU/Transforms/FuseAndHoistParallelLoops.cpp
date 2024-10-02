@@ -4,16 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <functional>
+#include <numeric>
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
@@ -36,36 +43,58 @@ struct FuseAndHoistParallelLoopsPass final
 };
 } // namespace
 
-struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
+static bool forallTripCountMatchesWorkgroupSize(scf::ForallOp forallOp,
+                                                int64_t flatWorkgroupSize) {
+  // True for lane mapped loops.
+  if (forallOpHasMappingType<IREE::GPU::LaneIdAttr>(forallOp)) {
+    return true;
+  }
+
+  // All other loops must be mapped to threads to compare. Also give up on
+  // non-normalized loops.
+  if (!forallOpHasMappingType<gpu::GPUThreadMappingAttr>(forallOp) ||
+      !forallOp.isNormalized()) {
+    return false;
+  }
+
+  int64_t tripCount = 1;
+  for (OpFoldResult ub : forallOp.getMixedUpperBound()) {
+    std::optional<int64_t> maybeConstantUb = getConstantIntValue(ub);
+    if (!maybeConstantUb) {
+      return false;
+    }
+    tripCount *= *maybeConstantUb;
+  }
+  return tripCount == flatWorkgroupSize;
+}
+struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+  FuseForalls(MLIRContext *ctx, int64_t flatWorkgroupSize, PatternBenefit b = 1)
+      : OpRewritePattern<scf::ForallOp>(ctx, b),
+        flatWorkgroupSize(flatWorkgroupSize) {}
+  LogicalResult matchAndRewrite(scf::ForallOp producerForall,
                                 PatternRewriter &rewriter) const override {
-    auto sliceParent = sliceOp->getParentOfType<scf::ForallOp>();
-    if (!sliceParent) {
-      return failure();
+    if (!producerForall->hasOneUse()) {
+      return rewriter.notifyMatchFailure(producerForall,
+                                         "multi-use producer forall");
     }
 
-    SmallVector<Operation *> consumerChain = {sliceOp};
-    Operation *currProducer = sliceOp.getSource().getDefiningOp();
-    while (currProducer && !llvm::isa<scf::ForallOp>(currProducer) &&
-           currProducer->hasOneUse()) {
-      consumerChain.insert(consumerChain.begin(), currProducer);
-      currProducer =
-          llvm::TypeSwitch<Operation *, Operation *>(currProducer)
-              .Case<tensor::ExpandShapeOp>([](tensor::ExpandShapeOp expand) {
-                return expand.getSrc().getDefiningOp();
-              })
-              .Case<tensor::CollapseShapeOp>(
-                  [](tensor::CollapseShapeOp collapse) {
-                    return collapse.getSrc().getDefiningOp();
-                  })
-              .Default([](Operation *) { return nullptr; });
+    SmallVector<Operation *> consumerChain;
+    Operation *currProducer = *producerForall->user_begin();
+    while (currProducer && currProducer->hasOneUse()) {
+      consumerChain.push_back(currProducer);
+      if (!isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(currProducer)) {
+        break;
+      }
+      currProducer = *currProducer->user_begin();
     }
 
-    auto producerForall =
-        llvm::dyn_cast_if_present<scf::ForallOp>(currProducer);
-    if (!producerForall) {
-      return failure();
+    auto consumerForall = currProducer->getParentOfType<scf::ForallOp>();
+    if (!consumerForall || !forallTripCountMatchesWorkgroupSize(
+                               consumerForall, flatWorkgroupSize)) {
+      return rewriter.notifyMatchFailure(
+          producerForall,
+          "no consumer forall with trip count matching workgroup size");
     }
 
     // TODO: Allow extracting multiple uses within the same consumer loop. Still
@@ -75,9 +104,12 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
       return failure();
     }
 
-    return fuseForallIntoConsumer(rewriter, producerForall, sliceParent,
+    return fuseForallIntoConsumer(rewriter, producerForall, consumerForall,
                                   consumerChain);
   }
+
+private:
+  int64_t flatWorkgroupSize;
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
@@ -198,12 +230,26 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
 
   FunctionOpInterface funcOp = getOperation();
 
+  // Try to get the flat workgroup size if possible.
+  std::optional<int64_t> maybeFlatWorkgroupSize = std::nullopt;
+  if (std::optional<SmallVector<int64_t>> workgroupSize =
+          getWorkgroupSize(funcOp)) {
+    maybeFlatWorkgroupSize =
+        std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
+                        std::multiplies<int64_t>());
+  }
+
   // First run the hoisting and fusion patterns.
   {
     RewritePatternSet patterns(context);
     // These two patterns are run to a fixed point, allowing fusion within
     // potentially nested loops, hoisting from said loops, and continued fusion.
-    patterns.add<FuseForalls>(context);
+    if (maybeFlatWorkgroupSize) {
+      // Forall fusion requires knowing the workgroup size to verify the fusion
+      // is valid.
+      patterns.add<FuseForalls>(context, *maybeFlatWorkgroupSize,
+                                /*benefit=*/1);
+    }
     patterns.add<FuseTilableForallConsumers>(context);
     populateForallLoopHoistingPattern(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

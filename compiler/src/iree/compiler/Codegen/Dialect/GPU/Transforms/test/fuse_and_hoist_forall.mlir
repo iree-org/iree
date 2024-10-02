@@ -1,11 +1,14 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(func.func(iree-gpu-fuse-and-hoist-parallel-loops))' --split-input-file | FileCheck %s
 
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
 #map2 = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
 #map3 = affine_map<(d0)[s0] -> (d0 * 2 + s0)>
 #map4 = affine_map<(d0) -> (d0 * 16)>
-func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf16>, %5: tensor<128x128xf32>) -> tensor<128x128xf32> {
+func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf16>, %5: tensor<128x128xf32>) -> tensor<128x128xf32>
+    attributes {translation_info = #translation_info} {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
@@ -62,11 +65,14 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
 
 // -----
 
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
 #map2 = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
 #map3 = affine_map<(d0) -> (d0 * 16)>
-func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: tensor<128x128xf32>) -> tensor<128x128xf32> {
+func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: tensor<128x128xf32>) -> tensor<128x128xf32>
+    attributes {translation_info = #translation_info} {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
@@ -113,12 +119,15 @@ func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: te
 
 // -----
 
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
 #map2 = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
 #map3 = affine_map<(d0)[s0] -> (d0 * 2 + s0)>
 #map4 = affine_map<(d0) -> (d0 * 16)>
-func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<128x128xf16>) -> tensor<128x128xf32> {
+func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<128x128xf16>) -> tensor<128x128xf32>
+    attributes {translation_info = #translation_info} {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
@@ -340,3 +349,103 @@ func.func @hoist_with_single_trip_loops(%2: tensor<128x128xf16>, %3: tensor<128x
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 2)>
+#map1 = affine_map<(d0) -> (d0 * 16)>
+func.func @no_fuse_forall_without_workgroup_size(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %0 = tensor.empty() : tensor<128x128xf32>
+  %2 = scf.forall (%arg5, %arg6) in (64, 1) shared_outs(%arg7 = %0) -> (tensor<128x128xf32>) {
+    %4 = affine.apply #map(%arg5)
+    %extracted_slice = tensor.extract_slice %arg0[%4, %arg6] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg7[%4, %arg6] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
+    %5 = linalg.copy ins(%extracted_slice : tensor<2x128xf32>) outs(%extracted_slice_0 : tensor<2x128xf32>) -> tensor<2x128xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %5 into %arg7[%4, %arg6] [2, 128] [1, 1] : tensor<2x128xf32> into tensor<128x128xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  %3 = scf.forall (%arg5, %arg6) in (8, 8) shared_outs(%arg7 = %0) -> (tensor<128x128xf32>) {
+    %6 = affine.apply #map1(%arg5)
+    %7 = affine.apply #map1(%arg6)
+    %extracted_slice_0 = tensor.extract_slice %2[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg7[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %8 = linalg.matmul ins(%extracted_slice_0, %extracted_slice_0 : tensor<16x16xf32>, tensor<16x16xf32>) outs(%extracted_slice_1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %8 into %arg7[%6, %7] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  return %3 : tensor<128x128xf32>
+}
+
+//   CHECK-LABEL: func @no_fuse_forall_without_workgroup_size
+// CHECK-COUNT-2:   scf.forall
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
+#map = affine_map<(d0) -> (d0 * 2)>
+#map1 = affine_map<(d0) -> (d0 * 16)>
+func.func @no_fuse_forall_workgroup_size_mismatch(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32>
+  attributes {translation_info = #translation_info} {
+  %0 = tensor.empty() : tensor<128x128xf32>
+  %2 = scf.forall (%arg5, %arg6) in (128, 1) shared_outs(%arg7 = %0) -> (tensor<128x128xf32>) {
+    %4 = affine.apply #map(%arg5)
+    %extracted_slice = tensor.extract_slice %arg0[%4, %arg6] [1, 128] [1, 1] : tensor<128x128xf32> to tensor<1x128xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg7[%4, %arg6] [1, 128] [1, 1] : tensor<128x128xf32> to tensor<1x128xf32>
+    %5 = linalg.copy ins(%extracted_slice : tensor<1x128xf32>) outs(%extracted_slice_0 : tensor<1x128xf32>) -> tensor<1x128xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %5 into %arg7[%4, %arg6] [1, 128] [1, 1] : tensor<1x128xf32> into tensor<128x128xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  // We have 128 threads but only use 64 here, so loops cannot be fused.
+  %3 = scf.forall (%arg5, %arg6) in (8, 8) shared_outs(%arg7 = %0) -> (tensor<128x128xf32>) {
+    %6 = affine.apply #map1(%arg5)
+    %7 = affine.apply #map1(%arg6)
+    %extracted_slice_0 = tensor.extract_slice %2[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg7[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %8 = linalg.matmul ins(%extracted_slice_0, %extracted_slice_0 : tensor<16x16xf32>, tensor<16x16xf32>) outs(%extracted_slice_1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %8 into %arg7[%6, %7] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  return %3 : tensor<128x128xf32>
+}
+
+//   CHECK-LABEL: func @no_fuse_forall_workgroup_size_mismatch
+// CHECK-COUNT-2:   scf.forall
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#map1 = affine_map<(d0) -> (d0 * 16)>
+func.func @fuse_direct_forall_use(%arg0: tensor<128x128xf32>, %arg1: tensor<16x16xf32>) -> tensor<128x128xf32>
+  attributes {translation_info = #translation_info} {
+  %0 = tensor.empty() : tensor<128x128xf32>
+  %1 = tensor.empty() : tensor<16x16xf32>
+  %2 = scf.forall (%arg5, %arg6) in (4, 4) shared_outs(%arg7 = %1) -> (tensor<16x16xf32>) {
+    %extracted_slice = tensor.extract_slice %arg1[%arg5, %arg6] [4, 4] [1, 1] : tensor<16x16xf32> to tensor<4x4xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg7[%arg5, %arg6] [4, 4] [1, 1] : tensor<16x16xf32> to tensor<4x4xf32>
+    %5 = linalg.copy ins(%extracted_slice : tensor<4x4xf32>) outs(%extracted_slice_0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %5 into %arg7[%arg5, %arg6] [4, 4] [1, 1] : tensor<4x4xf32> into tensor<16x16xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  %3 = scf.forall (%arg5, %arg6) in (8, 8) shared_outs(%arg7 = %0) -> (tensor<128x128xf32>) {
+    %6 = affine.apply #map1(%arg5)
+    %7 = affine.apply #map1(%arg6)
+    %extracted_slice_0 = tensor.extract_slice %arg0[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg7[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+    %8 = linalg.matmul ins(%2, %extracted_slice_0 : tensor<16x16xf32>, tensor<16x16xf32>) outs(%extracted_slice_1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %8 into %arg7[%6, %7] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  return %3 : tensor<128x128xf32>
+}
+
+//   CHECK-LABEL: func @fuse_direct_forall_use
+//       CHECK:   %[[FUSED_LOOP:.+]] = scf.forall
+//       CHECK:     %[[BARRIER:.+]] = iree_gpu.barrier_region
+//       CHECK:     linalg.matmul ins(%[[BARRIER]]
+//       CHECK:   return %[[FUSED_LOOP]]
