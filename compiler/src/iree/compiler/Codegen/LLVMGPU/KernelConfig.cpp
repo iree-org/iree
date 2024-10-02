@@ -115,6 +115,16 @@ bool isROCmBackend(IREE::GPU::TargetAttr target) {
   return target.getArch().starts_with("gfx");
 }
 
+static bool needsLoweringConfigPropagation(
+    IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
+  using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+  // Pipelines that do not need propagation of lowering config.
+  Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
+                                   Pipeline::LLVMGPUVectorDistribute,
+                                   Pipeline::LLVMGPUPadAndVectorDistribute};
+  return !llvm::is_contained(supportedPipelines, pipeline);
+}
+
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
 //====---------------------------------------------------------------------===//
@@ -339,6 +349,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
   for (int64_t batch : convolutionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -351,7 +362,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[oc] = 1;
   }
   for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
-    workgroupTileSizes[ic] = 1;
+    reductionTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
@@ -359,25 +370,32 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   workgroupTileSizes[nDim] =
       schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
 
-  // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
-  workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
-    workgroupTileSizes[filterDim] = 1;
+    reductionTileSizes[filterDim] = 1;
   }
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSizes);
+  MLIRContext *context = op.getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = op.getContext();
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
-  SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
+                             scheduleAttr);
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
@@ -385,17 +403,17 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
-    attrs.emplace_back(
+    pipelineAttrs.emplace_back(
         StringAttr::get(context,
                         IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
         pipelineOptions);
   }
 
-  auto configDict = DictionaryAttr::get(context, attrs);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, configDict);
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 [[maybe_unused]] static void
@@ -573,6 +591,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
   for (int64_t batch : contractionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -587,7 +606,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[n] = 1;
   }
   for (int64_t k : llvm::drop_end(contractionDims->k)) {
-    workgroupTileSizes[k] = 1;
+    reductionTileSizes[k] = 1;
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
@@ -596,23 +615,32 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   workgroupTileSizes[nDim] =
       schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
 
-  // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
-  workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
+  LLVM_DEBUG(debugPrintContractionInfo("Reduction tile sizes", op.getNumLoops(),
+                                       *contractionDims, reductionTileSizes));
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSizes);
+  MLIRContext *context = op.getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = op.getContext();
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
-  SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
+                             scheduleAttr);
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
@@ -620,17 +648,17 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
-    attrs.emplace_back(
+    pipelineAttrs.emplace_back(
         StringAttr::get(context,
                         IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
         pipelineOptions);
   }
 
-  auto configDict = DictionaryAttr::get(context, attrs);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               pipeline, workgroupSize,
-                                               targetSubgroupSize, configDict);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, pipeline, workgroupSize,
+      targetSubgroupSize, pipelineConfig);
 }
 
 static LogicalResult
@@ -712,8 +740,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG("Attention Vector Distribution Config");
 
-  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
-
   // Infer if Q, K and V are transposed to help generate better schedule.
   bool transposedQ =
       k1Dim != llvm::cast<AffineDimExpr>(op.getQueryMap().getResults().back())
@@ -765,6 +791,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
   for (int64_t batch : opInfo.getBatchDims()) {
     workgroupTileSizes[batch] = 1;
@@ -780,7 +807,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     workgroupTileSizes[n] = 1;
   }
   for (int64_t k2 : llvm::drop_end(opInfo.getK2Dims())) {
-    workgroupTileSizes[k2] = 1;
+    reductionTileSizes[k2] = 1;
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
@@ -789,29 +816,36 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   workgroupTileSizes[nDim] =
       schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
 
-  // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
-  workgroupTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
+  reductionTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSizes);
+  MLIRContext *context = op.getContext();
+  SmallVector<NamedAttribute, 2> attrs;
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "reduction"),
+                     b.getI64ArrayAttr(reductionTileSizes));
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = op.getContext();
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
-  SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
-  auto configDict = DictionaryAttr::get(context, attrs);
+  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
+                             scheduleAttr);
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
   // flag because there is a shared memory allocation the two matmuls, which
   // the prefetching pass cannot understand.
 
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               pipeline, workgroupSize,
-                                               targetSubgroupSize, configDict);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 static LogicalResult
@@ -2108,10 +2142,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
           getTranslationInfo(funcOp)) {
-    // Currently ROCDL requires propagation of user lowering configs for
-    // all pipelines except TileAndFuse.
-    if (translationInfo.getDispatchLoweringPassPipeline() !=
-        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+    // Currently some ROCDL requires propagation of user lowering configs.
+    if (needsLoweringConfigPropagation(
+            translationInfo.getDispatchLoweringPassPipeline())) {
       for (auto op : computeOps) {
         if (getLoweringConfig(op)) {
           propagateLoweringConfig(op, computeOps);
@@ -2165,10 +2198,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
   if (IREE::Codegen::TranslationInfoAttr translationInfo =
           getTranslationInfo(funcOp)) {
-    // Currently ROCDL requires propagation of user lowering configs for
-    // all pipelines except TileAndFuse.
-    if (translationInfo.getDispatchLoweringPassPipeline() ==
-        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+    // Currently some ROCDL requires propagation of user lowering configs.
+    if (!needsLoweringConfigPropagation(
+            translationInfo.getDispatchLoweringPassPipeline())) {
       return success();
     }
   }
