@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -272,12 +273,20 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   return VectorPreProcStrategy::None;
 }
 
-DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
+static DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
   auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
   auto unitAttr = UnitAttr::get(context);
 
   return DictionaryAttr::get(
       context, ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
+}
+
+static DictionaryAttr
+getPipelineConfWithDecompositionAttr(MLIRContext *context) {
+  auto attrName = getEnableDecompositionAttrName(context);
+  auto unitAttr = UnitAttr::get(context);
+  return DictionaryAttr::get(context,
+                             ArrayRef<NamedAttribute>({attrName, unitAttr}));
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
@@ -1690,11 +1699,23 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
+  // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
+  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
+  // backends prefer to not decompose the ops.
+  DictionaryAttr pipelineConfig;
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  bool hasDynamicInnerTile = llvm::any_of(
+      op.getMixedTiles(), [](OpFoldResult ofr) { return ofr.is<Value>(); });
+  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+    pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
+  }
+
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   TileSizesListType tileSizesList = {distTileSizes, vecTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
-      DispatchLoweringPassPipeline::CPUDataTiling);
+      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -1718,10 +1739,22 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
   }
 
+  // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
+  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
+  // backends prefer to not decompose the ops.
+  DictionaryAttr pipelineConfig;
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  bool hasDynamicInnerTile = llvm::any_of(
+      op.getMixedTiles(), [](OpFoldResult ofr) { return ofr.is<Value>(); });
+  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+    pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
+  }
+
   TileSizesListType tileSizesList = {distTileSizes, tileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
-      DispatchLoweringPassPipeline::CPUDataTiling);
+      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,

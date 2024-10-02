@@ -176,7 +176,8 @@ static void addExecutableSubstitutionPasses(OpPassManager &passManager,
   }
   if (!substitutions.empty()) {
     SubstituteExecutablesPassOptions substituteOptions;
-    substituteOptions.substitutions = substitutions;
+    substituteOptions.substitutions.assign(substitutions.begin(),
+                                           substitutions.end());
     passManager.addPass(
         IREE::HAL::createSubstituteExecutablesPass(substituteOptions));
   }
@@ -197,12 +198,19 @@ void buildHALDeviceAssignmentPassPipeline(
     // Today we just assign devices from parameters but we should instead be
     // performing analysis at the flow level and then doing magic device
     // database lookups here.
-    passManager.addPass(IREE::HAL::createAssignLegacyTargetDevicesPass(
-        {&targetRegistry, assignmentOptions.legacyTargetBackends}));
+    AssignLegacyTargetDevicesPassOptions options;
+    options.targetRegistry = &targetRegistry;
+    options.targetBackends.assign(
+        assignmentOptions.legacyTargetBackends.begin(),
+        assignmentOptions.legacyTargetBackends.end());
+    passManager.addPass(
+        IREE::HAL::createAssignLegacyTargetDevicesPass(options));
   }
   if (!assignmentOptions.targetDevices.empty()) {
-    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        {assignmentOptions.targetDevices}));
+    AssignTargetDevicesPassOptions options;
+    options.targetDevices.assign(assignmentOptions.targetDevices.begin(),
+                                 assignmentOptions.targetDevices.end());
+    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(options));
   }
 
   // Create globals for each device (if needed).

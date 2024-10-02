@@ -20,6 +20,15 @@ namespace mlir::iree_compiler {
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
 /// Creates a string attribute containing the name of the attribute that is
+/// used to enable decomposition.
+StringAttr getEnableDecompositionAttrName(MLIRContext *ctx);
+
+/// Checks whether loop peeling has been enabled for the input function. This
+/// is infered from the config dict. attribute that's part of to the
+/// translation info corresponding to this funciton.
+bool isDecompositionEnabled(FunctionOpInterface funcOp);
+
+/// Creates a string attribute containing the name of the attribute that is
 /// used to enable loop peeling.
 StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx);
 

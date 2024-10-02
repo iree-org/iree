@@ -81,9 +81,12 @@ void buildGlobalOptimizationPassPipeline(
   // parameters are available for folding.
   if (!transformOptions.options.parameterImportPaths.empty()) {
     IREE::IO::Parameters::ImportParametersPassOptions importParametersOptions;
-    importParametersOptions.scopePaths =
-        transformOptions.options.parameterImportPaths;
-    importParametersOptions.keys = transformOptions.options.parameterImportKeys;
+    importParametersOptions.scopePaths.assign(
+        transformOptions.options.parameterImportPaths.begin(),
+        transformOptions.options.parameterImportPaths.end());
+    importParametersOptions.keys.assign(
+        transformOptions.options.parameterImportKeys.begin(),
+        transformOptions.options.parameterImportKeys.end());
     importParametersOptions.maximumSize =
         transformOptions.options.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
