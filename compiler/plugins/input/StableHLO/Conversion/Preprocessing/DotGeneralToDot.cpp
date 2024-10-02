@@ -198,7 +198,7 @@ struct GeneralDotRemoveBatch final
 
     auto dot = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs,
-        newDimNumbers, op.getPrecisionConfigAttr());
+        newDimNumbers, op.getPrecisionConfigAttr(), op.getAlgorithmAttr());
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, ty,
                                                             dot.getResult());
     return success();

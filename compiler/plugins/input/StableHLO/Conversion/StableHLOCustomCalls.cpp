@@ -200,7 +200,8 @@ struct HouseholderReflectorRewriter final
           auto dotNums = mlir::stablehlo::DotDimensionNumbersAttr::get(
               b.getContext(), batch, batch, lhsContract, rhsContract);
           Value dot = b.create<mlir::stablehlo::DotGeneralOp>(
-              householder0.getType(), args[0], householder, dotNums, nullptr);
+              householder0.getType(), args[0], householder, dotNums, nullptr,
+              mlir::stablehlo::DotAlgorithmAttr{});
           b.create<scf::YieldOp>(loc, dot);
         });
 
