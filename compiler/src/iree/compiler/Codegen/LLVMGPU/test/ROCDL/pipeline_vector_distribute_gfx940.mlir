@@ -339,7 +339,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @conv_nhwc
-//          CHECK:   scf.for {{.*}} = %c0 to %c736 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c215 step %c1 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x4x1xf32>)
 // CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
