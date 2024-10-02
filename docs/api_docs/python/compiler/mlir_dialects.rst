@@ -45,15 +45,6 @@ MLIR Core Dialects
   :undoc-members:
 
 
-`std` dialect
-----------------
-
-.. automodule:: iree.compiler.dialects.std
-  :imported-members:
-  :members:
-  :undoc-members:
-
-
 `tensor` dialect
 ----------------
 

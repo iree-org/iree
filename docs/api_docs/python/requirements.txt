@@ -2,8 +2,13 @@ sphinx==4.2.0
 myst-parser==0.15.2  # For markdown
 sphinx_rtd_theme==1.0.0
 commonmark==0.9.1
-enum_tools==0.6.4
-sphinx_toolbox==2.15.0
+enum_tools==0.10.0
+sphinx_toolbox==2.16.1
+sphinxcontrib-applehelp==1.0.4
+sphinxcontrib-devhelp==1.0.2
+sphinxcontrib-htmlhelp==2.0.1
+sphinxcontrib-serializinghtml==1.1.5
+sphinxcontrib-qthelp==1.0.3
 
 # IREE Python API
 -f https://iree.dev/pip-release-links.html
