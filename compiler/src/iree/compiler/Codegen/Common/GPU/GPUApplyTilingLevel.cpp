@@ -135,10 +135,12 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
             bool isDestinationOperand)
         -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
       Operation *owner = originalProducer.getOwner();
-      if (tilingLevel == IREE::GPU::TilingLevel::Reduction &&
-          isa<tensor::PadOp>(owner)) {
-        // Do not fuse pad in reduction tiling.
-        return std::nullopt;
+      if (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
+          tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
+        // Do not fuse pad in reduction and subgroup tiling.
+        if (isa<tensor::PadOp>(owner)) {
+          return std::nullopt;
+        }
       }
 
       bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);

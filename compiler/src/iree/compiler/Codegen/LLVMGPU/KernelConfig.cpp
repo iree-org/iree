@@ -118,12 +118,11 @@ bool isROCmBackend(IREE::GPU::TargetAttr target) {
 static bool needsLoweringConfigPropagation(
     IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
   using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-  SmallVector<Pipeline> supportedPipelines = {
-      Pipeline::LLVMGPUTileAndFuse, Pipeline::LLVMGPUVectorDistribute,
-      Pipeline::LLVMGPUPadAndVectorDistribute};
-  return !llvm::any_of(supportedPipelines, [&pipeline](Pipeline choice) {
-    return choice == pipeline;
-  });
+  // Pipelines that do not need propagation of lowering config.
+  Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
+                                   Pipeline::LLVMGPUVectorDistribute,
+                                   Pipeline::LLVMGPUPadAndVectorDistribute};
+  return !llvm::is_contained(supportedPipelines, pipeline);
 }
 
 //====---------------------------------------------------------------------===//
@@ -380,7 +379,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   MLIRContext *context = op.getContext();
   Builder b(context);
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute, 2> attrs;
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
@@ -625,7 +624,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   MLIRContext *context = op.getContext();
   Builder b(context);
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute, 2> attrs;
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
@@ -820,7 +819,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   reductionTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
 
   MLIRContext *context = op.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
+  SmallVector<NamedAttribute, 2> attrs;
   attrs.emplace_back(StringAttr::get(context, "workgroup"),
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
