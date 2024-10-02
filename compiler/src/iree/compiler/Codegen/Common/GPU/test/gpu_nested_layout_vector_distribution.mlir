@@ -798,7 +798,7 @@ func.func @gather(%base: memref<32x256x64xf16>, %index_vec: vector<32x256x64xind
   %mask = arith.constant dense<true> : vector<32x256x64xi1>
   %pass = arith.constant dense<0.000000e+00> : vector<32x256x64xf16>
   %0 = vector.gather %base[%c0, %c0, %c0] [%index_vec], %mask, %pass : memref<32x256x64xf16>, vector<32x256x64xindex>, vector<32x256x64xi1>, vector<32x256x64xf16> into vector<32x256x64xf16>
-  %1 = iree_vector_ext.to_layout %0 to #layout :  vector<32x256x64xf16>
+  %1 = iree_vector_ext.to_layout %0 to layout(#layout) :  vector<32x256x64xf16>
   return %1 : vector<32x256x64xf16>
 }
 
