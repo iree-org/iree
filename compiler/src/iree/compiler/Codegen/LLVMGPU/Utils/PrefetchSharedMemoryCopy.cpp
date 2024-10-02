@@ -78,6 +78,8 @@ public:
   void emitPrologue(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, lb);
+    // Emit barrier to ensure we can reuse shared memory.
+    emitBarrier(loc, rewriter);
     // Directly write in the prologue and use the shared memory to communicate
     // data instead of the loop carried values. Read (0)
     emitRead(mapping[0], rewriter, zero);
