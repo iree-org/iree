@@ -4,10 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <memory>
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -18,11 +23,14 @@
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -189,6 +197,17 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
   return pattern;
 }
 
+static IREE::Codegen::EncodingSolverAttr
+getEncodingSolverOrDefault(Builder &b, IREE::HAL::ExecutableTargetAttr target) {
+  if (target.hasConfigurationAttr(b.getStringAttr("encoding_solver"))) {
+    auto config = target.getConfiguration();
+    std::optional<NamedAttribute> attr =
+        config.getNamed(b.getStringAttr("encoding_solver"));
+    return cast<IREE::Codegen::EncodingSolverAttr>(attr->getValue());
+  }
+  return IREE::Codegen::EncodingSolverAttr::get(b.getContext());
+}
+
 //===----------------------------------------------------------------------===//
 // stream.tensor.import
 //===----------------------------------------------------------------------===//
@@ -241,7 +260,12 @@ struct EncodeTensorExportOp
 
 struct EncodeTensorSizeOfOp
     : public OpRewritePattern<IREE::Stream::TensorSizeOfOp> {
-  using OpRewritePattern::OpRewritePattern;
+public:
+  using OpRewritePattern<IREE::Stream::TensorSizeOfOp>::OpRewritePattern;
+  EncodeTensorSizeOfOp(MLIRContext *ctx, IREE::HAL::DeviceAnalysis *analysis)
+      : OpRewritePattern<IREE::Stream::TensorSizeOfOp>(ctx),
+        deviceAnalysis(analysis) {}
+
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
     auto encodingType = llvm::cast<RankedTensorType>(op.getEncoding());
@@ -250,9 +274,21 @@ struct EncodeTensorSizeOfOp
       return failure();
     }
 
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    deviceAnalysis->gatherRequiredExecutableTargets(op.getAffinityAttr(), op,
+                                                    executableTargetAttrs);
+    SmallVector<OpFoldResult> resolvedDims =
+        getMixedValues(encodingType.getShape(), encodingDims, rewriter);
+    for (auto targetAttr : executableTargetAttrs) {
+      IREE::Codegen::EncodingSolverAttr solver =
+          getEncodingSolverOrDefault(rewriter, targetAttr);
+      resolvedDims = solver.reifyTensorShape(rewriter, encodingType,
+                                             encodingDims, targetAttr);
+    }
+
     // Dense: element count * element size.
     Value totalSize = calculateStorageElementCountInBytes(
-        op.getLoc(), encodingType, encodingDims, rewriter);
+        op.getLoc(), encodingType, resolvedDims, rewriter);
     if (!totalSize) {
       return op.emitOpError("failed to calculate total byte count: ")
              << encodingType << " does not have integral number of total bytes";
@@ -261,6 +297,9 @@ struct EncodeTensorSizeOfOp
 
     return success();
   }
+
+private:
+  IREE::HAL::DeviceAnalysis *deviceAnalysis;
 };
 
 //===----------------------------------------------------------------------===//
@@ -334,7 +373,8 @@ struct EncodeTensorConstantOp
 
     // Dense:
     Value resultSize = calculateStorageElementCountInBytes(
-        op.getLoc(), alignedType, resultDims, rewriter);
+        op.getLoc(), alignedType,
+        getMixedValues(alignedType.getShape(), resultDims, rewriter), rewriter);
     if (!resultSize) {
       return op.emitOpError("failed to calculate total byte count: ")
              << alignedType << " does not have integral number of total bytes";
@@ -596,15 +636,28 @@ struct EncodeHostTensorsPass
     : public IREE::Stream::impl::EncodeHostTensorsPassBase<
           EncodeHostTensorsPass> {
   void runOnOperation() override {
+    auto funcOp = getOperation();
+
+    // Run required analysis passes.
+    IREE::Stream::AffinityAnalysis affinityAnalysis(funcOp);
+    if (failed(affinityAnalysis.run())) {
+      return signalPassFailure();
+    }
+    IREE::HAL::DeviceAnalysis deviceAnalysis(funcOp);
+    if (failed(deviceAnalysis.run())) {
+      return signalPassFailure();
+    }
+
     RewritePatternSet patterns(&getContext());
-    patterns.insert<
-        EncodeTensorImportOp, EncodeTensorExportOp, EncodeTensorSizeOfOp,
-        EncodeTensorEmptyOp, EncodeTensorConstantOp, EncodeTensorSplatOp,
-        EncodeTensorCloneOp, EncodeTensorSliceOp, EncodeTensorFillOp,
-        EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp>(
-        &getContext());
+    patterns
+        .insert<EncodeTensorImportOp, EncodeTensorExportOp, EncodeTensorEmptyOp,
+                EncodeTensorConstantOp, EncodeTensorSplatOp,
+                EncodeTensorCloneOp, EncodeTensorSliceOp, EncodeTensorFillOp,
+                EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp>(
+            &getContext());
+    patterns.insert<EncodeTensorSizeOfOp>(&getContext(), &deviceAnalysis);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, frozenPatterns))) {
       return signalPassFailure();
     }
   }
