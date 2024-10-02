@@ -286,6 +286,8 @@ def GenericVectorizationPass :
       "Enable vector masking during vectorization.">,
     Option<"useConfiguredVectorSizes", "use-configured-vector-sizes", "bool",/*default=*/"true",
       "Control whether the op lowering config represents a set of masked vector sizes">,
+    Option<"vectorizeCopies", "vectorize-copies", "bool", /*default=*/"true",
+      "Enable vectorization of linalg.copy operations.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
