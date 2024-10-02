@@ -487,7 +487,8 @@ struct StripStreamAffinityOptionalAttributePattern
 
 // Remove device/queue affinities for the IR.
 // E.g. remove `flow.tensor.transfer` ops.
-static LogicalResult stripExecutionContextAffinities(ModuleOp moduleOp) {
+static LogicalResult
+stripExecutionContextAffinities(IREE::Util::FuncOp moduleOp) {
   RewritePatternSet patterns(moduleOp->getContext());
   patterns.add<StripFlowTensorTransferPattern,
                StripStreamAffinityOptionalAttributePattern>(
@@ -546,6 +547,11 @@ public:
       funcOp.erase();
       return failure();
     }
+
+    if (failed(stripExecutionContextAffinities(funcOp))) {
+      return failure();
+    }
+
     return success();
   }
 
@@ -881,10 +887,6 @@ public:
     if (programBuilder.getJitFunctions().empty()) {
       programBuilder.getTargetModule()->erase();
       return;
-    }
-    if (failed(stripExecutionContextAffinities(
-            programBuilder.getTargetModule()))) {
-      return signalPassFailure();
     }
 
     std::optional<llvm::Timer> compileTimer;
