@@ -470,7 +470,7 @@ def Util_AssumeDivisibleOp :
     Util_Range:$result
   );
   let assemblyFormat = [{
-    $operand `by` $divisor `:` type($operand) attr-dict
+    $operand `by` $divisor attr-dict `:` type($operand)
   }];
   let builders = [
     OpBuilder<(ins
