@@ -119,14 +119,27 @@ util.func public @reshapeDynamicDifferent(%arg0: tensor<4x?xf32>, %dim0: index, 
 
 // -----
 
-// CHECK-LABEL: @flattenReshapeChain
+// CHECK-LABEL: @foldReshapeChain
 // CHECK-SAME: %[[ARG:.+]]: tensor<4x?xf32>,
 // CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index
-util.func public @flattenReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<4x?xf32> {
+util.func public @foldReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<4x?xf32> {
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
   %1 = flow.tensor.reshape %0 : tensor<4x?xf32>{%dim1} -> tensor<4x?xf32>{%dim2}
   // CHECK-NEXT: util.return %[[ARG]]
   util.return %1 : tensor<4x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @flattenReshapeChain
+// CHECK-SAME: %[[ARG:.+]]: tensor<?x?xf32>,
+// CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index, %[[DIM3:.+]]: index, %[[DIM4:.+]]: index, %[[DIM5:.+]]: index
+util.func public @flattenReshapeChain(%arg0: tensor<?x?xf32>, %dim0: index, %dim1: index, %dim2: index, %dim3 : index, %dim4 : index, %dim5 : index) -> tensor<?x?xf32> {
+  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<?x?xf32>{%[[DIM0]], %[[DIM1]]} -> tensor<?x?xf32>{%[[DIM4]], %[[DIM5]]}
+  %0 = flow.tensor.reshape %arg0 : tensor<?x?xf32>{%dim0, %dim1} -> tensor<?x?xf32>{%dim2, %dim3}
+  %1 = flow.tensor.reshape %0 : tensor<?x?xf32>{%dim2, %dim3} -> tensor<?x?xf32>{%dim4, %dim5}
+  // CHECK-NEXT: util.return %[[RET]]
+  util.return %1 : tensor<?x?xf32>
 }
 
 // -----

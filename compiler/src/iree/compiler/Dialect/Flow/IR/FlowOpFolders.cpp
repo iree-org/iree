@@ -769,7 +769,7 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
       }
     }
   }
-  return numNonmatchingSSADims < 2;
+  return numNonmatchingSSADims <= 1;
 }
 
 //===----------------------------------------------------------------------===//
