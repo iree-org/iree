@@ -1018,7 +1018,7 @@ static bool incrementIndices(MutableArrayRef<int64_t> indices,
 }
 
 /// Flattens the input vector `value` to 1-D if the rank is greater than 1. Note
-/// that 0-D vector is returned directly.
+/// that it returns the value directly if it is a 0-D vector.
 static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   Type type = value.getType();
   VectorType vectorType = llvm::dyn_cast<VectorType>(type);
