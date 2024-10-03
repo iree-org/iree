@@ -260,7 +260,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributePass());
 
   // Post bufferization optimizations.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -393,7 +393,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // TODO: This LICM instance is load bearing due to brittleness of the
   // hoisting and fusion pass, as well as a lack of a fallback distribution
   // pass.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   {
     OptimizeTensorInsertExtractSlicesPassOptions options;
     options.foldIdentitySlices = true;
@@ -405,7 +405,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createFuseAndHoistParallelLoopsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(IREE::GPU::createCombineBarrierRegionsPass());
 
   // Step 6. Lower special ops and vectorize.
@@ -432,7 +432,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 9. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   if (pipelineOptions.enableReduceSharedMemoryBankConflicts) {
     GPUReduceBankConflictsPassOptions options = {};
     options.paddingBits = 64;
@@ -481,7 +481,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUDistributeScfForPass(options));
 
   // Post bufferization optimizations.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -545,7 +545,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   funcPassManager.addPass(createGPUPipeliningPass());
 }
@@ -608,7 +608,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   GPUPipeliningPassOptions pipelieningOptions = {};
   pipelieningOptions.epiloguePeeling = false;
@@ -675,7 +675,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createCSEPass());
 
   // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   GPUPipeliningPassOptions pipelieningOptions = {};
   pipelieningOptions.epiloguePeeling = false;
@@ -838,7 +838,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // Set anchors at tensor level for vector distribution later and hoist out
   // loop invariant anchors.
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
@@ -919,7 +919,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -928,7 +928,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createForOpCanonicalizationPass());
@@ -1023,13 +1023,13 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(memref::createExpandStridedMetadataPass)
       // Hoist loop invariant variables to give affine decomposition pass the
       // right loop dependencies.
-      .addPass(createLoopInvariantCodeMotionPass)
+      .addPass(createSafeLoopInvariantCodeMotionPass)
       // Decompose affine ops.
       .addPass(createDecomposeAffineOpsPass)
       // Get rid of the redundant computations.
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
-      .addPass(createLoopInvariantCodeMotionPass)
+      .addPass(createSafeLoopInvariantCodeMotionPass)
       .addPass(createLowerAffinePass);
 }
 
