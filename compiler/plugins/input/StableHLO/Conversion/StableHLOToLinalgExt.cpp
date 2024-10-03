@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements IREE-specific logic for lowering StableHLO/CHLO dialects to
+// Implements IREE-specific logic for lowering StableHLO dialects to
 // LinalgExt dialect.
 
 #include <algorithm>
@@ -33,7 +33,6 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -633,104 +632,6 @@ struct ScanOpConversion final
                                       signatureConverter);
 
     rewriter.replaceOp(op, scanOp.getResult(0));
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// TopkOp
-//===----------------------------------------------------------------------===//
-
-struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(chlo::TopKOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    Value operand = adaptor.getOperand();
-
-    auto inputValuesType = llvm::dyn_cast<ShapedType>(operand.getType());
-    auto outputValuesType =
-        llvm::dyn_cast<ShapedType>(op.getValues().getType());
-    auto outputIndicesType =
-        llvm::dyn_cast<ShapedType>(op.getIndices().getType());
-    if (!inputValuesType || !outputValuesType || !outputIndicesType) {
-      return rewriter.notifyMatchFailure(
-          op, "Input and output must be of ShapedType");
-    }
-
-    Type valueElementType = inputValuesType.getElementType();
-    Type indicesElementType = outputIndicesType.getElementType();
-    // Only handle integer types for indicies. Index type is not supported.
-    if (!llvm::isa<IntegerType>(indicesElementType)) {
-      return rewriter.notifyMatchFailure(
-          op, "Output indices must be of integer type.");
-    }
-
-    // Create and initialize output tensors for LinalgExt TopK results
-    // Define the output types based on the results of CHLO TopK
-    SmallVector<OpFoldResult> mixedSizes =
-        tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
-    mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
-    Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, valueElementType);
-    Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, indicesElementType);
-    // Initialize indices to 0 and values to negative infinity
-    TypedAttr negInfAttr;
-    if (auto intType = llvm::dyn_cast<IntegerType>(valueElementType)) {
-      negInfAttr = rewriter.getIntegerAttr(
-          intType, APInt::getSignedMinValue(intType.getWidth()));
-    } else {
-      auto negApFloat = APFloat::getInf(
-          llvm::cast<FloatType>(valueElementType).getFloatSemantics(),
-          /*Negative=*/true);
-      negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
-    }
-    Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-    TypedAttr posInfAttr = rewriter.getIntegerAttr(
-        indicesElementType, APInt::getSignedMaxValue(32));
-    Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
-    Value negInfTensor =
-        rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
-            .result();
-    Value posInfTensor =
-        rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
-            .result();
-
-    // Replace the CHLO TopK with LinalgExt TopK
-    uint64_t kDim = inputValuesType.getRank() - 1;
-    SmallVector<Type> newResultTypes;
-    newResultTypes.push_back(outputValuesType.cloneWith(
-        outputValuesType.getShape(), valueElementType));
-    for (int i = 1; i < op->getResultTypes().size(); i++) {
-      newResultTypes.push_back(op->getResultTypes()[i]);
-    }
-    auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
-        op, newResultTypes, ValueRange{operand},
-        ValueRange{negInfTensor, posInfTensor}, kDim);
-
-    // Define the region of TopK with a GT comparison
-    SmallVector<Type> types(2, valueElementType);
-    SmallVector<Location> locations(2, loc);
-    Block *block =
-        rewriter.createBlock(&topkOp.getRegion(), {}, types, locations);
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(block);
-      Value lhs = block->getArgument(0);
-      Value rhs = block->getArgument(1);
-      Value condition;
-      if (llvm::isa<IntegerType>(valueElementType)) {
-        condition = rewriter.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::sge, lhs, rhs);
-      } else {
-        condition = rewriter.create<arith::CmpFOp>(
-            loc, arith::CmpFPredicate::OGT, lhs, rhs);
-      }
-      rewriter.create<IREE::LinalgExt::YieldOp>(loc, condition);
-    }
-
     return success();
   }
 };

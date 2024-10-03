@@ -35,7 +35,6 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -553,7 +552,6 @@ struct ConvertStableHloToIreeInputDialects final
       return true;
     };
 
-    target.addIllegalDialect<mlir::chlo::ChloDialect>();
     target.addIllegalDialect<mlir::stablehlo::StablehloDialect>();
 
     // Functions must have legal types.

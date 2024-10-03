@@ -62,7 +62,6 @@ iree_cc_library(
   DEPS
     ::ComplexLoweringPatterns
     ::PassHeaders
-    ChloOps
     LLVMSupport
     MLIRArithDialect
     MLIRControlFlowDialect

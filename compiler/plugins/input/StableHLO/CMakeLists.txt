@@ -27,7 +27,6 @@ iree_cc_library(
   SRCS
     "PluginRegistration.cpp"
   DEPS
-    ChloOps
     MLIRIR
     MLIRPass
     MLIRShapeDialect

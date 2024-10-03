@@ -13,7 +13,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 //===----------------------------------------------------------------------===//
-// General StableHLO/CHLO preprocessing patterns.
+// General StableHLO preprocessing patterns.
 //===----------------------------------------------------------------------===//
 
 /// Collection of canonicalization patterns for StableHLO.

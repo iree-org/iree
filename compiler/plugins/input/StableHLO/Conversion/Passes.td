@@ -46,11 +46,6 @@ def LegalizeControlFlow :
   let summary = "Legalizes from StableHLO control flow to SCF control flow";
 }
 
-def LegalizeChlo :
-    InterfacePass<"iree-stablehlo-legalize-chlo", "mlir::FunctionOpInterface"> {
-  let summary = "Legalizes from CHLO ops flow to StableHLO and Shape ops";
-}
-
 def LegalizeStableHLOCustomCalls :
     InterfacePass<"iree-stablehlo-legalize-custom-calls", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes specialized custom calls to decomposed implementations";

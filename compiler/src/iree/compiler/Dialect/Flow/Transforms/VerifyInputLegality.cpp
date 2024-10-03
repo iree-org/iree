@@ -28,7 +28,6 @@ struct VerifyInputLegalityPass
     // We're already depending on the Tosa Dialect
     target.addIllegalDialect<tosa::TosaDialect>();
     // Avoid StableHLO dependency
-    target.addIllegalDialect("chlo");
     target.addIllegalDialect("stablehlo");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
