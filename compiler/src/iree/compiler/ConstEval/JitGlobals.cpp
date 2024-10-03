@@ -464,19 +464,14 @@ struct StripFlowTensorTransferPattern
   }
 };
 
-// If an op that implements AffinityOpInterface has an optional stream affinity
+// If an op that implements AffinityOpInterface has an stream affinity
 // attribute, remove it.
-struct StripStreamAffinityOptionalAttributePattern
+struct StripStreamAffinityAttributePattern
     : public OpInterfaceRewritePattern<IREE::Stream::AffinityOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Stream::AffinityOpInterface op,
                                 PatternRewriter &rewriter) const override {
-    // Shouldn't we reject ops for which `op.requiresAffinity() == true`?
-    // For example there are a lot of ops in the Flow dialect that
-    // have this property, but do they really require an affinity?
-    // See
-    // compiler/src/iree/compiler/ExternalInterfaces/StreamExternalModels.cpp
     if (op.getAffinityAttr() == nullptr) {
       return failure();
     }
@@ -488,13 +483,13 @@ struct StripStreamAffinityOptionalAttributePattern
 // Remove device/queue affinities for the IR.
 // E.g. remove `flow.tensor.transfer` ops.
 static LogicalResult
-stripExecutionContextAffinities(IREE::Util::FuncOp moduleOp) {
-  RewritePatternSet patterns(moduleOp->getContext());
-  patterns.add<StripFlowTensorTransferPattern,
-               StripStreamAffinityOptionalAttributePattern>(
-      moduleOp.getContext());
-  if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
-    return emitError(moduleOp->getLoc())
+stripExecutionContextAffinities(IREE::Util::FuncOp funcOp) {
+  RewritePatternSet patterns(funcOp->getContext());
+  patterns
+      .add<StripFlowTensorTransferPattern, StripStreamAffinityAttributePattern>(
+          funcOp.getContext());
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return emitError(funcOp->getLoc())
            << "Stripping execution context affinities failed";
   }
   return success();
