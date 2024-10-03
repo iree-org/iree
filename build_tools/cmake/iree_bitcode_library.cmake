@@ -62,7 +62,7 @@ function(iree_bitcode_library)
     # Enable inline asm.
     "-fasm"
 
-    # Object file only in bitcode format:
+    # Object file only in bitcode format.
     "-c"
     "-emit-llvm"
 
@@ -175,7 +175,7 @@ function(iree_cuda_bitcode_library)
     # Optimized and unstamped.
     "-O3"
 
-    # Object file only in bitcode format:
+    # Object file only in bitcode format.
     "-c"
     "-emit-llvm"
   )
@@ -226,7 +226,6 @@ function(iree_cuda_bitcode_library)
     DEPENDS "${_OUT}"
   )
 endfunction()
-
 
 # iree_link_bitcode()
 #
