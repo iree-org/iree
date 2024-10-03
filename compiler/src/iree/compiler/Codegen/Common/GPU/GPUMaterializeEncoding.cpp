@@ -404,7 +404,7 @@ public:
     AffineExpr nExpr = rewriter.getAffineDimExpr(1);
     AffineExpr kExpr = rewriter.getAffineDimExpr(2);
 
-    // The outer dims are all in row-major fasion after relayout.
+    // The outer dims are all in row-major order after relayout.
     auto lhsMap = AffineMap::get(3, 0, {mExpr, kExpr}, ctx);
     auto rhsMap = AffineMap::get(3, 0, {nExpr, kExpr}, ctx);
     auto accMap = AffineMap::get(3, 0, {mExpr, nExpr}, ctx);
@@ -432,8 +432,16 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                   targetAttr);
+    // On GPU, we use transposeNarrowN=false for a combination of reasons:
+    // 1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
+    //    its semantics from the wrapped intrinsic, we can't rely on any kind of
+    //    LHS<->RHS symmetry.
+    // 2. We do not currently use ukernels, which would be one of the main ares
+    //    to benefit from transposeNarrowN.
+    // 3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
+    //    runtime, so we don't need a simplification at that level either.
+    MaterializeEncodingTypeConverter typeConverter(
+        materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false);
     MaterializeEncodingConversionTarget target(*funcOp.getContext());
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,

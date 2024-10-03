@@ -235,7 +235,7 @@ FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
   if (!encoding) {
     return failure();
   }
-  if (isNarrowNResult(encoding)) {
+  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
     transposeInPlace(*encodingInfo);
   }
 
@@ -273,7 +273,8 @@ FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
   if (failed(encodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
-  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(sourceType))) {
+  auto encoding = IREE::Encoding::getEncodingAttr(sourceType);
+  if (typeConverter.getTransposeNarrowN() && isNarrowNResult(encoding)) {
     transposeInPlace(*encodingInfo);
   }
   // Create an `tensor.empty` for the result of the unpack operation.
@@ -329,7 +330,8 @@ static FailureOr<Operation *> lowerContractionOpWithEncoding(
                                     operands.take_front(inputs.size()),
                                     operands.drop_front(inputs.size()));
   } else {
-    bool transpose = isNarrowNResult(resultEncoding);
+    bool transpose =
+        typeConverter.getTransposeNarrowN() && isNarrowNResult(resultEncoding);
     auto elemTypes = llvm::map_to_vector(
         lhsEncoding.getElementTypes().getValue(),
         [](Attribute a) { return cast<TypeAttr>(a).getValue(); });
@@ -380,7 +382,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
     return newEmptyOp;
   }
 
-  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
+  if (typeConverter.getTransposeNarrowN() &&
+      isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
     transposeInPlace(*encodingInfo);
   }
 
@@ -556,7 +559,8 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   if (failed(encodingInfo)) {
     return failure();
   }
-  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
+  if (typeConverter.getTransposeNarrowN() &&
+      isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
     transposeInPlace(*encodingInfo);
   }
 
