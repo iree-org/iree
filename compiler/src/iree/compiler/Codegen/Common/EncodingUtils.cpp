@@ -92,8 +92,9 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     MaterializeEncodingFn materializeEncodingFn,
-    IREE::HAL::ExecutableTargetAttr targetAttr)
-    : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr) {
+    IREE::HAL::ExecutableTargetAttr targetAttr, bool transposeNarrowN)
+    : materializeEncodingFn(materializeEncodingFn), targetAttr(targetAttr),
+      transposeNarrowN(transposeNarrowN) {
   addConversion([](IntegerType intType) { return intType; });
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
@@ -102,7 +103,8 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
     // For a given tensor type with an encoding, return the materialized
     // type to use for it. If no encoding is set, then return the tensor type
     // itself.
-    RankedTensorType tensorType = transposeIfNarrowNResult(type);
+    RankedTensorType tensorType =
+        transposeNarrowN ? transposeIfNarrowNResult(type) : type;
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfo(tensorType);
     if (failed(maybeEncodingInfo)) {
