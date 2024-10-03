@@ -436,7 +436,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // 1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
     //    its semantics from the wrapped intrinsic, we can't rely on any kind of
     //    LHS<->RHS symmetry.
-    // 2. We do not currently use ukernels, which would be one of the main ares
+    // 2. We do not currently use ukernels, which would be one of the main areas
     //    to benefit from transposeNarrowN.
     // 3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
     //    runtime, so we don't need a simplification at that level either.
