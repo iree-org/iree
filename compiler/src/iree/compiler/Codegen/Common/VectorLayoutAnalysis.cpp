@@ -548,10 +548,6 @@ static void propagateLayoutToGatherOp(
     ArrayRef<DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
 
-  // We do not support multiple results yet.
-  if (resultLattices.size() != 1)
-    return;
-
   DistributionLayout *result = resultLattices[0];
 
   const DistributionLayout *indicesLayout = operandLattices[0];
@@ -559,11 +555,6 @@ static void propagateLayoutToGatherOp(
   // If result lattice already has a layout, we cannot do anything. We do not
   // impose layout conflicts on results.
   if (result->hasLayout()) {
-    return;
-  }
-
-  // Cannot propagate layout if value is uninitialized.
-  if (indicesLayout->isUninitialized()) {
     return;
   }
 
