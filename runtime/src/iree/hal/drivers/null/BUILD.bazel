@@ -1,0 +1,50 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "null",
+    srcs = [
+        "allocator.c",
+        "allocator.h",
+        "buffer.c",
+        "buffer.h",
+        "channel.c",
+        "channel.h",
+        "command_buffer.c",
+        "command_buffer.h",
+        "device.c",
+        "device.h",
+        "driver.c",
+        "driver.h",
+        "event.c",
+        "event.h",
+        "executable.c",
+        "executable.h",
+        "executable_cache.c",
+        "executable_cache.h",
+        "semaphore.c",
+        "semaphore.h",
+    ],
+    hdrs = [
+        "api.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:file_transfer",
+        "//runtime/src/iree/hal/utils:memory_file",
+        "//runtime/src/iree/hal/utils:semaphore_base",
+    ],
+)
