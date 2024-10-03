@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "compiler_hints.mlir"
     "structural_ops.mlir"
   TOOLS
     FileCheck
