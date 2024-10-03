@@ -79,6 +79,7 @@
 # Runtime
 /runtime/src/iree/ @benvanik
 /runtime/src/iree/hal/cts/ @ScottTodd
+/runtime/src/iree/hal/drivers/amdgpu/ @benvanik
 /runtime/src/iree/hal/drivers/cuda/ @antiagainst
 /runtime/src/iree/hal/drivers/hip/ @antiagainst @nithinsubbiah
 /runtime/src/iree/hal/drivers/metal/ @antiagainst

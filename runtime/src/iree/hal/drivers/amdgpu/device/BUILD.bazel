@@ -1,0 +1,66 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Common sources
+#===------------------------------------------------------------------------===#
+
+BITCODE_SRCS = glob([
+    "*.c",
+    "support/*.c",
+])
+
+BITCODE_HDRS = glob([
+    "*.h",
+    "support/*.h",
+])
+
+#===------------------------------------------------------------------------===#
+# Architecture-specific Binaries
+#===------------------------------------------------------------------------===#
+# NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
+# match them at runtime without having to load and reflect each code object.
+
+iree_amdgpu_binary(
+    name = "amdgcn-amd-amdhsa--gfx1100",
+    srcs = BITCODE_SRCS,
+    arch = "gfx1100",
+    internal_hdrs = BITCODE_HDRS,
+    target = "amdgcn-amd-amdhsa",
+)
+
+#===------------------------------------------------------------------------===#
+# Embedded Binary Table
+#===------------------------------------------------------------------------===#
+
+iree_c_embed_data(
+    name = "binaries",
+    srcs = [
+        ":amdgcn-amd-amdhsa--gfx1100.so",
+    ],
+    c_file_output = "binaries.c",
+    flatten = True,
+    h_file_output = "binaries.h",
+    identifier = "iree_hal_amdgpu_device_binaries",
+)
+
+#===------------------------------------------------------------------------===#
+# Exported Headers
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "headers",
+    hdrs = BITCODE_HDRS,
+)
