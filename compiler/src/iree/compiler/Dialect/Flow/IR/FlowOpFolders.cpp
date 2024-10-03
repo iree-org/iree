@@ -744,15 +744,15 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() && rhsType.hasStaticShape() &&
-      lhsType == rhsType) {
+  if (lhsType.hasStaticShape() && rhsType.hasStaticShape()) {
     // Static shape equivalence means we can fast-path the check.
-    return true;
+    return lhsType == rhsType;
   }
   if (lhsType.getRank() != rhsType.getRank()) {
     return false;
   }
   unsigned dynamicDimIndex = 0;
+  unsigned numNonmatchingSSADims = 0;
   for (unsigned i = 0; i < lhsType.getRank(); ++i) {
     if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
       // Static/dynamic dimension mismatch - definitely differ.
@@ -760,8 +760,7 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
     } else if (lhsType.isDynamicDim(i)) {
       unsigned j = dynamicDimIndex++;
       if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
-        // Dynamic dimensions with different SSA values - probably differ.
-        return false;
+        numNonmatchingSSADims++;
       }
     } else {
       if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
@@ -770,7 +769,7 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
       }
     }
   }
-  return true;
+  return numNonmatchingSSADims < 2;
 }
 
 //===----------------------------------------------------------------------===//

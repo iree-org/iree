@@ -112,7 +112,7 @@ util.func public @reshapeNoOpDynamic(%arg0: tensor<4x?xf32>, %dim: index) -> ten
 
 // CHECK-LABEL: @reshapeDynamicDifferent
 util.func public @reshapeDynamicDifferent(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index) -> tensor<4x?xf32> {
-  // CHECK-NEXT: flow.tensor.reshape %arg0
+  // CHECK-NEXT: util.return %arg0 : tensor<4x?xf32>
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
   util.return %0 : tensor<4x?xf32>
 }
@@ -123,10 +123,9 @@ util.func public @reshapeDynamicDifferent(%arg0: tensor<4x?xf32>, %dim0: index, 
 // CHECK-SAME: %[[ARG:.+]]: tensor<4x?xf32>,
 // CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index
 util.func public @flattenReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<4x?xf32> {
-  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<4x?xf32>{%[[DIM0]]} -> tensor<4x?xf32>{%[[DIM2]]}
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
   %1 = flow.tensor.reshape %0 : tensor<4x?xf32>{%dim1} -> tensor<4x?xf32>{%dim2}
-  // CHECK-NEXT: util.return %[[RET]]
+  // CHECK-NEXT: util.return %[[ARG]]
   util.return %1 : tensor<4x?xf32>
 }
 
