@@ -91,12 +91,27 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    ResolveCPUAndCPUFeatures
+  HDRS
+    "ResolveCPUAndCPUFeatures.h"
+  SRCS
+    "ResolveCPUAndCPUFeatures.cpp"
+  DEPS
+    LLVMSupport
+    LLVMTarget
+    LLVMTargetParser
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     LLVMTargetOptions
   HDRS
     "LLVMTargetOptions.h"
   SRCS
     "LLVMTargetOptions.cpp"
   DEPS
+    ::ResolveCPUAndCPUFeatures
     LLVMAnalysis
     LLVMCore
     LLVMMC
