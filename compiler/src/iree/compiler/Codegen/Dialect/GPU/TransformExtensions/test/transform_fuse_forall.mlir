@@ -371,3 +371,49 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:         scf.yield
 //       CHECK:       unroll_loop
 //       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 4)>
+#map1 = affine_map<(d0) -> (d0 * 16)>
+module {
+  func.func @fuse_forall_dynamic_output(%arg0: tensor<?x128xf32>, %size: index, %x: index, %y: index) -> tensor<128x128xf32> {
+    %0 = tensor.empty(%size) : tensor<?x128xf32>
+    %1 = tensor.empty() : tensor<128x128xf32>
+    %2 = scf.forall (%arg5, %arg6) in (%x, %y) shared_outs(%arg7 = %0) -> (tensor<?x128xf32>) {
+      %slice = tensor.extract_slice %arg0[%arg5, %arg6] [4, 128] [1, 1] : tensor<?x128xf32> to tensor<4x128xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %slice into %arg7[%arg5, %arg6] [4, 128] [1, 1] : tensor<4x128xf32> into tensor<?x128xf32>
+      }
+    } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+    %3 = scf.forall (%arg5, %arg6) in (8, 8) shared_outs(%arg7 = %1) -> (tensor<128x128xf32>) {
+      %6 = affine.apply #map1(%arg5)
+      %7 = affine.apply #map1(%arg6)
+      %extracted_slice_0 = tensor.extract_slice %2[%6, %7] [16, 16] [1, 1] : tensor<?x128xf32> to tensor<16x16xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg7[%6, %7] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+      %8 = linalg.matmul ins(%extracted_slice_0, %extracted_slice_0 : tensor<16x16xf32>, tensor<16x16xf32>) outs(%extracted_slice_1 : tensor<16x16xf32>) -> tensor<16x16xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %8 into %arg7[%6, %7] [16, 16] [1, 1] : tensor<16x16xf32> into tensor<128x128xf32>
+      }
+    } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+    return %3 : tensor<128x128xf32>
+  }
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %loops = transform.structured.match ops{["scf.forall"]} in %root : (!transform.any_op) -> !transform.any_op
+    %producer, %consumer = transform.split_handle %loops : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.iree.fuse_forall %producer into %consumer : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @fuse_forall_dynamic_output
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<?x128xf32>
+//  CHECK-SAME:   %[[SIZE:[A-Za-z0-9]+]]: index
+
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor(%[[SIZE]])
+//  CHECK-SAME:     memory_space = #gpu.address_space<workgroup>} : tensor<?x128xf32>
+//       CHECK:   scf.forall ({{.*}}) in (8, 8) {{.*}} -> (tensor<128x128xf32>) {
+//       CHECK:     iree_gpu.barrier_region ins(%[[ALLOC]]

@@ -110,8 +110,10 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-      empty->getLoc(), empty->getResultTypes()[0], empty.getDynamicSizes());
-  allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+      empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
+      empty.getDynamicSizes(),
+      /*copy=*/Value(), /*size_hint=*/Value(),
+      /*memory_space=*/sharedMemoryAddrSpace);
   return allocTensor.getResult();
 }
 
