@@ -39,34 +39,34 @@ jobs:
       matrix:
         include:
           # Ubuntu packages.
-          - runs-on: ubuntu-20.04
-            build-family: linux-x86_64
-            build-package: main-dist-linux
-            experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: main-dist-linux
-            experimental: true
-          - runs-on: ubuntu-20.04
-            build-family: linux-x86_64
-            build-package: py-compiler-pkg
-            experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: py-compiler-pkg
-            experimental: true
+          # - runs-on: ubuntu-20.04
+          #   build-family: linux-x86_64
+          #   build-package: main-dist-linux
+          #   experimental: false
+          # - runs-on: ah-ubuntu_22_04-c7g_4x-50
+          #   build-family: linux-aarch64
+          #   build-package: main-dist-linux
+          #   experimental: true
+          # - runs-on: ubuntu-20.04
+          #   build-family: linux-x86_64
+          #   build-package: py-compiler-pkg
+          #   experimental: false
+          # - runs-on: ah-ubuntu_22_04-c7g_4x-50
+          #   build-family: linux-aarch64
+          #   build-package: py-compiler-pkg
+          #   experimental: true
           - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
-          - runs-on: ah-ubuntu_22_04-c7g_4x-50
-            build-family: linux-aarch64
-            build-package: py-runtime-pkg
-            experimental: true
-          - runs-on: ubuntu-20.04
-            build-family: linux-x86_64
-            build-package: py-tf-compiler-tools-pkg
-            experimental: false
+          # - runs-on: ah-ubuntu_22_04-c7g_4x-50
+          #   build-family: linux-aarch64
+          #   build-package: py-runtime-pkg
+          #   experimental: true
+          # - runs-on: ubuntu-20.04
+          #   build-family: linux-x86_64
+          #   build-package: py-tf-compiler-tools-pkg
+          #   experimental: false
 
           # MacOS packages.
           # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
@@ -74,10 +74,10 @@ jobs:
           #     - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-14' }}
           #     - os-family=macOS
           #     - runner-group=postsubmit
-          - runs-on: macos-14
-            build-family: macos
-            build-package: py-compiler-pkg
-            experimental: true
+          # - runs-on: macos-14
+          #   build-family: macos
+          #   build-package: py-compiler-pkg
+          #   experimental: true
           - runs-on: macos-14
             build-family: macos
             build-package: py-runtime-pkg
@@ -87,10 +87,10 @@ jobs:
           # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
           # - runs-on:
           #     - ${{ github.repository == 'iree-org/iree' && 'windows-2022-64core' || 'windows-2022'}}
-          - runs-on: windows-2022
-            build-family: windows
-            build-package: py-compiler-pkg
-            experimental: true
+          # - runs-on: windows-2022
+          #   build-family: windows
+          #   build-package: py-compiler-pkg
+          #   experimental: true
           - runs-on: windows-2022
             build-family: windows
             build-package: py-runtime-pkg
