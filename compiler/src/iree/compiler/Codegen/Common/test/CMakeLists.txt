@@ -60,6 +60,7 @@ iree_lit_test_suite(
     "remove_trivial_loops.mlir"
     "repeated_matcher_use.mlir"
     "replace_slow_min_max_ops.mlir"
+    "safe_loop_invariant_code_motion.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "tile_and_distribute_to_workgroups_func_scope.mlir"

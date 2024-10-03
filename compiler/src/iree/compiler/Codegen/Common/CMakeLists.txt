@@ -126,6 +126,7 @@ iree_cc_library(
     "RematerializeParallelOps.cpp"
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
+    "SafeLoopInvariantCodeMotion.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
