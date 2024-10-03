@@ -49,8 +49,7 @@ getVectorTileSizesFromLoopRanges(SmallVector<int64_t> loopRanges,
                                  bool allowMultiDimCollapse = true) {
   // If any loop ranges are dynamic, default to a simple vector size based
   // tile size.
-  if (llvm::any_of(loopRanges,
-                   [](int64_t s) { return ShapedType::isDynamic(s); })) {
+  if (llvm::any_of(loopRanges, &ShapedType::isDynamic)) {
     return getVectorSizeTileSizes(loopRanges.size(), loopRanges.back(),
                                   vectorSize);
   }
