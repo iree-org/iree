@@ -538,6 +538,8 @@ hal.executable public @pad_batch_matmul {
 // CHECK: vector.transfer_write
 // The last dimension of output needs to be padded to intrinsic shape
 // CHECK-SAME: in_bounds = [true, true, false]
+// CHECK-SAME: vector<1x4x1xf32>
+// CHECK-SAME: memref<1x16x24xf32
 
 // -----
 
