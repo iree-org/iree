@@ -98,8 +98,7 @@ jobs:
 
     env:
       # These are also set in: build_tools/python_deploy/build_linux_packages.sh
-      # TODO(#18652): bump these versions to include python 3.13
-      MANYLINUX_X86_64_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399
+      MANYLINUX_X86_64_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4
       MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
