@@ -83,6 +83,8 @@ function(iree_static_linker_test)
   list(APPEND _COMPILER_ARGS "--iree-hal-target-backends=llvm-cpu")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _COMPILER_ARGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+  else()
+  list(APPEND _COMPILER_ARGS "--iree-llvmcpu-target-cpu=generic")
   endif()
 
   if(_RULE_EMITC)

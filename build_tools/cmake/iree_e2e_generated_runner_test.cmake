@@ -29,8 +29,6 @@ include(CMakeParseArguments)
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
-#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvmcpu-target-cpu-features.
 #   TEST_DEFINED: Whether to define a test target.
 #   TEST_DISABLED: The test target will be skipped and its status will be
 #       'Not Run'.
@@ -48,7 +46,7 @@ function(iree_e2e_runner_test)
     _RULE
     ""
     "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
 
@@ -63,9 +61,6 @@ function(iree_e2e_runner_test)
   set(_BASE_COMPILER_FLAGS
     "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
   )
-  if (_RULE_TARGET_CPU_FEATURES)
-    list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
-  endif()
 
   if(NOT TARGET "${_NAME}_${_RULE_TEST_TYPE}_module")
     iree_bytecode_module(
@@ -140,7 +135,7 @@ endfunction()
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
 #         --output_${TEST_TYPE}_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}.mlir
 #         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
-#       and if TARGET_CPU_FEATURES is not empty:
+#       and if COMPILER_FLAGS contains "--iree-llvmcpu-target-cpu_features=${TARGET_CPU_FEATURES}":
 #         --requirements=${TARGET_CPU_FEATURES}
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKEND: target backend to compile for.
@@ -152,8 +147,6 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
-#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvmcpu-target-cpu-features.
 function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -163,12 +156,11 @@ function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
     return()
   endif()
-
   cmake_parse_arguments(
     _RULE
     ""
     "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
-    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
+    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
 
@@ -251,9 +243,13 @@ function(iree_single_backend_e2e_runner_test)
 
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_${_RULE_TEST_TYPE}_mlir=${_TESTS_SRC}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_calls_mlir=${_CALLS_SRC}")
-  if(_RULE_TARGET_CPU_FEATURES)
-    list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
-  endif()
+  foreach(_COMPILER_FLAG IN LISTS _RULE_COMPILER_FLAGS)
+    set(_CPU_FEATURES_REGEX "^--iree-llvmcpu-target-cpu-features=")
+    if (_COMPILER_FLAG MATCHES "${_CPU_FEATURES_REGEX}")
+      string(REGEX REPLACE "${_CPU_FEATURES_REGEX}" "" _CPU_FEATURES "${_COMPILER_FLAG}")
+      list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_CPU_FEATURES}")
+    endif()
+  endforeach()
 
   if(NOT _BYTECODE_MODULE_BUILD_ENABLED)
     return()
@@ -304,7 +300,6 @@ function(iree_single_backend_e2e_runner_test)
       COMPILER_FLAGS ${_RULE_COMPILER_FLAGS}
       RUNNER_ARGS ${_RULE_RUNNER_ARGS}
       LABELS ${_RULE_LABELS}
-      TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
       TEST_DEFINED ${_TEST_DEFINED}
       TEST_DISABLED ${_TEST_DISABLED}
     )
@@ -338,7 +333,6 @@ function(iree_single_backend_e2e_runner_test)
         COMPILER_FLAGS ${_ASAN_COMPILER_FLAGS}
         RUNNER_ARGS ${_RULE_RUNNER_ARGS}
         LABELS ${_RULE_LABELS}
-        TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
       )
@@ -365,7 +359,6 @@ function(iree_single_backend_e2e_runner_test)
         COMPILER_FLAGS ${_TSAN_COMPILER_FLAGS}
         RUNNER_ARGS ${_RULE_RUNNER_ARGS}
         LABELS ${_RULE_LABELS}
-        TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
       )
@@ -410,9 +403,9 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
-#   TARGET_CPU_FEATURES_VARIANTS:list of target cpu features variants. Each
-#       entry is either "default" for the architecture defaults, or a colon-
-#       separated triple "arch:name:cpu_features" where "arch" filters
+#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
+#       entry is either "generic" for the architecture defaults, or "host" for
+#       the host CPU, or a colon-separated triple "arch:name:cpu_features" where "arch" filters
 #       for a target CPU architecture (in IREE_ARCH format), "name" is a
 #       short name for the CPU features set (used to generate target names)
 #       and cpu_features is a comma-separated list of LLVM target attributes
@@ -439,7 +432,7 @@ function(iree_generated_e2e_runner_test)
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
   else()
-    set(_TARGET_CPU_FEATURES_VARIANTS "default")
+    set(_TARGET_CPU_FEATURES_VARIANTS "generic")
   endif()
 
 
@@ -462,7 +455,7 @@ function(iree_generated_e2e_runner_test)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
     foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       parse_target_cpu_features_variant("${_VARIANT_STRING}"
-        _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)
+        _ENABLED _TARGET_CPU_FEATURES_NAME _VARIANT_COMPILER_FLAGS)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
@@ -490,12 +483,11 @@ function(iree_generated_e2e_runner_test)
           ${_DRIVER}
         COMPILER_FLAGS
           ${_RULE_COMPILER_FLAGS}
+          ${_VARIANT_COMPILER_FLAGS}
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_LABELS}
-        TARGET_CPU_FEATURES
-          ${_TARGET_CPU_FEATURES}
       )
     endforeach()
   endforeach()

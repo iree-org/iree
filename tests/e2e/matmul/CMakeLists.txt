@@ -140,7 +140,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
@@ -168,7 +168,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
@@ -196,7 +196,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fullfp16:+fullfp16"
@@ -225,7 +225,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fp16fml:+fp16fml"
@@ -254,7 +254,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -284,7 +284,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -313,7 +313,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
@@ -341,7 +341,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
@@ -369,7 +369,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fullfp16:+fullfp16"
@@ -398,7 +398,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fp16fml:+fp16fml"
@@ -427,7 +427,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -457,7 +457,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -487,7 +487,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
@@ -516,7 +516,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
@@ -545,7 +545,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fullfp16:+fullfp16"
@@ -575,7 +575,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fp16fml:+fp16fml"
@@ -605,7 +605,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -636,7 +636,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -666,7 +666,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
@@ -695,7 +695,7 @@ iree_generated_e2e_runner_test(
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
@@ -724,7 +724,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fullfp16:+fullfp16"
@@ -754,7 +754,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "arm_64:fp16fml:+fp16fml"
@@ -784,7 +784,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
@@ -815,7 +815,7 @@ iree_generated_e2e_runner_test(
     "noriscv"
     "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"

@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "tosa",
     target_backend = "llvm-cpu",
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 iree_check_single_backend_test_suite(

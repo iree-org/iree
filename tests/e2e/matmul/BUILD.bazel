@@ -46,7 +46,7 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] +
+    target_cpu_features_variants = ["generic"] +
                                    # Widening matmuls fail to lower for SVE.
                                    (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
@@ -149,7 +149,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] +
+    target_cpu_features_variants = ["generic"] +
                                    ([
                                        "arm_64:dotprod:+dotprod",
                                        "arm_64:i8mm:+i8mm",
@@ -216,7 +216,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] +
+    target_cpu_features_variants = ["generic"] +
                                    ([
                                        "arm_64:dotprod:+dotprod",
                                        "arm_64:i8mm:+i8mm",

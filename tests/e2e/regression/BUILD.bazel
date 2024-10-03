@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-llvmcpu-reassociate-fp-reductions=false",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     input_type = "stablehlo",
@@ -81,6 +82,7 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "stablehlo",
     target_backend = "llvm-cpu",
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 iree_check_single_backend_test_suite(
@@ -94,6 +96,7 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "tosa",
     target_backend = "llvm-cpu",
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 iree_check_single_backend_test_suite(
@@ -160,7 +163,10 @@ iree_check_single_backend_test_suite(
     srcs = [
         "disable_demote_f64_to_f32.mlir",
     ],
-    compiler_flags = ["-iree-input-demote-f64-to-f32=false"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-llvmcpu-target-cpu=generic"
+    ],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -172,6 +178,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-dispatch-creation-fuse-multi-use",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",

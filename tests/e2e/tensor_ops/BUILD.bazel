@@ -35,6 +35,7 @@ iree_check_single_backend_test_suite(
     srcs = ALL_SRCS,
     driver = "local-task",
     target_backend = "llvm-cpu",
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 iree_check_single_backend_test_suite(

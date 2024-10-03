@@ -41,6 +41,7 @@ iree_check_single_backend_test_suite(
         "nowasm",
     ],
     target_backend = "llvm-cpu",
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 VMVX_SRCS = enforce_glob(
@@ -92,6 +93,7 @@ iree_check_single_backend_test_suite(
     srcs = WINOGRAD_CONV_SRCS,
     compiler_flags = [
         "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",

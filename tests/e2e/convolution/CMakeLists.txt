@@ -31,8 +31,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -56,8 +54,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -81,8 +77,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -106,8 +100,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -131,8 +123,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -156,8 +146,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -183,8 +171,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -210,8 +196,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -237,8 +221,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -264,8 +246,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -291,8 +271,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -318,8 +296,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
