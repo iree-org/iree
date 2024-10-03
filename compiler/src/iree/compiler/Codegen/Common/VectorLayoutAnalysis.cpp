@@ -542,6 +542,35 @@ static void propagateLayoutToContractionOp(
   update(result, changed);
 }
 
+static void propagateLayoutToGatherOp(
+    vector::GatherOp gather,
+    ArrayRef<const DistributionLayout *> operandLattices,
+    ArrayRef<DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  // We do not support multiple results yet.
+  if (resultLattices.size() != 1)
+    return;
+
+  DistributionLayout *result = resultLattices[0];
+
+  const DistributionLayout *indicesLayout = operandLattices[0];
+
+  // If result lattice already has a layout, we cannot do anything. We do not
+  // impose layout conflicts on results.
+  if (result->hasLayout()) {
+    return;
+  }
+
+  // Cannot propagate layout if value is uninitialized.
+  if (indicesLayout->isUninitialized()) {
+    return;
+  }
+
+  ChangeResult changed = result->resolve(indicesLayout);
+  update(result, changed);
+}
+
 void propagationTransferFunction(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
     ArrayRef<DistributionLayout *> resultLattices,
@@ -574,6 +603,11 @@ void propagationTransferFunction(
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     propagateLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<vector::GatherOp>(op)) {
+    propagateLayoutToGatherOp(gather, operandLattices, resultLattices, update);
     return;
   }
 
@@ -860,7 +894,6 @@ void PropagateLayout::visitOperation(Operation *op) {
     if (!isa<VectorType>(operand.getType())) {
       continue;
     }
-
     DistributionLayout *operandLattice = getLatticeElement(operand);
     operandLattices.push_back(operandLattice);
   }

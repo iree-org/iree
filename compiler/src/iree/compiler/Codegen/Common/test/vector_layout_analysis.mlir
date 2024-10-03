@@ -190,6 +190,33 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+
+// Propagate the layout from transfer_read to everyone.
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @gather(%base: memref<16x16xf16>, %arr: memref<16x16xindex>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %mask = arith.constant dense<true> : vector<16x16xi1>
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    %pass = arith.constant dense<0.000000e+00> : vector<16x16xf16>
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    %index = vector.transfer_read %arr[%c0, %c0], %c0 {in_bounds = [true, true]} : memref<16x16xindex>, vector<16x16xindex>
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    %index_dist = iree_vector_ext.to_layout %index to layout(#layout) : vector<16x16xindex>
+    %c = vector.gather %base[%c0, %c0] [%index_dist], %mask, %pass : memref<16x16xf16>, vector<16x16xindex>, vector<16x16xi1>, vector<16x16xf16> into vector<16x16xf16>
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ VECTORX], [16]>>}}
+    func.return %c : vector<16x16xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 // This test checks that we can resolve layouts through arith.select
 // properly and that our layout analysis is not emitting redundant
 // to_layout conversions in between anchor ops.
