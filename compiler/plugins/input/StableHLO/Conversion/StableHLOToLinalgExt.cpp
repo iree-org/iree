@@ -694,8 +694,7 @@ void populateStableHloToLinalgExtConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns) {
   patterns->add<ScanOpConversion, SortOpConversion, ScatterOpConversion,
-                FftOpConversion, ReverseOpConversion, TopkOpConversion>(
-      typeConverter, context);
+                FftOpConversion, ReverseOpConversion>(typeConverter, context);
 
   // FIXME: It shouldn't be necessary to list every matching StableHlo op
   // here, especially since they're already listed in
