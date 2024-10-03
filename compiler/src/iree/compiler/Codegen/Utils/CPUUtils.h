@@ -22,20 +22,17 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 /// Creates a string attribute containing the name of the attribute that is
 /// used to enable decomposition.
 StringAttr getEnableDecompositionAttrName(MLIRContext *ctx);
-
-/// Checks whether loop peeling has been enabled for the input function. This
-/// is infered from the config dict. attribute that's part of to the
-/// translation info corresponding to this funciton.
-bool isDecompositionEnabled(FunctionOpInterface funcOp);
+std::string getEnableDecompositionStr();
 
 /// Creates a string attribute containing the name of the attribute that is
 /// used to enable loop peeling.
 StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx);
+std::string getEnableLoopPeelingStr();
 
-/// Checks whether loop peeling has been enabled for the input function. This
-/// is infered from the config dictt. attribute that's part of to the
-/// translation info corresponding to this funciton.
-bool isLoopPeelingEnabled(FunctionOpInterface funcOp);
+/// Returns true if the UnitAttr of the `label` is enabled for the input
+/// function. This is is infered from the config dictionary. attribute that's
+/// part of to the translation info corresponding to this funciton.
+bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 
 } // namespace mlir::iree_compiler
 
