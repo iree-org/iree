@@ -66,6 +66,7 @@ iree_cc_library(
     iree::compiler::Utils
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
+    iree::schemas::hsa_executable_def_c_fbs
   PUBLIC
 )
 

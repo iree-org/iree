@@ -106,6 +106,12 @@ typedef struct iree_string_view_list_t {
   const iree_string_view_t* values;
 } iree_string_view_list_t;
 
+// Returns an empty string list.
+static inline iree_string_view_list_t iree_string_view_list_empty(void) {
+  iree_string_view_list_t v = {0, NULL};
+  return v;
+}
+
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs);

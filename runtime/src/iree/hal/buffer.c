@@ -570,7 +570,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_calculate_range(
   // Calculate the real ranges adjusted for our region within the allocation.
   iree_device_size_t adjusted_offset = base_offset + offset;
   iree_device_size_t adjusted_length =
-      length == IREE_WHOLE_BUFFER ? max_length - offset : length;
+      length == IREE_WHOLE_BUFFER ? max_length - adjusted_offset : length;
   if (adjusted_length == 0) {
     // Fine to have a zero length.
     *out_adjusted_offset = adjusted_offset;

@@ -47,6 +47,13 @@ iree_flatbuffer_c_library(
 )
 
 iree_flatbuffer_c_library(
+    name = "hsa_executable_def_c_fbs",
+    srcs = ["hsa_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
+)
+
+iree_flatbuffer_c_library(
     name = "metal_executable_def_c_fbs",
     srcs = ["metal_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
@@ -74,6 +81,7 @@ iree_build_test(
         ":cuda_executable_def_c_fbs",
         ":executable_debug_info_c_fbs",
         ":hip_executable_def_c_fbs",
+        ":hsa_executable_def_c_fbs",
         ":metal_executable_def_c_fbs",
         ":vulkan_executable_def_c_fbs",
         ":webgpu_executable_def_c_fbs",
