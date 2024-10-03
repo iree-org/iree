@@ -12,6 +12,7 @@
 #map3 = affine_map<()[s0] -> (s0 * -128 + 1281, 128)>
 #map4 = affine_map<()[s0] -> (-s0 + 64)>
 #map5 = affine_map<()[s0] -> (-s0 + 128)>
+#config = #iree_gpu.lowering_config<{workgroup = [1, 16, 16, 0], reduction = [0, 0, 0, 16]}>
 #translation = #iree_codegen.translation_info<None, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 func.func @batch_matmul_f16() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f16
@@ -30,7 +31,7 @@ func.func @batch_matmul_f16() attributes {translation_info = #translation} {
   %8 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_z, %3, 0], sizes = [1, %5, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>> -> tensor<1x?x1281xf16>
   %9 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_z, 0, %4], sizes = [1, 1281, %6], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>> -> tensor<1x1281x?xf16>
   %10 = linalg.fill ins(%cst : f16) outs(%7 : tensor<1x?x?xf16>) -> tensor<1x?x?xf16>
-  %11 = linalg.batch_matmul ins(%8, %9 : tensor<1x?x1281xf16>, tensor<1x1281x?xf16>) outs(%10 : tensor<1x?x?xf16>) -> tensor<1x?x?xf16>
+  %11 = linalg.batch_matmul {lowering_config = #config} ins(%8, %9 : tensor<1x?x1281xf16>, tensor<1x1281x?xf16>) outs(%10 : tensor<1x?x?xf16>) -> tensor<1x?x?xf16>
   flow.dispatch.tensor.store %11, %2, offsets = [%workgroup_id_z, %3, %4], sizes = [1, %5, %6], strides = [1, 1, 1] : tensor<1x?x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
   return
 }
@@ -54,9 +55,9 @@ func.func @batch_matmul_f16() attributes {translation_info = #translation} {
 // REDUCTION-DAG:   %[[FILL_DEST:.+]] = flow.dispatch.tensor.load %[[OUT_HANDLE]]
 // REDUCTION:       %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[FILL_DEST]]
 // REDUCTION:       %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
-// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1281xf16>
+// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1296xf16>
 // REDUCTION:       %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
-// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1281x?xf16>
+// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1296x?xf16>
 // REDUCTION:       %[[GEMM:.+]] = linalg.batch_matmul
 // REDUCTION-SAME:    ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
 // REDUCTION-SAME:    outs(%[[FILL]]

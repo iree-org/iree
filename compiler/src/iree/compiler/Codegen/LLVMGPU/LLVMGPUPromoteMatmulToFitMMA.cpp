@@ -132,7 +132,9 @@ public:
       SmallVector<int64_t> padToMultipleOf;
       padToMultipleOf.reserve(paddingDimensions.size());
       for (int64_t dim : paddingDimensions) {
-        padToMultipleOf.push_back(padMultiples[dim]);
+        if (padMultiples[dim] != 0) {
+          padToMultipleOf.push_back(padMultiples[dim]);
+        }
       }
 
       padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf,
