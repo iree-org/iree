@@ -35,7 +35,7 @@ loadIRModule(Location loc, const std::string &filename,
                         diagnostic, *llvm_context));
 
   if (!module) {
-    mlir::emitError(loc) << "error loading HIP LLVM module: "
+    mlir::emitError(loc) << "error loading ROCM LLVM module: "
                          << diagnostic.getFilename().str() << ":"
                          << diagnostic.getLineNo() << ":"
                          << diagnostic.getColumnNo() << ": "
@@ -90,7 +90,7 @@ static LogicalResult linkBitcodeFile(Location loc, llvm::Linker &linker,
   auto setAlwaysInline = [&](llvm::Module &module) {
     if (targetMachine.getTargetCPU().contains("gfx10") ||
         targetMachine.getTargetCPU().contains("gfx11")) {
-      // some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
+      // Some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
       // inlined.
       return;
     }

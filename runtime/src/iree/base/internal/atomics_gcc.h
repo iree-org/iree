@@ -34,6 +34,8 @@ typedef enum iree_memory_order_e {
 
 typedef int32_t iree_atomic_int32_t;
 typedef int64_t iree_atomic_int64_t;
+typedef uint32_t iree_atomic_uint32_t;
+typedef uint64_t iree_atomic_uint64_t;
 // typedef __int128 iree_atomic_int128_t;
 typedef intptr_t iree_atomic_intptr_t;
 

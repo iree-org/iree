@@ -93,10 +93,11 @@ focus and the build configuration.
 | ------------ | ----------- |
 | `local-sync` | Synchronous local CPU device with inline execution |
 | `local-task` | Multithreaded local CPU device using a 'task' executor |
-| `vulkan`     | Portable GPU execution using the Vulkan API |
+| `amdgpu`     | **Experimental** <br> AMD GPU execution using HSA |
 | `cuda`       | NVIDIA GPU execution using CUDA |
 | `metal`      | GPU execution on Apple platforms using Metal |
-| `rocm`       | **Experimental** <br> AMD GPU execution using ROCm |
+| `hip`        | <br> AMD GPU execution using HIP |
+| `vulkan`     | Portable GPU execution using the Vulkan API |
 | `webgpu`     | **Experimental** <br> GPU execution on the web using WebGPU |
 
 Additional HAL drivers can also be defined external to the core project via

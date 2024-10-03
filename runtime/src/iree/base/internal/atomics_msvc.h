@@ -38,6 +38,12 @@ typedef struct {
 typedef struct {
   int64_t __val;
 } iree_atomic_int64_t;
+typedef struct {
+  uint32_t __val;
+} iree_atomic_uint32_t;
+typedef struct {
+  uint64_t __val;
+} iree_atomic_uint64_t;
 // typedef __declspec(align(16)) struct {
 //   uint64_t __val[2];
 // } iree_atomic_int128_t;

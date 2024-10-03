@@ -8,6 +8,10 @@
 
 #include "iree/hal/drivers/null/executable.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_executable_cache_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_executable_cache_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
@@ -26,8 +30,8 @@ iree_status_t iree_hal_null_executable_cache_create(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
-  *out_executable_cache = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_executable_cache = NULL;
 
   iree_hal_null_executable_cache_t* executable_cache = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

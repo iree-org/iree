@@ -32,7 +32,6 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
-/experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
 /experimental/webgpu/ @benvanik @ScottTodd
 
@@ -81,6 +80,7 @@
 # Runtime
 /runtime/src/iree/ @benvanik
 /runtime/src/iree/hal/cts/ @ScottTodd
+/runtime/src/iree/hal/drivers/amdgpu/ @benvanik
 /runtime/src/iree/hal/drivers/cuda/ @antiagainst
 /runtime/src/iree/hal/drivers/hip/ @antiagainst @nithinsubbiah
 /runtime/src/iree/hal/drivers/metal/ @antiagainst

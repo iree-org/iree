@@ -29,8 +29,8 @@ iree_status_t iree_hal_null_semaphore_create(
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
-  *out_semaphore = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_semaphore = NULL;
 
   iree_hal_null_semaphore_t* semaphore = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

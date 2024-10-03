@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_event_t
+//===----------------------------------------------------------------------===//
+
 // WIP API and may change. Mostly ignored for now.
 iree_status_t iree_hal_null_event_create(
     iree_hal_queue_affinity_t queue_affinity, iree_hal_event_flags_t flags,

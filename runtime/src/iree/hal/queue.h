@@ -35,6 +35,22 @@ typedef uint64_t iree_hal_queue_affinity_t;
 // Specifies that any queue may be selected.
 #define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
 
+// Returns true if the |queue_affinity| is empty (none specified).
+#define iree_hal_queue_affinity_is_empty(queue_affinity) ((queue_affinity) == 0)
+
+// Returns true if the |queue_affinity| is indicating any/all queues.
+#define iree_hal_queue_affinity_is_any(queue_affinity) \
+  ((queue_affinity) == IREE_HAL_QUEUE_AFFINITY_ANY)
+
+// Returns the index of the first set bit in |queue_affinity|.
+// Requires that at least one bit be set.
+#define iree_hal_queue_affinity_find_first_set(queue_affinity) \
+  iree_math_count_leading_zeros_u64(queue_affinity)
+
+// Updates |inout_affinity| to only include those bits set in |mask_affinity|.
+#define iree_hal_queue_affinity_and_into(inout_affinity, mask_affinity) \
+  (inout_affinity) = ((inout_affinity) & (mask_affinity))
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

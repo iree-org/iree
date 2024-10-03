@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_driver_t
+//===----------------------------------------------------------------------===//
+
 // NOTE: nothing in the skeleton implementation. Driver creation and adoption is
 // part of the public API header. This header can contain internal types and
 // functions.

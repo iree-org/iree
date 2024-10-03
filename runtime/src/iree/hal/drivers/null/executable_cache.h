@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_executable_cache_t
+//===----------------------------------------------------------------------===//
+
 // Creates a no-op executable cache that does not cache at all.
 // This is useful to isolate pipeline caching behavior and verify compilation
 // behavior.
