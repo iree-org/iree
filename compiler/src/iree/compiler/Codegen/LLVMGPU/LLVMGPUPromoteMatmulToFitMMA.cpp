@@ -37,12 +37,12 @@ public:
 
   void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
                         ArrayRef<int64_t> paddingDims,
-                        ArrayRef<int64_t> padToMultipleOf, bool nofold) const {
+                        ArrayRef<int64_t> padToMultipleOf, bool noFold) const {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
 
-    SmallVector<bool> packPaddings(op.getNumDpsInputs(), nofold);
+    SmallVector<bool> packPaddings(op.getNumDpsInputs(), noFold);
 
     SmallVector<Attribute> paddingValueAttributes;
     for (auto &operand : op->getOpOperands()) {
@@ -71,18 +71,18 @@ public:
 
     // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so
     // we can kick canonicalization patterns to fold outer tensor.pad ops away.
-    bool nofold = false;
+    bool noFold = false;
     utils::IteratorType targetIterType = utils::IteratorType::parallel;
     switch (targetDimensions) {
     case LLVMGPUMatmulPadOption::ParallelDims:
       LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
       targetIterType = utils::IteratorType::parallel;
-      nofold = false;
+      noFold = false;
       break;
     case LLVMGPUMatmulPadOption::ReductionDims:
       LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
       targetIterType = utils::IteratorType::reduction;
-      nofold = true;
+      noFold = true;
       break;
     default: // Unreachable.
       assert(false);
@@ -125,7 +125,10 @@ public:
         }
       }
 
-      // Populate tile sizes. All tile sizes are one, except mma tile sizes.
+      // Populate tile sizes. We pad to multiples of workgroup/reduction
+      // tile sizes based on the selected target tiling dimensions.
+      // This pass is ran after the select target tiling is done to pad
+      // all dimensions to the select tile sizes.
       SmallVector<int64_t> padToMultipleOf;
       padToMultipleOf.reserve(paddingDimensions.size());
       for (int64_t dim : paddingDimensions) {
@@ -133,7 +136,7 @@ public:
       }
 
       padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf,
-                       nofold);
+                       noFold);
     }
 
     {

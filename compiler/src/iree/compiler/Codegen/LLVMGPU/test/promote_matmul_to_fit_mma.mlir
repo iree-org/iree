@@ -54,9 +54,9 @@ func.func @batch_matmul_f16() attributes {translation_info = #translation} {
 // REDUCTION-DAG:   %[[FILL_DEST:.+]] = flow.dispatch.tensor.load %[[OUT_HANDLE]]
 // REDUCTION:       %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[FILL_DEST]]
 // REDUCTION:       %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
-// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1296xf16>
+// REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1281xf16>
 // REDUCTION:       %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
-// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1296x?xf16>
+// REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1281x?xf16>
 // REDUCTION:       %[[GEMM:.+]] = linalg.batch_matmul
 // REDUCTION-SAME:    ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
 // REDUCTION-SAME:    outs(%[[FILL]]
