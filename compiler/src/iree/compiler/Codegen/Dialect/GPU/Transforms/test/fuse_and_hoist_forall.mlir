@@ -379,7 +379,7 @@ func.func @no_fuse_forall_without_workgroup_size(%arg0: tensor<128x128xf32>) -> 
 }
 
 //   CHECK-LABEL: func @no_fuse_forall_without_workgroup_size
-// CHECK-COUNT-2:   scf.forall
+// CHECK-COUNT-2:   scf.forall {{.*}} -> (tensor<128x128xf32>)
 
 // -----
 
@@ -413,7 +413,7 @@ func.func @no_fuse_forall_workgroup_size_mismatch(%arg0: tensor<128x128xf32>) ->
 }
 
 //   CHECK-LABEL: func @no_fuse_forall_workgroup_size_mismatch
-// CHECK-COUNT-2:   scf.forall
+// CHECK-COUNT-2:   scf.forall {{.*}} -> (tensor<128x128xf32>)
 
 // -----
 

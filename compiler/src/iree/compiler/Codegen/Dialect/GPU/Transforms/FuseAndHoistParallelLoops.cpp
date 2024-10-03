@@ -246,7 +246,8 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
     // potentially nested loops, hoisting from said loops, and continued fusion.
     if (maybeFlatWorkgroupSize) {
       // Forall fusion requires knowing the workgroup size to verify the fusion
-      // is valid.
+      // is valid. Without validation we risk putting barriers inside
+      // conditioned regions (e.g. scf.if/for).
       patterns.add<FuseForalls>(context, *maybeFlatWorkgroupSize,
                                 /*benefit=*/1);
     }
