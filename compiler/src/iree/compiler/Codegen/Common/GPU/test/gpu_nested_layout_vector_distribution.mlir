@@ -784,6 +784,41 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 2, 2],
+  batch_tile = [2, 2, 1],
+  outer_tile = [2, 1, 1],
+  thread_tile = [4, 16, 8],
+  element_tile = [1, 4, 4],
+  subgroup_strides = [4, 2, 1],
+  thread_strides   = [128, 8, 1]
+>
+
+func.func @gather(%base: memref<32x256x64xf16>, %index_vec: vector<32x256x64xindex>)-> (vector<32x256x64xf16>){
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<true> : vector<32x256x64xi1>
+  %pass = arith.constant dense<0.000000e+00> : vector<32x256x64xf16>
+  %0 = vector.gather %base[%c0, %c0, %c0] [%index_vec], %mask, %pass : memref<32x256x64xf16>, vector<32x256x64xindex>, vector<32x256x64xi1>, vector<32x256x64xf16> into vector<32x256x64xf16>
+  %1 = iree_vector_ext.to_layout %0 to layout(#layout) :  vector<32x256x64xf16>
+  return %1 : vector<32x256x64xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @gather
+// CHECK-SAME:  (%[[SRC:.*]]: memref<32x256x64xf16>, %[[INDEX:.*]]: vector<32x256x64xindex>)
+// CHECK: %[[DIST_INDEX:.*]] = iree_vector_ext.to_simt %[[INDEX]] : vector<32x256x64xindex> -> vector<2x2x1x2x1x1x1x4x4xindex>
+// CHECK: %[[GATHER:.*]] = vector.gather %[[SRC]][%c0, %c0, %c0] [%[[DIST_INDEX]]]
+// CHECK: iree_vector_ext.to_simd %[[GATHER]] : vector<2x2x1x2x1x1x1x4x4xf16> -> vector<32x256x64xf16>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 2],
   batch_tile = [2, 4],
   outer_tile = [2, 1],
