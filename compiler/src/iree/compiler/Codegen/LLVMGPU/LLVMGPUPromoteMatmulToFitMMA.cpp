@@ -69,12 +69,6 @@ public:
     MLIRContext *ctx = &getContext();
     auto funcOp = getOperation();
 
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
-    DictionaryAttr configDict = getTranslationInfo(funcOp).getConfiguration();
-    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-        configDict.get(scheduleAttrName));
-
     // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so
     // we can kick canonicalization patterns to fold outer tensor.pad ops away.
     bool nofold = false;
@@ -103,10 +97,25 @@ public:
     });
 
     IRRewriter rewriter(ctx);
-    for (auto op : candidates) {
-      FailureOr<linalg::ContractionDimensions> dims =
-          linalg::inferContractionDims(op);
-      assert(succeeded(dims) && "expected contraction op interface");
+    for (linalg::LinalgOp op : candidates) {
+      SmallVector<int64_t> padMultiples(op.getNumLoops(), 1);
+      auto config = dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(
+          getLoweringConfig(op));
+      if (config) {
+        switch (targetDimensions) {
+        case LLVMGPUMatmulPadOption::ParallelDims:
+          padMultiples = config.getStaticTilingLevelSizes(
+              (unsigned)IREE::GPU::TilingLevel::Workgroup, op);
+          break;
+        case LLVMGPUMatmulPadOption::ReductionDims:
+          padMultiples = config.getStaticTilingLevelSizes(
+              (unsigned)IREE::GPU::TilingLevel::Reduction, op);
+          break;
+        default:
+          llvm_unreachable("Unexpected target dimensions");
+          break;
+        }
+      }
 
       // Populate padding dimensions.
       SmallVector<int64_t> paddingDimensions;
@@ -117,23 +126,10 @@ public:
       }
 
       // Populate tile sizes. All tile sizes are one, except mma tile sizes.
-      SmallVector<int64_t> padToMultipleOf(paddingDimensions.size(), 1);
-      if (scheduleAttr) {
-        auto [padM, padN, padK] = scheduleAttr.getIntrinsic().getMNKShape();
-        padM *= scheduleAttr.getSubgroupMCount();
-        padN *= scheduleAttr.getSubgroupNCount();
-        for (auto [dim, multiple] :
-             llvm::zip(paddingDimensions, padToMultipleOf)) {
-          if (dim == dims->m.back()) {
-            multiple = padM;
-          }
-          if (dim == dims->n.back()) {
-            multiple = padN;
-          }
-          if (dim == dims->k.back()) {
-            multiple = padK;
-          }
-        }
+      SmallVector<int64_t> padToMultipleOf;
+      padToMultipleOf.reserve(paddingDimensions.size());
+      for (int64_t dim : paddingDimensions) {
+        padToMultipleOf.push_back(padMultiples[dim]);
       }
 
       padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf,
