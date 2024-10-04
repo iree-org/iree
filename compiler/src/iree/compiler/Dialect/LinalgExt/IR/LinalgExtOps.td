@@ -48,7 +48,7 @@ def OpGroupUtilityOps : OpDocGroup {
 
 let opDocGroup = OpGroupUtilityOps in {
 
-def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>, 
+def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
     Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
     Results<(outs Index:$result)> {
   let summary = "linalg_ext index operation";
@@ -1696,7 +1696,5 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
     }
   }];
 }
-
-
 
 #endif  // IREE_DIALECT_LINALGEXT_OPS

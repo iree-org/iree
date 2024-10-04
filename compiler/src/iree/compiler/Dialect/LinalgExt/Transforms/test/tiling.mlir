@@ -2127,9 +2127,9 @@ func.func @tile_custom_op_with_symbolic_indexing_maps(%lhs0 : tensor<?x?xf32>,
   %0 = iree_linalg_ext.custom_op {
       indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (d0, s0)>,
                        affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
-		                   affine_map<(d0, d1)[s0, s1] -> (d0, s1)>,
+                                   affine_map<(d0, d1)[s0, s1] -> (d0, s1)>,
                        affine_map<(d0, d1)[s0, s1] -> (s1, d1)>,
-            		       affine_map<(d0, d1)[s0, s1] -> (d0, d1)>],
+                               affine_map<(d0, d1)[s0, s1] -> (d0, d1)>],
       iterator_types = [#iree_linalg_ext.iterator_type<parallel>,
                         #iree_linalg_ext.iterator_type<parallel>]}
       ins(%lhs0, %rhs0, %init0, %rhs1 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
@@ -2206,7 +2206,7 @@ func.func @custom_op_do_not_tile_empty_map(%arg0 : tensor<?x?xf32>,
     ^bb0(%b0 : tensor<?x?xf32>, %b1 : tensor<?x?xf32>, %b2 : tensor<?x?xf32>):
       %1 = linalg.matmul ins(%b0, %b1 : tensor<?x?xf32>, tensor<?x?xf32>)
           outs(%b2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      iree_linalg_ext.yield %1 : tensor<?x?xf32>      
+      iree_linalg_ext.yield %1 : tensor<?x?xf32>
   } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -2249,7 +2249,7 @@ func.func @custom_op_tile_scalar_args(%arg0 : tensor<?x?xf32>,
           %3 = arith.addf %2, %bb2 : f32
           linalg.yield %3 : f32
       } -> tensor<?x?xf32>
-      iree_linalg_ext.yield %1 : tensor<?x?xf32>      
+      iree_linalg_ext.yield %1 : tensor<?x?xf32>
   } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -2292,7 +2292,7 @@ func.func @custom_op_index_handling(%arg0 : tensor<?x?xindex>,
           %3 = arith.addi %2, %bb2 : index
           linalg.yield %3 : index
       } -> tensor<?x?xindex>
-      iree_linalg_ext.yield %2 : tensor<?x?xindex>      
+      iree_linalg_ext.yield %2 : tensor<?x?xindex>
   } -> tensor<?x?xindex>
   return %0 : tensor<?x?xindex>
 }
