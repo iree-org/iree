@@ -393,26 +393,32 @@ public:
     assert(
         succeeded(contractionDims) &&
         "should always be able to infer contraction dims for contraction ops");
-    // TODO(hanchung): Support batch gemms.
-    if (!contractionDims->batch.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "batch gemm is not yet implemented\n");
-      return failure();
-    }
 
     MLIRContext *ctx = rewriter.getContext();
-    AffineExpr mExpr = rewriter.getAffineDimExpr(0);
-    AffineExpr nExpr = rewriter.getAffineDimExpr(1);
-    AffineExpr kExpr = rewriter.getAffineDimExpr(2);
+    SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
+    int baseIdx = contractionDims->batch.empty() ? 0 : 1;
+    if (baseIdx) {
+      AffineExpr bExpr = rewriter.getAffineDimExpr(0);
+      lhsExprs.push_back(bExpr);
+      rhsExprs.push_back(bExpr);
+      accExprs.push_back(bExpr);
+    }
+    AffineExpr mExpr = rewriter.getAffineDimExpr(baseIdx + 0);
+    AffineExpr nExpr = rewriter.getAffineDimExpr(baseIdx + 1);
+    AffineExpr kExpr = rewriter.getAffineDimExpr(baseIdx + 2);
 
     // The outer dims are all in row-major order after relayout.
-    auto lhsMap = AffineMap::get(3, 0, {mExpr, kExpr}, ctx);
-    auto rhsMap = AffineMap::get(3, 0, {nExpr, kExpr}, ctx);
-    auto accMap = AffineMap::get(3, 0, {mExpr, nExpr}, ctx);
+    lhsExprs.append({mExpr, kExpr});
+    rhsExprs.append({nExpr, kExpr});
+    accExprs.append({mExpr, nExpr});
+    int64_t numDims = baseIdx + 3;
+    auto lhsMap = AffineMap::get(numDims, 0, lhsExprs, ctx);
+    auto rhsMap = AffineMap::get(numDims, 0, rhsExprs, ctx);
+    auto accMap = AffineMap::get(numDims, 0, accExprs, ctx);
 
     SmallVector<utils::IteratorType> iteratorTypes =
         linalgOp.getIteratorTypesArray();
 
-    // TODO(hanchung): Support batch gemms.
     Location loc = op.getLoc();
     auto mmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
         loc, operands[0], operands[1], operands[2],
