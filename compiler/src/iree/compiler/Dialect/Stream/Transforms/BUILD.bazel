@@ -17,6 +17,7 @@ iree_compiler_cc_library(
     srcs = [
         "AnnotateAffinities.cpp",
         "AnnotateDispatchArguments.cpp",
+        "AnnotateDispatchSignatures.cpp",
         "ConvertToStream.cpp",
         "DumpStatistics.cpp",
         "ElideAsyncCopies.cpp",

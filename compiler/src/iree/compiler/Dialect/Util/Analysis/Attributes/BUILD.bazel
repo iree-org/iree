@@ -15,12 +15,14 @@ package(
 iree_compiler_cc_library(
     name = "Attributes",
     srcs = [
+        "FPRange.cpp",
+        "IntRange.cpp",
         "PotentialValues.cpp",
-        "Range.cpp",
     ],
     hdrs = [
+        "FPRange.h",
+        "IntRange.h",
         "PotentialValues.h",
-        "Range.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",

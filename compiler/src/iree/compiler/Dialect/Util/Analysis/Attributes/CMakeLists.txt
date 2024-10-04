@@ -14,11 +14,13 @@ iree_cc_library(
   NAME
     Attributes
   HDRS
+    "FPRange.h"
+    "IntRange.h"
     "PotentialValues.h"
-    "Range.h"
   SRCS
+    "FPRange.cpp"
+    "IntRange.cpp"
     "PotentialValues.cpp"
-    "Range.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
