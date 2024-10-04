@@ -405,10 +405,7 @@ enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
     return {};
   }
   // Enumerate available tile shapes for the given encoding and target.
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
   if (isVMVXBackend(target)) {
     return enumerateMatmulTilesVMVX(*cDims, encoding, target);
   }

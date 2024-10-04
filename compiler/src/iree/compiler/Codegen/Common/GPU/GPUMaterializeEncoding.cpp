@@ -110,12 +110,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   } else {
     gpuTargetAttr = getCLGPUTarget(tensorType.getContext());
   }
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
   std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-      chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
+      chooseDataTiledMMAAttr(encoding.getElementTypesArray(), gpuTargetAttr);
   if (!mma) {
     return failure();
   }
@@ -369,11 +365,8 @@ public:
     } else {
       gpuTargetAttr = getCLGPUTarget(op.getContext());
     }
-    auto elementTypes = llvm::to_vector(llvm::map_range(
-        resultEncoding.getElementTypes().getValue(),
-        [](Attribute a) { return cast<TypeAttr>(a).getValue(); }));
-    std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-        chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
+    std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+        resultEncoding.getElementTypesArray(), gpuTargetAttr);
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();

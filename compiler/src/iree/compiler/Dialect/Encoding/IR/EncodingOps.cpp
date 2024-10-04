@@ -172,6 +172,12 @@ ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
   return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
 }
 
+SmallVector<Type> EncodingAttr::getElementTypesArray() {
+  return llvm::map_to_vector(getElementTypes().getValue(), [](Attribute a) {
+    return llvm::cast<TypeAttr>(a).getValue();
+  });
+}
+
 EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
              getElementTypes(), getUserIndexingMaps(),

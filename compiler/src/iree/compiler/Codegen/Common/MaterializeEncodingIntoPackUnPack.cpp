@@ -332,9 +332,7 @@ static FailureOr<Operation *> lowerContractionOpWithEncoding(
   } else {
     bool transpose =
         typeConverter.getTransposeNarrowN() && isNarrowNResult(resultEncoding);
-    auto elemTypes = llvm::map_to_vector(
-        lhsEncoding.getElementTypes().getValue(),
-        [](Attribute a) { return cast<TypeAttr>(a).getValue(); });
+    SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
     SmallVector<ReassociationIndices> ri;
     Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, rewriter,
                                    ri, elemTypes, /*operandIdx=*/0);
