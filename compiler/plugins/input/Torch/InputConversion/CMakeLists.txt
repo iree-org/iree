@@ -35,7 +35,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "BindSymbolicShapes.cpp"
-    "BitCastQuantTensor.cpp"
+    "BitCastTensor.cpp"
     "ConvertTMTensorToLinalgExt.cpp"
     "FuncConversion.cpp"
     "SetStrictSymbolicShapes.cpp"

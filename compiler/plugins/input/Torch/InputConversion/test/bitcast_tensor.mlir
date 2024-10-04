@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(torch-iree-bitcast-quant-tensor))" -split-input-file -verify-diagnostics | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(torch-iree-bitcast-tensor))" -split-input-file -verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: func @forward
 func.func @forward(%arg0: !torch.vtensor<[1,1,8],f16>) -> !torch.vtensor<[1,1,8],f16> {
@@ -24,3 +24,23 @@ func.func @view_type(%arg0 : !torch.vtensor<[295501824],ui8>) -> !torch.vtensor<
     %0 = torch.aten.view.dtype %arg0, %int4 : !torch.vtensor<[295501824],ui8>, !torch.int -> !torch.vtensor<[147750912],si16>
     return %0 : !torch.vtensor<[147750912],si16>
 }
+
+
+// -----
+
+// CHECK-LABEL: @view_as_complex
+func.func @view_as_complex(%arg0 : !torch.vtensor<[128,2],f32>) -> !torch.vtensor<[128], complex<f32>> {
+    // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<128x2xf32> -> tensor<128xcomplex<f32>>
+    %0 = torch.aten.view_as_complex %arg0 : !torch.vtensor<[128,2],f32> -> !torch.vtensor<[128],complex<f32>>
+    return %0 : !torch.vtensor<[128],complex<f32>>
+}
+
+// -----
+
+// CHECK-LABEL: @view_as_real
+func.func @view_as_real(%arg0 : !torch.vtensor<[128], complex<f32>>) -> !torch.vtensor<[128,2],f32> {
+    // CHECK: flow.tensor.bitcast %[[IN:.+]] : tensor<128xcomplex<f32>> -> tensor<128x2xf32>
+    %0 = torch.aten.view_as_real %arg0 : !torch.vtensor<[128],complex<f32>> -> !torch.vtensor<[128,2],f32>
+    return %0 : !torch.vtensor<[128,2],f32>
+}
+
