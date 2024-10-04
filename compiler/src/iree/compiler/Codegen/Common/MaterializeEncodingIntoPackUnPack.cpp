@@ -778,13 +778,10 @@ struct SetEncodingOpToPackOpConversion
                                              adaptor.getSource(), *converter,
                                              this->materializeEncodingValueFn);
     if (failed(packOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(encodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          encodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
@@ -808,13 +805,10 @@ struct UnsetEncodingOpToUnPackOpConversion
         rewriter, encodingOp, adaptor.getSource(), *converter,
         this->materializeEncodingValueFn);
     if (failed(unpackOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(encodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          encodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
@@ -869,12 +863,8 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
     for (auto [type, res] : llvm::zip_equal(
              op->getResultTypes(), convertedOp.value()->getResults())) {
       Type targetType = this->getTypeConverter()->convertType(type);
-      if (targetType == res.getType()) {
-        replacements.push_back(res);
-      } else {
-        replacements.push_back(
-            rewriter.create<tensor::CastOp>(op.getLoc(), targetType, res));
-      }
+      replacements.push_back(
+          rewriter.createOrFold<tensor::CastOp>(op.getLoc(), targetType, res));
     }
     rewriter.replaceOp(op, replacements);
     return success();

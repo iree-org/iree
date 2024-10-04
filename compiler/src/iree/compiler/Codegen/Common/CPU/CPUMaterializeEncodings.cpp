@@ -472,7 +472,8 @@ getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr) {
-  RewritePatternSet materializeEncodingPattern(funcOp.getContext());
+  MLIRContext *ctx = funcOp.getContext();
+  RewritePatternSet materializeEncodingPattern(ctx);
   // On CPU, we use transposeNarrowN=true for a combination of reasons:
   // 1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
   //    RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
@@ -482,7 +483,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   //    so it is nice that they have fewer narrow cases to consider.
   MaterializeEncodingTypeConverter typeConverter(
       materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true);
-  MaterializeEncodingConversionTarget target(*funcOp.getContext());
+  MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
@@ -499,7 +500,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
   // resolve dims ops.
   {
-    RewritePatternSet patterns(funcOp.getContext());
+    RewritePatternSet patterns(ctx);
+    tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

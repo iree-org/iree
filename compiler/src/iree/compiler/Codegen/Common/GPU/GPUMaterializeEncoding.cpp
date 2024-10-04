@@ -195,13 +195,10 @@ struct GPUSetEncodingOpLoweringConversion
                                              adaptor.getSource(), *converter,
                                              this->materializeEncodingValueFn);
     if (failed(packOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(encodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          encodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
@@ -267,13 +264,10 @@ struct GPUUnsetEncodingOpLoweringConversion
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (failed(maybeEncodingInfo)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          unsetEncodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
     }
@@ -319,12 +313,10 @@ struct GPUUnsetEncodingOpLoweringConversion
         rewriter, unsetEncodingOp, unpackSrc, *converter,
         this->materializeEncodingValueFn);
     if (failed(unPackOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(loc, targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
+                                                           adaptor.getSource());
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
     }
@@ -442,7 +434,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     //    runtime, so we don't need a simplification at that level either.
     MaterializeEncodingTypeConverter typeConverter(
         materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false);
-    MaterializeEncodingConversionTarget target(*funcOp.getContext());
+    MaterializeEncodingConversionTarget target(*ctx);
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,
            Location) -> FailureOr<MaterializeEncodingValueInfo> { return {}; };
@@ -464,6 +456,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // resolve dims ops.
   {
     RewritePatternSet patterns(ctx);
+    tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
