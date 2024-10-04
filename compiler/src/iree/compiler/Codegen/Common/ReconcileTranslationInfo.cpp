@@ -360,8 +360,9 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   auto innerModuleOp = variantOp.getInnerModule();
 
   auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
+
+  // reconciliation for multiple export ops is unsupported.
   if (!llvm::hasSingleElement(exportOps)) {
-    variantOp.emitWarning("reconciliation for multiple export ops unsupported");
     return;
   }
   auto exportOp = *exportOps.begin();
