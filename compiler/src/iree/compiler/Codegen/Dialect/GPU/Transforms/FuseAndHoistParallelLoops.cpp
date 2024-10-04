@@ -43,29 +43,53 @@ struct FuseAndHoistParallelLoopsPass final
 };
 } // namespace
 
-static bool forallTripCountMatchesWorkgroupSize(scf::ForallOp forallOp,
-                                                int64_t flatWorkgroupSize) {
-  // True for lane mapped loops.
-  if (forallOpHasMappingType<IREE::GPU::LaneIdAttr>(forallOp)) {
-    return true;
+static std::optional<int64_t> getStaticForallTripCount(scf::ForallOp forall) {
+  // TODO: Handle non-normalized loops.
+  if (!forall.isNormalized()) {
+    return std::nullopt;
   }
-
-  // All other loops must be mapped to threads to compare. Also give up on
-  // non-normalized loops.
-  if (!forallOpHasMappingType<gpu::GPUThreadMappingAttr>(forallOp) ||
-      !forallOp.isNormalized()) {
-    return false;
-  }
-
   int64_t tripCount = 1;
-  for (OpFoldResult ub : forallOp.getMixedUpperBound()) {
+  for (OpFoldResult ub : forall.getMixedUpperBound()) {
     std::optional<int64_t> maybeConstantUb = getConstantIntValue(ub);
     if (!maybeConstantUb) {
-      return false;
+      return std::nullopt;
     }
     tripCount *= *maybeConstantUb;
   }
-  return tripCount == flatWorkgroupSize;
+  return tripCount;
+}
+
+static bool forallTripCountMatchesWorkgroupSize(scf::ForallOp forallOp,
+                                                int64_t flatWorkgroupSize) {
+  std::optional<int64_t> maybeTripCount = getStaticForallTripCount(forallOp);
+  if (!maybeTripCount) {
+    return false;
+  }
+
+  // For lane mapped foralls we need to verify that it is contained within
+  // a parent warp mapped op that combines to match the workggroup size.
+  if (forallOpHasMappingType<IREE::GPU::LaneIdAttr>(forallOp)) {
+    auto parentForall = forallOp->getParentOfType<scf::ForallOp>();
+    if (!parentForall ||
+        !forallOpHasMappingType<gpu::GPUWarpMappingAttr>(parentForall)) {
+      return false;
+    }
+
+    std::optional<int64_t> maybeParentTripCount =
+        getStaticForallTripCount(parentForall);
+    if (!maybeParentTripCount) {
+      return false;
+    }
+
+    return *maybeParentTripCount * *maybeParentTripCount == flatWorkgroupSize;
+  }
+
+  // All other loops must be mapped to threads to compare.
+  if (!forallOpHasMappingType<gpu::GPUThreadMappingAttr>(forallOp)) {
+    return false;
+  }
+
+  return *maybeTripCount == flatWorkgroupSize;
 }
 struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -110,6 +134,7 @@ struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
 
 private:
   int64_t flatWorkgroupSize;
+  int64_t subgroupSize;
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
