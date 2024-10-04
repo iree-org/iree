@@ -108,6 +108,9 @@ def EncodingAttr :
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();
 
+    /// Returns a vector with values in `element_types`.
+    SmallVector<Type> getElementTypesArray();
+
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
   }];

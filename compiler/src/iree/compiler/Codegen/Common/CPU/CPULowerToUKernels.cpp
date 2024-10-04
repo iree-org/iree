@@ -475,7 +475,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
 
 static uint32_t
 getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
-                              ArrayRef<Attribute> operandTypes) {
+                              ArrayRef<Type> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
   auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
@@ -483,9 +483,9 @@ getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
-  Type lhs = cast<TypeAttr>(operandTypes[0]).getValue();
-  Type rhs = cast<TypeAttr>(operandTypes[1]).getValue();
-  Type out = cast<TypeAttr>(operandTypes[2]).getValue();
+  Type lhs = operandTypes[0];
+  Type rhs = operandTypes[1];
+  Type out = operandTypes[2];
 
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
@@ -545,8 +545,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   for (int64_t i : tensorType.getShape()) {
     inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
   }
-  uint32_t flagForUserAndOperandTypes = getFlagForUserAndOperandTypes(
-      encoding, encoding.getElementTypes().getValue());
+  uint32_t flagForUserAndOperandTypes =
+      getFlagForUserAndOperandTypes(encoding, encoding.getElementTypesArray());
   uint32_t flagForIndex =
       getFlagForIndex(encoding.getOperandIndex().getValue().getZExtValue());
   if (!flagForUserAndOperandTypes || !flagForIndex) {
