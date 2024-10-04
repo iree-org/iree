@@ -9,7 +9,7 @@
 
 stream.executable private @__builtin_splat_i64 {
   stream.executable.export public @__builtin_splat_i64 workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
