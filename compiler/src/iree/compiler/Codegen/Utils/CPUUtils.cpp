@@ -19,9 +19,6 @@
 
 namespace mlir::iree_compiler {
 
-static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
-static const char kDecompositionAttrName[] = "enable_decomposition";
-
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
@@ -67,24 +64,21 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   return rootOperation;
 }
 
+static const char kDecompositionAttrName[] = "enable_decomposition";
 StringAttr getEnableDecompositionAttrName(MLIRContext *ctx) {
   return StringAttr::get(ctx, kDecompositionAttrName);
 }
+std::string getEnableDecompositionStr() { return kDecompositionAttrName; }
 
-bool isDecompositionEnabled(FunctionOpInterface funcOp) {
-  DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
-
-  return config && config.contains(kDecompositionAttrName);
-}
-
+static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
 StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
   return StringAttr::get(ctx, kLoopPeelingAttrName);
 }
+std::string getEnableLoopPeelingStr() { return kLoopPeelingAttrName; }
 
-bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
+bool isOptEnabled(FunctionOpInterface funcOp, StringRef label) {
   DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
-
-  return config && config.contains(kLoopPeelingAttrName);
+  return config && config.contains(label);
 }
 
 } // namespace mlir::iree_compiler

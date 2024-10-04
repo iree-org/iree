@@ -2703,7 +2703,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto tInfo = getTranslationInfo(entryPointFn);
   auto pipeline = tInfo.getPassPipeline().getValue();
   auto pipelineConfig = tInfo.getConfiguration();
-  if (isLoopPeelingEnabled(entryPointFn)) {
+  if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
                             "back to non-peeling path");
