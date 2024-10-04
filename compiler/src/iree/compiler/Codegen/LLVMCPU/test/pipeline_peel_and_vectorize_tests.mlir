@@ -106,7 +106,8 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
 
 // CHECK-LABEL: func @peel_dynamic_matmul()
 // Distribution:
-// CHECK:           scf.forall
+// CHECK:         scf.for
+// CHECK:           scf.for
 
 // Vectorization:
 // CHECK:             scf.for
