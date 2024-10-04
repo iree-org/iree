@@ -1105,7 +1105,6 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   SmallVector<Value> intrinsicsAcc =
       distributeMmaFragmentToIntrinsics(builder, loc, acc, accSwizzle);
 
-
   // Get a MMAAttr for the intrinsic itself, to reuse MMAAttr::buildMmaOperation
   // to create the target intrinsics.
   auto intrinsicMma = MMAAttr::get(getContext(), getIntrinsic().getValue());
