@@ -59,7 +59,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //
   // Step 1: select a MMAIntrinsic.
   //
-  SmallVector<MMAIntrinsic> candidateIntrinsics = {
+  const MMAIntrinsic candidateIntrinsics[] = {
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
@@ -90,7 +90,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // Target ISA preferred load instruction size, in bits.
   const int kLoadInstructionBits = 128;
   // Target ISA preferred number of subgroups per block to get full utilization.
-  const int kMaxSubgroups = 4;
+  const int kNumSubgroups = 4;
   // Number of register space bits to use for accumulators. Should typically be
   // between 50% and 80% of total available register space, as the accumulator
   // tends to be larger than the A and B matrix tiles.
@@ -129,7 +129,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // below adjustments for narrow M/N, as we don't need to think about
   // unroll-to-subgroups when making the narrowing adjustment.
   int unrollMToSubgroups = 1;
-  int unrollNToSubgroups = kMaxSubgroups;
+  int unrollNToSubgroups = kNumSubgroups;
   int unrollM = totalUnrollM / unrollMToSubgroups;
   int unrollN = totalUnrollN / unrollNToSubgroups;
 
@@ -139,15 +139,15 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   IREE::Encoding::MatmulNarrowDim narrowDim =
       IREE::Encoding::getMatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
-    unrollM = std::min<int>(
-        unrollM, llvm::divideCeil(narrowDim.size, intrinsicMma.getMSize()));
+    unrollM = std::min(unrollM, static_cast<int>(llvm::divideCeil(
+                                    narrowDim.size, intrinsicMma.getMSize())));
   }
   if (narrowDim.isN()) {
     std::swap(unrollM, unrollN);
     std::swap(unrollMToSubgroups, unrollNToSubgroups);
     assert(unrollNToSubgroups == 1);
-    unrollN = std::min<int>(
-        unrollN, llvm::divideCeil(narrowDim.size, intrinsicMma.getNSize()));
+    unrollN = std::min(unrollN, static_cast<int>(llvm::divideCeil(
+                                    narrowDim.size, intrinsicMma.getNSize())));
   }
 
   return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
