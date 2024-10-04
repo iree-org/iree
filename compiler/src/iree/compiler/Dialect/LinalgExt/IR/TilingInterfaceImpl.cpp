@@ -2179,6 +2179,12 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
 /// These methods copied/modified from `TilingInterface` implementation of
 /// `getIterationDomain` of `LinalgOp`s.
 
+SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
 /// Method similar to `LinalgOp`s that concatenates shapes of all operands.
 static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(OpBuilder &builder, Location loc,

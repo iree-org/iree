@@ -51,6 +51,20 @@ DiagnosedSilenceableFailure LinalgExt::DecomposeTiledAttentionOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+DiagnosedSilenceableFailure LinalgExt::DecomposeAggregateOp::applyToOne(
+    transform::TransformRewriter &rewriter,
+    linalg::AggregatedOpInterface aggregateOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  FailureOr<SmallVector<Value>> replacements =
+      aggregateOp.decomposeOperation(rewriter);
+  if (failed(replacements)) {
+    return emitDefiniteFailure() << "failed to decompose operation";
+  }
+  rewriter.replaceOp(aggregateOp, replacements.value());
+  return DiagnosedSilenceableFailure::success();
+}
+
 DiagnosedSilenceableFailure LinalgExt::ConvertToOnlineAttention::applyToOne(
     transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
     transform::ApplyToEachResultList &results,
