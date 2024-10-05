@@ -490,6 +490,7 @@ bool simplifyCmpIOp(IndexArithmeticAnalysis &analysis, arith::CmpIOp cmpOp) {
 
   OpBuilder builder(cmpOp);
   auto rewrite = [&](bool resultValue) {
+    LLVM_DEBUG(dbgs() << "Rewrite " << cmpOp << " -> " << resultValue << "\n");
     Value newValue = builder.create<arith::ConstantOp>(
         cmpOp.getLoc(), builder.getBoolAttr(resultValue));
     cmpOp.getResult().replaceAllUsesWith(newValue);
@@ -500,7 +501,7 @@ bool simplifyCmpIOp(IndexArithmeticAnalysis &analysis, arith::CmpIOp cmpOp) {
     return true;
   } else if (!trueCount && falseCount) {
     // Replace with false.
-    rewrite(true);
+    rewrite(false);
     return true;
   }
 
