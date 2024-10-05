@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Analysis/Attributes/PotentialValues.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
@@ -41,194 +42,9 @@ namespace {
 // TODO(benvanik): move to Util/Analysis/ as this would be useful in other
 // passes as well and only depends on util.align and upstream ops.
 
-static std::string
-getPVSAsStr(const DFX::PotentialConstantIntValuesState &pvs) {
-  std::string str;
-  llvm::raw_string_ostream sstream(str);
-  sstream << "pvs: ";
-  if (pvs.isValidState()) {
-    sstream << "[";
-    if (pvs.isUndefContained()) {
-      sstream << "undef, ";
-    }
-    llvm::interleaveComma(pvs.getAssumedSet(), sstream,
-                          [&](APInt value) { value.print(sstream, false); });
-    sstream << "]";
-  } else {
-    sstream << "(invalid)";
-  }
-  sstream.flush();
-  return str;
-}
-
 static llvm::MaybeAlign commonAlignment(llvm::MaybeAlign A,
                                         llvm::MaybeAlign B) {
   return A && B ? std::min(*A, *B) : A ? A : B;
-}
-
-class GlobalPVS : public DFX::StateWrapper<
-                      DFX::PotentialConstantIntValuesState,
-                      DFX::TypedOperationElement<IREE::Util::GlobalOp>> {
-public:
-  using BaseType =
-      DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
-                        DFX::TypedOperationElement<IREE::Util::GlobalOp>>;
-
-  static GlobalPVS &createForPosition(const Position &pos,
-                                      DFX::Solver &solver) {
-    return *(new (solver.getAllocator()) GlobalPVS(pos));
-  }
-
-  const std::string getName() const override { return "GlobalPVS"; }
-  const void *getID() const override { return &ID; }
-  static bool classof(const DFX::AbstractElement *element) {
-    return (element->getID() == &ID);
-  }
-  static const char ID;
-
-  const std::string getAsStr(AsmState &asmState) const override {
-    return getPVSAsStr(getState());
-  }
-
-private:
-  explicit GlobalPVS(const Position &pos) : BaseType(pos) {}
-
-  void initializeOperation(IREE::Util::GlobalOp globalOp,
-                           DFX::Solver &solver) override;
-  ChangeStatus updateOperation(IREE::Util::GlobalOp globalOp,
-                               DFX::Solver &solver) override;
-
-  friend class DFX::Solver;
-};
-const char GlobalPVS::ID = 0;
-
-class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
-                                          DFX::ValueElement> {
-public:
-  using BaseType = DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
-                                     DFX::ValueElement>;
-
-  static ValuePVS &createForPosition(const Position &pos, DFX::Solver &solver) {
-    return *(new (solver.getAllocator()) ValuePVS(pos));
-  }
-
-  const std::string getName() const override { return "ValuePVS"; }
-  const void *getID() const override { return &ID; }
-  static bool classof(const DFX::AbstractElement *element) {
-    return (element->getID() == &ID);
-  }
-  static const char ID;
-
-  const std::string getAsStr(AsmState &asmState) const override {
-    return getPVSAsStr(getState());
-  }
-
-private:
-  explicit ValuePVS(const Position &pos) : BaseType(pos) {}
-
-  void initializeValue(Value value, DFX::Solver &solver) override {
-    APInt staticValue;
-    if (matchPattern(value, m_ConstantInt(&staticValue))) {
-      unionAssumed(staticValue);
-      indicateOptimisticFixpoint();
-    }
-  }
-
-  ChangeStatus updateValue(Value value, DFX::Solver &solver) override {
-    StateType newState;
-    if (solver.getExplorer().walkDefiningOps(value, [&](OpResult result) {
-          APInt staticValue;
-          if (matchPattern(result, m_ConstantInt(&staticValue))) {
-            newState.unionAssumed(staticValue);
-            return WalkResult::advance();
-          }
-
-          if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(
-                  result.getDefiningOp())) {
-            auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
-                loadOp.getGlobalName(), loadOp);
-            auto global = solver.getElementFor<GlobalPVS>(
-                *this, Position::forOperation(globalInfo->op),
-                DFX::Resolution::REQUIRED);
-            if (global.isValidState()) {
-              newState.unionAssumed(global);
-              return WalkResult::advance();
-            }
-          }
-
-          // TODO(benvanik): more ops supported for joining. We could for
-          // example walk the lhs/rhs of elementwise ops and perform the set
-          // operations (so addi %lhs, %rhs could produce a PVS of all of %lhs
-          // summed to all of %rhs). May not be worth it, though.
-          // TODO(benvanik): move select op walking to the explorer.
-          if (auto selectOp =
-                  dyn_cast<mlir::arith::SelectOp>(result.getDefiningOp())) {
-            auto lhs = solver.getElementFor<ValuePVS>(
-                *this, Position::forValue(selectOp.getTrueValue()),
-                DFX::Resolution::REQUIRED);
-            auto rhs = solver.getElementFor<ValuePVS>(
-                *this, Position::forValue(selectOp.getFalseValue()),
-                DFX::Resolution::REQUIRED);
-            if (!lhs.isValidState() || !rhs.isValidState()) {
-              newState.unionAssumedWithUndef();
-              newState.indicatePessimisticFixpoint();
-            } else {
-              newState.unionAssumed(lhs);
-              newState.unionAssumed(rhs);
-            }
-            return WalkResult::advance();
-          }
-
-          // Some other dynamic value we can't analyze (yet).
-          newState.unionAssumedWithUndef();
-          newState.indicatePessimisticFixpoint();
-          return WalkResult::advance();
-        }) == TraversalResult::INCOMPLETE) {
-      newState.unionAssumedWithUndef();
-      newState.indicatePessimisticFixpoint();
-    }
-    return DFX::clampStateAndIndicateChange(getState(), newState);
-  }
-
-  friend class DFX::Solver;
-};
-const char ValuePVS::ID = 0;
-
-void GlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
-                                    DFX::Solver &solver) {
-  auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
-  if (!globalInfo || globalInfo->isIndirect) {
-    // Cannot perform analysis.
-    indicatePessimisticFixpoint();
-  } else if (globalInfo) {
-    if (auto initialValue = llvm::dyn_cast_if_present<IntegerAttr>(
-            globalOp.getInitialValueAttr())) {
-      // Initial value is available for use; stored values from the rest of the
-      // program will come during iteration.
-      unionAssumed(initialValue.getValue());
-    }
-  }
-}
-
-ChangeStatus GlobalPVS::updateOperation(IREE::Util::GlobalOp globalOp,
-                                        DFX::Solver &solver) {
-  StateType newState;
-  auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
-  for (auto use : globalInfo->uses) {
-    auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(use);
-    if (!storeOp)
-      continue;
-    auto value = solver.getElementFor<ValuePVS>(
-        *this, Position::forValue(storeOp.getStoredGlobalValue()),
-        DFX::Resolution::REQUIRED);
-    if (value.isValidState()) {
-      newState.unionAssumed(value);
-    } else {
-      newState.unionAssumedWithUndef();
-      newState.indicatePessimisticFixpoint();
-    }
-  }
-  return DFX::clampStateAndIndicateChange(getState(), newState);
 }
 
 static constexpr uint64_t kMaximumAlignment = 1ull << 32;
@@ -274,7 +90,8 @@ private:
     }
   }
 
-  static llvm::MaybeAlign computeAlignment(const ValuePVS::SetTy &set) {
+  static llvm::MaybeAlign
+  computeAlignment(const IREE::Util::IntValuePVS::SetTy &set) {
     if (set.empty())
       return llvm::MaybeAlign();
     llvm::MaybeAlign alignment;
@@ -291,8 +108,8 @@ private:
 
     // If we can get a full potential value set then we can derive an alignment
     // from that.
-    auto pvs = solver.getElementFor<ValuePVS>(*this, Position::forValue(value),
-                                              DFX::Resolution::OPTIONAL);
+    auto pvs = solver.getElementFor<IREE::Util::IntValuePVS>(
+        *this, Position::forValue(value), DFX::Resolution::OPTIONAL);
     if (pvs.isValidState() && !pvs.isUndefContained()) {
       auto alignment = computeAlignment(pvs.getAssumedSet());
       if (alignment.has_value()) {
@@ -357,7 +174,8 @@ public:
     for (auto it : entryDispatchMap) {
       for (auto dispatchOp : it.second) {
         for (auto operand : dispatchOp.getUniformOperands()) {
-          solver.getOrCreateElementFor<ValuePVS>(Position::forValue(operand));
+          solver.getOrCreateElementFor<IREE::Util::IntValuePVS>(
+              Position::forValue(operand));
           solver.getOrCreateElementFor<ValueAlignment>(
               Position::forValue(operand));
         }
@@ -405,7 +223,7 @@ public:
                 unsigned operandIdx) {
     DFX::PotentialConstantIntValuesState state;
     for (auto dispatchOp : getDispatchSites(exportOp)) {
-      auto element = solver.lookupElementFor<ValuePVS>(
+      auto element = solver.lookupElementFor<IREE::Util::IntValuePVS>(
           Position::forValue(dispatchOp.getUniformOperands()[operandIdx]));
       if (!element) {
         state.unionAssumedWithUndef();

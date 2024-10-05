@@ -34,6 +34,7 @@ iree_cc_library(
     "Patterns.cpp"
     "PropagateSubranges.cpp"
     "SimplifyGlobalAccesses.cpp"
+    "SimplifyIndexArithmetic.cpp"
     "StripAndSplatConstants.cpp"
     "StripDebugOps.cpp"
     "TestConversion.cpp"

@@ -124,6 +124,13 @@ def SimplifyGlobalAccesses :
   }];
 }
 
+def SimplifyIndexArithmetic : Pass<"iree-util-simplify-index-arithmetic", ""> {
+  let summary = "Simplify index arithmetic.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createSimplifyIndexArithmeticPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Resource Management
 //===----------------------------------------------------------------------===//
