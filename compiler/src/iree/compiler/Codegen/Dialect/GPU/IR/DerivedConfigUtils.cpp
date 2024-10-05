@@ -11,6 +11,8 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -113,7 +115,15 @@ SmallVector<int64_t> deriveLinalgOpThreadTileSizes(linalg::LinalgOp linalgOp,
   int64_t vectorSize = kPreferredCopyNumBits /
                        getElementTypeOrSelf(linalgOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
-  return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
+  SmallVector<int64_t> tileSizes =
+      getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
+  for (auto [tileSize, iterType] :
+       llvm::zip(tileSizes, linalgOp.getIteratorTypesArray())) {
+    if (linalg::isReductionIterator(iterType)) {
+      tileSize = 0;
+    }
+  }
+  return tileSizes;
 }
 
 SmallVector<int64_t>
