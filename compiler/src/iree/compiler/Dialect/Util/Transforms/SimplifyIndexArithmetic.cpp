@@ -226,6 +226,13 @@ private:
                   *this, Position::forValue(indexCastOp.getOperand()),
                   DFX::Resolution::REQUIRED);
               newState ^= max;
+            } else if (auto assumeDivOp =
+                           dyn_cast<IREE::Util::AssumeDivisibleOp>(
+                               definingOp)) {
+              auto max = solver.getElementFor<ValueAPIntMax>(
+                  *this, Position::forValue(assumeDivOp.getOperand()),
+                  DFX::Resolution::REQUIRED);
+              newState ^= max;
             }
             return WalkResult::advance();
           }) == TraversalResult::INCOMPLETE) {
@@ -344,6 +351,13 @@ private:
               // TODO: Verify bitwidth is the same or trunc/extend.
               auto max = solver.getElementFor<ValueAPIntMin>(
                   *this, Position::forValue(indexCastOp.getOperand()),
+                  DFX::Resolution::REQUIRED);
+              newState ^= max;
+            } else if (auto assumeDivOp =
+                           dyn_cast<IREE::Util::AssumeDivisibleOp>(
+                               definingOp)) {
+              auto max = solver.getElementFor<ValueAPIntMin>(
+                  *this, Position::forValue(assumeDivOp.getOperand()),
                   DFX::Resolution::REQUIRED);
               newState ^= max;
             }
