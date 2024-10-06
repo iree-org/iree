@@ -26,35 +26,13 @@ namespace mlir::iree_compiler {
 // Utilities
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-struct ConvertAssumeNarrowOp
-    : public OpConversionPattern<IREE::Util::AssumeNarrowOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(IREE::Util::AssumeNarrowOp assumeOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // The op is a pass-through but we leave the narrow type unconverted since
-    // it is a hint and should not itself be subject to type conversion
-    // (narrowing, widening, etc).
-    rewriter.replaceOpWithNewOp<IREE::Util::AssumeNarrowOp>(
-        assumeOp, adaptor.getOperand().getType(), adaptor.getOperand(),
-        assumeOp.getNarrowType());
-    return success();
-  }
-};
-
-} // namespace
-
 void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
   patterns
-      .insert<GenericConvertTypesPattern<IREE::Util::AssumeDivisibleOp>,
-              GenericConvertTypesPattern<IREE::Util::AssumeRangeOp>,
+      .insert<GenericConvertTypesPattern<IREE::Util::AssumeIntOp>,
               GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
           typeConverter, context);
-  patterns.insert<ConvertAssumeNarrowOp>(typeConverter, context);
 
   typeConverter.addConversion([&](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &results) {
@@ -83,11 +61,7 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
-  addGenericLegalOp<IREE::Util::AssumeDivisibleOp>(conversionTarget,
-                                                   typeConverter);
-  addGenericLegalOp<IREE::Util::AssumeNarrowOp>(conversionTarget,
-                                                typeConverter);
-  addGenericLegalOp<IREE::Util::AssumeRangeOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<IREE::Util::AssumeIntOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::OptimizationBarrierOp>(conversionTarget,
                                                        typeConverter);
   addGenericLegalOp<IREE::Util::ListCreateOp>(conversionTarget, typeConverter);

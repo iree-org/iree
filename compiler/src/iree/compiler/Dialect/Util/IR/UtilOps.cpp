@@ -125,6 +125,22 @@ static bool anyAncestorHasAnyRefsToSymbol(Operation *baseOp,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<OperandIntAssumptions>($operands, $assumptions)
+//===----------------------------------------------------------------------===//
+
+// ParseResult parseOperandIntAssumptions(
+//     OpAsmParser &parser,
+//     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+//     ArrayAttr assumptions) {
+//   //
+//   return success();
+// }
+
+// void printOperandIntAssumptions(OpAsmPrinter &p, Operation *op,
+//                                 ValueRange operands, ArrayAttr assumptions)
+//                                 {}
+
+//===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
 // some.op custom<SymbolVisibility>($sym_visibility) $sym_name
@@ -1097,6 +1113,131 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
 } // namespace mlir::iree_compiler
 
 namespace mlir::iree_compiler::IREE::Util {
+
+//===----------------------------------------------------------------------===//
+// util.assume.int
+//===----------------------------------------------------------------------===//
+
+void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
+                        Value singleOperand,
+                        IntAssumptionAttr singleAssumption) {
+  state.addOperands({singleOperand});
+  state.addTypes({singleOperand.getType()});
+  state.addAttribute("assumptions", builder.getArrayAttr(builder.getArrayAttr(
+                                        {singleAssumption})));
+}
+
+LogicalResult AssumeIntOp::verify() {
+  ArrayAttr allOperandAssumptions = getAssumptions();
+  // Verify that there is an assumption row per operand.
+  if (getNumOperands() != allOperandAssumptions.size()) {
+    return emitOpError() << "expected " << getNumOperands()
+                         << " assumption rows to match number of operands";
+  }
+
+  std::optional<int> rank;
+  for (auto [index, operandAssumptionsAttr] :
+       llvm::enumerate(allOperandAssumptions)) {
+    auto operandAssumptions = cast<ArrayAttr>(operandAssumptionsAttr);
+    if (rank && *rank != operandAssumptions.size())
+      return emitOpError() << "expected operand #" << index << " to have "
+                           << *rank << " assumptions but it has "
+                           << operandAssumptions.size();
+    rank = operandAssumptions.size();
+  }
+
+  return success();
+}
+
+ParseResult AssumeIntOp::parse(OpAsmParser &parser, OperationState &result) {
+  SmallVector<Attribute> allOperandAssumptions;
+  SmallVector<OpAsmParser::UnresolvedOperand> parsedOperands;
+  SmallVector<Type> parsedOperandTypes;
+
+  if (parser.parseCommaSeparatedList([&]() {
+        parsedOperands.emplace_back();
+        OpAsmParser::UnresolvedOperand &parsedOperand = parsedOperands.back();
+        SmallVector<Attribute> operandAssumptions;
+
+        if (parser.parseOperand(parsedOperand))
+          return failure();
+
+        // Parse as a single assumption or a list.
+        if (failed(parser.parseOptionalLSquare())) {
+          // Single assumption.
+          IntAssumptionAttr singleAssumption;
+          if (parser.parseCustomAttributeWithFallback(singleAssumption))
+            return failure();
+          operandAssumptions.push_back(singleAssumption);
+        } else {
+          // Multiple assumptions.
+          if (failed(parser.parseOptionalRSquare())) {
+            if (parser.parseCommaSeparatedList([&]() {
+                  IntAssumptionAttr singleAssumption;
+                  if (parser.parseCustomAttributeWithFallback(singleAssumption))
+                    return failure();
+                  operandAssumptions.push_back(singleAssumption);
+                  return success();
+                }))
+              return failure();
+            if (parser.parseRSquare())
+              return failure();
+          }
+        }
+
+        // Finalize operand.
+        allOperandAssumptions.push_back(
+            parser.getBuilder().getArrayAttr(operandAssumptions));
+
+        return success();
+      }))
+    return failure();
+
+  // Parse `:` type.
+  if (parser.parseColon() || parser.parseTypeList(parsedOperandTypes))
+    return failure();
+  result.addTypes(parsedOperandTypes);
+
+  if (parser.resolveOperands(parsedOperands, parsedOperandTypes,
+                             parser.getNameLoc(), result.operands))
+    return failure();
+
+  result.attributes.append(
+      "assumptions", parser.getBuilder().getArrayAttr(allOperandAssumptions));
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  return success();
+}
+
+void AssumeIntOp::print(OpAsmPrinter &p) {
+  p << " ";
+  ArrayAttr allOperandAssumptions = getAssumptions();
+  for (auto [index, operand] : llvm::enumerate(getOperands())) {
+    if (index > 0)
+      p << ", ";
+    ArrayAttr operandAssumptions =
+        cast<ArrayAttr>(allOperandAssumptions[index]);
+    p.printOperand(operand);
+
+    // Print the assumptions, either as a single assumption or list.
+    if (operandAssumptions.size() == 1) {
+      p.printStrippedAttrOrType(cast<IntAssumptionAttr>(operandAssumptions[0]));
+    } else {
+      p << "[";
+      llvm::interleaveComma(
+          operandAssumptions, p.getStream(), [&](Attribute attr) {
+            p.printStrippedAttrOrType(cast<IntAssumptionAttr>(attr));
+          });
+      p << "]";
+    }
+  }
+
+  p << " : ";
+  llvm::interleaveComma(getOperands(), p.getStream(),
+                        [&](Value operand) { p.printType(operand.getType()); });
+  p.printOptionalAttrDict((*this)->getAttrs(), {"assumptions"});
+}
 
 //===----------------------------------------------------------------------===//
 // util.optimization_barrier
