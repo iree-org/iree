@@ -1,0 +1,14 @@
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task
+  SRCS
+    "swizzle_1x1_mfma_f32_16x16x4f32.mlir"
+    "swizzle_1x1_mfma_f32_16x16x4f32_Kx4.mlir"
+    "swizzle_2x2_mfma_f32_16x16x4f32_Kx4.mlir"
+    "swizzle_2x2_mfma_f32_16x16x16f16_Kx2.mlir"
+    "swizzle_2x2_mfma_i32_16x16x32i8_Kx2.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+)
