@@ -448,8 +448,13 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  {
+    OptimizeVectorTransferPassOptions options;
+    // Disable redundant vector transfer hoisting because it does not
+    // properly consider distributed code on memrefs.
+    options.redundantHoisting = false;
+    funcPassManager.addPass(createOptimizeVectorTransferPass());
+  }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());

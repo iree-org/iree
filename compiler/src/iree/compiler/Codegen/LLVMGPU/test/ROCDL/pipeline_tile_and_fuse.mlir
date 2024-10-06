@@ -941,3 +941,55 @@ hal.executable public @main {
 //   CHECK-DAG:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<4xf32>
 //   CHECK-DAG:     %[[RHS_MM:.+]] = vector.transfer_read %[[RHS_ALLOC]]{{.*}} vector<4x4xf32>
 //       CHECK:     vector.contract {{.*}} %[[LHS_MM]], %[[RHS_MM]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config = #iree_gpu.lowering_config<{
+  workgroup = [1, 64, 0],
+  reduction = [0, 0, 2],
+  thread = [1, 1, 0]
+}>
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @small_matvec ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @small_matvec()
+        attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x10xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<10x1xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<readwrite:tensor<10x1xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [10, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<10x10xf32>> -> tensor<10x10xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [10, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<10x1xf32>> -> tensor<10x1xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [10, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<10x1xf32>> -> tensor<10x1xf32>
+        %6 = linalg.matmul {lowering_config = #config}
+          ins(%3, %4 : tensor<10x10xf32>, tensor<10x1xf32>)
+          outs(%5 : tensor<10x1xf32>) -> tensor<10x1xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [10, 1], strides = [1, 1] : tensor<10x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<10x1xf32>>
+        return
+      }
+    }
+  }
+}
+
+// Note that current barrier placement logic is observedly poor. Some cleanup
+// analysis should be able to simplify the below to just two barriers.
+
+// CHECK-LABEL: func @small_matvec
+//   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c1 step %c64
+
+// Verify that the write does not get hoisted out of the single threaded
+// for loop.
+//       CHECK:     vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-NEXT:   }
+//  CHECK-NEXT:   return
