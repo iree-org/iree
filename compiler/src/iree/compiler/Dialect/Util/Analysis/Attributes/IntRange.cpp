@@ -64,7 +64,7 @@ ChangeStatus ValueGcd::updateValue(Value value, DFX::Solver &solver) {
 }
 
 const std::string ValueGcd::getAsStr(AsmState &asmState) const {
-  std::string s("gcd: "); 
+  std::string s("gcd: ");
   if (getAssumed() == GcdStateType::UNDEF) {
     s += "UNDEF";
   } else {

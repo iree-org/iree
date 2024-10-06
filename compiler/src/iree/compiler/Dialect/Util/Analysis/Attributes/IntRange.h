@@ -19,7 +19,7 @@ namespace mlir::iree_compiler::IREE::Util {
 
 struct GcdStateType : public DFX::IncIntegerState<uint64_t> {
   // Use the maximum value of the range to signal undefined. This is also
-  // considered the 
+  // considered the
   static constexpr uint64_t UNDEF = std::numeric_limits<uint64_t>::max();
 };
 
