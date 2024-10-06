@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Analysis/Attributes/IntRange.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
@@ -62,10 +63,9 @@ public:
     for (auto it : entryDispatchMap) {
       for (auto dispatchOp : it.second) {
         for (auto operand : dispatchOp.getUniformOperands()) {
-          (void)operand;
           // solver.getOrCreateElementFor<ValuePVS>(Position::forValue(operand));
-          // solver.getOrCreateElementFor<ValueAlignment>(
-          //     Position::forValue(operand));
+          solver.getOrCreateElementFor<Util::ValueGcd>(
+              Position::forValue(operand));
         }
         // for (auto resourceOffset : dispatchOp.getResourceOffsets()) {
         //   solver.getOrCreateElementFor<ValueAlignment>(
