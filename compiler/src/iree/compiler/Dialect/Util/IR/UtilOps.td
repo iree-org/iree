@@ -18,6 +18,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -458,7 +459,9 @@ def OpGroupCompilerHintOps : OpDocGroup {
 
 let opDocGroup = OpGroupCompilerHintOps in {
 
-def Util_AssumeIntOp : Util_PureOp<"assume.int", []> {
+def Util_AssumeIntOp : Util_PureOp<"assume.int", [
+    DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>
+]> {
   let summary = "memorializes assumptions about index/integer values.";
   let description = [{
     This op is used to memorialize the result of some integer analysis or
@@ -489,6 +492,23 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", []> {
       "IntAssumptionAttr":$singleAssumption
     )>,
   ];
+
+  let extraClassDeclaration = [{
+    // Gets the list of assumptions for an operand.
+    SmallVector<IntAssumptionAttr> getOperandAssumptions(unsigned operandIndex);
+
+    // Gets the unioned unsigned range for an operand. If there are multiple
+    // assumptions for the operand, this will return the bounding range for
+    // them all. If there is no umin/umax, then std::nullopt will be returned
+    // for that position.
+    std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
+      getUnionedUnsignedRange(unsigned operandIndex);
+
+    // Gets the unioned divisor for an operand. If there are multiple divisor
+    // assumptions, the gcd of all of them is returned. If there are no
+    // divisor assumptions, std::nullopt is returned.
+    std::optional<uint64_t> getUnionedDivisor(unsigned operandIndex);
+  }];
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;

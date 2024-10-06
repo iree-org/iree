@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -21,6 +22,8 @@
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+
+#include <numeric>
 
 namespace mlir::iree_compiler {
 
@@ -1101,6 +1104,77 @@ namespace mlir::iree_compiler::IREE::Util {
 //===----------------------------------------------------------------------===//
 // util.assume.int
 //===----------------------------------------------------------------------===//
+
+SmallVector<IntAssumptionAttr>
+AssumeIntOp::getOperandAssumptions(unsigned operandIndex) {
+  assert(operandIndex < getNumOperands() &&
+         "getUnionedUnsignedRange operand out of range");
+  auto assumptions = cast<ArrayAttr>(getAssumptions()[operandIndex]);
+  SmallVector<IntAssumptionAttr> results;
+  for (auto assumption : assumptions) {
+    results.push_back(cast<IntAssumptionAttr>(assumption));
+  }
+  return results;
+}
+
+std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
+AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
+  auto assumptions = getOperandAssumptions(operandIndex);
+  std::optional<uint64_t> uminUnion;
+  std::optional<uint64_t> umaxUnion;
+
+  for (auto assumption : assumptions) {
+    auto umin = assumption.getUmin();
+    auto umax = assumption.getUmax();
+    if (umin) {
+      uminUnion = std::min(
+          *umin, uminUnion ? *uminUnion : std::numeric_limits<uint64_t>::max());
+    }
+    if (umax) {
+      umaxUnion = std::max(
+          *umax, umaxUnion ? *umaxUnion : std::numeric_limits<uint64_t>::min());
+    }
+  }
+  return std::make_pair(uminUnion, umaxUnion);
+}
+
+// Gets the unioned divisor for an operand. If there are multiple divisor
+// assumptions, the gcd of all of them is returned. If there are no
+// divisor assumptions, std::nullopt is returned.
+std::optional<uint64_t> AssumeIntOp::getUnionedDivisor(unsigned operandIndex) {
+  auto assumptions = getOperandAssumptions(operandIndex);
+  std::optional<uint64_t> divisorUnion;
+  for (auto assumption : assumptions) {
+    auto divisor = assumption.getDivisor();
+    if (divisor) {
+      if (divisorUnion)
+        divisorUnion = std::gcd(*divisor, *divisorUnion);
+      else
+        divisorUnion = *divisor;
+    }
+  }
+  return divisorUnion;
+}
+
+void AssumeIntOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
+                                    SetIntRangeFn setResultRange) {
+  for (auto [index, result] : llvm::enumerate(getResults())) {
+    Type type = result.getType();
+    unsigned bitWidth;
+    if (isa<IndexType>(type))
+      bitWidth = 64;
+    else if (auto intType = dyn_cast<IntegerType>(type))
+      bitWidth = intType.getWidth();
+    else
+      continue;
+    auto [umin, umax] = getUnionedUnsignedRange(index);
+    if (umin && umax) {
+      APInt uminAp(bitWidth, *umin);
+      APInt umaxAp(bitWidth, *umax);
+      setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
+    }
+  }
+}
 
 void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
                         Value singleOperand,
