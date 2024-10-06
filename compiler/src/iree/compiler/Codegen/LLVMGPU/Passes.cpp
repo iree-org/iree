@@ -77,7 +77,7 @@ static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
 static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
-                      llvm::cl::init(false));
+                      llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
