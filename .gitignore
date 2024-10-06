@@ -19,9 +19,9 @@
 .DS_Store
 
 # CMake artifacts
-build/
-build-*/
-Testing/
+/build/
+/build-*/
+/Testing/
 
 # Bazel artifacts
 **/bazel-*
