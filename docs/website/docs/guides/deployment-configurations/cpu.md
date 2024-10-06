@@ -104,11 +104,52 @@ drivers:
 ```console hl_lines="4 5"
 $ iree-run-module --list_drivers
 
-        cuda: CUDA (dynamic)
-  local-sync: Local execution using a lightweight inline synchronous queue
-  local-task: Local execution using the IREE multithreading task system
-      vulkan: Vulkan 1.x (dynamic)
+            cuda: NVIDIA CUDA HAL driver (via dylib)
+             hip: HIP HAL driver (via dylib)
+      local-sync: Local execution using a lightweight inline synchronous queue
+      local-task: Local execution using the IREE multithreading task system
+          vulkan: Vulkan 1.x (dynamic)
 ```
+
+You can download the runtime from a release or build from source.
+
+#### :octicons-package-16: Download the runtime from a release
+
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The `iree-runtime` package includes CPU support by via the `local-sync` and
+`local-task` drivers.
+
+=== "Stable releases"
+
+    Stable release packages are
+    [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+
+    ``` shell
+    python -m pip install iree-runtime
+    ```
+
+=== ":material-alert: Nightly releases"
+
+    Nightly releases are published on
+    [GitHub releases](https://github.com/iree-org/iree/releases).
+
+    ``` shell
+    python -m pip install \
+      --find-links https://iree.dev/pip-release-links.html \
+      --upgrade iree-runtime
+    ```
+
+!!! tip
+    `iree-run-module` is installed to your python module installation path. If
+    you pip install with the user mode, it is under `${HOME}/.local/bin`, or
+    `%APPDATA%Python` on Windows. You may want to include the path in your
+    system's `PATH` environment variable:
+
+    ```shell
+    export PATH=${HOME}/.local/bin:${PATH}
+    ```
 
 #### :material-hammer-wrench: Build the runtime from source
 
