@@ -30,8 +30,6 @@ or [Linux](https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html).
 
 #### :octicons-package-16: Download the compiler from a release
 
-!!! note "Currently ROCm is **NOT supported** for the Python interface."
-
 #### :material-hammer-wrench: Build the compiler from source
 
 Please make sure you have followed the
