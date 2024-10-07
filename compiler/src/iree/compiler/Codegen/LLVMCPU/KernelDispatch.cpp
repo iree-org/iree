@@ -2556,6 +2556,10 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
+        .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          return setDefaultCustomOpLoweringConfig(entryPointFn, op,
+                                                  initCPULaunchConfig);
+        })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
               tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(

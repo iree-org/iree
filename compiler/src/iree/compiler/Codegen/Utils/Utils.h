@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -99,6 +100,11 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
+
+LogicalResult setDefaultCustomOpLoweringConfig(
+    mlir::FunctionOpInterface FunctionOpInterface,
+    IREE::LinalgExt::CustomOp customOp,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> configFn);
 
 /// Information about a tiled and distributed loop.
 ///
