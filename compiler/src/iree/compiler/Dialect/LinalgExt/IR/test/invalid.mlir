@@ -585,6 +585,58 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
 
 // -----
 
+func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected the same size m_offset and m_basis}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0, 0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected the same size k_offset and k_basis}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0, 0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_m_basis(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected inner m_basis to be 1}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [0] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_k_basis(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected inner k_basis to be 1}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [2]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
 func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected input rank to be the sum of batch, m, and k ranks}}

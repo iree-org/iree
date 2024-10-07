@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -270,24 +271,6 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
          affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
 }
 
-// Helper method to add 2 OpFoldResult inputs with affine.apply.
-static OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
-                            OpFoldResult b) {
-  AffineExpr d0, d1;
-  bindDims(builder.getContext(), d0, d1);
-  auto addMap = AffineMap::get(2, 0, {d0 + d1});
-  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
-}
-
-// Helper method to multiply 2 OpFoldResult inputs with affine.apply.
-static OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
-                            OpFoldResult b) {
-  AffineExpr d0, d1;
-  bindDims(builder.getContext(), d0, d1);
-  auto addMap = AffineMap::get(2, 0, {d0 * d1});
-  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
-}
-
 //===----------------------------------------------------------------------===//
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
@@ -481,16 +464,21 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
   Value inputSlice = getInput();
 
+  // This is part of the im2col verifier, but check here in case this changes.
+  assert(getConstantIntValue(getMixedMBasis().back()).value() == 1 &&
+         getConstantIntValue(getMixedKBasis().back()).value() == 1 &&
+         "Expected inner m_offset and k_offset to be 1");
+
   // Get the linearized mOffset and kOffset
-  auto linearizeIndex = [&](SmallVector<OpFoldResult> inds,
-                            SmallVector<OpFoldResult> basis) {
+  auto linearizeIndex = [&](ArrayRef<OpFoldResult> inds,
+                            ArrayRef<OpFoldResult> basis) {
     MLIRContext *ctx = b.getContext();
     SmallVector<AffineExpr> dims(inds.size()), symbols(basis.size());
     bindDimsList<AffineExpr>(ctx, dims);
     bindSymbolsList<AffineExpr>(ctx, symbols);
     AffineExpr linearExpr = mlir::linearize(ctx, dims, symbols);
     SmallVector<OpFoldResult> mapOperands(inds);
-    mapOperands.append(basis);
+    mapOperands.append(basis.begin(), basis.end());
     auto linearMap = AffineMap::get(
         /*dimCount=*/inds.size(), /*symbolCount=*/basis.size(), linearExpr);
     OpFoldResult linearIdx =
@@ -594,13 +582,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     kBasis.push_back(size);
   }
   OpFoldResult kIndex = kOffset;
-  for (auto [i, offset] : llvm::enumerate(getMixedKOffset())) {
+  for (auto [i, ivIdx, basis] :
+       llvm::enumerate(getKOutputDims(), getMixedKBasis())) {
     if (vectorizeInnerKLoop && i == getMixedKOffset().size() - 1) {
       break;
     }
-    int64_t ivIdx = getKOutputDims()[i];
-    OpFoldResult ivOffset =
-        mulOfrs(b, nestedLoc, getMixedKBasis()[i], ivs[ivIdx]);
+    OpFoldResult ivOffset = mulOfrs(b, nestedLoc, basis, ivs[ivIdx]);
     kIndex = addOfrs(b, nestedLoc, kIndex, ivOffset);
   }
   FailureOr<SmallVector<Value>> maybeDelinKOffset = affine::delinearizeIndex(
@@ -624,9 +611,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     inputKOffset.push_back(delinKOffset[delinKIdx++]);
   }
 
-  // Compute offsets for extract. Start by delinearizing the combined offset
-  // of m_offset and the offset from the tiled loop, using the mBasis. This
-  // will give an index into the delinearized output space of the convolution.
+  // Compute offsets for extract. The linearized im2col result M offset is
+  // computed as the m_offset * m_basis inner product plus the linearized offset
+  // from the tiled m loops. The M offsets into the im2col input are then
+  // computed as the delinearized im2col result M offset (in the convolution
+  // result iteration space), plus the convolutional window offsets computed
+  // above.
   SmallVector<int64_t> mOutDims = getMOutputDims();
   SmallVector<OpFoldResult> mIvs, mOutBasis(getMixedMBasis());
   for (auto [idx, dim] : llvm::enumerate(getMOutputDims())) {
@@ -634,6 +624,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
   OpFoldResult linearMIv = linearizeIndex(mIvs, mOutBasis);
   OpFoldResult linearMOffset = addOfrs(b, nestedLoc, linearMIv, mOffset);
+  // Delinearize the m_offset * m_basis into the convolution output space.
+  // `mBasis` contains the basis for the iteration space of result of the
+  // convolution op (i.e., basis for result H and W dims).
   FailureOr<SmallVector<Value>> maybeDelinMOffset = affine::delinearizeIndex(
       b, nestedLoc,
       getValueOrCreateConstantIndexOp(b, nestedLoc, linearMOffset), mBasis);

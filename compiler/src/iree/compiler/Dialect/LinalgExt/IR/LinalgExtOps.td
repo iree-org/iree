@@ -839,7 +839,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
           scf.for %arg2 = %c0 to %c5760 step %c1
             %im2col = iree_linalg_ext.im2col
                 strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-                m_offset = [%arg1] k_offset = [%arg2]
+                m_offset = [%arg1] * [1] k_offset = [%arg2] * [1]
                 batch_pos = [0] m_pos = [1, 2] k_pos = [3]
                 ins(%in_tile : tensor<1x34x34x640xf32>)
                 outs(%out_tile : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>

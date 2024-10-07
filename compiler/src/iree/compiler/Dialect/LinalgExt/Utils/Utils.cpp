@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -15,6 +16,22 @@
 #include "mlir/IR/Builders.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                     OpFoldResult b) {
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  auto addMap = AffineMap::get(2, 0, {d0 + d1});
+  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
+}
+
+OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                     OpFoldResult b) {
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  auto addMap = AffineMap::get(2, 0, {d0 * d1});
+  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
+}
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = cast<ShapedType>(v.getType());

@@ -1630,6 +1630,27 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError("expected one output operand");
   }
 
+  // Verify offsets and basis
+  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
+  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
+  SmallVector<OpFoldResult> kBasis = getMixedKBasis();
+  SmallVector<OpFoldResult> mBasis = getMixedMBasis();
+  if (kOffset.size() != kBasis.size()) {
+    return op->emitOpError("expected the same size k_offset and k_basis");
+  }
+  if (mOffset.size() != mBasis.size()) {
+    return op->emitOpError("expected the same size m_offset and m_basis");
+  }
+  std::optional<int64_t> constInnerKBasis = getConstantIntValue(kBasis.back());
+  if (!constInnerKBasis.has_value() || constInnerKBasis.value() != 1) {
+    return op->emitOpError("expected inner k_basis to be 1");
+  }
+  std::optional<int64_t> constInnerMBasis = getConstantIntValue(mBasis.back());
+  if (!constInnerMBasis.has_value() || constInnerMBasis.value() != 1) {
+    return op->emitOpError("expected inner m_basis to be 1");
+  }
+
+  // Verify operand ranks and dim position sizes.
   auto inputType = getInputType();
   unsigned inputRank = inputType.getRank();
   ArrayRef<int64_t> batchPos = getBatchPos();
@@ -1641,13 +1662,12 @@ LogicalResult Im2colOp::verify() {
   }
   auto outputType = getOutputType();
   unsigned outputRank = outputType.getRank();
-  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
-  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
   if (outputRank != batchPos.size() + kOffset.size() + mOffset.size()) {
     return op->emitOpError("expected output rank to be the sum of "
                            "batch_pos, k_offset, and m_offset ranks");
   }
 
+  // Verify convolution metadata.
   ArrayRef<int64_t> strides = getStrides();
   ArrayRef<int64_t> dilations = getDilations();
   SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
@@ -1664,6 +1684,7 @@ LogicalResult Im2colOp::verify() {
         "expected dilations rank to be equal to the kernel rank");
   }
 
+  // Verify input and output shapes.
   ArrayRef<int64_t> inputShape = inputType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
   // When the op is tiled, the m and k dimensions of the output are tiled, but
