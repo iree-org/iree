@@ -486,3 +486,35 @@ func.func @forall_hoist_unit_loop_with_fill(%3: tensor<1x128xf16>, %4: tensor<12
 //       CHECK:   scf.forall.in_parallel
 //  CHECK-NEXT:     tensor.parallel_insert_slice %[[LOOP]] into %[[ITER]]
 //       CHECK:   return %[[OUTER_PARALLEL]]
+
+// -----
+
+func.func @no_fuse_multi_use(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<128x128xf16>
+  %10:2 = scf.forall (%arg5, %arg6) in (32, 32) shared_outs(%arg7 = %empty, %arg8 = %empty) -> (tensor<128x128xf16>, tensor<128x128xf16>) {
+    %extracted_slice_1 = tensor.extract_slice %2[%arg5, %arg6] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+    %extracted_slice_2 = tensor.extract_slice %arg7[%arg5, %arg6] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+    %extracted_slice_3 = tensor.extract_slice %arg8[%arg6, %arg5] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+    %16 = linalg.copy ins(%extracted_slice_1 : tensor<2x2xf16>) outs(%extracted_slice_2 : tensor<2x2xf16>) -> tensor<2x2xf16>
+    %17 = linalg.transpose ins(%extracted_slice_1 : tensor<2x2xf16>) outs(%extracted_slice_3 : tensor<2x2xf16>) permutation = [1, 0]
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
+      tensor.parallel_insert_slice %17 into %arg8[%arg6, %arg5] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
+    }
+  } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  %add = linalg.add
+    ins(%10#0, %10#1 : tensor<128x128xf16>, tensor<128x128xf16>)
+    outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
+  return %add : tensor<128x128xf16>
+}
+
+// CHECK-LABEL: func @no_fuse_multi_use
+//       CHECK:   scf.forall
+//       CHECK:     linalg.copy
+//       CHECK:     linalg.transpose
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   linalg.add
+//       CHECK:   return
