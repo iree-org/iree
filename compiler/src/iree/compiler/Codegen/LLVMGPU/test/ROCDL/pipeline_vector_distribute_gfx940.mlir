@@ -484,9 +484,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // -----
 
-// This test checks if we can handle padding to intrinsic shape for batch
-// matmul.
-
 #config = #iree_gpu.lowering_config<{workgroup = [1, 16, 32, 0], reduction = [0, 0, 0, 8]}>
 #translation = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, subgroup_m_count = 1, subgroup_n_count = 2>}>
 
@@ -522,24 +519,29 @@ hal.executable public @pad_batch_matmul {
   }
 }
 
-// CHECK-LABEL: @pad_batch_matmul
-// CHECK: scf.for
+// This test checks if we can handle an unaligned batch matmul which has sizes
+// smaller than the chosen tile sizes. We just want to make sure we can compile
+// this example. We also check if the correct transfer_read/transfer_write are
+// produced with in_bounds attrs for the padded dimensions.
+
+// CHECK-LABEL:   @pad_batch_matmul
+// CHECK:           scf.for
 // LHS
-// CHECK: vector.transfer_read
-// CHECK-SAME: in_bounds = [true, true, true]
-// CHECK-SAME: memref<196x16x24xf32
-// CHECK-SAME: vector<1x1x1xf32>
+// CHECK:             vector.transfer_read
+// CHECK-SAME:        in_bounds = [true, true, true]
+// CHECK-SAME:        memref<196x16x24xf32
+// CHECK-SAME:        vector<1x1x1xf32>
 // RHS
-// CHECK: vector.transfer_read
-// CHECK-SAME: in_bounds = [true, true, false]
-// CHECK-SAME: memref<1x8x24xf32
-// CHECK-SAME: vector<1x1x2xf32>
-// CHECK: scf.yield
-// CHECK: vector.transfer_write
-// The last dimension of output needs to be padded to intrinsic shape
-// CHECK-SAME: in_bounds = [true, true, false]
-// CHECK-SAME: vector<1x4x1xf32>
-// CHECK-SAME: memref<1x16x24xf32
+// CHECK:             vector.transfer_read
+// CHECK-SAME:        in_bounds = [true, true, false]
+// CHECK-SAME:        memref<1x8x24xf32
+// CHECK-SAME:        vector<1x1x2xf32>
+// CHECK:           scf.yield
+// OUTPUT
+// CHECK:           vector.transfer_write
+// CHECK-SAME:      in_bounds = [true, true, false]
+// CHECK-SAME:      vector<1x4x1xf32>
+// CHECK-SAME:      memref<1x16x24xf32
 
 // -----
 

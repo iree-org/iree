@@ -13,8 +13,7 @@
 #map4 = affine_map<()[s0] -> (-s0 + 64)>
 #map5 = affine_map<()[s0] -> (-s0 + 128)>
 #config = #iree_gpu.lowering_config<{workgroup = [1, 16, 16, 0], reduction = [0, 0, 0, 16]}>
-#translation = #iree_codegen.translation_info<None, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
-func.func @batch_matmul_f16() attributes {translation_info = #translation} {
+func.func @batch_matmul_f16() attributes {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>>
@@ -79,8 +78,7 @@ func.func @batch_matmul_f16() attributes {translation_info = #translation} {
 #map4 = affine_map<()[s0] -> (-s0 + 64)>
 #map5 = affine_map<()[s0] -> (-s0 + 128)>
 #map6 = affine_map<(d0) -> (-d0 + 1281, 64)>
-#translation = #iree_codegen.translation_info<None, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1>}>
-func.func @batch_matmul_pad_reduction_after_tiling() attributes {translation_info = #translation} {
+func.func @batch_matmul_pad_reduction_after_tiling() attributes {
   %c64 = arith.constant 64 : index
   %c1281 = arith.constant 1281 : index
   %c2 = arith.constant 2 : index

@@ -38,6 +38,9 @@ public:
   void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
                         ArrayRef<int64_t> paddingDims,
                         ArrayRef<int64_t> padToMultipleOf, bool noFold) const {
+    assert(paddingDims.size() == padToMultipleOf.size() &&
+           "invalid pad multiples for padding dimensions");
+
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
@@ -105,14 +108,14 @@ public:
         switch (targetDimensions) {
         case LLVMGPUMatmulPadOption::ParallelDims:
           padMultiples = config.getStaticTilingLevelSizes(
-              (unsigned)IREE::GPU::TilingLevel::Workgroup, op);
+              static_cast<unsigned>(IREE::GPU::TilingLevel::Workgroup), op);
           break;
         case LLVMGPUMatmulPadOption::ReductionDims:
           padMultiples = config.getStaticTilingLevelSizes(
-              (unsigned)IREE::GPU::TilingLevel::Reduction, op);
+              static_cast<unsigned>(IREE::GPU::TilingLevel::Reduction), op);
           break;
         default:
-          llvm_unreachable("Unexpected target dimensions");
+          assert(false && "Unexpected target dimensions");
           break;
         }
       }
@@ -130,7 +133,6 @@ public:
       // This pass is ran after the select target tiling is done to pad
       // all dimensions to the select tile sizes.
       SmallVector<int64_t> padToMultipleOf;
-      padToMultipleOf.reserve(paddingDimensions.size());
       for (int64_t dim : paddingDimensions) {
         if (padMultiples[dim] != 0) {
           padToMultipleOf.push_back(padMultiples[dim]);
