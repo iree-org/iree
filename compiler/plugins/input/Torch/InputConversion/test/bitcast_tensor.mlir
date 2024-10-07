@@ -43,4 +43,3 @@ func.func @view_as_real(%arg0 : !torch.vtensor<[128], complex<f32>>) -> !torch.v
     %0 = torch.aten.view_as_real %arg0 : !torch.vtensor<[128],complex<f32>> -> !torch.vtensor<[128,2],f32>
     return %0 : !torch.vtensor<[128,2],f32>
 }
-
