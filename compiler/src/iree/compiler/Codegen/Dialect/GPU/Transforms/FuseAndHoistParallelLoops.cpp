@@ -81,7 +81,7 @@ static bool forallTripCountMatchesWorkgroupSize(scf::ForallOp forallOp,
       return false;
     }
 
-    return *maybeParentTripCount * *maybeParentTripCount == flatWorkgroupSize;
+    return *maybeParentTripCount * *maybeTripCount == flatWorkgroupSize;
   }
 
   // All other loops must be mapped to threads to compare.
