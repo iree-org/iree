@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "elementwise_pipeline.mlir",
             "cast_address_space_function.mlir",
             "cast_type_to_fit_mma.mlir",
+            "config_custom_op.mlir",
             "config_matvec.mlir",
             "config_winograd.mlir",
             "extract_address_computation_gpu.mlir",

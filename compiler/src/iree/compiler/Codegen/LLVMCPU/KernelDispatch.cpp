@@ -2557,6 +2557,10 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
+        .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          return setDefaultCustomOpLoweringConfig(entryPointFn, op,
+                                                  initCPULaunchConfig);
+        })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
               tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
@@ -3094,8 +3098,16 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    // Set vector level tile sizes for other operations individually.
-    if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
+    // Avoid this for ops within a custom_op since those ops have already their
+    // configuration set.
+    auto prunedComputeOps =
+        llvm::to_vector(llvm::make_filter_range(computeOps, [](Operation *op) {
+          return !isa_and_nonnull<IREE::LinalgExt::CustomOp>(
+                     op->getParentOp()) ||
+                 getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op) ==
+                     nullptr;
+        }));
+    if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();
     }

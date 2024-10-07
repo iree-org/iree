@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -100,6 +101,11 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
 
+LogicalResult setDefaultCustomOpLoweringConfig(
+    mlir::FunctionOpInterface FunctionOpInterface,
+    IREE::LinalgExt::CustomOp customOp,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> configFn);
+
 /// Information about a tiled and distributed loop.
 ///
 /// Right now distribution is happening as the same time when we tile the linalg
@@ -141,25 +147,11 @@ struct LoopTilingAndDistributionInfo {
   unsigned processorDistributionDim;
 };
 
-/// Assuming that `funcOp` contains a single nested scf.for that represented the
-/// tiled+fused+distributed loops with the distribution being across workgroups,
-/// i.e.
-///
-/// scf.for ... {
-///   ...
-///   scf.for ... {
-///     ...
-///     filtered_op.
-///     ...
-///     filtered_op.
-///     ...
-///   }
-/// }
-///
-/// Returns the list of TilingInterface ops in the functions. If there are no
-/// `scf.for` operations in the function return the TilingInterface operations
-/// in the body of the function if it has a single basic block.
-SmallVector<Operation *> getComputeOps(mlir::FunctionOpInterface funcOp);
+/// Returns the list of TilingInterface ops in the operation obtained by a
+/// post order walk of the operation. This implies that in case of
+/// nested compute ops, the outermost compute ops are towards the end of the
+/// list.
+SmallVector<Operation *> getComputeOps(Operation *containingOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.

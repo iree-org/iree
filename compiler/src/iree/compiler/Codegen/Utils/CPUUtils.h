@@ -11,7 +11,9 @@
 
 namespace mlir::iree_compiler {
 
-/// Find the root operation for the dispatch region. The priority is:
+/// Find the root operation for the dispatch region given `computeOps` that are
+/// obtained by a post order walk, i.e. in presence of nested compute ops the
+/// outermost operations are towards the end of the list. The priority is:
 ///   1. A Linalg operation that has reduction loops.
 ///   2. Any other Linalg op or LinalgExt op.
 ///   3. An operation that implements TilingInterface.

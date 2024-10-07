@@ -2084,6 +2084,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG("Ukernel Config");
         return setUKernelConfig(entryPointFn, ukernelOp);
       })
+      .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
+        LDBG("CustomOp Config");
+        return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
+                                                initGPULaunchConfig);
+      })
       .Default([&](auto op) {
         LDBG("Default Config");
         return setRootDefaultConfig(target, entryPointFn, computeOp);
