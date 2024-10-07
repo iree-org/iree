@@ -312,7 +312,9 @@ def OptimizeTensorInsertExtractSlicesPass
                 "(e.g. hoist and fold)";
   let options = [
     Option<"foldIdentitySlices", "fold-identity-slices", "bool", "false",
-           "Enable folding of identity tensor.*_slice ops.">
+           "Enable folding of identity tensor.*_slice ops.">,
+    Option<"hoistRedundantTransfers", "hoist-redundant-transfers", "bool", "true",
+           "Enables use of redundant vector transfer hoisting.">
   ];
 }
 

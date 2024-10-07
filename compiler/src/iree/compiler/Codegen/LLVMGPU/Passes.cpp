@@ -399,6 +399,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     OptimizeTensorInsertExtractSlicesPassOptions options;
     options.foldIdentitySlices = true;
+    // This does random unsafe LICM. >:(
+    options.hoistRedundantTransfers = false;
     funcPassManager.addPass(
         createOptimizeTensorInsertExtractSlicesPass(options));
   }
