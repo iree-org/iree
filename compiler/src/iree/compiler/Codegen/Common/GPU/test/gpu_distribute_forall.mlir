@@ -133,8 +133,8 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 //       CHECK:     %[[LINID:.+]] = affine.apply
 //  CHECK-SAME:       affine_map<(d0)[s0, s1, s2] -> (d0 + s0 + s1 * 64 + s2 * 128)>(%[[I]])
 //  CHECK-SAME:       [%[[TX]], %[[TY]], %[[TZ]]]
-//       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (%c4, %c8, %c16) : index
-//       CHECK:     memref.store {{.*}}[%[[DELIN]]#2, %[[DELIN]]#1, %[[DELIN]]#0]
+//       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (%c16, %c8, %c4) : index
+//       CHECK:     memref.store {{.*}}[%[[DELIN]]#0, %[[DELIN]]#1, %[[DELIN]]#2]
 
 
 // -----
