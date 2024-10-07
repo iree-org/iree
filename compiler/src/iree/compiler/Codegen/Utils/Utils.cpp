@@ -704,17 +704,11 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes,
     linalg::DistributionMethod distributionMethod,
     int32_t maxWorkgroupParallelDims) {
-  return {[&tileSizes, distributionMethod,
+  return {[distributionMethod,
            maxWorkgroupParallelDims](OpBuilder &builder, Location loc,
                                      ArrayRef<Range> parallelLoopRanges) {
-    SmallVector<int64_t> nonZeroTileSizes;
-    for (int64_t size : tileSizes) {
-      if (size != 0)
-        nonZeroTileSizes.push_back(size);
-    }
     auto numParallelDims = parallelLoopRanges.size();
 
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
@@ -729,11 +723,12 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         OpFoldResult size = parallelLoopRanges[numParallelDims - dim - 1].size;
         OpFoldResult offset =
             parallelLoopRanges[numParallelDims - dim - 1].offset;
-        AffineExpr d0, d1;
-        int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
-        bindSymbols(builder.getContext(), d0, d1);
+        OpFoldResult step =
+            parallelLoopRanges[numParallelDims - dim - 1].stride;
+        AffineExpr d0, d1, d2;
+        bindSymbols(builder.getContext(), d0, d1, d2);
         OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
-            builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
+            builder, loc, (d1 - d0).ceilDiv(d2), {offset, size, step});
         OpFoldResult dimValue;
         if (dim == numParallelDims - 1)
           dimValue = splitDim.value();

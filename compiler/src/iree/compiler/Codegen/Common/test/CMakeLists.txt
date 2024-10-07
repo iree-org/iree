@@ -62,6 +62,7 @@ iree_lit_test_suite(
     "replace_slow_min_max_ops.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
+    "tile_and_distribute_to_workgroups_func_scope.mlir"
     "tile_and_distribute_workgroups_using_forall.mlir"
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
