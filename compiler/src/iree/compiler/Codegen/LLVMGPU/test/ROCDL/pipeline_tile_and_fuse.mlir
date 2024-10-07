@@ -400,7 +400,7 @@ hal.executable public @main {
 #config = #iree_gpu.lowering_config<{
   workgroup = [64, 64, 0],
   reduction = [0, 0, 2],
-  subgroup = [2, 2],
+  subgroup = [1, 1],
   mma_kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>,
   promote_operands = [0, 1]
 }>
@@ -440,8 +440,8 @@ hal.executable public @main {
 // CHECK-LABEL: func @matmul_transpose_b_mfma_32x32x16_i8
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
-//       CHECK:   scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x4x1xi32>)
-// CHECK-COUNT-8:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32
+//       CHECK:   scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<1x1x4x4x1xi32>)
+// CHECK-COUNT-2:   amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32
 //       CHECK:     scf.yield
 
 // -----
