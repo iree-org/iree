@@ -23,14 +23,8 @@ public:
       if (auto op = dyn_cast<IREE::Util::OptimizationBarrierOp>(genericOp)) {
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
-      } else if (auto op = dyn_cast<IREE::Util::AssumeDivisibleOp>(genericOp)) {
-        op.replaceAllUsesWith({op.getOperand()});
-        op.erase();
-      } else if (auto op = dyn_cast<IREE::Util::AssumeRangeOp>(genericOp)) {
-        op.replaceAllUsesWith({op.getOperand()});
-        op.erase();
-      } else if (auto op = dyn_cast<IREE::Util::AssumeNarrowOp>(genericOp)) {
-        op.replaceAllUsesWith({op.getOperand()});
+      } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
+        op.replaceAllUsesWith(op.getOperands());
         op.erase();
       }
     });

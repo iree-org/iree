@@ -76,30 +76,10 @@ module @deeply_nested {
 
 // -----
 
-// CHECK-LABEL: @assume.divisible
-util.func @assume.divisible() -> i32 {
-  // CHECK-NOT: util.assume.divisible
+// CHECK-LABEL: @assume.int
+util.func @assume.int() -> i32 {
+  // CHECK-NOT: util.assume.int
   %c1 = arith.constant 12 : i32
-  %0 = util.assume.divisible %c1 by 2 : i32
-  util.return %0 : i32
-}
-
-// -----
-
-// CHECK-LABEL: @assume.narrow
-util.func @assume.narrow() -> i32 {
-  // CHECK-NOT: util.assume.narrow
-  %c1 = arith.constant 12 : i32
-  %0 = util.assume.narrow %c1 : i32 to i8
-  util.return %0 : i32
-}
-
-// -----
-
-// CHECK-LABEL: @assume.range
-util.func @assume.range() -> i32 {
-  // CHECK-NOT: util.assume.range
-  %c1 = arith.constant 12 : i32
-  %0 = util.assume.range %c1 in [2, 20] : i32
+  %0 = util.assume.int %c1<umin = 1> : i32
   util.return %0 : i32
 }

@@ -30,18 +30,6 @@ namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
-Type getNarrowestType(Builder &builder,
-                      std::optional<std::pair<int64_t, int64_t>> minMaxBounds) {
-  if (!minMaxBounds)
-    return {};
-
-  auto maxBound = minMaxBounds->second;
-  if (maxBound <= std::numeric_limits<int32_t>::max())
-    return builder.getIntegerType(32);
-  else
-    return builder.getIntegerType(64);
-}
-
 // Torch "binds" symbolic shape information to all tensors in the program
 // which are not static. It does this by emitting side-effecting
 // torch.bind_symbolic_shape ops which are backed by torch.symbolic_int ops
@@ -352,20 +340,25 @@ class BindSymbolicShapesPass final
         // Add optimization assumptions if the divisor or bounds are known.
         int64_t divisor = expr.getLargestKnownDivisor();
         auto bounds = evaluateExprBounds(expr, symbolInfos);
-        if (divisor != 1 || bounds) {
-          Type narrowType = getNarrowestType(builder, bounds);
-          if (narrowType) {
-            dimValue = builder.create<IREE::Util::AssumeNarrowOp>(
-                bindOp->getLoc(), dimValue, TypeAttr::get(narrowType));
-          }
-          if (bounds) {
-            dimValue = builder.create<IREE::Util::AssumeRangeOp>(
-                bindOp->getLoc(), dimValue, bounds->first, bounds->second);
-          }
-          if (divisor != 1) {
-            dimValue = builder.create<IREE::Util::AssumeDivisibleOp>(
-                bindOp->getLoc(), dimValue, divisor);
-          }
+        std::optional<uint64_t> optionalUmin;
+        std::optional<uint64_t> optionalUmax;
+        std::optional<int64_t> optionalDivisor;
+        if (bounds) {
+          optionalUmin = bounds->first;
+          optionalUmax = bounds->second;
+        }
+        if (divisor != 1) {
+          optionalDivisor = divisor;
+        }
+        if (optionalUmin || optionalUmax || optionalDivisor) {
+          auto assumption = builder.getAttr<IREE::Util::IntAssumptionAttr>(
+              /*umin=*/optionalUmin,
+              /*umax=*/optionalUmax,
+              /*divisor=*/optionalDivisor);
+          dimValue = builder
+                         .create<IREE::Util::AssumeIntOp>(bindOp->getLoc(),
+                                                          dimValue, assumption)
+                         .getResult(0);
         }
 
         materializedDims[index] = dimValue;

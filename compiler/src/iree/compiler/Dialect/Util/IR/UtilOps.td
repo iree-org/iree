@@ -458,78 +458,40 @@ def OpGroupCompilerHintOps : OpDocGroup {
 
 let opDocGroup = OpGroupCompilerHintOps in {
 
-def Util_AssumeDivisibleOp :
-    Util_PureOp<"assume.divisible", [SameOperandsAndResultType]> {
-  let summary = "Memorializes knowledge that an index/integer value is divisible by some constant.";
+def Util_AssumeIntOp : Util_PureOp<"assume.int", []> {
+  let summary = "memorializes assumptions about index/integer values.";
+  let description = [{
+    This op is used to memorialize the result of some integer analysis or
+    outside knowledge across a boundary beyond which such information can
+    not be easily recovered. Assumptions are made per op/result pair.
+
+    Assumptions are tied to operands as rows of permutations of an
+    `#util.assume.int` per operand. The number of permutations is the rank.
+    Typically multiple permutations record a specific subset of assumptions
+    broken down per call-site in some way that is meaningful to the receiver.
+    Implementations can use this information to specialize on each
+    permutation if it is meaninful to do so (i.e. vs unioning across them).
+    In such cases, there will typically be one such op at the top of a
+    function or scope which passes all covered operands through it.
+  }];
 
   let arguments = (ins
-    Util_Range:$operand,
-    Util_IndexAttr:$divisor
+    Variadic<AnySignlessIntegerOrIndex>:$operands,
+    Util_MultiValueIntAssumptionAttrList:$assumptions
   );
   let results = (outs
-    Util_Range:$result
+    Variadic<AnySignlessIntegerOrIndex>:$results
   );
-  let assemblyFormat = [{
-    $operand `by` $divisor attr-dict `:` type($operand)
-  }];
   let builders = [
+    // Helper for building simple single operand/single assumption ops.
     OpBuilder<(ins
-      "Value":$operand,
-      "uint64_t":$divisor
-    ),
-    [{
-      IntegerAttr divisorAttr = $_builder.getIntegerAttr(
-          $_builder.getIndexType(), divisor);
-      build($_builder, $_state, operand.getType(), operand, divisorAttr);
-    }]>,
+      "Value":$singleOperand,
+      "IntAssumptionAttr":$singleAssumption
+    )>,
   ];
-}
 
-def Util_AssumeNarrowOp :
-    Util_PureOp<"assume.narrow", [SameOperandsAndResultType]> {
-  let summary = "Memorializes knowledge that an index/integer value can be narrowed to a type.";
-
-  let arguments = (ins
-    Util_Range:$operand,
-    TypeAttr:$narrow_type
-  );
-  let results = (outs
-    Util_Range:$result
-  );
-  let assemblyFormat = [{
-    $operand attr-dict `:` type($operand) `to` $narrow_type
-  }];
-}
-
-def Util_AssumeRangeOp :
-    Util_PureOp<"assume.range", [SameOperandsAndResultType]> {
-  let summary = "Memorializes knowledge that an index/integer value is always within some range.";
-
-  let arguments = (ins
-    Util_Range:$operand,
-    Util_IndexAttr:$min_value,
-    Util_IndexAttr:$max_value
-  );
-  let results = (outs
-    Util_Range:$result
-  );
-  let assemblyFormat = [{
-    $operand `in` ` ` `[` $min_value `,` $max_value `]` `:` type($operand) attr-dict
-  }];
-  let builders = [
-    OpBuilder<(ins
-      "Value":$operand,
-      "uint64_t":$minValue,
-      "uint64_t":$maxValue
-    ),
-    [{
-      IntegerAttr minAttr = $_builder.getIntegerAttr(
-          $_builder.getIndexType(), minValue);
-      IntegerAttr maxAttr = $_builder.getIntegerAttr(
-          $_builder.getIndexType(), maxValue);
-      build($_builder, $_state, operand.getType(), operand, minAttr, maxAttr);
-    }]>,
-  ];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
