@@ -44,6 +44,10 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
   Value operand = op->getOperand(index);
 
   if (auto producer = operand.getDefiningOp<TilingInterface>()) {
+    // Skip promotion of fills.
+    if (isa<linalg::FillOp>(producer)) {
+      return;
+    }
     setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
                                     builder.getContext()));
     return;
