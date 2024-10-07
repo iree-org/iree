@@ -125,22 +125,6 @@ static bool anyAncestorHasAnyRefsToSymbol(Operation *baseOp,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<OperandIntAssumptions>($operands, $assumptions)
-//===----------------------------------------------------------------------===//
-
-// ParseResult parseOperandIntAssumptions(
-//     OpAsmParser &parser,
-//     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
-//     ArrayAttr assumptions) {
-//   //
-//   return success();
-// }
-
-// void printOperandIntAssumptions(OpAsmPrinter &p, Operation *op,
-//                                 ValueRange operands, ArrayAttr assumptions)
-//                                 {}
-
-//===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
 // some.op custom<SymbolVisibility>($sym_visibility) $sym_name
