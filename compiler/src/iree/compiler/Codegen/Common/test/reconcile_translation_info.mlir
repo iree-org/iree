@@ -3,6 +3,19 @@
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
+hal.executable private @err_multiple_entry_point {
+  // expected-error @+1 {{reconciliation for multiple export ops unsupported}}
+  hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
+    hal.executable.export public @entry_point1 layout(#pipeline_layout)
+    hal.executable.export public @entry_point2 layout(#pipeline_layout)
+  }
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 hal.executable private @reconcile_workgroup_size {
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
