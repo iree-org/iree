@@ -419,6 +419,8 @@ def OptimizeVectorTransferPass :
   let options = [
     Option<"flatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">,
+    Option<"redundantHoisting", "redundant-hoisting", "bool", "true",
+           "Enables use of redundant vector transfer hoisting.">,
   ];
   let dependentDialects = [
       "memref::MemRefDialect"
