@@ -627,8 +627,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
 //   CHECK-DAG:   %[[IDZ:.+]] = gpu.thread_id  z
 //       CHECK:   %[[LINID0:.+]] = affine.apply #[[$MAP]]()[%[[IDX]], %[[IDY]], %[[IDZ]]]
-//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c8, %c4) : index, index
-//       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#1, %[[IDS]]#0]
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %[[LINID0:.+]] into (%c4, %c8) : index, index
+//       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#0, %[[IDS]]#1]
 //       CHECK:   scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
 //       CHECK:     scf.for %{{.*}} = %[[LINID1]] to %c4 step %c32
 //       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}storage_buffer>>, vector<4xf32>
