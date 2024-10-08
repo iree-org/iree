@@ -2174,108 +2174,12 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
 /// These methods copied/modified from `TilingInterface` implementation of
 /// `getIterationDomain` of `LinalgOp`s.
 
-static SmallVector<OpFoldResult>
-createFlatListOfOperandDims(OpBuilder &builder, Location loc,
-                            CustomOp customOp) {
-  SmallVector<OpFoldResult> result;
-  for (Value operand : customOp->getOperands()) {
-    for (auto dim : llvm::seq<unsigned>(customOp.getRank(operand))) {
-      result.push_back(linalg::createFoldedDimOp(builder, loc, operand, dim));
-    }
-  }
-  return result;
-}
-
-/// Return dim expresssions that can be used as replacements in map that
-/// contains `numSymbols` symbols. The new dim expressions have positions
-/// `numDims, numDims + 1, numDims + 2, ...., numDims + numSymbols - 1`.
-static SmallVector<AffineExpr> getDimExprsForSymbols(MLIRContext *context,
-                                                     unsigned numDims,
-                                                     unsigned numSymbols) {
-  return llvm::map_to_vector(
-      llvm::seq<unsigned>(0, numSymbols), [&](unsigned symbolNumber) {
-        return getAffineDimExpr(symbolNumber + numDims, context);
-      });
-}
-
-/// Convert all symbols in the map to dim expressions, such that the new dim
-/// expressions have positions `numDims, numDims + 1, numDims + 2, ...., numDims
-/// + numSymbols - 1`.
-static AffineMap
-convertDimsToSymbols(AffineMap map, unsigned numDims, unsigned numSymbols,
-                     SmallVector<AffineExpr> &symbolReplacements) {
-  return map.replaceDimsAndSymbols(/*dimReplacements=*/ArrayRef<AffineExpr>{},
-                                   symbolReplacements, numDims + numSymbols, 0);
-}
-static SmallVector<AffineMap>
-convertDimsToSymbols(ArrayRef<AffineMap> maps, unsigned numDims,
-                     unsigned numSymbols,
-                     SmallVector<AffineExpr> &symbolReplacements) {
-  return llvm::map_to_vector(maps, [&](AffineMap map) {
-    return convertDimsToSymbols(map, numDims, numSymbols, symbolReplacements);
-  });
-}
-static SmallVector<AffineMap> convertDimsToSymbols(MLIRContext *context,
-                                                   ArrayRef<AffineMap> maps,
-                                                   unsigned numDims,
-                                                   unsigned numSymbols) {
-  auto symbolReplacements = getDimExprsForSymbols(context, numDims, numSymbols);
-  return convertDimsToSymbols(maps, numDims, numSymbols, symbolReplacements);
-}
-
-SmallVector<Range> CustomOp::getIterationDomainForDimensions(
-    OpBuilder &builder, ArrayRef<unsigned> dims, ArrayRef<unsigned> symbols) {
-  CustomOp customOp = *this;
-  SmallVector<AffineMap> maps = customOp.getIndexingMapsArray();
-  if (maps.empty()) {
-    return SmallVector<Range>{};
-  }
-
-  Location loc = getLoc();
-
-  // 1. Create a flat list of all the operand shapes (similar to Linalg)
-  SmallVector<OpFoldResult> allShapesSizes =
-      createFlatListOfOperandDims(builder, loc, customOp);
-
-  // 2a. Next we need to get a map from shapes to loop. Since `custom_op`
-  //     has indexing maps that have symbols, to make this work correctly
-  //     compute new maps that replaces the symbols with "new" dims.
-  unsigned numDims = getNumLoops();
-  unsigned numSymbols = getNumNonLoopDimensions();
-  MLIRContext *context = getContext();
-  SmallVector<AffineMap> modifiedMaps =
-      convertDimsToSymbols(context, maps, numDims, numSymbols);
-
-  // 2b. Concat the affine maps.
-  AffineMap concatMap = inversePermutation(concatAffineMaps(modifiedMaps));
-  SmallVector<Range> ranges;
-
-  OpFoldResult zero = builder.getIndexAttr(0), one = builder.getIndexAttr(1);
-  auto getRange = [&](AffineExpr expr) {
-    OpFoldResult ofr = affine::makeComposedFoldedAffineApply(builder, loc, expr,
-                                                             allShapesSizes);
-    return Range{zero, ofr, one};
-  };
-  ranges = llvm::map_to_vector(
-      dims, [&](unsigned dim) { return getRange(concatMap.getResult(dim)); });
-  ranges.append(llvm::map_to_vector(symbols, [&](unsigned symbol) {
-    return getRange(concatMap.getResult(symbol + numSymbols));
-  }));
-  return ranges;
-}
-
-SmallVector<Range> CustomOp::getIterationDomain(OpBuilder &builder) {
-  auto dims = llvm::to_vector(llvm::seq<unsigned>(0, getNumLoops()));
-  return getIterationDomainForDimensions(builder, dims,
-                                         /*symbols=*/ArrayRef<unsigned>{});
-}
-
 /// During tiling, the tiling implementation generates offsets and sizes
 /// to use for the dimensions of the operation that correspond to loops.
 /// The dimensions of the operation corresponding to symbols isnt tiled.
 /// This method extends the offsets and sizes for a tile with the
 /// offsets (which are zero) and sizes (which are same as the untiled sizes) for
-/// the dimension represented by symbols. The
+/// the dimension represented by symbols.
 static std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>
 appendOffsetAndSizeForSymbolDimensions(OpBuilder &builder, CustomOp customOp,
                                        ArrayRef<OpFoldResult> offsets,
@@ -2317,12 +2221,12 @@ computeCustomOpAllSliceParameters(OpBuilder &builder, Location loc,
   // that define tile subshapes.
   SmallVector<OpFoldResult> lbs =
       linalg::computeTileOffsets(builder, loc, ivs, tileSizes);
-  SmallVector<OpFoldResult> sizeBounds = llvm::to_vector(tileSizes);
+  SmallVector<OpFoldResult> sizeBounds = tileSizes;
 
   std::tie(lbs, sizeBounds) = appendOffsetAndSizeForSymbolDimensions(
       builder, customOp, lbs, sizeBounds);
 
-  tileSizes.resize(tileSizes.size() + numSymbols, builder.getIndexAttr(0));
+  tileSizes.append(numSymbols, builder.getIndexAttr(0));
   SmallVector<OpFoldResult> subShapeSizes =
       linalg::computeTileSizes(builder, loc, tileSizes, sizeBounds);
 
@@ -2383,11 +2287,10 @@ materializeTiledShape(OpBuilder &builder, Location loc, Value valueToTile,
 
 /// This method is adapted from the method `linalg::makeTiledShapes`,
 /// adapted to work with map that have symbols, and empty maps.
-SmallVector<Value> makeCustomOpTiledShapes(OpBuilder &builder, Location loc,
-                                           CustomOp customOp,
-                                           ValueRange valuesToTile,
-                                           ArrayRef<OpFoldResult> ivs,
-                                           ArrayRef<OpFoldResult> tileSizes) {
+static SmallVector<Value>
+makeCustomOpTiledShapes(OpBuilder &builder, Location loc, CustomOp customOp,
+                        ValueRange valuesToTile, ArrayRef<OpFoldResult> ivs,
+                        ArrayRef<OpFoldResult> tileSizes) {
   SmallVector<std::optional<linalg::SliceParameters>> allSliceParameter =
       computeCustomOpAllSliceParameters(builder, loc, customOp, valuesToTile,
                                         ivs, llvm::to_vector(tileSizes));
@@ -2469,16 +2372,15 @@ LogicalResult CustomOp::getResultTilePosition(
   CustomOp customOp = *this;
   Location loc = getLoc();
 
-  AffineExpr d0;
-  bindDims(builder.getContext(), d0);
+  AffineExpr d0 = builder.getAffineDimExpr(0);
   SmallVector<OpFoldResult> appendedOffsets, appendedSizes;
   std::tie(appendedOffsets, appendedSizes) =
       appendOffsetAndSizeForSymbolDimensions(builder, customOp, offsets, sizes);
 
   SmallVector<OpFoldResult> subShapeSizes =
-      llvm::to_vector(llvm::map_range(appendedSizes, [&](OpFoldResult ofr) {
+      llvm::map_to_vector(appendedSizes, [&](OpFoldResult ofr) {
         return affine::makeComposedFoldedAffineApply(builder, loc, d0 - 1, ofr);
-      }));
+      });
 
   OpOperand *outOperand = customOp.getDpsInitOperand(resultNumber);
   linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
