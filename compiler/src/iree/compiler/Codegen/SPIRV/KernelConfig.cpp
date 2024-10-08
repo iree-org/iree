@@ -927,8 +927,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCounts[0] * subgroupSize,
-                                       schedule->mWarpCounts[0], 1};
+  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
+                                           subgroupSize,
+                                       schedule->mSubgroupCounts[0], 1};
 
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
   if (isBM)
@@ -947,9 +948,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   if (isBM)
     workgroupTileSizes[bIndex] = 1;
   workgroupTileSizes[mIndex] =
-      schedule->mWarpCounts[0] * subgroupTileSizes[mIndex];
+      schedule->mSubgroupCounts[0] * subgroupTileSizes[mIndex];
   workgroupTileSizes[nIndex] =
-      schedule->nWarpCounts[0] * subgroupTileSizes[nIndex];
+      schedule->nSubgroupCounts[0] * subgroupTileSizes[nIndex];
 
   // Also create one level for reduction. This is needed because of
   // SPIRVTileAndPromotePass requires it.

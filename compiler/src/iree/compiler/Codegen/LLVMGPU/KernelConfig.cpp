@@ -345,9 +345,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCounts[0] *
+  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            targetSubgroupSize,
-                                       schedule->mWarpCounts[0], 1};
+                                       schedule->mSubgroupCounts[0], 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
@@ -367,9 +367,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mWarpCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nWarpCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
 
   reductionTileSizes[kDim] = schedule->kTileCounts[0] * schedule->kSize;
 
@@ -394,7 +394,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index],
-      schedule->mWarpCounts[0], schedule->nWarpCounts[0]);
+      schedule->mSubgroupCounts[0], schedule->nSubgroupCounts[0]);
   pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
                              scheduleAttr);
 
@@ -585,12 +585,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("Schedule: tile counts [" << schedule->mTileCounts[0] << ", "
                                  << schedule->nTileCounts[0] << ", "
                                  << schedule->kTileCounts[0] << "]");
-  LDBG("Schedule: warp counts [" << schedule->mWarpCounts[0] << ", "
-                                 << schedule->nWarpCounts[0] << "]");
+  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
+                                 << schedule->nSubgroupCounts[0] << "]");
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCounts[0] *
+  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            targetSubgroupSize,
-                                       schedule->mWarpCounts[0], 1};
+                                       schedule->mSubgroupCounts[0], 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
@@ -613,9 +613,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mWarpCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nWarpCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
 
   reductionTileSizes[kDim] = schedule->kTileCounts[0] * schedule->kSize;
 
@@ -640,7 +640,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index],
-      schedule->mWarpCounts[0], schedule->nWarpCounts[0]);
+      schedule->mSubgroupCounts[0], schedule->nSubgroupCounts[0]);
   pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
                              scheduleAttr);
 
@@ -775,9 +775,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // TODO: Due to a bug in layout configuration, we cannot set warp count on
   // the N dimension. This is however ok, because we generally do not want to
   // distribute subgroups on N dimension anyway.
-  if (schedule->nWarpCounts[0] != 1) {
-    schedule->nTileCounts[0] *= schedule->nWarpCounts[0];
-    schedule->nWarpCounts[0] = 1;
+  if (schedule->nSubgroupCounts[0] != 1) {
+    schedule->nTileCounts[0] *= schedule->nSubgroupCounts[0];
+    schedule->nSubgroupCounts[0] = 1;
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
@@ -786,12 +786,12 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("Schedule: tile counts [" << schedule->mTileCounts[0] << ", "
                                  << schedule->nTileCounts[0] << ", "
                                  << schedule->kTileCounts[0] << "]");
-  LDBG("Schedule: warp counts [" << schedule->mWarpCounts[0] << ", "
-                                 << schedule->nWarpCounts[0] << "]");
+  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
+                                 << schedule->nSubgroupCounts[0] << "]");
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCounts[0] *
+  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            targetSubgroupSize,
-                                       schedule->mWarpCounts[0], 1};
+                                       schedule->mSubgroupCounts[0], 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
@@ -815,9 +815,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mWarpCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nWarpCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
 
   reductionTileSizes[k2Dim] = schedule->kTileCounts[0] * schedule->kSize;
 
@@ -836,7 +836,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getWgp().getMma()[schedule->index],
-      schedule->mWarpCounts[0], schedule->nWarpCounts[0]);
+      schedule->mSubgroupCounts[0], schedule->nSubgroupCounts[0]);
   pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
                              scheduleAttr);
 

@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -33,10 +34,9 @@ constexpr int64_t kCacheLineSizeBits = 128 * 8;
 template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
-  for (T element : vector) {
-    os << element << " ";
-  }
-
+  os << "[";
+  llvm::interleaveComma(vector, os);
+  os << "]";
   return os;
 }
 
@@ -247,12 +247,13 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Schedule: tile counts [" << schedule->mTileCounts << ", "
                                  << schedule->nTileCounts << ", "
                                  << schedule->kTileCounts << "]");
-  LDBG("Schedule: warp counts [" << schedule->mWarpCounts << ", "
-                                 << schedule->nWarpCounts << "]");
+  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts << ", "
+                                 << schedule->nSubgroupCounts << "]");
 
   int64_t flatWorkgroupSize =
-      targetSubgroupSize * ShapedType::getNumElements(schedule->nWarpCounts) *
-      ShapedType::getNumElements(schedule->mWarpCounts);
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 0);
@@ -286,12 +287,12 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   // Compute the M/N dimension tile sizes by multiplying subgroup information.
   for (auto [i, mDim] : llvm::enumerate(mDims)) {
     workgroupTileSizes[mDim] =
-        schedule->mWarpCounts[i] * schedule->mTileCounts[i];
+        schedule->mSubgroupCounts[i] * schedule->mTileCounts[i];
     subgroupTileSizes[mDim] = schedule->mTileCounts[i];
   }
   for (auto [i, nDim] : llvm::enumerate(nDims)) {
     workgroupTileSizes[nDim] =
-        schedule->nWarpCounts[i] * schedule->nTileCounts[i];
+        schedule->nSubgroupCounts[i] * schedule->nTileCounts[i];
     subgroupTileSizes[nDim] = schedule->nTileCounts[i];
   }
 
