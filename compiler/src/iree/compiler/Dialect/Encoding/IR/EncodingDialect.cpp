@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
@@ -16,13 +17,12 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::Encoding;
-
-#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc" // IWYU pragma: keep
-
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.cpp.inc"
+#undef GET_ATTRDEF_CLASSES
+
+namespace mlir::iree_compiler::IREE::Encoding {
 
 // Used to control inlining behavior.
 struct IREEEncodingInlinerInterface : public DialectInlinerInterface {
@@ -59,5 +59,7 @@ void IREEEncodingDialect::initialize() {
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.cpp.inc"
       >();
 }
+
+} // namespace mlir::iree_compiler::IREE::Encoding
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.cpp.inc"

@@ -17,6 +17,7 @@ iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
+            "EncodingAttrs.td",
             "EncodingBase.td",
             "EncodingOps.td",
         ],
@@ -39,6 +40,7 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "IR",
     srcs = [
+        "EncodingAttrs.cpp",
         "EncodingAttrs.cpp.inc",
         "EncodingDialect.cpp",
         "EncodingDialect.cpp.inc",
@@ -54,6 +56,7 @@ iree_compiler_cc_library(
         "EncodingEnums.h.inc",
         "EncodingOps.h",
         "EncodingOps.h.inc",
+        "EncodingTypes.h",
         "EncodingTypes.h.inc",
     ],
     deps = [
@@ -101,7 +104,7 @@ iree_gentbl_cc_library(
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "EncodingBase.td",
+    td_file = "EncodingAttrs.td",
     deps = [":td_files"],
 )
 
@@ -169,7 +172,7 @@ iree_gentbl_cc_library(
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "EncodingBase.td",
+    td_file = "EncodingAttrs.td",
     deps = [":td_files"],
 )
 
