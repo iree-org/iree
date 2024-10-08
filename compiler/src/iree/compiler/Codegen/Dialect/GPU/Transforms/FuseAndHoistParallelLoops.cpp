@@ -276,6 +276,8 @@ struct FuseTilableForallConsumers final
     }
 
     tensor::ParallelInsertSliceOp producerSlice;
+    scf::ForallOp sliceOwner;
+    Value fusionOperand;
     for (auto operand : dpsOp.getDpsInputs()) {
       auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
       if (!forallProducer) {
@@ -288,6 +290,8 @@ struct FuseTilableForallConsumers final
         auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
         if (sliceOp && sliceOp.getDest() == iterArg) {
           producerSlice = sliceOp;
+          sliceOwner = forallProducer;
+          fusionOperand = operand;
           break;
         }
       }
@@ -297,7 +301,16 @@ struct FuseTilableForallConsumers final
     }
 
     if (!producerSlice) {
-      return failure();
+      return rewriter.notifyMatchFailure(tilableOp,
+                                         "no scf.forall producer to fuse into");
+    }
+
+    for (auto operand : tilableOp->getOperands()) {
+      if (operand != fusionOperand && operand.getDefiningOp() == sliceOwner) {
+        return rewriter.notifyMatchFailure(tilableOp,
+                                           "unimplemented: Cannot fuse op with "
+                                           "multiple uses of producer loop");
+      }
     }
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
