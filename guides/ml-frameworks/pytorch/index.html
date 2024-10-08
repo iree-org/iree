@@ -4282,8 +4282,8 @@ models parameters on disk, so that they can be loaded later during runtime.</p>
 <span class="c1"># Create a params dictionary. Note that the keys here match LinearModule&#39;s</span>
 <span class="c1"># attributes. We will use the saved safetensor file for use from the command</span>
 <span class="c1"># line.</span>
-<span class="n">wt</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">t</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
-<span class="n">bias</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">t</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+<span class="n">wt</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+<span class="n">bias</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
 <span class="n">params</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;weight&quot;</span><span class="p">:</span> <span class="n">wt</span><span class="p">,</span> <span class="s2">&quot;bias&quot;</span><span class="p">:</span> <span class="n">bias</span> <span class="p">}</span>
 <span class="n">save_file</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="s2">&quot;params.safetensors&quot;</span><span class="p">)</span>
 
