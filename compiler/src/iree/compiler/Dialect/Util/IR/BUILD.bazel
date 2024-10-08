@@ -52,6 +52,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ClosureOpUtils.h",
+        "IntegerDivisibility.h",
         "UtilDialect.h",
         "UtilOps.h",
         "UtilTraits.h",

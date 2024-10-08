@@ -156,6 +156,17 @@ void excludeTiedOperandAndResultIndices(
     SmallVector<int64_t> &tiedOperandIndices);
 
 //===----------------------------------------------------------------------===//
+// Forward defines for InferIntDivisibilityOpInterface
+// See implementations in IntegerDivisibility.h.
+//===----------------------------------------------------------------------===//
+
+class ConstantIntDivisibility;
+class IntegerDivisibility;
+
+using SetIntDivisibilityFn =
+    llvm::function_ref<void(Value, const ConstantIntDivisibility &)>;
+
+//===----------------------------------------------------------------------===//
 // Shape-aware interface utilities
 //===----------------------------------------------------------------------===//
 
