@@ -537,13 +537,13 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
   if (!llvmFuncOp.isExternal()) {
     id = DistinctAttr::create(UnitAttr::get(context));
   }
-  return LLVM::DISubprogramAttr::get(context, id, compileUnitAttr, fileAttr,
-                                     funcNameAttr, funcNameAttr, fileAttr,
-                                     /*line=*/1,
-                                     /*scopeline=*/1,
-                                     LLVM::DISubprogramFlags::Definition |
-                                         LLVM::DISubprogramFlags::Optimized,
-                                     subroutineTypeAttr, /*retainedNodes =*/{});
+  return LLVM::DISubprogramAttr::get(
+      context, id, compileUnitAttr, fileAttr, funcNameAttr, funcNameAttr,
+      fileAttr,
+      /*line=*/1,
+      /*scopeline=*/1,
+      LLVM::DISubprogramFlags::Definition | LLVM::DISubprogramFlags::Optimized,
+      subroutineTypeAttr, /*retainedNodes =*/{}, /*annotations =*/{});
 }
 
 // Returns the most local DISubprogramAttr starting from |forOp|.
