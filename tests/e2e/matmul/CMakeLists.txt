@@ -1631,6 +1631,7 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--compilation_info=LLVMGPUVectorDistributeWMMA"
+    "--shapes=gpu_large_aligned"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1662,6 +1663,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--transpose_rhs"
     "--compilation_info=LLVMGPUVectorDistributeWMMA"
+    "--shapes=gpu_large_aligned"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1719,6 +1721,7 @@ iree_generated_e2e_runner_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
+    "--shapes=small"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
