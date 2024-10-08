@@ -412,7 +412,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulSimt",
     ],
     tags = [
@@ -440,7 +440,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
@@ -517,7 +517,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
@@ -544,7 +544,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
@@ -571,7 +571,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
@@ -632,7 +632,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
@@ -659,7 +659,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeNVIDIA",
     ],
     tags = [
@@ -685,7 +685,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVCooperativeMatrixVectorize",
     ],
     runner_args = [

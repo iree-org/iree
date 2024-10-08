@@ -39,7 +39,7 @@ class ShapesId(enum.Enum):
     SMALL = "small"
     LARGE = "large"
     GPU_LARGE = "gpu_large"
-    GPU_LARGE_ALIGNED = "gpu_large_aligned"
+    EASY_LARGE_STATIC = "easy_large_static"
 
 
 # Enumerates of the collections of compilation info that we can generate tests
@@ -239,7 +239,7 @@ def get_test_shapes(shapes_id: ShapesId):
             # running on fewer backends/drivers or with fewer generators
             # (see get_test_generators).
         ]
-    if shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
@@ -265,7 +265,7 @@ def get_test_shapes(shapes_id: ShapesId):
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             Dynamicity.STATIC,
         ]
