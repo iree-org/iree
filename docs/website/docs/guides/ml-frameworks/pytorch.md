@@ -355,8 +355,8 @@ linear_module = LinearModule(4,3)
 # Create a params dictionary. Note that the keys here match LinearModule's
 # attributes. We will use the saved safetensor file for use from the command
 # line.
-wt = linear_module.weight.t().contiguous()
-bias = linear_module.bias.t().contiguous()
+wt = linear_module.weight.data.contiguous()
+bias = linear_module.bias.data.contiguous()
 params = { "weight": wt, "bias": bias }
 save_file(params, "params.safetensors")
 
