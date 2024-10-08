@@ -420,4 +420,28 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
   let genVerifyDecl = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// iree_codegen.encoding_solver
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_EncodingSolverAttr :
+    AttrDef<IREECodegen_Dialect, "EncodingSolver", [
+  DeclareAttrInterfaceMethods<IREECodegen_EncodingSolverInterfaceAttr, [
+    "reifyTensorShape",
+  ]>
+]> {
+  let mnemonic = "encoding_solver";
+  let summary = "The default encoding solver which behaves dropping encodings.";
+}
+
+def IREECodegen_VMVXEncodingSolverAttr :
+    AttrDef<IREECodegen_Dialect, "VMVXEncodingSolver", [
+  DeclareAttrInterfaceMethods<IREECodegen_EncodingSolverInterfaceAttr, [
+    "reifyTensorShape",
+  ]>
+]> {
+  let mnemonic = "vmvx_encoding_solver";
+  let summary = "The default encoding solver which behaves dropping encodings.";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
