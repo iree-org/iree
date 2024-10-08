@@ -852,20 +852,20 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     Where `(b, m, k)` are the indices of the tiled op's iteration space, and
     `M = m + m_offset` and `K = k + K_offset`.
 
-    The `m_basis` and `k_basis` fields are a basis for linearizing the
-    `m_offset` and `k_offset`. This is used when there are multiple M or K
+    The `m_strides` and `k_strides` fields are used as a basis for linearizing
+    the `m_offset` and `k_offset`. This is used when there are multiple M or K
     output dimensions, and therefore multiple `m_offset` or `k_offset` values.
-    The basis fields are assembled in the IR as if they are multiplied as an
+    The strides fields are assembled in the IR as if they are multiplied as an
     inner product with `m_offset` and `k_offset, indicating that the total
     linear offset along the dimension is equal to this inner product. These
-    basis fields also determine the strides of the output dimensions along
-    M and K. For example, an op with `m_basis = [32, 1]`, `k_basis = [4, 1]`,
+    strides fields also determine the strides of the output dimensions along
+    M and K. For example, an op with `m_strides = [32, 1]`, `k_strides = [4, 1]`,
     and output type `tensor<BxM0xM1xK0xK1>` (expanded from `tensor<BxMxK>`),
     would have strides along the M dim of 32 for `M0`, meaning as `M0` increases
     by 1, the index into the flat `M` increases by 32. Along the K dim, strides
     would be 4 for `K0`, and 1 for `K1`, meaning as `K0` increases by 1, the
-    index into the flat `K` increases by 4. The strides in M from `m_basis` are
-    orthogonal to the strides in `K` from `k_basis`.
+    index into the flat `K` increases by 4. The strides in M from `m_strides`
+    are orthogonal to the strides in `K` from `k_strides`.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -875,12 +875,12 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$static_kernel_size,
                        Variadic<Index>:$m_offset,
                        DenseI64ArrayAttr:$static_m_offset,
-                       Variadic<Index>:$m_basis,
-                       DenseI64ArrayAttr:$static_m_basis,
+                       Variadic<Index>:$m_strides,
+                       DenseI64ArrayAttr:$static_m_strides,
                        Variadic<Index>:$k_offset,
                        DenseI64ArrayAttr:$static_k_offset,
-                       Variadic<Index>:$k_basis,
-                       DenseI64ArrayAttr:$static_k_basis,
+                       Variadic<Index>:$k_strides,
+                       DenseI64ArrayAttr:$static_k_strides,
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
                        DenseI64ArrayAttr:$k_pos);
@@ -895,10 +895,10 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     custom<DynamicIndexList>($kernel_size, $static_kernel_size)
     `m_offset` `=`
     custom<DynamicIndexList>($m_offset, $static_m_offset)
-    `*` custom<DynamicIndexList>($m_basis, $static_m_basis)
+    `*` custom<DynamicIndexList>($m_strides, $static_m_strides)
     `k_offset` `=`
     custom<DynamicIndexList>($k_offset, $static_k_offset)
-    `*` custom<DynamicIndexList>($k_basis, $static_k_basis)
+    `*` custom<DynamicIndexList>($k_strides, $static_k_strides)
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
@@ -913,9 +913,9 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<int64_t>":$dilations,
       "ArrayRef<OpFoldResult>":$kernel_size,
       "ArrayRef<OpFoldResult>":$m_offset,
-      "ArrayRef<OpFoldResult>":$m_basis,
+      "ArrayRef<OpFoldResult>":$m_strides,
       "ArrayRef<OpFoldResult>":$k_offset,
-      "ArrayRef<OpFoldResult>":$k_basis,
+      "ArrayRef<OpFoldResult>":$k_strides,
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
       "ArrayRef<int64_t>":$k_dimensions)>
@@ -944,14 +944,14 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     SmallVector<OpFoldResult> getMixedKernelSize();
     SmallVector<OpFoldResult> getMixedMOffset();
     SmallVector<OpFoldResult> getMixedKOffset();
-    SmallVector<OpFoldResult> getMixedMBasis();
-    SmallVector<OpFoldResult> getMixedKBasis();
+    SmallVector<OpFoldResult> getMixedMStrides();
+    SmallVector<OpFoldResult> getMixedKStrides();
 
     // Set op metadata.
     void setMixedKOffset(SmallVector<OpFoldResult> kOffset);
     void setMixedMOffset(SmallVector<OpFoldResult> mOffset);
-    void setMixedKBasis(SmallVector<OpFoldResult> kBasis);
-    void setMixedMBasis(SmallVector<OpFoldResult> mBasis);
+    void setMixedKStrides(SmallVector<OpFoldResult> kStrides);
+    void setMixedMStrides(SmallVector<OpFoldResult> mStrides);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

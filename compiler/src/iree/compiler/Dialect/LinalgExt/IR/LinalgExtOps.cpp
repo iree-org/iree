@@ -1519,16 +1519,16 @@ SmallVector<OpFoldResult> Im2colOp::getMixedMOffset() {
                                    getMOffset());
 }
 
-/// Return all static and dynamic k_basis as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedKBasis() {
-  return LinalgExt::getMixedValues(getContext(), getStaticKBasis(),
-                                   getKBasis());
+/// Return all static and dynamic k_strides as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedKStrides() {
+  return LinalgExt::getMixedValues(getContext(), getStaticKStrides(),
+                                   getKStrides());
 }
 
-/// Return all static and dynamic m_basis as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedMBasis() {
-  return LinalgExt::getMixedValues(getContext(), getStaticMBasis(),
-                                   getMBasis());
+/// Return all static and dynamic m_strides as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedMStrides() {
+  return LinalgExt::getMixedValues(getContext(), getStaticMStrides(),
+                                   getMStrides());
 }
 
 void Im2colOp::setMixedKOffset(SmallVector<OpFoldResult> kOffset) {
@@ -1547,20 +1547,20 @@ void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
   getMOffsetMutable().assign(dynamicMOffset);
 }
 
-void Im2colOp::setMixedKBasis(SmallVector<OpFoldResult> kBasis) {
-  SmallVector<int64_t> staticKBasis;
-  SmallVector<Value> dynamicKBasis;
-  dispatchIndexOpFoldResults(kBasis, dynamicKBasis, staticKBasis);
-  setStaticKBasis(staticKBasis);
-  getKBasisMutable().assign(dynamicKBasis);
+void Im2colOp::setMixedKStrides(SmallVector<OpFoldResult> kStrides) {
+  SmallVector<int64_t> staticKStrides;
+  SmallVector<Value> dynamicKStrides;
+  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
+  setStaticKStrides(staticKStrides);
+  getKStridesMutable().assign(dynamicKStrides);
 }
 
-void Im2colOp::setMixedMBasis(SmallVector<OpFoldResult> mBasis) {
-  SmallVector<int64_t> staticMBasis;
-  SmallVector<Value> dynamicMBasis;
-  dispatchIndexOpFoldResults(mBasis, dynamicMBasis, staticMBasis);
-  setStaticMBasis(staticMBasis);
-  getMBasisMutable().assign(dynamicMBasis);
+void Im2colOp::setMixedMStrides(SmallVector<OpFoldResult> mStrides) {
+  SmallVector<int64_t> staticMStrides;
+  SmallVector<Value> dynamicMStrides;
+  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
+  setStaticMStrides(staticMStrides);
+  getMStridesMutable().assign(dynamicMStrides);
 }
 
 SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
@@ -1580,28 +1580,26 @@ SmallVector<int64_t> Im2colOp::getKOutputDims() {
 }
 
 /// Custom builder methods for im2col op.
-void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
-                     Value output, ArrayRef<int64_t> strides,
-                     ArrayRef<int64_t> dilations,
-                     ArrayRef<OpFoldResult> kernelSize,
-                     ArrayRef<OpFoldResult> mOffset,
-                     ArrayRef<OpFoldResult> mBasis,
-                     ArrayRef<OpFoldResult> kOffset,
-                     ArrayRef<OpFoldResult> kBasis, ArrayRef<int64_t> batchPos,
-                     ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
+void Im2colOp::build(
+    OpBuilder &builder, OperationState &state, Value input, Value output,
+    ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
+    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
+    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
+    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
+    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
          "strides, dilations, m_pos, and kernel expected to be the same rank");
   SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset,
-      staticMBasis, staticKBasis;
+      staticMStrides, staticKStrides;
   SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset,
-      dynamicMBasis, dynamicKBasis;
+      dynamicMStrides, dynamicKStrides;
   dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
   dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
-  dispatchIndexOpFoldResults(mBasis, dynamicMBasis, staticMBasis);
+  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
   dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
-  dispatchIndexOpFoldResults(kBasis, dynamicKBasis, staticKBasis);
+  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
   if (isa<RankedTensorType>(outputType)) {
@@ -1611,10 +1609,10 @@ void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
         builder.getDenseI64ArrayAttr(strides),
         builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
         builder.getDenseI64ArrayAttr(staticKernelSize), dynamicMOffset,
-        builder.getDenseI64ArrayAttr(staticMOffset), dynamicMBasis,
-        builder.getDenseI64ArrayAttr(staticMBasis), dynamicKOffset,
-        builder.getDenseI64ArrayAttr(staticKOffset), dynamicKBasis,
-        builder.getDenseI64ArrayAttr(staticKBasis),
+        builder.getDenseI64ArrayAttr(staticMOffset), dynamicMStrides,
+        builder.getDenseI64ArrayAttr(staticMStrides), dynamicKOffset,
+        builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
+        builder.getDenseI64ArrayAttr(staticKStrides),
         builder.getDenseI64ArrayAttr(batchPos),
         builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos));
 }
@@ -1630,24 +1628,26 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError("expected one output operand");
   }
 
-  // Verify offsets and basis
+  // Verify offsets and strides
   SmallVector<OpFoldResult> kOffset = getMixedKOffset();
   SmallVector<OpFoldResult> mOffset = getMixedMOffset();
-  SmallVector<OpFoldResult> kBasis = getMixedKBasis();
-  SmallVector<OpFoldResult> mBasis = getMixedMBasis();
-  if (kOffset.size() != kBasis.size()) {
-    return op->emitOpError("expected the same size k_offset and k_basis");
+  SmallVector<OpFoldResult> kStrides = getMixedKStrides();
+  SmallVector<OpFoldResult> mStrides = getMixedMStrides();
+  if (kOffset.size() != kStrides.size()) {
+    return op->emitOpError("expected the same size k_offset and k_strides");
   }
-  if (mOffset.size() != mBasis.size()) {
-    return op->emitOpError("expected the same size m_offset and m_basis");
+  if (mOffset.size() != mStrides.size()) {
+    return op->emitOpError("expected the same size m_offset and m_strides");
   }
-  std::optional<int64_t> constInnerKBasis = getConstantIntValue(kBasis.back());
-  if (!constInnerKBasis.has_value() || constInnerKBasis.value() != 1) {
-    return op->emitOpError("expected inner k_basis to be 1");
+  std::optional<int64_t> constInnerKStrides =
+      getConstantIntValue(kStrides.back());
+  if (!constInnerKStrides.has_value() || constInnerKStrides.value() != 1) {
+    return op->emitOpError("expected inner k_strides to be 1");
   }
-  std::optional<int64_t> constInnerMBasis = getConstantIntValue(mBasis.back());
-  if (!constInnerMBasis.has_value() || constInnerMBasis.value() != 1) {
-    return op->emitOpError("expected inner m_basis to be 1");
+  std::optional<int64_t> constInnerMStrides =
+      getConstantIntValue(mStrides.back());
+  if (!constInnerMStrides.has_value() || constInnerMStrides.value() != 1) {
+    return op->emitOpError("expected inner m_strides to be 1");
   }
 
   // Verify operand ranks and dim position sizes.

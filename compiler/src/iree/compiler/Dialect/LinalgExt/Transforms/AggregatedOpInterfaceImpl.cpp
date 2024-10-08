@@ -465,8 +465,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   Value inputSlice = getInput();
 
   // This is part of the im2col verifier, but check here in case this changes.
-  assert(getConstantIntValue(getMixedMBasis().back()).value() == 1 &&
-         getConstantIntValue(getMixedKBasis().back()).value() == 1 &&
+  assert(getConstantIntValue(getMixedMStrides().back()).value() == 1 &&
+         getConstantIntValue(getMixedKStrides().back()).value() == 1 &&
          "Expected inner m_offset and k_offset to be 1");
 
   // Get the linearized mOffset and kOffset
@@ -485,8 +485,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
         affine::makeComposedFoldedAffineApply(b, loc, linearMap, mapOperands);
     return linearIdx;
   };
-  OpFoldResult mOffset = linearizeIndex(getMixedMOffset(), getMixedMBasis());
-  OpFoldResult kOffset = linearizeIndex(getMixedKOffset(), getMixedKBasis());
+  OpFoldResult mOffset = linearizeIndex(getMixedMOffset(), getMixedMStrides());
+  OpFoldResult kOffset = linearizeIndex(getMixedKOffset(), getMixedKStrides());
 
   // Step 1: Tile the im2col op to loops with contiguous slices in the
   // innermost loop.
@@ -582,12 +582,12 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     kBasis.push_back(size);
   }
   OpFoldResult kIndex = kOffset;
-  for (auto [i, ivIdx, basis] :
-       llvm::enumerate(getKOutputDims(), getMixedKBasis())) {
+  for (auto [i, ivIdx, stride] :
+       llvm::enumerate(getKOutputDims(), getMixedKStrides())) {
     if (vectorizeInnerKLoop && i == getMixedKOffset().size() - 1) {
       break;
     }
-    OpFoldResult ivOffset = mulOfrs(b, nestedLoc, basis, ivs[ivIdx]);
+    OpFoldResult ivOffset = mulOfrs(b, nestedLoc, stride, ivs[ivIdx]);
     kIndex = addOfrs(b, nestedLoc, kIndex, ivOffset);
   }
   FailureOr<SmallVector<Value>> maybeDelinKOffset = affine::delinearizeIndex(
@@ -612,19 +612,19 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
 
   // Compute offsets for extract. The linearized im2col result M offset is
-  // computed as the m_offset * m_basis inner product plus the linearized offset
-  // from the tiled m loops. The M offsets into the im2col input are then
+  // computed as the m_offset * m_strides inner product plus the linearized
+  // offset from the tiled m loops. The M offsets into the im2col input are then
   // computed as the delinearized im2col result M offset (in the convolution
   // result iteration space), plus the convolutional window offsets computed
   // above.
   SmallVector<int64_t> mOutDims = getMOutputDims();
-  SmallVector<OpFoldResult> mIvs, mOutBasis(getMixedMBasis());
+  SmallVector<OpFoldResult> mIvs, mOutStrides(getMixedMStrides());
   for (auto [idx, dim] : llvm::enumerate(getMOutputDims())) {
     mIvs.push_back(ivs[dim]);
   }
-  OpFoldResult linearMIv = linearizeIndex(mIvs, mOutBasis);
+  OpFoldResult linearMIv = linearizeIndex(mIvs, mOutStrides);
   OpFoldResult linearMOffset = addOfrs(b, nestedLoc, linearMIv, mOffset);
-  // Delinearize the m_offset * m_basis into the convolution output space.
+  // Delinearize the m_offset * m_strides into the convolution output space.
   // `mBasis` contains the basis for the iteration space of result of the
   // convolution op (i.e., basis for result H and W dims).
   FailureOr<SmallVector<Value>> maybeDelinMOffset = affine::delinearizeIndex(
