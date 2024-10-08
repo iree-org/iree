@@ -265,7 +265,7 @@ def get_test_shapes(shapes_id: ShapesId):
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.GPU_LARGE or shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.GPU_LARGE_ALIGNED:
         return [
             Dynamicity.STATIC,
         ]
