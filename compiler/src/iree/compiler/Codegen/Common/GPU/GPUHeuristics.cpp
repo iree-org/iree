@@ -25,11 +25,8 @@ template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
   os << "[";
-  for (T element : vector) {
-    os << element << " ";
-  }
+  llvm::interleaveComma(vector, os);
   os << "]";
-
   return os;
 }
 
@@ -41,8 +38,8 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   os << "mTileCounts: " << schedule.mTileCounts << ", ";
   os << "nTileCounts: " << schedule.nTileCounts << ", ";
   os << "kTileCounts: " << schedule.kTileCounts << ", ";
-  os << "mWarpCounts: " << schedule.mWarpCounts << ", ";
-  os << "nWarpCounts: " << schedule.nWarpCounts;
+  os << "mSubgroupCounts: " << schedule.mSubgroupCounts << ", ";
+  os << "nSubgroupCounts: " << schedule.nSubgroupCounts;
   return os;
 }
 
@@ -55,10 +52,10 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
                                                 int64_t lhsBitwidth,
                                                 int64_t rhsBitwidth) {
 
-  int64_t tileM =
-      schedule.mSize * prod(schedule.mTileCounts) * prod(schedule.mWarpCounts);
-  int64_t tileN =
-      schedule.nSize * prod(schedule.nTileCounts) * prod(schedule.nWarpCounts);
+  int64_t tileM = schedule.mSize * prod(schedule.mTileCounts) *
+                  prod(schedule.mSubgroupCounts);
+  int64_t tileN = schedule.nSize * prod(schedule.nTileCounts) *
+                  prod(schedule.nSubgroupCounts);
   int64_t tileK = schedule.kSize * prod(schedule.kTileCounts);
   return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
 }
@@ -107,10 +104,10 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
   };
   bool isValidM = areAligned(
       alignedMSizes, getScheduleSizes(schedule.mSize, schedule.mTileCounts,
-                                      schedule.mWarpCounts));
+                                      schedule.mSubgroupCounts));
   bool isValidN = areAligned(
       alignedNSizes, getScheduleSizes(schedule.nSize, schedule.nTileCounts,
-                                      schedule.nWarpCounts));
+                                      schedule.nSubgroupCounts));
   bool isValidK = areAligned(
       alignedKSizes,
       getScheduleSizes(schedule.kSize, schedule.kTileCounts, std::nullopt));
@@ -133,12 +130,12 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   const int64_t kMaxVectorLoadBitWidth = 128;
   int64_t elemsPerThread =
       kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
-  int64_t wgThreads =
-      subgroupSize * prod(schedule.mWarpCounts) * prod(schedule.nWarpCounts);
-  int64_t mWgSize =
-      schedule.mSize * prod(schedule.mTileCounts) * prod(schedule.mWarpCounts);
-  int64_t nWgSize =
-      schedule.nSize * prod(schedule.nTileCounts) * prod(schedule.nWarpCounts);
+  int64_t wgThreads = subgroupSize * prod(schedule.mSubgroupCounts) *
+                      prod(schedule.nSubgroupCounts);
+  int64_t mWgSize = schedule.mSize * prod(schedule.mTileCounts) *
+                    prod(schedule.mSubgroupCounts);
+  int64_t nWgSize = schedule.nSize * prod(schedule.nTileCounts) *
+                    prod(schedule.nSubgroupCounts);
   int64_t kWgSize = schedule.kSize * prod(schedule.kTileCounts);
   int64_t innerLhsDimSize = transposedLhs ? mWgSize : kWgSize;
   int64_t innerRhsDimSize = transposedRhs ? kWgSize : nWgSize;
@@ -156,7 +153,7 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
 // Tries to fit the schedule into shared memory by decrementing the size of the
 // schedule dimensions in reverse lexicographical order until a valid schedule
 // is found. The schedule sizes are reduced in the order of mTileCounts,
-// nTileCounts, kTileCounts, mWarpCounts, nWarpCounts.
+// nTileCounts, kTileCounts, mSubgroupCounts, nSubgroupCounts.
 static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     GPUMatmulShapeType intrinsic, GPUMMASchedule schedule,
     llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
@@ -181,8 +178,9 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
 
     // Attempt to shrink the schedule along one of the dimensions.
     // TODO: A better solution should probably factor problem.mSize /
-    // (mWarpCount * mTileCount * mSize) and then pop off the smallest factors
-    // one at a time, preferably trying to keep the tile "generally square."
+    // (mSubgroupCount * mTileCount * mSize) and then pop off the smallest
+    // factors one at a time, preferably trying to keep the tile "generally
+    // square."
     if (succeeded(decrementIfPossible(schedule.mTileCounts))) {
       continue;
     }
@@ -192,10 +190,10 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     if (succeeded(decrementIfPossible(schedule.kTileCounts))) {
       continue;
     }
-    if (succeeded(decrementIfPossible(schedule.mWarpCounts))) {
+    if (succeeded(decrementIfPossible(schedule.mSubgroupCounts))) {
       continue;
     }
-    if (succeeded(decrementIfPossible(schedule.nWarpCounts))) {
+    if (succeeded(decrementIfPossible(schedule.nSubgroupCounts))) {
       continue;
     }
 
@@ -264,7 +262,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   nTotalTileCounts.back() =
       llvm::divideCeil(problem.nSizes.back(), intrinsic.nSizes[0]);
 
-  int64_t remainingWarps = seeds.bestSubgroupCountPerWorkgroup;
+  int64_t remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
   int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
   // Assign more warps to the M dimension (used later) to balance thread
   // counts along X and Y dimensions.
@@ -272,13 +270,13 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   int nDim = problem.nSizes.size() - 1;
   SmallVector<int64_t> mTileCounts(problem.mSizes.size(), 0),
       nTileCounts(problem.nSizes.size(), 0),
-      mWarpCounts(problem.mSizes.size(), 0),
-      nWarpCounts(problem.nSizes.size(), 0);
+      mSubgroupCounts(problem.mSizes.size(), 0),
+      nSubgroupCounts(problem.nSizes.size(), 0);
   // Start at the innermost nDim and mDim, and try to distribute evenly to M and
   // N for each pair of M and N dims. Otherwise, distribute to N and then M.
   while (mDim >= 0 || nDim >= 0) {
-    int64_t warpSqrt = 1ull
-                       << (llvm::divideCeil(llvm::Log2_64(remainingWarps), 2));
+    int64_t warpSqrt =
+        1ull << (llvm::divideCeil(llvm::Log2_64(remainingSubgroups), 2));
     int64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
 
     // See if the square root can divide mTotalTileCount. If so it means we can
@@ -287,17 +285,17 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
     if (mDim >= 0 && nDim >= 0 &&
         mTotalTileCounts[mDim] > (warpSqrt * tileSqrt) &&
         mTotalTileCounts[mDim] % (warpSqrt * tileSqrt) == 0) {
-      mWarpCounts[mDim] = warpSqrt;
+      mSubgroupCounts[mDim] = warpSqrt;
       mTileCounts[mDim] = tileSqrt;
 
-      remainingWarps /= warpSqrt;
+      remainingSubgroups /= warpSqrt;
       remainingTiles /= tileSqrt;
 
       APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                         APInt(64, remainingWarps));
-      nWarpCounts[nDim] = nGCD.getSExtValue();
-      nTotalTileCounts[nDim] /= nWarpCounts[nDim];
-      remainingWarps /= nWarpCounts[nDim];
+                                         APInt(64, remainingSubgroups));
+      nSubgroupCounts[nDim] = nGCD.getSExtValue();
+      nTotalTileCounts[nDim] /= nSubgroupCounts[nDim];
+      remainingSubgroups /= nSubgroupCounts[nDim];
 
       nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
                                    APInt(64, remainingTiles));
@@ -306,10 +304,10 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
     } else {
       if (nDim >= 0) {
         APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                           APInt(64, remainingWarps));
-        nWarpCounts[nDim] = nGCD.getSExtValue();
-        nTotalTileCounts[nDim] /= nWarpCounts[nDim];
-        remainingWarps /= nWarpCounts[nDim];
+                                           APInt(64, remainingSubgroups));
+        nSubgroupCounts[nDim] = nGCD.getSExtValue();
+        nTotalTileCounts[nDim] /= nSubgroupCounts[nDim];
+        remainingSubgroups /= nSubgroupCounts[nDim];
 
         nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
                                      APInt(64, remainingTiles));
@@ -319,10 +317,10 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 
       if (mDim >= 0) {
         APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
-                                           APInt(64, remainingWarps));
-        mWarpCounts[mDim] = mGCD.getSExtValue();
-        mTotalTileCounts[mDim] /= mWarpCounts[mDim];
-        remainingWarps /= mWarpCounts[mDim];
+                                           APInt(64, remainingSubgroups));
+        mSubgroupCounts[mDim] = mGCD.getSExtValue();
+        mTotalTileCounts[mDim] /= mSubgroupCounts[mDim];
+        remainingSubgroups /= mSubgroupCounts[mDim];
 
         mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
                                      APInt(64, remainingTiles));
@@ -357,7 +355,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 
   return GPUMMASchedule{
       intrinsicIndex,      intrinsic.mSizes[0], intrinsic.nSizes[0],
-      intrinsic.kSizes[0], mWarpCounts,         nWarpCounts,
+      intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
       mTileCounts,         nTileCounts,         kTileCounts};
 }
 
@@ -444,8 +442,8 @@ FailureOr<GPUMMASchedule> deduceAttentionSchedule(
                                 schedule.mSize,
                                 schedule.kSize,
                                 intrinsicK,
-                                /*mWarpCount=*/schedule.mWarpCounts[0],
-                                /*nWarpCount=*/1,
+                                /*mSubgroupCount=*/schedule.mSubgroupCounts[0],
+                                /*nSubgroupCount=*/1,
                                 schedule.mTileCounts[0],
                                 schedule.kTileCounts[0],
                                 qkMatmul.kSizes[0] / intrinsicK};
