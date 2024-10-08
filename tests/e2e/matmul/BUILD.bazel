@@ -466,7 +466,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
+        "--shapes=large",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -491,7 +491,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
+        "--shapes=large",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.

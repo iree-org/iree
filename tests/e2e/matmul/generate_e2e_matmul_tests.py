@@ -38,7 +38,6 @@ class ShapesId(enum.Enum):
     DEFAULT = "default"
     SMALL = "small"
     LARGE = "large"
-    GPU_LARGE = "gpu_large"
     EASY_LARGE_STATIC = "easy_large_static"
 
 
@@ -226,9 +225,17 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            # some random large sizes
-            TestShape(m=123, k=456, n=789, accumulate=True),
-            TestShape(m=654, k=321, n=234, accumulate=False),
+            # unaligned cases.
+            TestShape(m=457, k=330, n=512, accumulate=False),
+            TestShape(m=457, k=330, n=514, accumulate=False),
+            TestShape(m=438, k=330, n=514, accumulate=False),
+            TestShape(m=540, k=332, n=516, accumulate=False),
+            TestShape(m=1000, k=4, n=512, accumulate=False),
+            TestShape(m=4, k=1000, n=512, accumulate=False),
+            TestShape(m=512, k=1000, n=4, accumulate=False),
+            TestShape(m=512, k=128, n=500, accumulate=False),
+            TestShape(m=457, k=160, n=512, accumulate=False),
+            TestShape(m=512, k=330, n=512, accumulate=False),
             # shapes involving vectors (i.e. most rectangular cases)
             TestShape(m=1, k=1000, n=1000, accumulate=True),  # large vector*matrix
             TestShape(m=1000, k=1000, n=1, accumulate=True),  # large matrix*vector
@@ -243,20 +250,6 @@ def get_test_shapes(shapes_id: ShapesId):
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
-        ]
-    if shapes_id == ShapesId.GPU_LARGE:
-        return [
-            # unaligned cases.
-            TestShape(m=457, k=330, n=512, accumulate=False),
-            TestShape(m=457, k=330, n=514, accumulate=False),
-            TestShape(m=438, k=330, n=514, accumulate=False),
-            TestShape(m=540, k=332, n=516, accumulate=False),
-            TestShape(m=1000, k=4, n=512, accumulate=False),
-            TestShape(m=4, k=1000, n=512, accumulate=False),
-            TestShape(m=512, k=1000, n=4, accumulate=False),
-            TestShape(m=512, k=128, n=500, accumulate=False),
-            TestShape(m=457, k=160, n=512, accumulate=False),
-            TestShape(m=512, k=330, n=512, accumulate=False),
         ]
 
     raise ValueError(shapes_id)

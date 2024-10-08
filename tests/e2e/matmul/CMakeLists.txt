@@ -1929,7 +1929,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
-    "--shapes=gpu_large"
+    "--shapes=large"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1955,7 +1955,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
-    "--shapes=gpu_large"
+    "--shapes=large"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
