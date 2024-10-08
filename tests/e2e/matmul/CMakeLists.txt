@@ -1695,6 +1695,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=i32"
     "--transpose_rhs"
     "--compilation_info=LLVMGPUVectorDistributeWMMA"
+    "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
