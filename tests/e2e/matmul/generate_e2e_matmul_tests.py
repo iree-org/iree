@@ -35,6 +35,7 @@ class MatrixElemTypeId(enum.Enum):
 # The values are the accepted values for the --shapes= flag.
 @enum.unique
 class ShapesId(enum.Enum):
+    DEFAULT = "default"
     SMALL = "small"
     LARGE = "large"
     GPU_LARGE = "gpu_large"
@@ -192,6 +193,8 @@ def get_test_shapes(shapes_id: ShapesId):
     # 2. Some shapes are commented out: they used to be tested but have been
     #    disabled to improve the trade-off between test coverage and build
     #    latency.
+    if shapes_id == ShapesId.DEFAULT:
+        return get_test_shapes(ShapesId.SMALL) + get_test_shapes(ShapesId.LARGE)
     if shapes_id == ShapesId.SMALL:
         return [
             # square matrices. Start by the simplest case of 1x1x1.
@@ -927,7 +930,8 @@ def parse_arguments():
         type=str,
         choices=[s.value for s in ShapesId],
         help="Collection of matrix shapes to test",
-        required=True,
+        default="default",
+        required=False,
     )
     parser.add_argument(
         "--transpose_rhs",
