@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "hoist_into_globals_linalg.mlir"
     "import_resources.mlir"
     "ipo.mlir"
+    "optimize_int_arithmetic.mlir"
     "patterns.mlir"
     "propagate_subranges.mlir"
     "simplify_global_accesses.mlir"
