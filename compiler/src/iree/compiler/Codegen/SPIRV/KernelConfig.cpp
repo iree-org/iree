@@ -927,8 +927,8 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
-                                       schedule->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{schedule->nWarpCounts[0] * subgroupSize,
+                                       schedule->mWarpCounts[0], 1};
 
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
   if (isBM)
@@ -940,21 +940,23 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM)
     subgroupTileSizes[bIndex] = 1;
-  subgroupTileSizes[mIndex] = schedule->mTileCount * vectorSizes[mIndex];
-  subgroupTileSizes[nIndex] = schedule->nTileCount * vectorSizes[nIndex];
+  subgroupTileSizes[mIndex] = schedule->mTileCounts[0] * vectorSizes[mIndex];
+  subgroupTileSizes[nIndex] = schedule->nTileCounts[0] * vectorSizes[nIndex];
 
   SmallVector<int64_t> workgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM)
     workgroupTileSizes[bIndex] = 1;
-  workgroupTileSizes[mIndex] = schedule->mWarpCount * subgroupTileSizes[mIndex];
-  workgroupTileSizes[nIndex] = schedule->nWarpCount * subgroupTileSizes[nIndex];
+  workgroupTileSizes[mIndex] =
+      schedule->mWarpCounts[0] * subgroupTileSizes[mIndex];
+  workgroupTileSizes[nIndex] =
+      schedule->nWarpCounts[0] * subgroupTileSizes[nIndex];
 
   // Also create one level for reduction. This is needed because of
   // SPIRVTileAndPromotePass requires it.
   // TODO(#10499): Consolidate tiling configuration across different pipelines.
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(kIndex, 0);
-  reductionTileSizes.push_back(schedule->kTileCount * schedule->kSize);
+  reductionTileSizes.push_back(schedule->kTileCounts[0] * schedule->kSize);
 
   TileSizesListType tileSizes = {workgroupTileSizes, subgroupTileSizes,
                                  reductionTileSizes, vectorSizes};
@@ -962,7 +964,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // Don't do multibuffering if the inner reduction loop is folded out.
   auto pipelineDepth = softwarePipelineDepth;
   auto storeStage = softwarePipelineStoreStage;
-  if (schedule->kTileCount <= 1) {
+  if (schedule->kTileCounts[0] <= 1) {
     pipelineDepth = 0;
     storeStage = 0;
   }
