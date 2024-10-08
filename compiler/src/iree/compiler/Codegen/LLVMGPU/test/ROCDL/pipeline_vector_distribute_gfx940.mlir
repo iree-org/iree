@@ -484,6 +484,67 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // -----
 
+#config = #iree_gpu.lowering_config<{workgroup = [1, 16, 32, 0], reduction = [0, 0, 0, 8]}>
+#translation = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, subgroup_m_count = 1, subgroup_n_count = 2>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+hal.executable public @pad_batch_matmul {
+  hal.executable.variant public @rocm_hsaco_fb target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @pad_batch_matmul ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @pad_batch_matmul() attributes {translation_info = #translation} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<196x16x24xf32>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<196x24x24xf32>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<196x16x24xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [196, 16, 24], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<196x16x24xf32>> -> tensor<196x16x24xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [196, 24, 24], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<196x24x24xf32>> -> tensor<196x24x24xf32>
+        %5 = tensor.empty() : tensor<196x16x24xf32>
+        %6 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%5 : tensor<196x16x24xf32>) -> tensor<196x16x24xf32>
+        %7 = linalg.batch_matmul {lowering_config = #config} ins(%3, %4 : tensor<196x16x24xf32>, tensor<196x24x24xf32>) outs(%6 : tensor<196x16x24xf32>) -> tensor<196x16x24xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [196, 16, 24], strides = [1, 1, 1] : tensor<196x16x24xf32> -> !flow.dispatch.tensor<writeonly:tensor<196x16x24xf32>>
+        return
+      }
+    }
+  }
+}
+
+// This test checks if we can handle an unaligned batch matmul which has sizes
+// smaller than the chosen tile sizes. We just want to make sure we can compile
+// this example. We also check if the correct transfer_read/transfer_write are
+// produced with in_bounds attrs for the padded dimensions.
+
+// CHECK-LABEL:   @pad_batch_matmul
+// CHECK:           scf.for
+// LHS
+// CHECK:             vector.transfer_read
+// CHECK-SAME:        in_bounds = [true, true, true]
+// CHECK-SAME:        memref<196x16x24xf32
+// CHECK-SAME:        vector<1x1x1xf32>
+// RHS
+// CHECK:             vector.transfer_read
+// CHECK-SAME:        in_bounds = [true, true, false]
+// CHECK-SAME:        memref<1x8x24xf32
+// CHECK-SAME:        vector<1x1x2xf32>
+// CHECK:           scf.yield
+// OUTPUT
+// CHECK:           vector.transfer_write
+// CHECK-SAME:      in_bounds = [true, true, false]
+// CHECK-SAME:      vector<1x4x1xf32>
+// CHECK-SAME:      memref<1x16x24xf32
+
+// -----
+
 // This test ensures that we are generating contraction schedules does not only work on contraction,
 // but also will be compatible with transfer_read layouts anchors.
 // Currently the transfer_read layout anchors expects WorkgroupSize % (WgTileSize / numelPerThread) == 0.
