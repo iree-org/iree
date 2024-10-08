@@ -51,11 +51,11 @@ static constexpr uint64_t SAFE_INDEX_UNSIGNED_MAX_VALUE =
 /// Succeeds when a value is statically non-negative in that it has a lower
 /// bound on its value (if it is treated as signed) and that bound is
 /// non-negative.
-static LogicalResult staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
-                                                        Value v) {
+static bool staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
+                                               Value v) {
   auto *result = solver.lookupState<IntegerValueRangeLattice>(v);
   if (!result || result->getValue().isUninitialized()) {
-    return failure();
+    return false;
   }
   const ConstantIntRanges &range = result->getValue().getValue();
   bool isNonNegative = range.smin().isNonNegative();
@@ -64,9 +64,9 @@ static LogicalResult staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
     bool canSafelyTruncate =
         range.umin().getZExtValue() <= SAFE_INDEX_UNSIGNED_MAX_VALUE &&
         range.umax().getZExtValue() <= SAFE_INDEX_UNSIGNED_MAX_VALUE;
-    return success(isNonNegative && canSafelyTruncate);
+    return isNonNegative && canSafelyTruncate;
   } else {
-    return success(isNonNegative);
+    return isNonNegative;
   }
 }
 
@@ -76,8 +76,7 @@ static LogicalResult staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
 static LogicalResult
 staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op) {
   auto nonNegativePred = [&solver](Value v) -> bool {
-    bool isNonNegative =
-        succeeded(staticallyLegalToConvertToUnsigned(solver, v));
+    bool isNonNegative = staticallyLegalToConvertToUnsigned(solver, v);
     return isNonNegative;
   };
   return success(llvm::all_of(op->getOperands(), nonNegativePred) &&

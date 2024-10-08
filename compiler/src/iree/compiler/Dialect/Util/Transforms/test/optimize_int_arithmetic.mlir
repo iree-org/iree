@@ -108,21 +108,6 @@ util.func @int32_unsigned_overflow_signed(%arg0 : i32) -> i1, i1 {
 }
 
 // -----
-// Validate the index unsigned 32bit overflow case.
-// CHECK-LABEL: @index_unsigned_overflow_signed
-util.func @index_unsigned_overflow_signed(%arg0 : index) -> i1, i1 {
-  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
-  %cst = arith.constant 5 : index
-  // Max is one greater than the i32 unsigned range.
-  %0 = util.assume.int %arg0<umin=10, umax=4294967296> : index
-  // CHECK: %[[POISON:.*]] = arith.cmpi sgt
-  %1 = arith.cmpi sgt, %0, %cst : i32
-  %2 = arith.cmpi ugt, %0, %cst : i32
-  // CHECK: util.return %[[POISON]], %[[TRUE]]
-  util.return %1, %2 : i1, i1
-}
-
-// -----
 // CHECK-LABEL: @to_unsigned_ceildivsi
 util.func @to_unsigned_ceildivsi(%arg0 : i64, %arg1 : i64) -> i64, i64, i64 {
   %0 = util.assume.int %arg0<umin=10, umax=100> : i64
@@ -360,4 +345,17 @@ util.func @index_cast_i64_to_index_addi_bad_signed_bounds(%arg0 : i64) -> index 
   // CHECK: arith.index_castui
   %3 = arith.index_castui %2 : i64 to index
   util.return %3 : index
+}
+
+// -----
+// Validate the index unsigned 32bit overflow case.
+// CHECK-LABEL: @index_unsigned_overflow_signed
+util.func @index_unsigned_overflow_signed(%arg0 : index) -> index {
+  %cst = arith.constant 5 : index
+  // Max is one greater than the i32 unsigned range.
+  %0 = util.assume.int %arg0<umin=10, umax=4294967296> : index
+  // Should not convert to unsigned
+  // CHECK: arith.divsi
+  %1 = arith.divsi %0, %cst : index
+  util.return %1 : index
 }
