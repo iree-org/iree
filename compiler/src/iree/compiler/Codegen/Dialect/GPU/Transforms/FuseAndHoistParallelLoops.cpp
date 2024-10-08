@@ -132,7 +132,6 @@ struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
 
 private:
   int64_t flatWorkgroupSize;
-  int64_t subgroupSize;
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
@@ -169,6 +168,68 @@ struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
     if (!fusionResult) {
       return failure();
     }
+    rewriter.finalizeOpModification(forallOp);
+    return success();
+  }
+};
+
+struct FuseUnitLoopDestination final : OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    std::optional<int64_t> maybeTripCount = getStaticForallTripCount(forallOp);
+    if (!maybeTripCount || *maybeTripCount != 1) {
+      return rewriter.notifyMatchFailure(forallOp,
+                                         "not a unit trip count loop");
+    }
+    DestinationStyleOpInterface dpsProducer;
+    BlockArgument bodyArg;
+    Value dpsResult;
+    for (auto iterArg : forallOp.getRegionIterArgs()) {
+      dpsResult = forallOp.getTiedLoopInit(iterArg)->get();
+      bodyArg = iterArg;
+      dpsProducer = dpsResult.getDefiningOp<DestinationStyleOpInterface>();
+      if (dpsProducer) {
+        break;
+      }
+    }
+    if (!dpsProducer || !dpsProducer->hasOneUse()) {
+      return rewriter.notifyMatchFailure(forallOp,
+                                         "no single use DPS producer");
+    }
+
+    Operation *parallelInsert = nullptr;
+    for (auto user : bodyArg.getUsers()) {
+      if (isa<tensor::ParallelInsertSliceOp>(user)) {
+        // This should be illegal but check anyway.
+        if (parallelInsert) {
+          return rewriter.notifyMatchFailure(forallOp, "multiple insert users");
+        }
+        parallelInsert = user;
+      }
+    }
+    if (!parallelInsert) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "destination not used by a parallel insert");
+    }
+
+    rewriter.startOpModification(forallOp);
+    // Move the producer into the body of the forall loop.
+    rewriter.moveOpBefore(dpsProducer, forallOp.getBody(),
+                          forallOp.getBody()->begin());
+
+    // Replace all uses of the region iter arg with the moved dps op.
+    rewriter.replaceAllUsesExcept(bodyArg, dpsResult, parallelInsert);
+
+    // Set the init operand of the forall op to the init operand of the
+    // producer.
+    int64_t dpsInitIndex = cast<OpResult>(dpsResult).getResultNumber();
+    forallOp->setOperand(forallOp.getTiedOpOperand(bodyArg)->getOperandNumber(),
+                         dpsProducer.getDpsInitOperand(dpsInitIndex)->get());
+
+    // Finally replace the init operand of the moved producer with the region
+    // iter arg.
+    dpsProducer.setDpsInitOperand(dpsInitIndex, bodyArg);
     rewriter.finalizeOpModification(forallOp);
     return success();
   }
@@ -290,6 +351,7 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.add<FuseTilableDestinationProducers>(context);
+    patterns.add<FuseUnitLoopDestination>(context);
     patterns.add<FuseTilableForallConsumers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
