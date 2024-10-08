@@ -877,3 +877,67 @@ hal.executable public @main {
 // CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
 // CHECK:  vector.insert_strided_slice %[[C_71_4]], {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x1x2x1x1x4xf32>
 // CHECK:  vector.transfer_write
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, Indirect>
+], flags = Indirect>
+
+#lowering_config = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  reduction = [0, 0, 4],
+  thread = [1, 4, 0],
+  workgroup = [1, 128, 0]
+}>
+#translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+hal.executable public @main {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @small_m_matmul ordinal(0) layout(#layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @small_m_matmul() attributes {translation_info = #translation_info} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<4x1000xf32>>
+        %1 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1000x512xf32>>
+        %2 = hal.interface.binding.subspan layout(#layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<4x512xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 1000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1000xf32>> -> tensor<4x1000xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1000, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1000x512xf32>> -> tensor<1000x512xf32>
+        %5 = tensor.empty() : tensor<4x512xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x512xf32>) -> tensor<4x512xf32>
+        %7 = linalg.matmul {lowering_config = #lowering_config}
+          ins(%3, %4 : tensor<4x1000xf32>, tensor<1000x512xf32>)
+          outs(%6 : tensor<4x512xf32>) -> tensor<4x512xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [4, 512], strides = [1, 1] : tensor<4x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x512xf32>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @small_m_matmul
+//   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//   CHECK-DAG:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<1x6xf32, #gpu.address_space<workgroup>>
+//   CHECK-DAG:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<4x130xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1000 step %c4 {{.*}} -> (vector<1x4xf32>)
+//       CHECK:     gpu.barrier
+
+// TODO: The fact that this read gets hoisted out of the subsequent for loop
+// is a bug in LICM that does no verification that the loop has at least one
+// trip.
+//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<4xf32>
+//       CHECK:     scf.for %{{.*}} = %{{.*}} to %c1 step %c32
+//  CHECK-NEXT:       vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC]]
+//       CHECK:     gpu.barrier
+//   CHECK-DAG:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<4xf32>
+//   CHECK-DAG:     %[[RHS_MM:.+]] = vector.transfer_read %[[RHS_ALLOC]]{{.*}} vector<4x4xf32>
+//       CHECK:     vector.contract {{.*}} %[[LHS_MM]], %[[RHS_MM]]
