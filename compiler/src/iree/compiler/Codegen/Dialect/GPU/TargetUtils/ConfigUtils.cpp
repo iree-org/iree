@@ -134,15 +134,16 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Dynamic dims are expected to be taken care of earlier in the pipeline,
-  // and innermost contraction dimensions need to be part of the schedule.
+  // TODO(Max191): add dynamic shape support for inner most dims.
   if (ShapedType::isDynamic(bounds[contractionDims.m.back()]) ||
       ShapedType::isDynamic(bounds[contractionDims.n.back()]) ||
       ShapedType::isDynamic(bounds[contractionDims.k.back()])) {
     return failure();
   }
 
-  // Gather all static M, N, and K dimensions to deduce the MMASchedule.
+  // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
+  // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
+  // computing an MMA schedule.
   SmallVector<int64_t> mDims, nDims, kDims;
   for (auto mDim : contractionDims.m) {
     if (!ShapedType::isDynamic(bounds[mDim])) {
