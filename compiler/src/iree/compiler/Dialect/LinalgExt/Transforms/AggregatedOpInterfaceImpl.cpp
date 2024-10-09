@@ -509,12 +509,24 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
   OpFoldResult innerSliceSize;
   for (int idx = inputSizes.size() - 1; idx >= 0; --idx) {
-    if (!batchPosSet.contains(idx)) {
-      innerSliceSize = inputSizes[idx];
-      break;
+    if (batchPosSet.contains(idx)) {
+      continue;
     }
+    innerSliceSize = inputSizes[idx];
+    // If the innermost non-batch dimension is an m_pos dimension, then use the
+    // corresponding kernel_size instead of the input tensor size. This is
+    // because the slice will be of size `kernel_size` at some offset
+    // `i * kernel_size` in this case.
+    for (auto [mPos, kernelSize] :
+         llvm::zip_equal(getMPos(), getMixedKernelSize())) {
+      if (mPos == idx) {
+        innerSliceSize = kernelSize;
+      }
+    }
+    break;
   }
   bool vectorizeInnerKLoop =
+      getKPos().back() == getInputRank() - 1 &&
       willBeContiguousSlice(innerSliceSize, kTileSize, kOffset);
   if (vectorizeInnerKLoop) {
     iterationDomain.pop_back();

@@ -87,7 +87,6 @@ module {
 
 // -----
 
-#map = affine_map<(d0) -> (d0 * 4)>
 module {
   func.func @im2col_expanded(%arg0: tensor<2x34x34x640xf32>, %m_size0: index, %m_size1: index, %m0: index, %m1: index, %k: index, %m_stride: index) -> tensor<2x?x?x2x4xf32> {
     %0 = tensor.empty(%m_size0, %m_size1) : tensor<2x?x?x2x4xf32>
@@ -131,6 +130,24 @@ module {
 //       CHECK:       scf.yield %[[mLOOP1]] : tensor<2x?x?x2x4xf32>
 //       CHECK:     scf.yield %[[mLOOP0]] : tensor<2x?x?x2x4xf32>
 //       CHECK:   return %[[bLOOP]] : tensor<2x?x?x2x4xf32>
+
+// -----
+
+module {
+  func.func @im2col_expanded_nchw(%arg0: tensor<2x640x34x34xf32>, %m0: index, %m1: index, %k: index) -> tensor<2x1x1x2x4xf32> {
+    %0 = tensor.empty() : tensor<2x1x1x2x4xf32>
+    %7 = iree_linalg_ext.im2col
+            strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+            m_offset = [%m0, %m1] * [32, 1] k_offset = [%k, 0] * [4, 1]
+            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+            ins(%arg0 : tensor<2x640x34x34xf32>)
+            outs(%0 : tensor<2x1x1x2x4xf32>) -> tensor<2x1x1x2x4xf32>
+    return %7 : tensor<2x1x1x2x4xf32>
+  }
+}
+// Verify that the NCHW layout does not vectorize.
+// CHECK-LABEL: func.func @im2col_expanded_nchw
+//       CHECK:   linalg.copy ins({{.*}} : tensor<1x1x1x1xf32>) outs({{.*}} : tensor<1x1x1x1xf32>) -> tensor<1x1x1x1xf32>
 
 // -----
 
