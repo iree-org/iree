@@ -5935,7 +5935,7 @@ permutation if it is meaninful to do so (i.e. vs unioning across them).
 In such cases, there will typically be one such op at the top of a
 function or scope which passes all covered operands through it.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntDivisibilityOpInterface</code>, <code>InferIntRangeInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
@@ -7104,7 +7104,7 @@ any call-site.</p>
 <div class="highlight"><pre><span></span><code>#util.int.assumption&lt;
   std::optional&lt;uint64_t&gt;,   # umin
   std::optional&lt;uint64_t&gt;,   # umax
-  std::optional&lt;uint64_t&gt;   # divisor
+  std::optional&lt;uint64_t&gt;   # udiv
 &gt;
 </code></pre></div>
 <p>This is typically used to memorialize the result of some integer analysis
@@ -7131,7 +7131,7 @@ or outside knowledge. All components of the attribute are optional.</p>
 <td></td>
 </tr>
 <tr>
-<td style="text-align: center;">divisor</td>
+<td style="text-align: center;">udiv</td>
 <td style="text-align: center;"><code>std::optional&lt;uint64_t&gt;</code></td>
 <td></td>
 </tr>
