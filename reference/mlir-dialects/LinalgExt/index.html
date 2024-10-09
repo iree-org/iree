@@ -4691,8 +4691,10 @@ context, they will be the second and third inputs.</p>
               custom&lt;DynamicIndexList&gt;($kernel_size, $static_kernel_size)
               `m_offset` `=`
               custom&lt;DynamicIndexList&gt;($m_offset, $static_m_offset)
+              `*` custom&lt;DynamicIndexList&gt;($m_strides, $static_m_strides)
               `k_offset` `=`
               custom&lt;DynamicIndexList&gt;($k_offset, $static_k_offset)
+              `*` custom&lt;DynamicIndexList&gt;($k_strides, $static_k_strides)
               `batch_pos` `=` $batch_pos
               `m_pos` `=` $m_pos
               `k_pos` `=` $k_pos
@@ -4718,7 +4720,7 @@ im2col op were tiled to loops with a scalar inner tile, it would look like
 the following:
 <div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] k_offset = [0]
+      m_offset = [0] * [1] k_offset = [0] * [1]
       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
       outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
@@ -4729,7 +4731,7 @@ becomes:
       scf.for %arg2 = %c0 to %c5760 step %c1
         %im2col = iree_linalg_ext.im2col
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [%arg1] k_offset = [%arg2]
+            m_offset = [%arg1] * [1] k_offset = [%arg2] * [1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
             ins(%in_tile : tensor&lt;1x34x34x640xf32&gt;)
             outs(%out_tile : tensor&lt;1x1x1xf32&gt;) -&gt; tensor&lt;1x1x1xf32&gt;
@@ -4741,6 +4743,19 @@ computed using the <code>m_offset</code> and <code>k_offset</code> as:
 (b, m, k) -&gt; (b, M / 32 + K / (640<em>3), M % 32 + K % (640</em>3) / 640, K % 640)
 Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, and
 <code>M = m + m_offset</code> and <code>K = k + K_offset</code>.</p>
+<p>The <code>m_strides</code> and <code>k_strides</code> fields are used as a basis for linearizing
+the <code>m_offset</code> and <code>k_offset</code>. This is used when there are multiple M or K
+output dimensions, and therefore multiple <code>m_offset</code> or <code>k_offset</code> values.
+The strides fields are assembled in the IR as if they are multiplied as an
+inner product with <code>m_offset</code> and <code>k_offset, indicating that the total
+linear offset along the dimension is equal to this inner product. These
+strides fields also determine the strides of the output dimensions along
+M and K. For example, an op with</code>m_strides = [32, 1]<code>,</code>k_strides = [4, 1]<code>,
+and output type</code>tensor<BxM0xM1xK0xK1><code>(expanded from</code>tensor<BxMxK><code>),
+would have strides along the M dim of 32 for</code>M0<code>, meaning as</code>M0<code>increases
+by 1, the index into the flat</code>M<code>increases by 32. Along the K dim, strides
+would be 4 for</code>K0<code>, and 1 for</code>K1<code>, meaning as</code>K0<code>increases by 1, the
+index into the flat</code>K<code>increases by 4. The strides in M from</code>m_strides<code>are orthogonal to the strides in</code>K<code>from</code>k_strides`.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
@@ -4750,7 +4765,9 @@ Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, 
 <tr><td><code>dilations</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>static_kernel_size</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>static_m_offset</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_m_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>static_k_offset</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>static_k_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>batch_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>m_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>k_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -4782,7 +4799,15 @@ Where <code>(b, m, k)</code> are the indices of the tiled op's iteration space, 
 <td>variadic of index</td>
 </tr>
 <tr>
+<td style="text-align: center;"><code>m_strides</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
 <td style="text-align: center;"><code>k_offset</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>k_strides</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
