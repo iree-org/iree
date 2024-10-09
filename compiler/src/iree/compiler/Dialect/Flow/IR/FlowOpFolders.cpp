@@ -1017,6 +1017,73 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
   }
 };
 
+// Remove flow.tensor.reshapes around `op` (`expand_shape` or `collapse_shape`)
+// that only cast from static -> dynamic and back but are no-ops.
+template <typename OpTy>
+struct EraseReshapesAroundOp : public OpRewritePattern<Flow::TensorReshapeOp> {
+  using OpRewritePattern<Flow::TensorReshapeOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Flow::TensorReshapeOp lastReshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto op = lastReshapeOp.getSource().getDefiningOp<OpTy>();
+    if (!op) {
+      return failure();
+    }
+
+    auto firstReshapeOp =
+        op.getSrc().template getDefiningOp<Flow::TensorReshapeOp>();
+    if (!firstReshapeOp) {
+      return failure();
+    }
+
+    if (firstReshapeOp.getSourceDims().size() != 0 ||
+        lastReshapeOp.getResultDims().size() != 0) {
+      return failure();
+    }
+
+    auto isStaticToDynamicCast = [](ShapedType from, ShapedType to,
+                                    OperandRange dynamicSizes) {
+      auto it = dynamicSizes.begin();
+      for (auto [fromSize, toSize] :
+           llvm::zip_equal(from.getShape(), to.getShape())) {
+        if (ShapedType::isDynamic(fromSize)) {
+          return false;
+        }
+
+        auto resolvedSize = toSize;
+        if (ShapedType::isDynamic(resolvedSize)) {
+          APInt d;
+          if (!matchPattern(*it++, m_ConstantInt(&d))) {
+            return false;
+          }
+          resolvedSize = d.getSExtValue();
+        }
+        if (fromSize != resolvedSize) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    // `firstReshapeOp` only converts from static -> dynamic and
+    // `secondReshapeOp` must only convert back. The dynamic dimensions must be
+    // of a known size and be equal to the static dimension.
+    if (!isStaticToDynamicCast(firstReshapeOp.getSource().getType(),
+                               firstReshapeOp.getType(),
+                               firstReshapeOp.getResultDims()) ||
+        !isStaticToDynamicCast(lastReshapeOp.getType(),
+                               lastReshapeOp.getSource().getType(),
+                               lastReshapeOp.getSourceDims())) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<OpTy>(lastReshapeOp, lastReshapeOp.getType(),
+                                      firstReshapeOp.getSource(),
+                                      op.getReassociationIndices());
+    return success();
+  }
+};
+
 } // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1029,6 +1096,8 @@ void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<FlattenTensorCastLikeChain<TensorReshapeOp>>(context);
   results.insert<ResolveShapedRank>(context);
   results.insert<ResolveShapedDim>(context);
+  results.insert<EraseReshapesAroundOp<tensor::ExpandShapeOp>>(context);
+  results.insert<EraseReshapesAroundOp<tensor::CollapseShapeOp>>(context);
 }
 
 void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,

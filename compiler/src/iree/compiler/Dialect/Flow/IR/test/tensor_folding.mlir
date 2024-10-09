@@ -751,3 +751,35 @@ util.func public @innermost_unit_dim(%4: !flow.dispatch.tensor<readonly:tensor<3
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
 //       CHECK:   flow.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]
+
+// -----
+
+util.func public @canonicalizeReshapeExpand(%arg0: tensor<4x1x8192xf16>) -> tensor<4x1x256x32xf16> {
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %0 = flow.tensor.reshape %arg0: tensor<4x1x8192xf16> -> tensor<?x?x8192xf16>{%c4, %c1}
+  %expanded_0 = tensor.expand_shape %0 [[0], [1], [2, 3]] output_shape [%c4, %c1, 256, 32] : tensor<?x?x8192xf16> into tensor<?x?x256x32xf16>
+  %1 = flow.tensor.reshape %expanded_0 : tensor<?x?x256x32xf16>{%c4, %c1} -> tensor<4x1x256x32xf16>
+  util.return %1 : tensor<4x1x256x32xf16>
+}
+
+// CHECK-LABEL: util.func public @canonicalizeReshapeExpand
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x1x8192xf16>
+//       CHECK:   %[[VAL0:.+]] = tensor.expand_shape
+//       CHECK:   util.return %[[VAL0]]
+
+// -----
+
+util.func public @canonicalizeReshapeCollapse(%arg0: tensor<4x1x256x32xf16>) -> tensor<4x1x8192xf16> {
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %0 = flow.tensor.reshape %arg0: tensor<4x1x256x32xf16> -> tensor<?x?x256x32xf16>{%c4, %c1}
+  %expanded_0 = tensor.collapse_shape %0 [[0], [1], [2, 3]] : tensor<?x?x256x32xf16> into tensor<?x?x8192xf16>
+  %1 = flow.tensor.reshape %expanded_0 : tensor<?x?x8192xf16>{%c4, %c1} -> tensor<4x1x8192xf16>
+  util.return %1 : tensor<4x1x8192xf16>
+}
+
+// CHECK-LABEL: util.func public @canonicalizeReshapeCollapse
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x1x256x32xf16>
+//       CHECK:   %[[VAL0:.+]] = tensor.collapse_shape
+//       CHECK:   util.return %[[VAL0]]
