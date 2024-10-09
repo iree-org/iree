@@ -771,11 +771,11 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:        %[[RES0:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C2]] step %[[C1]]
-// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x1024x5760xf32>)
 // CHECK:          %[[RES1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C5]]
-// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x1024x5760xf32>)
 // CHECK:            %[[RES2:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C5760]] step %[[C4]]
-// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x1024x5760xf32>)
 // CHECK-DAG:          %[[MSIZE:.+]] = affine.min #[[MAP]](%[[ARG3]])
 // CHECK-DAG:          %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG1]], 0, 0, 0]
 // CHECK-SAME:           [1, 34, 34, 640] [1, 1, 1, 1] : tensor<2x34x34x640xf32> to tensor<1x34x34x640xf32>
@@ -792,11 +792,8 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:           [%[[ARG1]], %[[ARG3]], %[[ARG5]]] [1, %[[MSIZE]], 4] [1, 1, 1]
 // CHECK-SAME:           tensor<1x?x4xf32> into tensor<2x1024x5760xf32>
 // CHECK:              scf.yield %[[INSERTED_SLICE]] : tensor<2x1024x5760xf32>
-// CHECK:            }
 // CHECK:            scf.yield %[[RES2]] : tensor<2x1024x5760xf32>
-// CHECK:          }
 // CHECK:          scf.yield %[[RES1]] : tensor<2x1024x5760xf32>
-// CHECK:        }
 // CHECK:        return %[[RES0]] : tensor<2x1024x5760xf32>
 
 // -----
@@ -831,11 +828,11 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x1024x5760xf32>
 // CHECK:        %[[RES0:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C2]] step %[[C1]]
-// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x1024x5760xf32>)
 // CHECK:          %[[RES1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C9]]
-// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x1024x5760xf32>)
 // CHECK:            %[[RES2:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C5760]] step %[[C7]]
-// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x1024x5760xf32>) {
+// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x1024x5760xf32>)
 // CHECK-DAG:          %[[MSIZE:.+]] = affine.min #[[MAP]](%[[ARG3]])
 // CHECK-DAG:          %[[KSIZE:.+]] = affine.min #[[MAP1]](%[[ARG5]])
 // CHECK-DAG:          %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[ARG1]], 0, 0]
@@ -853,11 +850,8 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:           [%[[ARG1]], %[[ARG3]], %[[ARG5]]] [1, %[[MSIZE]], %[[KSIZE]]] [1, 1, 1]
 // CHECK-SAME:           tensor<1x?x?xf32> into tensor<2x1024x5760xf32>
 // CHECK:              scf.yield %[[INSERTED_SLICE]] : tensor<2x1024x5760xf32>
-// CHECK:            }
 // CHECK:            scf.yield %[[RES2]] : tensor<2x1024x5760xf32>
-// CHECK:          }
 // CHECK:          scf.yield %[[RES1]] : tensor<2x1024x5760xf32>
-// CHECK:        }
 // CHECK:        return %[[RES0]] : tensor<2x1024x5760xf32>
 
 // -----
@@ -893,11 +887,11 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[D0:.+]] = tensor.empty(%[[S0]], %[[S1]], %[[S2]]) : tensor<?x?x?xf32>
 // CHECK:        %[[RES0:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[S0]] step %[[C2]]
-// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<?x?x?xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<?x?x?xf32>)
 // CHECK:          %[[RES1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[S1]] step %[[C7]]
-// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<?x?x?xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<?x?x?xf32>)
 // CHECK:            %[[RES2:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[S2]] step %[[C5]]
-// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<?x?x?xf32>) {
+// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<?x?x?xf32>)
 // CHECK-DAG:          %[[BSIZE:.+]] = affine.min #[[MAP]](%[[ARG1]])
 // CHECK-DAG:          %[[MSIZE:.+]] = affine.min #[[MAP1]](%[[ARG3]])
 // CHECK-DAG:          %[[KSIZE:.+]] = affine.min #[[MAP2]](%[[ARG5]])
@@ -919,21 +913,18 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:           [%[[ARG1]], %[[ARG3]], %[[ARG5]]] [%[[BSIZE]], %[[MSIZE]], %[[KSIZE]]] [1, 1, 1]
 // CHECK-SAME:           tensor<?x?x?xf32> into tensor<?x?x?xf32>
 // CHECK:              scf.yield %[[INSERTED_SLICE]] : tensor<?x?x?xf32>
-// CHECK:            }
 // CHECK:            scf.yield %[[RES2]] : tensor<?x?x?xf32>
-// CHECK:          }
 // CHECK:          scf.yield %[[RES1]] : tensor<?x?x?xf32>
-// CHECK:        }
 // CHECK:        return %[[RES0]] : tensor<?x?x?xf32>
 
 // -----
 
 module {
-  func.func @im2col_expanded(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x32x32x1440x4xf32> {
+  func.func @im2col_expanded(%arg0: tensor<2x34x34x640xf32>, %m_stride: index) -> tensor<2x32x32x1440x4xf32> {
     %0 = tensor.empty() : tensor<2x32x32x1440x4xf32>
     %7 = iree_linalg_ext.im2col
             strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-            m_offset = [0, 0] * [32, 1] k_offset = [0, 0] * [4, 1]
+            m_offset = [0, 0] * [%m_stride, 1] k_offset = [0, 0] * [4, 1]
             batch_pos = [0] m_pos = [1, 2] k_pos = [3]
             ins(%arg0 : tensor<2x34x34x640xf32>)
             outs(%0 : tensor<2x32x32x1440x4xf32>) -> tensor<2x32x32x1440x4xf32>
@@ -950,7 +941,9 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (-d0 + 32, 7)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (-d0 + 32, 5)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0) -> (-d0 + 1440, 11)>
-// CHECK:      func.func @im2col_expanded(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>) -> tensor<2x32x32x1440x4xf32>
+// CHECK:      func.func @im2col_expanded
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x640xf32>
+// CHECK-SAME:   %[[M_STRIDE:[a-zA-Z0-9_]+]]: index
 // CHECK-DAG:    %[[C11:.+]] = arith.constant 11 : index
 // CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
 // CHECK-DAG:    %[[C7:.+]] = arith.constant 7 : index
@@ -962,15 +955,15 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
 // CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x32x32x1440x4xf32>
 // CHECK:        %[[RES0:.+]] = scf.for %[[ARG1:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C2]] step %[[C1]]
-// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x32x32x1440x4xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG2:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<2x32x32x1440x4xf32>)
 // CHECK:          %[[RES1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C32]] step %[[C7]]
-// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x32x32x1440x4xf32>) {
+// CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<2x32x32x1440x4xf32>)
 // CHECK:            %[[RES2:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C32]] step %[[C5]]
-// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x32x32x1440x4xf32>) {
+// CHECK-SAME:         iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<2x32x32x1440x4xf32>)
 // CHECK:              %[[RES3:.+]] = scf.for %[[ARG7:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1440]] step %[[C11]]
-// CHECK-SAME:           iter_args(%[[ARG8:[a-zA-Z0-9_]+]] = %[[ARG6]]) -> (tensor<2x32x32x1440x4xf32>) {
+// CHECK-SAME:           iter_args(%[[ARG8:[a-zA-Z0-9_]+]] = %[[ARG6]]) -> (tensor<2x32x32x1440x4xf32>)
 // CHECK:                %[[RES4:.+]] = scf.for %[[ARG9:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C4]] step %[[C2]]
-// CHECK-SAME:             iter_args(%[[ARG10:[a-zA-Z0-9_]+]] = %[[ARG8]]) -> (tensor<2x32x32x1440x4xf32>) {
+// CHECK-SAME:             iter_args(%[[ARG10:[a-zA-Z0-9_]+]] = %[[ARG8]]) -> (tensor<2x32x32x1440x4xf32>)
 // CHECK-DAG:              %[[M0SIZE:.+]] = affine.min #[[MAP]](%[[ARG3]])
 // CHECK-DAG:              %[[M1SIZE:.+]] = affine.min #[[MAP1]](%[[ARG5]])
 // CHECK-DAG:              %[[K0SIZE:.+]] = affine.min #[[MAP2]](%[[ARG7]])
@@ -979,7 +972,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK-DAG:              %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[ARG10]][%[[ARG1]], %[[ARG3]], %[[ARG5]], %[[ARG7]], %[[ARG9]]]
 // CHECK-SAME:               [1, %[[M0SIZE]], %[[M1SIZE]], %[[K0SIZE]], 2] [1, 1, 1, 1, 1] : tensor<2x32x32x1440x4xf32> to tensor<1x?x?x?x2xf32>
 // CHECK:                  %[[IM2COL:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:               m_offset = [%[[ARG3]], %[[ARG5]]] * [32, 1] k_offset = [%[[ARG7]], %[[ARG9]]] * [4, 1]
+// CHECK-SAME:               m_offset = [%[[ARG3]], %[[ARG5]]] * [%[[M_STRIDE]], 1] k_offset = [%[[ARG7]], %[[ARG9]]] * [4, 1]
 // CHECK-SAME:               batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:               ins(%[[EXTRACTED_SLICE]] : tensor<1x34x34x640xf32>)
 // CHECK-SAME:               outs(%[[EXTRACTED_SLICE_0]] : tensor<1x?x?x?x2xf32>) -> tensor<1x?x?x?x2xf32>
@@ -987,15 +980,10 @@ module attributes { transform.with_named_sequence } {
 // CHECK-SAME:               [%[[ARG1]], %[[ARG3]], %[[ARG5]], %[[ARG7]], %[[ARG9]]] [1, %[[M0SIZE]], %[[M1SIZE]], %[[K0SIZE]], 2] [1, 1, 1, 1, 1]
 // CHECK-SAME:               tensor<1x?x?x?x2xf32> into tensor<2x32x32x1440x4xf32>
 // CHECK:                  scf.yield %[[INSERTED_SLICE]] : tensor<2x32x32x1440x4xf32>
-// CHECK:                }
 // CHECK:                scf.yield %[[RES4]] : tensor<2x32x32x1440x4xf32>
-// CHECK:              }
 // CHECK:              scf.yield %[[RES3]] : tensor<2x32x32x1440x4xf32>
-// CHECK:            }
 // CHECK:            scf.yield %[[RES2]] : tensor<2x32x32x1440x4xf32>
-// CHECK:          }
 // CHECK:          scf.yield %[[RES1]] : tensor<2x32x32x1440x4xf32>
-// CHECK:        }
 // CHECK:        return %[[RES0]] : tensor<2x32x32x1440x4xf32>
 
 // -----

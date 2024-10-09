@@ -469,7 +469,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
          getConstantIntValue(getMixedKStrides().back()).value() == 1 &&
          "Expected inner m_offset and k_offset to be 1");
 
-  // Get the linearized mOffset and kOffset
+  // Get the linearized mOffset and kOffset.
   auto linearizeIndex = [&](ArrayRef<OpFoldResult> inds,
                             ArrayRef<OpFoldResult> basis) {
     MLIRContext *ctx = b.getContext();

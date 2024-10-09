@@ -1295,20 +1295,15 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
 
   // Adjust m_offset and k_offset by adding the offsets from tiling.
   SmallVector<OpFoldResult> newKOffsets, newMOffsets;
-  AffineExpr d0, d1;
-  bindDims(getContext(), d0, d1);
-  auto map = AffineMap::get(2, 0, {d0 + d1}, getContext());
   for (auto [outDim, kOffset] :
        llvm::zip_equal(getKOutputDims(), getMixedKOffset())) {
     OpFoldResult kTileOffset = offsets[outDim];
-    newKOffsets.push_back(affine::makeComposedFoldedAffineApply(
-        builder, loc, map, {kTileOffset, kOffset}));
+    newKOffsets.push_back(addOfrs(builder, loc, kTileOffset, kOffset));
   }
   for (auto [outDim, mOffset] :
        llvm::zip_equal(getMOutputDims(), getMixedMOffset())) {
     OpFoldResult mTileOffset = offsets[outDim];
-    newMOffsets.push_back(affine::makeComposedFoldedAffineApply(
-        builder, loc, map, {mTileOffset, mOffset}));
+    newMOffsets.push_back(addOfrs(builder, loc, mTileOffset, mOffset));
   }
 
   // Create the tiled op.
