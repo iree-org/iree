@@ -17,7 +17,6 @@
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -121,9 +120,7 @@ Value preSparsify(Operation *op, llvm::SmallVector<Value, 2> &values, Type rtp,
   // TODO(peiming, ajcbik): these all can potentially be optimized by applying
   // value transform on sparse_tenosr.value memref
   if (isa<mlir::stablehlo::SignOp, mlir::stablehlo::NegOp>(op) ||
-      (isa<mlir::stablehlo::AbsOp>(op) && hasIntegralShapeType(op)) ||
-      isa<chlo::AsinOp, chlo::AsinhOp, chlo::AtanOp, chlo::AtanhOp,
-          chlo::BesselI1eOp, chlo::SinhOp, chlo::TanOp>(op)) {
+      (isa<mlir::stablehlo::AbsOp>(op) && hasIntegralShapeType(op))) {
     if (!sparse_tensor::getSparseTensorEncoding(op->getResult(0).getType()) &&
         !sparse_tensor::getSparseTensorEncoding(op->getOperand(0).getType()))
       return Value();
