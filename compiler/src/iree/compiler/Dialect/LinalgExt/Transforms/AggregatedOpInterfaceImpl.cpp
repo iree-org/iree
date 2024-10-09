@@ -361,11 +361,13 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
   Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
+
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
+  s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());
+
   s = applyRegion(b, loc, getRegion(), s);
   // TODO: We shouldn't be relying on such attributes. We need a better
   // mechanism to identify attention matmuls.
-  s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());
 
   if (qETy.getIntOrFloatBitWidth() <= 8) {
     // For low bit-depth types we perform post Q @ K scaling. This is to avoid
