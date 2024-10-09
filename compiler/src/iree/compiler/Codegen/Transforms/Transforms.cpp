@@ -35,6 +35,22 @@
 
 namespace mlir::iree_compiler {
 
+static bool isAllConstantValue(SmallVector<OpFoldResult> ofrs, int64_t v) {
+  return llvm::all_of(
+      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, v); });
+}
+
+static bool isFullSlice(SmallVector<OpFoldResult> mixedOffsets,
+                        SmallVector<OpFoldResult> mixedSizes,
+                        SmallVector<OpFoldResult> mixedStrides,
+                        IREE::Flow::DispatchTensorType tensorType) {
+  std::optional<SmallVector<int64_t>> constSizes =
+      getConstantIntValues(mixedSizes);
+  return isAllConstantValue(mixedOffsets, 0) &&
+         isAllConstantValue(mixedStrides, 1) && constSizes &&
+         llvm::equal(tensorType.getShape(), *constSizes);
+}
+
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
   for (auto val : nonIndexComputationOperands) {
@@ -531,9 +547,10 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!loadOp.offsets().empty() || !loadOp.sizes().empty() ||
-        !loadOp.strides().empty())
+    if (!isFullSlice(loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+                     loadOp.getMixedStrides(), loadOp.getSourceType())) {
       return failure();
+    }
 
     auto subspanOp =
         loadOp.getSource()
@@ -588,9 +605,10 @@ struct FoldExpandShapeIntoInterfaceTensorStore
                                 PatternRewriter &rewriter) const override {
     // Make sure we are storing the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!storeOp.offsets().empty() || !storeOp.sizes().empty() ||
-        !storeOp.strides().empty())
+    if (!isFullSlice(storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+                     storeOp.getMixedStrides(), storeOp.getTargetType())) {
       return failure();
+    }
 
     auto reshapeOp = storeOp.getValue().getDefiningOp<tensor::ExpandShapeOp>();
     if (!reshapeOp) {
