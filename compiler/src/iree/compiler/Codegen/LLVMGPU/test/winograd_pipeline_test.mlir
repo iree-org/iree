@@ -43,9 +43,9 @@ func.func @winograd_input_transform() {
 }
 //   CHECK-LABEL:  func.func @winograd_input_transform
 //     CHECK-NOT:      memref.alloc
+//         CHECK:      vector.transfer_read
+//         CHECK:      vector.transfer_read
 //         CHECK:      scf.for
-//         CHECK:        vector.transfer_read
-//         CHECK:        vector.transfer_read
 //         CHECK:        scf.for
 //         CHECK:          scf.for
 //         CHECK:          vector.transfer_read
@@ -71,9 +71,9 @@ func.func @winograd_output_transform() {
 }
 //   CHECK-LABEL:  func.func @winograd_output_transform
 //     CHECK-NOT:      memref.alloc
+//         CHECK:      vector.transfer_read
+//         CHECK:      vector.transfer_read
 //         CHECK:      scf.for
-//         CHECK:        vector.transfer_read
-//         CHECK:        vector.transfer_read
 //         CHECK:        scf.for
 //         CHECK:          scf.for
 //         CHECK:          vector.transfer_read
