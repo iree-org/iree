@@ -1633,6 +1633,12 @@ LogicalResult Im2colOp::verify() {
   SmallVector<OpFoldResult> mOffset = getMixedMOffset();
   SmallVector<OpFoldResult> kStrides = getMixedKStrides();
   SmallVector<OpFoldResult> mStrides = getMixedMStrides();
+  if (kOffset.size() < 1) {
+    return op->emitOpError("expected at least one k_offset");
+  }
+  if (mOffset.size() < 1) {
+    return op->emitOpError("expected at least one m_offset");
+  }
   if (kOffset.size() != kStrides.size()) {
     return op->emitOpError("expected the same size k_offset and k_strides");
   }
