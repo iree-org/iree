@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 
-#include "iree/compiler/Dialect/Util/IR/IntegerDivisibility.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"

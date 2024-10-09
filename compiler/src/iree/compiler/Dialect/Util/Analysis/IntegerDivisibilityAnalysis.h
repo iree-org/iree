@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_INTEGER_DIVISIBILITY_ANALYSIS_H_
 #define IREE_COMPILER_DIALECT_UTIL_INTEGER_DIVISIBILITY_ANALYSIS_H_
 
-#include "iree/compiler/Dialect/Util/IR/IntegerDivisibility.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 
 #include <optional>

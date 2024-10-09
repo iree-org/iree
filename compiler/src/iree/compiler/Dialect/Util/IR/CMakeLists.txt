@@ -15,7 +15,6 @@ iree_cc_library(
     IR
   HDRS
     "ClosureOpUtils.h"
-    "IntegerDivisibility.h"
     "UtilDialect.h"
     "UtilOps.h"
     "UtilTraits.h"
