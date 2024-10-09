@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/Analysis/Attributes/Range.h"
+#include "iree/compiler/Dialect/Util/Analysis/Attributes/FPRange.h"
 
 #include "iree/compiler/Dialect/Util/Analysis/Attributes/PotentialValues.h"
 #include "llvm/Support/Debug.h"

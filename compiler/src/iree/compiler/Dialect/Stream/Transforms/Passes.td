@@ -438,6 +438,18 @@ def AnnotateDispatchArgumentsPass :
   }];
 }
 
+def AnnotateDispatchSignaturesPass :
+    Pass<"iree-stream-annotate-dispatch-signatures", "mlir::ModuleOp"> {
+  let summary = "Annotates dispatch arguments with signature attributes for all possible dispatch sites.";
+  let description = [{
+    Uses data flow analysis to determine dispatch signatures with statistics
+    about bounds and divisibility. Unlike AnnotateDispatchArguments, this pass
+    preserves all possible signatures, not just the broadest bounds. this allows
+    dispatch code generation to make holistic decisions about its strategy for
+    specializing.
+  }];
+}
+
 def PackDispatchOperandsPass :
     Pass<"iree-stream-pack-dispatch-operands", "mlir::ModuleOp"> {
   let summary = "Packs stream dispatch operands into i32 push constants.";

@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_FPRANGE_H_
+#define IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_FPRANGE_H_
+
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -170,3 +173,5 @@ private:
 };
 
 } // namespace mlir::iree_compiler::IREE::Util
+
+#endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_FPRANGE_H_
