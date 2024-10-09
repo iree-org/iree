@@ -18,7 +18,10 @@ util.func public @fuse_attention_expand_transpose(
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
     ins(%arg0, %arg1, %arg2, %arg3 : tensor<?x?x?xf16>, tensor<?x?x?xf16>, tensor<?x?x?xf16>, f16)
-    outs(%empty : tensor<?x?x?xf16>) -> tensor<?x?x?xf16>
+    outs(%empty : tensor<?x?x?xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<?x?x?xf16>
   %split = arith.divsi %d0, %c2 : index
   %expanded = tensor.expand_shape %attention [[0, 1], [2], [3]] output_shape[2, %split, %d1, %d4]
       : tensor<?x?x?xf16> into tensor<2x?x?x?xf16>
@@ -78,7 +81,10 @@ util.func public @fuse_attention_expand_transpose_static(
                        affine_map<(d0, d1, d2, d3, d4) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
       ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
-      outs(%empty: tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>
+      outs(%empty: tensor<20x4096x64xf16>) {
+    ^bb0(%score: f16):
+      iree_linalg_ext.yield %score: f16
+  } -> tensor<20x4096x64xf16>
   %expanded = tensor.expand_shape %attention [[0, 1], [2], [3]]
       output_shape [2, 10, 4096, 64] : tensor<20x4096x64xf16> into tensor<2x10x4096x64xf16>
   %empty2 = tensor.empty() : tensor<2x4096x10x64xf16>

@@ -8,7 +8,10 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<1x1024x64xf32>
   return %1 : tensor<1x1024x64xf32>
 }
 
@@ -45,14 +48,18 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK-SAME:       tensor<1024x32xf32>
 // CHECK:          %[[D10:.+]] = linalg.matmul_transpose_b ins(%[[SCALE_Q]], %[[EXTRACTED_SLICE]] :
 // CHECK-SAME:       tensor<1024x64xf32>, tensor<32x64xf32>) outs(%[[D9]] : tensor<1024x32xf32>) -> tensor<1024x32xf32>
+// CHECK:          %[[POST:.+]] = linalg.generic {indexing_maps = [#[[$MAP]]], iterator_types = ["parallel", "parallel"]} outs(%[[D10]] : tensor<1024x32xf32>) {
+// CHECK:          ^bb0(%[[OUT:.+]]: f32):
+// CHECK:            linalg.yield %[[OUT]] : f32
+// CHECK:          } -> tensor<1024x32xf32>
 // CHECK:          %[[D11:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel",
-// CHECK-SAME:       "reduction"]} ins(%[[D10]] : tensor<1024x32xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
+// CHECK-SAME:       "reduction"]} ins(%[[POST]] : tensor<1024x32xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D18]] : f32
 // CHECK:          } -> tensor<1024xf32>
 // CHECK:          %[[D12:.+]] = linalg.generic {indexing_maps = [#[[$MAP1]], #[[$MAP]]], iterator_types = ["parallel",
-// CHECK-SAME:       "parallel"]} ins(%[[D11]] : tensor<1024xf32>) outs(%[[D10]] : tensor<1024x32xf32>) {
+// CHECK-SAME:       "parallel"]} ins(%[[D11]] : tensor<1024xf32>) outs(%[[POST]] : tensor<1024x32xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
@@ -111,7 +118,10 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+                     ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
 }
 
@@ -152,14 +162,18 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:          %[[D9:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D8]] : tensor<?x32xf32>) -> tensor<?x32xf32>
 // CHECK:          %[[D10:.+]] = linalg.matmul_transpose_b ins(%[[SCALE_Q]], %[[EXTRACTED_SLICE]] :
 // CHECK-SAME:       tensor<?x?xf32>, tensor<32x?xf32>) outs(%[[D9]] : tensor<?x32xf32>) -> tensor<?x32xf32>
+// CHECK:          %[[POST:.+]] = linalg.generic {indexing_maps = [#[[$MAP]]], iterator_types = ["parallel", "parallel"]} outs(%[[D10]] : tensor<?x32xf32>) {
+// CHECK:          ^bb0(%[[OUT:.+]]: f32):
+// CHECK:            linalg.yield %[[OUT]] : f32
+// CHECK:          } -> tensor<?x32xf32>
 // CHECK:          %[[D11:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel",
-// CHECK-SAME:       "reduction"]} ins(%[[D10]] : tensor<?x32xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
+// CHECK-SAME:       "reduction"]} ins(%[[POST]] : tensor<?x32xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D18]] : f32
 // CHECK:          } -> tensor<?xf32>
 // CHECK:          %[[D12:.+]] = linalg.generic {indexing_maps = [#[[$MAP1]], #[[$MAP]]], iterator_types = ["parallel",
-// CHECK-SAME:       "parallel"]} ins(%[[D11]] : tensor<?xf32>) outs(%[[D10]] : tensor<?x32xf32>) {
+// CHECK-SAME:       "parallel"]} ins(%[[D11]] : tensor<?xf32>) outs(%[[POST]] : tensor<?x32xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
@@ -217,7 +231,10 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 
@@ -257,14 +274,18 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
 // CHECK:          %[[D11:.+]] = linalg.matmul_transpose_b ins(%[[SCALE_Q]], %[[EXTRACTED_SLICE_1]] :
 // CHECK-SAME:       tensor<1024x64xf16>, tensor<32x64xf16>) outs(%[[D10]] : tensor<1024x32xf32>) ->
 // CHECK-SAME:       tensor<1024x32xf32>
+// CHECK:          %[[POST:.+]] = linalg.generic {indexing_maps = [#[[$MAP]]], iterator_types = ["parallel", "parallel"]} outs(%[[D11]] : tensor<1024x32xf32>) {
+// CHECK:          ^bb0(%[[OUT:.+]]: f32):
+// CHECK:            linalg.yield %[[OUT]] : f32
+// CHECK:          } -> tensor<1024x32xf32>
 // CHECK:          %[[D12:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel",
-// CHECK-SAME:       "reduction"]} ins(%[[D11]] : tensor<1024x32xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
+// CHECK-SAME:       "reduction"]} ins(%[[POST]] : tensor<1024x32xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D21:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D21]] : f32
 // CHECK:          } -> tensor<1024xf32>
 // CHECK:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[$MAP1]], #[[$MAP]]], iterator_types = ["parallel",
-// CHECK-SAME:       "parallel"]} ins(%[[D12]] : tensor<1024xf32>) outs(%[[D11]] : tensor<1024x32xf32>) {
+// CHECK-SAME:       "parallel"]} ins(%[[D12]] : tensor<1024xf32>) outs(%[[POST]] : tensor<1024x32xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D21]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D22:.+]] = math.exp2 %[[D21]] : f32
@@ -338,7 +359,10 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 

@@ -1750,7 +1750,10 @@ func.func @attention() attributes {hal.executable.target = #executable_target_em
     affine_map<(d0, d1, d2, d3, d4) -> ()>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
     ins(%4, %5, %6, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
-    outs(%7 : tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>
+    outs(%7 : tensor<20x4096x64xf16>) {
+     ^bb0(%score: f32):
+       iree_linalg_ext.yield %score : f32
+    } -> tensor<20x4096x64xf16>
   flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
   return
 }

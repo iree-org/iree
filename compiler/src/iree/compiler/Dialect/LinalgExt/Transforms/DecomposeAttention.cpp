@@ -161,6 +161,30 @@ static Value computeQKTranspose(Value query, Value key, Value output,
   return matmulOp.getResult(0);
 }
 
+static Value applyRegion(Region &region, Value value, Location loc,
+                         RewriterBase &builder,
+                         SmallVectorImpl<Operation *> &ops) {
+  auto rank = cast<RankedTensorType>(value.getType()).getRank();
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(rank,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, value.getType(), ValueRange{}, value, indexingMaps, iteratorTypes);
+  auto &dstRegion = genericOp.getRegion();
+  builder.inlineRegionBefore(region, dstRegion, dstRegion.end());
+  {
+    OpBuilder::InsertionGuard withinRegion(builder);
+    builder.setInsertionPoint(dstRegion.back().getTerminator());
+    builder.create<linalg::YieldOp>(
+        loc, dstRegion.back().getTerminator()->getOperands());
+    builder.eraseOp(dstRegion.back().getTerminator());
+  }
+  ops.push_back(genericOp);
+  return genericOp.getResult(0);
+}
+
 static Value truncateToF16(Value input, Value output,
                            SmallVectorImpl<Operation *> &ops,
                            OpBuilder &builder, Location loc) {
@@ -179,13 +203,12 @@ static Value truncateToF16(Value input, Value output,
   return genericOp.getResult(0);
 }
 
-static std::tuple<Value, Value, Value>
-createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
-                    Value outputSlice, Value maxSlice, Value sumSlice,
-                    OpFoldResult sequenceTileLength,
-                    OpFoldResult keyValueTileLength, OpFoldResult headDimension,
-                    Type elementType, SmallVectorImpl<Operation *> &ops,
-                    bool transposeV, Location loc, OpBuilder &builder) {
+static std::tuple<Value, Value, Value> createAttentionBody(
+    Value keySlice, Value valueSlice, Value querySlice, Value outputSlice,
+    Value maxSlice, Value sumSlice, OpFoldResult sequenceTileLength,
+    OpFoldResult keyValueTileLength, OpFoldResult headDimension, Region &region,
+    Type elementType, SmallVectorImpl<Operation *> &ops, bool transposeV,
+    Location loc, RewriterBase &builder) {
 
   Type f32Type = builder.getF32Type();
   // Compute matmul(q, transpose(k))
@@ -196,6 +219,8 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
+
+  qkTranspose = applyRegion(region, qkTranspose, loc, builder, ops);
 
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaximumFOp>(
@@ -330,10 +355,11 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   querySlice = scaleQuery(querySlice, scale, rewriter);
   ops.push_back(querySlice.getDefiningOp());
 
-  auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, tiledResult, max, sum,
-      sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
-      tiledAttnOp.isTransposeV(), loc, rewriter);
+  auto [result, newMax, newSum] =
+      createAttentionBody(keySlice, valueSlice, querySlice, tiledResult, max,
+                          sum, sequenceTileLength, keyValueTileLength,
+                          headDimension, tiledAttnOp.getRegion(), elementType,
+                          ops, tiledAttnOp.isTransposeV(), loc, rewriter);
 
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }

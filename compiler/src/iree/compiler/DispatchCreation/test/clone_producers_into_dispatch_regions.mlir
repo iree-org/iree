@@ -388,7 +388,10 @@ util.func public @clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<1638
   } -> tensor<4x1x4x16x32x128xf16>
   %3 = tensor.empty() : tensor<4x1x32x1x128xf16>
   %4 = flow.dispatch.region -> (tensor<4x1x32x1x128xf16>) {
-    %5 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]} ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16) outs(%3 : tensor<4x1x32x1x128xf16>) -> tensor<4x1x32x1x128xf16>
+    %5 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]} ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16) outs(%3 : tensor<4x1x32x1x128xf16>) {
+      ^bb0(%score: f16):
+        iree_linalg_ext.yield %score: f16
+    } -> tensor<4x1x32x1x128xf16>
     flow.return %5 : tensor<4x1x32x1x128xf16>
   }
   %collapsed = tensor.collapse_shape %4 [[0, 1], [2], [3], [4]] : tensor<4x1x32x1x128xf16> into tensor<4x32x1x128xf16>
@@ -429,7 +432,10 @@ util.func public @clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<1638
   } -> tensor<4x1x4x16x32x128xf16>
   %3 = tensor.empty() : tensor<4x1x32x1x128xf16>
   %4 = flow.dispatch.region -> (tensor<4x1x32x1x128xf16>) {
-    %5 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]} ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16) outs(%3 : tensor<4x1x32x1x128xf16>) -> tensor<4x1x32x1x128xf16>
+    %5 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]} ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16) outs(%3 : tensor<4x1x32x1x128xf16>) {
+      ^bb0(%score: f16):
+        iree_linalg_ext.yield %score: f16
+    } -> tensor<4x1x32x1x128xf16>
     flow.return %5 : tensor<4x1x32x1x128xf16>
   }
   %collapsed = tensor.collapse_shape %4 [[0, 1], [2], [3], [4]] : tensor<4x1x32x1x128xf16> into tensor<4x32x1x128xf16>
@@ -481,7 +487,10 @@ util.func public @clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<1638
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>
       ]
-    } ins(%arg5, %1, %2, %arg2, %arg6 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16, tensor<4x1x32x128xf16>) outs(%3 : tensor<4x1x32x1x128xf16>) -> tensor<4x1x32x1x128xf16>
+    } ins(%arg5, %1, %2, %arg2, %arg6 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16, tensor<4x1x32x128xf16>) outs(%3 : tensor<4x1x32x1x128xf16>) {
+      ^bb0(%score: f16):
+        iree_linalg_ext.yield %score: f16
+    } -> tensor<4x1x32x1x128xf16>
 
     flow.return %5 : tensor<4x1x32x1x128xf16>
   }

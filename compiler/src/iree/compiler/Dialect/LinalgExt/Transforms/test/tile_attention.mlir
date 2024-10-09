@@ -10,7 +10,10 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, tensor<1x1024x64xf32>, f32) outs(%0 : tensor<1x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<1x1024x64xf32>
   return %1 : tensor<1x1024x64xf32>
 }
 
@@ -37,6 +40,8 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention
 // CHECK-SAME:                                           ins(%[[Q_S]], %[[K_S]], %[[V_S]], %[[CST_1]]
 // CHECK-SAME:                                           outs(%[[ARG4]], %[[ARG5]], %[[ARG6]]
+// CHECK:              ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK:                iree_linalg_ext.yield %[[SCORE]] : f32
 // CHECK:          scf.yield %[[ATT]]#0, %[[ATT]]#1, %[[ATT]]#2
 // CHECK:        }
 // CHECK:        %[[D7:.+]] = linalg.generic
@@ -64,7 +69,10 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+                     ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%0 : tensor<?x?x?xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     } -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
 }
 
@@ -121,7 +129,10 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) {
+                      ^bb0(%score: f16):
+                        iree_linalg_ext.yield %score: f16
+                     } -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 
@@ -131,7 +142,7 @@ func.func @attention_f16(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf
 // CHECK:          iree_linalg_ext.attention
 // CHECK-SAME:                                           ins(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}} : tensor<1024x64xf16>, tensor<1024x64xf16>, tensor<1024x64xf16>, f16
 // CHECK-SAME:                                           outs(%{{.*}}, %{{.*}}, %{{.*}} :
-// CHECK-SAME:                                           -> tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
+// CHECK:                                           -> tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // CHECK:        scf.yield
 
 // CHECK:        linalg.generic
@@ -156,7 +167,10 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+                     ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x64x1024xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) {
+                      ^bb0(%score: f16):
+                        iree_linalg_ext.yield %score: f16
+                     } -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 // CHECK-LABEL:  func.func @attention_transpose_v
