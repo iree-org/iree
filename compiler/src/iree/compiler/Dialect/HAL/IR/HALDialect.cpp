@@ -6,10 +6,13 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "iree/compiler/Dialect/Stream/Analysis/AffinityAnalysisDialectInterface.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -115,6 +118,32 @@ public:
   }
 };
 
+class HALAffinityAnalysisDialectInterface
+    : public IREE::Stream::AffinityAnalysisDialectInterface {
+public:
+  using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
+
+  std::function<LogicalResult(IREE::Stream::AffinityAttr, Operation *,
+                              SetVector<Attribute> &)>
+  makeTargetResolver(ModuleOp moduleOp) const {
+    return [=](IREE::Stream::AffinityAttr aff, Operation *op,
+               SetVector<Attribute> &targetAttrs) {
+      // TODO: This needs to be in the lambda. Otherwise, it could crash because
+      // the root op (i.e., the original moduleOp) could be outdated.
+      IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+      if (failed(deviceAnalysis.run())) {
+        op->emitError("failed to run DeviceAnalysis");
+        return failure();
+      }
+      SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
+      deviceAnalysis.gatherRequiredExecutableTargets(aff, op, resultSet);
+      // TODO(hanchung): Populate the EncodingSolverAttr when it is ready.
+      targetAttrs.insert(resultSet.begin(), resultSet.end());
+      return success();
+    };
+  };
+};
+
 } // namespace
 
 HALDialect::HALDialect(MLIRContext *context)
@@ -131,6 +160,7 @@ HALDialect::HALDialect(MLIRContext *context)
 #include "iree/compiler/Dialect/HAL/IR/HALOps.cpp.inc"
       >();
   addInterfaces<HALInlinerInterface, HALOpAsmInterface,
+                HALAffinityAnalysisDialectInterface,
                 HALToVMConversionInterface>();
 }
 

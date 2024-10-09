@@ -15,6 +15,7 @@ iree_cc_library(
     Analysis
   HDRS
     "Affinity.h"
+    "AffinityAnalysisDialectInterface.h"
     "Partitioning.h"
     "ResourceHazards.h"
     "ResourceUsage.h"

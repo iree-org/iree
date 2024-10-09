@@ -111,6 +111,13 @@ EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
              AffineMapAttr::get(bcastMap), getRoundDimsTo(), getTargets());
 }
 
+EncodingAttr EncodingAttr::cloneWithTargets(ArrayRef<Attribute> targets) {
+  MLIRContext *ctx = getContext();
+  return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
+             getUserIndexingMaps(), getBcastMap(), getRoundDimsTo(),
+             ArrayAttr::get(ctx, targets));
+}
+
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
   if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
     return {};
