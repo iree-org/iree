@@ -312,7 +312,9 @@ def OptimizeTensorInsertExtractSlicesPass
                 "(e.g. hoist and fold)";
   let options = [
     Option<"foldIdentitySlices", "fold-identity-slices", "bool", "false",
-           "Enable folding of identity tensor.*_slice ops.">
+           "Enable folding of identity tensor.*_slice ops.">,
+    Option<"hoistRedundantTransfers", "hoist-redundant-transfers", "bool", "true",
+           "Enables use of redundant vector transfer hoisting.">
   ];
 }
 
@@ -454,6 +456,20 @@ def RematerializeParallelOpsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+def SafeLoopInvariantCodeMotionPass :
+  Pass<"iree-safe-loop-invariant-code-motion", ""> {
+  let summary = "Performs LICM on loops guaranteed to have >= 1 trip";
+  let description = [{
+    This is a safer mirror of the upstream LICM pass that restricts to loops
+    that are guaranteed to have at least one trip. This currently only supports
+    loops that expose a lower bound and upper bound as the generic loop-like
+    interface does not expose a way to query for trip count.
+
+    Additionally code motion of `scf.forall` ops with mappings is always unsafe
+    and is explicitly disabled.
+  }];
 }
 
 def SplitFullPartialTransferPass :

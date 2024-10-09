@@ -861,15 +861,15 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable private @shared_mem_alloc {
+hal.executable private @generalized_pool {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @shared_mem_alloc ordinal(0) layout(#pipeline_layout) {
+    hal.executable.export public @generalized_pool ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @shared_mem_alloc() {
+      func.func @generalized_pool() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant dense<0xFF800000> : tensor<14x14x480xf32>
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<29x29x480xf32>>
@@ -888,16 +888,11 @@ hal.executable private @shared_mem_alloc {
   }
 }
 
-// Check that bufferization is emitting correct code for the temp shared
-// memory alloc.
-//   CHECK-LABEL: hal.executable private @shared_mem_alloc
+//   CHECK-LABEL: hal.executable private @generalized_pool
 //         CHECK:   hal.executable.variant public @cuda
-//         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
-//         CHECK:     nvvm.barrier0
-//         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load %{{.*}} : !llvm.ptr<3> -> f32
-//         CHECK:     nvvm.barrier0
+//         CHECK:     llvm.load %{{.*}} : !llvm.ptr<1> -> f32
+//         CHECK:     llvm.intr.maxnum
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<1>
 
 // -----
 

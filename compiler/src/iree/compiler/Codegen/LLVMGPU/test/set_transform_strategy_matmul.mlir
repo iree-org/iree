@@ -432,7 +432,7 @@ func.func @matmul_5_small() {
   return
 }
 
-// CHECK:       iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32>
+// CHECK:       iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 // CHECK-LABEL: func @matmul_5_small
 
 // This matmul is considered "too small"/"degenerate" for a tensor core strategy,

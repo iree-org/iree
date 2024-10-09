@@ -240,7 +240,12 @@ struct CastLikeInsertSliceOpFolder final
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   auto funcOp = getOperation();
-  linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
+
+  // TODO: This pattern is a footgun that does unexpected LICM and doesn't
+  // model parallel loop properly. Fix or disable all uses of it.
+  if (hoistRedundantTransfers) {
+    linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
+  }
   IRRewriter rewriter(funcOp->getContext());
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
