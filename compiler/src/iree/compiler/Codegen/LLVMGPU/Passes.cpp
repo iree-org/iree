@@ -549,7 +549,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
   // still rely on buffer level transformations for transfer ops hoisting and
   // store to load forwarding. This relies on shacky alias analysis and we need
   // to move this to tensor level once we have better abstractions.
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  // TODO: We should be to start hoisting out accumulator load/store out
+  // after https://github.com/llvm/llvm-project/pull/111533.
+  funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
