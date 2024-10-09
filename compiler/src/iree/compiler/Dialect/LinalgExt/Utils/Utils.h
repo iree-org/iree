@@ -114,6 +114,28 @@ static void permute(SmallVectorImpl<T> &vector) {
   }
 }
 
+/// Return dim expresssions that can be used as replacements in map that
+/// contains `numSymbols` symbols. The new dim expressions have positions
+/// `numDims, numDims + 1, numDims + 2, ...., numDims + numSymbols - 1`.
+SmallVector<AffineExpr> getDimExprsForSymbols(MLIRContext *context,
+                                              unsigned numDims,
+                                              unsigned numSymbols);
+
+/// Convert all symbols in the map to dim expressions, such that the new dim
+/// expressions have positions `numDims, numDims + 1, numDims + 2, ...., numDims
+/// + numSymbols - 1`.
+AffineMap convertDimsToSymbols(AffineMap map, unsigned numDims,
+                               unsigned numSymbols,
+                               SmallVector<AffineExpr> &symbolReplacements);
+SmallVector<AffineMap>
+convertDimsToSymbols(ArrayRef<AffineMap> maps, unsigned numDims,
+                     unsigned numSymbols,
+                     SmallVector<AffineExpr> &symbolReplacements);
+SmallVector<AffineMap> convertDimsToSymbols(MLIRContext *context,
+                                            ArrayRef<AffineMap> map,
+                                            unsigned numDims,
+                                            unsigned numSymbols);
+
 /// Returns true if the operation increases bitwidths of tensors.
 /// This function checks that the genericOp:
 /// 1. Has only one output.

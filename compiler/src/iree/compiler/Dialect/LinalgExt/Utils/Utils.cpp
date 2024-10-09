@@ -136,6 +136,37 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
   return result;
 }
 
+SmallVector<AffineExpr> getDimExprsForSymbols(MLIRContext *context,
+                                              unsigned numDims,
+                                              unsigned numSymbols) {
+  return llvm::map_to_vector(
+      llvm::seq<unsigned>(0, numSymbols), [&](unsigned symbolNumber) {
+        return getAffineDimExpr(symbolNumber + numDims, context);
+      });
+}
+
+AffineMap convertDimsToSymbols(AffineMap map, unsigned numDims,
+                               unsigned numSymbols,
+                               SmallVector<AffineExpr> &symbolReplacements) {
+  return map.replaceDimsAndSymbols(/*dimReplacements=*/ArrayRef<AffineExpr>{},
+                                   symbolReplacements, numDims + numSymbols, 0);
+}
+SmallVector<AffineMap>
+convertDimsToSymbols(ArrayRef<AffineMap> maps, unsigned numDims,
+                     unsigned numSymbols,
+                     SmallVector<AffineExpr> &symbolReplacements) {
+  return llvm::map_to_vector(maps, [&](AffineMap map) {
+    return convertDimsToSymbols(map, numDims, numSymbols, symbolReplacements);
+  });
+}
+SmallVector<AffineMap> convertDimsToSymbols(MLIRContext *context,
+                                            ArrayRef<AffineMap> maps,
+                                            unsigned numDims,
+                                            unsigned numSymbols) {
+  auto symbolReplacements = getDimExprsForSymbols(context, numDims, numSymbols);
+  return convertDimsToSymbols(maps, numDims, numSymbols, symbolReplacements);
+}
+
 //===---------------------------------------------------------------------===//
 // Classification of ops that change bit-widths
 //===---------------------------------------------------------------------===//

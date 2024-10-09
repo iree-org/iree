@@ -39,7 +39,6 @@ iree_cc_library(
     "ReshapeFusion.cpp"
     "SplitReduction.cpp"
     "TileAttention.cpp"
-    "TilingInterfaceImpl.cpp"
     "TransposeFusion.cpp"
   DEPS
     ::PassesIncGen

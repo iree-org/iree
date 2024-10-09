@@ -13,6 +13,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -23,6 +24,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -1651,6 +1653,16 @@ int64_t CustomOp::getRank(Value v) {
   return cast<RankedTensorType>(type).getRank();
 }
 
+unsigned CustomOp::getNumNonLoopDimensions() {
+  for (auto map : getIndexingMaps().getAsValueRange<AffineMapAttr>()) {
+    if (map.isEmpty()) {
+      continue;
+    }
+    return map.getNumSymbols();
+  }
+  return 0;
+}
+
 LogicalResult CustomOp::verify() {
   // All inputs/outputs must have indexing maps.
   if (static_cast<int64_t>(getIndexingMapsAttr().size()) != getNumOperands()) {
@@ -1794,6 +1806,27 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
   }
   return success();
 }
+
+//===---------------------------------------------------------------------===//
+// IndexOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult IREE::LinalgExt::IndexOp::verify() {
+  auto customOp = dyn_cast<CustomOp>(getOperation()->getParentOp());
+  if (!customOp) {
+    return emitOpError("expected parent op to be `iree_linalg_ext.custom_op`");
+  }
+  if (customOp.getNumLoops() <= getDim()) {
+    return emitOpError("expected dim (")
+           << getDim() << ") to be lower than the number of loops ("
+           << customOp.getNumLoops() << ") of the enclosing CustomOp";
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// End operation definitions
+//===---------------------------------------------------------------------===//
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \

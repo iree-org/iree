@@ -48,6 +48,21 @@ def OpGroupUtilityOps : OpDocGroup {
 
 let opDocGroup = OpGroupUtilityOps in {
 
+def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
+    Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
+    Results<(outs Index:$result)> {
+  let summary = "linalg_ext index operation";
+  let description = [{
+    This operation is a mirror of `linalg.index` operation and has the same
+    semantics, except that `linalg.index` enforces that the parent op is a
+    `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
+    parent op is a `IREE::LinalgExt::CustomOp`.
+  }];
+
+  let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
+  let hasVerifier = 1;
+}
+
 def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
   let summary = "LinalgExt yield op";
   let description = [{
@@ -1578,7 +1593,10 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
   DeclareOpInterfaceMethods<LinalgFusionInterface>,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
-    ["getLoopIteratorTypes"]>
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
+     "getTiledImplementation"]>
   ]> {
   let summary = "Custom operation for compiling with IREE";
   let description = [{
@@ -1663,6 +1681,14 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
     // Helper accessor methods.
     unsigned getNumLoops();
     int64_t getRank(Value);
+
+    // Return the number of non-loop dimensions of the op.
+    unsigned getNumNonLoopDimensions();
+
+    // Return the ranges for the loop dimensions and symbol
+    // dimensions of the operation.
+    SmallVector<Range> getIterationDomainForDimensions(OpBuilder &builder,
+        ArrayRef<unsigned> dims, ArrayRef<unsigned> symbols);
 
     // DestinationStyleOpInterface methods
     MutableOperandRange getDpsInitsMutable() {
