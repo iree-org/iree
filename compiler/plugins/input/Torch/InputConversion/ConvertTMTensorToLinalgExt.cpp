@@ -166,6 +166,16 @@ struct AttentionOpConversion
         loc, result.getType(), query, key, value, scale, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
+    {
+      auto *block = rewriter.createBlock(&attention.getRegion());
+      OpBuilder::InsertionGuard g(rewriter);
+      block->addArgument(getElementTypeOrSelf(attention.getResult(0).getType()),
+                         loc);
+      rewriter.setInsertionPoint(block, block->begin());
+
+      rewriter.create<IREE::LinalgExt::YieldOp>(loc, block->getArgument(0));
+    }
+
     rewriter.replaceOp(op, attention.getResult(0));
     return success();
   }

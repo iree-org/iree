@@ -321,6 +321,30 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
       SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum},
       rewriter.getAffineMapArrayAttr(tiledIndexingMaps));
 
+  {
+    OpBuilder::InsertionGuard yieldGuard(rewriter);
+    rewriter.cloneRegionBefore(attnOp.getRegion(), tiledAttentionOp.getRegion(),
+                               tiledAttentionOp.getRegion().begin());
+    auto block = &tiledAttentionOp.getRegion().front();
+
+    // We expect everything to be `f32` here:
+    block->getArgument(0).setType(rewriter.getF32Type());
+    for (auto &op : *block) {
+      if (isa<arith::ConstantOp>(op) && !op.getResultTypes()[0].isF32()) {
+        op.setAttr(
+            "value",
+            rewriter.getF32FloatAttr(
+                cast<FloatAttr>(op.getAttr("value")).getValueAsDouble()));
+      }
+
+      for (auto result : op.getResults()) {
+        if (isa<FloatType>(result.getType())) {
+          result.setType(rewriter.getF32Type());
+        }
+      }
+    }
+  }
+
   Value tiledResult = tiledAttentionOp.getResult(0);
   Value newMax = tiledAttentionOp.getResult(1);
   Value newSum = tiledAttentionOp.getResult(2);
@@ -426,6 +450,9 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
       mask, accFill, maxFill, sumFill,
       rewriter.getAffineMapArrayAttr(indexingMaps));
+
+  rewriter.cloneRegionBefore(attnOp.getRegion(), onlineAttn.getRegion(),
+                             onlineAttn.getRegion().begin());
   onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
 

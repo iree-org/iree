@@ -178,6 +178,28 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
+static Value applyRegion(OpBuilder &builder, Location loc, Region &region,
+                         Value value) {
+  auto rank = cast<RankedTensorType>(value.getType()).getRank();
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(rank,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, value.getType(), ValueRange{}, value, indexingMaps, iteratorTypes);
+  auto &dstRegion = genericOp.getRegion();
+  builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
+  {
+    OpBuilder::InsertionGuard withinRegion(builder);
+    builder.setInsertionPoint(dstRegion.back().getTerminator());
+    builder.create<linalg::YieldOp>(
+        loc, dstRegion.back().getTerminator()->getOperands());
+    dstRegion.back().getTerminator()->erase();
+  }
+  return genericOp.getResult(0);
+}
+
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
                        AffineMap maskMap, Value qk, Value mask) {
 
@@ -340,6 +362,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
+  s = applyRegion(b, loc, getRegion(), s);
   // TODO: We shouldn't be relying on such attributes. We need a better
   // mechanism to identify attention matmuls.
   s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());

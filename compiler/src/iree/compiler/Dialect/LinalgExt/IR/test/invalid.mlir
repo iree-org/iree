@@ -783,7 +783,10 @@ func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
-                    ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
+                    ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) {
+                     ^bb0(%score: f32):
+                       iree_linalg_ext.yield %score : f32
+                    } -> tensor<6x12x20x8xf32>
   return %1 : tensor<6x12x20x8xf32>
 }
 
@@ -802,7 +805,10 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
                        affine_map<(d0, d1, d2, d3) -> (d0)>,
                        affine_map<(d0, d1, d2, d3) -> (d0)>,
                        affine_map<(d0, d1, d2, d3) -> (d0)>]}
-                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) {
+                        ^bb0(%score: f32):
+                          iree_linalg_ext.yield %score : f32
+                       } -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
   return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
 }
 
@@ -817,7 +823,10 @@ func.func @illegal_attention_inputs(%query: tensor<192x1024x64xf32>, %key: tenso
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
-                    ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+                    ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) {
+                     ^bb0(%score: f32):
+                       iree_linalg_ext.yield %score : f32
+                    } -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
 }
 
@@ -831,7 +840,10 @@ func.func @attention_missing_affine_map(%query: tensor<192x1024x64xf32>, %key: t
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
 }
 
@@ -846,7 +858,10 @@ func.func @attention_affine_map_domain_mismatch(%query: tensor<192x1024x64xf32>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
 }
 

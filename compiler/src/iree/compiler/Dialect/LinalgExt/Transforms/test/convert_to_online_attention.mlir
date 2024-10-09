@@ -13,7 +13,10 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
   %out = iree_linalg_ext.attention
          {indexing_maps = [#map, #map1, #map2, #map3, #map4]}
          ins(%q, %k, %v, %scale : tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, f16)
-         outs(%acc : tensor<2x10x4096x128xf16>) -> tensor<2x10x4096x128xf16>
+         outs(%acc : tensor<2x10x4096x128xf16>) {
+              ^bb0(%score: f32):
+                iree_linalg_ext.yield %score : f32
+         } -> tensor<2x10x4096x128xf16>
   func.return %out : tensor<2x10x4096x128xf16>
 }
 
@@ -28,6 +31,9 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
 // CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]]
 // CHECK-SAME:         outs(%[[ACC_FILL]], %[[MAX_FILL]], %[[SUM_FILL]]
+// CHECK-NEXT:             ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK-NEXT:               iree_linalg_ext.yield %[[SCORE]] : f32
+// CHECK-NEXT:        }
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
 // CHECK: arith.divf

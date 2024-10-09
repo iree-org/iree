@@ -518,6 +518,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        Variadic<AnyShaped>:$outputs,
                        AffineMapArrayAttr:$indexing_maps
   );
+  let regions = (region SizedRegion<1>:$region);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let hasFolder = 1;
@@ -527,6 +528,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)? `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )? `)`
     `outs` `(` $outputs `:` type($outputs) `)`
+    $region
     (`->` type($results)^)?
   }];
 
@@ -727,6 +729,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
                        AnyShaped:$sum,
                        AffineMapArrayAttr:$indexing_maps
   );
+  let regions = (region SizedRegion<1>:$region);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let hasVerifier = 1;
@@ -735,6 +738,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
     `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
+    $region
     (`->` type($results)^)?
   }];
 
