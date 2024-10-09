@@ -832,14 +832,10 @@ hal.executable public @main {
 // CHECK-DAG:  %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[C_READ:.+]] = vector.transfer_read %[[BINDING_C]]{{.*}} vector<8x1x2x1x1x4xf32>
-// CHECK-DAG:  %[[C_SLICE00:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [0, 0, 0, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
-// CHECK-DAG:  %[[C_SLICE01:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [0, 0, 1, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
-// CHECK-DAG:  %[[C_SLICE70:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [7, 0, 0, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
-// CHECK-DAG:  %[[C_SLICE71:.+]] = vector.extract_strided_slice %[[C_READ]] {{.*}}offsets = [7, 0, 1, 0, 0, 0]{{.*}} : vector<8x1x2x1x1x4xf32> to vector<1x1x1x1x1x4xf32>
-// CHECK-DAG:  %[[C_00_0:.+]] = vector.shape_cast %[[C_SLICE00]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
-// CHECK-DAG:  %[[C_01_0:.+]] = vector.shape_cast %[[C_SLICE01]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
-// CHECK-DAG:  %[[C_70_0:.+]] = vector.shape_cast %[[C_SLICE70]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
-// CHECK-DAG:  %[[C_71_0:.+]] = vector.shape_cast %[[C_SLICE71]] : vector<1x1x1x1x1x4xf32> to vector<4xf32>
+// CHECK-DAG:  %[[C_00_0:.+]] = vector.extract %[[C_READ]][0, 0, 0, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_01_0:.+]] = vector.extract %[[C_READ]][0, 0, 1, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_70_0:.+]] = vector.extract %[[C_READ]][7, 0, 0, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
+// CHECK-DAG:  %[[C_71_0:.+]] = vector.extract %[[C_READ]][7, 0, 1, 0, 0] : vector<4xf32> from vector<8x1x2x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0] : f32 from vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 0, 0, 1] : f32 from vector<8x1x1x4xf32>
 // CHECK-DAG:  %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 0, 0, 2] : f32 from vector<8x1x1x4xf32>
