@@ -35,10 +35,10 @@ class MatrixElemTypeId(enum.Enum):
 # The values are the accepted values for the --shapes= flag.
 @enum.unique
 class ShapesId(enum.Enum):
+    DEFAULT = "default"
     SMALL = "small"
     LARGE = "large"
-    GPU_LARGE = "gpu_large"
-    GPU_LARGE_ALIGNED = "gpu_large_aligned"
+    EASY_LARGE_STATIC = "easy_large_static"
 
 
 # Enumerates of the collections of compilation info that we can generate tests
@@ -192,6 +192,8 @@ def get_test_shapes(shapes_id: ShapesId):
     # 2. Some shapes are commented out: they used to be tested but have been
     #    disabled to improve the trade-off between test coverage and build
     #    latency.
+    if shapes_id == ShapesId.DEFAULT:
+        return get_test_shapes(ShapesId.SMALL) + get_test_shapes(ShapesId.LARGE)
     if shapes_id == ShapesId.SMALL:
         return [
             # square matrices. Start by the simplest case of 1x1x1.
@@ -223,9 +225,16 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            # some random large sizes
-            TestShape(m=123, k=456, n=789, accumulate=True),
-            TestShape(m=654, k=321, n=234, accumulate=False),
+            # unaligned cases.
+            TestShape(m=457, k=330, n=512, accumulate=False),
+            TestShape(m=438, k=331, n=513, accumulate=False),
+            TestShape(m=540, k=332, n=516, accumulate=False),
+            TestShape(m=1000, k=4, n=512, accumulate=False),
+            TestShape(m=4, k=1000, n=512, accumulate=False),
+            TestShape(m=512, k=1000, n=4, accumulate=False),
+            TestShape(m=513, k=128, n=55, accumulate=False),
+            TestShape(m=7, k=160, n=31, accumulate=False),
+            TestShape(m=512, k=330, n=33, accumulate=False),
             # shapes involving vectors (i.e. most rectangular cases)
             TestShape(m=1, k=1000, n=1000, accumulate=True),  # large vector*matrix
             TestShape(m=1000, k=1000, n=1, accumulate=True),  # large matrix*vector
@@ -236,24 +245,10 @@ def get_test_shapes(shapes_id: ShapesId):
             # running on fewer backends/drivers or with fewer generators
             # (see get_test_generators).
         ]
-    if shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
-        ]
-    if shapes_id == ShapesId.GPU_LARGE:
-        return [
-            # unaligned cases.
-            TestShape(m=457, k=330, n=512, accumulate=False),
-            TestShape(m=457, k=330, n=514, accumulate=False),
-            TestShape(m=438, k=330, n=514, accumulate=False),
-            TestShape(m=540, k=332, n=516, accumulate=False),
-            TestShape(m=1000, k=4, n=512, accumulate=False),
-            TestShape(m=4, k=1000, n=512, accumulate=False),
-            TestShape(m=512, k=1000, n=4, accumulate=False),
-            TestShape(m=512, k=128, n=500, accumulate=False),
-            TestShape(m=457, k=160, n=512, accumulate=False),
-            TestShape(m=512, k=330, n=512, accumulate=False),
         ]
 
     raise ValueError(shapes_id)
@@ -262,7 +257,7 @@ def get_test_shapes(shapes_id: ShapesId):
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.GPU_LARGE or shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             Dynamicity.STATIC,
         ]
@@ -927,7 +922,8 @@ def parse_arguments():
         type=str,
         choices=[s.value for s in ShapesId],
         help="Collection of matrix shapes to test",
-        required=True,
+        default="default",
+        required=False,
     )
     parser.add_argument(
         "--transpose_rhs",

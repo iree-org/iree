@@ -198,12 +198,23 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
       return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
                    iree_math_f16_to_f32(expected.f16_u16)) <
              acceptable_fp_delta;
-    case IREE_TEST_UTILS_VALUE_TYPE_BF16:
+    case IREE_TEST_UTILS_VALUE_TYPE_BF16: {
       if (actual.bf16_u16 == expected.bf16_u16) return true;
+      // This is the rare case where the accumulator itself (not just LHS/RHS)
+      // is bf16. This doesn't really happen in practice and is mostly just in
+      // some CPU tests for completeness. Accumulators grow outside of the
+      // narrow range of bf16 exact representation of integers, forcing fuzzy
+      // compares.
+      float actual_f32 = iree_math_bf16_to_f32(actual.bf16_u16);
+      float expected_f32 = iree_math_bf16_to_f32(expected.bf16_u16);
+      if (fabsf(actual_f32) > 127.0f || fabsf(expected_f32) > 127.0f) {
+        if (fabsf(actual_f32 - expected_f32) < 10.0f) {
+          return true;
+        }
+      }
       if (iree_test_utils_require_exact_results()) return false;
-      return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
-                   iree_math_bf16_to_f32(expected.bf16_u16)) <
-             acceptable_fp_delta;
+      return fabsf(actual_f32 - expected_f32) < acceptable_fp_delta;
+    }
     case IREE_TEST_UTILS_VALUE_TYPE_F32:
       if (actual.f32 == expected.f32) return true;
       if (iree_test_utils_require_exact_results()) return false;
