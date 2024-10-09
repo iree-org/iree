@@ -64,7 +64,13 @@ def EncodingAttr :
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"AffineMapAttr", "Indexing map that represents the broadcasting dims in the producer">:$bcast_map,
     // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to
+    // TODO(hanchung): Deprecate the round_dims_to field when we plumb the
+    // solvers through the whole stack.
+    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to,
+    OptionalParameter<"ArrayAttr", "An array of target attributes that the "
+    "encoding is targeting. Note that it can be any attribute, but we will "
+    "need them to     implement EncodingSolverInterfaceAttr before any "
+    "materialization.">:$targets
   );
 
   let builders = [
@@ -73,7 +79,8 @@ def EncodingAttr :
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
         CArg<"std::optional<AffineMap>", "{}">:$bcastMap,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
+        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
+        CArg<"ArrayRef<Attribute>", "{}">:$targets)>
   ];
 
   let extraClassDeclaration = [{

@@ -25,18 +25,20 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
                                ArrayRef<AffineMap> maps,
                                std::optional<AffineMap> bcastMap,
-                               ArrayRef<int64_t> roundDimsTo) {
+                               ArrayRef<int64_t> roundDimsTo,
+                               ArrayRef<Attribute> targets) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
+  auto targetsAttr = targets.empty() ? ArrayAttr() : b.getArrayAttr(targets);
   auto bcastMapAttr = bcastMap.has_value()
                           ? AffineMapAttr::get(bcastMap.value())
                           : AffineMapAttr();
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
              b.getTypeArrayAttr(elemTypes), b.getAffineMapArrayAttr(maps),
-             bcastMapAttr, roundDimsToAttr);
+             bcastMapAttr, roundDimsToAttr, targetsAttr);
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() {
@@ -106,7 +108,7 @@ SmallVector<Type> EncodingAttr::getElementTypesArray() {
 EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
   return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
              getElementTypes(), getUserIndexingMaps(),
-             AffineMapAttr::get(bcastMap), getRoundDimsTo());
+             AffineMapAttr::get(bcastMap), getRoundDimsTo(), getTargets());
 }
 
 MatmulNarrowDim getMatmulNarrowDim(EncodingAttr encoding) {
