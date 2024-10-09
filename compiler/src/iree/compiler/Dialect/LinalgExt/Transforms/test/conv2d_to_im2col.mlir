@@ -17,7 +17,7 @@ util.func public @conv_2d_nhwc_hwcf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0] k_offset = [0]
+// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf32>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
@@ -53,7 +53,7 @@ util.func public @conv_2d_nchw_fchw(%arg0: tensor<1x4x16x16xf32>, %arg1: tensor<
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf32>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0] k_offset = [0]
+// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:   batch_pos = [0] m_pos = [2, 3] k_pos = [1]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x4x16x16xf32>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
@@ -89,7 +89,7 @@ util.func public @conv_mixed_types(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x196x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0] k_offset = [0]
+// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x196x36xf16>) -> tensor<1x196x36xf16>
@@ -127,7 +127,7 @@ util.func public @conv_strided(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3x3x4
 // CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<1x49x36xf16>
 // CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
 // CHECK-SAME:   strides = [2, 2] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:   m_offset = [0] k_offset = [0]
+// CHECK-SAME:   m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:   batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:   ins(%[[ARG0]] : tensor<1x16x16x4xf16>)
 // CHECK-SAME:   outs(%[[EMPTY]] : tensor<1x49x36xf16>) -> tensor<1x49x36xf16>
