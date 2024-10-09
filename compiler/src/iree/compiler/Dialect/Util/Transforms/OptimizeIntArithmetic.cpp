@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -163,6 +164,49 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 };
 
 //===----------------------------------------------------------------------===//
+// Divisibility
+//===----------------------------------------------------------------------===//
+
+static LogicalResult getDivisibility(DataFlowSolver &solver, Operation *op,
+                                     Value value, PatternRewriter &rewriter,
+                                     ConstantIntDivisibility &out) {
+  auto *div = solver.lookupState<IntegerDivisibilityLattice>(value);
+  if (!div || div->getValue().isUninitialized())
+    return rewriter.notifyMatchFailure(op,
+                                       "divisibility could not be determined");
+
+  out = div->getValue().getValue();
+  LLVM_DEBUG(dbgs() << "  * Resolved divisibility: " << out << "\n");
+  return success();
+}
+
+struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
+  RemUIDivisibilityByConstant(MLIRContext *context, DataFlowSolver &solver)
+      : OpRewritePattern(context), solver(solver) {}
+
+  LogicalResult matchAndRewrite(arith::RemUIOp op,
+                                PatternRewriter &rewriter) const override {
+    APInt rhsConstant;
+    if (!matchPattern(op.getRhs(), m_ConstantInt(&rhsConstant)))
+      return rewriter.notifyMatchFailure(op, "rhs is not constant");
+
+    ConstantIntDivisibility lhsDiv;
+    if (failed(getDivisibility(solver, op, op.getLhs(), rewriter, lhsDiv)))
+      return failure();
+
+    uint64_t rhsValue = rhsConstant.getZExtValue();
+    if (rhsValue > 0 && lhsDiv.udiv() > 0 && lhsDiv.udiv() % rhsValue != 0)
+      return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
+
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        op, rewriter.getZeroAttr(op.getResult().getType()));
+    return success();
+  }
+
+  DataFlowSolver &solver;
+};
+
+//===----------------------------------------------------------------------===//
 // Pass setup
 //===----------------------------------------------------------------------===//
 
@@ -229,6 +273,7 @@ class OptimizeIntArithmeticPass
     DataFlowSolver solver;
     solver.load<DeadCodeAnalysis>();
     solver.load<IntegerRangeAnalysis>();
+    solver.load<IntegerDivisibilityAnalysis>();
     DataFlowListener listener(solver);
     RewritePatternSet patterns(ctx);
 
@@ -254,6 +299,9 @@ class OptimizeIntArithmeticPass
                  ConvertOpToUnsigned<arith::MaxSIOp, arith::MaxUIOp>,
                  ConvertOpToUnsigned<arith::ExtSIOp, arith::ExtUIOp>>(ctx,
                                                                       solver);
+
+    // Populate divisibility patterns.
+    patterns.add<RemUIDivisibilityByConstant>(ctx, solver);
 
     GreedyRewriteConfig config;
     // Results in fewer recursive data flow flushes/cycles on modification.

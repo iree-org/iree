@@ -460,7 +460,8 @@ def OpGroupCompilerHintOps : OpDocGroup {
 let opDocGroup = OpGroupCompilerHintOps in {
 
 def Util_AssumeIntOp : Util_PureOp<"assume.int", [
-    DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>
+    DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>,
+    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>
 ]> {
   let summary = "memorializes assumptions about index/integer values.";
   let description = [{
@@ -507,7 +508,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     // Gets the unioned divisor for an operand. If there are multiple divisor
     // assumptions, the gcd of all of them is returned. If there are no
     // divisor assumptions, std::nullopt is returned.
-    std::optional<uint64_t> getUnionedDivisor(unsigned operandIndex);
+    std::optional<uint64_t> getUnionedUnsignedDivisor(unsigned operandIndex);
   }];
 
   let hasCustomAssemblyFormat = 1;

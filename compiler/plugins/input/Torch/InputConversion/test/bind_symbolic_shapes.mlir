@@ -19,7 +19,7 @@ module @basic_example {
     // CHECK: %[[ARG1_DIM0_RANGE:.*]] = util.assume.int %[[DIM0]]<umin = 1, umax = 1024>
     // CHECK: %[[MULTIPLIER0:.*]] = arith.constant 2 : index
     // CHECK: %[[ARG1_DIM1:.*]] = arith.muli %[[DIM1]], %[[MULTIPLIER0]]
-    // CHECK: %[[ARG1_DIM1_RANGE:.*]] = util.assume.int %[[ARG1_DIM1]]<umin = 2, umax = 2048, divisor = 2> : index
+    // CHECK: %[[ARG1_DIM1_RANGE:.*]] = util.assume.int %[[ARG1_DIM1]]<umin = 2, umax = 2048, udiv = 2> : index
     // CHECK: %[[ARG1_TIE:.*]] = flow.tensor.tie_shape %[[ARG1_ANCHOR]] : tensor<?x?xf32>{%[[ARG1_DIM0_RANGE]], %[[ARG1_DIM1_RANGE]]}
     // CHECK: %[[ARG1_EXPORT:.*]] = torch_c.from_builtin_tensor %[[ARG1_TIE]]
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
@@ -49,10 +49,10 @@ module @basic_example {
 module @unbacked_symbol {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) -> !torch.vtensor<[?,?],f32> {
     // CHECK: util.assume.int{{.*}}<umin = 1, umax = 1024>
-    // CHECK: util.assume.int{{.*}}<umin = 2, umax = 2048, divisor = 2>
+    // CHECK: util.assume.int{{.*}}<umin = 2, umax = 2048, udiv = 2>
     // CHECK: tie_shape
     // CHECK: util.assume.int{{.*}}<umin = 1, umax = 1024>
-    // CHECK: util.assume.int{{.*}}<umin = 4, umax = 4096, divisor = 4>
+    // CHECK: util.assume.int{{.*}}<umin = 4, umax = 4096, udiv = 4>
     // CHECK: tie_shape
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "2*s4" {min_val = 0, max_val = 2048} : !torch.int
@@ -100,7 +100,7 @@ module @all_bindings_dropped {
 module @add_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
     // CHECK: addi
-    // CHECK-NOT: divisor
+    // CHECK-NOT: udiv
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 1024} : !torch.int
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>
@@ -114,7 +114,7 @@ module @add_expr {
 module @mod_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
     // CHECK: remui
-    // CHECK-NOT: divisor
+    // CHECK-NOT: udiv
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 1024} : !torch.int
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>
@@ -128,7 +128,7 @@ module @mod_expr {
 module @floordiv_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
     // CHECK: divui
-    // CHECK-NOT: divisor
+    // CHECK-NOT: udiv
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 1024} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 1024} : !torch.int
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>

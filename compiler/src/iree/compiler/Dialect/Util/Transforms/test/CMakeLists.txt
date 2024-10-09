@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "hoist_into_globals.mlir"
     "hoist_into_globals_linalg.mlir"
     "import_resources.mlir"
+    "integer_divisibility.mlir"
     "ipo.mlir"
     "optimize_int_arithmetic.mlir"
     "patterns.mlir"

@@ -359,3 +359,15 @@ util.func @index_unsigned_overflow_signed(%arg0 : index) -> index {
   %1 = arith.divsi %0, %cst : index
   util.return %1 : index
 }
+
+// -----
+// CHECK-LABEL: @index_cast_i64_to_index_remsi
+util.func @index_cast_i64_to_index_remsi(%arg0 : index, %arg1 : index) -> index {
+  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  %0 = util.assume.int %arg0<umin=10, umax=100> : index
+  %1 = arith.index_cast %0 : index to i64
+  // CHECK: arith.remui %[[ASSUME]], %[[ASSUME]] : index
+  %2 = arith.remsi %1, %1 : i64
+  %3 = arith.index_cast %2 : i64 to index
+  util.return %3 : index
+}

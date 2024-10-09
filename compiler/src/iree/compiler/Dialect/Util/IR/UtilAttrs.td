@@ -30,10 +30,10 @@ def Util_IntAssumptionAttr : AttrDef<Util_Dialect, "IntAssumption", []
   let parameters = (ins
     DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$umin,
     DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$umax,
-    DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$divisor
+    DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$udiv
   );
   let assemblyFormat = [{
-    `<` struct($umin, $umax, $divisor) `>`
+    `<` struct($umin, $umax, $udiv) `>`
   }];
 }
 

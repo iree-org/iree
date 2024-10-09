@@ -1141,11 +1141,12 @@ AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
 // Gets the unioned divisor for an operand. If there are multiple divisor
 // assumptions, the gcd of all of them is returned. If there are no
 // divisor assumptions, std::nullopt is returned.
-std::optional<uint64_t> AssumeIntOp::getUnionedDivisor(unsigned operandIndex) {
+std::optional<uint64_t>
+AssumeIntOp::getUnionedUnsignedDivisor(unsigned operandIndex) {
   auto assumptions = getOperandAssumptions(operandIndex);
   std::optional<uint64_t> divisorUnion;
   for (auto assumption : assumptions) {
-    auto divisor = assumption.getDivisor();
+    auto divisor = assumption.getUdiv();
     if (divisor) {
       if (divisorUnion)
         divisorUnion = std::gcd(*divisor, *divisorUnion);
@@ -1172,6 +1173,20 @@ void AssumeIntOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
       APInt uminAp(bitWidth, *umin);
       APInt umaxAp(bitWidth, *umax);
       setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
+    }
+  }
+}
+
+void AssumeIntOp::inferResultDivisibility(ArrayRef<IntegerDivisibility> argDivs,
+                                          SetIntDivisibilityFn setResultDivs) {
+  for (auto [index, result] : llvm::enumerate(getResults())) {
+    Type type = result.getType();
+    if (!isa<IndexType>(type) && !isa<IntegerType>(type))
+      continue;
+    auto udiv = getUnionedUnsignedDivisor(index);
+    if (udiv) {
+      setResultDivs(result,
+                    ConstantIntDivisibility(/*udiv=*/*udiv, /*sdiv=*/*udiv));
     }
   }
 }

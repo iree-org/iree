@@ -23,6 +23,29 @@ namespace mlir::iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
+// InferIntDivisibilityOpInterface
+//===----------------------------------------------------------------------===//
+
+struct ArithConstantInferIntDivisibilityOpInterface
+    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto constOp = cast<arith::ConstantOp>(op);
+    auto constAttr = llvm::dyn_cast_or_null<IntegerAttr>(constOp.getValue());
+    if (constAttr) {
+      const APInt &value = constAttr.getValue();
+      uint64_t udiv = value.getZExtValue();
+      uint64_t sdiv = std::abs(value.getSExtValue());
+      setResultDivs(constOp.getResult(),
+                    IREE::Util::ConstantIntDivisibility(udiv, sdiv));
+    }
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // GlobalOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -303,6 +326,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
         arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,
         arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(context);
+    arith::ConstantOp::attachInterface<
+        ArithConstantInferIntDivisibilityOpInterface>(*context);
   });
 
   registry.addExtension(
