@@ -240,8 +240,11 @@ struct CastLikeInsertSliceOpFolder final
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   auto funcOp = getOperation();
-  linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
   IRRewriter rewriter(funcOp->getContext());
+
+  funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
+  LDBG("after hoisting loop invariant code\n" << funcOp);
+
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
   funcOp.walk(
@@ -252,11 +255,8 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     hoistSubsetWithLoopInvariantTensor(rewriter, forOp);
   });
   LDBG("after hoisting subset loop invariant tensors" << funcOp);
-  vector::transferOpflowOpt(rewriter, funcOp);
+
   MLIRContext *context = &getContext();
-
-  LDBG("after hoisting redundant transfers on tensors\n" << funcOp);
-
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
