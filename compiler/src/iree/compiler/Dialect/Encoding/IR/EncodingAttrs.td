@@ -103,6 +103,8 @@ def EncodingAttr :
 
     /// Clones an encoding with a new bcast_map
     EncodingAttr clone(AffineMap bcastMap);
+
+    EncodingAttr cloneWithTargets(ArrayRef<Attribute> targets);
   }];
 
   let genVerifyDecl = 0;

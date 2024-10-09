@@ -140,6 +140,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Tensor lowering and resource management
   //----------------------------------------------------------------------------
 
+  passManager.addPass(IREE::Stream::createMakeEncodingSolvablePass());
+  // TODO(hanchung): Add SpecializeEncodings pass.
+
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.
   FunctionLikeNest(passManager)
