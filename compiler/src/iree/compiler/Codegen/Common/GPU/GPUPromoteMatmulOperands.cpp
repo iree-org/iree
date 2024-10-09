@@ -48,6 +48,11 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
     if (isa<linalg::FillOp>(producer)) {
       return;
     }
+    if (auto generic = dyn_cast<linalg::GenericOp>(producer)) {
+      if (linalg::isaFillOpInterface(generic)) {
+        return;
+      }
+    }
     setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
                                     builder.getContext()));
     return;
