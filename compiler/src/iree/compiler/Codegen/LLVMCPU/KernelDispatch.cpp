@@ -2937,6 +2937,15 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
+  // lialan: hack for now:
+  //commonVecTileSizes[0] = 8;
+
+
+  // check to make sure the innermost tile size times element size is multiple of byte
+  auto elementTypeSize = cast<ShapedType>(rootOperation->getResultTypes().front()).getElementType().getIntOrFloatBitWidth();
+  auto innermostTileSize = commonVecTileSizes.back();
+  commonVecTileSizes.back() = llvm::alignTo(innermostTileSize * elementTypeSize, 8) / elementTypeSize;
+
   // Set the lowering configs with new tile sizes.
   for (auto op : computeOps) {
     int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();

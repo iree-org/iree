@@ -937,6 +937,21 @@ static bool insertBindingOp(BlockArgument arg,
     }
   }
 
+  // align tensor type to multiple of 8 bits:
+  auto rankedTensorType = tensorType.asRankedTensorType();
+  auto elementSize = rankedTensorType.getElementType().getIntOrFloatBitWidth();
+  auto typeSize = tensorType.getNumElements() * elementSize;
+
+  if (typeSize * elementSize % 8 != 0) {
+    SmallVector<int64_t> newShape(rankedTensorType.getShape());
+    newShape.back() = llvm::alignTo(newShape.back(), 8 / elementSize);
+
+    auto newTensorType = IREE::Flow::DispatchTensorType::get(
+        tensorType.getAccess(), newShape,
+        rankedTensorType.getElementType(), rankedTensorType.getEncoding());
+    tensorType = newTensorType;
+  }
+
   auto subspanOp = builder.create<IREE::Stream::BindingSubspanOp>(
       arg.getLoc(), tensorType, arg, zero, dynamicDims);
   arg.replaceAllUsesExcept(subspanOp.getResult(), subspanOp);
