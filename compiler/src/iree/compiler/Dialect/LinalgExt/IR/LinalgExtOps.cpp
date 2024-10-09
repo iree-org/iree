@@ -1887,62 +1887,6 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 /// End `ReifyRankedShapedTypeOpInterface` implementation
 
-/// Start `AggregateOpInterface` implementation
-FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
-  CustomOp customOp = *this;
-
-  IRRewriter rewriter(builder);
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(customOp);
-  // Inline the body of the operation using the ins/outs as the arguments.
-  SmallVector<Value> argReplacements;
-  Location loc = getLoc();
-  Block *body = customOp.getBody();
-  for (auto [operand, argument] :
-       llvm::zip_equal(customOp->getOperands(), body->getArguments())) {
-    if (operand.getType() != argument.getType()) {
-      assert(isa<RankedTensorType>(operand.getType()) &&
-             isa<RankedTensorType>(argument.getType()) &&
-             "expected operand and arguments to be `RankedTensorType`");
-      Value cast =
-          builder.create<tensor::CastOp>(loc, argument.getType(), operand);
-      argReplacements.push_back(cast);
-    } else {
-      argReplacements.push_back(operand);
-    }
-  }
-
-  Block *oldBlock = customOp->getBlock();
-  Block *newBlock = rewriter.splitBlock(oldBlock, Block::iterator(customOp));
-  rewriter.mergeBlocks(body, oldBlock, argReplacements);
-
-  // Get the operands of the `iree_linalg_ext.yield` which is the terminator of
-  // `oldBlock` right now.
-  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(oldBlock->getTerminator());
-  rewriter.setInsertionPointToEnd(oldBlock);
-  SmallVector<Value> customOpReplacements;
-  for (auto [yieldedVal, result] :
-       llvm::zip_equal(yieldOp->getOperands(), customOp->getResults())) {
-    if (yieldedVal.getType() != result.getType()) {
-      assert(isa<RankedTensorType>(yieldedVal.getType()) &&
-             isa<RankedTensorType>(result.getType()) &&
-             "expected yielded value and result to be `RankedTensorType`");
-      Value cast =
-          builder.create<tensor::CastOp>(loc, result.getType(), yieldedVal);
-      customOpReplacements.push_back(cast);
-    } else {
-      customOpReplacements.push_back(yieldedVal);
-    }
-  }
-  // Erase the yield op.
-  rewriter.eraseOp(yieldOp);
-
-  // Merge the block back.
-  rewriter.mergeBlocks(newBlock, oldBlock);
-
-  return customOpReplacements;
-}
-
 //===---------------------------------------------------------------------===//
 // IndexOp
 //===---------------------------------------------------------------------===//
