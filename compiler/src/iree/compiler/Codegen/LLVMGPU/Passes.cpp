@@ -405,6 +405,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(IREE::GPU::createFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
@@ -420,6 +421,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   addGPUBufferizePasses(funcPassManager);
 
   // Step 8. Resolve remaining parallel loops.
+  funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
+      NormalizeLoopBoundsPassOptions{/*normalizeFor=*/false,
+                                     /*normalizeForall=*/true}));
   funcPassManager.addPass(createGPUVerifyDistributionPass());
   funcPassManager.addPass(createGPUDistributeForallPass());
 
