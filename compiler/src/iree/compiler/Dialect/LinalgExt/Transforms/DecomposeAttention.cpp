@@ -16,6 +16,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 namespace {
+
 struct DecomposeAttentionPass final
     : impl::DecomposeAttentionPassBase<DecomposeAttentionPass> {
   using impl::DecomposeAttentionPassBase<

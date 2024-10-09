@@ -34,6 +34,7 @@ struct ConvertAttentionToOnlineAttentionPass final
 
 } // namespace
 
+
 void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                               SmallVectorImpl<Operation *> &ops,
                               RewriterBase &rewriter) {
@@ -107,6 +108,9 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
       mask, accFill, maxFill, sumFill,
       rewriter.getAffineMapArrayAttr(indexingMaps));
+
+  rewriter.cloneRegionBefore(attnOp.getRegion(), onlineAttn.getRegion(),
+                             onlineAttn.getRegion().begin());
   onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
 

@@ -220,7 +220,10 @@ def generate_function(
         f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
         f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
-        f"      outs(%result0: {result_tensor_type}) -> {result_tensor_type}\n"
+        f"      outs(%result0: {result_tensor_type}) {{\n"
+        f"   ^bb0(%score: f32): \n"
+        f"   iree_linalg_ext.yield %score : f32\n"
+        f" }} -> {result_tensor_type}\n"
         f" return %result1: {result_tensor_type}\n"
         f"}}\n"
     )

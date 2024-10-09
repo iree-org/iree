@@ -1302,6 +1302,16 @@ LogicalResult AttentionOp::verify() {
       return failure();
   }
 
+  if (!isa<FloatType>(blockTys[0]))
+    return attnOp->emitOpError("block arg0 should be float");
+
+  auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
+  if (!yieldOp)
+    return attnOp->emitOpError("expected linalg_ext.yield");
+
+  if (yieldOp->getNumOperands() != 1)
+    return emitOpError("expected only one return");
+
   return success();
 }
 
@@ -1456,6 +1466,22 @@ LogicalResult OnlineAttentionOp::verify() {
     if (failed(checkDomain("Mask", *maskMap)))
       return failure();
   }
+
+  auto &block = attnOp.getRegion().front();
+  auto blockTys = block.getArgumentTypes();
+  if (blockTys.size() != 1) {
+    return attnOp->emitOpError("expected one block arguments");
+  }
+
+  if (!isa<FloatType>(blockTys[0]))
+    return attnOp->emitOpError("block arg0 should be float");
+
+  auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
+  if (!yieldOp)
+    return attnOp->emitOpError("expected linalg_ext.yield");
+
+  if (yieldOp->getNumOperands() != 1)
+    return emitOpError("expected only one return");
 
   return success();
 }
