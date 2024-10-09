@@ -227,15 +227,14 @@ def get_test_shapes(shapes_id: ShapesId):
         return [
             # unaligned cases.
             TestShape(m=457, k=330, n=512, accumulate=False),
-            TestShape(m=457, k=330, n=514, accumulate=False),
-            TestShape(m=438, k=330, n=514, accumulate=False),
+            TestShape(m=438, k=331, n=513, accumulate=False),
             TestShape(m=540, k=332, n=516, accumulate=False),
             TestShape(m=1000, k=4, n=512, accumulate=False),
             TestShape(m=4, k=1000, n=512, accumulate=False),
             TestShape(m=512, k=1000, n=4, accumulate=False),
-            TestShape(m=512, k=128, n=500, accumulate=False),
-            TestShape(m=457, k=160, n=512, accumulate=False),
-            TestShape(m=512, k=330, n=512, accumulate=False),
+            TestShape(m=513, k=128, n=55, accumulate=False),
+            TestShape(m=7, k=160, n=31, accumulate=False),
+            TestShape(m=512, k=330, n=33, accumulate=False),
             # shapes involving vectors (i.e. most rectangular cases)
             TestShape(m=1, k=1000, n=1000, accumulate=True),  # large vector*matrix
             TestShape(m=1000, k=1000, n=1, accumulate=True),  # large matrix*vector
