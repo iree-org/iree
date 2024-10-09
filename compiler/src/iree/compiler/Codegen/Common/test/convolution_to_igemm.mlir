@@ -18,16 +18,13 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
   return %2 : tensor<1x14x14x16xf16>
 }
 // CHECK:      func.func public @conv_with_consumer
-// CHECK:      %[[IM2COL:.+]] = iree_linalg_ext.im2col
-// CHECK-SAME:   : tensor<1x196x36xf32>) -> tensor<1x196x36xf32>
-// CHECK:      %[[FILL:.+]] = linalg.fill
-// CHECK-SAME:   -> tensor<1x196x16xf32>
-// CHECK:      %[[MATMUL:.+]] = linalg.generic
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
-// CHECK:      %[[TRUNCF:.+]] = linalg.generic
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel"]
-// CHECK:      %[[EXPANDED:.+]] = tensor.expand_shape %[[TRUNCF]] {{\[}}[0], [1, 2], [3]] output_shape [1, 14, 14, 16] : tensor<1x196x16xf16> into tensor<1x14x14x16xf16>
-// CHECK:      return %[[EXPANDED]] : tensor<1x14x14x16xf16>
+// CHECK-DAG:    %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-DAG:    %[[FILL:.+]] = linalg.fill {{.*}} -> tensor<1x14x14x16xf32>
+// CHECK:        %[[MATMUL:.+]] = linalg.generic
+// CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK:        %[[TRUNCF:.+]] = linalg.generic
+// CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK:        return %[[TRUNCF]] : tensor<1x14x14x16xf16>
 
 // -----
 
@@ -61,13 +58,13 @@ module {
 // CHECK:      func.func @fold_with_interface_tensor
 // CHECK-DAG:  %[[LHS:.+]] = flow.dispatch.tensor.load {{.*}} -> tensor<1x16x16x4xf32>
 // CHECK-DAG:  %[[RHS:.+]] = flow.dispatch.tensor.load {{.*}} -> tensor<36x16xf32>
-// CHECK-DAG:  %[[RES:.+]] = flow.dispatch.tensor.load {{.*}} -> tensor<1x196x16xf32>
-// CHECK-DAG:  %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} ins(%[[LHS]] : tensor<1x16x16x4xf32>){{.*}}-> tensor<1x196x36xf32>
-// CHECK-DAG:  %[[FILL:.+]] = linalg.fill {{.*}}outs(%[[RES]] : tensor<1x196x16xf32>)
+// CHECK-DAG:  %[[RES:.+]] = flow.dispatch.tensor.load {{.*}} -> tensor<1x14x14x16xf32>
+// CHECK-DAG:  %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} ins(%[[LHS]] : tensor<1x16x16x4xf32>){{.*}}-> tensor<1x14x14x36xf32>
+// CHECK-DAG:  %[[FILL:.+]] = linalg.fill {{.*}}outs(%[[RES]] : tensor<1x14x14x16xf32>)
 // CHECK:      %[[MATMUL:.+]] = linalg.generic
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]
-// CHECK-SAME:   ins(%[[IM2COL]], %[[RHS]] : tensor<1x196x36xf32>, tensor<36x16xf32>)
-// CHECK-SAME:   outs(%[[FILL]] : tensor<1x196x16xf32>) {
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[RHS]] : tensor<1x14x14x36xf32>, tensor<36x16xf32>)
+// CHECK-SAME:   outs(%[[FILL]] : tensor<1x14x14x16xf32>) {
 // CHECK:      flow.dispatch.tensor.store %[[MATMUL]]
 
 // -----
