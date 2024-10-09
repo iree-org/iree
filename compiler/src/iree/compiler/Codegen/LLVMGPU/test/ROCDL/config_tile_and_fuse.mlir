@@ -75,6 +75,41 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d4, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>
+func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: tensor<?x32x?x16xf16>) -> tensor<?x6x?x16x32xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %d0 = tensor.dim %lhs, %c0 : tensor<?x6x16x?x16xf16>
+  %d2 = tensor.dim %rhs, %c0 : tensor<?x32x?x16xf16>
+  %5 = tensor.empty(%d0, %d2) : tensor<?x6x?x16x32xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<?x6x?x16x32xf16>) -> tensor<?x6x?x16x32xf16>
+  %7 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%lhs, %rhs : tensor<?x6x16x?x16xf16>, tensor<?x32x?x16xf16>) outs(%6 : tensor<?x6x?x16x32xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %8 = arith.mulf %in, %in_0 : f16
+    %9 = arith.addf %8, %out : f16
+    linalg.yield %9 : f16
+  } -> tensor<?x6x?x16x32xf16>
+  return %7 : tensor<?x6x?x16x32xf16>
+}
+
+// CHECK-LABEL: func.func @dynamic_multi_dim_mma_schedule
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>
+
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+//  CHECK-SAME:     promote_operands = [0, 1]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 0, 1, 1]
+//  CHECK-SAME:     subgroup = [0, 1, 0, 1, 1, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 2, 1, 1, 2, 0, 0]
+
+// -----
+
 func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<1024x1024xf16>) -> tensor<1024x1024xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
