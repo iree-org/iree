@@ -125,5 +125,33 @@ util.func public @fail_dynamic_nchw_conv_2d(%input: tensor<1x2x?x?xf32>, %filter
     util.return %1 : tensor<1x7x?x?xf32>
 }
 
-// CHECK: @fail_dynamic_nchw_conv_2d
+// CHECK-LABEL: @fail_dynamic_nchw_conv_2d
+// CHECK: linalg.conv_2d_nchw_fchw
+
+// -----
+
+util.func public @non_unit_n_nchw_hwcf(%arg0: tensor<2x128x128x960xf16>, %arg1: tensor<1x1x960x320xf16>) -> tensor<2x128x128x320xf32> {
+    %cst = arith.constant 0.0 : f32
+    %9 = tensor.empty() : tensor<2x128x128x320xf32>
+    %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
+    %11 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%arg0, %arg1 : tensor<2x128x128x960xf16>, tensor<1x1x960x320xf16>) outs(%10 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
+    util.return %11 : tensor<2x128x128x320xf32>
+}
+
+// CHECK-LABEL: @non_unit_n_nchw_hwc
+// CHECK: linalg.matmul
+
+// -----
+
+util.func public @non_unit_n_nchw_conv_2d(%input: tensor<5x2x4x5xf32>, %filter: tensor<7x2x1x1xf32>) -> tensor<5x7x4x5xf32> {
+    %0 = tensor.empty() : tensor<5x7x4x5xf32>
+    %1 = linalg.conv_2d_nchw_fchw {
+        dilations = dense<1> : tensor<2xi64>,
+        strides = dense<1> : tensor<2xi64>
+    } ins(%input, %filter : tensor<5x2x4x5xf32>, tensor<7x2x1x1xf32>) outs(%0 : tensor<5x7x4x5xf32>) -> tensor<5x7x4x5xf32>
+    util.return %1 : tensor<5x7x4x5xf32>
+}
+
+// Currently not implemented
+// CHECK-LABEL: @non_unit_n_nchw_conv_2d(
 // CHECK: linalg.conv_2d_nchw_fchw

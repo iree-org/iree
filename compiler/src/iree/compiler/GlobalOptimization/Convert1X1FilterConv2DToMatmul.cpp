@@ -67,7 +67,7 @@ public:
       return failure();
 
     // TODO(ataei): Support conversion to linalg.batch_matmul.
-    if (inputShape[0] != 1)
+    if (isNCHW && inputShape[0] != 1)
       return failure();
 
     if (!llvm::all_of(convOp.getStrides(), [](APInt element) {
@@ -79,10 +79,10 @@ public:
         }))
       return failure();
 
-    auto combineDims = [](int64_t a, int64_t b) {
-      if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b))
+    auto combineDims = [](auto... args) {
+      if ((ShapedType::isDynamic(args) || ...))
         return ShapedType::kDynamic;
-      return a * b;
+      return (args * ...);
     };
 
     SmallVector<ReassociationIndices> reassociationInputOutputIndices;
@@ -96,13 +96,14 @@ public:
       reassociationFilterIndices = {{khIndex, kwIndex, kcIndex}, {kfIndex}};
 
       // Generate matmul shapes from 1x1 conv.
-      reshapedInputShape = {
-          combineDims(inputShape[ohIndex], inputShape[owIndex]),
-          inputShape[ocIndex]};
+      reshapedInputShape = {combineDims(inputShape[nIndex], inputShape[ohIndex],
+                                        inputShape[owIndex]),
+                            inputShape[ocIndex]};
       reshapedFilterShape = {filterShape[kcIndex], filterShape[kfIndex]};
-      reshapedOutputShape = {
-          combineDims(outputShape[ohIndex], outputShape[owIndex]),
-          outputShape[ocIndex]};
+      reshapedOutputShape = {combineDims(inputShape[nIndex],
+                                         outputShape[ohIndex],
+                                         outputShape[owIndex]),
+                             outputShape[ocIndex]};
     } else if (isNCHW) {
       // Generate reassociation indices.
       reassociationInputOutputIndices = {{nIndex, ocIndex}, {ohIndex, owIndex}};
