@@ -167,37 +167,35 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 // Divisibility
 //===----------------------------------------------------------------------===//
 
-static LogicalResult getBinaryDivisibility(DataFlowSolver &solver,
-                                           Operation *op,
-                                           PatternRewriter &rewriter,
-                                           ConstantIntDivisibility &outLhs,
-                                           ConstantIntDivisibility &outRhs) {
-  Value lhs = op->getOperand(0);
-  Value rhs = op->getOperand(1);
-  auto *lhsDiv = solver.lookupState<IntegerDivisibilityLattice>(lhs);
-  auto *rhsDiv = solver.lookupState<IntegerDivisibilityLattice>(rhs);
-  if (!lhsDiv || !rhsDiv || lhsDiv->getValue().isUninitialized() ||
-      rhsDiv->getValue().isUninitialized())
-    return rewriter.notifyMatchFailure(
-        op, "divisibility could not be determined for lhs or rhs");
+static LogicalResult getDivisibility(DataFlowSolver &solver, Operation *op,
+                                     Value value, PatternRewriter &rewriter,
+                                     ConstantIntDivisibility &out) {
+  auto *div = solver.lookupState<IntegerDivisibilityLattice>(value);
+  if (!div || div->getValue().isUninitialized())
+    return rewriter.notifyMatchFailure(op,
+                                       "divisibility could not be determined");
 
-  outLhs = lhsDiv->getValue().getValue();
-  outRhs = rhsDiv->getValue().getValue();
+  out = div->getValue().getValue();
+  LLVM_DEBUG(dbgs() << "  * Resolved divisibility: " << out << "\n");
   return success();
 }
 
-struct RemUIDivisibility : public OpRewritePattern<arith::RemUIOp> {
-  RemUIDivisibility(MLIRContext *context, DataFlowSolver &solver)
+struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
+  RemUIDivisibilityByConstant(MLIRContext *context, DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
   LogicalResult matchAndRewrite(arith::RemUIOp op,
                                 PatternRewriter &rewriter) const override {
+    APInt rhsConstant;
+    if (!matchPattern(op.getRhs(), m_ConstantInt(&rhsConstant)))
+      return rewriter.notifyMatchFailure(op, "rhs is not constant");
+
     ConstantIntDivisibility lhsDiv;
-    ConstantIntDivisibility rhsDiv;
-    if (failed(getBinaryDivisibility(solver, op, rewriter, lhsDiv, rhsDiv)))
+    if (failed(getDivisibility(solver, op, op.getLhs(), rewriter, lhsDiv)))
       return failure();
 
-    if (lhsDiv.udiv() % rhsDiv.udiv() != 0)
+    uint64_t rhsValue = rhsConstant.getZExtValue();
+    if (rhsValue > 0 && lhsDiv.udiv() > 0 && lhsDiv.udiv() % rhsValue != 0)
       return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
 
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(
@@ -303,7 +301,7 @@ class OptimizeIntArithmeticPass
                                                                       solver);
 
     // Populate divisibility patterns.
-    patterns.add<RemUIDivisibility>(ctx, solver);
+    patterns.add<RemUIDivisibilityByConstant>(ctx, solver);
 
     GreedyRewriteConfig config;
     // Results in fewer recursive data flow flushes/cycles on modification.

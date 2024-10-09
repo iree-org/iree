@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "int-divisibility-analysis"
+#define DEBUG_TYPE "iree-util-int-divisibility-analysis"
 
 using llvm::dbgs;
 

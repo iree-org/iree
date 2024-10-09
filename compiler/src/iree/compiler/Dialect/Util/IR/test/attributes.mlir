@@ -2,12 +2,12 @@
 
 // CHECK-LABEL: @assume_int
 builtin.module @assume_int attributes {
-  // CHECK: util.all = #util.int.assumption<umin = 1, umax = 2, divisor = 16>
-  // CHECK-SAME: util.divisor = #util.int.assumption<divisor = 32>
+  // CHECK: util.all = #util.int.assumption<umin = 1, umax = 2, udiv = 16>
+  // CHECK-SAME: util.udiv = #util.int.assumption<udiv = 32>
   // CHECK-SAME: util.umax = #util.int.assumption<umax = 10>
   // CHECK-SAME: util.umin = #util.int.assumption<umin = 5>
-  util.all = #util.int.assumption<umin = 1, umax = 2, divisor = 16>,
-  util.divisor = #util.int.assumption<divisor = 32>,
+  util.all = #util.int.assumption<umin = 1, umax = 2, udiv = 16>,
+  util.udiv = #util.int.assumption<udiv = 32>,
   util.umax = #util.int.assumption<umax = 10>,
   util.umin = #util.int.assumption<umin = 5>
 } {}
