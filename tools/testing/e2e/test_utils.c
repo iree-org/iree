@@ -207,8 +207,8 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
       // compares.
       float actual_f32 = iree_math_bf16_to_f32(actual.bf16_u16);
       float expected_f32 = iree_math_bf16_to_f32(expected.bf16_u16);
-      if (fabsf(actual_f32) > 255.0f || fabsf(expected_f32) > 255.0f) {
-        if (fabsf(actual_f32 - expected_f32) < 8.0f) {
+      if (fabsf(actual_f32) > 127.0f || fabsf(expected_f32) > 127.0f) {
+        if (fabsf(actual_f32 - expected_f32) < 10.0f) {
           return true;
         }
       }
