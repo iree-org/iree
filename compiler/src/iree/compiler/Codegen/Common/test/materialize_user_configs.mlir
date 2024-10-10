@@ -41,7 +41,7 @@ module {
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
     "llvm-cpu", "embedded-elf-x86_64",
-    {cpu_features = "+avx512f", 
+    {cpu_features = "+avx512f",
      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 func.func @custom_op_compilation_info(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
