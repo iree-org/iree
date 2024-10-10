@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -122,6 +123,38 @@ struct MakeEncodingSolvablePass
 
         if (failed(result)) {
           return signalPassFailure();
+        }
+      }
+    }
+
+    // gather per-export [execution affinity -> [resource affinities]] map
+    {
+      AffinityAnalysis affinityAnalysis(moduleOp);
+      (void)affinityAnalysis.run();
+      SmallVector<TensorExportOp> candidates;
+      for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+        funcOp.walk([&](TensorExportOp op) {
+          candidates.push_back(op);
+        });
+      }
+
+      for (auto exportOp : candidates) {
+        exportOp.dump();
+        {
+          llvm::dbgs() << "Try Lookup Execution Affinity\n";
+          SmallVector<IREE::Stream::AffinityAttr> affinities;
+          assert(affinityAnalysis.tryLookupExecutionAffinity(exportOp,
+                                                             affinities));
+          for (auto i : affinities) i.dump();
+        }
+        {
+          llvm::dbgs() << "Try Lookup Resource Affinity\n";
+          SmallVector<IREE::Stream::AffinityAttr> affinities;
+          llvm::dbgs() << "Operand: " << exportOp.getSource() << "\n";
+          assert(affinityAnalysis.tryLookupResourceAffinity(
+              exportOp.getSource(), affinities));
+          for (auto i : affinities)
+            i.dump();
         }
       }
     }
