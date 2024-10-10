@@ -106,3 +106,39 @@ util.func public @tensor_cast_to_reshape(%reshape_17 : tensor<?x?x?x?xf32>, %65 
 //       CHECK:   flow.tensor.reshape
 //       CHECK-SAME: tensor<?x12x?x64xf32>
 //       CHECK-SAME: -> tensor<?x?x?x?xf32>
+
+// -----
+
+// CHECK-LABEL: util.func public @move_reshape_after_transfer
+util.func public @move_reshape_after_transfer(
+// CHECK-SAME: %[[ARG0:.*]]: tensor<1x?xf32>) -> tensor<?x2xf32> {
+  %arg0: tensor<1x?xf32>) -> tensor<?x2xf32> {
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  // CHECK: %[[TRANSFER:.*]] = flow.tensor.transfer %[[ARG0]] : tensor<1x?xf32>{%[[C2]]} to #hal.device.affinity<@__device_0>
+  // CHECK: %[[RESHAPE:.*]] = flow.tensor.reshape %[[TRANSFER]] : tensor<1x?xf32>{%[[C2]]} -> tensor<?x2xf32>{%[[C1]]}
+  %1 = flow.tensor.reshape %arg0 : tensor<1x?xf32>{%c2} -> tensor<?x2xf32>{%c1}
+  %2 = flow.tensor.transfer %1 : tensor<?x2xf32>{%c1} to
+      #hal.device.affinity<@__device_0>
+  // CHECK: util.return  %[[RESHAPE]] : tensor<?x2xf32>
+  util.return  %2 : tensor<?x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @do_not_move_reshape_after_transfer
+util.func public @do_not_move_reshape_after_transfer(
+// CHECK-SAME: %[[ARG0:.*]]: tensor<?xf32>) -> tensor<1xf32> {
+  %arg0: tensor<?xf32>) -> tensor<1xf32> {
+  // CHECK: %[[C1:.*]] = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[RESHAPE:.*]] = flow.tensor.reshape %[[ARG0]] : tensor<?xf32>{%[[C1]]} -> tensor<1xf32>
+  %1 = flow.tensor.reshape %arg0 : tensor<?xf32>{%c1} -> tensor<1xf32>
+  // CHECK: %[[TRANSFER:.*]] = flow.tensor.transfer %[[RESHAPE]] : tensor<1xf32> to #hal.device.affinity<@__device_0>
+  %2 = flow.tensor.transfer %1 : tensor<1xf32> to
+      #hal.device.affinity<@__device_0>
+  // CHECK: util.return  %[[TRANSFER]] : tensor<1xf32>
+  util.return  %2 : tensor<1xf32>
+}

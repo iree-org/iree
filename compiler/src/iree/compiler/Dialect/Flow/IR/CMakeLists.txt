@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
+    MLIRTransforms
     MLIRViewLikeInterface
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils

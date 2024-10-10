@@ -27,6 +27,7 @@ iree_cc_library(
     "PassUtils.h"
     "PatternUtils.h"
     "Permutation.h"
+    "Shape.h"
     "SmallVectorDenseMapInfo.h"
     "StringUtils.h"
     "ToolUtils.h"
