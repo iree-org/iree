@@ -41,7 +41,11 @@ struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
     auto im2colOp =
         genericOp.getOperand(0).getDefiningOp<IREE::LinalgExt::Im2colOp>();
     if (!im2colOp) {
-      return rewriter.notifyMatchFailure(genericOp, "no im2colOp producer.");
+      im2colOp =
+          genericOp.getOperand(1).getDefiningOp<IREE::LinalgExt::Im2colOp>();
+      if (!im2colOp) {
+        return rewriter.notifyMatchFailure(genericOp, "no im2colOp producer.");
+      }
     }
 
     if (getLoweringConfig(genericOp)) {
