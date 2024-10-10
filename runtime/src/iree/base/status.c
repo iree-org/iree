@@ -281,6 +281,8 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
       return "UNAUTHENTICATED";
     case IREE_STATUS_DEFERRED:
       return "DEFERRED";
+    case IREE_STATUS_INCOMPATIBLE:
+      return "INCOMPATIBLE";
     default:
       return "";
   }

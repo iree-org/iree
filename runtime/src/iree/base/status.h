@@ -154,6 +154,11 @@ typedef enum iree_status_code_e {
   // Callers that do not handle deferred execution can treat this as a failure.
   IREE_STATUS_DEFERRED = 17,
 
+  // The program or a component of it is incompatible with the hosting
+  // environment. This may indicate the operating system, host hardware, or
+  // device hardware does not match expectations.
+  IREE_STATUS_INCOMPATIBLE = 18,
+
   IREE_STATUS_CODE_MASK = 0x1Fu,
 } iree_status_code_t;
 
@@ -216,6 +221,8 @@ typedef struct iree_status_handle_t* iree_status_t;
   (iree_status_code(value) == IREE_STATUS_UNAUTHENTICATED)
 #define iree_status_is_deferred(value) \
   (iree_status_code(value) == IREE_STATUS_DEFERRED)
+#define iree_status_is_incompatible(value) \
+  (iree_status_code(value) == IREE_STATUS_INCOMPATIBLE)
 
 #define IREE_STATUS_IMPL_CONCAT_INNER_(x, y) x##y
 #define IREE_STATUS_IMPL_CONCAT_(x, y) IREE_STATUS_IMPL_CONCAT_INNER_(x, y)
