@@ -1248,11 +1248,7 @@ static void populateMoveOpAfterTransferPattern(RewritePatternSet &results) {
     // Op is transfer.
     return op->getResult(0);
   };
-
-  auto getTargetAlgebraicOpResultFn = [](Operation *op) {
-    // Op is transfer.
-    return op->getResult(0);
-  };
+  auto getTargetAlgebraicOpResultFn = getSourceAlgebraicOpResultFn;
 
   auto isHomomorphismOpFn = [](Operation *op,
                                std::optional<Operation *> referenceOp) {
