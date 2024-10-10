@@ -67,7 +67,7 @@ static void initializeDeviceGlobal(
   initializerBuilder.create<scf::IfOp>(
       loc, isNull, [&](OpBuilder &thenBuilder, Location thenLoc) {
         Value status = thenBuilder.create<arith::ConstantIntOp>(
-            thenLoc, static_cast<int64_t>(IREE::Util::StatusCode::NotFound),
+            thenLoc, static_cast<int64_t>(IREE::Util::StatusCode::Incompatible),
             32);
         std::string str;
         {
