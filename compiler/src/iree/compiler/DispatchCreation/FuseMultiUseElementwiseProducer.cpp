@@ -16,9 +16,13 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -45,25 +49,55 @@ static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
     llvm::cl::desc("Maximum number of elements to try to constant fold."),
     llvm::cl::init(0));
 
-/// Check if any of the use dominates all other uses of the operation.
-static std::optional<OpOperand *> getFusableUse(Operation *op,
-                                                DominanceInfo &dominanceInfo) {
+static Operation *getMostDominantUse(Operation *op,
+                                     const DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
+  auto it = llvm::find_if(uses, [&](OpOperand &source) {
+    Operation *sourceOp = source.getOwner();
+
+    return llvm::all_of(uses, [&](OpOperand &target) {
+      Operation *targetOp = target.getOwner();
+      return dominanceInfo.dominates(sourceOp, targetOp);
+    });
+  });
+  if (it != uses.end()) {
+    return it->getOwner();
+  }
+  return nullptr;
+}
+
+/// Check if any of the use dominates all other uses of the operation.
+static Operation *getFusableUse(Operation *op,
+                                const DominanceInfo &dominanceInfo) {
+  auto uses = op->getUses();
+  Operation *fusableUse = nullptr;
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
-    bool dominatesAllUsers = true;
-    for (OpOperand &target : uses) {
+
+    bool dominatesAllFusableOps = llvm::all_of(uses, [&](OpOperand &target) {
       Operation *targetOp = target.getOwner();
-      if (!dominanceInfo.dominates(sourceOp, targetOp)) {
-        dominatesAllUsers = false;
-        break;
-      }
-    }
-    if (dominatesAllUsers) {
-      return &source;
+      return !isa<linalg::GenericOp>(targetOp) ||
+             dominanceInfo.dominates(sourceOp, targetOp);
+    });
+    if (dominatesAllFusableOps) {
+      fusableUse = sourceOp;
+      break;
     }
   }
-  return std::nullopt;
+  Operation *mostDominantOp = getMostDominantUse(op, dominanceInfo);
+  if (!fusableUse || !mostDominantOp) {
+    return nullptr;
+  }
+
+  // If `fusableUse` dominates all other users, there's nothing else to do.
+  if (fusableUse == mostDominantOp) {
+    return fusableUse;
+  }
+
+  SmallVector<Operation *> users(op->getUsers().begin(), op->getUsers().end());
+  return isHorizontalToGroup(fusableUse, users, dominanceInfo, mostDominantOp)
+             ? fusableUse
+             : nullptr;
 }
 
 static OpOperand *getFirstUseInConsumer(Operation *producer,
@@ -91,6 +125,7 @@ static SmallVector<OpOperand *> getAllUsesInConsumer(Operation *producer,
 /// using elementwise fusion.
 static LogicalResult doMultiUseFusion(Operation *rootOp,
                                       llvm::SetVector<Operation *> &fusableOps,
+                                      const DominanceInfo &dominanceInfo,
                                       RewriterBase &rewriter) {
   assert(rootOp && "root op cant be null");
 
@@ -112,11 +147,20 @@ static LogicalResult doMultiUseFusion(Operation *rootOp,
   Operation *consumerOp = rootOp;
   OpBuilder::InsertionGuard g(rewriter);
   for (Operation *producerOp : llvm::reverse(fusedOpsVec)) {
+    Operation *mostDominantUser = getMostDominantUse(producerOp, dominanceInfo);
     // Fuse all uses from producer -> consumer. It has been checked
     // before that all uses are fusable.
     while (OpOperand *fusedOperand =
                getFirstUseInConsumer(producerOp, consumerOp)) {
       rewriter.setInsertionPoint(consumerOp);
+
+      if (consumerOp != mostDominantUser &&
+          failed(moveOperandDefs(rewriter, ArrayRef<Operation *>{consumerOp},
+                                 mostDominantUser, dominanceInfo))) {
+        return rewriter.notifyMatchFailure(consumerOp,
+                                           "failed to move operand defs");
+      }
+      rewriter.moveOpBefore(consumerOp, mostDominantUser);
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, fusedOperand);
       if (failed(fusionResult)) {
@@ -190,9 +234,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
           }
 
           // 6. Check that the `genericOp` dominates all uses of `producer`.
-          std::optional<OpOperand *> fusableUse =
-              getFusableUse(producer, dominanceInfo);
-          if (!fusableUse || fusableUse.value()->getOwner() != genericOp) {
+          Operation *fusableUse = getFusableUse(producer, dominanceInfo);
+          if (!fusableUse || fusableUse != genericOp) {
             continue;
           }
 
@@ -232,7 +275,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
   IRRewriter rewriter(context);
   for (auto it = fusedOps.rbegin(), ie = fusedOps.rend(); it != ie; ++it) {
-    if (failed(doMultiUseFusion(it->first, it->second, rewriter))) {
+    if (failed(
+            doMultiUseFusion(it->first, it->second, dominanceInfo, rewriter))) {
       return funcOp->emitOpError("failed multi use fusion");
     }
   }
