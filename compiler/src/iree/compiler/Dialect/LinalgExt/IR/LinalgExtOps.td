@@ -469,7 +469,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DestinationStyleOpInterface, LinalgExtInterface,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
-      ["getIndexingMapsForResults", "getIndexingMapsForOperands"]>,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
@@ -549,8 +550,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
 
     SmallVector<AffineMap> getIndexingMapsArray();
-
-    SmallVector<int64_t, 4> getStaticLoopRanges();
 
     AffineMap getQueryMap() {
       return cast<AffineMap>(getIndexingMapsArray()[0]);
