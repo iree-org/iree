@@ -252,6 +252,11 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+SmallVector<int64_t, 4> ScatterOp::getStaticLoopRanges() {
+  // Scatter loop ranges are loop ranges for update.
+  return SmallVector<int64_t, 4>(getUpdateType().getShape());
+}
+
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
@@ -1836,6 +1841,10 @@ LogicalResult CustomOp::verify() {
 }
 
 /// Start `LinalgFusionInterface` implementation.
+
+SmallVector<int64_t, 4> CustomOp::getStaticLoopRanges() {
+  llvm_unreachable("Not Yet Implemented");
+}
 
 SmallVector<AffineMap> CustomOp::getIndexingMapsForOperands() {
   return llvm::map_to_vector(
