@@ -449,6 +449,11 @@ public:
         if (!targetFeatures.empty()) {
           features += (features.empty() ? "" : ",") + targetFeatures.str();
         }
+        // Mixed precision fma instructions have complicated semantics on
+        // gf9+ GPUs and can lead to numeric issues as seen in
+        // https://github.com/iree-org/iree/issues/18746 so we disable this
+        // feature.
+        features += "-fma-mix-insts";
 
         targetMachine.reset(target->createTargetMachine(
             triple.str(), targetArch, features, opt, llvm::Reloc::Model::PIC_,
