@@ -439,3 +439,43 @@ module @dispatch_executable {
     util.return
   }
 }
+
+// -----
+
+// CHECK-LABEL: @strip_flow_tensor_transfer
+// CHECK: util.global private @[[EVALED:.+]] = dense<2.000000e+02> : tensor<2xf16>
+module @strip_flow_tensor_transfer {
+  util.global private @hoisted : tensor<2xf16>
+  // CHECK-NOT: util.initializer
+  util.initializer {
+    %cst = arith.constant dense<2.0e+2> : tensor<2xf16>
+    %cst_transfered = flow.tensor.transfer %cst : tensor<2xf16> to #hal.device.promise<@dev_a>
+    util.global.store %cst_transfered, @hoisted : tensor<2xf16>
+    util.return
+  }
+  util.func public @main() -> tensor<2xf16> {
+    // CHECK: util.global.load @[[EVALED]]
+    %hoisted = util.global.load @hoisted : tensor<2xf16>
+    util.return %hoisted : tensor<2xf16>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @strip_optional_stream_affinity_attribute
+// CHECK: util.global private @[[EVALED:.+]] = dense<1> : tensor<2xi32>
+module @strip_optional_stream_affinity_attribute {
+  util.global private @hoisted : tensor<2xi32>
+  // CHECK-NOT: util.initializer
+  util.initializer {
+    %c1 = arith.constant 1 : i32
+    %tensor = flow.tensor.splat %c1 : tensor<2xi32> attributes { stream.affinity = #hal.device.promise<@dev_a> }
+    util.global.store %tensor , @hoisted : tensor<2xi32>
+    util.return
+  }
+  util.func public @main() -> tensor<2xi32> {
+    // CHECK: util.global.load @[[EVALED]]
+    %hoisted = util.global.load @hoisted : tensor<2xi32>
+    util.return %hoisted : tensor<2xi32>
+  }
+}
