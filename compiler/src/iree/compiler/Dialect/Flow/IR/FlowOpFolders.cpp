@@ -1017,8 +1017,9 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
   }
 };
 
-// Remove flow.tensor.reshapes around `op` (`expand_shape` or `collapse_shape`)
-// that only cast from static -> dynamic and back but are no-ops.
+// Remove flow.tensor.reshapes around `lastReshapeOp` (`expand_shape` or
+// `collapse_shape`) that only cast from static -> dynamic and back but are
+// no-ops.
 template <typename OpTy>
 struct EraseReshapesAroundOp : public OpRewritePattern<Flow::TensorReshapeOp> {
   using OpRewritePattern<Flow::TensorReshapeOp>::OpRewritePattern;
@@ -1035,8 +1036,8 @@ struct EraseReshapesAroundOp : public OpRewritePattern<Flow::TensorReshapeOp> {
       return failure();
     }
 
-    if (firstReshapeOp.getSourceDims().size() != 0 ||
-        lastReshapeOp.getResultDims().size() != 0) {
+    if (!firstReshapeOp.getSourceDims().empty() ||
+        !lastReshapeOp.getResultDims().empty()) {
       return failure();
     }
 
