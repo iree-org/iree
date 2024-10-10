@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "attention_mfma.mlir"
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
+    "config_custom_op.mlir"
     "config_matvec.mlir"
     "config_winograd.mlir"
     "configure_tensor_layout.mlir"

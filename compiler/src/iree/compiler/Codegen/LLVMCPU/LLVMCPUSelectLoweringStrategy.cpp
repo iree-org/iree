@@ -67,6 +67,9 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
                             F verificationFn) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
+    if (isa<IREE::LinalgExt::CustomOp>(op)) {
+      return WalkResult::advance();
+    }
     auto loweringConfig =
         getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
     if (!loweringConfig)
