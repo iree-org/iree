@@ -529,9 +529,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Insert slice ops should always be fused with their producers.
   if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(consumer)) {
-    // TODO: Enable multi-use slice source fusion.
     Value source = insertSliceOp.getSource();
-    if (!source.hasOneUse() || source.getDefiningOp() != producer) {
+    if (source.getDefiningOp() != producer) {
       return false;
     }
     // Fuse in `insert_slice` consumer operations if destination is a fill.
