@@ -1916,40 +1916,10 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(outputSliceOp);
   }
 
-  std::optional<Value> max = getMax();
-  if (max) {
-    SmallVector<Range> maxSlice =
-        getPermutedSlice(*getMaxMap(), offsets, sizes);
-    Operation *maxSliceOp = getSlice(builder, loc, max.value(), maxSlice);
-    if (!maxSliceOp) {
-      return emitOpError("failed to get max slice");
-    }
-    tiledOperands.emplace_back(maxSliceOp->getResult(0));
-    slices.push_back(maxSliceOp);
-  }
-
-  std::optional<Value> sum = getSum();
-  if (sum) {
-    SmallVector<Range> sumSlice =
-        getPermutedSlice(*getSumMap(), offsets, sizes);
-    Operation *sumSliceOp = getSlice(builder, loc, sum.value(), sumSlice);
-    if (!sumSliceOp) {
-      return emitOpError("failed to get sum slice");
-    }
-    tiledOperands.emplace_back(sumSliceOp->getResult(0));
-    slices.push_back(sumSliceOp);
-  }
-
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
     int64_t baseIdx = attnMask ? 5 : 4;
     resultTypes.push_back(tiledOperands[baseIdx].getType());
-    if (max) {
-      resultTypes.push_back(tiledOperands[baseIdx + 1].getType());
-    }
-    if (sum) {
-      resultTypes.push_back(tiledOperands[baseIdx + 2].getType());
-    }
   }
 
   Operation *tiledOp =
@@ -1970,12 +1940,6 @@ LogicalResult AttentionOp::getResultTilePosition(
   switch (resultNumber) {
   case 0:
     resultIndexingMap = getOutputMap();
-    break;
-  case 1:
-    resultIndexingMap = *getMaxMap();
-    break;
-  case 2:
-    resultIndexingMap = *getSumMap();
     break;
   default:
     return failure();

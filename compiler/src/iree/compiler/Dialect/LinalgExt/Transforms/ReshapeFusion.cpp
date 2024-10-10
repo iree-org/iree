@@ -230,28 +230,28 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
     expandedOpOperands.push_back(opOperand->get());
   }
 
-  SmallVector<Value> outputs;
-  for (OpOperand &opOperand : attentionOp.getDpsInitsMutable()) {
-    AffineMap indexingMap = attentionOp.getMatchingIndexingMap(&opOperand);
-    auto opOperandType = cast<RankedTensorType>(opOperand.get().getType());
-    RankedTensorType expandedOutputType =
-        getExpandedType(opOperandType, indexingMap, expansionInfo);
-    if (expandedOutputType != opOperand.get().getType()) {
-      SmallVector<ReassociationIndices> reassociation =
-          getReassociationForExpansion(indexingMap, expansionInfo);
-      if (failed(reshapeLikeShapesAreCompatible(
-              [&](const Twine &msg) {
-                return rewriter.notifyMatchFailure(attentionOp, msg);
-              },
-              opOperandType.getShape(), expandedOutputType.getShape(),
-              reassociation,
-              /*isExpandingReshape=*/true)))
-        return std::nullopt;
-      outputs.push_back(rewriter.create<tensor::ExpandShapeOp>(
-          loc, expandedOutputType, opOperand.get(), reassociation));
-    } else {
-      outputs.push_back(opOperand.get());
-    }
+  Value output;
+  OpOperand &outOperand = attentionOp.getOutputMutable();
+
+  AffineMap indexingMap = attentionOp.getMatchingIndexingMap(&outOperand);
+  auto opOperandType = cast<RankedTensorType>(outOperand.get().getType());
+  RankedTensorType expandedOutputType =
+      getExpandedType(opOperandType, indexingMap, expansionInfo);
+  if (expandedOutputType != outOperand.get().getType()) {
+    SmallVector<ReassociationIndices> reassociation =
+        getReassociationForExpansion(indexingMap, expansionInfo);
+    if (failed(reshapeLikeShapesAreCompatible(
+            [&](const Twine &msg) {
+              return rewriter.notifyMatchFailure(attentionOp, msg);
+            },
+            opOperandType.getShape(), expandedOutputType.getShape(),
+            reassociation,
+            /*isExpandingReshape=*/true)))
+      return std::nullopt;
+    output = rewriter.create<tensor::ExpandShapeOp>(
+        loc, expandedOutputType, outOperand.get(), reassociation);
+  } else {
+    output = outOperand.get();
   }
 
   Value maskOperand;
@@ -260,11 +260,11 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
   }
 
   // Create a new `AttentionOp` that has the computed operands/indexing maps.
-  TypeRange resultTypes = ValueRange(outputs).getTypes();
+  TypeRange resultTypes = ValueRange(output).getTypes();
   auto fusedOp = rewriter.create<AttentionOp>(
       attentionOp.getLoc(), resultTypes, expandedOpOperands[0],
       expandedOpOperands[1], expandedOpOperands[2], expandedOpOperands[3],
-      outputs, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
+      output, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
       maskOperand);
 
   // Reshape the result values to their original shape if this is a collapsing

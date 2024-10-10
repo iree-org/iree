@@ -32,16 +32,13 @@ void AttentionOpDetail::inferFromIndexingMaps(
   AffineMap qMap = indexingMaps[0];
   AffineMap kMap = indexingMaps[1];
   AffineMap vMap = indexingMaps[2];
-  AffineMap resMap = indexingMaps[3];
 
   // Q   = B x M x K1
   // K   = B x K2 x K1
   // V   = B x K2 x N
-  // res = B x M x N
   llvm::SmallDenseSet<int64_t> qSet = findPermutationsIndexingOperand(qMap);
-  llvm::SmallDenseSet<int64_t> vSet = findPermutationsIndexingOperand(vMap);
   llvm::SmallDenseSet<int64_t> kSet = findPermutationsIndexingOperand(kMap);
-  llvm::SmallDenseSet<int64_t> resSet = findPermutationsIndexingOperand(resMap);
+  llvm::SmallDenseSet<int64_t> vSet = findPermutationsIndexingOperand(vMap);
 
   // B = Q & K & V
   llvm::SmallDenseSet<int64_t> bSet = qSet;
