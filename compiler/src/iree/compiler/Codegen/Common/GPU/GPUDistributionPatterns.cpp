@@ -598,8 +598,12 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> operands;
     for (Value operand : yieldOp->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      signature[vectorOperand]);
+        // Types such as vector<f32> can pass this condition. An additional rank
+        // check is added here to ensure that the type is indeed a vector value.
+        if (vectorOperand.getType().getRank() != 0) {
+          operand = DistributionPattern::getDistributed(
+              rewriter, vectorOperand, signature[vectorOperand]);
+        }
       }
       operands.push_back(operand);
     }
