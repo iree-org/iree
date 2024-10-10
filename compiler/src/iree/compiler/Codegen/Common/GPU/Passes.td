@@ -205,6 +205,9 @@ def GPUApplyTilingLevelPass :
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
                          "Tile and fuse all annotated ops to threads")
            )}]>,
+    Option<"noZeroSlices", "no-zero-slices", "bool",
+           /*default=*/"false",
+           "Assume that tiling does not produce zero size slices">
   ];
 }
 
