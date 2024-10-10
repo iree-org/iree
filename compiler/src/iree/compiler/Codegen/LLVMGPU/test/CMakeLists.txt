@@ -17,8 +17,6 @@ iree_lit_test_suite(
     "amdgpu_chained_matmul.mlir"
     "amdgpu_contraction_distribution.mlir"
     "amdgpu_set_anchor_layouts.mlir"
-    "attention.mlir"
-    "attention_mfma.mlir"
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
@@ -77,8 +75,6 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
-    attention_mfma_transform_spec.mlir
-    attention_transform_spec.mlir
     transform_dialect_codegen_bufferize_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
     transform_dialect_codegen_vector_distribution_spec.mlir
