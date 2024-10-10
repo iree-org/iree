@@ -4,13 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_STREAM_ANALYSIS_AFFINITYANALYSISDIALECTINTERFACE_H_
-#define IREE_COMPILER_DIALECT_STREAM_ANALYSIS_AFFINITYANALYSISDIALECTINTERFACE_H_
+#ifndef IREE_COMPILER_DIALECT_STREAM_IR_STREAMINTERACES_H_
+#define IREE_COMPILER_DIALECT_STREAM_IR_STREAMINTERACES_H_
 
-#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectInterface.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
@@ -22,9 +23,9 @@ public:
 
   virtual std::function<LogicalResult(AffinityAttr, Operation *,
                                       SetVector<Attribute> &)>
-  makeTargetResolver(ModuleOp moduleOp) const;
+  makeTargetResolver(ModuleOp moduleOp) const = 0;
 };
 
 } // namespace mlir::iree_compiler::IREE::Stream
 
-#endif // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_AFFINITYANALYSISDIALECTINTERFACE_H_
+#endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAM_INTERFACES_H_
