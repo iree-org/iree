@@ -40,6 +40,7 @@ class PyModuleInterface {
     interface_.lookup_function = &PyModuleInterface::ModuleLookupFunction;
     interface_.alloc_state = &PyModuleInterface::ModuleAllocState;
     interface_.free_state = &PyModuleInterface::ModuleFreeState;
+    interface_.fork_state = &PyModuleInterface::ModuleForkState;
     interface_.resolve_import = &PyModuleInterface::ModuleResolveImport;
     interface_.notify = &PyModuleInterface::ModuleNotify;
     interface_.begin_call = &PyModuleInterface::ModuleBeginCall;
@@ -156,6 +157,15 @@ class PyModuleInterface {
     auto retained_handle =
         py::handle(reinterpret_cast<PyObject*>(module_state));
     retained_handle.dec_ref();
+  }
+
+  static iree_status_t ModuleForkState(
+      void* self, iree_vm_module_state_t* parent_state,
+      iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+    // TODO: call into python to clone the state (mostly what ctor_ is doing
+    // but each module will want to handle things differently).
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "python module fork not supported");
   }
 
   static iree_status_t ModuleResolveImport(

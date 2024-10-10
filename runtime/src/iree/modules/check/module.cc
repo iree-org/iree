@@ -497,6 +497,12 @@ class CheckModule final : public vm::NativeModule<CheckModuleState> {
     auto state = std::make_unique<CheckModuleState>(allocator);
     return state;
   }
+
+  StatusOr<std::unique_ptr<CheckModuleState>> ForkState(
+      CheckModuleState* parent_state, iree_allocator_t allocator) override {
+    // No state needs to be forked.
+    return CreateState(allocator);
+  }
 };
 
 }  // namespace

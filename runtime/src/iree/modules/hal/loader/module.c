@@ -72,6 +72,20 @@ static void IREE_API_PTR iree_hal_loader_module_free_state(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t IREE_API_PTR iree_hal_loader_module_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // NOTE: parent state contains nothing useful and is unused.
+  // We just realloc new state.
+  iree_status_t status =
+      iree_hal_loader_module_alloc_state(self, allocator, out_child_state);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t IREE_API_PTR iree_hal_loader_module_notify(
     void* self, iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
   switch (signal) {
@@ -392,6 +406,7 @@ IREE_API_EXPORT iree_status_t iree_hal_loader_module_create(
       .destroy = iree_hal_loader_module_destroy,
       .alloc_state = iree_hal_loader_module_alloc_state,
       .free_state = iree_hal_loader_module_free_state,
+      .fork_state = iree_hal_loader_module_fork_state,
       .notify = iree_hal_loader_module_notify,
   };
 

@@ -88,6 +88,7 @@ class NativeModule {
     // TODO(benvanik): get_function_attr
     interface_.alloc_state = NativeModule::ModuleAllocState;
     interface_.free_state = NativeModule::ModuleFreeState;
+    interface_.fork_state = NativeModule::ModuleForkState;
     interface_.resolve_import = NativeModule::ModuleResolveImport;
     interface_.notify = NativeModule::ModuleNotify;
     interface_.begin_call = NativeModule::ModuleBeginCall;
@@ -111,6 +112,12 @@ class NativeModule {
   // Creates a new per-context module State holder.
   virtual StatusOr<std::unique_ptr<State>> CreateState(
       iree_allocator_t allocator) = 0;
+
+  // Forks a parent state into a new per-context module State holder.
+  // Anything that should be shared between the states should be retained by
+  // reference.
+  virtual StatusOr<std::unique_ptr<State>> ForkState(
+      State* parent_state, iree_allocator_t allocator) = 0;
 
   // Notifies the module a signal has been raised.
   virtual Status Notify(State* state, iree_vm_signal_t signal) {
@@ -233,6 +240,27 @@ class NativeModule {
   static void ModuleFreeState(void* self,
                               iree_vm_module_state_t* module_state) {
     if (module_state) delete FromStatePointer(module_state);
+  }
+
+  static iree_status_t ModuleForkState(
+      void* self, iree_vm_module_state_t* parent_state,
+      iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+    IREE_ASSERT_ARGUMENT(out_child_state);
+    *out_child_state = nullptr;
+
+    // Ignore cases where there is no state required.
+    if (!parent_state) {
+      return iree_ok_status();
+    }
+
+    auto* module = FromModulePointer(self);
+    IREE_ASSIGN_OR_RETURN(
+        auto child_state,
+        module->ForkState(reinterpret_cast<State*>(parent_state), allocator));
+
+    *out_child_state =
+        reinterpret_cast<iree_vm_module_state_t*>(child_state.release());
+    return iree_ok_status();
   }
 
   static iree_status_t ModuleResolveImport(

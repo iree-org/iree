@@ -67,6 +67,20 @@ static void IREE_API_PTR iree_io_parameters_module_free_state(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t IREE_API_PTR iree_io_parameters_module_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t host_allocator, iree_vm_module_state_t** out_child_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // NOTE: parent state contains nothing useful and is unused.
+  // We just realloc new state.
+  iree_status_t status = iree_io_parameters_module_alloc_state(
+      self, host_allocator, out_child_state);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t IREE_API_PTR iree_io_parameters_module_notify(
     void* self, iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
   iree_io_parameters_module_t* module = IREE_IO_PARAMETERS_MODULE_CAST(self);

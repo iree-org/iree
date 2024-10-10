@@ -522,6 +522,11 @@ struct Conv2dTestModule final : public vm::NativeModule<Conv2dTestModuleState> {
       iree_allocator_t host_allocator) override {
     return std::make_unique<Conv2dTestModuleState>(host_allocator);
   }
+  StatusOr<std::unique_ptr<Conv2dTestModuleState>> ForkState(
+      Conv2dTestModuleState* parent_state,
+      iree_allocator_t host_allocator) override {
+    return CreateState(host_allocator);
+  }
 };
 
 }  // namespace iree

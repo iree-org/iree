@@ -341,6 +341,12 @@ typedef enum iree_vm_signal_e {
   //
   // Modules are walked in reverse registration order (C->B->A).
   IREE_VM_SIGNAL_LOW_MEMORY = 2,
+
+  // Program has been forked from a parent context and can re-run any
+  // initialization required or clear any state that should not be inherited.
+  //
+  // Modules are walked in registration order (A->B->C).
+  IREE_VM_SIGNAL_FORK = 3,
 } iree_vm_signal_t;
 
 // Defines an interface that can be used to reflect and execute functions on a
@@ -420,6 +426,15 @@ typedef struct iree_vm_module_t {
   // Frees module state data.
   void(IREE_API_PTR* free_state)(void* self,
                                  iree_vm_module_state_t* module_state);
+
+  // Forks the module state into a new state. All global resources should be
+  // retained by-reference. After all module state is cloned the fork signal
+  // will be sent to all modules that have been forked. The provided |allocator|
+  // must be used for the new child state though any referenced resources may
+  // still use the original allocator used during alloc_state.
+  iree_status_t(IREE_API_PTR* fork_state)(
+      void* self, iree_vm_module_state_t* parent_state,
+      iree_allocator_t allocator, iree_vm_module_state_t** out_child_state);
 
   // Resolves the import with the given ordinal to |function|.
   // The function is guaranteed to remain valid for the lifetime of the module

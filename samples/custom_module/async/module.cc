@@ -290,6 +290,16 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
     return state;
   }
 
+  // Forks a parent state into a child state, preserving any module state
+  // by-reference.
+  StatusOr<std::unique_ptr<CustomModuleState>> ForkState(
+      CustomModuleState* parent_state,
+      iree_allocator_t host_allocator) override {
+    // No special state to preserve; the device is the same for all states
+    // created from this module.
+    return CreateState(host_allocator);
+  }
+
  private:
   vm::ref<iree_hal_device_t> device_;
 };

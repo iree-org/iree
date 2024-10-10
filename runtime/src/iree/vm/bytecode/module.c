@@ -693,6 +693,63 @@ static void iree_vm_bytecode_module_free_state(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t IREE_API_PTR iree_vm_bytecode_module_fork_state(
+    void* self, iree_vm_module_state_t* base_parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  if (!base_parent_state) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(out_child_state);
+  *out_child_state = NULL;
+
+  iree_vm_bytecode_module_state_t* parent_state =
+      (iree_vm_bytecode_module_state_t*)base_parent_state;
+
+  // Both parent and child module states share the same module/def.
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  iree_vm_BytecodeModuleDef_table_t module_def = module->def;
+
+  // Compute the total size required (with padding) for the state structure.
+  // This should exactly match the original parent_state size.
+  iree_host_size_t total_state_struct_size =
+      iree_vm_bytecode_module_layout_state(module_def, NULL);
+
+  // Allocate the storage for the structure and all its nested tables.
+  iree_vm_bytecode_module_state_t* child_state = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_state_struct_size,
+                                (void**)&child_state));
+  child_state->allocator = allocator;
+
+  // Perform layout to get the pointers into the storage for each nested table.
+  // They are initially unpopulated until we copy over the values.
+  iree_vm_bytecode_module_layout_state(module_def, child_state);
+
+  // Copy rwdata directly. Any values that the module doesn't want to persist
+  // across the fork will be reinitialized during the fork signal handler.
+  memcpy(child_state->rwdata_storage.data, parent_state->rwdata_storage.data,
+         child_state->rwdata_storage.data_length);
+
+  // Retain all global refs by default. The fork signal handler in the child
+  // state may clear/reinitialize ones it doesn't want to retain from the
+  // parent. Note that some of these may be null.
+  for (iree_host_size_t i = 0; i < parent_state->global_ref_count; ++i) {
+    iree_vm_ref_retain(&parent_state->global_ref_table[i],
+                       &child_state->global_ref_table[i]);
+  }
+
+  // Reuse the resolved imports directly as the context is being forked and all
+  // must resolve to the same exact functions. Note that the import table
+  // entries have pointers but those are referencing the shared flatbuffer data
+  // that exists in the module instead of in the parent state.
+  memcpy(child_state->import_table, parent_state->import_table,
+         parent_state->import_count * sizeof(child_state->import_table[0]));
+
+  *out_child_state = (iree_vm_module_state_t*)child_state;
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_vm_bytecode_module_resolve_import(
     void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
     const iree_vm_function_t* function,
@@ -889,6 +946,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 #endif  // IREE_VM_BACKTRACE_ENABLE
   module->interface.alloc_state = iree_vm_bytecode_module_alloc_state;
   module->interface.free_state = iree_vm_bytecode_module_free_state;
+  module->interface.fork_state = iree_vm_bytecode_module_fork_state;
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;
   module->interface.notify = iree_vm_bytecode_module_notify;
   module->interface.begin_call = iree_vm_bytecode_module_begin_call;

@@ -698,6 +698,11 @@ struct MatmulTestModule final : public vm::NativeModule<MatmulTestModuleState> {
       iree_allocator_t host_allocator) override {
     return std::make_unique<MatmulTestModuleState>(host_allocator);
   }
+  StatusOr<std::unique_ptr<MatmulTestModuleState>> ForkState(
+      MatmulTestModuleState* parent_state,
+      iree_allocator_t host_allocator) override {
+    return CreateState(host_allocator);
+  }
 };
 
 }  // namespace iree

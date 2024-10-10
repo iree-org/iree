@@ -800,6 +800,55 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     builder.create<mlir::emitc::ReturnOp>(loc, nullptr);
   }
 
+  // iree_status_t fork_state(
+  //   void* self,
+  //   iree_vm_module_state_t* parent_state,
+  //   iree_allocator_t allocator,
+  //   iree_vm_module_state_t** out_child_state
+  // )
+  {
+    OpBuilder::InsertionGuard guard(builder);
+
+    // const int parentStateArgIndex = 1;
+    // const int allocatorArgIndex = 2;
+    // const int childStateArgIndex = 3;
+
+    auto funcType = mlir::FunctionType::get(
+        ctx,
+        {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
+         emitc::PointerType::get(
+             emitc::OpaqueType::get(ctx, "iree_vm_module_state_t")),
+         emitc::OpaqueType::get(ctx, "iree_allocator_t"),
+         emitc::PointerType::get(emitc::PointerType::get(
+             emitc::OpaqueType::get(ctx, "iree_vm_module_state_t")))},
+        {emitc::OpaqueType::get(ctx, "iree_status_t")});
+
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
+        loc, moduleName + "_fork_state", funcType);
+    funcOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
+    funcOp.setPrivate();
+
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
+
+    Block *entryBlock = funcOp.addEntryBlock();
+
+    builder.setInsertionPointToStart(entryBlock);
+
+    // TODO: someone will need to do what the bytecode module does in order to
+    // support forking. For now we don't support forking emitc contexts.
+    auto statusOp = builder.create<emitc::CallOpaqueOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+        /*callee=*/"iree_make_status",
+        /*operands=*/ArrayRef<Value>{},
+        /*args=*/
+        ArrayAttr::get(
+            ctx, {emitc::OpaqueAttr::get(ctx, "IREE_STATUS_UNIMPLEMENTED")}));
+
+    builder.create<mlir::emitc::ReturnOp>(loc, statusOp.getResult(0));
+  }
+
   // iree_status_t resolve_import(
   //   void*,
   //   iree_vm_module_state_t*,
@@ -1038,8 +1087,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     builder.setInsertionPointToStart(continuationBlock);
 
     // Set function pointers
-    for (std::string funcName :
-         {"destroy", "alloc_state", "free_state", "resolve_import"}) {
+    for (std::string funcName : {"destroy", "alloc_state", "free_state",
+                                 "fork_state", "resolve_import"}) {
       // The type doesn't matter, the result gets inlined into it's uses anyway.
       Type type = emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
 

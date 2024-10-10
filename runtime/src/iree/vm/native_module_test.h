@@ -196,6 +196,21 @@ module_b_free_state(void* self, iree_vm_module_state_t* module_state) {
   iree_allocator_free(state->allocator, state);
 }
 
+// Clones the module state and retains resources by-reference.
+static iree_status_t IREE_API_PTR module_b_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  module_b_state_t* child_state = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, sizeof(*child_state),
+                                             (void**)&child_state));
+  // Copy resolved imports and the counter value.
+  memcpy(child_state, parent_state, sizeof(*child_state));
+  // Reassign the allocator used.
+  child_state->allocator = allocator;
+  *out_child_state = (iree_vm_module_state_t*)child_state;
+  return iree_ok_status();
+}
+
 // Called once per import function so the module can store the function ref.
 static iree_status_t IREE_API_PTR module_b_resolve_import(
     void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
@@ -310,6 +325,7 @@ static iree_status_t module_b_create(iree_vm_instance_t* instance,
   interface.destroy = module_b_destroy;
   interface.alloc_state = module_b_alloc_state;
   interface.free_state = module_b_free_state;
+  interface.fork_state = module_b_fork_state;
   interface.resolve_import = module_b_resolve_import;
   return iree_vm_native_module_create(&interface, &module_b_descriptor_,
                                       instance, allocator, out_module);

@@ -443,6 +443,11 @@ struct AttentionTestModule final
       iree_allocator_t host_allocator) override {
     return std::make_unique<AttentionTestModuleState>(host_allocator);
   }
+  StatusOr<std::unique_ptr<AttentionTestModuleState>> ForkState(
+      AttentionTestModuleState* parent_state,
+      iree_allocator_t host_allocator) override {
+    return std::make_unique<AttentionTestModuleState>(host_allocator);
+  }
 };
 
 }  // namespace iree
