@@ -19,6 +19,7 @@
 
 // clang-format off
 #include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.h.inc" // IWYU pragma: export
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.h.inc" // IWYU pragma: export
 #undef GET_ATTRDEF_CLASSES
