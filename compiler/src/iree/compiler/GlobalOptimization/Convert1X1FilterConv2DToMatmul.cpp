@@ -8,7 +8,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -55,19 +57,11 @@ public:
     const int owIndex = isNHWC ? 2 : 3;
     const int ocIndex = isNHWC ? 3 : 1;
 
-    bool isInputHWDynamic = ShapedType::isDynamic(inputShape[ohIndex]) &&
-                            ShapedType::isDynamic(inputShape[owIndex]);
-
-    // We cannot merge the width and height if they are both dynamic as we
-    // cannot expand them back to their dynamic values.
-    if (isInputHWDynamic)
-      return failure();
-
     if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1)
       return failure();
 
     // TODO(ataei): Support conversion to linalg.batch_matmul.
-    if (inputShape[0] != 1)
+    if (isNCHW && inputShape[0] != 1)
       return failure();
 
     if (!llvm::all_of(convOp.getStrides(), [](APInt element) {
@@ -79,10 +73,10 @@ public:
         }))
       return failure();
 
-    auto combineDims = [](int64_t a, int64_t b) {
-      if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b))
+    auto combineDims = [](auto... args) {
+      if ((ShapedType::isDynamic(args) || ...))
         return ShapedType::kDynamic;
-      return a * b;
+      return (args * ...);
     };
 
     SmallVector<ReassociationIndices> reassociationInputOutputIndices;
@@ -96,13 +90,14 @@ public:
       reassociationFilterIndices = {{khIndex, kwIndex, kcIndex}, {kfIndex}};
 
       // Generate matmul shapes from 1x1 conv.
-      reshapedInputShape = {
-          combineDims(inputShape[ohIndex], inputShape[owIndex]),
-          inputShape[ocIndex]};
+      reshapedInputShape = {combineDims(inputShape[nIndex], inputShape[ohIndex],
+                                        inputShape[owIndex]),
+                            inputShape[ocIndex]};
       reshapedFilterShape = {filterShape[kcIndex], filterShape[kfIndex]};
-      reshapedOutputShape = {
-          combineDims(outputShape[ohIndex], outputShape[owIndex]),
-          outputShape[ocIndex]};
+      reshapedOutputShape = {combineDims(inputShape[nIndex],
+                                         outputShape[ohIndex],
+                                         outputShape[owIndex]),
+                             outputShape[ocIndex]};
     } else if (isNCHW) {
       // Generate reassociation indices.
       reassociationInputOutputIndices = {{nIndex, ocIndex}, {ohIndex, owIndex}};
@@ -148,9 +143,15 @@ public:
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, matmulInput, ArrayRef<Value>{reshapedOutput});
 
+    auto interfaceOp =
+        dyn_cast<ReifyRankedShapedTypeOpInterface>(convOp.getOperation());
+    ReifiedRankedShapedTypeDims dims;
+    auto ret = interfaceOp.reifyResultShapes(rewriter, dims);
+    assert(succeeded(ret));
+    (void)ret;
     auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
-        reassociationInputOutputIndices);
+        reassociationInputOutputIndices, dims[0]);
 
     rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
 
