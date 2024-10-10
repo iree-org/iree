@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -38,26 +39,12 @@ namespace {
 template <typename T>
 SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
-  moduleOp.walk([&](Operation *op) {
-    // Special case for declarations which may reference builtins.
-    // TODO(benvanik): add a linking attribute to the module instead to avoid
-    // the walk. All dialects could then indicate they want certain modules
-    // linked in.
-    Dialect *dialect = nullptr;
-    if (auto moduleAttr = op->getAttrOfType<StringAttr>("vm.import.module")) {
-      // Specified dialect lookup.
-      dialect = op->getContext()->getOrLoadDialect(moduleAttr.getValue());
-    } else {
-      // Generic dialect lookup.
-      dialect = op->getDialect();
-    }
-    if (!dialect)
-      return;
+  for (auto dialect : moduleOp.getContext()->getLoadedDialects()) {
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
     if (!dialectInterface)
-      return;
+      continue;
     resultSet.insert(dialectInterface);
-  });
+  }
 
   // NOTE: to ensure deterministic output we sort the result so that imports are
   // always added in a consistent order.
@@ -80,7 +67,7 @@ struct MakeEncodingSolvablePass
         gatherUsedDialectInterfaces<AffinityAnalysisDialectInterface>(moduleOp);
     if (usedDialects.size() != 1) {
       moduleOp.emitError("expected single resolver");
-      return;
+      return signalPassFailure();
     }
     std::function<LogicalResult(AffinityAttr, Operation *,
                                 SetVector<Attribute> &)>
