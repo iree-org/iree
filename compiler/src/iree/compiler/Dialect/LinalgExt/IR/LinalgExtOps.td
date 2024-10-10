@@ -1623,6 +1623,8 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 //===---------------------------------------------------------------------===//
 
 def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
+  DeclareOpInterfaceMethods<AggregatedOpInterface, [
+    "decomposeOperation"]>,
   DeclareOpInterfaceMethods<LinalgFusionInterface>,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,

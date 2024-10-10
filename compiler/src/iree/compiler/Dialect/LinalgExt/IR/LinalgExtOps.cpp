@@ -1856,6 +1856,8 @@ LogicalResult CustomOp::verify() {
   return success();
 }
 
+/// Start `LinalgFusionInterface` implementation.
+
 SmallVector<AffineMap> CustomOp::getIndexingMapsForOperands() {
   return llvm::map_to_vector(
       getIndexingMaps().getValue().take_front(getNumDpsInputs()),
@@ -1868,11 +1870,9 @@ SmallVector<AffineMap> CustomOp::getIndexingMapsForResults() {
       [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
 }
 
-SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
-  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
-    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
-  });
-}
+/// End `LinalgFusionInterface` implementation
+
+/// Start `ReifyRankedShapedTypeOpInterface` implementation
 
 LogicalResult
 CustomOp::reifyResultShapes(OpBuilder &builder,
@@ -1884,6 +1884,8 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
   }
   return success();
 }
+
+/// End `ReifyRankedShapedTypeOpInterface` implementation
 
 //===---------------------------------------------------------------------===//
 // IndexOp

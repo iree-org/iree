@@ -43,6 +43,7 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "IR",
     srcs = [
+        "AggregatedOpInterfaceImpl.cpp",
         "LinalgExtAttrs.cpp.inc",
         "LinalgExtDialect.cpp",
         "LinalgExtDialect.cpp.inc",
