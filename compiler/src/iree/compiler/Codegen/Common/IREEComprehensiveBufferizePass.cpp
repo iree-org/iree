@@ -165,9 +165,37 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
   return success();
 }
 
+/// Multiple uses of `tensor.empty()` results in a copy since upstream
+/// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
+/// creating copies/allocations. Since the `empty` op is a proxy for
+/// undef, these could just be duplicated to have a single use. This removes
+/// unnecessary data-hazards.
+static LogicalResult duplicateTensorEmptyOps(OpBuilder &b,
+                                             tensor::EmptyOp emptyOp) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(emptyOp);
+  SmallVector<OpOperand *> uses = llvm::map_to_vector(
+      emptyOp->getUses(), [](OpOperand &use) { return &use; });
+  for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
+    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
+    Operation *user = use->getOwner();
+    user->setOperand(use->getOperandNumber(), newOp);
+  }
+  return success();
+}
+
 void EliminateEmptyTensorsPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
+
+  OpBuilder b(context);
+  SmallVector<tensor::EmptyOp> emptyOps;
+  funcOp.walk([&](tensor::EmptyOp emptyOp) { emptyOps.push_back(emptyOp); });
+  if (llvm::any_of(emptyOps, [&](tensor::EmptyOp emptyOp) {
+        return failed(duplicateTensorEmptyOps(b, emptyOp));
+      })) {
+    return signalPassFailure();
+  }
 
   // Run the convert to destination style patterns.
   {
