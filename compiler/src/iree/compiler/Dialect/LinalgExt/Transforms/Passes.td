@@ -83,24 +83,10 @@ def ConvertConv2DToWinogradPass :
   ];
 }
 
-def TileAttentionPass :
-    InterfacePass<"iree-linalg-ext-tile-attention", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Tile the attention op along the reduction dimension";
-  let options = [
-    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
-           "Tile size for sequential for loop in attention">,
-  ];
-}
-
 def DecomposeAttentionPass :
     InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes attention op into a sequence of linalg ops";
-  let options = [
-    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
-           "Tile size for sequential for loop in attention">,
-  ];
 }
 
 def ConvertAttentionToOnlineAttentionPass :

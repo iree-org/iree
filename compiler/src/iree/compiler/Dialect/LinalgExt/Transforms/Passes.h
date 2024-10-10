@@ -34,16 +34,6 @@ void populateConv2DToIm2colOpPatterns(
     RewritePatternSet &patterns,
     std::optional<std::function<bool(Operation *)>> controlFn = std::nullopt);
 
-IREE::LinalgExt::AttentionOp
-tileAttention(IREE::LinalgExt::AttentionOp attnOp,
-              SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
-              std::optional<uint64_t> tileSize = std::nullopt);
-
-void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
-                             SmallVectorImpl<Operation *> &ops,
-                             RewriterBase &rewriter,
-                             std::optional<uint64_t> tileSize = std::nullopt);
-
 void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                               SmallVectorImpl<Operation *> &ops,
                               RewriterBase &rewriter);

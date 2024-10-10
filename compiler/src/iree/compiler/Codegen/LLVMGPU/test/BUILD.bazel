@@ -21,8 +21,6 @@ iree_lit_test_suite(
             "amdgpu_chained_matmul.mlir",
             "amdgpu_contraction_distribution.mlir",
             "amdgpu_set_anchor_layouts.mlir",
-            "attention.mlir",
-            "attention_mfma.mlir",
             "conv_pipeline_test_cuda.mlir",
             "conv_pipeline_test_rocm.mlir",
             "convert_to_nvvm.mlir",
@@ -82,8 +80,6 @@ iree_lit_test_suite(
         # tensor_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
         exclude = [
-            "attention_mfma_transform_spec.mlir",
-            "attention_transform_spec.mlir",
             "transform_dialect_codegen_bufferize_spec.mlir",
             "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
             "transform_dialect_codegen_vector_distribution_spec.mlir",
@@ -92,8 +88,6 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
-        "attention_mfma_transform_spec.mlir",
-        "attention_transform_spec.mlir",
         "transform_dialect_codegen_bufferize_spec.mlir",
         "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
         "transform_dialect_codegen_vector_distribution_spec.mlir",
