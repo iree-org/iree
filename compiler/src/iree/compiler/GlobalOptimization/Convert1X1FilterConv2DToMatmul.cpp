@@ -8,7 +8,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -54,14 +56,6 @@ public:
     const int ohIndex = isNHWC ? 1 : 2;
     const int owIndex = isNHWC ? 2 : 3;
     const int ocIndex = isNHWC ? 3 : 1;
-
-    bool isInputHWDynamic = ShapedType::isDynamic(inputShape[ohIndex]) &&
-                            ShapedType::isDynamic(inputShape[owIndex]);
-
-    // We cannot merge the width and height if they are both dynamic as we
-    // cannot expand them back to their dynamic values.
-    if (isInputHWDynamic)
-      return failure();
 
     if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1)
       return failure();
@@ -149,9 +143,15 @@ public:
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, matmulInput, ArrayRef<Value>{reshapedOutput});
 
+    auto interfaceOp =
+        dyn_cast<ReifyRankedShapedTypeOpInterface>(convOp.getOperation());
+    ReifiedRankedShapedTypeDims dims;
+    auto ret = interfaceOp.reifyResultShapes(rewriter, dims);
+    assert(succeeded(ret));
+    (void)ret;
     auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
-        reassociationInputOutputIndices);
+        reassociationInputOutputIndices, dims[0]);
 
     rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
 

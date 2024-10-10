@@ -47,7 +47,7 @@ util.func public @dynamic_nhwc_conv_2d(%input: tensor<1x4x?x2xf32>, %filter: ten
 
 // -----
 
-util.func public @fail_dynamic_nhwc_conv_2d(%input: tensor<1x?x?x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x?x?x7xf32> {
+util.func public @dynamic_hw_nhwc_conv_2d(%input: tensor<1x?x?x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x?x?x7xf32> {
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
     %d1 = tensor.dim %input, %c1 : tensor<1x?x?x2xf32>
@@ -60,8 +60,8 @@ util.func public @fail_dynamic_nhwc_conv_2d(%input: tensor<1x?x?x2xf32>, %filter
     util.return %1 : tensor<1x?x?x7xf32>
 }
 
-// CHECK: @fail_dynamic_nhwc_conv_2d
-// CHECK: linalg.conv_2d_nhwc_hwcf
+// CHECK: @dynamic_hw_nhwc_conv_2d
+// CHECK: linalg.matmul
 
 // -----
 
@@ -112,7 +112,7 @@ util.func public @dynamic_nchw_conv_2d(%input: tensor<1x2x4x?xf32>, %filter: ten
 
 // -----
 
-util.func public @fail_dynamic_nchw_conv_2d(%input: tensor<1x2x?x?xf32>, %filter: tensor<7x2x1x1xf32>) -> tensor<1x7x?x?xf32> {
+util.func public @dynamic_hw_nchw_conv_2d(%input: tensor<1x2x?x?xf32>, %filter: tensor<7x2x1x1xf32>) -> tensor<1x7x?x?xf32> {
     %c2 = arith.constant 2 : index
     %c3 = arith.constant 3 : index
     %d2 = tensor.dim %input, %c2 : tensor<1x2x?x?xf32>
@@ -125,8 +125,8 @@ util.func public @fail_dynamic_nchw_conv_2d(%input: tensor<1x2x?x?xf32>, %filter
     util.return %1 : tensor<1x7x?x?xf32>
 }
 
-// CHECK-LABEL: @fail_dynamic_nchw_conv_2d
-// CHECK: linalg.conv_2d_nchw_fchw
+// CHECK-LABEL: @dynamic_hw_nchw_conv_2d
+// CHECK: linalg.matmul
 
 // -----
 
@@ -140,18 +140,3 @@ util.func public @non_unit_n_nchw_hwcf(%arg0: tensor<2x128x128x960xf16>, %arg1: 
 
 // CHECK-LABEL: @non_unit_n_nchw_hwc
 // CHECK: linalg.matmul
-
-// -----
-
-util.func public @non_unit_n_nchw_conv_2d(%input: tensor<5x2x4x5xf32>, %filter: tensor<7x2x1x1xf32>) -> tensor<5x7x4x5xf32> {
-    %0 = tensor.empty() : tensor<5x7x4x5xf32>
-    %1 = linalg.conv_2d_nchw_fchw {
-        dilations = dense<1> : tensor<2xi64>,
-        strides = dense<1> : tensor<2xi64>
-    } ins(%input, %filter : tensor<5x2x4x5xf32>, tensor<7x2x1x1xf32>) outs(%0 : tensor<5x7x4x5xf32>) -> tensor<5x7x4x5xf32>
-    util.return %1 : tensor<5x7x4x5xf32>
-}
-
-// Currently not implemented
-// CHECK-LABEL: @non_unit_n_nchw_conv_2d(
-// CHECK: linalg.conv_2d_nchw_fchw
