@@ -34,7 +34,6 @@ struct ConvertAttentionToOnlineAttentionPass final
 
 } // namespace
 
-
 void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                               SmallVectorImpl<Operation *> &ops,
                               RewriterBase &rewriter) {
