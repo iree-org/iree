@@ -527,10 +527,6 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSizes);
-  tileSizes.push_back(threadTileSizes);
-
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = linalgOp.getContext();
