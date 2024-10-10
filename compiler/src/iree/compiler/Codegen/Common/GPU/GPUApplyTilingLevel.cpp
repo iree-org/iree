@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -31,11 +32,13 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
+
 struct GPUApplyTilingLevelPass final
     : impl::GPUApplyTilingLevelPassBase<GPUApplyTilingLevelPass> {
   using GPUApplyTilingLevelPassBase::GPUApplyTilingLevelPassBase;
   void runOnOperation() override;
 };
+
 } // namespace
 
 /// This collects the set of operations to tile + fuse starting from the given
@@ -137,7 +140,8 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       Operation *owner = originalProducer.getOwner();
       if (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
           tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
-        // Do not fuse pad in reduction and subgroup tiling.
+        // Do not fuse pad in reduction and subgroup tiling. We instead fuse
+        // pad without zero slice gaurd as a cleanup pattern.
         if (isa<tensor::PadOp>(owner)) {
           return std::nullopt;
         }
@@ -160,6 +164,23 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       return std::nullopt;
     };
     tileAndFuseOptions.setFusionControlFn(controlFn);
+
+    RewritePatternSet cleanupPatterns(context);
+
+    {
+      // Add pattern to fuse pad operations without zero slice gaurd. In IREE,
+      // due to the way we tile, generally we do not have zero slices.
+      auto zeroSliceGaurd =
+          [](tensor::ExtractSliceOp sliceOp) -> std::optional<bool> {
+        // Do not use zero slice gaurd.
+        return false;
+      };
+      cleanupPatterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, zeroSliceGaurd);
+    }
+
+    tileAndFuseOptions.cleanupPatterns =
+        FrozenRewritePatternSet(std::move(cleanupPatterns));
 
     FailureOr<scf::SCFTileAndFuseResult> tiledResults =
         scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
