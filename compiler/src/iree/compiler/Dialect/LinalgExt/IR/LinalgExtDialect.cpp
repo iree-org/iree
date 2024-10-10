@@ -128,6 +128,12 @@ public:
         }));
   }
 
+  SmallVector<int64_t, 4> getStaticLoopRanges(Operation *op) const {
+    auto softmaxOp = cast<linalg::SoftmaxOp>(op);
+    // Softmax loop range is the input shape.
+    return SmallVector<int64_t, 4>(softmaxOp.getInputOperandType().getShape());
+  }
+
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
                                          OpResult result) const {
     return getIndexingMapsForResults(op)[result.getResultNumber()];
