@@ -266,8 +266,12 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  // This instance of transfer_read/write optimizations on memrefs is required
+  // because this pipeline materializes multiple scf.forall regions for
+  // different operations. Since folding cannot happen accross these regions, we
+  // can only do this folding after scf.forall regions have been distributed,
+  // which is post bufferization.
   funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -448,13 +452,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  {
-    OptimizeVectorTransferPassOptions options;
-    // Disable redundant vector transfer hoisting because it does not
-    // properly consider distributed code on memrefs.
-    options.redundantHoisting = false;
-    funcPassManager.addPass(createOptimizeVectorTransferPass());
-  }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -492,8 +489,6 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -599,8 +594,9 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
       createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::WMMA));
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
+  // Since this pipeline does vectorization post bufferization, we can only
+  // do transfer_read/write optimizations on memrefs.
   funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Distribute shared memory copies.
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
@@ -669,8 +665,9 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
       createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::MMA_SYNC));
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
+  // Since this pipeline does vectorization post bufferization, we can only
+  // do transfer_read/write optimizations on memrefs.
   funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Distribute shared memory copies.
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
@@ -718,8 +715,6 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
 
   // Linalg -> vector
   addGPUVectorizationPasses(funcPassManager);
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -940,7 +935,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
 
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
