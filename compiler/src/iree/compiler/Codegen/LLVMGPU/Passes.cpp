@@ -545,12 +545,16 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Even though we vectorize before bufferization we are not able to hoist
-  // accumulator load/store out of the K loop until distribution. Therefore we
-  // still rely on buffer level transformations for transfer ops hoisting and
-  // store to load forwarding. This relies on shacky alias analysis and we need
-  // to move this to tensor level once we have better abstractions.
-  // TODO: We should be to start hoisting out accumulator load/store out
-  // after https://github.com/llvm/llvm-project/pull/111533.
+  // accumulator load/store out of the K loop until distribution. This is
+  // because we materialize the fill and the matmul in two different scf.forall
+  // regions, when they should be in the same scf.forall. Newer pipelines
+  // like TileAndFuse don't have this problem, because they coalesce these
+  // scf.forall regions into a single scf.forall.
+  //
+  // Therefore we still rely on buffer level transformations for transfer ops
+  // hoisting and store to load forwarding. This relies on shacky alias
+  // analysis and we need to move this to tensor level once we have better
+  // abstractions.
   funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Hoist loop invariant code to avoid pipelining it.
