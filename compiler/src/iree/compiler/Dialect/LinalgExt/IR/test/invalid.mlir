@@ -789,21 +789,17 @@ func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<
 
 // -----
 
-func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<20x8xf32>, %value: tensor<20x8xf32>) -> (tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) {
+func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<20x8xf32>, %value: tensor<20x8xf32>) -> tensor<20x8xf32> {
   %result = tensor.empty() : tensor<20x8xf32>
-  %max = tensor.empty() : tensor<8xf32>
-  %sum = tensor.empty() : tensor<8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 2 Got: 1}}
-  %1:3 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
                        affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                        affine_map<(d0, d1, d2, d3) -> ()>,
-                       affine_map<(d0, d1, d2, d3) -> (d0)>,
-                       affine_map<(d0, d1, d2, d3) -> (d0)>,
                        affine_map<(d0, d1, d2, d3) -> (d0)>]}
-                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
-  return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result : tensor<20x8xf32>) -> tensor<20x8xf32>
+  return %1 : tensor<20x8xf32>
 }
 
 // -----

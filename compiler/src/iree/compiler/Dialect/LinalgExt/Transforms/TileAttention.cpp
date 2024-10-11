@@ -124,7 +124,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                                                  utils::IteratorType::parallel);
 
   auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, attnOp.getOutputType(), ValueRange{sum, x}, attnOp.getOutput(),
+      loc, attnOp.getOutput().getType(), ValueRange{sum, x}, attnOp.getOutput(),
       compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value one = b.create<arith::ConstantOp>(

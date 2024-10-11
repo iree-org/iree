@@ -1204,22 +1204,15 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, Value query, Value key, Value value,
-                        Value scale, ValueRange outputs, ArrayAttr indexingMaps,
+                        Value scale, Value output, ArrayAttr indexingMaps,
                         std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, scale, maskIn,
-        outputs, indexingMaps);
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
+        indexingMaps);
 }
 
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
-
-  int numOutputs = getNumDpsInits();
-  if (numOutputs != 1 && numOutputs != 3) {
-    return attnOp->emitOpError(
-        "expected 1 or 3 output operands: Output, [Max and Sum]");
-  }
-  bool isTiled = numOutputs == 3;
 
   // Check if indexing maps can represent attention.
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
@@ -1267,17 +1260,19 @@ LogicalResult AttentionOp::verify() {
     return success();
   };
 
-  if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
-      failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
-      failed(
-          checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
+  if (failed(checkShape("Query", getQuery().getType().getShape(),
+                        getQueryMap())) ||
+      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValue().getType().getShape(),
+                        getValueMap())) ||
+      failed(checkShape("Output", getOutput().getType().getShape(),
+                        getOutputMap()))) {
     return failure();
   }
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMaskType()->getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
       return failure();
   }
 
@@ -1307,28 +1302,12 @@ LogicalResult AttentionOp::verify() {
       return failure();
   }
 
-  if (isTiled) {
-    // Tiled/Flash attention.
-    Type maxElementType = getMaxType()->getElementType();
-    Type sumElementType = getSumType()->getElementType();
-    Type outputElementType = getOutputType().getElementType();
-    if (outputElementType != maxElementType ||
-        maxElementType != sumElementType) {
-      return attnOp->emitOpError(
-          "element types of tiled output, max and sum should be same");
-    }
-
-    if (failed(checkShape("Max", getMaxType()->getShape(), *getMaxMap())) ||
-        failed(checkShape("Sum", getSumType()->getShape(), *getSumMap()))) {
-      return failure();
-    }
-  }
-
   return success();
 }
 
-LogicalResult AttentionOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
-  return memref::foldMemRefCast(*this);
+MutableOperandRange AttentionOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+                             /*numInits=*/1);
 }
 
 LogicalResult AttentionOp::reifyResultShapes(
@@ -1347,10 +1326,10 @@ SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
   // batch(s), m, k1
-  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
   ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
   // batch(s), k2, n
-  ArrayRef<int64_t> valueShape = getValueType().getShape();
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
   ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
 
   auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
