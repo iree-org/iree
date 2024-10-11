@@ -84,6 +84,7 @@ iree_cc_library(
     "ConcretizePadResultShape.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
+    "ConvertSplatConstantToFill.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"

@@ -325,6 +325,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions) {
+  funcPassManager.addPass(createConvertSplatConstantToFillPass());
   tileAndDistributeToWorkgroup(funcPassManager,
                                /*convertToDpsOptions=*/std::nullopt);
 
