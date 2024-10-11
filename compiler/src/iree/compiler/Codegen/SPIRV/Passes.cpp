@@ -634,6 +634,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
     addMemRefLoweringPasses(modulePassManager);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();

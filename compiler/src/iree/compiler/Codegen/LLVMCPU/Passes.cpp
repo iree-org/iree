@@ -818,6 +818,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Run conversion to LLVM at `ModuleOp` granularity.
   {
