@@ -1302,6 +1302,8 @@ LogicalResult AttentionOp::verify() {
       return failure();
   }
 
+  auto &block = getRegion().front();
+  auto blockTys = block.getArgumentTypes();
   if (!isa<FloatType>(blockTys[0]))
     return attnOp->emitOpError("block arg0 should be float");
 
