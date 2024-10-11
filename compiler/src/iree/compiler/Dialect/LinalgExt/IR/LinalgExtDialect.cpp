@@ -83,8 +83,10 @@ public:
     return (llvm::cast<ConcreteType>(op).getNumLoops());
   }
 
-  SmallVector<int64_t, 4> getStaticLoopRanges(mlir::Operation *op) const {
-    return (llvm::cast<ConcreteType>(op).getStaticLoopRanges());
+  FailureOr<SmallVector<int64_t>>
+  getStaticLoopRanges(mlir::Operation *op) const {
+    return SmallVector<int64_t>(
+        llvm::cast<ConcreteType>(op).getStaticLoopRanges());
   }
 
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
@@ -128,10 +130,10 @@ public:
         }));
   }
 
-  SmallVector<int64_t, 4> getStaticLoopRanges(Operation *op) const {
+  FailureOr<SmallVector<int64_t>> getStaticLoopRanges(Operation *op) const {
     auto softmaxOp = cast<linalg::SoftmaxOp>(op);
     // Softmax loop range is the input shape.
-    return SmallVector<int64_t, 4>(softmaxOp.getInputOperandType().getShape());
+    return SmallVector<int64_t>(softmaxOp.getInputOperandType().getShape());
   }
 
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,

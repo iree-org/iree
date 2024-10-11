@@ -252,9 +252,9 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-SmallVector<int64_t, 4> ScatterOp::getStaticLoopRanges() {
+FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
   // Scatter loop ranges are loop ranges for update.
-  return SmallVector<int64_t, 4>(getUpdateType().getShape());
+  return SmallVector<int64_t>(getUpdateType().getShape());
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
@@ -1326,8 +1326,8 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
-  SmallVector<int64_t, 4> bounds(getIterationDomainRank());
+FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
   // batch(s), m, k1
@@ -1841,10 +1841,6 @@ LogicalResult CustomOp::verify() {
 }
 
 /// Start `LinalgFusionInterface` implementation.
-
-SmallVector<int64_t, 4> CustomOp::getStaticLoopRanges() {
-  llvm_unreachable("Not Yet Implemented");
-}
 
 SmallVector<AffineMap> CustomOp::getIndexingMapsForOperands() {
   return llvm::map_to_vector(

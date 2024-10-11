@@ -672,7 +672,12 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Get iteration domain bounds.
   OpBuilder b(op);
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  FailureOr<SmallVector<int64_t>> maybeBounds = op.getStaticLoopRanges();
+  if (failed(maybeBounds)) {
+    return failure();
+  }
+
+  ArrayRef<int64_t> bounds = maybeBounds.value();
 
   auto opInfo =
       IREE::LinalgExt::AttentionOpDetail::get(op.getIndexingMapsArray())
