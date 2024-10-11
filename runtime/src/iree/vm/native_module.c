@@ -310,6 +310,24 @@ static void IREE_API_PTR iree_vm_native_module_free_state(
   IREE_ASSERT_EQ(module_state, NULL);
 }
 
+static iree_status_t IREE_API_PTR iree_vm_native_module_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  if (module->user_interface.fork_state) {
+    return module->user_interface.fork_state(module->self, parent_state,
+                                             allocator, out_child_state);
+  }
+  // No-op in the default implementation. If any state is allocated the target
+  // must implement the fork_state function.
+  IREE_ASSERT_EQ(parent_state, NULL);
+  return parent_state
+             ? iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "native module must implement fork_state if it "
+                                "provides module state")
+             : iree_ok_status();
+}
+
 static iree_status_t IREE_API_PTR iree_vm_native_module_resolve_import(
     void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
     const iree_vm_function_t* function,
@@ -527,6 +545,7 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
       iree_vm_native_module_get_function_attr;
   module->base_interface.alloc_state = iree_vm_native_module_alloc_state;
   module->base_interface.free_state = iree_vm_native_module_free_state;
+  module->base_interface.fork_state = iree_vm_native_module_fork_state;
   module->base_interface.resolve_import = iree_vm_native_module_resolve_import;
   module->base_interface.notify = iree_vm_native_module_notify;
   module->base_interface.begin_call = iree_vm_native_module_begin_call;

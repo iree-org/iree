@@ -69,6 +69,14 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
     iree_host_size_t module_count, iree_vm_module_t** modules,
     iree_allocator_t allocator, iree_vm_context_t** out_context);
 
+// Forks the provided |parent_context| into |out_child_context|.
+// The new context will have all of the same modules loaded and a shallow copy
+// of the per-module state. Modules may decide to retain subresources
+// by-reference or completely reinitialize themselves.
+IREE_API_EXPORT iree_status_t iree_vm_context_fork(
+    const iree_vm_context_t* parent_context, iree_allocator_t allocator,
+    iree_vm_context_t** out_child_context);
+
 // Retains the given |context| for the caller.
 IREE_API_EXPORT void iree_vm_context_retain(iree_vm_context_t* context);
 

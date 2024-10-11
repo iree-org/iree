@@ -91,6 +91,13 @@ iree_vmvx_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   iree_allocator_free(state->host_allocator, state);
 }
 
+static iree_status_t IREE_API_PTR iree_vmvx_module_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "vmvx module forking not implemented");
+}
+
 //===----------------------------------------------------------------------===//
 // Argument validation and marshalling
 //===----------------------------------------------------------------------===//
@@ -796,6 +803,7 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
       .destroy = iree_vmvx_module_destroy,
       .alloc_state = iree_vmvx_module_alloc_state,
       .free_state = iree_vmvx_module_free_state,
+      .fork_state = iree_vmvx_module_fork_state,
   };
 
   // Allocate shared module state.

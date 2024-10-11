@@ -132,6 +132,44 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t IREE_API_PTR iree_hal_module_fork_state(
+    void* self, iree_vm_module_state_t* base_parent_state,
+    iree_allocator_t host_allocator, iree_vm_module_state_t** out_child_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_child_state = NULL;
+
+  iree_hal_module_state_t* parent_state =
+      (iree_hal_module_state_t*)base_parent_state;
+
+  // The base module state is derived entirely from the shared module.
+  iree_hal_module_t* module = IREE_HAL_MODULE_CAST(self);
+  iree_hal_module_state_t* child_state = NULL;
+  iree_host_size_t total_size =
+      sizeof(*child_state) +
+      module->device_count * sizeof(child_state->executable_caches[0]);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, total_size, (void**)&child_state));
+  memset(child_state, 0, total_size);
+  child_state->host_allocator = host_allocator;
+  child_state->flags = module->flags;
+  child_state->device_count = module->device_count;
+  child_state->devices = module->devices;
+  child_state->loop_status = iree_ok_status();
+
+  // Reference the parent executable caches.
+  for (iree_host_size_t i = 0; i < child_state->device_count; ++i) {
+    iree_hal_executable_cache_t* executable_cache =
+        parent_state->executable_caches[i];
+    child_state->executable_caches[i] = executable_cache;
+    iree_hal_executable_cache_retain(executable_cache);
+  }
+
+  *out_child_state = (iree_vm_module_state_t*)child_state;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 // Returns an unretained reference to the executable cache for the given device.
 // If the same device is registered multiple times the first cache is returned.
 static iree_status_t iree_hal_module_state_lookup_executable_cache(
@@ -1754,6 +1792,7 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
       .destroy = iree_hal_module_destroy,
       .alloc_state = iree_hal_module_alloc_state,
       .free_state = iree_hal_module_free_state,
+      .fork_state = iree_hal_module_fork_state,
       .notify = iree_hal_module_notify,
   };
 
