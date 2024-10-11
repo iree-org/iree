@@ -12,7 +12,7 @@
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
-#define DEBUG_TYPE "iree-stream-annotate-dispatch-arguments"
+#define DEBUG_TYPE "iree-stream-annotate-dispatch-assumptions"
 
 using llvm::dbgs;
 
