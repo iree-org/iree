@@ -169,8 +169,7 @@ struct AttentionOpConversion
     {
       auto *block = rewriter.createBlock(&attention.getRegion());
       OpBuilder::InsertionGuard g(rewriter);
-      block->addArgument(getElementTypeOrSelf(attention.getResult(0).getType()),
-                         loc);
+      block->addArgument(rewriter.getF32Type(), loc);
       rewriter.setInsertionPoint(block, block->begin());
 
       rewriter.create<IREE::LinalgExt::YieldOp>(loc, block->getArgument(0));
