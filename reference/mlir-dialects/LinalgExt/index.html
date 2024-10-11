@@ -4546,8 +4546,8 @@ also supports permuting the tiled loops.</p>
 <p><em>Attention operator</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
-              `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)? `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )? `)`
-              `outs` `(` $outputs `:` type($outputs) `)`
+              `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
+              `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
 <p>Computes the scaled dot product attention function:</p>
@@ -4556,22 +4556,6 @@ also supports permuting the tiled loops.</p>
 the scale to use.</p>
 <p>If an additional mask argument M is included, the result of the first matmul is modified according to:</p>
 <p>Q @ K.T += M</p>
-<p>For self-attention, all inputs and the result have the same shape BxNxd
-where B is the batch dimension, N is the sequence length and d is head
-dimension. Typically N &gt;&gt;&gt; d. Usually, this operator also performs
-masking and dropout, but we leave that out of the current implementation.
-For cross-attention, the query and output have the same shape (BxNxd),
-while the key and value differ in sequence length (they have shape BxLxd,
-where L != N).</p>
-<p>This operator after tiling results in a tiled result as per
-FlashAttention 2 and optionally results in the current <code>max</code> and <code>sum</code>
-statistics while processing the current tile.</p>
-<p>With indexing_maps we can also infer when variables are transposed.
-for example, if V has indexing_map of (m, k1, k2, n) -&gt; (n, k2) instead
-of (m, k1, k2, n) -&gt; (k2, n), then we'd know that V is transposed (V.T),
-and we can expect computation to look like:</p>
-<p>attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T</p>
-<p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
@@ -4609,8 +4593,8 @@ and we can expect computation to look like:</p>
 <td>shaped of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of shaped of any type values</td>
+<td style="text-align: center;"><code>output</code></td>
+<td>shaped of any type values</td>
 </tr>
 </tbody>
 </table>
