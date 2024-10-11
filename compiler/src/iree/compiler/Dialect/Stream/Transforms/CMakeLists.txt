@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "AnnotateAffinities.cpp"
     "AnnotateDispatchArguments.cpp"
+    "AnnotateDispatchAssumptions.cpp"
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"

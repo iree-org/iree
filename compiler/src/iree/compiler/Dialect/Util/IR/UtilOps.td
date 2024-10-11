@@ -492,6 +492,10 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
       "Value":$singleOperand,
       "IntAssumptionAttr":$singleAssumption
     )>,
+    OpBuilder<(ins
+      "ArrayRef<Value>":$operands,
+      "ArrayRef<ArrayAttr>":$assumptions
+    )>
   ];
 
   let extraClassDeclaration = [{

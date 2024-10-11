@@ -1200,6 +1200,18 @@ void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
                                         {singleAssumption})));
 }
 
+void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
+                        ArrayRef<Value> operands,
+                        ArrayRef<ArrayAttr> assumptions) {
+  state.addOperands(operands);
+  for (auto operand : operands)
+    state.addTypes({operand.getType()});
+  state.addAttribute("assumptions",
+                     ArrayAttr::get(builder.getContext(),
+                                    ArrayRef<Attribute>(assumptions.begin(),
+                                                        assumptions.end())));
+}
+
 LogicalResult AssumeIntOp::verify() {
   ArrayAttr allOperandAssumptions = getAssumptions();
   // Verify that there is an assumption row per operand.
@@ -1285,10 +1297,20 @@ ParseResult AssumeIntOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void AssumeIntOp::print(OpAsmPrinter &p) {
   p << " ";
+  bool multiLine = getOperands().size() > 1;
+  if (multiLine) {
+    p.increaseIndent();
+    p.increaseIndent();
+    p.printNewline();
+  }
   ArrayAttr allOperandAssumptions = getAssumptions();
   for (auto [index, operand] : llvm::enumerate(getOperands())) {
-    if (index > 0)
+    if (index > 0) {
       p << ", ";
+      if (multiLine) {
+        p.printNewline();
+      }
+    }
     ArrayAttr operandAssumptions =
         cast<ArrayAttr>(allOperandAssumptions[index]);
     p.printOperand(operand);
@@ -1306,10 +1328,19 @@ void AssumeIntOp::print(OpAsmPrinter &p) {
     }
   }
 
-  p << " : ";
+  if (multiLine) {
+    p.decreaseIndent();
+    p.printNewline();
+  } else {
+    p << " ";
+  }
+  p << ": ";
   llvm::interleaveComma(getOperands(), p.getStream(),
                         [&](Value operand) { p.printType(operand.getType()); });
   p.printOptionalAttrDict((*this)->getAttrs(), {"assumptions"});
+  if (multiLine) {
+    p.decreaseIndent();
+  }
 }
 
 //===----------------------------------------------------------------------===//

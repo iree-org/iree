@@ -1188,6 +1188,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(createLLVMGPULowerExecutableTargetPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
   //
@@ -1234,6 +1236,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createROCDLLowerExecutableTargetPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
                           /*forROCDL=*/true);

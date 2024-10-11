@@ -20,6 +20,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/Debug.h"
@@ -634,6 +635,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
     addMemRefLoweringPasses(modulePassManager);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
