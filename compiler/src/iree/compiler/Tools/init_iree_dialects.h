@@ -14,6 +14,7 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
@@ -41,6 +42,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<IREE::Codegen::IREECodegenDialect,
                   IREE::Flow::FlowDialect,
+                  IREE::CPU::IREECPUDialect,
                   IREE::GPU::IREEGPUDialect,
                   IREE::HAL::HALDialect,
                   IREE::HAL::Inline::HALInlineDialect,

@@ -78,6 +78,7 @@ iree_cc_library(
     MLIRParser
     MLIRSCFDialect
     MLIRTransformUtils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports
