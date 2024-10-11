@@ -68,7 +68,7 @@ def IPO : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
 def OptimizeIntArithmetic : Pass<"iree-util-optimize-int-arithmetic", ""> {
   let summary = "Optimizes integer arithmetic using a variety of dataflow analysis and patterns.";
   let constructor = [{
-    mlir::iree_compiler::IREE::Util::createOptimizeIntArithmetic()
+    mlir::iree_compiler::IREE::Util::createOptimizeIntArithmeticPass()
   }];
 }
 

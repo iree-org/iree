@@ -332,7 +332,7 @@ class OptimizeIntArithmeticPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<void>> createOptimizeIntArithmetic() {
+std::unique_ptr<OperationPass<void>> createOptimizeIntArithmeticPass() {
   return std::make_unique<OptimizeIntArithmeticPass>();
 }
 
