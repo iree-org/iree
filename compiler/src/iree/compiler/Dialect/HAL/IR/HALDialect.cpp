@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -137,7 +138,17 @@ public:
       SetVector<IREE::HAL::ExecutableTargetAttr> resultSet;
       deviceAnalysis.gatherRequiredExecutableTargets(aff, op, resultSet);
       // TODO(hanchung): Populate the EncodingSolverAttr when it is ready.
-      targetAttrs.insert(resultSet.begin(), resultSet.end());
+      for (auto target : resultSet) {
+        if (target.hasConfigurationAttr("encoding_solver")) {
+          Attribute attr =
+              target.getConfiguration()
+                  .getAs<IREE::Encoding::EncodingSolverInterfaceAttr>(
+                      "encoding_solver");
+          targetAttrs.insert(attr ? attr : target);
+        } else {
+          targetAttrs.insert(target);
+        }
+      }
       return success();
     };
   };
