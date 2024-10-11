@@ -438,6 +438,22 @@ def AnnotateDispatchArgumentsPass :
   }];
 }
 
+def AnnotateDispatchAssumptionsPass :
+    Pass<"iree-stream-annotate-dispatch-assumptions", "mlir::ModuleOp"> {
+  let summary = "Adds util.assume.* op to executables from all dispatch sites.";
+  let description = [{
+    Uses dataflow analysis to determine integer range and divisibility,
+    propagating that as `util.assume.int` ops within the executable with an
+    assumption row for each dispatch site. This effectively transports the
+    per-dispatch level analyses to the executable so that the backend can
+    act on it as it sees fit.
+
+    Note that this pass largely replaces the `AnnotateDispatchArgumentsPass`
+    above and can eventually subsume it entirely. However, as the mechanism is
+    new and needs to be phased in, both exist in parallel for the moment.
+  }];
+}
+
 def PackDispatchOperandsPass :
     Pass<"iree-stream-pack-dispatch-operands", "mlir::ModuleOp"> {
   let summary = "Packs stream dispatch operands into i32 push constants.";
