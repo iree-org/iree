@@ -34,3 +34,14 @@ util.func @remui_div_by_unrelated(%arg0 : index) -> index {
   %1 = arith.remui %0, %cst : index
   util.return %1 : index
 }
+
+// -----
+// A missing udiv in a multi-row assumption is treated as an unknown.
+// CHECK-LABEL: @missing_udiv_skipped
+util.func @missing_udiv_skipped(%arg0 : index) -> index {
+  // CHECK: arith.remui
+  %cst = arith.constant 16 : index
+  %0 = util.assume.int %arg0[<udiv = 16>, <>] : index
+  %1 = arith.remui %0, %cst : index
+  util.return %1 : index
+}

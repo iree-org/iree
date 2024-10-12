@@ -153,14 +153,16 @@ module @unsupported_non_symbolic {
 
 // -----
 // Torch uses high values to signal unbounded ranges. Ensure they are
-// suppressed.
+// clamped.
 // CHECK-LABEL: @torch_unbounded_max_range
 module @torch_unbounded_max_range {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
-    // CHECK-NOT: util.assume.int<umin
     %0 = torch.symbolic_int "s0" {min_val = 0, max_val = 4611686018427387903} : !torch.int
     %1 = torch.symbolic_int "s1" {min_val = 0, max_val = 9223372036854775806} : !torch.int
+    // CHECK: util.assume.int {{.*}}<umin = 1, umax = 9007199254740991>
+    // CHECK: util.assume.int {{.*}}<umin = 1, umax = 9007199254740991>
     torch.bind_symbolic_shape %arg0, [%0, %1], affine_map<()[s0, s1] -> (s0, s1)> : !torch.vtensor<[?,?],f32>
+    // CHECK: util.assume.int {{.*}}<umin = 10, umax = 90071992547409910, udiv = 10>
     torch.bind_symbolic_shape %arg1, [%0, %1], affine_map<()[s0, s1] -> (s0, s1 * 10)> : !torch.vtensor<[?,?],f32>
     return
   }

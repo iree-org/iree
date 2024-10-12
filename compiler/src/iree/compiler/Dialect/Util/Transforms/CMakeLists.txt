@@ -43,6 +43,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineTransforms
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithTransforms

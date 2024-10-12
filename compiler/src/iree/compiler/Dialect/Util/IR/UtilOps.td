@@ -336,7 +336,9 @@ def OpGroupAddressOffsetArithmeticOps : OpDocGroup {
 let opDocGroup = OpGroupAddressOffsetArithmeticOps in {
 
 def Util_AlignOp : Util_PureOp<"align", [
-  SameOperandsAndResultType
+    SameOperandsAndResultType,
+    DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>,
+    DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>
 ]> {
   let summary = "Aligns up to a power-of-two alignment if required";
   let description = [{
@@ -504,14 +506,15 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
 
     // Gets the unioned unsigned range for an operand. If there are multiple
     // assumptions for the operand, this will return the bounding range for
-    // them all. If there is no umin/umax, then std::nullopt will be returned
-    // for that position.
+    // them all. If there is no umin/umax for any row in the set, then
+    // std::nullopt will be returned for that position.
     std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
       getUnionedUnsignedRange(unsigned operandIndex);
 
     // Gets the unioned divisor for an operand. If there are multiple divisor
     // assumptions, the gcd of all of them is returned. If there are no
-    // divisor assumptions, std::nullopt is returned.
+    // divisor assumptions or if there is not a udiv for any row, std::nullopt
+    // is returned.
     std::optional<uint64_t> getUnionedUnsignedDivisor(unsigned operandIndex);
   }];
 

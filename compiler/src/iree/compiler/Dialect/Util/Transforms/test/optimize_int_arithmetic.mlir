@@ -28,6 +28,30 @@ util.func @index_lower_bound(%arg0 : index) -> i1 {
 }
 
 // -----
+// If there is a missing umax in a multi-row assumption, then it must
+// be treated as having no known upper bound.
+// CHECK-LABEL: @missing_umax_skipped
+util.func @missing_umax_skipped(%arg0 : index) -> i1 {
+  // CHECK: arith.cmpi
+  %cst = arith.constant 101 : index
+  %0 = util.assume.int %arg0[<umin=10, umax=100>, <umin=10>] : index
+  %1 = arith.cmpi ult, %0, %cst : index
+  util.return %1 : i1
+}
+
+// -----
+// If there is a missing umin in a multi-row assumption, then it must
+// be treated as having no known lower bound.
+// CHECK-LABEL: @missing_umin_skipped
+util.func @missing_umin_skipped(%arg0 : index) -> i1 {
+  // CHECK: arith.cmpi
+  %cst = arith.constant 5 : index
+  %0 = util.assume.int %arg0[<umin=10, umax=100>, <umax=100>] : index
+  %1 = arith.cmpi ugt, %0, %cst : index
+  util.return %1 : i1
+}
+
+// -----
 // CHECK-LABEL: @index_indeterminate
 util.func @index_indeterminate(%arg0 : index) -> i1 {
   // CHECK: arith.cmpi
@@ -247,6 +271,20 @@ util.func @index_cast_i64_to_index_addi(%arg0 : index, %arg1 : index) -> index {
 }
 
 // -----
+// Multi-use should not convert
+// CHECK-LABEL: @index_cast_i64_to_index_addi_multiuse
+util.func @index_cast_i64_to_index_addi_multiuse(%arg0 : index, %arg1 : index) -> index, i64 {
+  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  %0 = util.assume.int %arg0<umin=10, umax=100> : index
+  // CHECK: arith.index_cast
+  // CHECK: arith.index_cast
+  %1 = arith.index_cast %0 : index to i64
+  %2 = arith.addi %1, %1 : i64
+  %3 = arith.index_cast %2 : i64 to index
+  util.return %3, %2 : index, i64
+}
+
+// -----
 // CHECK-LABEL: @index_cast_i64_to_index_ceildivsi
 util.func @index_cast_i64_to_index_ceildivsi(%arg0 : index, %arg1 : index) -> index {
   // CHECK: %[[ASSUME:.*]] = util.assume.int
@@ -370,4 +408,57 @@ util.func @index_cast_i64_to_index_remsi(%arg0 : index, %arg1 : index) -> index 
   %2 = arith.remsi %1, %1 : i64
   %3 = arith.index_cast %2 : i64 to index
   util.return %3 : index
+}
+
+// -----
+// Truncate of an index cast can be folded into the index cast.
+// CHECK-LABEL: @elide_trunc_of_index_castui
+util.func @elide_trunc_of_index_castui(%arg0 : index) -> i32 {
+  %1 = arith.index_castui %arg0 : index to i64
+  %2 = arith.trunci %1 : i64 to i32
+  // CHECK: %[[RESULT:.*]] = arith.index_castui %arg0 : index to i32
+  // CHECH: util.return %[[RESULT]]
+  util.return %2 : i32
+}
+
+// -----
+// CHECK-LABEL: @elide_trunc_of_index_cast
+util.func @elide_trunc_of_index_cast(%arg0 : index) -> i32 {
+  %1 = arith.index_cast %arg0 : index to i64
+  %2 = arith.trunci %1 : i64 to i32
+  // CHECK: %[[RESULT:.*]] = arith.index_castui %arg0 : index to i32
+  // CHECH: util.return %[[RESULT]]
+  util.return %2 : i32
+}
+
+// -----
+// CHECK-LABEL: @util_align_bounds_div
+util.func @util_align_bounds_div(%arg0 : index, %arg1 : index) -> index, index, index, i1, i1 {
+  %0 = util.assume.int %arg0<umin=10, umax=120> : index
+  %1 = util.assume.int %arg1<umin=64, umax=64, udiv=64> : index
+  // CHECK-DAG: %[[ZERO:.*]] = arith.constant 0
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK-DAG: %[[C64:.*]] = arith.constant 64
+  // CHECK-DAG: %[[ASSUME:.*]] = util.assume.int %arg0
+  // CHECK: %[[ALIGN:.*]] = util.align %[[ASSUME]], %[[C64]]
+  %2 = util.align %0, %1 : index
+
+  // The result should be >= 64 and <= 128.
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %lower = arith.cmpi uge, %2, %c64 : index   // True
+  %upper = arith.cmpi ule, %2, %c128 : index  // True
+  %under = arith.cmpi ult, %2, %c64 : index   // False
+  %over = arith.cmpi ugt, %2, %c128 : index   // False
+  %in_bounds = arith.andi %lower, %upper : i1 // True
+  %out_bounds = arith.andi %under, %over : i1 // False
+
+  // And 64 should evenly divide it.
+  %rem64 = arith.remui %2, %c64 : index
+  // But 128 should not.
+  // CHECK: %[[REM128:.*]] = arith.remui
+  %rem128 = arith.remui %2, %c128 : index
+  // CHECK: util.return %[[ALIGN]], %[[ZERO]], %[[REM128]], %[[TRUE]], %[[FALSE]]
+  util.return %2, %rem64, %rem128, %in_bounds, %out_bounds : index, index, index, i1, i1
 }
