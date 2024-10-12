@@ -243,6 +243,9 @@ public:
     if (options.wavesPerEu > 0)
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
 
+    addConfig("encoding_solver",
+              IREE::Codegen::EncodingSolverAttr::get(context));
+
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
         b.getDictionaryAttr(configItems));

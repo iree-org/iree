@@ -35,7 +35,7 @@ Type legalizeStorageElementType(Type elementType);
 /// |shapedType| have corresponding values in |dynamicDims|.
 Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
-                                          ValueRange dynamicDims,
+                                          SmallVector<OpFoldResult> dynamicDims,
                                           OpBuilder &builder);
 
 /// Emits IR with the given |builder| to calculate the byte offset for the

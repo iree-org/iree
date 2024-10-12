@@ -11,6 +11,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
@@ -50,7 +51,7 @@ Type legalizeStorageElementType(Type elementType) {
 
 Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
-                                          ValueRange dynamicDims,
+                                          SmallVector<OpFoldResult> dynamicDims,
                                           OpBuilder &builder) {
   Type alignedElementType =
       legalizeStorageElementType(shapedType.getElementType());
@@ -64,8 +65,9 @@ Value calculateStorageElementCountInBytes(Location loc,
 
   // TODO: Do we use makeComposedFoldedAffineApply here, so the index
   // computation an be much simpler.
-  SmallVector<int64_t> paddedShape(shapedType.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
+  SmallVector<int64_t> paddedShape = decomposeMixedValues(dynamicDims).first;
+  SmallVector<Value> paddedDynamicDims =
+      getValueOrCreateConstantIndexOp(builder, loc, dynamicDims);
   auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
   if (encoding && !encoding.getRoundDimsToArray().empty()) {
     auto roundDimsTo = encoding.getRoundDimsToArray();
@@ -107,16 +109,20 @@ Value calculateStorageElementCountInBytes(Location loc,
   // Scale by dynamic dims, if present.
   auto value =
       builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
-  for (auto dim : paddedDynamicDims) {
-    value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
+  for (unsigned i = 0; i < shapedType.getRank(); ++i) {
+    if (!shapedType.isDynamicDim(i))
+      continue;
+    value =
+        builder.createOrFold<arith::MulIOp>(loc, value, paddedDynamicDims[i]);
   }
+
   // Sub-byte packing requires putting multiple elements in the same byte.
   if (needToPackSubByteElementBitWidth(elementBits)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // Perform some basic sanity check to make sure the total count is byte
     // aligned for fully static shapes.
-    if (paddedDynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
+    if (shapedType.hasStaticShape() && (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
