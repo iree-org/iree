@@ -14,6 +14,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: gpu.barrier
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
@@ -54,6 +55,7 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: gpu.barrier
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[ARG1:.*]] = %[[CST]])
@@ -80,4 +82,45 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
   // CHECK: %[[EPI_COMPUTE2:.*]] = arith.addf %[[EPI_COMPUTE]], %[[OUT]]#1
   // CHECK: return %[[EPI_COMPUTE]], %[[EPI_COMPUTE2]]
   return %0#0, %0#1 : vector<1xf32>, vector<1xf32>
+}
+
+// CHECK-LABEL: @prefetch_multiple_loops
+// We are mostly checking if barriers are inserted correctly and only the
+// innermost loop is prefetched.
+func.func @prefetch_multiple_loops(%arg0: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: scf.for
+  %out = scf.for %i = %c0 to %c128 step %c1 iter_args (%it = %cst) -> vector<1xf32> {
+    // CHECK: gpu.barrier
+    // CHECK: vector.transfer_read
+    // CHECK: vector.transfer_write
+    %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %it) -> (vector<1xf32>) {
+      // CHECK: arith.addi
+      // CHECK: vector.transfer_read
+      %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
+      vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+      // CHECK: gpu.barrier
+      // CHECK: vector.transfer_read
+      %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+      // CHECK: arith.addf
+      %3 = arith.addf %2, %arg2 : vector<1xf32>
+      // CHECK: gpu.barrier
+      // CHECK: vector.transfer_write
+      // CHECK: scf.yield
+      scf.yield %3 : vector<1xf32>
+    }
+    // CHECK: gpu.barrier
+    // CHECK: vector.transfer_read
+    // CHECK: arith.addf
+    // CHECK: scf.yield
+    scf.yield %0 : vector<1xf32>
+  }
+  // CHECK: vector.transfer_write
+  vector.transfer_write %out, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
 }
