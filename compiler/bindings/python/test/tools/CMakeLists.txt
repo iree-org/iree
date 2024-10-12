@@ -24,6 +24,15 @@ if(IREE_INPUT_TORCH)
   )
 endif()
 
+if(IREE_INPUT_TORCH)
+  iree_py_test(
+    NAME
+      import_onnx_api_test
+    SRCS
+      "import_onnx_api_test.py"
+  )
+endif()
+
 iree_py_test(
   NAME
     ir_tool_test
