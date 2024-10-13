@@ -293,7 +293,7 @@ getNonConstantValuesDefinedFromAbove(Region &region) {
   return {constants, valuesDefinedFromAbove};
 }
 
-/// Listner to track mapping from operations in the body of a cloned custom op
+/// Listener to track mapping from operations in the body of a cloned custom op
 /// back to the original operations in the body of the original custom op.
 class CustomOpConfigListener : public RewriterBase::Listener {
 public:
@@ -386,8 +386,7 @@ LogicalResult setDefaultCustomOpLoweringConfig(
       getNonConstantValuesDefinedFromAbove(customOp.getRegion());
 
   // 2. Create an empty function with arguments being the operands of the custom
-  // op
-  //    and values captured from above in the custom op.
+  // op and values captured from above in the custom op.
   auto operandTypes = llvm::to_vector(customOp->getOperandTypes());
   auto valuesDefinedAboveTypes =
       llvm::map_range(valuesDefinedAbove, [](Value v) { return v.getType(); });

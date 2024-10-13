@@ -46,8 +46,6 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 
 // -----
 
-// -----
-
 func.func @custom_op_preset_config(%arg0: tensor<384x512xf32>, %arg1: tensor<512x128xf32>, %arg2: tensor<128xf32>) -> tensor<384x128xf32>
   attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse>} {
   %cst = arith.constant 0.000000e+00 : f32
