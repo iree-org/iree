@@ -68,14 +68,26 @@ static FailureOr<TilingConfig>
 getTilingConfigForPipeline(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp) || !rootOp.value()) {
-    return failure();
+
+  if (failed(rootOp)) {
+    return funcOp.emitOpError(
+        "failed to get tiling configuration for pipeline");
   }
+  // In presence of custom_op, need to look for root op within the custom op
+  // to get the root lowering config.
+  if (auto customOp = dyn_cast<IREE::LinalgExt::CustomOp>(rootOp.value())) {
+    SmallVector<Operation *> nestedCustomOps = getComputeOps(customOp);
+    FailureOr<Operation *> nestedRootOp = getRootOperation(nestedCustomOps);
+    if (succeeded(nestedRootOp)) {
+      rootOp = nestedRootOp.value();
+    }
+  }
+
   auto rootLoweringConfig =
       iree_compiler::getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
           rootOp.value());
   if (!rootLoweringConfig) {
-    return failure();
+    return funcOp.emitOpError("expected root op to have a lowering config");
   }
   return TilingConfig(rootLoweringConfig);
 }
