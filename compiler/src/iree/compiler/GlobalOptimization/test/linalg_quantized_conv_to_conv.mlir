@@ -292,12 +292,12 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
   // CHECK-SAME:  ins(%arg0 : tensor<?x?x?x?xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<?x?x?xi32>)
+  // CHECK: %[[DIM00:.+]] = tensor.dim %arg0, %[[I0]]
   // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SUMI]] {{\[\[}}0], [1], [2, 3]]
 
-  // CHECK-DAG: %[[DIM0:.+]] = tensor.dim %arg0, %[[I0]]
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %arg2, %[[I1]]
   // CHECK-DAG: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
-  // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]])
+  // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM00]], %[[DIM1]], %[[DIM2]])
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%9 : tensor<?x?x?x1xi32>)
   // CHECK-DAG: %[[DIM0:.+]] = tensor.dim %arg1, %[[I0]] : tensor<?x?x?x?xi8>
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %arg1, %[[I1]] : tensor<?x?x?x?xi8>
