@@ -456,8 +456,8 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
-def SafeLoopInvariantCodeMotionPass :
-  Pass<"iree-safe-loop-invariant-code-motion", ""> {
+def IREELoopInvariantCodeMotionPass :
+  Pass<"iree-loop-invariant-code-motion", ""> {
   let summary = "Performs LICM on loops guaranteed to have >= 1 trip";
   let description = [{
     This is a safer mirror of the upstream LICM pass that restricts to loops

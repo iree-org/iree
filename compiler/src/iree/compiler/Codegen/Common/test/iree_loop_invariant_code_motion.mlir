@@ -1,4 +1,4 @@
-// RUN: iree-opt %s  -split-input-file --iree-safe-loop-invariant-code-motion | FileCheck %s
+// RUN: iree-opt %s  -split-input-file --iree-loop-invariant-code-motion | FileCheck %s
 
 func.func @nested_loops_code_invariant_to_both() {
   %m = memref.alloc() : memref<10xf32>

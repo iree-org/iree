@@ -13,19 +13,19 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_SAFELOOPINVARIANTCODEMOTIONPASS
+#define GEN_PASS_DEF_IREELOOPINVARIANTCODEMOTIONPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-/// Safer IREE loop invariant code motion (LICM) pass.
-struct SafeLoopInvariantCodeMotionPass
-    : public impl::SafeLoopInvariantCodeMotionPassBase<
-          SafeLoopInvariantCodeMotionPass> {
+/// IREE loop invariant code motion (LICM) pass.
+struct IREELoopInvariantCodeMotionPass
+    : public impl::IREELoopInvariantCodeMotionPassBase<
+          IREELoopInvariantCodeMotionPass> {
   void runOnOperation() override;
 };
 } // namespace
 
-void SafeLoopInvariantCodeMotionPass::runOnOperation() {
+void IREELoopInvariantCodeMotionPass::runOnOperation() {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
