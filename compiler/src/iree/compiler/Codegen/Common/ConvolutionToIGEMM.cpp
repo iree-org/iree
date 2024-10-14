@@ -38,13 +38,11 @@ struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    auto im2colOp =
-        genericOp.getOperand(0).getDefiningOp<IREE::LinalgExt::Im2colOp>();
-    if (!im2colOp) {
-      im2colOp =
-          genericOp.getOperand(1).getDefiningOp<IREE::LinalgExt::Im2colOp>();
-      if (!im2colOp) {
-        return rewriter.notifyMatchFailure(genericOp, "no im2colOp producer.");
+    IREE::LinalgExt::Im2colOp im2colOp;
+    for (auto operand : genericOp.getDpsInputs()) {
+      im2colOp = operand.getDefiningOp<IREE::LinalgExt::Im2colOp>();
+      if (im2colOp) {
+        break;
       }
     }
 
