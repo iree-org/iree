@@ -335,7 +335,7 @@ public:
         replacementOp = definingOp;
       }
     }
-    if (replacementOp) {
+    if (replacementOp && replacementOp->getName() == op->getName()) {
       notifyOperationReplaced(op, replacementOp);
     }
   }
@@ -353,7 +353,7 @@ private:
   llvm::MapVector<Operation *, Operation *> clonedOpToOrigOp;
 
   /// On cast propagation, the replacement value used is not the
-  /// actual op that is sued for replacement. Walk back the replacement
+  /// actual op that is used for replacement. Walk back the replacement
   /// value use-def chain to get to the real replacement. This is a
   /// bit of a hack, but the lowering config propagation is really
   /// best effort, so not incorrect.
@@ -404,8 +404,8 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   }
 
   // 3. Clone the custom op into the function
-  auto locs = llvm::map_to_vector(customOp->getOperands(),
-                                  [](Value v) { return v.getLoc(); });
+  SmallVector<Location> locs = llvm::map_to_vector(
+      customOp->getOperands(), [](Value v) { return v.getLoc(); });
   auto valuesDefinedAboveLocs =
       llvm::map_range(valuesDefinedAbove, [](Value v) { return v.getLoc(); });
   locs.append(valuesDefinedAboveLocs.begin(), valuesDefinedAboveLocs.end());

@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
+    MLIRMemRefTransforms
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
