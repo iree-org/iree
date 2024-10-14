@@ -68,7 +68,7 @@ collectTiledAndFusedOps(Operation *op,
 /// tiled operation as well as the created tile loops.
 static LogicalResult applyTileAndFuseToEachRoot(
     RewriterBase &rewriter, llvm::SmallDenseSet<TilingInterface> &payloadOps,
-    IREE::GPU::TilingLevel tilingLevel, bool noZeroSlices) {
+    IREE::GPU::TilingLevel tilingLevel, bool allowZeroSlices) {
   MLIRContext *context = rewriter.getContext();
   for (TilingInterface tilingInterfaceOp : payloadOps) {
     mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
@@ -138,7 +138,7 @@ static LogicalResult applyTileAndFuseToEachRoot(
       if (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
           tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
         // Do not fuse pad in reduction and subgroup tiling. We instead fuse
-        // pad without zero slice gaurd as a cleanup pattern.
+        // pad without zero slice guard as a cleanup pattern.
         if (isa<tensor::PadOp>(owner)) {
           return std::nullopt;
         }
@@ -164,15 +164,15 @@ static LogicalResult applyTileAndFuseToEachRoot(
 
     RewritePatternSet cleanupPatterns(context);
 
-    if (noZeroSlices) {
+    if (allowZeroSlices) {
       // Add pattern to fuse pad operations without zero slice gaurd, if we
       // know we have no zero slices.
-      auto zeroSliceGaurd = [](tensor::ExtractSliceOp) -> std::optional<bool> {
+      auto zeroSliceGuard = [](tensor::ExtractSliceOp) -> std::optional<bool> {
         // Do not use zero slice gaurd.
         return false;
       };
       cleanupPatterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
-          context, zeroSliceGaurd);
+          context, zeroSliceGuard);
     }
 
     tileAndFuseOptions.cleanupPatterns =
@@ -239,7 +239,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
 
   IRRewriter rewriter(funcOp);
   if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel,
-                                        noZeroSlices))) {
+                                        allowZeroSlices))) {
     funcOp.emitError() << "tiling of level "
                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
