@@ -67,8 +67,12 @@ LogicalResult ExpansionInfo::compute(OpTy op, OpOperand *fusableOpOperand,
   if (reassociationMaps.empty())
     return failure();
   AffineMap fusedIndexMap = op.getMatchingIndexingMap(fusableOpOperand);
-  SmallVector<int64_t, 4> originalLoopRange = op.getStaticLoopRanges();
-  originalLoopExtent.assign(originalLoopRange.begin(), originalLoopRange.end());
+  FailureOr<SmallVector<int64_t>> originalLoopRange = op.getStaticLoopRanges();
+  if (failed(originalLoopRange)) {
+    return failure();
+  }
+  originalLoopExtent.assign(originalLoopRange->begin(),
+                            originalLoopRange->end());
 
   reassociation.clear();
   expandedShapeMap.clear();

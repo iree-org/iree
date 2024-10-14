@@ -252,6 +252,11 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
+  // Scatter loop ranges are loop ranges for update.
+  return SmallVector<int64_t>(getUpdateType().getShape());
+}
+
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
@@ -1321,8 +1326,8 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
-  SmallVector<int64_t, 4> bounds(getIterationDomainRank());
+FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
   // batch(s), m, k1
