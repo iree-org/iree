@@ -201,13 +201,13 @@ static void tileAndDistributeToWorkgroup(
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass(
         kNumMaxParallelDims,
         linalg::DistributionMethod::CyclicNumProcsEqNumIters));
+    funcPassManager.addPass(createCSEPass());
+    if (convertToDpsOptions) {
+      funcPassManager.addPass(
+          createConvertToDestinationPassingStylePass(*convertToDpsOptions));
+    }
   }
-  funcPassManager.addPass(createCSEPass());
 
-  if (convertToDpsOptions) {
-    funcPassManager.addPass(
-        createConvertToDestinationPassingStylePass(*convertToDpsOptions));
-  }
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());

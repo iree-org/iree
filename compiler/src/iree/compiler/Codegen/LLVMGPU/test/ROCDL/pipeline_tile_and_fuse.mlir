@@ -1089,6 +1089,7 @@ hal.executable public @main {
 
 // Verify that the write does not get hoisted out of the single threaded
 // for loop.
-//       CHECK:     vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
-//  CHECK-NEXT:   }
+//       CHECK:       vector.transfer_write %{{.*}}, %[[B2]]{{.*}} memref<10x1xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-NEXT:     }
+//  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
