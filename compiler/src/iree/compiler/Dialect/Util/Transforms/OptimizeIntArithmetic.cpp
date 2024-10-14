@@ -216,7 +216,7 @@ public:
 
 protected:
   void notifyOperationErased(Operation *op) override {
-    s.eraseState(op);
+    s.eraseState(s.getProgramPointAfter(op));
     for (Value res : op->getResults())
       flushValue(res);
   }
