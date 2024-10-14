@@ -326,9 +326,4 @@ void populateTensorToFlowConversionPatterns(MLIRContext *context,
               ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
-void populateTensorDialectCastOpPattern(MLIRContext *context,
-                                        RewritePatternSet &patterns) {
-  patterns.insert<ConvertTensorCastPattern>(context);
-}
-
 } // namespace mlir::iree_compiler::IREE::Flow
