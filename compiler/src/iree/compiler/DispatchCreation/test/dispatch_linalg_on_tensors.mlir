@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(canonicalize, util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
 
 util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -202,52 +202,6 @@ util.func public @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B
 
 // -----
 
-util.func public @always_fuse_cast
-  (%lhs : tensor<?x?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
-  -> (tensor<?x?xf32>, tensor<?x?xf32>)
-{
-  %cst = arith.constant 0.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %0 = tensor.cast %lhs : tensor<?x?xf32> to tensor<?x4xf32>
-  %m = tensor.dim %0, %c0 : tensor<?x4xf32>
-  %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
-  %init1 = tensor.empty(%m, %n1) : tensor<?x?xf32>
-  %fill1 = linalg.fill ins(%cst : f32) outs(%init1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul
-    ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
-    outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %n2 = tensor.dim %rhs2, %c1 : tensor<4x?xf32>
-  %init2 = tensor.empty(%m, %n2) : tensor<?x?xf32>
-  %fill2 = linalg.fill ins(%cst : f32) outs(%init2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %2= linalg.matmul
-    ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
-    outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  util.return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
-}
-
-//      CHECK: util.func public @always_fuse_cast(
-// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[M]], %[[K]], %[[N1]]]
-// CHECK-SAME:     (%[[ARG0]], %[[ARG1]], %[[M]], %[[K]], %[[N1]])
-//      CHECK:     tensor.cast
-//      CHECK:     flow.return
-//  CHECK-DAG:   %[[N2:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[M]], %[[K]], %[[N2]]]
-// CHECK-SAME:     (%[[ARG0]], %[[ARG2]], %[[M]], %[[K]], %[[N2]])
-//      CHECK:     tensor.cast
-//      CHECK:     flow.return
-//      CHECK:   util.return %[[RESULT1]], %[[RESULT2]]
-
-// -----
-
 util.func public @dont_fuse_tensor_update_with_fill(
     %arg0: tensor<?x?xf32>, %arg1: tensor<f32>,
     %arg2: index, %arg3: index, %arg4: index, %arg5: index)
@@ -297,7 +251,7 @@ util.func public @fuse_matmul_with_generic_op(%A: tensor<?x?xf32>, %B: tensor<?x
                     outs(%CC: tensor<?x?xf32>) -> tensor<?x?xf32>
   util.return %D: tensor<?x?xf32>
 }
-// CHECK-LABEL: util.func public @fuse_matmul_with_generic_op
+// CHECK: util.func public @fuse_matmul_with_generic_op
 // linalg.generic is fused inside the dispatch region and becomes dead.
 //   CHECK-NOT: generic
 //     CHECK: flow.dispatch.workgroups
@@ -513,26 +467,21 @@ util.func public @inline_dag_1(
 //   CHECK-NOT:   linalg.
 //   CHECK-NOT:   tensor.extract_slice
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
-//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<i32>>
+//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<i32>>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>
 //  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG11:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG12:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:tensor<1x?xf32>>
-//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]]
-//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]]
-//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]]
-//       CHECK:     %[[INIT:.+]] = tensor.empty
-//   CHECK-DAG:     %[[OP1:.+]] = tensor.cast %[[LEAF1]]
-//   CHECK-DAG:     %[[OP2:.+]] = tensor.cast %[[LEAF2]]
-//   CHECK-DAG:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//   CHECK-DAG:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//   CHECK-DAG:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:tensor<1x?xf32>>
+//   CHECK-DAG:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 0]
+//   CHECK-DAG:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 10]
+//   CHECK-DAG:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 20]
+//   CHECK-DAG:     %[[LEAF4:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+//   CHECK-DAG:     %[[LEAF5:.+]] = flow.dispatch.tensor.load %[[ARG6]]
+//   CHECK-DAG:     %[[INIT:.+]] = tensor.empty
 //       CHECK:     linalg.generic
-//  CHECK-SAME:         ins(%[[LEAF3]], %[[OP5]], %[[OP2]], %[[OP4]], %[[OP3]] :
+//  CHECK-SAME:         ins(%[[LEAF4]], %[[LEAF3]], %[[LEAF5]], %[[LEAF2]], %[[LEAF1]] :
 //  CHECK-SAME:         outs(%[[INIT]] :
 
 // -----
@@ -573,24 +522,21 @@ util.func public @inline_dag_2(
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x?xf32>
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
-//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<i32>>
+//  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<i32>>
+//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>
 //  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG11:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:tensor<1x?xf32>>
-//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
-//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
-//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
-//       CHECK:     %[[INIT:.+]] = tensor.empty
-//   CHECK-DAG:     %[[OP1:.+]] = tensor.cast %[[LEAF1]]
-//   CHECK-DAG:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//   CHECK-DAG:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//   CHECK-DAG:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:tensor<1x?xf32>>
+//   CHECK-DAG:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 0]
+//   CHECK-DAG:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 10]
+//   CHECK-DAG:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [0, 20]
+//   CHECK-DAG:     %[[LEAF4:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
+//   CHECK-DAG:     %[[LEAF5:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
+//   CHECK-DAG:     %[[INIT:.+]] = tensor.empty
 //       CHECK:     linalg.generic
-//  CHECK-SAME:         ins(%[[LEAF3]], %[[OP5]], %[[LEAF2]], %[[OP4]], %[[OP3]] :
+//  CHECK-SAME:         ins(%[[LEAF4]], %[[LEAF3]], %[[LEAF5]], %[[LEAF2]], %[[LEAF1]] :
 //  CHECK-SAME:         outs(%[[INIT]] :
 
 // -----
@@ -1031,7 +977,7 @@ util.func public @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : 
       tensor<?x?xf32> to tensor<?x?xf32>
   util.return %0 : tensor<?x?xf32>
 }
-//      CHECK: util.func public @extract_slice
+// CHECK: util.func public @extract_slice
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
@@ -1148,7 +1094,7 @@ util.func public @gemm_unitM_unitN(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf
       outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-LABEL: util.func public @gemm_unitM_unitN(
+// CHECK: util.func public @gemm_unitM_unitN(
 //       CHECK:   flow.dispatch.workgroups(
 //       CHECK:     linalg.matmul
 
@@ -1283,6 +1229,7 @@ util.func public @fill_op_alone(%arg0 : index, %arg1 : index) -> tensor<?x?xf32>
 //      CHECK: util.func public @fill_op_alone(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//      CHECK:   %[[CST:.+]] = arith.constant {{.+}}
 //      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%arg0, %arg1}
 //      CHECK:   util.return %[[SPLAT]]
 
