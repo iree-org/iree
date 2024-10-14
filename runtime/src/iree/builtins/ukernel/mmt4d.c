@@ -112,6 +112,8 @@ static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   return false;
 }
 
+extern void iree_uk_mmt4d_svd_analysis(const iree_uk_mmt4d_params_t* params);
+
 void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_validate(params);
 
@@ -119,6 +121,10 @@ void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params) {
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
   if (iree_uk_mmt4d_early(params)) return;
+
+#ifdef IREE_DEVICE_STANDALONE
+  iree_uk_mmt4d_svd_analysis(params);
+#endif
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
