@@ -1589,10 +1589,10 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
   let assemblyFormat = [{
     `{` `indexing_maps` `=` $indexing_maps `,`
     `iterator_types` `=` $iterator_types `}`
+    attr-dict-with-keyword
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-    $region
-    attr-dict (`->` type($results)^)?
+    $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration =[{
