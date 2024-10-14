@@ -157,6 +157,12 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
+/// Helper to perform LICM on loops nested within |target| that are guaranteed
+/// to have at least one trip. Additionally LICM on `scf.forall` ops with
+/// mapping attributes are excluded as their trip count is unclear until
+/// resolution.
+void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target);
+
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.
