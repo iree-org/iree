@@ -92,6 +92,13 @@ bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// operation.
 bool isReadOnly(Value v);
 
+/// Multiple uses of `tensor.empty()` results in a copy since upstream
+/// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
+/// creating copies/allocations. Since the `empty` op is a proxy for
+/// undef, these could just be duplicated to have a single use. This removes
+/// unnecessary data-hazards.
+LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp);
+
 /// Return the static number of workgroup dispatched if it is known and
 /// constant. If it is not known, it will return ShapedType::kDynamic.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);

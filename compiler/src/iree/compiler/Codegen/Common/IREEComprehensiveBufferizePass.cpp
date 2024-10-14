@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -162,25 +163,6 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
   if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state)))
     return failure();
 
-  return success();
-}
-
-/// Multiple uses of `tensor.empty()` results in a copy since upstream
-/// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
-/// creating copies/allocations. Since the `empty` op is a proxy for
-/// undef, these could just be duplicated to have a single use. This removes
-/// unnecessary data-hazards.
-static LogicalResult duplicateTensorEmptyOps(OpBuilder &b,
-                                             tensor::EmptyOp emptyOp) {
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(emptyOp);
-  SmallVector<OpOperand *> uses = llvm::map_to_vector(
-      emptyOp->getUses(), [](OpOperand &use) { return &use; });
-  for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
-    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
-    Operation *user = use->getOwner();
-    user->setOperand(use->getOperandNumber(), newOp);
-  }
   return success();
 }
 

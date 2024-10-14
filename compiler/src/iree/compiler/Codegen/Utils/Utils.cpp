@@ -261,6 +261,19 @@ bool isReadOnly(Value v) {
       .Default([&](Operation *op) { return false; });
 }
 
+LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(emptyOp);
+  SmallVector<OpOperand *> uses = llvm::map_to_vector(
+      emptyOp->getUses(), [](OpOperand &use) { return &use; });
+  for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
+    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
+    Operation *user = use->getOwner();
+    user->setOperand(use->getOperandNumber(), newOp);
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
