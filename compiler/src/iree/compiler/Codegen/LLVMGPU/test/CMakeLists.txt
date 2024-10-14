@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"
     "gpu_pipeline_generalize_named_ops.mlir"
+    "gpu_pipeline_igemm.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
     "legalize.mlir"
