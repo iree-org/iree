@@ -120,7 +120,7 @@ sdxl_punet_int8_fp8_real_weights = fetch_source_fixture(
 )
 
 sdxl_punet_int8_fp8_mlir = fetch_source_fixture(
-    "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8.mlir",
+    "https://sharkpublic.blob.core.windows.net/sharkpublic/rob/sdxl-punet/punet_fp8.mlir",
     group="sdxl_punet_int8_fp8",
 )
 

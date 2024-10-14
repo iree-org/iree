@@ -178,8 +178,8 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
-static Value applyRegion(OpBuilder &builder, Location loc, Region &region,
-                         Value value) {
+static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
+                                          Region &region, Value value) {
   auto rank = cast<RankedTensorType>(value.getType()).getRank();
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
@@ -363,11 +363,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
 
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
-  s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());
 
-  s = applyRegion(b, loc, getRegion(), s);
   // TODO: We shouldn't be relying on such attributes. We need a better
   // mechanism to identify attention matmuls.
+  s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());
+
+  s = applyPostQKMatmulElementwise(b, loc, getRegion(), s);
 
   if (qETy.getIntOrFloatBitWidth() <= 8) {
     // For low bit-depth types we perform post Q @ K scaling. This is to avoid

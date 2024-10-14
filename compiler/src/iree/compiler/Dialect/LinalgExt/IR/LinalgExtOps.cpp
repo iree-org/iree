@@ -1308,11 +1308,13 @@ LogicalResult AttentionOp::verify() {
     return attnOp->emitOpError("block arg0 should be float");
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
-  if (!yieldOp)
+  if (!yieldOp) {
     return attnOp->emitOpError("expected linalg_ext.yield");
+  }
 
-  if (yieldOp->getNumOperands() != 1)
+  if (yieldOp->getNumOperands() != 1) {
     return emitOpError("expected only one return");
+  }
 
   return success();
 }
@@ -1469,21 +1471,24 @@ LogicalResult OnlineAttentionOp::verify() {
       return failure();
   }
 
-  auto &block = attnOp.getRegion().front();
+  Block &block = attnOp.getRegion().front();
   auto blockTys = block.getArgumentTypes();
   if (blockTys.size() != 1) {
-    return attnOp->emitOpError("expected one block arguments");
+    return attnOp->emitOpError("expects single block argument for score");
   }
 
-  if (!isa<FloatType>(blockTys[0]))
+  if (!isa<FloatType>(blockTys[0])) {
     return attnOp->emitOpError("block arg0 should be float");
+  }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
-  if (!yieldOp)
+  if (!yieldOp) {
     return attnOp->emitOpError("expected linalg_ext.yield");
+  }
 
-  if (yieldOp->getNumOperands() != 1)
+  if (yieldOp->getNumOperands() != 1) {
     return emitOpError("expected only one return");
+  }
 
   return success();
 }
