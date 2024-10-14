@@ -456,6 +456,7 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+// TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
 def IREELoopInvariantCodeMotionPass :
   Pass<"iree-loop-invariant-code-motion", ""> {
   let summary = "Performs LICM on loops guaranteed to have >= 1 trip";
