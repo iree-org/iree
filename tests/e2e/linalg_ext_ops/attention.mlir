@@ -89,13 +89,15 @@ func.func @softcap_attention1x3x4() {
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32) outs(%init : tensor<1x3x4xf32>) {
           ^bb0(%arg0: f32):
           %tanh = math.tanh %arg0 : f32
-          iree_linalg_ext.yield %tanh : f32
+          %cst = arith.constant 2.0 : f32
+          %mul = arith.mulf %tanh, %cst : f32
+          iree_linalg_ext.yield %mul : f32
         } -> tensor<1x3x4xf32>
   check.expect_almost_eq_const(
       %1,
-      dense<[[[0.389204, 0.467124, 0.362128, 0.715769],
-              [0.485032, 0.426267, 0.341673, 0.765076],
-              [0.450497, 0.207868, 0.333702, 0.741759]]]> : tensor<1x3x4xf32>
+      dense<[[[0.331149, 0.576043, 0.380060, 0.6879],
+              [0.519539, 0.532548, 0.342270, 0.78571],
+              [0.442426, 0.125056, 0.329748, 0.735554]]]> : tensor<1x3x4xf32>
   ) : tensor<1x3x4xf32>
   return
 }
