@@ -4268,10 +4268,10 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.custom_op` `{` `indexing_maps` `=` $indexing_maps `,`
               `iterator_types` `=` $iterator_types `}`
+              attr-dict-with-keyword
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               (`outs` `(` $outputs^ `:` type($outputs) `)`)?
-              $region
-              attr-dict (`-&gt;` type($results)^)?
+              $region (`-&gt;` type($results)^)?
 </code></pre></div>
 <p>This operation is meant to allow computation sequences that are fused at
 tile level prescriptively. This is to account for cases where such fusion
