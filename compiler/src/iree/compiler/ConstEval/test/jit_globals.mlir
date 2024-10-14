@@ -405,7 +405,7 @@ module @dispatch_inline {
 module @dispatch_executable {
   flow.executable private @exe {
     flow.executable.export public @dispatch_fn workgroups(%arg0: index) -> (index, index, index) {
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg0
       flow.return %x, %y, %z : index, index, index
     }
     builtin.module {
