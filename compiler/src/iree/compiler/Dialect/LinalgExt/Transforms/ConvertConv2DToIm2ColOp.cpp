@@ -186,7 +186,7 @@ public:
         });
     Value result = genericOp.getResults().front();
 
-    rewriter.replaceOp(convOp, ArrayRef<Value>{result});
+    rewriter.replaceOp(convOp, result);
 
     return success();
   }
@@ -308,7 +308,7 @@ public:
         });
     Value result = genericOp.getResults().front();
 
-    rewriter.replaceOp(convOp, ArrayRef<Value>{result});
+    rewriter.replaceOp(convOp, result);
 
     return success();
   }
