@@ -634,6 +634,9 @@ static void enforceLayoutToMultiReductionOp(
     ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
+  }
   // Reductions should always propagate value layout to result. Result can
   // enforce it's layout on init.
   const DistributionLayout *result = resultLattices[0];
