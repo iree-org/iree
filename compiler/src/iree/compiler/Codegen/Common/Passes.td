@@ -456,6 +456,21 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+// TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
+def IREELoopInvariantCodeMotionPass :
+  Pass<"iree-loop-invariant-code-motion", ""> {
+  let summary = "Performs LICM on loops guaranteed to have >= 1 trip";
+  let description = [{
+    This is a mirror of the upstream LICM pass that restricts to loops that are
+    guaranteed to have at least one trip. This currently only supports loops
+    that expose a lower and upper bound as the generic loop-like interface does
+    not expose a way to query for trip count.
+
+    Additionally code motion of `scf.forall` ops with mappings is always unsafe
+    and is explicitly disabled.
+  }];
+}
+
 def SplitFullPartialTransferPass :
     InterfacePass<"iree-codegen-split-full-partial-transfer", "mlir::FunctionOpInterface"> {
   let summary =
