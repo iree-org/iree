@@ -2,6 +2,7 @@ add_library(GPUHello SHARED GPUHello.cpp)
 target_link_libraries(GPUHello
   PRIVATE
   LLVMSupport
+  LLVMCodeGen
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
 )
 
