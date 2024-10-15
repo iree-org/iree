@@ -105,19 +105,6 @@ def LLVMGPUPrefetchSharedMemoryPass :
 def LLVMGPUPromoteMatmulToFitMMAPass :
     InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
   let summary = "Pass to promote contraction ops to fit mma shapes";
-  let options = [
-    Option<"targetDimensions", "target-dimensions", "mlir::iree_compiler::LLVMGPUMatmulPadOption",
-           /*default=*/"mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims",
-           "Select the strategy to control how multi_reduction is lowered.",
-           [{::llvm::cl::values(
-            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims,
-                       "parallel",
-                       "Pad all the parallel dims for contraction ops."),
-            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ReductionDims,
-                       "reduction",
-                       "Pad all the reduction dims for contraction ops.")
-        )}]>
-  ];
 }
 
 def LLVMGPUSelectLoweringStrategyPass :
