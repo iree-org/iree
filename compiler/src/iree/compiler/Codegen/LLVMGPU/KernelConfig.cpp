@@ -829,7 +829,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   qkAttrs.emplace_back(StringAttr::get(context, "attention_qk_matmul"),
                        UnitAttr::get(context));
-  qkAttrs.emplace_back(StringAttr::get(context, "attention_pv_matmul"),
+  pvAttrs.emplace_back(StringAttr::get(context, "attention_pv_matmul"),
                        UnitAttr::get(context));
 
   auto qkAttrDict = DictionaryAttr::get(context, qkAttrs);
