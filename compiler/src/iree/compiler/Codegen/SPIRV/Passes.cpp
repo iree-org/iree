@@ -530,7 +530,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   PipeliningSchedulingStrategy schedule =
       storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
@@ -572,7 +572,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createCSEPass());
   }
 
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -587,7 +587,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
 
   // Simplify the IR for vector distribution.
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createSafeLoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createForOpCanonicalizationPass());
