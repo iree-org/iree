@@ -19,6 +19,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
+#include "mlir/Interfaces/InferIntRangeInterface.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -2003,10 +2004,27 @@ static void getAsmResultNamesForInterfaceWorkgroupOp(
   }
 }
 
+static void
+setResultRangesForInterfaceWorkgroupOp(Value result,
+                                       const std::optional<APInt> &upperBound,
+                                       SetIntRangeFn setResultRanges) {
+  if (!upperBound.has_value())
+    return;
+  setResultRanges(result,
+                  ConstantIntRanges::fromUnsigned(
+                      APInt::getZero(upperBound->getBitWidth()), *upperBound));
+}
+
 void InterfaceWorkgroupIDOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_id_", getDimension(),
                                            getResult(), setNameFn);
+}
+
+void InterfaceWorkgroupIDOp::inferResultRanges(
+    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
+  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
+                                         setResultRanges);
 }
 
 void InterfaceWorkgroupCountOp::getAsmResultNames(
@@ -2015,10 +2033,22 @@ void InterfaceWorkgroupCountOp::getAsmResultNames(
                                            getResult(), setNameFn);
 }
 
+void InterfaceWorkgroupCountOp::inferResultRanges(
+    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
+  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
+                                         setResultRanges);
+}
+
 void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", getDimension(),
                                            getResult(), setNameFn);
+}
+
+void InterfaceWorkgroupSizeOp::inferResultRanges(
+    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRanges) {
+  setResultRangesForInterfaceWorkgroupOp(getResult(), getUpperBound(),
+                                         setResultRanges);
 }
 
 //===----------------------------------------------------------------------===//

@@ -31,6 +31,7 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -1047,7 +1048,9 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createLoopInvariantCodeMotionPass)
-      .addPass(createLowerAffinePass);
+      .addPass(createLowerAffinePass)
+      .addPass(arith::createIntRangeOptimizationsPass)
+      .addPass(arith::createArithUnsignedWhenEquivalentPass);
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
@@ -1083,7 +1086,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
       .addPass(createLLVMGPUVectorLoweringPass)
-      .addPass(createExpandGPUOpsPass);
+      .addPass(createExpandGPUOpsPass)
+      // Expose workitem and workgroup counts to range inference later.
+      .addPass(createGPUPropagateDispatchSizeBoundsPass);
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
@@ -1111,6 +1116,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createEmulateNarrowTypePass)
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass)
+      // Re-run index optimizations to take care of this ronud of indexing
+      // even though now we can't reason about loop bounds
+      .addPass(arith::createIntRangeOptimizationsPass)
+      .addPass(arith::createArithUnsignedWhenEquivalentPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
