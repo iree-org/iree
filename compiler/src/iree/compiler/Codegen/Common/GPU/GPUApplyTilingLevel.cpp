@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -65,10 +66,9 @@ collectTiledAndFusedOps(Operation *op,
 
 /// Apply a tile and fuse transformation to all payload ops and store both the
 /// tiled operation as well as the created tile loops.
-static LogicalResult
-applyTileAndFuseToEachRoot(RewriterBase &rewriter,
-                           llvm::SmallDenseSet<TilingInterface> &payloadOps,
-                           IREE::GPU::TilingLevel tilingLevel) {
+static LogicalResult applyTileAndFuseToEachRoot(
+    RewriterBase &rewriter, llvm::SmallDenseSet<TilingInterface> &payloadOps,
+    IREE::GPU::TilingLevel tilingLevel, bool allowZeroSlices) {
   MLIRContext *context = rewriter.getContext();
   for (TilingInterface tilingInterfaceOp : payloadOps) {
     mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
@@ -137,7 +137,8 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       Operation *owner = originalProducer.getOwner();
       if (tilingLevel == IREE::GPU::TilingLevel::Reduction ||
           tilingLevel == IREE::GPU::TilingLevel::Subgroup) {
-        // Do not fuse pad in reduction and subgroup tiling.
+        // Do not fuse pad in reduction and subgroup tiling. We instead fuse
+        // pad without zero slice guard as a cleanup pattern.
         if (isa<tensor::PadOp>(owner)) {
           return std::nullopt;
         }
@@ -160,6 +161,22 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
       return std::nullopt;
     };
     tileAndFuseOptions.setFusionControlFn(controlFn);
+
+    RewritePatternSet cleanupPatterns(context);
+
+    if (allowZeroSlices) {
+      // Add pattern to fuse pad operations without zero slice gaurd, if we
+      // know we have no zero slices.
+      auto zeroSliceGuard = [](tensor::ExtractSliceOp) -> std::optional<bool> {
+        // Do not use zero slice gaurd.
+        return false;
+      };
+      cleanupPatterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, zeroSliceGuard);
+    }
+
+    tileAndFuseOptions.cleanupPatterns =
+        FrozenRewritePatternSet(std::move(cleanupPatterns));
 
     FailureOr<scf::SCFTileAndFuseResult> tiledResults =
         scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
@@ -221,7 +238,8 @@ void GPUApplyTilingLevelPass::runOnOperation() {
       getTiledOps(funcOp, tilingLevel);
 
   IRRewriter rewriter(funcOp);
-  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel))) {
+  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel,
+                                        allowZeroSlices))) {
     funcOp.emitError() << "tiling of level "
                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
