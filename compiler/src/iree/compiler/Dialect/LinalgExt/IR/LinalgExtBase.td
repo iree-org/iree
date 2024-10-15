@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_LINALGEXT_BASE
 #define IREE_DIALECT_LINALGEXT_BASE
 
+include "mlir/Dialect/Utils/StructuredOpsUtils.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
@@ -25,6 +26,7 @@ def IREELinalgExt_Dialect : Dialect {
     A dialect designed for experimenting with non-structured operations that
     cannot be represented efficiently/directly by the Linalg dialect.
   }];
+  let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -37,5 +39,24 @@ class RankedTensorOrMemRefOf<list<Type> allowedTypes> :
   "ranked tensor or memref", "::mlir::ShapedType">;
 
 def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
+
+class RankedTensorOrScalarType<list<Type> allowedTypes> :
+  AnyTypeOf<[RankedTensorOf<allowedTypes>, AnyTypeOf<allowedTypes>]>;
+
+def AnyRankedTensorOrScalarType :
+  RankedTensorOrScalarType<[AnySignlessIntegerOrIndex, AnyFloat]>;
+
+//===----------------------------------------------------------------------===//
+// Enum definitions
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_IteratorTypeEnum : EnumAttr<IREELinalgExt_Dialect,
+    IteratorType, "iterator_type"> {
+  let assemblyFormat = "`<` $value `>`";
+}
+
+def IREELinalgExt_IteratorTypeArrayAttr :
+    TypedArrayAttrBase<IREELinalgExt_IteratorTypeEnum,
+    "LinalgExt iterator type">;
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

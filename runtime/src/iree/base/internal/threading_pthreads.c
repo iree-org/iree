@@ -113,10 +113,6 @@ static void* iree_thread_start_routine(void* param) {
   thread->entry = NULL;
   thread->entry_arg = NULL;
 
-  // Release our ownership of the thread handle. If the creating thread doesn't
-  // want it this will free the memory and fully detach the thread.
-  iree_thread_release(thread);
-
   // Call the user thread entry point function.
   // Note that this can be a tail-call which saves a stack frame in all threads
   // (which is really just to make call stacks in debuggers much cleaner).
@@ -157,9 +153,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
     pthread_attr_setstacksize(&thread_attr, params.stack_size);
   }
 
-  // Retain the thread for the thread itself; this way if the caller immediately
-  // releases the iree_thread_t handle the thread won't explode.
-  iree_thread_retain(thread);
   *out_thread = thread;
 
   // Unfortunately we can't create the thread suspended (no API). This means
@@ -176,7 +169,6 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
   pthread_attr_destroy(&thread_attr);
   if (rc != 0) {
-    iree_thread_release(thread);  // for self
     iree_thread_release(thread);  // for caller
     *out_thread = NULL;
     IREE_TRACE_ZONE_END(z0);

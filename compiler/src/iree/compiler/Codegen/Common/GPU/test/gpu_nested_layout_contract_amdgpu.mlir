@@ -43,9 +43,9 @@
 >
 
 func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<32x8xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<8x32xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<32x32xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<32x8xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<8x32xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<32x32xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -54,7 +54,7 @@ func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x8xf16>, vector<8x32xf16> into vector<32x32xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<32x32xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
   return %O : vector<32x32xf32>
 }
 
@@ -120,9 +120,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // C: shape = 16x16, layout = layoutB
 
 func.func @contract_to_mfma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<16x16xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<16x16xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_b : vector<16x16xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x16xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<16x16xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_b) : vector<16x16xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -131,7 +131,7 @@ func.func @contract_to_mfma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x1
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_b : vector<16x16xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_b) : vector<16x16xf32>
   return %O : vector<16x16xf32>
 }
 
@@ -208,9 +208,9 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vector<8x32xf16>, %c : vector<64x32xf32>) -> vector<64x32xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<64x8xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<8x32xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<64x32xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<64x8xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<8x32xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<64x32xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -219,7 +219,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vecto
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<64x8xf16>, vector<8x32xf16> into vector<64x32xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<64x32xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<64x32xf32>
   return %O : vector<64x32xf32>
 }
 
@@ -297,9 +297,9 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vector<16x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<32x16xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<16x32xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<32x32xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<32x16xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<16x32xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<32x32xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -308,7 +308,7 @@ func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vecto
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x16xf16>, vector<16x32xf16> into vector<32x32xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<32x32xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
   return %O : vector<32x32xf32>
 }
 
@@ -380,9 +380,9 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b : vector<8x96xf16>, %c : vector<64x96xf32>) -> vector<64x96xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<64x8xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<8x96xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<64x96xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<64x8xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<8x96xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<64x96xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -391,7 +391,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b :
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<64x8xf16>, vector<8x96xf16> into vector<64x96xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<64x96xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<64x96xf32>
   return %O : vector<64x96xf32>
 }
 
@@ -471,9 +471,9 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8xf16>, %c : vector<32x64xf32>) -> vector<32x64xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<32x8xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<64x8xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<32x64xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<32x8xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<64x8xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<32x64xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -482,7 +482,7 @@ func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8x
     iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x8xf16>, vector<64x8xf16> into vector<32x64xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<32x64xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x64xf32>
   return %O : vector<32x64xf32>
 }
 
@@ -550,9 +550,9 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @contract_to_wmma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<16x16xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<16x16xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<16x16xf32>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x16xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<16x16xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<16x16xf32>
 
   %output = vector.contract {
     indexing_maps = [#map1, #map2, #map3],
@@ -561,7 +561,7 @@ func.func @contract_to_wmma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x1
     iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
-  %O = iree_vector_ext.to_layout %output to #layout_c : vector<16x16xf32>
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
   return %O : vector<16x16xf32>
 }
 

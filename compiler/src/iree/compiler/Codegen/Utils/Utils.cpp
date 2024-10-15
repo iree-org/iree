@@ -6,19 +6,24 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -26,6 +31,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
@@ -259,6 +266,258 @@ bool isReadOnly(Value v) {
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
+}
+
+LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(emptyOp);
+  SmallVector<OpOperand *> uses = llvm::map_to_vector(
+      emptyOp->getUses(), [](OpOperand &use) { return &use; });
+  for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
+    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
+    Operation *user = use->getOwner();
+    user->setOperand(use->getOperandNumber(), newOp);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Setting CustomOp Lowering config.
+//===----------------------------------------------------------------------===//
+
+static std::tuple<SmallVector<Operation *>, SetVector<Value>>
+getNonConstantValuesDefinedFromAbove(Region &region) {
+  llvm::SetVector<Value> valuesDefinedFromAbove;
+  mlir::getUsedValuesDefinedAbove(region, valuesDefinedFromAbove);
+  SmallVector<Operation *> constants;
+  SetVector<Value> erasedVals;
+  for (auto value : valuesDefinedFromAbove) {
+    Attribute constVal;
+    if (!matchPattern(value, m_Constant(&constVal))) {
+      continue;
+    }
+    if (!isa<IntegerAttr, FloatAttr>(constVal)) {
+      continue;
+    }
+    constants.push_back(value.getDefiningOp());
+    erasedVals.insert(value);
+  }
+  valuesDefinedFromAbove.set_subtract(erasedVals);
+  return {constants, valuesDefinedFromAbove};
+}
+
+/// Listener to track mapping from operations in the body of a cloned custom op
+/// back to the original operations in the body of the original custom op.
+class CustomOpConfigListener : public RewriterBase::Listener {
+public:
+  CustomOpConfigListener(IREE::LinalgExt::CustomOp origCustomOp,
+                         IREE::LinalgExt::CustomOp clonedCustomOp) {
+    for (auto [origOp, clonedOp] :
+         llvm::zip_equal(origCustomOp.getBody()->without_terminator(),
+                         clonedCustomOp.getBody()->without_terminator())) {
+      clonedOpToOrigOp[&clonedOp] = &origOp;
+    }
+  }
+  void notifyOperationErased(Operation *op) override {
+    clonedOpToOrigOp.erase(op);
+  }
+  void notifyOperationReplaced(Operation *op, Operation *replacement) override {
+    auto it = clonedOpToOrigOp.find(op);
+    if (it != clonedOpToOrigOp.end()) {
+      Operation *origOp = it->second;
+      clonedOpToOrigOp.erase(it);
+      clonedOpToOrigOp[replacement] = origOp;
+    }
+  }
+  void notifyOperationReplaced(Operation *op,
+                               ValueRange replacements) override {
+    Operation *replacementOp = nullptr;
+    for (auto val : replacements) {
+      Operation *definingOp = getDefiningOp(val);
+      if (!definingOp) {
+        // One of the replacements is definitely not from an op. Bail
+        // immediately.
+        return;
+      }
+      if (replacementOp) {
+        if (definingOp != replacementOp) {
+          // No consistent replacementOp. Bail.
+          return;
+        }
+      } else {
+        replacementOp = definingOp;
+      }
+    }
+    if (replacementOp && replacementOp->getName() == op->getName()) {
+      notifyOperationReplaced(op, replacementOp);
+    }
+  }
+
+  // Helper methods to get back the orig op for the cloned op.
+  std::optional<Operation *> getOrigOp(Operation *clonedOp) {
+    auto it = clonedOpToOrigOp.find(clonedOp);
+    if (it == clonedOpToOrigOp.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+private:
+  llvm::MapVector<Operation *, Operation *> clonedOpToOrigOp;
+
+  /// On cast propagation, the replacement value used is not the
+  /// actual op that is used for replacement. Walk back the replacement
+  /// value use-def chain to get to the real replacement. This is a
+  /// bit of a hack, but the lowering config propagation is really
+  /// best effort, so not incorrect.
+  Operation *getDefiningOp(Value v) {
+    Operation *definingOp = v.getDefiningOp();
+    while (definingOp) {
+      if (auto castOp = dyn_cast<tensor::CastOp>(definingOp)) {
+        definingOp = castOp.getSource().getDefiningOp();
+        continue;
+      }
+      // Default is to break out of the loop.
+      break;
+    }
+    return definingOp;
+  }
+};
+
+LogicalResult setDefaultCustomOpLoweringConfig(
+    FunctionOpInterface funcOp, IREE::LinalgExt::CustomOp customOp,
+    std::function<LogicalResult(FunctionOpInterface)> configFn) {
+
+  MLIRContext *context = funcOp.getContext();
+  IRRewriter rewriter(context);
+  rewriter.setInsertionPoint(funcOp);
+
+  // 1. Get values captured from above in the custom op region.
+  llvm::SetVector<Value> valuesDefinedAbove;
+  SmallVector<Operation *> constantOps;
+  std::tie(constantOps, valuesDefinedAbove) =
+      getNonConstantValuesDefinedFromAbove(customOp.getRegion());
+
+  // 2. Create an empty function with arguments being the operands of the custom
+  // op and values captured from above in the custom op.
+  auto operandTypes = llvm::to_vector(customOp->getOperandTypes());
+  auto valuesDefinedAboveTypes =
+      llvm::map_range(valuesDefinedAbove, [](Value v) { return v.getType(); });
+  operandTypes.append(valuesDefinedAboveTypes.begin(),
+                      valuesDefinedAboveTypes.end());
+  auto dummyFuncType =
+      FunctionType::get(context, operandTypes, customOp->getResultTypes());
+  std::string dummyFuncName =
+      std::string("__") + funcOp.getName().str() + "_config_setting__";
+  auto dummyFuncOp = rewriter.create<func::FuncOp>(
+      customOp.getLoc(), dummyFuncName, dummyFuncType);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  if (targetAttr) {
+    dummyFuncOp->setAttr(IREE::HAL::ExecutableTargetAttr::name, targetAttr);
+  }
+
+  // 3. Clone the custom op into the function
+  SmallVector<Location> locs = llvm::map_to_vector(
+      customOp->getOperands(), [](Value v) { return v.getLoc(); });
+  auto valuesDefinedAboveLocs =
+      llvm::map_range(valuesDefinedAbove, [](Value v) { return v.getLoc(); });
+  locs.append(valuesDefinedAboveLocs.begin(), valuesDefinedAboveLocs.end());
+  Block *body =
+      rewriter.createBlock(&dummyFuncOp.getRegion(),
+                           dummyFuncOp.getRegion().begin(), operandTypes, locs);
+  rewriter.setInsertionPointToStart(body);
+  IRMapping map;
+  map.map(customOp.getOperands(),
+          body->getArguments().take_front(customOp.getNumOperands()));
+  map.map(valuesDefinedAbove.getArrayRef(),
+          body->getArguments().take_back(valuesDefinedAbove.size()));
+  for (auto op : constantOps) {
+    rewriter.clone(*op, map);
+  }
+  auto clonedCustomOp = cast<IREE::LinalgExt::CustomOp>(
+      rewriter.clone(*customOp.getOperation(), map));
+  rewriter.create<func::ReturnOp>(customOp.getLoc(),
+                                  clonedCustomOp->getResults());
+  CustomOpConfigListener customOpConfigListener(customOp, clonedCustomOp);
+
+  // 4. Inline the cloned custom op.
+  rewriter.setInsertionPoint(clonedCustomOp);
+  FailureOr<SmallVector<Value>> replacements =
+      clonedCustomOp.decomposeOperation(rewriter);
+  if (failed(replacements)) {
+    return customOp.emitOpError(
+        "failed to decompose op during custom op configuration setting");
+  }
+  rewriter.replaceOp(clonedCustomOp, replacements.value());
+
+  // 5. Run canonicalizations on the created function to constant propagate the
+  // shape.
+  RewritePatternSet patterns(context);
+  auto addCanonicalizationPatterns = [&context,
+                                      &patterns](StringRef dialectName) {
+    context->getLoadedDialect(dialectName)
+        ->getCanonicalizationPatterns(patterns);
+  };
+  addCanonicalizationPatterns(linalg::LinalgDialect::getDialectNamespace());
+  addCanonicalizationPatterns(
+      IREE::LinalgExt::IREELinalgExtDialect::getDialectNamespace());
+  tensor::CastOp::getCanonicalizationPatterns(patterns, context);
+  addCanonicalizationPatterns(tensor::TensorDialect::getDialectNamespace());
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+  GreedyRewriteConfig config;
+  config.listener = &customOpConfigListener;
+  if (failed(applyPatternsAndFoldGreedily(dummyFuncOp, std::move(patterns),
+                                          config))) {
+    return customOp.emitOpError(
+        "failed to canonicalize during custom op configuration setting");
+  }
+
+  // 6. Run set configuration on the new dummy function.
+  if (failed(configFn(dummyFuncOp))) {
+    return customOp.emitOpError("failed to set configuration for custom op");
+  }
+
+  // 7. Set translation info and lowering config for the custom op.
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(dummyFuncOp);
+  // Move lowering config from ops in the cloned function to the ops
+  // within the body of the custom op.
+  // TODO: This logic needs to be made more robust (by account for indexing maps
+  // specified for operands on the custom op and the indexing maps of the
+  // operations within the region of the custom op). For now, just use the first
+  // operation with lowering config.
+  std::optional<SmallVector<int64_t>> workgroupTileSizes;
+  std::optional<SmallVector<int64_t>> workgroupInterchange;
+  for (Operation &op : dummyFuncOp.getBody().front()) {
+    auto currLoweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(&op);
+    if (!currLoweringConfig)
+      continue;
+
+    // Translate the lowering config to the original operation.
+    if (std::optional<Operation *> originalOperation =
+            customOpConfigListener.getOrigOp(&op)) {
+      setLoweringConfig(originalOperation.value(), currLoweringConfig);
+    }
+
+    auto currWorkgroupTileSizes = currLoweringConfig.getWorkgroupTileSizes();
+    if (currWorkgroupTileSizes.empty())
+      continue;
+    workgroupTileSizes = currWorkgroupTileSizes;
+    workgroupInterchange = currLoweringConfig.getWorkgroupInterchange();
+  }
+  IREE::Codegen::LoweringConfigAttr loweringConfig;
+  if (workgroupTileSizes) {
+    loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
+        context, workgroupTileSizes.value_or(SmallVector<int64_t>{}),
+        workgroupInterchange.value_or(SmallVector<int64_t>{}));
+  }
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          funcOp, customOp, loweringConfig, translationInfo))) {
+    return funcOp.emitOpError("failed to set custom op configuration");
+  }
+  rewriter.eraseOp(dummyFuncOp);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -614,9 +873,14 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
   return loopInfo;
 }
 
-SmallVector<Operation *> getComputeOps(mlir::FunctionOpInterface funcOp) {
+SmallVector<Operation *> getComputeOps(Operation *containingOp) {
+  if (containingOp->getNumRegions() == 0) {
+    return {};
+  }
+  assert(containingOp->getNumRegions() == 1 &&
+         "expected op with a single region");
   SmallVector<Operation *> computeOps;
-  funcOp.walk([&](Operation *op) {
+  containingOp->getRegion(0).walk([&](Operation *op) {
     if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
       computeOps.push_back(op);
     }
@@ -704,17 +968,11 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes,
     linalg::DistributionMethod distributionMethod,
     int32_t maxWorkgroupParallelDims) {
-  return {[&tileSizes, distributionMethod,
+  return {[distributionMethod,
            maxWorkgroupParallelDims](OpBuilder &builder, Location loc,
                                      ArrayRef<Range> parallelLoopRanges) {
-    SmallVector<int64_t> nonZeroTileSizes;
-    for (int64_t size : tileSizes) {
-      if (size != 0)
-        nonZeroTileSizes.push_back(size);
-    }
     auto numParallelDims = parallelLoopRanges.size();
 
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
@@ -729,11 +987,12 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         OpFoldResult size = parallelLoopRanges[numParallelDims - dim - 1].size;
         OpFoldResult offset =
             parallelLoopRanges[numParallelDims - dim - 1].offset;
-        AffineExpr d0, d1;
-        int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
-        bindSymbols(builder.getContext(), d0, d1);
+        OpFoldResult step =
+            parallelLoopRanges[numParallelDims - dim - 1].stride;
+        AffineExpr d0, d1, d2;
+        bindSymbols(builder.getContext(), d0, d1, d2);
         OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
-            builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
+            builder, loc, (d1 - d0).ceilDiv(d2), {offset, size, step});
         OpFoldResult dimValue;
         if (dim == numParallelDims - 1)
           dimValue = splitDim.value();

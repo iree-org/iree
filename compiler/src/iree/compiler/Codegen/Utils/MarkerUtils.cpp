@@ -142,4 +142,15 @@ void setMarker(Operation *op, StringRef marker) {
               StringAttr::get(op->getContext(), marker));
 }
 
+constexpr StringLiteral kUnrollLoopName = "unroll_loop";
+void setLoopUnrollMarker(Operation *op) {
+  op->setAttr(kUnrollLoopName, UnitAttr::get(op->getContext()));
+}
+
+Attribute getLoopUnrollMarker(Operation *op) {
+  return op->getAttr(kUnrollLoopName);
+}
+
+void removeLoopUnrollMarker(Operation *op) { op->removeAttr(kUnrollLoopName); }
+
 } // namespace mlir::iree_compiler

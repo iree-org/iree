@@ -48,6 +48,21 @@ def OpGroupUtilityOps : OpDocGroup {
 
 let opDocGroup = OpGroupUtilityOps in {
 
+def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
+    Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
+    Results<(outs Index:$result)> {
+  let summary = "linalg_ext index operation";
+  let description = [{
+    This operation is a mirror of `linalg.index` operation and has the same
+    semantics, except that `linalg.index` enforces that the parent op is a
+    `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
+    parent op is a `IREE::LinalgExt::CustomOp`.
+  }];
+
+  let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
+  let hasVerifier = 1;
+}
+
 def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
   let summary = "LinalgExt yield op";
   let description = [{
@@ -79,7 +94,9 @@ let opDocGroup = OpGroupNonStructuredOps in {
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-     DeclareOpInterfaceMethods<LinalgFusionInterface>,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
@@ -454,14 +471,15 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DestinationStyleOpInterface, LinalgExtInterface,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
-      ["getIndexingMapsForResults", "getIndexingMapsForOperands"]>,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
        "getTiledImplementation",
-       "generateResultTileValue"]>, AttrSizedOperandSegments]> {
+       "generateResultTileValue"]>]> {
   let summary = "Attention operator";
   let description = [{
     Computes the scaled dot product attention function:
@@ -474,25 +492,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
-
-    For self-attention, all inputs and the result have the same shape BxNxd
-    where B is the batch dimension, N is the sequence length and d is head
-    dimension. Typically N >>> d. Usually, this operator also performs
-    masking and dropout, but we leave that out of the current implementation.
-    For cross-attention, the query and output have the same shape (BxNxd),
-    while the key and value differ in sequence length (they have shape BxLxd,
-    where L != N).
-
-    This operator after tiling results in a tiled result as per
-    FlashAttention 2 and optionally results in the current `max` and `sum`
-    statistics while processing the current tile.
-
-    With indexing_maps we can also infer when variables are transposed.
-    for example, if V has indexing_map of (m, k1, k2, n) -> (n, k2) instead
-    of (m, k1, k2, n) -> (k2, n), then we'd know that V is transposed (V.T),
-    and we can expect computation to look like:
-
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -500,18 +499,17 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyShaped:$value,
                        AnyFloat:$scale,
                        Optional<AnyShaped>:$mask,
-                       Variadic<AnyShaped>:$outputs,
+                       AnyShaped:$output,
                        AffineMapArrayAttr:$indexing_maps
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
-  let hasFolder = 1;
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)? `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )? `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
   }];
 
@@ -521,7 +519,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     "Value":$key,
     "Value":$value,
     "Value":$scale,
-    "ValueRange":$outputs,
+    "Value":$output,
     "ArrayAttr":$indexing_maps,
     CArg<"std::optional<Value>", "std::nullopt">:$mask)>
   ];
@@ -529,13 +527,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let extraClassDeclaration = [{
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
 
     SmallVector<AffineMap> getIndexingMapsArray();
-
-    SmallVector<int64_t, 4> getStaticLoopRanges();
 
     AffineMap getQueryMap() {
       return cast<AffineMap>(getIndexingMapsArray()[0]);
@@ -560,102 +554,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     }
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
-    }
-    ShapedType getQueryType() {
-      return cast<ShapedType>(getQuery().getType());
-    }
-    ShapedType getKeyType() {
-      return cast<ShapedType>(getKey().getType());
-    }
-    ShapedType getValueType() {
-      return cast<ShapedType>(getValue().getType());
-    }
-    std::optional<ShapedType> getMaskType() {
-      std::optional<Value> mask = getMask();
-      if (!mask) return std::nullopt;
-      return cast<ShapedType>(mask->getType());
-    }
-    FloatType getScaleType() {
-      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
-    }
-    ShapedType getOutputType() {
-      return cast<ShapedType>(getOutput().getType());
-    }
-
-    // Helper functions used for tile_and_decompose_attn.
-    // TODO: Remove once we completely move to
-    //       online_attn decompose pipeline.
-
-    std::optional<AffineMap> getMaxMap() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 1]);
-    }
-    std::optional<AffineMap> getSumMap() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[getNumDpsInputs() + 2]);
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-    std::optional<Value> getMax() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return getDpsInitOperand(1)->get();
-    }
-    std::optional<Value> getSum() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return getDpsInitOperand(2)->get();
-    }
-    std::optional<ShapedType> getMaxType() {
-      std::optional<Value> maxVal = getMax();
-      if (!maxVal) return std::nullopt;
-      return cast<ShapedType>(maxVal->getType());
-    }
-    std::optional<ShapedType> getSumType() {
-      std::optional<Value> sumVal = getSum();
-      if (!sumVal) return std::nullopt;
-      return cast<ShapedType>(sumVal->getType());
-    }
-
-    int64_t getQueryRank() {
-      return getQueryType().getRank();
-    }
-    int64_t getKeyRank() {
-      return getKeyType().getRank();
-    }
-    int64_t getValueRank() {
-      return getValueType().getRank();
-    }
-    std::optional<int64_t> getMaskRank() {
-      std::optional<ShapedType> maskType = getMaskType();
-      if (!maskType)
-        return std::nullopt;
-      return maskType->getRank();
-    }
-    int64_t getOutputRank() {
-      return getOutputType().getRank();
-    }
-    std::optional<int64_t> getMaxRank() {
-      std::optional<ShapedType> maxType = getMaxType();
-      if (!maxType) return std::nullopt;
-      return maxType->getRank();
-    }
-    std::optional<int64_t> getSumRank() {
-      std::optional<ShapedType> sumType = getSumType();
-      if (!sumType) return std::nullopt;
-      return sumType->getRank();
-    }
-
-    // Since we expect map_V to be (b, m, k1, k2, n) -> (b, k2, n), this function
-    // returns true if n is not the fastest dim.
-    bool isTransposeV() {
-      AffineMap vMap = getValueMap();
-      auto vFastDim = llvm::cast<AffineDimExpr>(vMap.getResults().back());
-      int64_t nDim = vMap.getNumInputs() - 1;
-      return nDim != vFastDim.getPosition();
     }
   }];
 }
@@ -812,7 +710,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     ```
       %im2col = iree_linalg_ext.im2col
           strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-          m_offset = [0] k_offset = [0]
+          m_offset = [0] * [1] k_offset = [0] * [1]
           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
           ins(%in : tensor<2x34x34x640xf32>)
           outs(%out : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
@@ -824,7 +722,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
           scf.for %arg2 = %c0 to %c5760 step %c1
             %im2col = iree_linalg_ext.im2col
                 strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-                m_offset = [%arg1] k_offset = [%arg2]
+                m_offset = [%arg1] * [1] k_offset = [%arg2] * [1]
                 batch_pos = [0] m_pos = [1, 2] k_pos = [3]
                 ins(%in_tile : tensor<1x34x34x640xf32>)
                 outs(%out_tile : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
@@ -836,6 +734,21 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     (b, m, k) -> (b, M / 32 + K / (640*3), M % 32 + K % (640*3) / 640, K % 640)
     Where `(b, m, k)` are the indices of the tiled op's iteration space, and
     `M = m + m_offset` and `K = k + K_offset`.
+
+    The `m_strides` and `k_strides` fields are used as a basis for linearizing
+    the `m_offset` and `k_offset`. This is used when there are multiple M or K
+    output dimensions, and therefore multiple `m_offset` or `k_offset` values.
+    The strides fields are assembled in the IR as if they are multiplied as an
+    inner product with `m_offset` and `k_offset, indicating that the total
+    linear offset along the dimension is equal to this inner product. These
+    strides fields also determine the strides of the output dimensions along
+    M and K. For example, an op with `m_strides = [32, 1]`, `k_strides = [4, 1]`,
+    and output type `tensor<BxM0xM1xK0xK1>` (expanded from `tensor<BxMxK>`),
+    would have strides along the M dim of 32 for `M0`, meaning as `M0` increases
+    by 1, the index into the flat `M` increases by 32. Along the K dim, strides
+    would be 4 for `K0`, and 1 for `K1`, meaning as `K0` increases by 1, the
+    index into the flat `K` increases by 4. The strides in M from `m_strides`
+    are orthogonal to the strides in `K` from `k_strides`.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -845,8 +758,12 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$static_kernel_size,
                        Variadic<Index>:$m_offset,
                        DenseI64ArrayAttr:$static_m_offset,
+                       Variadic<Index>:$m_strides,
+                       DenseI64ArrayAttr:$static_m_strides,
                        Variadic<Index>:$k_offset,
                        DenseI64ArrayAttr:$static_k_offset,
+                       Variadic<Index>:$k_strides,
+                       DenseI64ArrayAttr:$static_k_strides,
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
                        DenseI64ArrayAttr:$k_pos);
@@ -861,8 +778,10 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     custom<DynamicIndexList>($kernel_size, $static_kernel_size)
     `m_offset` `=`
     custom<DynamicIndexList>($m_offset, $static_m_offset)
+    `*` custom<DynamicIndexList>($m_strides, $static_m_strides)
     `k_offset` `=`
     custom<DynamicIndexList>($k_offset, $static_k_offset)
+    `*` custom<DynamicIndexList>($k_strides, $static_k_strides)
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
@@ -877,7 +796,9 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<int64_t>":$dilations,
       "ArrayRef<OpFoldResult>":$kernel_size,
       "ArrayRef<OpFoldResult>":$m_offset,
+      "ArrayRef<OpFoldResult>":$m_strides,
       "ArrayRef<OpFoldResult>":$k_offset,
+      "ArrayRef<OpFoldResult>":$k_strides,
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
       "ArrayRef<int64_t>":$k_dimensions)>
@@ -896,14 +817,24 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     int64_t getOutputRank() {
       return getOutputType().getRank();
     }
+
+    // Helpers to get output dimensions corresponding to batch, m, and k.
+    SmallVector<int64_t> getBatchOutputDims();
+    SmallVector<int64_t> getMOutputDims();
+    SmallVector<int64_t> getKOutputDims();
+
     // Return op metadata.
     SmallVector<OpFoldResult> getMixedKernelSize();
     SmallVector<OpFoldResult> getMixedMOffset();
     SmallVector<OpFoldResult> getMixedKOffset();
+    SmallVector<OpFoldResult> getMixedMStrides();
+    SmallVector<OpFoldResult> getMixedKStrides();
 
     // Set op metadata.
     void setMixedKOffset(SmallVector<OpFoldResult> kOffset);
     void setMixedMOffset(SmallVector<OpFoldResult> mOffset);
+    void setMixedKStrides(SmallVector<OpFoldResult> kStrides);
+    void setMixedMStrides(SmallVector<OpFoldResult> mStrides);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1569,5 +1500,119 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 }
 
 } // OpGroupWinogradOps
+
+//===---------------------------------------------------------------------===//
+// Custom tilable op
+//===---------------------------------------------------------------------===//
+
+def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
+  DeclareOpInterfaceMethods<AggregatedOpInterface, [
+    "decomposeOperation"]>,
+  DeclareOpInterfaceMethods<LinalgFusionInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
+     "getTiledImplementation"]>
+  ]> {
+  let summary = "Custom operation for compiling with IREE";
+  let description = [{
+    This operation is meant to allow computation sequences that are fused at
+    tile level prescriptively. This is to account for cases where such fusion
+    cannot/is not yet discovered appropriately.
+
+    The operation implements all the interfaces needed to be able to
+    1. Compile e2e using IREE
+    2. Still be able to fuse with other operations that the compiler can
+       figure out automatically.
+
+    Similar to how `LinalgOp`s represent a perfectly nested loop computation
+    with
+    - `indexing_maps` representing how the `ins`/`outs` are accessed
+    - `region` representing the scalar computation performed
+    - `iterator_types` representing the dependence along each iteration space
+      dimension
+    this operation represent a tiled computation with perfectly nested
+    inter-tile loop nest.
+    - `indexing_maps` represent what slices slices of the `ins`/`outs` are
+      needed for each iteration of the tiled computation.
+    - `region` represents the tiled computation performed using these slices
+    - `iterator_types` represents the dependence between tiles along each
+      iteration space.
+
+    Some modifications required to handle the tile-level semantics are
+    - Some dimensions of operands might not be accessed by dimensions of the
+      inter-tile iteration space. This means that along these dimensions the
+      slice size matches the dimension size. This access pattern of operands
+      is captured in the respective indexing map using a `symbol` to represent
+      that the entire dimension needs to be sliced.
+    - The basic block arguments of the region represent the slice of the
+      operand. These are either scalar types (if the corresponding operand is a
+      scalar), or a `tensor` type with dynamic shapes (if the corresponding
+      operand is a `tensor` type).
+
+    For example, one could represent a prescriptively fused matmul computation
+    as follows
+
+    ```
+    %0:2 = iree_linalg_ext.custom_op {
+        indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (d0, s0)>,
+                         affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (s1, d1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (d0, s1)>,
+                         affine_map<(d0, d1)[s0, s1] -> (d0, d1)],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%lhs1, %rhs1, %rhs2
+            : tensor<1000000x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+        outs(%outs1, %outs2 : tensor<1000000x?xf32>, tensor<1000000x?xf32>) {
+      ^bb0(%t0 : tensor<?x?xf32>, %t1 : tensor<?x?xf32>, %t2 : tensor<?x?xf32>,
+           %t3 : tensor<?x?xf32>, %t4 : tensor<?x?xf32>) :
+        %0 = linalg.matmul ins(%t0, %t1 : tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%t3 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %1 = linalg.matmul ins(%0, %t2 : tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%t4 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        iree_linalg_ext.yield %0, %1 : tensor<?x?xf32>, tensor<?x?xf32>
+    } -> tensor<1000000x?xf32>, tensor<x?xf32>
+    ```
+  }];
+  let arguments = (ins
+    Variadic<AnyRankedTensorOrScalarType>:$inputs,
+    Variadic<AnyRankedTensor>:$outputs,
+    AffineMapArrayAttr:$indexing_maps,
+    IREELinalgExt_IteratorTypeArrayAttr:$iterator_types);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+
+  let hasVerifier = 1;
+
+  let assemblyFormat = [{
+    `{` `indexing_maps` `=` $indexing_maps `,`
+    `iterator_types` `=` $iterator_types `}`
+    attr-dict-with-keyword
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration =[{
+    // Helper accessor methods.
+    unsigned getNumLoops();
+    int64_t getRank(Value);
+
+    // Return the number of non-loop dimensions of the op.
+    unsigned getNumNonLoopDimensions();
+
+    // Return the ranges for the loop dimensions and symbol
+    // dimensions of the operation.
+    SmallVector<Range> getIterationDomainForDimensions(OpBuilder &builder,
+        ArrayRef<unsigned> dims, ArrayRef<unsigned> symbols);
+
+    // DestinationStyleOpInterface methods
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
 
 #endif  // IREE_DIALECT_LINALGEXT_OPS

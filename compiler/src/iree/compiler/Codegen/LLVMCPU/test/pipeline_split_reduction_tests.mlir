@@ -40,7 +40,7 @@ func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_support
 // CHECK:             scf.for
 // CHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
 // CHECK:                 arith.addi
-// CHECK:                 scf.yield %{{.*}} : vector<1x1x4xi32>
+// CHECK:                 scf.yield %{{.*}} : vector<4xi32>
 // CHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 // CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<4xi32>
 
@@ -77,7 +77,7 @@ func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_s
 }
 
 // CHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
-// CHECK-NOT:     scf.yield %{{.+}} : vector<1x1x4xf32>
+// CHECK-NOT:     arith.addf : vector<4xf32>
 
 // REORDERCHECK-LABEL: func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag()
 // REORDERCHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -88,7 +88,7 @@ func.func @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_s
 // REORDERCHECK:             scf.for
 // REORDERCHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
 // REORDERCHECK:                 arith.addf
-// REORDERCHECK:                 scf.yield %{{.*}} : vector<1x1x4xf32>
+// REORDERCHECK:                 scf.yield %{{.*}} : vector<4xf32>
 // REORDERCHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xf32> into f32
 // REORDERCHECK:             arith.addf %{{.+}}, %{{.+}} : vector<4xf32>
 
@@ -129,7 +129,7 @@ func.func @split_reduction_innermost_reduction_next_dynamic_supported() attribut
 // CHECK:              scf.for
 // CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
 // CHECK:                  arith.addi
-// CHECK:                  scf.yield %{{.*}} : vector<1x1x4xi32>
+// CHECK:                  scf.yield %{{.*}} : vector<4xi32>
 // CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
@@ -165,7 +165,7 @@ func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported()
 // CHECK:              scf.for
 // CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
 // CHECK:                  arith.addi
-// CHECK:                  scf.yield %{{.*}} : vector<1x1x4xi32>
+// CHECK:                  scf.yield %{{.*}} : vector<4xi32>
 // CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
@@ -249,7 +249,6 @@ func.func @split_reduction_not_innermost_reduction_unsupported() attributes {hal
 }
 
 // CHECK-LABEL:  func.func @split_reduction_not_innermost_reduction_unsupported()
-// CHECK-NOT:      scf.yield %{{.+}} : vector<1x1x4xi32>
 // CHECK-NOT:      vector.reduction
 
 // -----

@@ -234,7 +234,7 @@ struct YieldOpBufferizationInterface
           YieldOpBufferizationInterface, IREE::GPU::YieldOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    return true;
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,

@@ -286,6 +286,8 @@ def GenericVectorizationPass :
       "Enable vector masking during vectorization.">,
     Option<"useConfiguredVectorSizes", "use-configured-vector-sizes", "bool",/*default=*/"true",
       "Control whether the op lowering config represents a set of masked vector sizes">,
+    Option<"vectorizeCopies", "vectorize-copies", "bool", /*default=*/"true",
+      "Enable vectorization of linalg.copy operations.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
@@ -417,6 +419,8 @@ def OptimizeVectorTransferPass :
   let options = [
     Option<"flatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">,
+    Option<"redundantHoisting", "redundant-hoisting", "bool", "true",
+           "Enables use of redundant vector transfer hoisting.">,
   ];
   let dependentDialects = [
       "memref::MemRefDialect"
@@ -450,6 +454,21 @@ def RematerializeParallelOpsPass :
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";
+}
+
+// TODO: Replace with upstream: https://github.com/iree-org/iree/issues/18759
+def IREELoopInvariantCodeMotionPass :
+  Pass<"iree-loop-invariant-code-motion", ""> {
+  let summary = "Performs LICM on loops guaranteed to have >= 1 trip";
+  let description = [{
+    This is a mirror of the upstream LICM pass that restricts to loops that are
+    guaranteed to have at least one trip. This currently only supports loops
+    that expose a lower and upper bound as the generic loop-like interface does
+    not expose a way to query for trip count.
+
+    Additionally code motion of `scf.forall` ops with mappings is always unsafe
+    and is explicitly disabled.
+  }];
 }
 
 def SplitFullPartialTransferPass :
@@ -542,6 +561,11 @@ def TransformDialectInterpreterPass :
 def TypePropagationPass :
     InterfacePass<"iree-codegen-type-propagation", "mlir::FunctionOpInterface"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
+}
+
+def UnrollAnnotatedLoopsPass :
+    InterfacePass<"iree-codegen-unroll-annotated-loops", "mlir::FunctionOpInterface"> {
+  let summary = "Unrolls all scf.for loops marked with `unroll_loop`";
 }
 
 def VectorizeMemrefCopyPass :

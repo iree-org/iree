@@ -424,7 +424,7 @@ struct TransposeReshapeGenericDotGeneral final
 
     auto newOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
-        op.getPrecisionConfigAttr());
+        op.getPrecisionConfigAttr(), op.getAlgorithmAttr());
 
     // Copy over unknown attributes as we currently rely on it to let user tune
     // lowering parameters.

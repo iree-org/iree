@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_RECONCILETRANSLATIONINFOPASS
@@ -211,6 +212,14 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
   Block *parentBlock = forallOp->getBlock();
   Block *remainingBlock =
       rewriter.splitBlock(parentBlock, Block::iterator(forallOp));
+  for (auto [id, step] : llvm::zip_equal(procId, mixedStep)) {
+    rewriter.setInsertionPointToEnd(parentBlock);
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineExpr expr = s1 * s0;
+    id = affine::makeComposedFoldedAffineApply(rewriter, forallOp.getLoc(),
+                                               expr, {id, step});
+  }
   auto argReplacements =
       getValueOrCreateConstantIndexOp(rewriter, forallOp.getLoc(), procId);
   Block *loopBody = forallOp.getBody();
@@ -255,10 +264,6 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
     return success();
   }
 
-  if (!llvm::hasSingleElement(body)) {
-    return funcOp.emitOpError("unhandled function with multiple blocks");
-  }
-
   auto forAllOps = body.getOps<scf::ForallOp>();
   SmallVector<scf::ForallOp> workgroupForAllOps = llvm::to_vector(
       llvm::make_filter_range(forAllOps, [&](scf::ForallOp forAllOp) {
@@ -285,6 +290,10 @@ static LogicalResult resolveWorkgroupForAll(RewriterBase &rewriter,
   if (!llvm::hasSingleElement(workgroupForAllOps)) {
     return funcOp.emitOpError("unhandled resolution of zero/multiple "
                               "scf.forall ops withing the function");
+  }
+
+  if (!llvm::hasSingleElement(body)) {
+    return funcOp.emitOpError("unhandled function with multiple blocks");
   }
 
   scf::ForallOp forallOp = *forAllOps.begin();
@@ -351,9 +360,10 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   auto innerModuleOp = variantOp.getInnerModule();
 
   auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
+
+  // reconciliation for multiple export ops is unsupported.
   if (!llvm::hasSingleElement(exportOps)) {
-    variantOp.emitOpError("reconciliation for multiple export ops unsupported");
-    return signalPassFailure();
+    return;
   }
   auto exportOp = *exportOps.begin();
   IRRewriter rewriter(&getContext());

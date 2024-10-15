@@ -10,3 +10,16 @@ func.func @memref_copy(%source: memref<2x2xf32>, %dest: memref<2x2xf32>) {
 //  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: memref<2x2xf32>
 //       CHECK:   %[[RD:.+]] = vector.transfer_read %[[SOURCE]]
 //       CHECK:   vector.transfer_write %[[RD]], %[[DEST]]
+
+// -----
+
+func.func @linalg_copy(%source: memref<2x2xf32>, %dest: memref<2x2xf32>) {
+  linalg.copy ins(%source : memref<2x2xf32>) outs(%dest : memref<2x2xf32>)
+  return
+}
+
+// CHECK-LABEL: func.func @linalg_copy
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: memref<2x2xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: memref<2x2xf32>
+//       CHECK:   %[[RD:.+]] = vector.transfer_read %[[SOURCE]]
+//       CHECK:   vector.transfer_write %[[RD]], %[[DEST]]

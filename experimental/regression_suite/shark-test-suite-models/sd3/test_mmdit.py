@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 from conftest import VmfbManager
 
-iree_test_path_extension = os.getenv("IREE_TEST_PATH_EXTENSION", default=Path.cwd())
 rocm_chip = os.getenv("ROCM_CHIP", default="gfx90a")
 vmfb_dir = os.getenv("TEST_OUTPUT_ARTIFACTS", default=Path.cwd())
 
@@ -85,7 +84,6 @@ ROCM_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-hip-target={rocm_chip}",
     "--iree-opt-const-eval=false",
-    f"--iree-codegen-transform-dialect-library={iree_test_path_extension}/attention_and_matmul_spec.mlir",
     "--iree-global-opt-propagate-transposes=true",
     "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
     "--iree-dispatch-creation-enable-aggressive-fusion=true",

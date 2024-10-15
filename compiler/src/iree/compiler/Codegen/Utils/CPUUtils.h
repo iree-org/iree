@@ -11,7 +11,9 @@
 
 namespace mlir::iree_compiler {
 
-/// Find the root operation for the dispatch region. The priority is:
+/// Find the root operation for the dispatch region given `computeOps` that are
+/// obtained by a post order walk, i.e. in presence of nested compute ops the
+/// outermost operations are towards the end of the list. The priority is:
 ///   1. A Linalg operation that has reduction loops.
 ///   2. Any other Linalg op or LinalgExt op.
 ///   3. An operation that implements TilingInterface.
@@ -20,13 +22,19 @@ namespace mlir::iree_compiler {
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
 /// Creates a string attribute containing the name of the attribute that is
+/// used to enable decomposition.
+StringAttr getEnableDecompositionAttrName(MLIRContext *ctx);
+std::string getEnableDecompositionStr();
+
+/// Creates a string attribute containing the name of the attribute that is
 /// used to enable loop peeling.
 StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx);
+std::string getEnableLoopPeelingStr();
 
-/// Checks whether loop peeling has been enabled for the input function. This
-/// is infered from the config dictt. attribute that's part of to the
-/// translation info corresponding to this funciton.
-bool isLoopPeelingEnabled(FunctionOpInterface funcOp);
+/// Returns true if the UnitAttr of the `label` is enabled for the input
+/// function. This is is infered from the config dictionary. attribute that's
+/// part of to the translation info corresponding to this funciton.
+bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 
 } // namespace mlir::iree_compiler
 

@@ -20,6 +20,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/Debug.h"
@@ -529,7 +530,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeVectorTransferPass());
 
   // Hoist loop invariant code to avoid pipelining it.
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   PipeliningSchedulingStrategy schedule =
       storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
@@ -571,7 +572,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createCSEPass());
   }
 
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -586,7 +587,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
 
   // Simplify the IR for vector distribution.
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createForOpCanonicalizationPass());
@@ -634,6 +635,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
     addMemRefLoweringPasses(modulePassManager);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();

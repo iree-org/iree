@@ -30,6 +30,7 @@ createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
+std::unique_ptr<OperationPass<void>> createOptimizeIntArithmeticPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

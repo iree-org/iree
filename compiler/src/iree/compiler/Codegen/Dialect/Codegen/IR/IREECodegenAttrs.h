@@ -113,6 +113,21 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 void setLoweringConfig(Operation *op, Attribute config);
 
 /// Convenience function that sets the lowering configuration on the operation
+/// and translation info.
+inline LogicalResult setOpConfigAndEntryPointFnTranslation(
+    mlir::FunctionOpInterface entryPointFn, Operation *op,
+    IREE::Codegen::LoweringConfigAttrInterface config,
+    IREE::Codegen::TranslationInfoAttr translationInfo) {
+  if (config) {
+    setLoweringConfig(op, config);
+  }
+  if (translationInfo) {
+    (void)setTranslationInfo(entryPointFn, translationInfo);
+  }
+  return success();
+}
+
+/// Convenience function that sets the lowering configuration on the operation
 /// and translation info for a generic lowering config, lowering pipeline,
 /// and optional workgroup/subgroup size.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
@@ -123,11 +138,11 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     std::optional<int64_t> subgroupSize = {},
     DictionaryAttr pipelineConfig = DictionaryAttr()) {
   MLIRContext *context = entryPointFn.getContext();
-  setLoweringConfig(op, config);
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, passPipeline, SymbolRefAttr(), workgroupSize, subgroupSize,
       pipelineConfig);
-  return setTranslationInfo(entryPointFn, translationInfo);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
+                                               translationInfo);
 }
 
 /// Convenience function that sets the lowering configuration on the operation

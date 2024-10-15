@@ -19,9 +19,14 @@ public:
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
-    getOperation()->walk([&](IREE::Util::OptimizationBarrierOp op) {
-      op.replaceAllUsesWith(op.getOperands());
-      op.erase();
+    getOperation()->walk([&](Operation *genericOp) {
+      if (auto op = dyn_cast<IREE::Util::OptimizationBarrierOp>(genericOp)) {
+        op.replaceAllUsesWith(op.getOperands());
+        op.erase();
+      } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
+        op.replaceAllUsesWith(op.getOperands());
+        op.erase();
+      }
     });
   }
 };

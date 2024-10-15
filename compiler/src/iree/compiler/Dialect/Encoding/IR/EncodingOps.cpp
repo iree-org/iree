@@ -6,19 +6,13 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 
-#include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/IR/Value.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -92,108 +86,11 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   return success();
 }
 
-//===----------------------------------------------------------------------===//
-// encoding.encoding
-//===----------------------------------------------------------------------===//
-
-EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
-                               EncodingOpType opType, ArrayRef<Type> elemTypes,
-                               std::optional<int64_t> matmulNarrowM,
-                               std::optional<int64_t> matmulNarrowN,
-                               ArrayRef<AffineMap> maps,
-                               std::optional<AffineMap> bcastMap,
-                               ArrayRef<int64_t> roundDimsTo) {
-  Builder b(ctx);
-  auto optionalToAttr = [&](std::optional<int64_t> x) {
-    return x ? b.getIndexAttr(*x) : IntegerAttr();
-  };
-  auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
-  auto roundDimsToAttr = roundDimsTo.empty()
-                             ? DenseI64ArrayAttr()
-                             : b.getDenseI64ArrayAttr(roundDimsTo);
-  auto bcastMapAttr = bcastMap.has_value()
-                          ? AffineMapAttr::get(bcastMap.value())
-                          : AffineMapAttr();
-  return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), optionalToAttr(matmulNarrowM),
-             optionalToAttr(matmulNarrowN), b.getAffineMapArrayAttr(maps),
-             bcastMapAttr, roundDimsToAttr);
-}
-
-AffineMap EncodingAttr::getMapForOperandIndex() {
-  auto index = getOperandIndex().getValue().getZExtValue();
-  switch (index) {
-  case MATMUL_LHS:
-  case MATMUL_RHS:
-  case MATMUL_RESULT: {
-    auto indexingMap =
-        llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index]).getAffineMap();
-    if (auto bcastMap = getBcastMap()) {
-      indexingMap = bcastMap.getAffineMap().compose(indexingMap);
-    }
-    return indexingMap;
-  }
-  default:
-    return AffineMap();
-  }
-}
-
-std::optional<unsigned> EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
-  return getMapForOperandIndex().getResultPosition(
-      getAffineDimExpr(dimPos, getContext()));
-}
-
-ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
-  auto roundDimsTo = getRoundDimsTo();
-  if (!roundDimsTo) {
-    return {};
-  }
-  return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
-}
-
-EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
-  return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
-             getElementTypes(), getMatmulNarrow_M(), getMatmulNarrow_N(),
-             getUserIndexingMaps(), AffineMapAttr::get(bcastMap),
-             getRoundDimsTo());
-}
-
-//===---------------------------------------------------------------------===//
-// Encoding Dialect Helpers
-//===---------------------------------------------------------------------===//
-
-EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
-}
-
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getUserIndexingMaps();
-  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
-      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
-        return cast<AffineMapAttr>(m).getAffineMap();
-      });
-  return linalg::inferContractionDims(indexingMaps);
-}
-
-std::string stringifyOperandIndex(IntegerAttr valueAttr) {
-  auto value = valueAttr.getValue().getZExtValue();
-  switch (value) {
-  case MATMUL_LHS:
-    return "LHS";
-  case MATMUL_RHS:
-    return "RHS";
-  case MATMUL_RESULT:
-    return "RESULT";
-  default:
-    assert(false && "invalid index");
-    return "";
-  }
-}
-
 } // namespace mlir::iree_compiler::IREE::Encoding
 
-// clang-format off
+//===----------------------------------------------------------------------===//
+// TableGen definitions (intentionally last)
+//===----------------------------------------------------------------------===//
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.cpp.inc" // IWYU pragma: keep
-// clang-format: on

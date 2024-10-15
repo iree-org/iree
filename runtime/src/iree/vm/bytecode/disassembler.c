@@ -2126,7 +2126,17 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, " = vm.cast.f32.sif32 "));
+          iree_string_builder_append_cstring(b, " = vm.cast.f32.si32 "));
+      EMIT_F32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F32, CastF32SI64) {
+      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f32.si64 "));
       EMIT_F32_REG_NAME(operand_reg);
       EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
@@ -2136,7 +2146,17 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, " = vm.cast.f32.uif32 "));
+          iree_string_builder_append_cstring(b, " = vm.cast.f32.ui32 "));
+      EMIT_F32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F32, CastF32UI64) {
+      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f32.ui64 "));
       EMIT_F32_REG_NAME(operand_reg);
       EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;

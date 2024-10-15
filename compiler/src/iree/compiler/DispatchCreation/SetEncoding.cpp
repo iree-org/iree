@@ -45,55 +45,6 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
   return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
-struct MatmulNarrowSizes {
-  std::optional<int64_t> M, N;
-};
-
-// Returns the minimum of static sizes of the M/N-dimensions in the types of the
-// Ouput.
-static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
-                                              linalg::LinalgOp linalgOp) {
-  linalg::ContractionDimensions cDims =
-      linalg::inferContractionDims(linalgOp).value();
-  auto map = linalgOp.getIndexingMapsArray().back();
-  auto getOutputSizeAtDimPos = [&](unsigned dimPos) -> int64_t {
-    return outType.getDimSize(
-        map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
-            .value());
-  };
-  // M or N can be empty instead of having an explicit dim size of 1 for matvec
-  // and vecmat, so set to 1 if empty.
-  int64_t M = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
-  int64_t N = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
-
-  MatmulNarrowSizes narrow;
-  // Threshold below which a M/N size is considered "narrow", making it
-  // eligible for a narrow tile size during materialization. This value should
-  // be at least as large as the actual M/N tile sizes that we choose on any
-  // target in CPUMaterializeEncodingPass. If it is smaller, we will miss
-  // opportunities to select optimized narrow tiles for narrow matmuls.
-  // If it is larger, everything will work fine, but the IR will be a bit more
-  // verbose as more narrow_matmul_{M,N} optional parameters will be specified.
-  const int64_t kNarrowThreshold = 16;
-  if (!ShapedType::isDynamic(M) && M < kNarrowThreshold) {
-    narrow.M = M;
-  }
-  if (!ShapedType::isDynamic(N) && N < kNarrowThreshold) {
-    narrow.N = N;
-  }
-
-  // Only pick 1 if both are present
-  if (narrow.M && narrow.N) {
-    if (*narrow.M <= *narrow.N) {
-      narrow.N.reset();
-    } else {
-      narrow.M.reset();
-    }
-  }
-
-  return narrow;
-}
-
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                           Value source,
                                           SmallVector<OpFoldResult> sizes) {
@@ -255,8 +206,7 @@ public:
     }
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
-    MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(cast<ShapedType>(out.getType()), linalgOp);
+    auto narrowDim = IREE::Encoding::getMatmulNarrowDim(linalgOp, padFactor);
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
@@ -264,10 +214,15 @@ public:
     auto opType = IREE::Encoding::EncodingOpType::matmul;
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
       SmallVector<int64_t> roundDimsTo(3, padFactor);
-      auto encoding =
-          EncodingAttr::get(linalgOp.getContext(), operandIndex, opType,
-                            elemTypes, narrowSizes.M, narrowSizes.N, maps,
-                            /*bcastMap=*/std::nullopt, roundDimsTo);
+      if (narrowDim.isM()) {
+        roundDimsTo[0] = llvm::PowerOf2Ceil(narrowDim.size);
+      }
+      if (narrowDim.isN()) {
+        roundDimsTo[1] = llvm::PowerOf2Ceil(narrowDim.size);
+      }
+      auto encoding = EncodingAttr::get(linalgOp.getContext(), operandIndex,
+                                        opType, elemTypes, maps,
+                                        /*bcastMap=*/std::nullopt, roundDimsTo);
       return setEncoding(rewriter, loc, src, encoding);
     };
     Value encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);

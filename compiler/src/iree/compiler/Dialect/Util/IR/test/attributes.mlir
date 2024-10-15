@@ -1,5 +1,19 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope %s | iree-opt --split-input-file --mlir-print-local-scope | FileCheck %s
 
+// CHECK-LABEL: @assume_int
+builtin.module @assume_int attributes {
+  // CHECK: util.all = #util.int.assumption<umin = 1, umax = 2, udiv = 16>
+  // CHECK-SAME: util.udiv = #util.int.assumption<udiv = 32>
+  // CHECK-SAME: util.umax = #util.int.assumption<umax = 10>
+  // CHECK-SAME: util.umin = #util.int.assumption<umin = 5>
+  util.all = #util.int.assumption<umin = 1, umax = 2, udiv = 16>,
+  util.udiv = #util.int.assumption<udiv = 32>,
+  util.umax = #util.int.assumption<umax = 10>,
+  util.umin = #util.int.assumption<umin = 5>
+} {}
+
+// -----
+
 // CHECK-LABEL: @byte_pattern
 builtin.module @byte_pattern attributes {
   // CHECK: r0 = #util.byte_pattern<0> : i8

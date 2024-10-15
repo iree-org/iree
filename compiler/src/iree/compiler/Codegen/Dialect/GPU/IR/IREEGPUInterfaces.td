@@ -149,8 +149,8 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Populates the reassociation indices and result shape to materialize the
-        thread layout shape from the subgroup block shape.
+        Returns the scope of the MMA operation. See IREEGPUEnums.td for
+        available options.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::iree_compiler::IREE::GPU::MMAScope>",
       /*methodName=*/"getMmaScope",

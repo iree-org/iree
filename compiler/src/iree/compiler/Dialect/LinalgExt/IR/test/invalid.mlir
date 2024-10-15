@@ -550,7 +550,8 @@ func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x10
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
   %1 = iree_linalg_ext.im2col strides = [1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -562,7 +563,8 @@ func.func @illegal_im2col_dilations(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected dilations rank to be equal to the kernel rank}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1, 1] kernel_size = [3, 3]
-           m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -574,7 +576,60 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected kernel rank to be equal to the m_pos rank}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3]
-           m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected the same size m_offset and m_strides}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0, 0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected the same size k_offset and k_strides}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0, 0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_m_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected inner m_strides to be 1}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [0] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_k_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected inner k_strides to be 1}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [2]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -586,10 +641,24 @@ func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected input rank to be the sum of batch, m, and k ranks}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            ins(%arg0 : tensor<1x2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_output_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x9x640xf32> {
+  %0 = tensor.empty() : tensor<2x1024x9x640xf32>
+  // expected-error @+1 {{expected output rank to be the sum of batch_pos, k_offset, and m_offset ranks}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x9x640xf32>) -> tensor<2x1024x9x640xf32>
+  return %1 : tensor<2x1024x9x640xf32>
 }
 
 // -----
@@ -720,21 +789,17 @@ func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<
 
 // -----
 
-func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<20x8xf32>, %value: tensor<20x8xf32>) -> (tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) {
+func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<20x8xf32>, %value: tensor<20x8xf32>) -> tensor<20x8xf32> {
   %result = tensor.empty() : tensor<20x8xf32>
-  %max = tensor.empty() : tensor<8xf32>
-  %sum = tensor.empty() : tensor<8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 2 Got: 1}}
-  %1:3 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
                        affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                        affine_map<(d0, d1, d2, d3) -> ()>,
-                       affine_map<(d0, d1, d2, d3) -> (d0)>,
-                       affine_map<(d0, d1, d2, d3) -> (d0)>,
                        affine_map<(d0, d1, d2, d3) -> (d0)>]}
-                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
-  return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+                       ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result : tensor<20x8xf32>) -> tensor<20x8xf32>
+  return %1 : tensor<20x8xf32>
 }
 
 // -----
@@ -779,4 +844,232 @@ func.func @attention_affine_map_domain_mismatch(%query: tensor<192x1024x64xf32>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
+}
+
+// -----
+
+func.func @custom_op_memref_operand(%arg0 : memref<?xf32>, %arg1 : tensor<?xf32>, %arg2 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{operand #0 must be variadic of ranked tensor of signless integer or index or floating-point values or signless integer or index or floating-point, but got 'memref<?xf32>'}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0, %arg1 : memref<?xf32>, tensor<?xf32>) outs(%arg2 : tensor<?xf32>) {
+    ^bb0(%b0 : memref<?xf32>, %b1 : tensor<?xf32>, %b2 : tensor<?xf32>):
+      iree_linalg_ext.yield %b1 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_scalar_outs_argument(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>, %arg2 : f32) -> f32 {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{operand #2 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0, %arg1 : tensor<?xf32>, tensor<?xf32>) outs(%arg2 : f32) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>, %b2 : f32):
+      %1 = tensor.extract %b1[%c0] : tensor<?xf32>
+      iree_linalg_ext.yield %1 : f32
+  } -> f32
+  return %0 : f32
+}
+
+// -----
+
+func.func @custom_op_missing_indexing_maps(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+2 {{expected 'indexing_maps'}}
+  %0 = iree_linalg_ext.custom_op {
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_missing_iterator_types(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+3 {{expected 'iterator_types'}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_outs_result_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<10xf32> {
+  // expected-error @+1 {{expected type of operand #1 ('tensor<?xf32>') to match type of corresponding result ('tensor<10xf32>')}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<10xf32>
+  return %0 : tensor<10xf32>
+}
+
+// -----
+
+func.func @custom_op_missing_indexing_map(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>, %arg2 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{expected number of indexing maps (2) to be same as the number of input/output operands (3)}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0, %arg1 : tensor<?xf32>, tensor<?xf32>) outs(%arg2 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>, %b2 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_indexing_map_inconsistent_num_symbol(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{inconsistent number of symbol dimensions in indexing_map #1, expected 1 instead of 0}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0)[s0] -> (d0 + s0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_indexing_map_domain_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{expected indexing_map #0 to have 1 dim(s) to match the number of loops or be zero}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_indexing_map_range_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{expected operand rank(1) to match the result rank of indexing map #0}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_missing_bb_arg(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{expected as many basic block arguments (1) as the number of operands (2)}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_scalar_operand_bb_arg_mismatch(%arg0 : tensor<?xf32>, %arg1 : f32, %arg2 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{for (scalar) operand #1 expected corresponding basic block argument to be of the same type}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0, %arg1 : tensor<?xf32>, f32) outs(%arg2 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<f32>, %b2 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_vector_operand_bb_arg_mismatch(%arg0 : tensor<10xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  // expected-error @+1 {{expected basic block argument corresponding to (tensor) operand #0 to be 'tensor<?xf32>' instead of 'tensor<10xf32>'}}
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<10xf32>) outs(%arg1 : tensor<?xf32>) {
+    ^bb0(%b0 : tensor<10xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<10xf32>
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_number_of_yields_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
+  // expected-error @+1 {{expected as many yields as the numbers of `outs` operand}}
+  %0:2 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%arg1, %arg1 : tensor<?xf32>, tensor<?xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>, %b2 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0 : tensor<?xf32>
+  } -> tensor<?xf32>, tensor<?xf32>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xf32>
+}
+
+// -----
+
+func.func @custom_op_yield_type_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<10xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
+  %1 = tensor.cast %arg1 : tensor<10xf32> to tensor<?xf32>
+  // expected-error @+1 {{expected type of 1-th operand of yield to match the corresponding output basic block argument}}
+  %0:2 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<?xf32>) outs(%1, %arg1 : tensor<?xf32>, tensor<10xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>, %b2 : tensor<?xf32>):
+      iree_linalg_ext.yield %b0, %arg1 : tensor<?xf32>, tensor<10xf32>
+  } -> tensor<?xf32>, tensor<?xf32>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xf32>
+}
+
+// -----
+
+func.func @index_op_outside_custom_op() -> index {
+  // expected-error @+1 {{expected parent op to be `iree_linalg_ext.custom_op`}}
+  %0 = iree_linalg_ext.index 0 : index
+  return %0 : index
+}
+
+// -----
+
+func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      outs(%arg0: tensor<?xindex>) {
+    ^bb0(%b0 : tensor<?xindex>):
+      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing CustomOp}}
+      %1 = iree_linalg_ext.index 1 : index
+      %2 = linalg.generic {
+          indexing_maps = [affine_map<(d0) -> (d0)>],
+          iterator_types = ["parallel"]}
+          outs(%b0 : tensor<?xindex>) {
+        ^bb1(%bb0 : index):
+          %3 = arith.addi %bb0, %1 : index
+          linalg.yield %3 : index
+      } -> tensor<?xindex>
+      iree_linalg_ext.yield %2 : tensor<?xindex>
+  } -> tensor<?xindex>
+  return %0 : tensor<?xindex>
 }

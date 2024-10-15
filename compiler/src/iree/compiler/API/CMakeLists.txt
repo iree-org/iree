@@ -110,7 +110,8 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   # It isn't super polite to be poking at other people's library definitions
   # like this, but MSVC is weird and given the structure of the projects, this
   # isn't so bad.
-  if(MSVC)
+  get_target_property(_imported ${_object_lib} IMPORTED)
+  if(MSVC AND NOT ${_imported})
     target_compile_definitions(${_object_lib} PRIVATE
       # See compiler/bindings/c/iree/compiler/api_support.h.
       # IREE embedded CAPI uses its own macros to enable

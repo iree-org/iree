@@ -57,6 +57,11 @@ struct InputDialectOptions {
   bool promoteF16ToF32 = false;
   bool promoteBF16ToF32 = false;
 
+  // Perfoms early optimizations geared towards optimizing/simplifying the
+  // types of integer arithmetic inefficiencies that frontends typically
+  // include and which are implicated in blocking downstream optimizations.
+  bool optimizeIndexArithmetic = true;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<InputDialectOptions>;
 };
@@ -77,29 +82,6 @@ struct PreprocessingOptions {
 
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
-  // Enables aggressive propagation of transposes to the inputs of named ops,
-  // rewriting named ops as fused generics.
-  bool aggressiveTransposePropagation = false;
-
-  // Enables transposing all concatenations to the outer most dimension.
-  bool outerDimConcat = false;
-
-  // Enables data tiling.
-  bool dataTiling = true;
-
-  // Enables const-expr hoisting into globals.
-  bool constExprHoisting = true;
-
-  // Enables recursive evaluation of immutable globals using the compiler
-  // and runtime.
-  bool constEval = true;
-
-  // Optimizations to reduce numeric precision where it is safe to do so.
-  bool numericPrecisionReduction = false;
-
-  // Strips debug assertions after any useful information has been extracted.
-  bool stripAssertions = false;
-
   // Maximum byte size increase allowed for constant expr hoisting policy to
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
@@ -122,6 +104,29 @@ struct GlobalOptimizationOptions {
   // File path to create a splat parameter archive out of all parameters in the
   // module.
   std::string parameterSplatExportFile = "";
+
+  // Enables aggressive propagation of transposes to the inputs of named ops,
+  // rewriting named ops as fused generics.
+  bool aggressiveTransposePropagation = false;
+
+  // Enables transposing all concatenations to the outer most dimension.
+  bool outerDimConcat = false;
+
+  // Enables data tiling.
+  bool dataTiling = true;
+
+  // Enables const-expr hoisting into globals.
+  bool constExprHoisting = true;
+
+  // Enables recursive evaluation of immutable globals using the compiler
+  // and runtime.
+  bool constEval = true;
+
+  // Optimizations to reduce numeric precision where it is safe to do so.
+  bool numericPrecisionReduction = false;
+
+  // Strips debug assertions after any useful information has been extracted.
+  bool stripAssertions = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;

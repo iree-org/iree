@@ -1831,9 +1831,17 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyOperandRegF32(operand);
       VM_VerifyResultRegI32(result);
     });
+    VERIFY_OP(EXT_F32, CastF32SI64, {
+      VM_VerifyOperandRegF32(operand);
+      VM_VerifyResultRegI64(result);
+    });
     VERIFY_OP(EXT_F32, CastF32UI32, {
       VM_VerifyOperandRegF32(operand);
       VM_VerifyResultRegI32(result);
+    });
+    VERIFY_OP(EXT_F32, CastF32UI64, {
+      VM_VerifyOperandRegF32(operand);
+      VM_VerifyResultRegI64(result);
     });
     VERIFY_OP(EXT_F32, BitcastI32F32, {
       VM_VerifyOperandRegI32(operand);

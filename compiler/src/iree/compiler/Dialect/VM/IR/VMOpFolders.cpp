@@ -1724,12 +1724,35 @@ OpFoldResult CastF32SI32Op::fold(FoldAdaptor operands) {
       });
 }
 
+OpFoldResult CastF32SI64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 64), operands.getOperand(),
+      [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b(/*BitWidth=*/64, /*isUnsigned=*/false);
+        a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
+        return b;
+      });
+}
+
 OpFoldResult CastF32UI32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<FloatAttr, IntegerAttr>(
       IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APFloat &a) {
         bool isExact = false;
         llvm::APSInt b(/*BitWidth=*/32, /*isUnsigned=*/false);
+        a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
+        b.setIsUnsigned(true);
+        return b;
+      });
+}
+
+OpFoldResult CastF32UI64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 64), operands.getOperand(),
+      [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b(/*BitWidth=*/64, /*isUnsigned=*/false);
         a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
         b.setIsUnsigned(true);
         return b;

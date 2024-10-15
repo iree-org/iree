@@ -150,7 +150,7 @@ func.func @conditional_nested(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<
 func.func @case2(%arg0 : tensor<i32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>) -> tensor<4xf32> {
 
   // CHECK-NEXT: %[[VAL_3:.*]] = stablehlo.constant dense<0> : tensor<i32>
-  // CHECK: %[[VAL_4:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_3]], NOTYPE : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  // CHECK: %[[VAL_4:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_3]] : (tensor<i32>, tensor<i32>) -> tensor<i1>
   // CHECK: %[[VAL_5:.*]] = tensor.extract %[[VAL_4]][] : tensor<i1>
   // CHECK: %[[VAL_6:.*]] = scf.if %[[VAL_5]] -> (tensor<4xf32>) {
   %1 = "stablehlo.case"(%arg0) ({
@@ -180,7 +180,7 @@ func.func @case2(%arg0 : tensor<i32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf3
 func.func @case3(%arg0 : tensor<i32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>, %arg3 : tensor<4xf32>) -> tensor<4xf32> {
 
   // CHECK-NEXT: %[[VAL_4:.*]] = stablehlo.constant dense<0> : tensor<i32>
-  // CHECK: %[[VAL_5:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_4]], NOTYPE : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  // CHECK: %[[VAL_5:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_4]] : (tensor<i32>, tensor<i32>) -> tensor<i1>
   // CHECK: %[[VAL_6:.*]] = tensor.extract %[[VAL_5]][] : tensor<i1>
   // CHECK: %[[VAL_7:.*]] = scf.if %[[VAL_6]] -> (tensor<4xf32>) {
   %1 = "stablehlo.case"(%arg0) ({
@@ -191,7 +191,7 @@ func.func @case3(%arg0 : tensor<i32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf3
 
   // CHECK: } else {
   // CHECK-NEXT:   %[[VAL_9:.*]] = stablehlo.constant dense<1> : tensor<i32>
-  // CHECK:   %[[VAL_10:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_9]], NOTYPE : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  // CHECK:   %[[VAL_10:.*]] = stablehlo.compare EQ, %[[VAL_0]], %[[VAL_9]] : (tensor<i32>, tensor<i32>) -> tensor<i1>
   // CHECK:   %[[VAL_11:.*]] = tensor.extract %[[VAL_10]][] : tensor<i1>
   // CHECK:   %[[VAL_12:.*]] = scf.if %[[VAL_11]] -> (tensor<4xf32>) {
   }, {

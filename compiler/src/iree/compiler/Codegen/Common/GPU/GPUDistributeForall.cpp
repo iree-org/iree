@@ -130,13 +130,12 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
                                             {forLoop.getInductionVar(), flatId})
           : forLoop.getInductionVar();
 
-  // We require a descending relative mapping, so delinearize in reverse order.
+  // We require a descending relative mapping, so we can reuse the upper bound
+  // sizes directly.
   auto delinearize = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, newFlatProducerId, llvm::to_vector(llvm::reverse(delinSizes)));
+      loc, newFlatProducerId, delinSizes);
 
-  SmallVector<Value> newBlockArgs =
-      llvm::map_to_vector(llvm::reverse(delinearize.getResults()),
-                          [](OpResult r) -> Value { return r; });
+  SmallVector<Value> newBlockArgs = delinearize.getResults();
 
   // Step 4. Inline the region of the forall op.
   Operation *forallTerminator = forallOp.getBody()->getTerminator();

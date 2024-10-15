@@ -171,9 +171,9 @@ getDimIdxForTargetSize(const TileSwizzle::ExpandShapeDimVectorType &shape,
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                        IREE::GPU::MMAFragment fragment) {
-  auto [AType, BType, CType] = mma.getABCElementTypes();
-  int ABits = AType.getIntOrFloatBitWidth();
-  int BBits = BType.getIntOrFloatBitWidth();
+  auto [aType, bType, cType] = mma.getABCElementTypes();
+  int aBits = aType.getIntOrFloatBitWidth();
+  int bBits = bType.getIntOrFloatBitWidth();
   // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
   const int targetPreferredLoadBitWidth = 128;
   auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
@@ -186,7 +186,7 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
       int interleavingIdx = getDimIdxForTargetSize(
           swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * ABits));
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * aBits));
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollM() > 1) {
@@ -204,7 +204,7 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
       int interleavingIdx = getDimIdxForTargetSize(
           swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * BBits));
+          targetPreferredLoadBitWidth / (mma.getUnrollK() * bBits));
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollN() > 1) {

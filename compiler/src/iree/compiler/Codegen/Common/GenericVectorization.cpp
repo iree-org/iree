@@ -333,6 +333,9 @@ void GenericVectorizationPass::runOnOperation() {
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp>(op)) {
+      if (isa<linalg::CopyOp>(op) && !vectorizeCopies) {
+        return;
+      }
       candidates.push_back(op);
     } else if (vectorizePadding && enableVectorMasking &&
                isa<tensor::PadOp>(op)) {

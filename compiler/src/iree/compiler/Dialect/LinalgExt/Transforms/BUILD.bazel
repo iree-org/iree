@@ -30,7 +30,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "AggregatedOpInterfaceImpl.cpp",
         "ConvertConv2DToIm2ColOp.cpp",
         "ConvertConv2DToWinograd.cpp",
         "ConvertToLoops.cpp",
@@ -42,7 +41,6 @@ iree_compiler_cc_library(
         "ReshapeFusion.cpp",
         "SplitReduction.cpp",
         "TileAttention.cpp",
-        "TilingInterfaceImpl.cpp",
         "TransposeFusion.cpp",
     ],
     hdrs = [

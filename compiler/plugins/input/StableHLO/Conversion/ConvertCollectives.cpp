@@ -491,7 +491,7 @@ struct AllGatherOpConversion final
         op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
-    auto resultType = cast<RankedTensorType>(op.getResult().getType());
+    auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
         IREE::Flow::getCollectiveElementTypeAttr(resultType);
     if (!elementTypeAttr) {
@@ -499,7 +499,7 @@ struct AllGatherOpConversion final
           op, "unsupported element type for collective op");
     }
     uint64_t allGatherDim = op.getAllGatherDim();
-    Value gatherInput = adaptor.getOperand();
+    Value gatherInput = adaptor.getOperands()[0];
     SmallVector<int64_t> gatherResultShape(resultType.getShape());
 
     // When all_gather_dim != 0, we need to transpose between 0 and
@@ -513,7 +513,7 @@ struct AllGatherOpConversion final
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, gatherResultShape,
-        getElementTypeOrSelf(adaptor.getOperand().getType()));
+        getElementTypeOrSelf(adaptor.getOperands()[0].getType()));
     Value gatherResult = rewriter.create<IREE::Flow::CollectiveAllGatherOp>(
         op.getLoc(), elementTypeAttr, target, gatherInput, channel);
 
@@ -585,7 +585,7 @@ struct AllReduceOpConversion final
     auto reductionOpAttr =
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
-    auto inputType = cast<RankedTensorType>(op.getOperand().getType());
+    auto inputType = cast<RankedTensorType>(op.getOperand(0).getType());
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
@@ -597,10 +597,11 @@ struct AllReduceOpConversion final
     // Create an empty tensor for the result.
     ArrayRef<int64_t> inputShape = inputType.getShape();
     Value target = rewriter.create<tensor::EmptyOp>(
-        loc, inputShape, getElementTypeOrSelf(adaptor.getOperand().getType()));
+        loc, inputShape,
+        getElementTypeOrSelf(adaptor.getOperands()[0].getType()));
     auto allReduceOp = rewriter.create<IREE::Flow::CollectiveAllReduceOp>(
         op.getLoc(), reductionOpAttr, elementTypeAttr, target,
-        adaptor.getOperand(), channel);
+        adaptor.getOperands()[0], channel);
     rewriter.replaceOp(op, allReduceOp.getResult());
     return success();
   }
@@ -676,7 +677,7 @@ struct AllToAllOpConversion final
         op.getReplicaGroups(), /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
     // Get the collective element type attribute.
-    auto resultType = cast<RankedTensorType>(op.getType());
+    auto resultType = cast<RankedTensorType>(op.getType(0));
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
         IREE::Flow::getCollectiveElementTypeAttr(resultType);
     if (!elementTypeAttr) {
@@ -687,7 +688,7 @@ struct AllToAllOpConversion final
     uint64_t splitDim = op.getSplitDimension();
     uint64_t concatDim = op.getConcatDimension();
     uint64_t splitCount = op.getSplitCount();
-    Value allToAllInput = adaptor.getOperand();
+    Value allToAllInput = adaptor.getOperands()[0];
 
     // When splitDim != 0, we need to transpose splitDim to 0 before and after
     // the all-to-all.

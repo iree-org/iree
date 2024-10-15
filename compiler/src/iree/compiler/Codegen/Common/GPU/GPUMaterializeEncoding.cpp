@@ -51,41 +51,108 @@ static bool hasIntrinsic(IREE::GPU::TargetAttr target,
 }
 
 static std::optional<IREE::GPU::DataTiledMMAAttr>
-chooseDataTiledMMAAttr(TypeRange elementTypes, IREE::GPU::TargetAttr target) {
-  assert(elementTypes.size() == 3);
+chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
+                       IREE::Encoding::EncodingAttr encoding) {
   using namespace IREE::GPU;
   MLIRContext *ctx = target.getContext();
-  Type lhs = elementTypes[0];
-  Type rhs = elementTypes[1];
-  Type out = elementTypes[2];
-  auto match = [=](MMAIntrinsic intrinsic, int unrollM, int unrollMToSubgroups,
-                   int unrollN, int unrollNToSubgroups,
-                   int unrollK) -> std::optional<DataTiledMMAAttr> {
-    if (!hasIntrinsic(target, intrinsic)) {
-      return std::nullopt;
-    }
-    auto candidate = DataTiledMMAAttr::get(
-        ctx, MMAIntrinsicAttr::get(ctx, intrinsic), /*unroll_m=*/unrollM,
-        /*unroll_m_to_subgroups=*/unrollMToSubgroups, /*unroll_n=*/unrollN,
-        /*unroll_n_to_subgroups=*/unrollNToSubgroups, /*unroll_k=*/unrollK);
-    auto [candidateLhs, candidateRhs, candidateOut] =
-        candidate.getABCElementTypes();
-    if (candidateLhs != lhs || candidateRhs != rhs || candidateOut != out) {
-      return std::nullopt;
-    }
-    return candidate;
+
+  //
+  // Step 1: select a MMAIntrinsic.
+  //
+  const MMAIntrinsic candidateIntrinsics[] = {
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_I32_16x16x32_I8,
   };
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x4_F32, 8, 1, 2, 4, 4)) {
-    return m;
+  std::optional<MMAIntrinsic> intrinsic;
+  for (MMAIntrinsic candidateIntrinsic : candidateIntrinsics) {
+    if (!hasIntrinsic(target, candidateIntrinsic)) {
+      continue;
+    }
+    auto [et0, et1, et2] =
+        MMAAttr::get(ctx, candidateIntrinsic).getABCElementTypes();
+    if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
+      continue;
+    }
+    intrinsic = candidateIntrinsic;
+    break;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_F32_16x16x16_F16, 8, 1, 2, 4, 2)) {
-    return m;
+  if (!intrinsic) {
+    return std::nullopt;
   }
-  if (auto m = match(MMAIntrinsic::MFMA_I32_16x16x32_I8, 8, 1, 2, 4, 2)) {
-    return m;
+
+  //
+  // Step 2: Select the unrolling factors for the generic case where there is no
+  //         narrow dimension.
+  //
+  // These hardcoded constants should become functions querying `target`.
+  //
+  // Target ISA preferred load instruction size, in bits.
+  const int kLoadInstructionBits = 128;
+  // Target ISA preferred number of subgroups per block to get full utilization.
+  const int kNumSubgroups = 4;
+  // Number of register space bits to use for accumulators. Should typically be
+  // between 50% and 80% of total available register space, as the accumulator
+  // tends to be larger than the A and B matrix tiles.
+  const int kMaxAccumulatorRegisterBits = 256 * 32;
+
+  MMAAttr intrinsicMma = MMAAttr::get(ctx, *intrinsic);
+  auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
+  // The unrollK factor serves to allow loads from the A and B matrices to use
+  // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
+  // and each intrinsic consumes only 32 bits from A and B, then we want to set
+  // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
+  const int unrollK =
+      kLoadInstructionBits /
+      std::min(
+          intrinsicA.getElementTypeBitWidth() * intrinsicA.getNumElements(),
+          intrinsicB.getElementTypeBitWidth() * intrinsicB.getNumElements());
+  // The total amount of unrolling along the M and N dimensions is normally
+  // limited only by the number of available registers, since larger M and N
+  // yields higher arithmetic intensity. Here, we do not yet distinguish between
+  // plain unrolling (more instructions on each thread) and
+  // unrolling-to-subgroups (more threads).
+  const int totalUnrollMN =
+      kMaxAccumulatorRegisterBits /
+      (intrinsicC.getElementTypeBitWidth() * intrinsicC.getNumElements());
+  const int totalUnrollM = static_cast<int>(
+      std::floor(std::sqrt(static_cast<float>(totalUnrollMN))));
+  const int totalUnrollN = totalUnrollMN / totalUnrollM;
+  // Now we introduce unroll-to-subgroups. It doesn't change the overall tile
+  // size, as it increases the number of subgroups but correspondingly decreases
+  // the number of registers available to each subgroups. In other words, the
+  // overall tile size determined above only needed to be concerned with the
+  // overall number of registers, not with how they are split between subgroups.
+  //
+  // For now for simplicity we put all the unroll-to-subgroups in the N
+  // dimension. That might be suboptimal, revisit later. That does simplify the
+  // below adjustments for narrow M/N, as we don't need to think about
+  // unroll-to-subgroups when making the narrowing adjustment.
+  int unrollMToSubgroups = 1;
+  int unrollNToSubgroups = kNumSubgroups;
+  int unrollM = totalUnrollM / unrollMToSubgroups;
+  int unrollN = totalUnrollN / unrollNToSubgroups;
+
+  //
+  // Step 3: Adjust the unrolling factors when there is a narrow dimension.
+  //
+  IREE::Encoding::MatmulNarrowDim narrowDim =
+      IREE::Encoding::getMatmulNarrowDim(encoding);
+  if (narrowDim.isM()) {
+    unrollM = std::min(unrollM, static_cast<int>(llvm::divideCeil(
+                                    narrowDim.size, intrinsicMma.getMSize())));
   }
-  // Fallback - no architecture-optimized tile size for this case.
-  return std::nullopt;
+  if (narrowDim.isN()) {
+    std::swap(unrollM, unrollN);
+    std::swap(unrollMToSubgroups, unrollNToSubgroups);
+    assert(unrollNToSubgroups == 1);
+    unrollN = std::min(unrollN, static_cast<int>(llvm::divideCeil(
+                                    narrowDim.size, intrinsicMma.getNSize())));
+  }
+
+  return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), unrollM,
+                               unrollMToSubgroups, unrollN, unrollNToSubgroups,
+                               unrollK);
 }
 
 static FailureOr<MaterializeEncodingInfo>
@@ -110,12 +177,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   } else {
     gpuTargetAttr = getCLGPUTarget(tensorType.getContext());
   }
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
-  std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-      chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
+  std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+      encoding.getElementTypesArray(), gpuTargetAttr, encoding);
   if (!mma) {
     return failure();
   }
@@ -195,13 +258,10 @@ struct GPUSetEncodingOpLoweringConversion
                                              adaptor.getSource(), *converter,
                                              this->materializeEncodingValueFn);
     if (failed(packOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(encodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(encodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          encodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(encodingOp, result);
       return success();
     }
@@ -267,13 +327,10 @@ struct GPUUnsetEncodingOpLoweringConversion
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (failed(maybeEncodingInfo)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(unsetEncodingOp.getLoc(),
-                                                 targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(
+          unsetEncodingOp.getLoc(), targetType, adaptor.getSource());
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
     }
@@ -319,12 +376,10 @@ struct GPUUnsetEncodingOpLoweringConversion
         rewriter, unsetEncodingOp, unpackSrc, *converter,
         this->materializeEncodingValueFn);
     if (failed(unPackOp)) {
-      Value result = adaptor.getSource();
       Type targetType =
           getTypeConverter()->convertType(unsetEncodingOp.getResultType());
-      if (targetType != result.getType()) {
-        result = rewriter.create<tensor::CastOp>(loc, targetType, result);
-      }
+      Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
+                                                           adaptor.getSource());
       rewriter.replaceOp(unsetEncodingOp, result);
       return success();
     }
@@ -377,11 +432,8 @@ public:
     } else {
       gpuTargetAttr = getCLGPUTarget(op.getContext());
     }
-    auto elementTypes = llvm::to_vector(llvm::map_range(
-        resultEncoding.getElementTypes().getValue(),
-        [](Attribute a) { return cast<TypeAttr>(a).getValue(); }));
-    std::optional<IREE::GPU::DataTiledMMAAttr> mma =
-        chooseDataTiledMMAAttr(elementTypes, gpuTargetAttr);
+    std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+        resultEncoding.getElementTypesArray(), gpuTargetAttr, resultEncoding);
     if (!mma) {
       LLVM_DEBUG(llvm::dbgs() << "can't find supported Mma intrinsic\n");
       return failure();
@@ -393,26 +445,32 @@ public:
     assert(
         succeeded(contractionDims) &&
         "should always be able to infer contraction dims for contraction ops");
-    // TODO(hanchung): Support batch gemms.
-    if (!contractionDims->batch.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "batch gemm is not yet implemented\n");
-      return failure();
-    }
 
     MLIRContext *ctx = rewriter.getContext();
-    AffineExpr mExpr = rewriter.getAffineDimExpr(0);
-    AffineExpr nExpr = rewriter.getAffineDimExpr(1);
-    AffineExpr kExpr = rewriter.getAffineDimExpr(2);
+    SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
+    int baseIdx = contractionDims->batch.empty() ? 0 : 1;
+    if (baseIdx) {
+      AffineExpr bExpr = rewriter.getAffineDimExpr(0);
+      lhsExprs.push_back(bExpr);
+      rhsExprs.push_back(bExpr);
+      accExprs.push_back(bExpr);
+    }
+    AffineExpr mExpr = rewriter.getAffineDimExpr(baseIdx + 0);
+    AffineExpr nExpr = rewriter.getAffineDimExpr(baseIdx + 1);
+    AffineExpr kExpr = rewriter.getAffineDimExpr(baseIdx + 2);
 
-    // The outer dims are all in row-major fasion after relayout.
-    auto lhsMap = AffineMap::get(3, 0, {mExpr, kExpr}, ctx);
-    auto rhsMap = AffineMap::get(3, 0, {nExpr, kExpr}, ctx);
-    auto accMap = AffineMap::get(3, 0, {mExpr, nExpr}, ctx);
+    // The outer dims are all in row-major order after relayout.
+    lhsExprs.append({mExpr, kExpr});
+    rhsExprs.append({nExpr, kExpr});
+    accExprs.append({mExpr, nExpr});
+    int64_t numDims = baseIdx + 3;
+    auto lhsMap = AffineMap::get(numDims, 0, lhsExprs, ctx);
+    auto rhsMap = AffineMap::get(numDims, 0, rhsExprs, ctx);
+    auto accMap = AffineMap::get(numDims, 0, accExprs, ctx);
 
     SmallVector<utils::IteratorType> iteratorTypes =
         linalgOp.getIteratorTypesArray();
 
-    // TODO(hanchung): Support batch gemms.
     Location loc = op.getLoc();
     auto mmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
         loc, operands[0], operands[1], operands[2],
@@ -432,9 +490,17 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                   targetAttr);
-    MaterializeEncodingConversionTarget target(*funcOp.getContext());
+    // On GPU, we use transposeNarrowN=false for a combination of reasons:
+    // 1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
+    //    its semantics from the wrapped intrinsic, we can't rely on any kind of
+    //    LHS<->RHS symmetry.
+    // 2. We do not currently use ukernels, which would be one of the main areas
+    //    to benefit from transposeNarrowN.
+    // 3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
+    //    runtime, so we don't need a simplification at that level either.
+    MaterializeEncodingTypeConverter typeConverter(
+        materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/false);
+    MaterializeEncodingConversionTarget target(*ctx);
     MaterializeEncodingValueFn materializeEncodingValueFn =
         [](RankedTensorType, OpBuilder,
            Location) -> FailureOr<MaterializeEncodingValueInfo> { return {}; };
@@ -456,6 +522,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // resolve dims ops.
   {
     RewritePatternSet patterns(ctx);
+    tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

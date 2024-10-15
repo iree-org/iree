@@ -14,6 +14,13 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+/// Helper for setting up a data tiled multi_mma config based on the specified
+/// target.
+LogicalResult
+setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op);
+
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.

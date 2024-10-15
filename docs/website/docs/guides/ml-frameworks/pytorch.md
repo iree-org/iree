@@ -23,8 +23,7 @@ status: new
 ## :octicons-book-16: Overview
 
 [iree-turbine](https://pypi.org/project/iree-turbine/) (rebrand pending from
-[SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine)) offers a tight
-integration between compatible versions of IREE,
+"shark-turbine") offers a tight integration between compatible versions of IREE,
 [torch-mlir](https://github.com/llvm/torch-mlir), and
 [PyTorch](https://pytorch.org/).
 
@@ -65,11 +64,12 @@ graph LR
 
 ## :octicons-download-16: Prerequisites
 
-Install a recent version of PyTorch (`2.3.0+`, prerelease as of April 2024):
+Install a recent version of PyTorch
+(`2.4.1`, latest stable release as of September 2024):
 
 ``` shell
 python -m pip install \
-  --pre --index-url https://download.pytorch.org/whl/test/cpu torch==2.3.0
+  --index-url https://download.pytorch.org/whl/test/cpu torch==2.4.1
 ```
 
 Install iree-turbine:
@@ -84,7 +84,7 @@ Just-in-time integration allows for Python code using TorchDynamo to optimize
 PyTorch models/functions using IREE, all within an interactive Python session.
 
 <!-- TODO(scotttodd): mention targets like AMD GPUs when supported
-                      https://github.com/nod-ai/SHARK-Turbine/issues/94 -->
+                      https://github.com/iree-org/iree-turbine/issues/78 -->
 
 ``` mermaid
 graph TD
@@ -218,7 +218,7 @@ binary = export_output.compile(save_to=None)
 # Use the IREE runtime API to test the compiled program.
 config = ireert.Config("local-task")
 vm_module = ireert.load_vm_module(
-    ireert.VmModule.wrap_buffer(config.vm_instance, binary.map_memory()),
+    ireert.VmModule.copy_buffer(config.vm_instance, binary.map_memory()),
     config,
 )
 input = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
@@ -268,7 +268,7 @@ Advanced export workflows can use the
 class to define and constrain the structure of a program prior to compiling it.
 
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
-                      https://github.com/nod-ai/SHARK-Turbine/issues/106
+                      https://github.com/iree-org/iree-turbine/issues/77
 -->
 
 ```python
@@ -297,59 +297,6 @@ exported function (typically called "forward"), while more complex programs can
 have multiple computation functions, initialization functions, "backward"
 methods for training, state management functions, debugging functions, etc.
 
-* Each instance method on a `aot.CompiledModule`-derived class is exported.
-  These instance methods can include calls to other `aot` components, such as
-  `aot.jittable` compute functions:
-
-    ```python
-    class GetOnesModule(aot.CompiledModule):
-      @aot.jittable
-      def compute_ones():
-        return torch.ones(3)
-
-      def get_ones(self):
-        return self.compute_ones()
-    ```
-
-* Instance methods can use `aot.AbstractTensor` to specify data types:
-
-    ```python hl_lines="8-9"
-    class IntSumModule(aot.CompiledModule):
-      @aot.jittable
-      def compute_sum(a, b):
-        return a + b
-
-      def sum_int32(
-        self,
-        a=aot.AbstractTensor(2, dtype=torch.int32),
-        b=aot.AbstractTensor(2, dtype=torch.int32),
-      ):
-        return self.compute_sum(a, b)
-    ```
-
-* Shapes can be made dynamic using `aot.AbstractTensor` and `aot.jittable`
-  constraints:
-
-    ```python hl_lines="8-9 14-16"
-    class DynamicSumModule(aot.CompiledModule):
-      @aot.jittable
-      def compute_sum(a, b):
-        return a + b
-
-      def sum_dynamic(
-        self,
-        a=aot.AbstractTensor(None),
-        b=aot.AbstractTensor(None),
-      ):
-        return self.compute_sum(
-            a,
-            b,
-            constraints=[
-                a.dynamic_dim(0) == b.dynamic_dim(0),
-            ],
-        )
-    ```
-
 #### :material-variable: Global variables
 
 _Global variables_ are used to represent persistent state within a program
@@ -374,37 +321,126 @@ their values independently at runtime.
         self.value = new_value
     ```
 
-* All named parameters on a `nn.Module` can be exported using
-  `export_parameters()`:
+#### :octicons-file-symlink-file-16: Using external parameters
 
-    ```python hl_lines="12 18-26"
-    class SimpleParams(torch.nn.Module):
-      def __init__(self):
+Model parameters can be stored in standalone files that can be efficiently
+stored and loaded separately from model compute graphs. See the
+[Parameters guide](../parameters.md) for more general information about
+parameters in IREE.
+
+When using iree-turbine, the `aot.externalize_module_parameters()` function
+separates parameters from program modules and encodes a symbolic relationship
+between them so they can be loaded at runtime.
+
+We use [Safetensors](https://huggingface.co/docs/safetensors/) here to store the
+models parameters on disk, so that they can be loaded later during runtime.
+
+```python
+import torch
+from safetensors.torch import save_file
+import numpy as np
+import shark_turbine.aot as aot
+
+class LinearModule(torch.nn.Module):
+    def __init__(self, in_features, out_features):
         super().__init__()
-        self.classifier = torch.nn.Linear(20, 30)
+        self.weight = torch.nn.Parameter(torch.randn(in_features, out_features))
+        self.bias = torch.nn.Parameter(torch.randn(out_features))
 
-      def forward(self, x):
-        return self.classifier(x)
+    def forward(self, input):
+        return (input @ self.weight) + self.bias
 
-    m = SimpleParams()
+linear_module = LinearModule(4,3)
 
-    class SimpleParamsModule(aot.CompiledModule):
-      params = aot.export_parameters(m)
-      compute = aot.jittable(m.forward)
+# Create a params dictionary. Note that the keys here match LinearModule's
+# attributes. We will use the saved safetensor file for use from the command
+# line.
+wt = linear_module.weight.data.contiguous()
+bias = linear_module.bias.data.contiguous()
+params = { "weight": wt, "bias": bias }
+save_file(params, "params.safetensors")
 
-      def run(self, x=aot.AbstractTensor(128, 20)):
-        return self.compute(x)
+# Externalize the model parameters. This removes weight tensors from the IR
+# module, allowing them to be loaded at runtime. Symbolic references to these
+# parameters are still retained in the IR.
+aot.externalize_module_parameters(linear_module)
 
-      # torch.nn.Linear has 'weight' and 'bias' variables:
-      #   https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-      # Add getters for both exported parameters.
+input = torch.randn(4)
+exported_module = aot.export(linear_module, input)
 
-      def get_weight(self):
-        return self.params["classifier.weight"]
+# Compile the exported module, to generate the binary. When `save_to` is
+# not None, the binary will be stored at the path passed in to `save_to`.
+# Here, we pass in None, so that the binary can stored in a variable.
+binary = exported_module.compile(save_to=None)
 
-      def get_bias(self):
-        return self.params["classifier.bias"]
+# Save the input as an npy tensor, so that it can be passed in through the
+# command line to `iree-run-module`.
+input_np = input.numpy()
+np.save("input.npy", input_np)
+```
+
+=== "Python runtime"
+
+    Runtime invocation now requires loading the parameters as a separate module.
+    To get the parameters as a module, iree.runtime provides a convenient method,
+    called `create_io_parameters_module()`.
+
+    ```python
+    import iree.runtime as ireert
+
+    # To load the parameters, we need to define ParameterIndex for each
+    # parameter class.
+    idx = ireert.ParameterIndex()
+    idx.add_buffer("weight", wt.detach().numpy().tobytes())
+    idx.add_buffer("bias", bias.detach().numpy().tobytes())
+
+
+    # Create the runtime instance, and load the runtime.
+    config = ireert.Config(driver_name="local-task")
+    instance = config.vm_instance
+
+    param_module = ireert.create_io_parameters_module(
+        instance, idx.create_provider(scope="model"),
+    )
+
+    # Load the runtime. There are essentially two modules to load, one for the
+    # weights, and one for the main module. Ensure that the VMFB file is not
+    # already open or deleted before use.
+    vm_modules = ireert.load_vm_modules(
+        param_module,
+        ireert.create_hal_module(instance, config.device),
+        ireert.VmModule.copy_buffer(instance, binary.map_memory()),
+        config=config,
+    )
+
+    # vm_modules is a list of modules. The last module in the list is the one
+    # generated from the binary, so we use that to generate an output.
+    result = vm_modules[-1].main(input)
+    print(result.to_host())
     ```
+
+=== "Command line tools"
+
+    It is also possible to save the VMFB binary to disk, then call `iree-run-module`
+    through the command line to generate outputs.
+
+    ```python
+    # When save_to is not None, the binary is saved to the given path,
+    # and a None value is returned.
+    binary = exported_module.compile(save_to="compiled_module.vmfb")
+    ```
+
+    The stored safetensors file, the input tensor, and the VMFB can now be passed
+    in to IREE through the command line.
+
+    ```bash
+    iree-run-module --module=compiled_module.vmfb --parameters=model=params.safetensors \
+                    --input=@input.npy
+    ```
+
+    Note here that the `--parameters` flag has `model=` following it immediately.
+    This simply specifies the scope of the parameters, and is reflected in the
+    compiled module.
 
 #### :octicons-code-16: Samples
 
@@ -414,4 +450,4 @@ Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.c
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
 AOT unit tests | [`tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
 Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_dynamic.py)
-stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py)
+stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-ModelDev/blob/main/models/turbine_models/custom_models/stateless_llama.py)

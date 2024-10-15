@@ -36,6 +36,10 @@ void createTorchToIREEPipeline(
   // model) and those constants get somewhat obscured by TorchToArith.
   llvm::ArrayRef<std::string> emptyArrayRef;
 
+  // Dynamic shape bindings add a lot of structure to the IR which we prefer to
+  // leverage and eliminate prior to any other activity, so do this first.
+  pm.addNestedPass<func::FuncOp>(createBindSymbolicShapesPass());
+
   if (options.strictSymbolicShapes) {
     pm.addNestedPass<func::FuncOp>(createSetStrictSymbolicShapesPass());
     // Run canonicalization in case any previously non-strict dynamic code can

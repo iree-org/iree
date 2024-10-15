@@ -236,6 +236,9 @@ void ErrorInstance::BindApi(PJRT_Api* api) {
       case IREE_STATUS_DEFERRED:
         args->code = PJRT_Error_Code_UNKNOWN;  // No mapping
         break;
+      case IREE_STATUS_INCOMPATIBLE:
+        args->code = PJRT_Error_Code_NOT_FOUND;
+        break;
       default:
         // Should not happen.
         args->code = PJRT_Error_Code_UNKNOWN;

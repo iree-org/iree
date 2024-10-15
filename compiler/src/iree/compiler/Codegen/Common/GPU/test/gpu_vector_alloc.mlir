@@ -12,7 +12,7 @@
 >
 
 func.func @test(%vector: vector<16x16xf16>) -> vector<16x16xf16> {
-  %out = iree_vector_ext.to_layout %vector to #layout {shared_memory_conversion} : vector<16x16xf16>
+  %out = iree_vector_ext.to_layout %vector to layout(#layout) {shared_memory_conversion} : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 

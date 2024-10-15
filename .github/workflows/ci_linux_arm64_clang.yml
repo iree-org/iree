@@ -27,16 +27,15 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  # TODO(#18238): migrate to new runner cluster
-  #   Or switch to GitHub-hosted arm64 runners when available?
   linux_arm64_clang:
     needs: setup
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - arm64
-      - os-family=Linux
+    # See https://gitlab.arm.com/tooling/gha-runner-docs
+    runs-on: ah-ubuntu_22_04-c7g_4x-50
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:f3e2c56680b6007f29c8e191d93dfcb4f8800802e3caeb4851da90f2a1a0b5a5
+    defaults:
+      run:
+        shell: bash
     env:
       BUILD_DIR: build-arm64
     steps:
@@ -44,22 +43,31 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: "Building IREE"
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18557): enable sccache (watching for network bandwidth charges
+      #               between the cache server and AWS VMs)
+      - name: CMake - configure
+        run: |
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DPython3_EXECUTABLE="$(which python3)" \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DIREE_BUILD_PYTHON_BINDINGS=ON \
+            -DIREE_ENABLE_LLD=ON \
+            -DIREE_ENABLE_ASSERTIONS=ON \
+            -DIREE_BUILD_DOCS=ON \
+            -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
+      - name: CMake - build
+        run: |
+          cmake --build ${BUILD_DIR} -- -k 0
+          cmake --build ${BUILD_DIR} --target install -- -k 0
+          cmake --build ${BUILD_DIR} --target iree-test-deps -- -k 0
+      - name: Run CTest
         env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=ci_linux_arm64_clang" \
-            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
-            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
-      - name: "Testing IREE"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
-            ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:af7f082731b8947b91975a825d212855038e310328c0bdb1c8202a6693d1fa77 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+          # (For now) QEMU is required to run tests with SME
+          IREE_ARM_SME_QEMU_AARCH64_BIN: /usr/bin/qemu-aarch64
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      - name: Test iree-dialects
+        run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"

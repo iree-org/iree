@@ -36,23 +36,17 @@ public:
   }
 
   void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
-                        utils::IteratorType targetIterType, bool nofold) const {
+                        ArrayRef<int64_t> paddingDims,
+                        ArrayRef<int64_t> padToMultipleOf, bool noFold) const {
+    assert(paddingDims.size() == padToMultipleOf.size() &&
+           "invalid pad multiples for padding dimensions");
+
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
 
-    SmallVector<int64_t> paddingDims;
-    for (auto [index, iterType] : llvm::enumerate(op.getIteratorTypesArray())) {
-      if (iterType == targetIterType) {
-        paddingDims.push_back(index);
-      }
-    }
+    SmallVector<bool> packPaddings(op.getNumDpsInputs(), noFold);
 
-    SmallVector<bool> packPaddings(op.getNumDpsInputs(), nofold);
-
-    // One is enough because they will essentially be padded to corresponding
-    // tile sizes, which should be multiple of MMA shapes.
-    SmallVector<int64_t> padToMultipleOf(paddingDims.size(), 1);
     SmallVector<Attribute> paddingValueAttributes;
     for (auto &operand : op->getOpOperands()) {
       auto elemType = getElementTypeOrSelf(operand.get().getType());
@@ -80,18 +74,18 @@ public:
 
     // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so
     // we can kick canonicalization patterns to fold outer tensor.pad ops away.
-    bool nofold = false;
+    bool noFold = false;
     utils::IteratorType targetIterType = utils::IteratorType::parallel;
     switch (targetDimensions) {
     case LLVMGPUMatmulPadOption::ParallelDims:
       LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
       targetIterType = utils::IteratorType::parallel;
-      nofold = false;
+      noFold = false;
       break;
     case LLVMGPUMatmulPadOption::ReductionDims:
       LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
       targetIterType = utils::IteratorType::reduction;
-      nofold = true;
+      noFold = true;
       break;
     default: // Unreachable.
       assert(false);
@@ -106,8 +100,47 @@ public:
     });
 
     IRRewriter rewriter(ctx);
-    for (auto op : candidates) {
-      padWithZeroValue(rewriter, op, targetIterType, nofold);
+    for (linalg::LinalgOp op : candidates) {
+      SmallVector<int64_t> padMultiples(op.getNumLoops(), 1);
+      auto config = dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(
+          getLoweringConfig(op));
+      if (config) {
+        switch (targetDimensions) {
+        case LLVMGPUMatmulPadOption::ParallelDims:
+          padMultiples = config.getStaticTilingLevelSizes(
+              static_cast<unsigned>(IREE::GPU::TilingLevel::Workgroup), op);
+          break;
+        case LLVMGPUMatmulPadOption::ReductionDims:
+          padMultiples = config.getStaticTilingLevelSizes(
+              static_cast<unsigned>(IREE::GPU::TilingLevel::Reduction), op);
+          break;
+        default:
+          assert(false && "Unexpected target dimensions");
+          break;
+        }
+      }
+
+      // Populate padding dimensions.
+      SmallVector<int64_t> paddingDimensions;
+      for (auto [idx, iter] : llvm::enumerate(op.getIteratorTypesArray())) {
+        if (iter == targetIterType) {
+          paddingDimensions.push_back(idx);
+        }
+      }
+
+      // Populate tile sizes. We pad to multiples of workgroup/reduction
+      // tile sizes based on the selected target tiling dimensions.
+      // This pass is ran after the select target tiling is done to pad
+      // all dimensions to the select tile sizes.
+      SmallVector<int64_t> padToMultipleOf;
+      for (int64_t dim : paddingDimensions) {
+        if (padMultiples[dim] != 0) {
+          padToMultipleOf.push_back(padMultiples[dim]);
+        }
+      }
+
+      padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf,
+                       noFold);
     }
 
     {

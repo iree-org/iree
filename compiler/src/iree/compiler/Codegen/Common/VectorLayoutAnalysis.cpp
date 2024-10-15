@@ -122,7 +122,7 @@ public:
 
   LogicalResult initialize(Operation *root) override;
 
-  LogicalResult visit(ProgramPoint point) override;
+  LogicalResult visit(ProgramPoint *point) override;
 
   void registerNewValue(Value val, const VectorLayoutInterface &layout);
 
@@ -147,7 +147,7 @@ public:
 
   LogicalResult initialize(Operation *root) override;
 
-  LogicalResult visit(ProgramPoint point) override;
+  LogicalResult visit(ProgramPoint *point) override;
 
   /// Register a new value to be part of the dataflow analysis. The value should
   /// not be part of the analysis already. This is used for new values that are
@@ -308,7 +308,7 @@ void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   if (propagation) {
     // Make propagation run again on all users of this value.
     for (Operation *user : value.getUsers()) {
-      solver->enqueue({user, propagation});
+      solver->enqueue({solver->getProgramPointAfter(user), propagation});
     }
     // TODO: Maybe we need to run it on the parent operation as well to give
     // layout to other results? Seems unlikely though as results usually
@@ -318,17 +318,19 @@ void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
   if (enforcement) {
     // Make enforcement run on the parent.
     if (Operation *definingOp = value.getDefiningOp()) {
-      solver->enqueue({definingOp, enforcement});
+      solver->enqueue({solver->getProgramPointAfter(definingOp), enforcement});
     } else {
       // TODO: This is not always correct. Ideally, we should enqueue all
       // predecessors of these block arguements.
-      solver->enqueue({value.getParentBlock()->getParentOp(), enforcement});
+      solver->enqueue(
+          {solver->getProgramPointAfter(value.getParentBlock()->getParentOp()),
+           enforcement});
     }
 
     // Enforce users of this value also, as some other operands may need to
     // be updated.
     for (Operation *user : value.getUsers()) {
-      solver->enqueue({user, enforcement});
+      solver->enqueue({solver->getProgramPointAfter(user), enforcement});
     }
   }
 }
@@ -542,6 +544,26 @@ static void propagateLayoutToContractionOp(
   update(result, changed);
 }
 
+static void propagateLayoutToGatherOp(
+    vector::GatherOp gather,
+    ArrayRef<const DistributionLayout *> operandLattices,
+    ArrayRef<DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  DistributionLayout *result = resultLattices[0];
+
+  const DistributionLayout *indicesLayout = operandLattices[0];
+
+  // If result lattice already has a layout, we cannot do anything. We do not
+  // impose layout conflicts on results.
+  if (result->hasLayout()) {
+    return;
+  }
+
+  ChangeResult changed = result->resolve(indicesLayout);
+  update(result, changed);
+}
+
 void propagationTransferFunction(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
     ArrayRef<DistributionLayout *> resultLattices,
@@ -574,6 +596,11 @@ void propagationTransferFunction(
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     propagateLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<vector::GatherOp>(op)) {
+    propagateLayoutToGatherOp(gather, operandLattices, resultLattices, update);
     return;
   }
 
@@ -739,6 +766,27 @@ static void enforceLayoutToContractionOp(
   update(value, changed);
 }
 
+static void enforceLayoutToGatherOp(
+    vector::GatherOp gather, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Gather has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+
+  if (result->hasLayout()) {
+    // Note that the operand lattice is not updated. So using the operand
+    // lattice again can cause bugs.
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          result, getOpOperand(gather, index));
+      update(operandLattice, changed);
+    }
+  } else {
+    // Enforce the same layout on all operands.
+    enforceSameLayoutForOperands(gather, operandLattices, update);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -772,6 +820,11 @@ void enforcementTransferFunction(
     return;
   }
 
+  if (auto gather = dyn_cast<vector::GatherOp>(op)) {
+    enforceLayoutToGatherOp(gather, operandLattices, resultLattices, update);
+    return;
+  }
+
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     enforceLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                  update);
@@ -798,8 +851,11 @@ LogicalResult PropagateLayout::initialize(Operation *root) {
   return success();
 }
 
-LogicalResult PropagateLayout::visit(ProgramPoint point) {
-  if (Operation *op = dyn_cast_or_null<Operation *>(point)) {
+LogicalResult PropagateLayout::visit(ProgramPoint *point) {
+  if (point->isBlockStart())
+    return success();
+
+  if (auto op = point->getPrevOp()) {
     visitOperation(op);
     return success();
   }
@@ -834,7 +890,6 @@ void PropagateLayout::visitOperation(Operation *op) {
     if (!isa<VectorType>(operand.getType())) {
       continue;
     }
-
     DistributionLayout *operandLattice = getLatticeElement(operand);
     operandLattices.push_back(operandLattice);
   }
@@ -919,8 +974,11 @@ LogicalResult EnforceLayout::initialize(Operation *root) {
   return success();
 }
 
-LogicalResult EnforceLayout::visit(ProgramPoint point) {
-  if (Operation *op = dyn_cast_or_null<Operation *>(point)) {
+LogicalResult EnforceLayout::visit(ProgramPoint *point) {
+  if (point->isBlockStart())
+    return success();
+
+  if (auto op = point->getPrevOp()) {
     visitOperation(op);
     return success();
   }

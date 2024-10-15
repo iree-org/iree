@@ -59,6 +59,12 @@ def IREEGPU_LoweringConfigAttr :
   let extraClassDeclaration = [{
     /// Helper to retrieve a target mma intrinsic if present.
     ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
+
+    /// Helper to retrieve/set a list of operand indices to promote.
+    std::optional<SmallVector<int64_t>> getPromotedOperandList() const;
+    static void setPromotedOperandList(MLIRContext *context,
+                                       SmallVectorImpl<NamedAttribute> &attrs,
+                                       ArrayRef<int64_t> operands);
   }];
 }
 
@@ -217,9 +223,6 @@ def IREEGPU_DataTiledMMAAttr :
     AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
-    // TODO: Implement the interface method. The current implementation just
-    // returns {VectorType(), VectorType(), VectorType()} now because the dummy
-    // implementation is required by the MmaInterfaceAttr.
     "getABCVectorTypes",
     "getMNKShape",
     "getSubgroupSize",

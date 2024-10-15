@@ -291,10 +291,28 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
 
   IREETilingResult tilingResult;
   tilingResult.tiledLoops.resize(numLoops, false);
-  for (auto [index, tileSize] : llvm::enumerate(tileSizes)) {
-    if (!isConstantIntValue(tileSize, 0)) {
-      tilingResult.tiledLoops.set(index);
+  AffineExpr s0, s1, s2, s3; // lb, ub, step, tileSize
+  bindSymbols(rewriter.getContext(), s0, s1, s2, s3);
+  AffineExpr numTilesExprs = (s1 - s0).ceilDiv(s2 * s3);
+  for (auto [index, iteratorType, range, tileSize] :
+       llvm::enumerate(op.getLoopIteratorTypes(), iterationDomain, tileSizes)) {
+    // If distribution is specified, only parallel loops are tiled.
+    if (options.distribution && iteratorType != utils::IteratorType::parallel) {
+      continue;
     }
+    // If tile size is 0, it isnt tiled.
+    if (isConstantIntValue(tileSize, 0)) {
+      continue;
+    }
+    // If number of tiles is statically know to be 1, the loop isnt tiled.
+    OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, numTilesExprs,
+        {range.offset, range.size, range.stride, tileSize});
+    if (isConstantIntValue(numTiles, 1)) {
+      continue;
+    }
+
+    tilingResult.tiledLoops.set(index);
   }
 
   if (!tilingResult.tiledLoops.any()) {
@@ -328,40 +346,30 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
         iterationDomain.size(), linalg::DistributionMethod::None);
     SmallVector<linalg::ProcInfo> procInfo;
     if (options.distribution) {
-      SmallVector<utils::IteratorType> iteratorTypes =
-          op.getLoopIteratorTypes();
-
-      // The parallel loops that are tiled are partitionable loops.
       SmallVector<Range> parallelLoopRanges;
-      SmallVector<unsigned> partitionedLoopIds;
-
-      AffineExpr s0, s1, s2, s3; // lb, ub, step, tileSize
-      bindSymbols(rewriter.getContext(), s0, s1, s2, s3);
-      AffineExpr numTilesExprs = (s1 - s0).ceilDiv(s2 * s3);
-      for (auto [index, iteratorType] : llvm::enumerate(iteratorTypes)) {
-        if (iteratorType != utils::IteratorType::parallel ||
-            isConstantIntValue(tileSizes[index], 0)) {
-          continue;
+      for (auto loopIdx : llvm::seq<unsigned>(0, numLoops)) {
+        if (tilingResult.tiledLoops.test(loopIdx)) {
+          AffineExpr s0, s1;
+          bindSymbols(rewriter.getContext(), s0, s1);
+          OpFoldResult parallelLoopStep = affine::makeComposedFoldedAffineApply(
+              rewriter, loc, s0 * s1,
+              {iterationDomain[loopIdx].stride, tileSizes[loopIdx]});
+          Range r = {iterationDomain[loopIdx].offset,
+                     iterationDomain[loopIdx].size, parallelLoopStep};
+          parallelLoopRanges.emplace_back(std::move(r));
         }
-
-        OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
-            rewriter, loc, numTilesExprs,
-            {iterationDomain[index].offset, iterationDomain[index].size,
-             iterationDomain[index].stride, tileSizes[index]});
-        if (isConstantIntValue(numTiles, 1)) {
-          continue;
-        }
-
-        parallelLoopRanges.push_back(iterationDomain[index]);
-        partitionedLoopIds.push_back(index);
       }
 
-      // Query the callback to get the {procId, nprocs} to use.
       procInfo =
           options.distribution->procInfo(rewriter, loc, parallelLoopRanges);
 
-      for (auto [index, loopIdx] : llvm::enumerate(partitionedLoopIds)) {
-        distributionMethods[loopIdx] = procInfo[index].distributionMethod;
+      unsigned partitionedLoopIdx = 0;
+      for (auto loopIdx : llvm::seq<unsigned>(0, numLoops)) {
+        if (!tilingResult.tiledLoops.test(loopIdx)) {
+          continue;
+        }
+        distributionMethods[loopIdx] =
+            procInfo[partitionedLoopIdx++].distributionMethod;
       }
     }
 
@@ -443,7 +451,8 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     worklist.pop_front();
     for (OpOperand &operand : currOp->getOpOperands()) {
       Operation *definingOp = operand.get().getDefiningOp();
-      auto tilingInterfaceProducer = dyn_cast<TilingInterface>(definingOp);
+      auto tilingInterfaceProducer =
+          dyn_cast_or_null<TilingInterface>(definingOp);
       if (!tilingInterfaceProducer || isa<tensor::PadOp>(definingOp) ||
           producers.count(tilingInterfaceProducer)) {
         continue;

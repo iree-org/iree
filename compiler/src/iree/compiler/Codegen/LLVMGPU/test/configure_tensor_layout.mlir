@@ -42,9 +42,9 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 // CHECK-LABEL: func.func @matmul_96x64x16_mfma
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED2]]
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME: outs(%[[ACC]]
@@ -93,9 +93,9 @@ func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
 
 // CHECK-LABEL: func.func @matmul_96x64x16_wmma
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED2]]
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME: outs(%[[ACC]]
@@ -144,9 +144,9 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 
 // CHECK-LABEL: func.func @matmul_128x64x16_multi_subgroup
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED2]]
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME: outs(%[[ACC]]
@@ -195,9 +195,9 @@ func.func @packed_matmul_128x128x128(%lhs: tensor<8x16x16xf16>,
 // CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [2, 1, 2, 1], batch_tile = [4, 1, 4, 1], outer_tile = [1, 1, 1, 1], thread_tile = [1, 4, 1, 16], element_tile = [1, 4, 1, 1], subgroup_strides = [2, 0, 1, 0], thread_strides = [0, 16, 0, 1]>
 // CHECK-LABEL: func.func @packed_matmul_128x128x128
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED]] {shared_memory_conversion}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED1]] {shared_memory_conversion}
-// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to #[[$NESTED2]]
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion}
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME: outs(%[[ACC]]

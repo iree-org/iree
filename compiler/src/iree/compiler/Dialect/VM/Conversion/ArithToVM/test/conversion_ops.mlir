@@ -324,6 +324,18 @@ module @fptosi_fp32_i32 {
 
 // -----
 
+// CHECK-LABEL: @fptosi_fp32_i64
+module @fptosi_fp32_i64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
+  func.func @fn(%arg0: f32) -> i64 {
+    // CHECK: vm.cast.f32.si64 %[[ARG0]] : f32 -> i64
+    %0 = arith.fptosi %arg0 : f32 to i64
+    return %0 : i64
+  }
+}
+
+// -----
+
 // expected-error@+1 {{conversion to vm.module failed}}
 module @fptoui_fp32_i8 {
   func.func @fn(%arg0: f32) -> i8 {
@@ -342,6 +354,18 @@ module @fptoui_fp32_i32 {
     // CHECK: vm.cast.f32.ui32 %[[ARG0]] : f32 -> i32
     %0 = arith.fptoui %arg0 : f32 to i32
     return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @fptoui_fp32_i64
+module @fptoui_fp32_i64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: f32)
+  func.func @fn(%arg0: f32) -> i64 {
+    // CHECK: vm.cast.f32.ui64 %[[ARG0]] : f32 -> i64
+    %0 = arith.fptoui %arg0 : f32 to i64
+    return %0 : i64
   }
 }
 

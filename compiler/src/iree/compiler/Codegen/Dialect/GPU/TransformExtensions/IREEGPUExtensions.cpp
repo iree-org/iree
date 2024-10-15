@@ -200,8 +200,8 @@ transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
                                      "extracted slice from the consumer loop");
   }
 
-  if (failed(GPU::fuseForallIntoSlice(rewriter, producer, consumer,
-                                      consumerChain))) {
+  if (failed(GPU::fuseForallIntoConsumer(rewriter, producer, consumer,
+                                         consumerChain))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to fuse forall ops");
   }

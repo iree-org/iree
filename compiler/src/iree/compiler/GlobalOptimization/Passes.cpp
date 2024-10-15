@@ -81,9 +81,12 @@ void buildGlobalOptimizationPassPipeline(
   // parameters are available for folding.
   if (!transformOptions.options.parameterImportPaths.empty()) {
     IREE::IO::Parameters::ImportParametersPassOptions importParametersOptions;
-    importParametersOptions.scopePaths =
-        transformOptions.options.parameterImportPaths;
-    importParametersOptions.keys = transformOptions.options.parameterImportKeys;
+    importParametersOptions.scopePaths.assign(
+        transformOptions.options.parameterImportPaths.begin(),
+        transformOptions.options.parameterImportPaths.end());
+    importParametersOptions.keys.assign(
+        transformOptions.options.parameterImportKeys.begin(),
+        transformOptions.options.parameterImportKeys.end());
     importParametersOptions.maximumSize =
         transformOptions.options.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
@@ -92,6 +95,7 @@ void buildGlobalOptimizationPassPipeline(
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
+      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
@@ -191,8 +195,11 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(IREE::Util::createApplyPatternsPass());
   mainPassManager.addPass(IREE::Util::createFoldGlobalsPass());
   mainPassManager.addPass(IREE::Util::createIPOPass());
-  mainPassManager.addPass(IREE::Flow::createCanonicalizerPass());
-  mainPassManager.addPass(createCSEPass());
+
+  FunctionLikeNest(mainPassManager)
+      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(createCSEPass);
 
   if (transformOptions.options.constExprHoisting) {
     buildGlobalOptExprHoistingPassPipeline(mainPassManager, transformOptions);

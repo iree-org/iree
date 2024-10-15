@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -21,6 +22,8 @@
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+
+#include <numeric>
 
 namespace mlir::iree_compiler {
 
@@ -1097,6 +1100,248 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
 } // namespace mlir::iree_compiler
 
 namespace mlir::iree_compiler::IREE::Util {
+
+//===----------------------------------------------------------------------===//
+// util.assume.int
+//===----------------------------------------------------------------------===//
+
+SmallVector<IntAssumptionAttr>
+AssumeIntOp::getOperandAssumptions(unsigned operandIndex) {
+  assert(operandIndex < getNumOperands() &&
+         "getUnionedUnsignedRange operand out of range");
+  auto assumptions = cast<ArrayAttr>(getAssumptions()[operandIndex]);
+  SmallVector<IntAssumptionAttr> results;
+  for (auto assumption : assumptions) {
+    results.push_back(cast<IntAssumptionAttr>(assumption));
+  }
+  return results;
+}
+
+std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
+AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
+  auto assumptions = getOperandAssumptions(operandIndex);
+  std::optional<uint64_t> uminUnion;
+  std::optional<uint64_t> umaxUnion;
+
+  for (auto assumption : assumptions) {
+    auto umin = assumption.getUmin();
+    auto umax = assumption.getUmax();
+    if (umin) {
+      uminUnion = std::min(
+          *umin, uminUnion ? *uminUnion : std::numeric_limits<uint64_t>::max());
+    }
+    if (umax) {
+      umaxUnion = std::max(
+          *umax, umaxUnion ? *umaxUnion : std::numeric_limits<uint64_t>::min());
+    }
+  }
+  return std::make_pair(uminUnion, umaxUnion);
+}
+
+// Gets the unioned divisor for an operand. If there are multiple divisor
+// assumptions, the gcd of all of them is returned. If there are no
+// divisor assumptions, std::nullopt is returned.
+std::optional<uint64_t>
+AssumeIntOp::getUnionedUnsignedDivisor(unsigned operandIndex) {
+  auto assumptions = getOperandAssumptions(operandIndex);
+  std::optional<uint64_t> divisorUnion;
+  for (auto assumption : assumptions) {
+    auto divisor = assumption.getUdiv();
+    if (divisor) {
+      if (divisorUnion)
+        divisorUnion = std::gcd(*divisor, *divisorUnion);
+      else
+        divisorUnion = *divisor;
+    }
+  }
+  return divisorUnion;
+}
+
+void AssumeIntOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
+                                    SetIntRangeFn setResultRange) {
+  for (auto [index, result] : llvm::enumerate(getResults())) {
+    Type type = result.getType();
+    unsigned bitWidth;
+    if (isa<IndexType>(type))
+      bitWidth = 64;
+    else if (auto intType = dyn_cast<IntegerType>(type))
+      bitWidth = intType.getWidth();
+    else
+      continue;
+    auto [umin, umax] = getUnionedUnsignedRange(index);
+    if (umin && umax) {
+      APInt uminAp(bitWidth, *umin);
+      APInt umaxAp(bitWidth, *umax);
+      setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
+    }
+  }
+}
+
+void AssumeIntOp::inferResultDivisibility(ArrayRef<IntegerDivisibility> argDivs,
+                                          SetIntDivisibilityFn setResultDivs) {
+  for (auto [index, result] : llvm::enumerate(getResults())) {
+    Type type = result.getType();
+    if (!isa<IndexType>(type) && !isa<IntegerType>(type))
+      continue;
+    auto udiv = getUnionedUnsignedDivisor(index);
+    if (udiv) {
+      setResultDivs(result,
+                    ConstantIntDivisibility(/*udiv=*/*udiv, /*sdiv=*/*udiv));
+    }
+  }
+}
+
+void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
+                        Value singleOperand,
+                        IntAssumptionAttr singleAssumption) {
+  state.addOperands({singleOperand});
+  state.addTypes({singleOperand.getType()});
+  state.addAttribute("assumptions", builder.getArrayAttr(builder.getArrayAttr(
+                                        {singleAssumption})));
+}
+
+void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
+                        ArrayRef<Value> operands,
+                        ArrayRef<ArrayAttr> assumptions) {
+  state.addOperands(operands);
+  for (auto operand : operands)
+    state.addTypes({operand.getType()});
+  state.addAttribute("assumptions",
+                     ArrayAttr::get(builder.getContext(),
+                                    ArrayRef<Attribute>(assumptions.begin(),
+                                                        assumptions.end())));
+}
+
+LogicalResult AssumeIntOp::verify() {
+  ArrayAttr allOperandAssumptions = getAssumptions();
+  // Verify that there is an assumption row per operand.
+  if (getNumOperands() != allOperandAssumptions.size()) {
+    return emitOpError() << "expected " << getNumOperands()
+                         << " assumption rows to match number of operands";
+  }
+
+  std::optional<int> rank;
+  for (auto [index, operandAssumptionsAttr] :
+       llvm::enumerate(allOperandAssumptions)) {
+    auto operandAssumptions = cast<ArrayAttr>(operandAssumptionsAttr);
+    if (rank && *rank != operandAssumptions.size())
+      return emitOpError() << "expected operand #" << index << " to have "
+                           << *rank << " assumptions but it has "
+                           << operandAssumptions.size();
+    rank = operandAssumptions.size();
+  }
+
+  return success();
+}
+
+ParseResult AssumeIntOp::parse(OpAsmParser &parser, OperationState &result) {
+  SmallVector<Attribute> allOperandAssumptions;
+  SmallVector<OpAsmParser::UnresolvedOperand> parsedOperands;
+  SmallVector<Type> parsedOperandTypes;
+
+  if (parser.parseCommaSeparatedList([&]() {
+        parsedOperands.emplace_back();
+        OpAsmParser::UnresolvedOperand &parsedOperand = parsedOperands.back();
+        SmallVector<Attribute> operandAssumptions;
+
+        if (parser.parseOperand(parsedOperand))
+          return failure();
+
+        // Parse as a single assumption or a list.
+        if (failed(parser.parseOptionalLSquare())) {
+          // Single assumption.
+          IntAssumptionAttr singleAssumption;
+          if (parser.parseCustomAttributeWithFallback(singleAssumption))
+            return failure();
+          operandAssumptions.push_back(singleAssumption);
+        } else {
+          // Multiple assumptions.
+          if (failed(parser.parseOptionalRSquare())) {
+            if (parser.parseCommaSeparatedList([&]() {
+                  IntAssumptionAttr singleAssumption;
+                  if (parser.parseCustomAttributeWithFallback(singleAssumption))
+                    return failure();
+                  operandAssumptions.push_back(singleAssumption);
+                  return success();
+                }))
+              return failure();
+            if (parser.parseRSquare())
+              return failure();
+          }
+        }
+
+        // Finalize operand.
+        allOperandAssumptions.push_back(
+            parser.getBuilder().getArrayAttr(operandAssumptions));
+
+        return success();
+      }))
+    return failure();
+
+  // Parse `:` type.
+  if (parser.parseColon() || parser.parseTypeList(parsedOperandTypes))
+    return failure();
+  result.addTypes(parsedOperandTypes);
+
+  if (parser.resolveOperands(parsedOperands, parsedOperandTypes,
+                             parser.getNameLoc(), result.operands))
+    return failure();
+
+  result.attributes.append(
+      "assumptions", parser.getBuilder().getArrayAttr(allOperandAssumptions));
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  return success();
+}
+
+void AssumeIntOp::print(OpAsmPrinter &p) {
+  p << " ";
+  bool multiLine = getOperands().size() > 1;
+  if (multiLine) {
+    p.increaseIndent();
+    p.increaseIndent();
+    p.printNewline();
+  }
+  ArrayAttr allOperandAssumptions = getAssumptions();
+  for (auto [index, operand] : llvm::enumerate(getOperands())) {
+    if (index > 0) {
+      p << ", ";
+      if (multiLine) {
+        p.printNewline();
+      }
+    }
+    ArrayAttr operandAssumptions =
+        cast<ArrayAttr>(allOperandAssumptions[index]);
+    p.printOperand(operand);
+
+    // Print the assumptions, either as a single assumption or list.
+    if (operandAssumptions.size() == 1) {
+      p.printStrippedAttrOrType(cast<IntAssumptionAttr>(operandAssumptions[0]));
+    } else {
+      p << "[";
+      llvm::interleaveComma(
+          operandAssumptions, p.getStream(), [&](Attribute attr) {
+            p.printStrippedAttrOrType(cast<IntAssumptionAttr>(attr));
+          });
+      p << "]";
+    }
+  }
+
+  if (multiLine) {
+    p.decreaseIndent();
+    p.printNewline();
+  } else {
+    p << " ";
+  }
+  p << ": ";
+  llvm::interleaveComma(getOperands(), p.getStream(),
+                        [&](Value operand) { p.printType(operand.getType()); });
+  p.printOptionalAttrDict((*this)->getAttrs(), {"assumptions"});
+  if (multiLine) {
+    p.decreaseIndent();
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // util.optimization_barrier

@@ -20,7 +20,7 @@ func.func @distribute_transfer_read_col_major(%arg0: memref<32x32xf16>) -> vecto
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %arg0[%c0, %c0], %cst {in_bounds = [true, true]}
                   : memref<32x32xf16>, vector<16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_col_major) : vector<16x16xf16>
   func.return %rootl : vector<16x16xf16>
 }
 
@@ -66,7 +66,7 @@ func.func @distribute_transfer_read_row_major_with_nontrivial_index(%a: index, %
           {in_bounds = [true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
   func.return %rootl : vector<16x16xf16>
 }
 
@@ -109,7 +109,7 @@ func.func @distribute_transfer_read_col_major_with_broadcast(%a: index, %b: inde
           {in_bounds = [true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (0, 0)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_col_major) : vector<16x16xf16>
   func.return %rootl : vector<16x16xf16>
 }
 
@@ -155,7 +155,7 @@ func.func @distribute_transfer_read_row_major_transpose(%a: index, %b: index, %a
           {in_bounds = [true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
   func.return %rootl : vector<16x16xf16>
 }
 
@@ -202,7 +202,7 @@ func.func @distribute_transfer_read_col_major_transpose(%a: index, %b: index, %a
           {in_bounds = [true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_col_major) : vector<16x16xf16>
   func.return %rootl : vector<16x16xf16>
 }
 
@@ -237,7 +237,7 @@ func.func @distribute_transfer_read_row_major_with_permutations(%a: index, %b: i
           {in_bounds = [true, true, true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d0, d3, 0, d1)>}
                   : memref<32x32x32x32xf16>, vector<21x15x8x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout : vector<21x15x8x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<21x15x8x16xf16>
   func.return %rootl : vector<21x15x8x16xf16>
 }
 
@@ -276,7 +276,7 @@ func.func @distribute_transfer_read_broadcast(%arg0: memref<32x32xf16>) -> vecto
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %arg0[%c0, %c0], %cst
           {in_bounds = [true]} : memref<32x32xf16>, vector<16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout : vector<16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16xf16>
   func.return %rootl : vector<16xf16>
 }
 
@@ -313,7 +313,7 @@ func.func @distribute_transfer_read_broadcast2(%arg0: memref<32x128xf16>) -> vec
   %cst = arith.constant 0.0 : f16
   %root = vector.transfer_read %arg0[%c0, %c0], %cst
           {in_bounds = [true]} : memref<32x128xf16>, vector<128xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout : vector<128xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<128xf16>
   func.return %rootl : vector<128xf16>
 }
 
@@ -348,7 +348,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @distribute_transfer_write_row_major
 func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
-  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
   vector.transfer_write %rootl, %alloc[%c0, %c0]
           {in_bounds = [true, true]}
                   : vector<16x16xf16>, memref<64x64xf16>
@@ -395,7 +395,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @distribute_transfer_write_col_major
 func.func @distribute_transfer_write_col_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
   %c0 = arith.constant 0 : index
-  %rootl = iree_vector_ext.to_layout %root to #layout_col_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_col_major) : vector<16x16xf16>
   vector.transfer_write %rootl, %alloc[%c0, %c0]
           {in_bounds = [true, true]}
                   : vector<16x16xf16>, memref<64x64xf16>
@@ -439,7 +439,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 func.func @distribute_transfer_write_row_major_with_nontrivial_index(%root: vector<16x16xf16>, %a: index, %b: index, %alloc: memref<32x32x32x32xf16>) {
   %c0 = arith.constant 0 : index
-  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
   vector.transfer_write %rootl, %alloc[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>}
@@ -494,7 +494,7 @@ func.func @distribute_transfer_read_write(%a: index, %b: index,
            permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>}
                   : memref<32x32x32x32xf16>, vector<16x16xf16>
 
-  %rootl = iree_vector_ext.to_layout %root to #layout_row_major : vector<16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
 
   vector.transfer_write %rootl, %arg1[%c0, %c0, %a, %b]
           {in_bounds = [true, true],
@@ -608,9 +608,9 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
           {in_bounds = [true, true]}
   : memref<128x64xf16>, vector<128x64xf16>
 
-  %A = iree_vector_ext.to_layout %a to #layout_a : vector<128x8xf16>
-  %B = iree_vector_ext.to_layout %b to #layout_b : vector<8x64xf16>
-  %C = iree_vector_ext.to_layout %c to #layout_c : vector<128x64xf16>
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<128x8xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<8x64xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<128x64xf16>
 
   return %A, %B, %C : vector<128x8xf16>, vector<8x64xf16>, vector<128x64xf16>
 }
@@ -645,7 +645,7 @@ func.func @transposed_read_64x8(%mem: memref<8x64xf16>)
   %read = vector.transfer_read %mem[%c0, %c0], %cst
           {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>}
   : memref<8x64xf16>, vector<64x8xf16>
-  %readl = iree_vector_ext.to_layout %read to #layout : vector<64x8xf16>
+  %readl = iree_vector_ext.to_layout %read to layout(#layout) : vector<64x8xf16>
 
   return %readl : vector<64x8xf16>
 }
@@ -683,7 +683,7 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @broadcast(%src: vector<128xf16>) -> (vector<64x128xf16>) {
   %bcast = vector.broadcast %src
     : vector<128xf16> to vector<64x128xf16>
-  %bcastl = iree_vector_ext.to_layout %bcast to #layout : vector<64x128xf16>
+  %bcastl = iree_vector_ext.to_layout %bcast to layout(#layout) : vector<64x128xf16>
   return %bcastl : vector<64x128xf16>
 }
 
@@ -727,7 +727,7 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @broadcast(%src: vector<64xf16>) -> (vector<32x256x64xf16>) {
   %bcast = vector.broadcast %src
     : vector<64xf16> to vector<32x256x64xf16>
-  %bcastl = iree_vector_ext.to_layout %bcast to #layout : vector<32x256x64xf16>
+  %bcastl = iree_vector_ext.to_layout %bcast to layout(#layout) : vector<32x256x64xf16>
   return %bcastl : vector<32x256x64xf16>
 }
 
@@ -764,7 +764,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 func.func @scalar_broadcast(%src: f16) -> (vector<32x256x64xf16>) {
   %bcast = vector.broadcast %src : f16 to vector<32x256x64xf16>
-  %bcastl = iree_vector_ext.to_layout %bcast to #layout : vector<32x256x64xf16>
+  %bcastl = iree_vector_ext.to_layout %bcast to layout(#layout) : vector<32x256x64xf16>
   return %bcastl : vector<32x256x64xf16>
 }
 
@@ -784,6 +784,41 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 2, 2],
+  batch_tile = [2, 2, 1],
+  outer_tile = [2, 1, 1],
+  thread_tile = [4, 16, 8],
+  element_tile = [1, 4, 4],
+  subgroup_strides = [4, 2, 1],
+  thread_strides   = [128, 8, 1]
+>
+
+func.func @gather(%base: memref<32x256x64xf16>, %index_vec: vector<32x256x64xindex>)-> (vector<32x256x64xf16>){
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<true> : vector<32x256x64xi1>
+  %pass = arith.constant dense<0.000000e+00> : vector<32x256x64xf16>
+  %0 = vector.gather %base[%c0, %c0, %c0] [%index_vec], %mask, %pass : memref<32x256x64xf16>, vector<32x256x64xindex>, vector<32x256x64xi1>, vector<32x256x64xf16> into vector<32x256x64xf16>
+  %1 = iree_vector_ext.to_layout %0 to layout(#layout) :  vector<32x256x64xf16>
+  return %1 : vector<32x256x64xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @gather
+// CHECK-SAME:  (%[[SRC:.*]]: memref<32x256x64xf16>, %[[INDEX:.*]]: vector<32x256x64xindex>)
+// CHECK: %[[DIST_INDEX:.*]] = iree_vector_ext.to_simt %[[INDEX]] : vector<32x256x64xindex> -> vector<2x2x1x2x1x1x1x4x4xindex>
+// CHECK: %[[GATHER:.*]] = vector.gather %[[SRC]][%c0, %c0, %c0] [%[[DIST_INDEX]]]
+// CHECK: iree_vector_ext.to_simd %[[GATHER]] : vector<2x2x1x2x1x1x1x4x4xf16> -> vector<32x256x64xf16>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 2],
   batch_tile = [2, 4],
   outer_tile = [2, 1],
@@ -796,7 +831,7 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @transpose(%src: vector<256x64xf16>) -> (vector<64x256xf16>) {
   %transp = vector.transpose %src, [1, 0]
     : vector<256x64xf16> to vector<64x256xf16>
-  %transpl = iree_vector_ext.to_layout %transp to #layout : vector<64x256xf16>
+  %transpl = iree_vector_ext.to_layout %transp to layout(#layout) : vector<64x256xf16>
   %sqrt = math.sqrt %transpl : vector<64x256xf16>
   return %sqrt : vector<64x256xf16>
 }
@@ -828,7 +863,7 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @transpose(%src: vector<64x256xf16>) -> (vector<256x64xf16>) {
-  %srcl = iree_vector_ext.to_layout %src to #layout : vector<64x256xf16>
+  %srcl = iree_vector_ext.to_layout %src to layout(#layout) : vector<64x256xf16>
   %transp = vector.transpose %srcl, [1, 0]
     : vector<64x256xf16> to vector<256x64xf16>
   %sqrt = math.sqrt %transp : vector<256x64xf16>
@@ -879,7 +914,7 @@ func.func @transpose_3d(%arr: memref<32x32x32xf16>) -> () {
   %root = vector.transfer_read %arr[%c0, %c0, %c0], %cst_0 {
     in_bounds = [true, true, true]
   } : memref<32x32x32xf16>, vector<32x16x16xf16>
-  %rootl = iree_vector_ext.to_layout %root to #layout : vector<32x16x16xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<32x16x16xf16>
   %t = vector.transpose %rootl, [1, 2, 0] : vector<32x16x16xf16> to vector<16x16x32xf16>
   vector.transfer_write %t, %arr[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x16x32xf16>, memref<32x32x32xf16>
   func.return
@@ -949,7 +984,7 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @mfma_16x16x16_out_reduced_dim1(%arg0: vector<32x32xf32>, %arg1: vector<32xf32>) -> vector<32xf32> {
-  %arg0l = iree_vector_ext.to_layout %arg0 to #nested : vector<32x32xf32>
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xf32>
   %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [1] : vector<32x32xf32> to vector<32xf32>
   return %0 : vector<32xf32>
 }
@@ -992,7 +1027,7 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 func.func @mfma_32x32x8_out_reduced_dim1(%arg0: vector<32x32xf32>, %arg1: vector<32xf32>) -> vector<32xf32> {
-  %arg0l = iree_vector_ext.to_layout %arg0 to #nested : vector<32x32xf32>
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xf32>
   %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [1] : vector<32x32xf32> to vector<32xf32>
   return %0 : vector<32xf32>
 }

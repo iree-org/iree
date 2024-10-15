@@ -39,11 +39,18 @@ namespace mlir::iree_compiler {
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+                         IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  bool hasUkernelSupport = hasUkernel(target);
+
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
-  // batch_matmul.
-  if (hasUkernel(target) && cDims.batch.empty()) {
+  // batch_matmul. Also, they are not set up for narrow M/N matmul, so it is
+  // disabled when it is the case.
+  if (!cDims.batch.empty() || getMatmulNarrowDim(encoding)) {
+    hasUkernelSupport = false;
+  }
+  if (hasUkernelSupport) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -286,17 +293,20 @@ enumerateMatmulTileX86_64(TypeRange elementTypes,
 /// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
 /// information to host. For now, they are defined by host.
 static TileMxNxK
-chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
-                 int64_t matmulNarrowN,
+chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                 IREE::Encoding::MatmulNarrowDim narrowDim,
                  ArrayRef<int64_t> hostDefinedUpperBound = {}) {
   assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
          "expected hostDefinedUpperBound is empty or has upper bound for {M, "
          "N, K}");
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
-  if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
-    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
-                                      hostDefinedUpperBound);
+  if (narrowDim.isN()) {
+    SmallVector<int64_t> newHostDefinedUpperBound(hostDefinedUpperBound);
+    std::swap(newHostDefinedUpperBound[0], newHostDefinedUpperBound[1]);
+    narrowDim.dim = IREE::Encoding::MatmulNarrowDim::Dim::M;
+    TileMxNxK tile =
+        chooseMatmulTile(enumeratedTiles, narrowDim, newHostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -357,12 +367,17 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
     // are OK with the tile that has M==8 even though it requires some padding.
     // Otherwise, we would be penalizing the tiles with M==8,4,2 and we would
     // end up selecting the vecmat tile (M==1) for that case!
-    if (matmulNarrowM) {
+    if (narrowDim) {
       ratedTile.paddingPenalty =
-          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(matmulNarrowM), 0);
+          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(narrowDim.size), 0);
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
+
+    LLVM_DEBUG(llvm::dbgs() << "candidate: "; llvm::interleaveComma(
+                   ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+               llvm::dbgs() << " penalty:" << ratedTile.paddingPenalty << "\n");
+
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -381,11 +396,18 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
 }
 
 static SmallVector<TileMxNxK>
-enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
-                         TypeRange elementTypes,
+enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
                          IREE::HAL::ExecutableTargetAttr target) {
+  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
+    return {};
+  }
+  // Enumerate available tile shapes for the given encoding and target.
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
   if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(cDims, target);
+    return enumerateMatmulTilesVMVX(*cDims, encoding, target);
   }
   if (isAArch64(target)) {
     return enumerateMatmulTileArm64(elementTypes, target);
@@ -407,29 +429,17 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (!encoding) {
     return failure();
   }
-  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
-  auto cDims = getEncodingContractionDims(encoding);
-  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1) {
-    return failure();
-  }
-  // Enumerate available tile shapes for the given encoding and target.
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
+
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
+      enumerateMatmulTileMxNxK(encoding, targetAttr);
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = getIntOrZero(encoding.getMatmulNarrow_N());
+  auto narrowDim = IREE::Encoding::getMatmulNarrowDim(encoding);
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
-  TileMxNxK chosenTileMxNxK =
-      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
-                       encoding.getRoundDimsToArray());
+  TileMxNxK chosenTileMxNxK = chooseMatmulTile(enumeratedTileMxNxK, narrowDim,
+                                               encoding.getRoundDimsToArray());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its operand index in the matmul.
@@ -459,10 +469,18 @@ getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr) {
-  RewritePatternSet materializeEncodingPattern(funcOp.getContext());
-  MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                 targetAttr);
-  MaterializeEncodingConversionTarget target(*funcOp.getContext());
+  MLIRContext *ctx = funcOp.getContext();
+  RewritePatternSet materializeEncodingPattern(ctx);
+  // On CPU, we use transposeNarrowN=true for a combination of reasons:
+  // 1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
+  //    RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
+  //    implement at that level.
+  // 2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
+  // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
+  //    so it is nice that they have fewer narrow cases to consider.
+  MaterializeEncodingTypeConverter typeConverter(
+      materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true);
+  MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
@@ -479,7 +497,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
   // resolve dims ops.
   {
-    RewritePatternSet patterns(funcOp.getContext());
+    RewritePatternSet patterns(ctx);
+    tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

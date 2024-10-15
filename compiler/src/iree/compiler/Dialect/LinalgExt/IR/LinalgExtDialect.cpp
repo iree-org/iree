@@ -26,12 +26,11 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc" // IWYU pragma: keep
-
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc" // IWYU pragma: keep
 
 // Used to control inlining behavior.
+namespace {
 struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
@@ -84,8 +83,10 @@ public:
     return (llvm::cast<ConcreteType>(op).getNumLoops());
   }
 
-  SmallVector<int64_t, 4> getStaticLoopRanges(mlir::Operation *op) const {
-    return (llvm::cast<ConcreteType>(op).getStaticLoopRanges());
+  FailureOr<SmallVector<int64_t>>
+  getStaticLoopRanges(mlir::Operation *op) const {
+    return SmallVector<int64_t>(
+        llvm::cast<ConcreteType>(op).getStaticLoopRanges());
   }
 
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
@@ -105,7 +106,6 @@ public:
   }
 };
 
-namespace {
 struct SoftmaxFusionOpInterfaceAdapter
     : public LinalgFusionOpInterface::ExternalModel<
           SoftmaxFusionOpInterfaceAdapter, linalg::SoftmaxOp> {
@@ -130,6 +130,12 @@ public:
         }));
   }
 
+  FailureOr<SmallVector<int64_t>> getStaticLoopRanges(Operation *op) const {
+    auto softmaxOp = cast<linalg::SoftmaxOp>(op);
+    // Softmax loop range is the input shape.
+    return SmallVector<int64_t>(softmaxOp.getInputOperandType().getShape());
+  }
+
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
                                          OpResult result) const {
     return getIndexingMapsForResults(op)[result.getResultNumber()];
@@ -147,6 +153,10 @@ public:
   }
 };
 } // namespace
+
+struct IREELinalgExtDialectOpAsmInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+};
 
 template <typename... Args>
 static void registerOpsWithLinalgExtOpInterface(mlir::MLIRContext *context) {
@@ -172,6 +182,7 @@ void IREELinalgExtDialect::initialize() {
 
   addInterfaces<IREELinalgExtInlinerInterface>();
 
+  addInterfaces<IREELinalgExtDialectOpAsmInterface>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc"

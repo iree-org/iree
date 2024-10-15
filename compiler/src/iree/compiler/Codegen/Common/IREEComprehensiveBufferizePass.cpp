@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -168,6 +169,15 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 void EliminateEmptyTensorsPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
+
+  OpBuilder b(context);
+  SmallVector<tensor::EmptyOp> emptyOps;
+  funcOp.walk([&](tensor::EmptyOp emptyOp) { emptyOps.push_back(emptyOp); });
+  if (llvm::any_of(emptyOps, [&](tensor::EmptyOp emptyOp) {
+        return failed(duplicateTensorEmptyOps(b, emptyOp));
+      })) {
+    return signalPassFailure();
+  }
 
   // Run the convert to destination style patterns.
   {

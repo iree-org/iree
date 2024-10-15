@@ -27,27 +27,17 @@ void LinalgExt::LinalgExtTransformOpsExtension::init() {}
 // TileAndDecomposeAttention
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure LinalgExt::TileAttentionOp::applyToOne(
-    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
+DiagnosedSilenceableFailure LinalgExt::DecomposeAggregateOp::applyToOne(
+    transform::TransformRewriter &rewriter,
+    linalg::AggregatedOpInterface aggregateOp,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  SmallVector<Operation *> ops;
-  LinalgExt::tileAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops) {
-    results.push_back(op);
+  FailureOr<SmallVector<Value>> replacements =
+      aggregateOp.decomposeOperation(rewriter);
+  if (failed(replacements)) {
+    return emitDefiniteFailure() << "failed to decompose operation";
   }
-  return DiagnosedSilenceableFailure::success();
-}
-
-DiagnosedSilenceableFailure LinalgExt::DecomposeTiledAttentionOp::applyToOne(
-    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  SmallVector<Operation *> ops;
-  LinalgExt::decomposeTiledAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops) {
-    results.push_back(op);
-  }
+  rewriter.replaceOp(aggregateOp, replacements.value());
   return DiagnosedSilenceableFailure::success();
 }
 

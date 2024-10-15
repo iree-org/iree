@@ -192,6 +192,15 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
     auto state = std::make_unique<CustomModuleState>(allocator);
     return state;
   }
+
+  // Forks a parent state into a child state, preserving any module state
+  // by-reference.
+  StatusOr<std::unique_ptr<CustomModuleState>> ForkState(
+      CustomModuleState* parent_state,
+      iree_allocator_t host_allocator) override {
+    // No special state to preserve.
+    return CreateState(host_allocator);
+  }
 };
 
 }  // namespace

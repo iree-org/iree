@@ -47,7 +47,8 @@ using MaterializeEncodingValueFn =
 class MaterializeEncodingTypeConverter : public TypeConverter {
 public:
   MaterializeEncodingTypeConverter(MaterializeEncodingFn fn,
-                                   IREE::HAL::ExecutableTargetAttr targetAttr);
+                                   IREE::HAL::ExecutableTargetAttr targetAttr,
+                                   bool transposeNarrowN);
 
   const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
@@ -60,9 +61,12 @@ public:
     return materializeEncodingFn(type, targetAttr);
   }
 
+  bool getTransposeNarrowN() const { return transposeNarrowN; }
+
 private:
   const MaterializeEncodingFn materializeEncodingFn;
   const IREE::HAL::ExecutableTargetAttr targetAttr;
+  bool transposeNarrowN = false;
 };
 
 /// Conversion target to use for for materializing the encoding.
@@ -92,9 +96,6 @@ protected:
 
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
-
-/// Returns the integer contained in an IntegerAttr, or zero if it has none.
-int64_t getIntOrZero(IntegerAttr a);
 
 struct TileMxNxK {
   int64_t M = 1;

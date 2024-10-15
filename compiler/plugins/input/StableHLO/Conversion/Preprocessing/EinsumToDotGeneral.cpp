@@ -141,7 +141,7 @@ struct EinsumToDotGeneralPattern final
     auto dotGeneralOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         einsum.getLoc(), dotGeneralResultType, einsum.getLhs(), einsum.getRhs(),
         dimNumbers,
-        /*precision_config=*/ArrayAttr{});
+        /*precision_config=*/ArrayAttr{}, mlir::stablehlo::DotAlgorithmAttr{});
 
     if (isNaturalOrder) {
       // The dot_general is already in an appropriate result order.
