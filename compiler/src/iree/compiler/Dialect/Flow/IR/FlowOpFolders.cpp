@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/Shape.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -24,6 +23,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -1183,6 +1183,20 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
   }
 };
 
+// Unranked shapes are always considered to have more dynamic dimensions than
+// ranked.
+static bool shapeHasLessOrEqualDynamicDimensions(ShapedType t1, ShapedType t2) {
+  if (!t2.hasRank()) {
+    return true;
+  }
+  if (!t1.hasRank()) {
+    return false;
+  }
+
+  return llvm::count_if(t1.getShape(), &ShapedType::isDynamic) <=
+         llvm::count_if(t2.getShape(), &ShapedType::isDynamic);
+}
+
 // Move an op of type Op after flow.tensor.transfer.
 // E.g.
 //
@@ -1218,7 +1232,7 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 // before the transfer instead. We strive to reduce the dynamism of the
 // transfer op. If there will be no strict dynamism improvement, we prefer the
 // other op after the transfer.
-// TODO: add the analogous move-befor-transfer pattern.
+// TODO: add the analogous move-before-transfer pattern.
 //
 // Uses the homomorphism simplification pattern
 // transfer(cast(x)) -> cast(transfer(x))
@@ -1227,7 +1241,6 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 template <typename Op, unsigned homomorphismOpOperandIndex = 0,
           unsigned homomorphismOpResultIndex = 0>
 static void populateMoveOpAfterTransferPattern(RewritePatternSet &results) {
-
   auto getHomomorphismOpOperandFn = [](Operation *op) {
     // op is Op.
     return &op->getOpOperand(homomorphismOpOperandIndex);
@@ -1302,10 +1315,10 @@ void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   results.insert<ElideRedundantTransfer>(context);
   populateMoveOpAfterTransferPattern<tensor::BitcastOp>(results);
-  populateMoveOpAfterTransferPattern<TensorBitCastOp>(results);
+  populateMoveOpAfterTransferPattern<IREE::Flow::TensorBitCastOp>(results);
   populateMoveOpAfterTransferPattern<tensor::CastOp>(results);
   populateMoveOpAfterTransferPattern<tensor::ReshapeOp>(results);
-  populateMoveOpAfterTransferPattern<TensorReshapeOp>(results);
+  populateMoveOpAfterTransferPattern<IREE::Flow::TensorReshapeOp>(results);
 }
 
 //===----------------------------------------------------------------------===//
