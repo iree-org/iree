@@ -37,7 +37,8 @@ static Value skipAffineMaxZero(Value dim) {
   return *affineMax.getSymbolOperands().begin();
 }
 
-static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
+template <typename OpTy>
+static LogicalResult padAlloc(MLIRContext *context, OpTy allocOp) {
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
@@ -66,7 +67,7 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
+  Value paddedAlloc = rewriter.create<OpTy>(loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(shape.size(), rewriter.getIndexAttr(1));
   Value subview = rewriter.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
@@ -88,7 +89,17 @@ struct PadDynamicAllocPass final
     funcOp.walk(
         [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
-      if (failed(padAlloc(context, alloc)))
+      if (failed(padAlloc<memref::AllocOp>(context, alloc)))
+        return signalPassFailure();
+    }
+
+    SmallVector<memref::AllocaOp> privateMemAllocas;
+    // Collect all the alloc operations.
+    funcOp.walk([&](memref::AllocaOp allocaOp) {
+      privateMemAllocas.push_back(allocaOp);
+    });
+    for (memref::AllocaOp alloca : privateMemAllocas) {
+      if (failed(padAlloc<memref::AllocaOp>(context, alloca)))
         return signalPassFailure();
     }
   }
