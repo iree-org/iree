@@ -433,30 +433,36 @@ public:
         opt.UnsafeFPMath = false;
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
-        std::string features;
+        SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11")) {
           switch (subgroupSize.value_or(64)) {
           case 32:
-            features = "+wavefrontsize32";
+            features.emplace_back("+wavefrontsize32");
             break;
           default:
           case 64:
-            features = "+wavefrontsize64";
+            features.emplace_back("+wavefrontsize64");
             break;
           }
         }
-        if (!targetFeatures.empty()) {
-          features += (features.empty() ? "" : ",") + targetFeatures.str();
-        }
+
         // Mixed precision fma instructions have complicated semantics on
         // gf9+ GPUs and can lead to numeric issues as seen in
         // https://github.com/iree-org/iree/issues/18746 so we disable this
         // feature.
-        features += "-fma-mix-insts";
+        if (targetArch.starts_with("gfx9")) {
+          features.emplace_back("-fma-mix-insts");
+        }
+
+        if (!targetFeatures.empty()) {
+          features.emplace_back(targetFeatures.str());
+        }
+
+        std::string featureStr = llvm::join(features, ",");
 
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, features, opt, llvm::Reloc::Model::PIC_,
+            triple.str(), targetArch, featureStr, opt, llvm::Reloc::Model::PIC_,
             std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
         if (!targetMachine) {
