@@ -1305,7 +1305,7 @@ LogicalResult AttentionOp::verify() {
   auto &block = getRegion().front();
   auto blockTys = block.getArgumentTypes();
   if (!isa<FloatType>(blockTys[0]))
-    return attnOp->emitOpError("block arg0 should be float");
+    return attnOp->emitOpError("block argument 0 should be float");
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   if (!yieldOp) {
@@ -1478,7 +1478,7 @@ LogicalResult OnlineAttentionOp::verify() {
   }
 
   if (!isa<FloatType>(blockTys[0])) {
-    return attnOp->emitOpError("block arg0 should be float");
+    return attnOp->emitOpError("block argument 0 should be float");
   }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
