@@ -57,7 +57,7 @@ func.func @batch_matmul_dispatch_0_generic_128x80x320x32_f32() {
 // DEFAULT:   [0, 0, 0, 16]
 // OPTIONS:   [0, 0, 0, 8]
 // CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op pad_to_multiple_of [1, 1, 1, 1]
-// CHECK:     pack_paddings = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
+// CHECK:     nofold_flags = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK:   %[[V3:.+]] = transform.get_producer_of_operand %[[PADDED]][2]
 // CHECK:   transform.structured.hoist_pad %{{.*}} by 1 loops

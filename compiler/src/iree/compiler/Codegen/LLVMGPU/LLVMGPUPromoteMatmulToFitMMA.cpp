@@ -45,7 +45,7 @@ public:
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
 
-    SmallVector<bool> packPaddings(op.getNumDpsInputs(), noFold);
+    SmallVector<bool> nofoldFlags(op.getNumDpsInputs(), noFold);
 
     SmallVector<Attribute> paddingValueAttributes;
     for (auto &operand : op->getOpOperands()) {
@@ -58,7 +58,7 @@ public:
             .setPaddingDimensions(paddingDims)
             .setPaddingValues(paddingValueAttributes)
             .setPadToMultipleOf(padToMultipleOf)
-            .setPackPaddings(packPaddings)
+            .setPackPaddings(nofoldFlags)
             .setCopyBackOp(linalg::LinalgPaddingOptions::CopyBackOp::None);
 
     FailureOr<linalg::LinalgOp> result =
