@@ -466,6 +466,7 @@ struct StripFlowTensorTransferPattern
 };
 
 void stripStreamAffinityAttributes(IREE::Util::FuncOp funcOp) {
+  // Removes affinity attributes from funcOp and nested ops.
   // Removes only from dictionaries (includes op's named attributes).
   // We are not removing affinity attributes form an ArrayAttr as it is not
   // clear if this would not silently change the semantics of an operation.
