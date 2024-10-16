@@ -26,7 +26,7 @@ py_binary(
 
 # LLVMCPU, non-data-tiling, no microkernels
 [iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    name = "e2e_matmul_cpu_nondt_%s_%s" % (lhs_rhs_type, acc_type),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
         "--iree-llvmcpu-enable-ukernels=none",
@@ -37,7 +37,6 @@ py_binary(
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-        "--shapes=%s" % size,
     ],
     tags = [
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
@@ -60,9 +59,6 @@ py_binary(
     # TODO(#15258): enable bf16 tests when that bug is fixed.
     # ("bf16", "bf16"),
     # ("bf16", "f32"),
-] for size in [
-    "small",
-    "large",
 ]]
 
 PREPROCESSING_TRANSPOSE_LHS = "--iree-preprocessing-pass-pipeline=builtin.module\\(util.func\\(iree-preprocessing-transpose-matmul-pass{input=lhs}\\)\\)"
@@ -71,9 +67,8 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
 
 # LLVMCPU, non-data-tiling, no microkernels, ArmSME
 [iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_arm_sme_nondt_%s_%s%s%s" % (
+    name = "e2e_matmul_cpu_arm_sme_nondt_%s_%s%s" % (
         dtype,
-        size,
         "_transpose_lhs" if transpose_lhs else "",
         "_peel" if peel else "",
     ),
@@ -87,7 +82,6 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     generator_args = [
         "--lhs_rhs_type=%s" % dtype,
         "--acc_type=%s" % dtype,
-        "--shapes=%s" % size,
     ],
     tags = [
         "requires-arm-sme",
@@ -101,9 +95,6 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
 ) for dtype in [
     "f32",
     # "f64" (also supported for ArmSME, but not by the test generator)
-] for size in [
-    "small",
-    "large",
 ] for transpose_lhs in [
     True,
     False,
@@ -137,11 +128,10 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 
 # LLVMCPU, data-tiling, data-tiling + ukernels.
 [iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_dt%s_%s_%s_%s" % (
+    name = "e2e_matmul_cpu_dt%s_%s_%s" % (
         ("_uk" if use_uk else ""),
         lhs_rhs_type,
         acc_type,
-        size,
     ),
     compiler_flags = [
         "--iree-opt-data-tiling",
@@ -150,14 +140,8 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-        "--shapes=%s" % size,
     ],
     tags = ([
-        # "--shapes=large" can cause timeouts on sanitizers.
-        "noasan",
-        "notsan",
-    ] if size == "large" else []) + ([
-        # "--shapes=large" can cause timeouts on RISC-V emulator.
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
@@ -206,18 +190,14 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         ("bf16", "bf16"),
         ("bf16", "f32"),
     ]
-) for size in [
-    "small",
-    "large",
-]]
+)]
 
 # LLVMCPU, data-tiling, data-tiling + ukernels + late materialization.
 [iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_experimental_dt%s_%s_%s_%s" % (
+    name = "e2e_matmul_cpu_experimental_dt%s_%s_%s" % (
         ("_uk" if use_uk else ""),
         lhs_rhs_type,
         acc_type,
-        size,
     ),
     compiler_flags = [
         "--iree-opt-data-tiling",
@@ -227,14 +207,8 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-        "--shapes=%s" % size,
     ],
     tags = ([
-        # "--shapes=large" can cause timeouts on sanitizers.
-        "noasan",
-        "notsan",
-    ] if size == "large" else []) + ([
-        # "--shapes=large" can cause timeouts on RISC-V emulator.
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
@@ -283,10 +257,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         ("bf16", "bf16"),
         ("bf16", "f32"),
     ]
-) for size in [
-    "small",
-    "large",
-]]
+)]
 
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_vmvx_experimental_dt%s_%s_%s" % (
@@ -412,7 +383,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulSimt",
     ],
     tags = [
@@ -440,7 +411,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
@@ -459,14 +430,13 @@ iree_generated_e2e_runner_test(
 )
 
 iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cuda_f32_large_unaligned",
+    name = "e2e_matmul_cuda_f32",
     compiler_flags = [
         "--iree-cuda-target=sm_80",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -484,14 +454,13 @@ iree_generated_e2e_runner_test(
 )
 
 iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cuda_f16_large_unaligned",
+    name = "e2e_matmul_cuda_f16",
     compiler_flags = [
         "--iree-cuda-target=sm_80",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -517,7 +486,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
@@ -544,7 +513,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
     tags = [
@@ -571,7 +540,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
     tags = [
@@ -590,14 +559,13 @@ iree_generated_e2e_runner_test(
 )
 
 [iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cuda_%s_large_splitk" % lhs_rhs_type,
+    name = "e2e_matmul_cuda_%s_splitk" % lhs_rhs_type,
     compiler_flags = [
         "--iree-dispatch-creation-split-matmul-reduction=4",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=large",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -606,8 +574,6 @@ iree_generated_e2e_runner_test(
         "notsan",
         "noubsan",
         "requires-gpu-nvidia",
-        # "--shapes=large" can cause timeouts on riscv emulator.
-        "noriscv",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
@@ -632,7 +598,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
@@ -659,7 +625,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeNVIDIA",
     ],
     tags = [
@@ -685,7 +651,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
-        "--shapes=gpu_large_aligned",
+        "--shapes=easy_large_static",
         "--compilation_info=SPIRVCooperativeMatrixVectorize",
     ],
     runner_args = [

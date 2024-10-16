@@ -110,7 +110,8 @@ static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
 // single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (!isaTransposeOpInterface(genericOp)) {
+  if (!mlir::iree_compiler::GlobalOptimization::isaTransposeOpInterface(
+          genericOp)) {
     return;
   }
 

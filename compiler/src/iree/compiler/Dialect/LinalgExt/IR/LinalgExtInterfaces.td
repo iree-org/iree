@@ -110,18 +110,12 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
       /*desc=*/[{
         Return the static loop ranges.
       }],
-      /*retTy=*/"SmallVector<int64_t, 4>",
+      /*retTy=*/"FailureOr<SmallVector<int64_t>>",
       /*methodName=*/"getStaticLoopRanges",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-          SmallVector<int64_t, 4> loopRanges;
-          llvm::for_each($_op.getOperands(), [&](Value operand) {
-          if (auto shapedType = dyn_cast<ShapedType>(operand.getType())) {
-            llvm::append_range(loopRanges, shapedType.getShape());
-            }
-          });
-          return loopRanges;
+        return failure();
       }]
     >,
     InterfaceMethod<

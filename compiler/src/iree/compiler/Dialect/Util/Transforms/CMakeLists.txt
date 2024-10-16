@@ -29,6 +29,7 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
+    "OptimizeIntArithmetic.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "Patterns.cpp"

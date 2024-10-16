@@ -598,10 +598,7 @@ void iree_hal_deferred_work_queue_destroy(
   // Request the workers to exit.
   iree_hal_deferred_work_queue_request_exit(work_queue);
 
-  iree_thread_join(work_queue->worker_thread);
   iree_thread_release(work_queue->worker_thread);
-
-  iree_thread_join(work_queue->completion_thread);
   iree_thread_release(work_queue->completion_thread);
 
   iree_hal_deferred_work_queue_working_area_deinitialize(

@@ -276,8 +276,7 @@ func.func @ukernel_dispatch() attributes {hal.executable.target = #executable_ta
 }
 // CHECK-LABEL: func @ukernel_dispatch()
 // Checks scf.for for distribution loops.
-//       CHECK:   scf.for
-//       CHECK:     scf.for
+//       CHECK:   scf.forall
 // Checks scf.for for outer and inner parallel loops.
 //       CHECK:       scf.for
 //       CHECK:         scf.for

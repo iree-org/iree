@@ -62,7 +62,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     }
 
     os << "  if (";
-    auto printOneCondition = [&](Record *encodingExpr) {
+    auto printOneCondition = [&](const Record *encodingExpr) {
       StringRef expr = encodingExpr->getValueAsString("expr");
       std::vector<StringRef> params =
           encodingExpr->getValueAsListOfStrings("params");

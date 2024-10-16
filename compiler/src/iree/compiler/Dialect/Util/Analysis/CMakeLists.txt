@@ -16,10 +16,12 @@ iree_cc_library(
   HDRS
     "Explorer.h"
     "GlobalTable.h"
+    "IntegerDivisibilityAnalysis.h"
     "Position.h"
   SRCS
     "Explorer.cpp"
     "GlobalTable.cpp"
+    "IntegerDivisibilityAnalysis.cpp"
     "Position.cpp"
   DEPS
     LLVMSupport

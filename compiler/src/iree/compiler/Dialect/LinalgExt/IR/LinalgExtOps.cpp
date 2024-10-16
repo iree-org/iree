@@ -13,6 +13,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -23,6 +24,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -248,6 +250,11 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
                              ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
+  // Scatter loop ranges are loop ranges for update.
+  return SmallVector<int64_t>(getUpdateType().getShape());
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
@@ -1202,22 +1209,15 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, Value query, Value key, Value value,
-                        Value scale, ValueRange outputs, ArrayAttr indexingMaps,
+                        Value scale, Value output, ArrayAttr indexingMaps,
                         std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, scale, maskIn,
-        outputs, indexingMaps);
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
+        indexingMaps);
 }
 
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
-
-  int numOutputs = getNumDpsInits();
-  if (numOutputs != 1 && numOutputs != 3) {
-    return attnOp->emitOpError(
-        "expected 1 or 3 output operands: Output, [Max and Sum]");
-  }
-  bool isTiled = numOutputs == 3;
 
   // Check if indexing maps can represent attention.
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
@@ -1265,17 +1265,19 @@ LogicalResult AttentionOp::verify() {
     return success();
   };
 
-  if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
-      failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValueType().getShape(), getValueMap())) ||
-      failed(
-          checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
+  if (failed(checkShape("Query", getQuery().getType().getShape(),
+                        getQueryMap())) ||
+      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValue().getType().getShape(),
+                        getValueMap())) ||
+      failed(checkShape("Output", getOutput().getType().getShape(),
+                        getOutputMap()))) {
     return failure();
   }
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMaskType()->getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
       return failure();
   }
 
@@ -1305,28 +1307,12 @@ LogicalResult AttentionOp::verify() {
       return failure();
   }
 
-  if (isTiled) {
-    // Tiled/Flash attention.
-    Type maxElementType = getMaxType()->getElementType();
-    Type sumElementType = getSumType()->getElementType();
-    Type outputElementType = getOutputType().getElementType();
-    if (outputElementType != maxElementType ||
-        maxElementType != sumElementType) {
-      return attnOp->emitOpError(
-          "element types of tiled output, max and sum should be same");
-    }
-
-    if (failed(checkShape("Max", getMaxType()->getShape(), *getMaxMap())) ||
-        failed(checkShape("Sum", getSumType()->getShape(), *getSumMap()))) {
-      return failure();
-    }
-  }
-
   return success();
 }
 
-LogicalResult AttentionOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
-  return memref::foldMemRefCast(*this);
+MutableOperandRange AttentionOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+                             /*numInits=*/1);
 }
 
 LogicalResult AttentionOp::reifyResultShapes(
@@ -1340,15 +1326,15 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-SmallVector<int64_t, 4> AttentionOp::getStaticLoopRanges() {
-  SmallVector<int64_t, 4> bounds(getIterationDomainRank());
+FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
   // batch(s), m, k1
-  ArrayRef<int64_t> queryShape = getQueryType().getShape();
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
   ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
   // batch(s), k2, n
-  ArrayRef<int64_t> valueShape = getValueType().getShape();
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
   ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
 
   auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
@@ -1511,10 +1497,22 @@ SmallVector<OpFoldResult> Im2colOp::getMixedKOffset() {
                                    getKOffset());
 }
 
-/// Return all static and dynamic k_offset as OpFoldResults.
+/// Return all static and dynamic m_offset as OpFoldResults.
 SmallVector<OpFoldResult> Im2colOp::getMixedMOffset() {
   return LinalgExt::getMixedValues(getContext(), getStaticMOffset(),
                                    getMOffset());
+}
+
+/// Return all static and dynamic k_strides as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedKStrides() {
+  return LinalgExt::getMixedValues(getContext(), getStaticKStrides(),
+                                   getKStrides());
+}
+
+/// Return all static and dynamic m_strides as OpFoldResults.
+SmallVector<OpFoldResult> Im2colOp::getMixedMStrides() {
+  return LinalgExt::getMixedValues(getContext(), getStaticMStrides(),
+                                   getMStrides());
 }
 
 void Im2colOp::setMixedKOffset(SmallVector<OpFoldResult> kOffset) {
@@ -1533,23 +1531,59 @@ void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
   getMOffsetMutable().assign(dynamicMOffset);
 }
 
+void Im2colOp::setMixedKStrides(SmallVector<OpFoldResult> kStrides) {
+  SmallVector<int64_t> staticKStrides;
+  SmallVector<Value> dynamicKStrides;
+  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
+  setStaticKStrides(staticKStrides);
+  getKStridesMutable().assign(dynamicKStrides);
+}
+
+void Im2colOp::setMixedMStrides(SmallVector<OpFoldResult> mStrides) {
+  SmallVector<int64_t> staticMStrides;
+  SmallVector<Value> dynamicMStrides;
+  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
+  setStaticMStrides(staticMStrides);
+  getMStridesMutable().assign(dynamicMStrides);
+}
+
+SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
+  return llvm::to_vector(llvm::seq<int64_t>(0, getBatchPos().size()));
+}
+
+SmallVector<int64_t> Im2colOp::getMOutputDims() {
+  int64_t begin = getBatchPos().size();
+  int64_t end = begin + getMixedMOffset().size();
+  return llvm::to_vector(llvm::seq<int64_t>(begin, end));
+}
+
+SmallVector<int64_t> Im2colOp::getKOutputDims() {
+  int64_t begin = getBatchPos().size() + getMixedMOffset().size();
+  int64_t end = begin + getMixedKOffset().size();
+  return llvm::to_vector(llvm::seq<int64_t>(begin, end));
+}
+
 /// Custom builder methods for im2col op.
-void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
-                     Value output, ArrayRef<int64_t> strides,
-                     ArrayRef<int64_t> dilations,
-                     ArrayRef<OpFoldResult> kernelSize,
-                     ArrayRef<OpFoldResult> kOffset,
-                     ArrayRef<OpFoldResult> mOffset, ArrayRef<int64_t> batchPos,
-                     ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
+void Im2colOp::build(
+    OpBuilder &builder, OperationState &state, Value input, Value output,
+    ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
+    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
+    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
+    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
+    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
          "strides, dilations, m_pos, and kernel expected to be the same rank");
-  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset;
-  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset;
+  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset,
+      staticMStrides, staticKStrides;
+  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset,
+      dynamicMStrides, dynamicKStrides;
   dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
   dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
+  dispatchIndexOpFoldResults(mStrides, dynamicMStrides, staticMStrides);
   dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
+  dispatchIndexOpFoldResults(kStrides, dynamicKStrides, staticKStrides);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
   if (isa<RankedTensorType>(outputType)) {
@@ -1558,9 +1592,11 @@ void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
   build(builder, state, resultType, input, output,
         builder.getDenseI64ArrayAttr(strides),
         builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
-        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicKOffset,
-        builder.getDenseI64ArrayAttr(staticKOffset), dynamicMOffset,
-        builder.getDenseI64ArrayAttr(staticMOffset),
+        builder.getDenseI64ArrayAttr(staticKernelSize), dynamicMOffset,
+        builder.getDenseI64ArrayAttr(staticMOffset), dynamicMStrides,
+        builder.getDenseI64ArrayAttr(staticMStrides), dynamicKOffset,
+        builder.getDenseI64ArrayAttr(staticKOffset), dynamicKStrides,
+        builder.getDenseI64ArrayAttr(staticKStrides),
         builder.getDenseI64ArrayAttr(batchPos),
         builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos));
 }
@@ -1576,14 +1612,35 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError("expected one output operand");
   }
 
-  // TODO(Max191): Support cases with more than 1 m or k dimension, and remove
-  // the check for a single m_offset and k_offset.
-  if (getMixedMOffset().size() != 1) {
-    return op->emitOpError("expected one m_offset");
+  // Verify offsets and strides
+  SmallVector<OpFoldResult> kOffset = getMixedKOffset();
+  SmallVector<OpFoldResult> mOffset = getMixedMOffset();
+  SmallVector<OpFoldResult> kStrides = getMixedKStrides();
+  SmallVector<OpFoldResult> mStrides = getMixedMStrides();
+  if (kOffset.size() < 1) {
+    return op->emitOpError("expected at least one k_offset");
   }
-  if (getMixedKOffset().size() != 1) {
-    return op->emitOpError("expected one k_offset");
+  if (mOffset.size() < 1) {
+    return op->emitOpError("expected at least one m_offset");
   }
+  if (kOffset.size() != kStrides.size()) {
+    return op->emitOpError("expected the same size k_offset and k_strides");
+  }
+  if (mOffset.size() != mStrides.size()) {
+    return op->emitOpError("expected the same size m_offset and m_strides");
+  }
+  std::optional<int64_t> constInnerKStrides =
+      getConstantIntValue(kStrides.back());
+  if (!constInnerKStrides.has_value() || constInnerKStrides.value() != 1) {
+    return op->emitOpError("expected inner k_strides to be 1");
+  }
+  std::optional<int64_t> constInnerMStrides =
+      getConstantIntValue(mStrides.back());
+  if (!constInnerMStrides.has_value() || constInnerMStrides.value() != 1) {
+    return op->emitOpError("expected inner m_strides to be 1");
+  }
+
+  // Verify operand ranks and dim position sizes.
   auto inputType = getInputType();
   unsigned inputRank = inputType.getRank();
   ArrayRef<int64_t> batchPos = getBatchPos();
@@ -1593,6 +1650,14 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError(
         "expected input rank to be the sum of batch, m, and k ranks");
   }
+  auto outputType = getOutputType();
+  unsigned outputRank = outputType.getRank();
+  if (outputRank != batchPos.size() + kOffset.size() + mOffset.size()) {
+    return op->emitOpError("expected output rank to be the sum of "
+                           "batch_pos, k_offset, and m_offset ranks");
+  }
+
+  // Verify convolution metadata.
   ArrayRef<int64_t> strides = getStrides();
   ArrayRef<int64_t> dilations = getDilations();
   SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
@@ -1609,17 +1674,16 @@ LogicalResult Im2colOp::verify() {
         "expected dilations rank to be equal to the kernel rank");
   }
 
+  // Verify input and output shapes.
   ArrayRef<int64_t> inputShape = inputType.getShape();
-  SmallVector<int64_t> expectedOutputShape;
-  for (auto pos : batchPos) {
-    expectedOutputShape.push_back(inputShape[pos]);
-  }
-  ArrayRef<int64_t> outputShape = getOutputType().getShape();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
   // When the op is tiled, the m and k dimensions of the output are tiled, but
   // they are not tiled in the input, so we cannot verify the output size of
-  // these dimensions.
-  expectedOutputShape.push_back(outputShape[outputShape.size() - 2]);
-  expectedOutputShape.push_back(outputShape.back());
+  // these dimensions. Only verify the shape of the batch dimensions.
+  SmallVector<int64_t> expectedOutputShape(outputShape);
+  for (auto [idx, pos] : llvm::enumerate(batchPos)) {
+    expectedOutputShape[idx] = inputShape[pos];
+  }
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
   }
@@ -1649,6 +1713,16 @@ int64_t CustomOp::getRank(Value v) {
     return 0;
   }
   return cast<RankedTensorType>(type).getRank();
+}
+
+unsigned CustomOp::getNumNonLoopDimensions() {
+  for (auto map : getIndexingMaps().getAsValueRange<AffineMapAttr>()) {
+    if (map.isEmpty()) {
+      continue;
+    }
+    return map.getNumSymbols();
+  }
+  return 0;
 }
 
 LogicalResult CustomOp::verify() {
@@ -1765,6 +1839,58 @@ LogicalResult CustomOp::verify() {
 
   return success();
 }
+
+/// Start `LinalgFusionInterface` implementation.
+
+SmallVector<AffineMap> CustomOp::getIndexingMapsForOperands() {
+  return llvm::map_to_vector(
+      getIndexingMaps().getValue().take_front(getNumDpsInputs()),
+      [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
+}
+
+SmallVector<AffineMap> CustomOp::getIndexingMapsForResults() {
+  return llvm::map_to_vector(
+      getIndexingMaps().getValue().take_back(getNumDpsInits()),
+      [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
+}
+
+/// End `LinalgFusionInterface` implementation
+
+/// Start `ReifyRankedShapedTypeOpInterface` implementation
+
+LogicalResult
+CustomOp::reifyResultShapes(OpBuilder &builder,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  for (auto init : getOutputs()) {
+    SmallVector<OpFoldResult> sizes =
+        tensor::getMixedSizes(builder, getLoc(), init);
+    reifiedReturnShapes.emplace_back(std::move(sizes));
+  }
+  return success();
+}
+
+/// End `ReifyRankedShapedTypeOpInterface` implementation
+
+//===---------------------------------------------------------------------===//
+// IndexOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult IREE::LinalgExt::IndexOp::verify() {
+  auto customOp = dyn_cast<CustomOp>(getOperation()->getParentOp());
+  if (!customOp) {
+    return emitOpError("expected parent op to be `iree_linalg_ext.custom_op`");
+  }
+  if (customOp.getNumLoops() <= getDim()) {
+    return emitOpError("expected dim (")
+           << getDim() << ") to be lower than the number of loops ("
+           << customOp.getNumLoops() << ") of the enclosing CustomOp";
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// End operation definitions
+//===---------------------------------------------------------------------===//
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \

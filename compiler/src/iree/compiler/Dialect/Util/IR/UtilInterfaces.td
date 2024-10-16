@@ -95,6 +95,32 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::InferIntDivisibilityOpInterface
+//===----------------------------------------------------------------------===//
+
+def InferIntDivisibilityOpInterface :
+    OpInterface<"InferIntDivisibilityOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Allows operations to participate in integer divisibility analysis.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+    /*desc=*/[{
+
+    }],
+    /*retTy=*/"void",
+    /*methodName=*/"inferResultDivisibility",
+    /*args=*/(ins
+        "::llvm::ArrayRef<::mlir::iree_compiler::IREE::Util::IntegerDivisibility>":$argDivs,
+        "::mlir::iree_compiler::IREE::Util::SetIntDivisibilityFn":$setResultDivs)
+    >
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::InitializerOpInterface
 //===----------------------------------------------------------------------===//
 

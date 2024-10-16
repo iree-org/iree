@@ -46,35 +46,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-compiler` package includes the LLVM-based CPU compiler:
 
-=== "Stable releases"
-
-    Stable release packages are
-    [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
-
-    ``` shell
-    python -m pip install iree-compiler
-    ```
-
-=== ":material-alert: Nightly releases"
-
-    Nightly releases are published on
-    [GitHub releases](https://github.com/iree-org/iree/releases).
-
-    ``` shell
-    python -m pip install \
-      --find-links https://iree.dev/pip-release-links.html \
-      --upgrade iree-compiler
-    ```
-
-!!! tip
-    `iree-compile` is installed to your python module installation path. If you
-    pip install with the user mode, it is under `${HOME}/.local/bin`, or
-    `%APPDATA%Python` on Windows. You may want to include the path in your
-    system's `PATH` environment variable:
-
-    ```shell
-    export PATH=${HOME}/.local/bin:${PATH}
-    ```
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
 #### :material-hammer-wrench: Build the compiler from source
 
@@ -101,14 +73,18 @@ along with the appropriate executable loaders for your application.
 You can check for CPU support by looking for the `local-sync` and `local-task`
 drivers:
 
-```console hl_lines="4 5"
-$ iree-run-module --list_drivers
-
-        cuda: CUDA (dynamic)
-  local-sync: Local execution using a lightweight inline synchronous queue
-  local-task: Local execution using the IREE multithreading task system
-      vulkan: Vulkan 1.x (dynamic)
+```console hl_lines="5 6"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
 ```
+
+#### :octicons-package-16: Download the runtime from a release
+
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-runtime` package includes the local CPU HAL drivers:
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
 #### :material-hammer-wrench: Build the runtime from source
 

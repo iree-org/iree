@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -14,8 +15,11 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/OpDefinition.h"
+
+#define DEBUG_TYPE "linalg-ext-tiling"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1261,9 +1265,10 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputSizes = getDims(builder, loc, getInput());
 
   // Set batch offsets and sizes for input
-  for (auto [idx, dim] : llvm::enumerate(getBatchPos())) {
-    inputOffsets[dim] = offsets[idx];
-    inputSizes[dim] = sizes[idx];
+  for (auto [outDim, inDim] :
+       llvm::zip_equal(getBatchOutputDims(), getBatchPos())) {
+    inputOffsets[inDim] = offsets[outDim];
+    inputSizes[inDim] = sizes[outDim];
   }
 
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
@@ -1288,26 +1293,30 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
                        outputSlice->result_type_end());
   }
 
-  AffineExpr d0, d1;
-  bindDims(getContext(), d0, d1);
-  auto map = AffineMap::get(2, 0, {d0 + d1}, getContext());
-  OpFoldResult kTileOffset = offsets.back();
-  OpFoldResult kOpOffset = getMixedKOffset()[0];
-  OpFoldResult kOffset = affine::makeComposedFoldedAffineApply(
-      builder, loc, map, {kTileOffset, kOpOffset});
-  OpFoldResult mTileOffset = offsets[offsets.size() - 2];
-  OpFoldResult mOpOffset = getMixedMOffset()[0];
-  OpFoldResult mOffset = affine::makeComposedFoldedAffineApply(
-      builder, loc, map, {mTileOffset, mOpOffset});
+  // Adjust m_offset and k_offset by adding the offsets from tiling.
+  SmallVector<OpFoldResult> newKOffsets, newMOffsets;
+  for (auto [outDim, kOffset] :
+       llvm::zip_equal(getKOutputDims(), getMixedKOffset())) {
+    OpFoldResult kTileOffset = offsets[outDim];
+    newKOffsets.push_back(addOfrs(builder, loc, kTileOffset, kOffset));
+  }
+  for (auto [outDim, mOffset] :
+       llvm::zip_equal(getMOutputDims(), getMixedMOffset())) {
+    OpFoldResult mTileOffset = offsets[outDim];
+    newMOffsets.push_back(addOfrs(builder, loc, mTileOffset, mOffset));
+  }
 
+  // Create the tiled op.
   SmallVector<Value> operands = {inputSlice->getResult(0),
                                  outputSlice->getResult(0)};
+  // Copy all metadata operands from the untiled operation.
   operands.append(getOperation()->getOperands().begin() + 2,
                   getOperation()->getOperands().end());
   Im2colOp tiledOp =
       mlir::clone(builder, *this, outputSlice->getResultTypes(), operands);
-  tiledOp.setMixedKOffset({kOffset});
-  tiledOp.setMixedMOffset({mOffset});
+  // Set the new k_offset and m_offset, since they have changed with tiling.
+  tiledOp.setMixedKOffset(newKOffsets);
+  tiledOp.setMixedMOffset(newMOffsets);
 
   return TilingResult{{tiledOp},
                       SmallVector<Value>(tiledOp->getResults()),
@@ -1907,40 +1916,10 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     slices.push_back(outputSliceOp);
   }
 
-  std::optional<Value> max = getMax();
-  if (max) {
-    SmallVector<Range> maxSlice =
-        getPermutedSlice(*getMaxMap(), offsets, sizes);
-    Operation *maxSliceOp = getSlice(builder, loc, max.value(), maxSlice);
-    if (!maxSliceOp) {
-      return emitOpError("failed to get max slice");
-    }
-    tiledOperands.emplace_back(maxSliceOp->getResult(0));
-    slices.push_back(maxSliceOp);
-  }
-
-  std::optional<Value> sum = getSum();
-  if (sum) {
-    SmallVector<Range> sumSlice =
-        getPermutedSlice(*getSumMap(), offsets, sizes);
-    Operation *sumSliceOp = getSlice(builder, loc, sum.value(), sumSlice);
-    if (!sumSliceOp) {
-      return emitOpError("failed to get sum slice");
-    }
-    tiledOperands.emplace_back(sumSliceOp->getResult(0));
-    slices.push_back(sumSliceOp);
-  }
-
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
     int64_t baseIdx = attnMask ? 5 : 4;
     resultTypes.push_back(tiledOperands[baseIdx].getType());
-    if (max) {
-      resultTypes.push_back(tiledOperands[baseIdx + 1].getType());
-    }
-    if (sum) {
-      resultTypes.push_back(tiledOperands[baseIdx + 2].getType());
-    }
   }
 
   Operation *tiledOp =
@@ -1961,12 +1940,6 @@ LogicalResult AttentionOp::getResultTilePosition(
   switch (resultNumber) {
   case 0:
     resultIndexingMap = getOutputMap();
-    break;
-  case 1:
-    resultIndexingMap = *getMaxMap();
-    break;
-  case 2:
-    resultIndexingMap = *getSumMap();
     break;
   default:
     return failure();
@@ -2160,6 +2133,300 @@ LogicalResult OnlineAttentionOp::getResultTilePosition(
     resultOffsets.push_back(offsets[dim]);
     resultSizes.push_back(sizes[dim]);
   }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// CustomOp
+//===---------------------------------------------------------------------===//
+
+/// These methods copied/modified from `TilingInterface` implementation of
+/// `getIterationDomain` of `LinalgOp`s.
+
+SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
+/// Method similar to `LinalgOp`s that concatenates shapes of all operands.
+static SmallVector<OpFoldResult>
+createFlatListOfOperandDims(OpBuilder &builder, Location loc,
+                            CustomOp customOp) {
+  SmallVector<OpFoldResult> result;
+  for (Value operand : customOp->getOperands()) {
+    for (auto dim : llvm::seq<unsigned>(customOp.getRank(operand))) {
+      result.push_back(getDim(builder, loc, operand, dim));
+    }
+  }
+  return result;
+}
+
+SmallVector<Range> CustomOp::getIterationDomainForDimensions(
+    OpBuilder &builder, ArrayRef<unsigned> dims, ArrayRef<unsigned> symbols) {
+  CustomOp customOp = *this;
+  SmallVector<AffineMap> maps = customOp.getIndexingMapsArray();
+  if (maps.empty()) {
+    return SmallVector<Range>{};
+  }
+
+  Location loc = getLoc();
+
+  // 1. Create a flat list of all the operand shapes (similar to Linalg)
+  SmallVector<OpFoldResult> allShapesSizes =
+      createFlatListOfOperandDims(builder, loc, customOp);
+
+  // 2a. Next we need to get a map from shapes to loop. Since `custom_op`
+  //     has indexing maps that have symbols, to make this work correctly
+  //     compute new maps that replaces the symbols with "new" dims.
+  unsigned numDims = getNumLoops();
+  unsigned numSymbols = getNumNonLoopDimensions();
+  MLIRContext *context = getContext();
+  SmallVector<AffineMap> modifiedMaps =
+      convertDimsToSymbols(context, maps, numDims, numSymbols);
+
+  // 2b. Concat the affine maps.
+  AffineMap concatMap = inversePermutation(concatAffineMaps(modifiedMaps));
+  // TODO: Ideally we should bail if the map is invalid, i.e. we abort from
+  // applying the transformation. We could add this to the verifier as well, but
+  // it is unclear if this makes the op invalid. Revisit after more experience
+  // of how this operation is used.
+  assert(concatMap && "failure in inverting indexing maps");
+  SmallVector<Range> ranges;
+
+  OpFoldResult zero = builder.getIndexAttr(0), one = builder.getIndexAttr(1);
+  auto getRange = [&](AffineExpr expr) {
+    OpFoldResult ofr = affine::makeComposedFoldedAffineApply(builder, loc, expr,
+                                                             allShapesSizes);
+    return Range{zero, ofr, one};
+  };
+  ranges = llvm::map_to_vector(
+      dims, [&](unsigned dim) { return getRange(concatMap.getResult(dim)); });
+  ranges.append(llvm::map_to_vector(symbols, [&](unsigned symbol) {
+    return getRange(concatMap.getResult(symbol + numSymbols));
+  }));
+  return ranges;
+}
+
+SmallVector<Range> CustomOp::getIterationDomain(OpBuilder &builder) {
+  auto dims = llvm::to_vector(llvm::seq<unsigned>(0, getNumLoops()));
+  return getIterationDomainForDimensions(builder, dims,
+                                         /*symbols=*/ArrayRef<unsigned>{});
+}
+
+/// During tiling, the tiling implementation generates offsets and sizes
+/// to use for the dimensions of the operation that correspond to loops.
+/// The dimensions of the operation corresponding to symbols isnt tiled.
+/// This method extends the offsets and sizes for a tile with the
+/// offsets (which are zero) and sizes (which are same as the untiled sizes) for
+/// the dimension represented by symbols.
+static std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>
+appendOffsetAndSizeForSymbolDimensions(OpBuilder &builder, CustomOp customOp,
+                                       ArrayRef<OpFoldResult> offsets,
+                                       ArrayRef<OpFoldResult> sizes) {
+  unsigned numSymbols = customOp.getNumNonLoopDimensions();
+  if (numSymbols == 0) {
+    return {llvm::to_vector(offsets), llvm::to_vector(sizes)};
+  }
+
+  auto appendedOffsets = llvm::to_vector(offsets);
+  appendedOffsets.append(numSymbols, builder.getIndexAttr(0));
+
+  auto appendedSizes = llvm::to_vector(sizes);
+  auto symbols = llvm::to_vector(llvm::seq<unsigned>(0, numSymbols));
+  auto symbolRanges = customOp.getIterationDomainForDimensions(
+      builder, /*dims=*/ArrayRef<unsigned>{}, symbols);
+  auto symbolRangesUb =
+      llvm::map_range(symbolRanges, [](Range r) { return r.size; });
+  appendedSizes.append(symbolRangesUb.begin(), symbolRangesUb.end());
+  return {appendedOffsets, appendedSizes};
+}
+
+/// This method is adapted from the method `linalg::computeAllSliceParameters`,
+/// adapted to work with map that have symbols, and empty maps.
+static SmallVector<std::optional<linalg::SliceParameters>>
+computeCustomOpAllSliceParameters(OpBuilder &builder, Location loc,
+                                  CustomOp customOp, ValueRange valuesToTile,
+                                  ArrayRef<OpFoldResult> ivs,
+                                  SmallVector<OpFoldResult> tileSizes) {
+  assert(ivs.size() == static_cast<size_t>(llvm::count_if(
+                           llvm::make_range(tileSizes.begin(), tileSizes.end()),
+                           [](OpFoldResult v) { return !isZeroIndex(v); })) &&
+         "expected as many ivs as non-zero sizes");
+  unsigned numDims = customOp.getNumLoops();
+  unsigned numSymbols = customOp.getNumNonLoopDimensions();
+
+  // Construct (potentially temporary) mins and maxes on which to apply maps
+  // that define tile subshapes.
+  SmallVector<OpFoldResult> lbs =
+      linalg::computeTileOffsets(builder, loc, ivs, tileSizes);
+  SmallVector<OpFoldResult> sizeBounds = tileSizes;
+
+  std::tie(lbs, sizeBounds) = appendOffsetAndSizeForSymbolDimensions(
+      builder, customOp, lbs, sizeBounds);
+
+  tileSizes.append(numSymbols, builder.getIndexAttr(0));
+  SmallVector<OpFoldResult> subShapeSizes =
+      linalg::computeTileSizes(builder, loc, tileSizes, sizeBounds);
+
+  SmallVector<AffineExpr> symbolReplacements;
+  if (numSymbols != 0) {
+    symbolReplacements =
+        getDimExprsForSymbols(builder.getContext(), numDims, numSymbols);
+  }
+
+  assert(static_cast<int64_t>(valuesToTile.size()) <=
+             customOp->getNumOperands() &&
+         "more value to tile than operands.");
+  SmallVector<std::optional<linalg::SliceParameters>> allSliceParams;
+  allSliceParams.reserve(valuesToTile.size());
+  for (auto [opOperand, val] :
+       llvm::zip(customOp->getOpOperands(), valuesToTile)) {
+    Value shapedOp = val;
+    LLVM_DEBUG(llvm::dbgs() << "makeTiledShapes: for operand " << shapedOp);
+    AffineMap map = customOp.getMatchingIndexingMap(&opOperand);
+    if (numSymbols != 0) {
+      map = convertDimsToSymbols(map, numDims, numSymbols, symbolReplacements);
+    }
+
+    // If the map is empty, we dont tile this operand.
+    Type operandType = opOperand.get().getType();
+    if (map.isEmpty() || !isa<ShapedType>(operandType)) {
+      allSliceParams.push_back(std::nullopt);
+      LLVM_DEBUG(llvm::dbgs()
+                 << ": not tiled: use shape: " << operandType << "\n");
+      continue;
+    }
+
+    allSliceParams.push_back(linalg::computeSliceParameters(
+        builder, loc, shapedOp, tileSizes, map, lbs, sizeBounds, subShapeSizes,
+        /*omitPartialTileCheck=*/true));
+  }
+
+  return allSliceParams;
+}
+
+/// This method is same as `materializeTiledShape` method defined in
+/// `mlir/Dialect/Linalg/Utils/Utils.[h|cpp]`.
+static Operation *
+materializeTiledShape(OpBuilder &builder, Location loc, Value valueToTile,
+                      const linalg::SliceParameters &sliceParams) {
+  auto shapedType = dyn_cast<ShapedType>(valueToTile.getType());
+  auto *sliceOp = TypeSwitch<ShapedType, Operation *>(shapedType)
+                      .Case([&](RankedTensorType) {
+                        return builder.create<tensor::ExtractSliceOp>(
+                            loc, valueToTile, sliceParams.offsets,
+                            sliceParams.sizes, sliceParams.strides);
+                      })
+                      .Default([](ShapedType) -> Operation * {
+                        llvm_unreachable("Unexpected shaped type");
+                      });
+  return sliceOp;
+}
+
+/// This method is adapted from the method `linalg::makeTiledShapes`,
+/// adapted to work with map that have symbols, and empty maps.
+static SmallVector<Value>
+makeCustomOpTiledShapes(OpBuilder &builder, Location loc, CustomOp customOp,
+                        ValueRange valuesToTile, ArrayRef<OpFoldResult> ivs,
+                        ArrayRef<OpFoldResult> tileSizes) {
+  SmallVector<std::optional<linalg::SliceParameters>> allSliceParameter =
+      computeCustomOpAllSliceParameters(builder, loc, customOp, valuesToTile,
+                                        ivs, llvm::to_vector(tileSizes));
+  SmallVector<Value> tiledShapes;
+  for (auto [valueToTile, sliceParams] :
+       llvm::zip_equal(valuesToTile, allSliceParameter)) {
+    tiledShapes.push_back(
+        sliceParams.has_value()
+            ? materializeTiledShape(builder, loc, valueToTile, *sliceParams)
+                  ->getResult(0)
+            : valueToTile);
+  }
+  return tiledShapes;
+}
+
+static void offsetCustomOpIndices(OpBuilder &b, CustomOp customOp,
+                                  ArrayRef<OpFoldResult> offsets) {
+  IRRewriter rewriter(b);
+  for (auto indexOp : customOp.getBody()->getOps<IREE::LinalgExt::IndexOp>()) {
+    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()])
+      continue;
+    OpBuilder::InsertionGuard guard(b);
+    rewriter.setInsertionPointAfter(indexOp);
+    AffineExpr index, offset;
+    bindDims(b.getContext(), index, offset);
+    OpFoldResult applied = affine::makeComposedFoldedAffineApply(
+        rewriter, indexOp.getLoc(), index + offset,
+        {getAsOpFoldResult(indexOp.getResult()), offsets[indexOp.getDim()]});
+    Value materialized =
+        getValueOrCreateConstantIndexOp(b, indexOp.getLoc(), applied);
+    rewriter.replaceUsesWithIf(indexOp, materialized, [&](OpOperand &use) {
+      return use.getOwner() != materialized.getDefiningOp();
+    });
+  }
+}
+
+FailureOr<TilingResult>
+CustomOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  CustomOp customOp = *this;
+  // Leave the `sizeBounds` value empty. That is only needed when the `sizes`
+  // specified could lead to out of bounds accesses.
+  Location loc = getLoc();
+
+  SmallVector<Value> valuesToTile = getOperation()->getOperands();
+  SmallVector<Value> tiledOperands = makeCustomOpTiledShapes(
+      builder, loc, *this, valuesToTile, offsets, sizes);
+  SmallVector<Operation *> generatedSlices = llvm::map_to_vector(
+      llvm::make_filter_range(
+          tiledOperands,
+          [](Value v) -> bool {
+            return isa_and_nonnull<tensor::ExtractSliceOp, memref::SubViewOp>(
+                v.getDefiningOp());
+          }),
+      [](Value v) -> Operation * { return v.getDefiningOp(); });
+
+  SmallVector<Type> resultTensorTypes =
+      llvm::map_to_vector(getDpsInitsMutable(), [&](OpOperand &opOperand) {
+        return tiledOperands[opOperand.getOperandNumber()].getType();
+      });
+
+  Operation *tiledOp =
+      mlir::clone(builder, customOp, resultTensorTypes, tiledOperands);
+  offsetCustomOpIndices(builder, cast<CustomOp>(tiledOp), offsets);
+
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};
+}
+
+/// Methods copied/modified from `TilingInterface` implementation of
+/// `getTiledImplementation` of `LinalgOp`s.
+
+LogicalResult CustomOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  CustomOp customOp = *this;
+  Location loc = getLoc();
+
+  AffineExpr d0 = builder.getAffineDimExpr(0);
+  SmallVector<OpFoldResult> appendedOffsets, appendedSizes;
+  std::tie(appendedOffsets, appendedSizes) =
+      appendOffsetAndSizeForSymbolDimensions(builder, customOp, offsets, sizes);
+
+  SmallVector<OpFoldResult> subShapeSizes =
+      llvm::map_to_vector(appendedSizes, [&](OpFoldResult ofr) {
+        return affine::makeComposedFoldedAffineApply(builder, loc, d0 - 1, ofr);
+      });
+
+  OpOperand *outOperand = customOp.getDpsInitOperand(resultNumber);
+  linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
+      builder, loc, outOperand->get(), sizes,
+      customOp.getMatchingIndexingMap(outOperand), appendedOffsets,
+      /*ubs*/ {}, subShapeSizes, /*omitPartialTileCheck=*/true);
+  resultOffsets = sliceParams.offsets;
+  resultSizes = sliceParams.sizes;
   return success();
 }
 

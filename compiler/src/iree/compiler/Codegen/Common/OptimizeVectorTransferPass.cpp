@@ -87,11 +87,12 @@ struct OptimizeVectorTransferPass final
 
     LDBG("after dropping leading unit dims\n" << funcOp);
 
-    // Workaround, run loop invariant code motion before hoist redundant vector
-    // transfer to workaround a bug upstream.
-    // TODO(thomasraoux): Remove it once the fix is merged.
-    loopInvariantCodeMotion(funcOp);
-    linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
+    if (redundantHoisting) {
+      // Workaround, run loop invariant code motion before hoist redundant
+      // vector transfer to workaround a bug upstream.
+      loopInvariantCodeMotion(funcOp);
+      linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
+    }
     IRRewriter rewriter(funcOp->getContext());
     vector::transferOpflowOpt(rewriter, funcOp);
 

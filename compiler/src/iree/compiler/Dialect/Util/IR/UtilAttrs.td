@@ -14,6 +14,37 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
+// #util.int.assumptions
+//===----------------------------------------------------------------------===//
+
+def Util_IntAssumptionAttr : AttrDef<Util_Dialect, "IntAssumption", []
+> {
+  let mnemonic = "int.assumption";
+  let summary = [{specifies assumptions that can be made about an integer's value}];
+  let description = [{
+    This is typically used to memorialize the result of some integer analysis
+    or outside knowledge. All components of the attribute are optional.
+
+    See the op `util.assume.int` for binding assumptions to values.
+  }];
+  let parameters = (ins
+    DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$umin,
+    DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$umax,
+    DefaultValuedParameter<"std::optional<uint64_t>", "std::nullopt">:$udiv
+  );
+  let assemblyFormat = [{
+    `<` struct($umin, $umax, $udiv) `>`
+  }];
+}
+
+def Util_IntAssumptionAttrList : TypedArrayAttrBase<
+    Util_IntAssumptionAttr, "list of int assumption attributes">;
+
+def Util_MultiValueIntAssumptionAttrList : TypedArrayAttrBase<
+    Util_IntAssumptionAttrList,
+    "list of int attribute assumptions for multiple values">;
+
+//===----------------------------------------------------------------------===//
 // #util.byte_pattern
 //===----------------------------------------------------------------------===//
 

@@ -20,8 +20,10 @@ iree_cc_library(
     "EncodingEnums.h.inc"
     "EncodingOps.h"
     "EncodingOps.h.inc"
+    "EncodingTypes.h"
     "EncodingTypes.h.inc"
   SRCS
+    "EncodingAttrs.cpp"
     "EncodingAttrs.cpp.inc"
     "EncodingDialect.cpp"
     "EncodingDialect.cpp.inc"
@@ -63,7 +65,7 @@ iree_tablegen_library(
   NAME
     EncodingEnumsGen
   TD_FILE
-    "EncodingBase.td"
+    "EncodingAttrs.td"
   OUTS
     --gen-enum-decls EncodingEnums.h.inc
     --gen-enum-defs EncodingEnums.cpp.inc
@@ -85,7 +87,7 @@ iree_tablegen_library(
   NAME
     EncodingTypesGen
   TD_FILE
-    "EncodingBase.td"
+    "EncodingAttrs.td"
   OUTS
     --gen-attrdef-decls --attrdefs-dialect=iree_encoding EncodingAttrs.h.inc
     --gen-attrdef-defs --attrdefs-dialect=iree_encoding EncodingAttrs.cpp.inc

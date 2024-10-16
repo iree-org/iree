@@ -83,35 +83,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-compiler` package includes the SPIR-V compiler:
 
-=== "Stable releases"
-
-    Stable release packages are
-    [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
-
-    ``` shell
-    python -m pip install iree-compiler
-    ```
-
-=== ":material-alert: Nightly releases"
-
-    Nightly releases are published on
-    [GitHub releases](https://github.com/iree-org/iree/releases).
-
-    ``` shell
-    python -m pip install \
-      --find-links https://iree.dev/pip-release-links.html \
-      --upgrade iree-compiler
-    ```
-
-!!! tip
-    `iree-compile` is installed to your python module installation path. If you
-    pip install with the user mode, it is under `${HOME}/.local/bin`, or
-    `%APPDATA%Python` on Windows. You may want to include the path in your
-    system's `PATH` environment variable:
-
-    ```shell
-    export PATH=${HOME}/.local/bin:${PATH}
-    ```
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
 #### :material-hammer-wrench: Build the compiler from source
 
@@ -135,13 +107,8 @@ Next you will need to get an IREE runtime that supports the Vulkan HAL driver.
 
 You can check for Vulkan support by looking for a matching driver and device:
 
-```console hl_lines="6"
-$ iree-run-module --list_drivers
-
-        cuda: CUDA (dynamic)
-  local-sync: Local execution using a lightweight inline synchronous queue
-  local-task: Local execution using the IREE multithreading task system
-      vulkan: Vulkan 1.x (dynamic)
+```console hl_lines="7"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
 ```
 
 ```console hl_lines="6"
@@ -152,6 +119,15 @@ $ iree-run-module --list_devices
   local-task://
   vulkan://00000000-1111-2222-3333-444444444444
 ```
+
+#### :octicons-package-16: Download the runtime from a release
+
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-runtime` package includes the Vulkan HAL drivers:
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
 #### :material-hammer-wrench: Build the runtime from source
 

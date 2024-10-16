@@ -10,7 +10,7 @@ util.global private @device_123 = #hal.device.ordinal<123> : !hal.device
 //  CHECK-DAG: %[[NULL_DEVICE:.+]] = util.null : !hal.device
 //  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[DEVICE]], %[[NULL_DEVICE]]
 // CHECK-NEXT: scf.if %[[IS_NULL]] {
-//      CHECK:   util.status.check_ok %c5_i32, "HAL device `device_123` not found or unavailable: #hal.device.ordinal<123>"
+//      CHECK:   util.status.check_ok %c18_i32, "HAL device `device_123` not found or unavailable: #hal.device.ordinal<123>"
 //      CHECK: util.global.store %[[DEVICE]], @device_123
 
 // -----
@@ -26,7 +26,7 @@ util.global private @device_fallback = #hal.device.fallback<@device_base> : !hal
 //  CHECK-DAG: %[[DEVICE:.+]] = util.global.load @device_base : !hal.device
 //  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[DEVICE]], %{{.+}}
 // CHECK-NEXT: scf.if %[[IS_NULL]] {
-//      CHECK:   util.status.check_ok %c5_i32, "HAL device `device_fallback` not found or unavailable: #hal.device.fallback<@device_base>"
+//      CHECK:   util.status.check_ok %c18_i32, "HAL device `device_fallback` not found or unavailable: #hal.device.fallback<@device_base>"
 //      CHECK: util.global.store %[[DEVICE]], @device_fallback
 
 // -----
@@ -80,7 +80,7 @@ util.global private @device_a = #hal.device.target<"a", {
 // Error out if no device was found because at least one match is required.
 //  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[WHILE]]#2, %[[NULL_DEVICE]]
 // CHECK-NEXT: scf.if %[[IS_NULL]] {
-//      CHECK:   util.status.check_ok %c5_i32, "HAL device `device_a` not found or unavailable: #hal.device.target<{{.+}}>"
+//      CHECK:   util.status.check_ok %c18_i32, "HAL device `device_a` not found or unavailable: #hal.device.target<{{.+}}>"
 //      CHECK: util.global.store %[[WHILE]]#2, @device_a
 
 // -----
@@ -115,5 +115,5 @@ util.global private @selected = #hal.device.select<[
 // CHECK-NEXT: }
 //  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[IF_0]], %[[NULL_DEVICE]]
 // CHECK-NEXT: scf.if %[[IS_NULL]] {
-//      CHECK:   util.status.check_ok %c5_i32, "HAL device `selected` not found or unavailable: #hal.device.select<{{.+}}>"
+//      CHECK:   util.status.check_ok %c18_i32, "HAL device `selected` not found or unavailable: #hal.device.select<{{.+}}>"
 //      CHECK: util.global.store %[[IF_0]], @selected

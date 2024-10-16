@@ -76,6 +76,17 @@ def GPUGeneralizeNamedOpsPass :
   let summary = "Convert named Linalg ops to linalg.generic ops";
 }
 
+def GPUGreedilyDistributeToThreadsPass :
+    InterfacePass<"iree-codegen-gpu-greedily-distribute-to-threads", "mlir::FunctionOpInterface"> {
+  let summary = "Greedily distributes all remaining tilable ops to threads";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
+}
+
 def GPUInferMemorySpacePass :
     InterfacePass<"iree-codegen-gpu-infer-memory-space", "mlir::FunctionOpInterface"> {
   let summary = "Pass to infer and set the memory space for all alloc_tensor ops.";
@@ -194,6 +205,9 @@ def GPUApplyTilingLevelPass :
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
                          "Tile and fuse all annotated ops to threads")
            )}]>,
+    Option<"allowZeroSlices", "allow-zero-slices", "bool",
+           /*default=*/"false",
+           "Allow pad fusion to generate zero size slices">
   ];
 }
 

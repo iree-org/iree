@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{allow-zero-slices=true}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NOZERO
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 
@@ -155,6 +156,30 @@ func.func @matmul_fuse(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<
 
 // -----
 
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 8], thread = [8, 8, 0]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @matmul_fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %empty = tensor.empty() : tensor<64x64xf32>
+  %cst = arith.constant 0.0 : f32
+  %5 = linalg.fill ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<64x64xf32>, tensor<64x64xf32>) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %7 : tensor<64x64xf32>
+}
+
+// Verify that destinations are not fused for reduction tiling.
+// CHECK-LABEL: func.func @matmul_fuse_destination
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%{{.*}} : tensor<64x64xf32>)
+//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8 iter_args(%[[ITER:.+]] = %[[FILL]]
+//       CHECK:     linalg.matmul
+
+// THREAD-LABEL: func.func @matmul_fuse_destination
+//       THREAD:   %[[EMPTY:.+]] = tensor.empty() : tensor<64x64xf32>
+//       THREAD:   scf.forall {{.*}} shared_outs(%[[INIT:.+]] = %[[EMPTY]]
+//       THREAD:     linalg.fill
+//       THREAD:     linalg.matmul
+
+// -----
+
 #config = #iree_gpu.lowering_config<{thread = [8, 8]}>
 func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<64x64xf32>) -> tensor<64x64xf32> {
   %c8 = arith.constant 8 : index
@@ -204,8 +229,8 @@ module {
 //   CHECK-NOT:   scf.for
 
 // THREAD-LABEL: func.func @inferred_add_tensor
-//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (8, 4)
-//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<8x4xf32>, tensor<8x4xf32>)
+//       THREAD:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (1, 4)
+//       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<1x4xf32>, tensor<1x4xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 
@@ -283,10 +308,77 @@ module {
 }
 
 // THREAD-LABEL: func.func @inferred_small_inner_dim_fill_vector_sizes
-//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (16, 8, 4, 16) step (8, 1, 1, 1)
-//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<4x8x1x1x1x2x4xf16>) outs({{.*}} : tensor<4x8x1x1x1x2x4xf16>)
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0, 0, 0, 0) to (4, 16, 8, 4, 16, 2, 4) step (1, 1, 1, 1, 1, 2, 4)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x1x1x2x4xf16>) outs({{.*}} : tensor<1x1x1x1x1x2x4xf16>)
 //       THREAD:     scf.forall.in_parallel
-//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, #gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+//       THREAD:   mapping = [#gpu.thread<linear_dim_6>, {{.*}}, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_small_inner_dim_dont_fill_non_contiguous(
+    %0: tensor<4x16x4x4xf16>, %1: tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<4x16x4x4xf16>)
+        outs(%1 : tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
+    return %2 : tensor<4x16x4x4xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_small_inner_dim_dont_fill_non_contiguous
+//       THREAD:   scf.forall ({{.*}}) = (0, 0, 0, 0) to (4, 16, 4, 4) step (1, 1, 1, 4)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<1x1x1x4xf16>) outs({{.*}} : tensor<1x1x1x4xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_3>, {{.*}}, #gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_unaligned(%0: tensor<70xf16>, %1: tensor<70xf16>) -> tensor<70xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<70xf16>)
+        outs(%1 : tensor<70xf16>) -> tensor<70xf16>
+    return %2 : tensor<70xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_unaligned
+//       THREAD:   scf.forall ({{.*}}) = (0) to (70) step (8)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<?xf16>) outs({{.*}} : tensor<?xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @inferred_smaller_load(%0: tensor<128xf16>, %1: tensor<128xf16>) -> tensor<128xf16>
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+      } {
+    %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%0 : tensor<128xf16>)
+        outs(%1 : tensor<128xf16>) -> tensor<128xf16>
+    return %2 : tensor<128xf16>
+  }
+}
+
+// THREAD-LABEL: func.func @inferred_smaller_load
+//       THREAD:   scf.forall ({{.*}}) = (0) to (128) step (2)
+//       THREAD:     linalg.copy{{.*}}ins({{.*}} : tensor<2xf16>) outs({{.*}} : tensor<2xf16>)
+//       THREAD:     scf.forall.in_parallel
+//       THREAD:   mapping = [#gpu.thread<linear_dim_0>]
 
 // -----
 
@@ -298,7 +390,8 @@ module {
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [2, 3] k_pos = [1]
+      m_offset = [0] * [1] k_offset = [0] * [1]
+      batch_pos = [0] m_pos = [2, 3] k_pos = [1]
       ins(%2 : tensor<2x34x34x128xf16>)
       outs(%3 : tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
     return %4 : tensor<2x128x8xf16>
@@ -382,3 +475,51 @@ module {
 //       SUBGROUP:     scf.forall.in_parallel
 //       SUBGROUP:       tensor.parallel_insert_slice %[[MMA]] into %[[INIT]]
 //       SUBGROUP:   return
+
+// -----
+
+// This test only checks when a tensor.pad gets fused when tiling. We disable
+// tensor.pad fusion by default, because it generates a gaurd to prevent
+// empty slices, which is hard to vectorize.
+//
+// However, if we already know no zero slices will be generated, we can fuse
+// the pad directly.
+
+#map = affine_map<()[s0] -> (s0 * -16 + 19, 16)>
+#map1 = affine_map<()[s0] -> (-s0 + 16)>
+module {
+  func.func @fuse_pad_no_zero_slice(%arg0: tensor<?x17xf32>, %arg1: tensor<17x17xf32>, %arg2: index, %arg3: index) -> tensor<?x17xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = affine.min #map()[%arg2]
+    %1 = tensor.empty() : tensor<16x32xf32>
+    %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<16x32xf32>) -> tensor<16x32xf32>
+    %3 = affine.apply #map1()[%0]
+    %padded = tensor.pad %arg0 low[0, 0] high[%3, 7] {
+    ^bb0(%arg4: index, %arg5: index):
+      tensor.yield %cst : f32
+    } : tensor<?x17xf32> to tensor<16x24xf32>
+    %padded_0 = tensor.pad %arg1 low[0, 0] high[7, 15] {
+    ^bb0(%arg4: index, %arg5: index):
+      tensor.yield %cst : f32
+    } : tensor<17x17xf32> to tensor<24x32xf32>
+    %4 = linalg.matmul {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 8]}>} ins(%padded, %padded_0 : tensor<16x24xf32>, tensor<24x32xf32>) outs(%2 : tensor<16x32xf32>) -> tensor<16x32xf32>
+    %extracted_slice = tensor.extract_slice %4[0, 0] [%0, 17] [1, 1] : tensor<16x32xf32> to tensor<?x17xf32>
+    return %extracted_slice : tensor<?x17xf32>
+  }
+}
+
+// Only fuse pad when no-zero-slices is true.
+
+// CHECK-LABEL: @fuse_pad_no_zero_slice
+// CHECK: tensor.pad
+// CHECK: tensor.pad
+// CHECK: scf.for
+// CHECK-NOT: tensor.pad
+// CHECK: linalg.matmul
+
+// NOZERO-LABEL: @fuse_pad_no_zero_slice
+// NOZERO-NOT: tensor.pad
+// NOZERO: scf.for
+// NOZERO: tensor.pad
+// NOZERO: tensor.pad
+// NOZERO: linalg.matmul

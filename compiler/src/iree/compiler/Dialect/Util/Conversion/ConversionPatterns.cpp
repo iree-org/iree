@@ -30,7 +30,8 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
   patterns
-      .insert<GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
+      .insert<GenericConvertTypesPattern<IREE::Util::AssumeIntOp>,
+              GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
           typeConverter, context);
 
   typeConverter.addConversion([&](IREE::Util::PtrType type,
@@ -60,6 +61,7 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
+  addGenericLegalOp<IREE::Util::AssumeIntOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::OptimizationBarrierOp>(conversionTarget,
                                                        typeConverter);
   addGenericLegalOp<IREE::Util::ListCreateOp>(conversionTarget, typeConverter);

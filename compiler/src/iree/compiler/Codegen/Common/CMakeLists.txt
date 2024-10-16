@@ -108,6 +108,7 @@ iree_cc_library(
     "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
+    "IREELoopInvariantCodeMotion.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelsToCalls.cpp"
@@ -135,6 +136,7 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
+    "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
     "VectorizeMemrefCopy.cpp"
   DEPS

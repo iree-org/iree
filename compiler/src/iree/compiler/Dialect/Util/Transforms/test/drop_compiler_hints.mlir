@@ -73,3 +73,13 @@ module @deeply_nested {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: @assume.int
+util.func @assume.int() -> i32 {
+  // CHECK-NOT: util.assume.int
+  %c1 = arith.constant 12 : i32
+  %0 = util.assume.int %c1<umin = 1> : i32
+  util.return %0 : i32
+}

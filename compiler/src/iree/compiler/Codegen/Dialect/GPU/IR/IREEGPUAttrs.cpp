@@ -36,6 +36,8 @@
 #include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -952,6 +954,12 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // Get the swizzle describing the internal layout of this fragment.
   TileSwizzle swizzle = getSwizzle(*this, fragment);
 
+  LLVM_DEBUG({
+    DBGS() << "DataTiledMMAAttr::populateOperandOffsetsSizesStrides\n";
+    DBGS() << "    fragment: " << llvm::to_underlying(fragment) << "\n";
+    DBGS() << "    swizzle: " << swizzle << "\n";
+  });
+
   // Populate tile sizes.
   MLIRContext *ctx = builder.getContext();
   SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
@@ -1009,7 +1017,8 @@ static bool incrementIndices(MutableArrayRef<int64_t> indices,
   return false; // All indices wrapped around.
 }
 
-/// Flattens the input vector `value` to 1-D.
+/// Flattens the input vector `value` to 1-D if the rank is greater than 1. Note
+/// that it returns the value directly if it is a 0-D vector.
 static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   Type type = value.getType();
   VectorType vectorType = llvm::dyn_cast<VectorType>(type);
@@ -1017,9 +1026,8 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   if (vectorType.getRank() <= 1) {
     return value;
   }
-  VectorType flatVectorType =
-      VectorType::get(SmallVector<int64_t>{vectorType.getNumElements()},
-                      vectorType.getElementType());
+  auto flatVectorType = VectorType::get({vectorType.getNumElements()},
+                                        vectorType.getElementType());
   return builder.create<vector::ShapeCastOp>(loc, flatVectorType, value);
 }
 
@@ -1035,10 +1043,15 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
+  LLVM_DEBUG({
+    DBGS() << "crossIntrinsicShape: ";
+    llvm::interleaveComma(crossIntrinsicShape, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
   int rank = internalShape.size();
-  auto strides = SmallVector<int64_t>(rank, 1);
-  SmallVector<Value> distributedValues;
   SmallVector<int64_t> indices(rank, 0);
+  SmallVector<int64_t> strides(rank, 1);
+  SmallVector<Value> distributedValues;
   do {
     Value extract = builder.create<vector::ExtractStridedSliceOp>(
         loc, value, indices, internalShape, strides);
@@ -1067,12 +1080,30 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
   }
 
   // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
-  SmallVector<Value> intrinsicsLhs = distributeMmaFragmentToIntrinsics(
-      builder, loc, lhs, getSwizzle(*this, MMAFragment::Lhs));
-  SmallVector<Value> intrinsicsRhs = distributeMmaFragmentToIntrinsics(
-      builder, loc, rhs, getSwizzle(*this, MMAFragment::Rhs));
-  SmallVector<Value> intrinsicsAcc = distributeMmaFragmentToIntrinsics(
-      builder, loc, acc, getSwizzle(*this, MMAFragment::Acc));
+  TileSwizzle lhsSwizzle = getSwizzle(*this, MMAFragment::Lhs);
+  LLVM_DEBUG({
+    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
+    DBGS() << "    lhsSwizzle: " << lhsSwizzle << "\n";
+  });
+  SmallVector<Value> intrinsicsLhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, lhs, lhsSwizzle);
+
+  TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
+  LLVM_DEBUG({
+    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
+    DBGS() << "    rhsSwizzle: " << rhsSwizzle << "\n";
+  });
+  SmallVector<Value> intrinsicsRhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, rhs, rhsSwizzle);
+
+  TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
+  LLVM_DEBUG({
+    DBGS() << "DataTiledMMAAttr::buildMmaOperation\n";
+    DBGS() << "    accSwizzle: " << accSwizzle << "\n";
+  });
+
+  SmallVector<Value> intrinsicsAcc =
+      distributeMmaFragmentToIntrinsics(builder, loc, acc, accSwizzle);
 
   // Get a MMAAttr for the intrinsic itself, to reuse MMAAttr::buildMmaOperation
   // to create the target intrinsics.
@@ -1086,20 +1117,25 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       for (int ku = 0; ku < getUnrollK(); ++ku) {
         // Assume intrinsicMma.buildMmaOperation() success: validation should be
         // completed prior to mutating IR.
-        intrinsicsAcc[mu * getUnrollN() + nu] = *intrinsicMma.buildMmaOperation(
-            builder, loc, intrinsicCType, intrinsicsLhs[mu * getUnrollK() + ku],
-            intrinsicsRhs[nu * getUnrollK() + ku],
-            intrinsicsAcc[mu * getUnrollN() + nu]);
+        Value lhs = intrinsicsLhs[mu * getUnrollK() + ku];
+        Value rhs = intrinsicsRhs[nu * getUnrollK() + ku];
+        Value &acc = intrinsicsAcc[mu * getUnrollN() + nu];
+        acc = *intrinsicMma.buildMmaOperation(builder, loc, intrinsicCType, lhs,
+                                              rhs, acc);
       }
     }
   }
 
   // Insert the results into the destination accumulator.
-  auto accSwizzle = getSwizzle(*this, MMAFragment::Acc);
   SmallVector<int64_t> accCrossIntrinsicShape =
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
+  LLVM_DEBUG({
+    DBGS() << "accCrossIntrinsicShape: ";
+    llvm::interleaveComma(accCrossIntrinsicShape, llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
   SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
   SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
   for (Value intrAcc : intrinsicsAcc) {

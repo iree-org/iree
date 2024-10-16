@@ -30,7 +30,12 @@ or [Linux](https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html).
 
 #### :octicons-package-16: Download the compiler from a release
 
-!!! note "Currently ROCm is **NOT supported** for the Python interface."
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-compiler` package includes the ROCm compiler:
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
 #### :material-hammer-wrench: Build the compiler from source
 
@@ -46,6 +51,29 @@ the IREE compiler, then enable the ROCm compiler target with the
 ### Get the IREE runtime
 
 Next you will need to get an IREE runtime that includes the HIP HAL driver.
+
+You can check for HIP support by looking for a matching driver and device:
+
+```console hl_lines="4"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
+```
+
+```console hl_lines="3"
+$ iree-run-module --list_devices
+
+  hip://GPU-00000000-1111-2222-3333-444444444444
+  local-sync://
+  local-task://
+```
+
+#### :octicons-package-16: Download the runtime from a release
+
+Python packages are regularly published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/). See the
+[Python Bindings](../../reference/bindings/python.md) page for more details.
+The core `iree-runtime` package includes the HIP HAL driver:
+
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
 #### :material-hammer-wrench: Build the runtime from source
 

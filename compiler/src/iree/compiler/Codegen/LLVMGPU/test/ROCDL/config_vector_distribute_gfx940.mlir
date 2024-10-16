@@ -1,13 +1,10 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution \
-// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=WMMA
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 64, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -42,11 +39,12 @@ func.func @expanded_matmul_transpose_b() {
 }
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b()
-// CHECK: linalg.generic {{.*}}lowering_config = #[[$TILE_SIZES]]
+// CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 128]
+// CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 128, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -73,7 +71,9 @@ func.func @conv_nhwc() {
 }
 
 // CHECK-LABEL: func.func @conv_nhwc()
-// CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #[[$TILE_SIZES]]
+// CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 32]
+// CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
 // -----
 
@@ -111,7 +111,6 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -138,11 +137,12 @@ func.func @mfma_matmul_1024x1024x1024() {
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
-// CHECK: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
+// CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 64]
+// CHECK-SAME:                           workgroup =  [64, 128, 0]
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 1, 32, 32, 1, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -153,7 +153,8 @@ func.func @mfma_matmul_1024x1024x1024() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 0, 1, 1, 1, 32],
+                                     workgroup = [1, 1, 1, 32, 32, 0, 0, 0, 0]}>
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
@@ -187,42 +188,12 @@ func.func @conv_nchwc() {
 }
 
 // CHECK-LABEL: func.func @conv_nchwc()
-// CHECK: linalg.generic {{.*}}lowering_config = #[[$TILE_SIZES]]
+// CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 32]
+// CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]
 
 // -----
 
-// WMMA:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
-// WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// WMMA-SAME: mma_schedule = #iree_gpu.mma_schedule
-// WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
-// WMMA-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @wmma_matmul_1024x1024x1024() {
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>> -> tensor<1024x1024xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>> -> tensor<1024x1024xf16>
-  %5 = tensor.empty() : tensor<1024x1024xf32>
-  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
-  %7 = linalg.matmul ins(%3, %4 : tensor<1024x1024xf16>, tensor<1024x1024xf16>) outs(%6 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : tensor<1024x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
-  return
-}
-
-// WMMA-LABEL: func.func @wmma_matmul_1024x1024x1024()
-// WMMA: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
-
-// -----
-
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 16, 16]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -249,11 +220,12 @@ func.func @unaligned_mk_batch_matmul() {
 }
 // CHECK-LABEL: func.func @unaligned_mk_batch_matmul()
 // CHECK:         linalg.batch_matmul
-// CHECK-SAME:      lowering_config = #[[$TILE_SIZES]]
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 16]
+// CHECK-SAME:                           workgroup =  [1, 16, 16, 0]
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 128, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -280,7 +252,9 @@ func.func @unaligned_m_batch_matmul_64x72x1280x1280() {
 }
 // CHECK-LABEL: func.func @unaligned_m_batch_matmul_64x72x1280x1280()
 // CHECK:         linalg.batch_matmul
-// CHECK-SAME:      lowering_config = #[[$TILE_SIZES]]
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 128]
+// CHECK-SAME:                           workgroup =  [1, 16, 128, 0]
 
 // -----
 
@@ -342,7 +316,6 @@ func.func @matmul_dynamic_dim() {
 
 // -----
 
-// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 64, 0, 64, 64]{{\]}}
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME:  subgroup_m_count = 2, subgroup_n_count = 1
 // CHECK-NOT:   prefetch_shared_memory = true
@@ -376,9 +349,12 @@ func.func @attention_20x4096x64x4096x64() {
   return
 }
 
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 64, 0]
+// CHECK-SAME:                           workgroup =  [1, 64, 0, 0, 64]
+
 // -----
 
-// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[32, 0, 16, 32]{{\]}}
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME:  subgroup_m_count = 2, subgroup_n_count = 1
 // CHECK-NOT:   prefetch_shared_memory = true
@@ -414,3 +390,7 @@ func.func @attention_large_head_dim_shared_mem() {
   flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<1024x512xf16>>
   return
 }
+
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 16, 0]
+// CHECK-SAME:                           workgroup =  [32, 0, 0, 32]

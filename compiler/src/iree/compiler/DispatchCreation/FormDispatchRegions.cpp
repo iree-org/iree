@@ -568,9 +568,15 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
   if (!options.aggressiveFusion) {
-    auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
-    auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
-    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+    FailureOr<SmallVector<int64_t>> producerIterationSpace =
+        producerFusionOp.getStaticLoopRanges();
+    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
+        consumerFusionOp.getStaticLoopRanges();
+    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+      return false;
+    }
+    if (producerIterationSpace.value().size() <
+        consumerIterationSpace.value().size()) {
       return false;
     }
   }

@@ -30,10 +30,27 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
+#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-transforms"
 
 namespace mlir::iree_compiler {
+
+static bool isAllConstantValue(SmallVector<OpFoldResult> ofrs, int64_t v) {
+  return llvm::all_of(
+      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, v); });
+}
+
+static bool isFullSlice(SmallVector<OpFoldResult> mixedOffsets,
+                        SmallVector<OpFoldResult> mixedSizes,
+                        SmallVector<OpFoldResult> mixedStrides,
+                        IREE::Flow::DispatchTensorType tensorType) {
+  std::optional<SmallVector<int64_t>> constSizes =
+      getConstantIntValues(mixedSizes);
+  return isAllConstantValue(mixedOffsets, 0) &&
+         isAllConstantValue(mixedStrides, 1) && constSizes &&
+         llvm::equal(tensorType.getShape(), *constSizes);
+}
 
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
@@ -477,6 +494,52 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 }
 
 //===---------------------------------------------------------------------===//
+// Helper to perform LICM on loops that are guaranteed at least one trip.
+//===---------------------------------------------------------------------===//
+
+void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
+  // Walk through all loops in a function in innermost-loop-first order. This
+  // way, we first LICM from the inner loop, and place the ops in
+  // the outer loop, which in turn can be further LICM'ed.
+  //
+  // Hoisting is only performed on loops with guaranteed non-zero trip counts.
+  // `scf.forall` ops with mapping attributes can never be proven to have a
+  // non-zero trip count until the loop is resolved and is blanket included
+  // here.
+  target->walk([&](LoopLikeOpInterface loopLike) {
+    if (auto forallOp = dyn_cast<scf::ForallOp>(*loopLike)) {
+      if (forallOp.getMapping()) {
+        return;
+      }
+    }
+
+    // Skip loops without lower/upper bounds. There is no generic way to verify
+    // whether a loop has at least one trip so new loop types of interest can be
+    // added as needed. For example, `scf.while` needs non-trivial analysis of
+    // its condition region to know that it has at least one trip.
+    std::optional<SmallVector<OpFoldResult>> maybeLowerBounds =
+        loopLike.getLoopLowerBounds();
+    std::optional<SmallVector<OpFoldResult>> maybeUpperBounds =
+        loopLike.getLoopUpperBounds();
+    if (!maybeLowerBounds || !maybeUpperBounds) {
+      return;
+    }
+
+    // If any lower + upper bound pair cannot be definitely verified as lb < ub
+    // then the loop may have a zero trip count.
+    for (auto [lb, ub] :
+         llvm::zip_equal(*maybeLowerBounds, *maybeUpperBounds)) {
+      if (!ValueBoundsConstraintSet::compare(lb, ValueBoundsConstraintSet::LT,
+                                             ub)) {
+        return;
+      }
+    }
+
+    moveLoopInvariantCode(loopLike);
+  });
+}
+
+//===---------------------------------------------------------------------===//
 // Patterns to fold tensor.expand/collapse_shape into
 // `hal.interface.binding.subspan`
 //===---------------------------------------------------------------------===//
@@ -531,9 +594,10 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!loadOp.offsets().empty() || !loadOp.sizes().empty() ||
-        !loadOp.strides().empty())
+    if (!isFullSlice(loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+                     loadOp.getMixedStrides(), loadOp.getSourceType())) {
       return failure();
+    }
 
     auto subspanOp =
         loadOp.getSource()
@@ -588,9 +652,10 @@ struct FoldExpandShapeIntoInterfaceTensorStore
                                 PatternRewriter &rewriter) const override {
     // Make sure we are storing the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
-    if (!storeOp.offsets().empty() || !storeOp.sizes().empty() ||
-        !storeOp.strides().empty())
+    if (!isFullSlice(storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+                     storeOp.getMixedStrides(), storeOp.getTargetType())) {
       return failure();
+    }
 
     auto reshapeOp = storeOp.getValue().getDefiningOp<tensor::ExpandShapeOp>();
     if (!reshapeOp) {
@@ -1257,8 +1322,17 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
         // Step 5. Inline the body of the original forall into the new for loop.
         OpBuilder::InsertionGuard g2(rewriter);
         SmallVector<Value> argReplacements(newForallOp.getInductionVars());
-        argReplacements.append(newForallOp.getRegionIterArgs().begin(),
-                               newForallOp.getRegionIterArgs().end());
+        // If there is no paired slice (for a single trip count loop) then
+        // replace the iter arg of the forall op directly.
+        for (auto [forallIterArg, forIterArg, maybeSlice] :
+             llvm::zip_equal(newForallOp.getRegionIterArgs(),
+                             newLoop.getRegionIterArgs(), pairedSlices)) {
+          if (maybeSlice) {
+            argReplacements.push_back(forallIterArg);
+          } else {
+            argReplacements.push_back(forIterArg);
+          }
+        }
         rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
                              argReplacements);
         rewriter.replaceAllUsesWith(loop.getInductionVar(),

@@ -15,7 +15,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["structural_ops.mlir"],
+        [
+            "compiler_hints.mlir",
+            "structural_ops.mlir",
+        ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",

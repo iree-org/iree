@@ -97,11 +97,17 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     return;
   }
 
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(funcOp);
+  if (!translationInfo)
+    return;
+
   LLVMCPUPipelineOptions pipelineOpts;
   if (isX86(target) || isRISCV(target)) {
     pipelineOpts.useConfiguredVectorSizes = false;
-    pipelineOpts.decomposePackUnPackOps = false;
   }
+  pipelineOpts.decomposePackUnPackOps =
+      isOptEnabled(funcOp, getEnableDecompositionStr());
   pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);
   pipelineOpts.enableVectorMasking =
       isX86(target) || isRISCV(target) ||
@@ -109,12 +115,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.enableAArch64SME =
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
   pipelineOpts.enableAArch64I8mm = isAArch64(target) && hasI8mmFeature(target);
-  pipelineOpts.enablePeeling = isLoopPeelingEnabled(funcOp);
-
-  IREE::Codegen::TranslationInfoAttr translationInfo =
-      getTranslationInfo(funcOp);
-  if (!translationInfo)
-    return;
+  pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
 
   OpPassManager pipeline(func::FuncOp::getOperationName());
   switch (translationInfo.getDispatchLoweringPassPipeline()) {

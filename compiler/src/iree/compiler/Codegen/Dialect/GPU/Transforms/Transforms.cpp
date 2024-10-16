@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -109,8 +110,10 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-      empty->getLoc(), empty->getResultTypes()[0], empty.getDynamicSizes());
-  allocTensor.setMemorySpaceAttr(sharedMemoryAddrSpace);
+      empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
+      empty.getDynamicSizes(),
+      /*copy=*/Value(), /*size_hint=*/Value(),
+      /*memory_space=*/sharedMemoryAddrSpace);
   return allocTensor.getResult();
 }
 
@@ -234,6 +237,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
   auto newProducer = rewriter.create<scf::ForOp>(
       loc, lb, ub, step, barrierOp.getBody()->getArgument(0));
+  setLoopUnrollMarker(newProducer);
   Block *loopBody = newProducer.getBody();
 
   // Get the replacement IDs for the producer loop.

@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -272,12 +273,20 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   return VectorPreProcStrategy::None;
 }
 
-DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
+static DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
   auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
   auto unitAttr = UnitAttr::get(context);
 
   return DictionaryAttr::get(
       context, ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
+}
+
+static DictionaryAttr
+getPipelineConfWithDecompositionAttr(MLIRContext *context) {
+  auto attrName = getEnableDecompositionAttrName(context);
+  auto unitAttr = UnitAttr::get(context);
+  return DictionaryAttr::get(context,
+                             ArrayRef<NamedAttribute>({attrName, unitAttr}));
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
@@ -1690,11 +1699,23 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
+  // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
+  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
+  // backends prefer to not decompose the ops.
+  DictionaryAttr pipelineConfig;
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  bool hasDynamicInnerTile = llvm::any_of(
+      op.getMixedTiles(), [](OpFoldResult ofr) { return ofr.is<Value>(); });
+  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+    pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
+  }
+
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   TileSizesListType tileSizesList = {distTileSizes, vecTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
-      DispatchLoweringPassPipeline::CPUDataTiling);
+      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -1718,10 +1739,22 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
   }
 
+  // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
+  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
+  // backends prefer to not decompose the ops.
+  DictionaryAttr pipelineConfig;
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  bool hasDynamicInnerTile = llvm::any_of(
+      op.getMixedTiles(), [](OpFoldResult ofr) { return ofr.is<Value>(); });
+  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+    pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
+  }
+
   TileSizesListType tileSizesList = {distTileSizes, tileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
-      DispatchLoweringPassPipeline::CPUDataTiling);
+      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -1755,7 +1788,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, attnOp.getOutput().getType());
   config.maxTileSizes.resize(opInfo.getDomainRank(), clDefaultDistTileSize);
   config.vectorSizeHints.resize(opInfo.getDomainRank(), vectorSize);
   // Distribute batch dimensions completely on workgroups (tile_size = 1).
@@ -2523,6 +2557,10 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
+        .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          return setDefaultCustomOpLoweringConfig(entryPointFn, op,
+                                                  initCPULaunchConfig);
+        })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
               tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
@@ -2670,7 +2708,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto tInfo = getTranslationInfo(entryPointFn);
   auto pipeline = tInfo.getPassPipeline().getValue();
   auto pipelineConfig = tInfo.getConfiguration();
-  if (isLoopPeelingEnabled(entryPointFn)) {
+  if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
                             "back to non-peeling path");
@@ -3060,8 +3098,16 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    // Set vector level tile sizes for other operations individually.
-    if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
+    // Avoid this for ops within a custom_op since those ops have already their
+    // configuration set.
+    auto prunedComputeOps =
+        llvm::to_vector(llvm::make_filter_range(computeOps, [](Operation *op) {
+          return !isa_and_nonnull<IREE::LinalgExt::CustomOp>(
+                     op->getParentOp()) ||
+                 getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op) ==
+                     nullptr;
+        }));
+    if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();
     }

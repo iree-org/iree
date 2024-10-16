@@ -35,10 +35,10 @@ class MatrixElemTypeId(enum.Enum):
 # The values are the accepted values for the --shapes= flag.
 @enum.unique
 class ShapesId(enum.Enum):
+    DEFAULT = "default"
     SMALL = "small"
     LARGE = "large"
-    GPU_LARGE = "gpu_large"
-    GPU_LARGE_ALIGNED = "gpu_large_aligned"
+    EASY_LARGE_STATIC = "easy_large_static"
 
 
 # Enumerates of the collections of compilation info that we can generate tests
@@ -106,19 +106,79 @@ class MMASchedule:
 # Describes how to construct compilation info for the testcase.
 @dataclasses.dataclass
 class CompilationInfo:
-    # Lowering Config
-    tile_sizes: typing.List[typing.List[int]]
-    # Translation Info
-    dispatch_lowering_pass_pipeline: str
-    software_pipeline_depth: int
-    mma_schedule: typing.Optional[MMASchedule]
     # Compilation info
     workgroup_size: typing.List[int]
-    subgroup_size: Optional[int] = None
+    subgroup_size: Optional[int]
+    # Translation info
+    dispatch_lowering_pass_pipeline: str
 
     # Prints the workgroup size
     def workgroup_size_str(self):
         return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
+
+    def get_compilation_info_attr(self) -> str:
+        ...
+
+
+@dataclasses.dataclass
+class IREEGPUCompilationInfo(CompilationInfo):
+    # Lowering Config
+    workgroup_tile: list[int]
+    reduction_tile: list[int]
+    # Translation Info
+    mma_schedule: Optional[MMASchedule]
+
+    def get_compilation_info_attr(self) -> str:
+        requested_pipeline = self.dispatch_lowering_pass_pipeline
+        compiler_pipeline = requested_pipeline
+
+        mma_schedule = ""
+        if self.mma_schedule is not None:
+            mma_schedule = "{}".format(self.mma_schedule)
+        subgroup_size_str = ""
+        if self.subgroup_size is not None:
+            subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
+
+        return (
+            "#iree_codegen.compilation_info<\n"
+            f"  lowering_config = #iree_gpu.lowering_config<{{"
+            f"  workgroup = {self.workgroup_tile}, "
+            f"  reduction = {self.reduction_tile} }}>,\n"
+            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  {subgroup_size_str},\n"
+            f"  {{ {mma_schedule} }}>>\n"
+        )
+
+
+@dataclasses.dataclass
+class LegacyCompilationInfo(CompilationInfo):
+    # Lowering Config
+    tile_sizes: typing.List[typing.List[int]]
+    # Translation Info
+    software_pipeline_depth: int
+
+    def get_compilation_info_attr(self) -> str:
+        requested_pipeline = self.dispatch_lowering_pass_pipeline
+        compiler_pipeline = requested_pipeline
+        if requested_pipeline == "SPIRVVectorizeMali":
+            compiler_pipeline = "SPIRVBaseVectorize"
+        elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
+            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
+        elif requested_pipeline == "SPIRVVectorizeNVIDIA":
+            # TODO: change to test SPIRVMatmulPromoteVectorize too
+            compiler_pipeline = "SPIRVBaseVectorize"
+
+        subgroup_size_str = ""
+        if self.subgroup_size is not None:
+            subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
+
+        return (
+            "#iree_codegen.compilation_info<\n"
+            f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {self.tile_sizes}>,\n"
+            f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
+            f"  {subgroup_size_str},\n"
+            f"  {{ pipeline_depth = {self.software_pipeline_depth}, store_stage = 1}}>>"
+        )
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -132,6 +192,8 @@ def get_test_shapes(shapes_id: ShapesId):
     # 2. Some shapes are commented out: they used to be tested but have been
     #    disabled to improve the trade-off between test coverage and build
     #    latency.
+    if shapes_id == ShapesId.DEFAULT:
+        return get_test_shapes(ShapesId.SMALL) + get_test_shapes(ShapesId.LARGE)
     if shapes_id == ShapesId.SMALL:
         return [
             # square matrices. Start by the simplest case of 1x1x1.
@@ -163,9 +225,16 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            # some random large sizes
-            TestShape(m=123, k=456, n=789, accumulate=True),
-            TestShape(m=654, k=321, n=234, accumulate=False),
+            # unaligned cases.
+            TestShape(m=457, k=330, n=512, accumulate=False),
+            TestShape(m=438, k=331, n=513, accumulate=False),
+            TestShape(m=540, k=332, n=516, accumulate=False),
+            TestShape(m=1000, k=4, n=512, accumulate=False),
+            TestShape(m=4, k=1000, n=512, accumulate=False),
+            TestShape(m=512, k=1000, n=4, accumulate=False),
+            TestShape(m=513, k=128, n=55, accumulate=False),
+            TestShape(m=7, k=160, n=31, accumulate=False),
+            TestShape(m=512, k=330, n=33, accumulate=False),
             # shapes involving vectors (i.e. most rectangular cases)
             TestShape(m=1, k=1000, n=1000, accumulate=True),  # large vector*matrix
             TestShape(m=1000, k=1000, n=1, accumulate=True),  # large matrix*vector
@@ -176,24 +245,10 @@ def get_test_shapes(shapes_id: ShapesId):
             # running on fewer backends/drivers or with fewer generators
             # (see get_test_generators).
         ]
-    if shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
-        ]
-    if shapes_id == ShapesId.GPU_LARGE:
-        return [
-            # unaligned cases.
-            TestShape(m=457, k=330, n=512, accumulate=False),
-            TestShape(m=457, k=330, n=514, accumulate=False),
-            TestShape(m=438, k=330, n=514, accumulate=False),
-            TestShape(m=540, k=332, n=516, accumulate=False),
-            TestShape(m=1000, k=4, n=512, accumulate=False),
-            TestShape(m=4, k=1000, n=512, accumulate=False),
-            TestShape(m=512, k=1000, n=4, accumulate=False),
-            TestShape(m=512, k=128, n=500, accumulate=False),
-            TestShape(m=457, k=160, n=512, accumulate=False),
-            TestShape(m=512, k=330, n=512, accumulate=False),
         ]
 
     raise ValueError(shapes_id)
@@ -202,7 +257,7 @@ def get_test_shapes(shapes_id: ShapesId):
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.GPU_LARGE or shapes_id == ShapesId.GPU_LARGE_ALIGNED:
+    if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [
             Dynamicity.STATIC,
         ]
@@ -356,14 +411,15 @@ def get_rocm_test_compilation_infos(
         else:
             raise NotImplementedError("unhandled intrinsic case")
 
-        workgroup_tile = [[wg_tile_m, wg_tile_n, wg_tile_k]]
+        workgroup_tile = [wg_tile_m, wg_tile_n, 0]
+        reduction_tile = [0, 0, wg_tile_k]
         workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
         infos.append(
-            CompilationInfo(
-                tile_sizes=workgroup_tile,
+            IREEGPUCompilationInfo(
+                workgroup_tile=workgroup_tile,
+                reduction_tile=reduction_tile,
                 dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
                 workgroup_size=workgroup_size,
-                software_pipeline_depth=0,
                 mma_schedule=schedule,
                 subgroup_size=subgroup_size,
             )
@@ -385,6 +441,7 @@ def get_test_compilation_infos(
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
     software_pipeline_depth = 0
+    tile_workgroup_size_pairs = []
     if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
         tile_workgroup_size_pairs = [
             TileWorkgroupSizePair([[32, 128, 32]], [32, 8, 1]),
@@ -438,12 +495,12 @@ def get_test_compilation_infos(
     compilation_infos = []
     for tile_workgroup_size_pair in tile_workgroup_size_pairs:
         compilation_infos.append(
-            CompilationInfo(
+            LegacyCompilationInfo(
                 tile_sizes=tile_workgroup_size_pair.tile_size,
                 dispatch_lowering_pass_pipeline=compilation_info_id.value,
                 workgroup_size=tile_workgroup_size_pair.workgroup_size,
+                subgroup_size=None,
                 software_pipeline_depth=software_pipeline_depth,
-                mma_schedule=None,
             )
         )
     return compilation_infos
@@ -496,7 +553,7 @@ def cast_argtype_if_required(target_type: MatrixElemTypeId):
 def get_castback_from_arg_op(target_type: MatrixElemTypeId):
     if target_type == MatrixElemTypeId.F8E4M3FNUZ:
         return "arith.truncf"
-    return ValueError(f"Unhandled castback type of {t}")
+    return ValueError(f"Unhandled castback type of {target_type}")
 
 
 # Describes the fully resolved shape dimensions of all 3 input matrices,
@@ -559,13 +616,7 @@ def generate_function_name(
 
     info = ""
     if compilation_info:
-        tile_sizes = list(itertools.chain(*compilation_info.tile_sizes))
-        tile_workgroup_key = (
-            "_".join([str(a) for a in tile_sizes])
-            + "_"
-            + "_".join([str(a) for a in compilation_info.workgroup_size])
-        )
-        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}_{tile_workgroup_key}"
+        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}"
 
     matmul_kind = "matmul_accumulate" if accumulate else "matmul"
     return (
@@ -592,7 +643,7 @@ def generate_function(
     shape: TestShape,
     transpose_rhs: bool,
     dynamicity: Dynamicity,
-    compilation_info: typing.Optional[CompilationInfo] = None,
+    compilation_info: Optional[CompilationInfo] = None,
 ):
     shapes = generate_shapes(shape, transpose_rhs, dynamicity)
     func_name = generate_function_name(
@@ -619,32 +670,7 @@ def generate_function(
     func_definition = ""
     compilation_info_attr = ""
     if compilation_info:
-        requested_pipeline = compilation_info.dispatch_lowering_pass_pipeline
-        compiler_pipeline = requested_pipeline
-        if requested_pipeline == "SPIRVVectorizeMali":
-            compiler_pipeline = "SPIRVBaseVectorize"
-        elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
-            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
-        elif requested_pipeline == "SPIRVVectorizeNVIDIA":
-            # TODO: change to test SPIRVMatmulPromoteVectorize too
-            compiler_pipeline = "SPIRVBaseVectorize"
-
-        mma_schedule = ""
-        if compilation_info.mma_schedule is not None:
-            mma_schedule = ", {}".format(compilation_info.mma_schedule)
-        subgroup_size_str = ""
-        if compilation_info.subgroup_size is not None:
-            subgroup_size_str = f"subgroup_size = {compilation_info.subgroup_size}"
-
-        compilation_info_string = (
-            f"#compilation{generate_function.compilation_index} = "
-            "#iree_codegen.compilation_info<\n"
-            f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()}\n"
-            f"  {subgroup_size_str},\n"
-            f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
-            f"  store_stage = 1{mma_schedule} }}>>\n"
-        )
+        compilation_info_string = f"#compilation{generate_function.compilation_index} = {compilation_info.get_compilation_info_attr()}"
         compilation_info_attr = (
             f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
         )
@@ -896,7 +922,8 @@ def parse_arguments():
         type=str,
         choices=[s.value for s in ShapesId],
         help="Collection of matrix shapes to test",
-        required=True,
+        default="default",
+        required=False,
     )
     parser.add_argument(
         "--transpose_rhs",

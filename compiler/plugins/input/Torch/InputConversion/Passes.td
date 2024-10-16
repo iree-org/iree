@@ -9,6 +9,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def BindSymbolicShapesPass :
+    InterfacePass<"torch-iree-bind-symbolic-shapes", "mlir::FunctionOpInterface"> {
+  let summary = "Process torch dynamic shape bindings into IREE analyzable forms";
+}
+
 def BitCastQuantTensorPass :
     InterfacePass<"torch-iree-bitcast-quant-tensor", "mlir::FunctionOpInterface"> {
   let summary = "Bitcasts i8 packed tensors of sub-byte types to the actual bit width";

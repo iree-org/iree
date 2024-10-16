@@ -405,10 +405,7 @@ enumerateMatmulTileMxNxK(IREE::Encoding::EncodingAttr encoding,
     return {};
   }
   // Enumerate available tile shapes for the given encoding and target.
-  auto elementTypes = llvm::to_vector(
-      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return cast<TypeAttr>(a).getValue();
-      }));
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
   if (isVMVXBackend(target)) {
     return enumerateMatmulTilesVMVX(*cDims, encoding, target);
   }
@@ -472,10 +469,18 @@ getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr) {
-  RewritePatternSet materializeEncodingPattern(funcOp.getContext());
-  MaterializeEncodingTypeConverter typeConverter(materializeEncodingForTarget,
-                                                 targetAttr);
-  MaterializeEncodingConversionTarget target(*funcOp.getContext());
+  MLIRContext *ctx = funcOp.getContext();
+  RewritePatternSet materializeEncodingPattern(ctx);
+  // On CPU, we use transposeNarrowN=true for a combination of reasons:
+  // 1. As linalg.matmul materializes into linalg.mmt4d, which has a transposed
+  //    RHS and therefore LHS<->RHS symmetry, transposeNarrowN is easy to
+  //    implement at that level.
+  // 2. We use ukernels, and this allows writing 2x fewer narrow ukernels.
+  // 3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
+  //    so it is nice that they have fewer narrow cases to consider.
+  MaterializeEncodingTypeConverter typeConverter(
+      materializeEncodingForTarget, targetAttr, /*transposeNarrowN=*/true);
+  MaterializeEncodingConversionTarget target(*ctx);
   auto materializeEncodingValueFn = getMaterializeEncodingValueFn(targetAttr);
   populateMaterializeEncodingIntoPackUnPackPatterns(
       materializeEncodingPattern, typeConverter, materializeEncodingValueFn);
@@ -492,7 +497,8 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
   // Add patterns to fold pack/unpack ops with pad/extract_slice ops and
   // resolve dims ops.
   {
-    RewritePatternSet patterns(funcOp.getContext());
+    RewritePatternSet patterns(ctx);
+    tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -92,6 +93,13 @@ bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// operation.
 bool isReadOnly(Value v);
 
+/// Multiple uses of `tensor.empty()` results in a copy since upstream
+/// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
+/// creating copies/allocations. Since the `empty` op is a proxy for
+/// undef, these could just be duplicated to have a single use. This removes
+/// unnecessary data-hazards.
+LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp);
+
 /// Return the static number of workgroup dispatched if it is known and
 /// constant. If it is not known, it will return ShapedType::kDynamic.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
@@ -99,6 +107,11 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
+
+LogicalResult setDefaultCustomOpLoweringConfig(
+    mlir::FunctionOpInterface FunctionOpInterface,
+    IREE::LinalgExt::CustomOp customOp,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> configFn);
 
 /// Information about a tiled and distributed loop.
 ///
@@ -141,25 +154,11 @@ struct LoopTilingAndDistributionInfo {
   unsigned processorDistributionDim;
 };
 
-/// Assuming that `funcOp` contains a single nested scf.for that represented the
-/// tiled+fused+distributed loops with the distribution being across workgroups,
-/// i.e.
-///
-/// scf.for ... {
-///   ...
-///   scf.for ... {
-///     ...
-///     filtered_op.
-///     ...
-///     filtered_op.
-///     ...
-///   }
-/// }
-///
-/// Returns the list of TilingInterface ops in the functions. If there are no
-/// `scf.for` operations in the function return the TilingInterface operations
-/// in the body of the function if it has a single basic block.
-SmallVector<Operation *> getComputeOps(mlir::FunctionOpInterface funcOp);
+/// Returns the list of TilingInterface ops in the operation obtained by a
+/// post order walk of the operation. This implies that in case of
+/// nested compute ops, the outermost compute ops are towards the end of the
+/// list.
+SmallVector<Operation *> getComputeOps(Operation *containingOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
@@ -183,7 +182,6 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes,
     linalg::DistributionMethod distributionMethod,
     int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
 

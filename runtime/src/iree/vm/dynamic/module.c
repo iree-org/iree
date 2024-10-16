@@ -164,6 +164,14 @@ static void IREE_API_PTR iree_vm_dynamic_module_free_state(
   module->user_module->free_state(module->user_module->self, module_state);
 }
 
+static iree_status_t IREE_API_PTR iree_vm_dynamic_module_fork_state(
+    void* self, iree_vm_module_state_t* parent_state,
+    iree_allocator_t allocator, iree_vm_module_state_t** out_child_state) {
+  iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
+  return iree_status_freeze(module->user_module->fork_state(
+      module->user_module->self, parent_state, allocator, out_child_state));
+}
+
 static iree_status_t IREE_API_PTR iree_vm_dynamic_module_resolve_import(
     void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
     const iree_vm_function_t* function,
@@ -230,6 +238,7 @@ static iree_status_t iree_vm_dynamic_module_create(
       iree_vm_dynamic_module_resolve_source_location;
   module->interface.alloc_state = iree_vm_dynamic_module_alloc_state;
   module->interface.free_state = iree_vm_dynamic_module_free_state;
+  module->interface.fork_state = iree_vm_dynamic_module_fork_state;
   module->interface.resolve_import = iree_vm_dynamic_module_resolve_import;
   module->interface.notify = iree_vm_dynamic_module_notify;
   module->interface.begin_call = iree_vm_dynamic_module_begin_call;

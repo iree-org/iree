@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-canonicalize,iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(canonicalize, util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
+
 util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -201,52 +202,6 @@ util.func public @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B
 
 // -----
 
-util.func public @always_fuse_cast
-  (%lhs : tensor<?x?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
-  -> (tensor<?x?xf32>, tensor<?x?xf32>)
-{
-  %cst = arith.constant 0.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %0 = tensor.cast %lhs : tensor<?x?xf32> to tensor<?x4xf32>
-  %m = tensor.dim %0, %c0 : tensor<?x4xf32>
-  %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
-  %init1 = tensor.empty(%m, %n1) : tensor<?x?xf32>
-  %fill1 = linalg.fill ins(%cst : f32) outs(%init1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul
-    ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
-    outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %n2 = tensor.dim %rhs2, %c1 : tensor<4x?xf32>
-  %init2 = tensor.empty(%m, %n2) : tensor<?x?xf32>
-  %fill2 = linalg.fill ins(%cst : f32) outs(%init2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %2= linalg.matmul
-    ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
-    outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  util.return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
-}
-
-//      CHECK: util.func public @always_fuse_cast(
-// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//      CHECK:   %[[RESHAPE:.*]] = flow.tensor.reshape %[[ARG0]]
-// CHECK-SAME:   tensor<?x?xf32>{%[[M]], %[[C4]]} -> tensor<?x4xf32>{%[[M]]}
-//  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]]]
-// CHECK-SAME:     (%[[RESHAPE]], %[[ARG1]], %[[N1]], %[[M]])
-//      CHECK:     flow.return
-//  CHECK-DAG:   %[[N2:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]]]
-// CHECK-SAME:     (%[[RESHAPE]], %[[ARG2]], %[[N2]], %[[M]])
-//      CHECK:     flow.return
-//      CHECK:   util.return %[[RESULT1]], %[[RESULT2]]
-
-// -----
-
 util.func public @dont_fuse_tensor_update_with_fill(
     %arg0: tensor<?x?xf32>, %arg1: tensor<f32>,
     %arg2: index, %arg3: index, %arg4: index, %arg5: index)
@@ -296,7 +251,7 @@ util.func public @fuse_matmul_with_generic_op(%A: tensor<?x?xf32>, %B: tensor<?x
                     outs(%CC: tensor<?x?xf32>) -> tensor<?x?xf32>
   util.return %D: tensor<?x?xf32>
 }
-// CHECK-LABEL: util.func public @fuse_matmul_with_generic_op
+// CHECK: util.func public @fuse_matmul_with_generic_op
 // linalg.generic is fused inside the dispatch region and becomes dead.
 //   CHECK-NOT: generic
 //     CHECK: flow.dispatch.workgroups
@@ -1022,7 +977,7 @@ util.func public @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : 
       tensor<?x?xf32> to tensor<?x?xf32>
   util.return %0 : tensor<?x?xf32>
 }
-//      CHECK: util.func public @extract_slice
+// CHECK: util.func public @extract_slice
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
@@ -1139,7 +1094,7 @@ util.func public @gemm_unitM_unitN(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf
       outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-LABEL: util.func public @gemm_unitM_unitN(
+// CHECK: util.func public @gemm_unitM_unitN(
 //       CHECK:   flow.dispatch.workgroups(
 //       CHECK:     linalg.matmul
 
@@ -1274,6 +1229,7 @@ util.func public @fill_op_alone(%arg0 : index, %arg1 : index) -> tensor<?x?xf32>
 //      CHECK: util.func public @fill_op_alone(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//      CHECK:   %[[CST:.+]] = arith.constant {{.+}}
 //      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%arg0, %arg1}
 //      CHECK:   util.return %[[SPLAT]]
 

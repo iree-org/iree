@@ -81,7 +81,7 @@ util.func public @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xco
     } -> tensor<4x2xcomplex<f32>>
     flow.return %generic : tensor<4x2xcomplex<f32>>
   }
-  util.return %0 : tensor<4x2xcomplex<f32>>
+  util.return %1 : tensor<4x2xcomplex<f32>>
 }
 
 // CHECK-LABEL: @complex_create
@@ -330,13 +330,13 @@ util.func public @clone_broadcast_dequant_op(
 // -----
 
 // Do no clone index cast operations when they are operands to the dispatch
-util.func public @dont_clone_index_type_op(%arg0 : i64) {
+util.func public @dont_clone_index_type_op(%arg0 : i64) -> tensor<?xf32> {
   %0 = arith.index_cast %arg0 : i64 to index
   %1 = flow.dispatch.region[] -> (tensor<?xf32>{%0}) {
     %2 = tensor.empty(%0) : tensor<?xf32>
     flow.return %2 : tensor<?xf32>
   }
-  util.return
+  util.return %1 : tensor<?xf32>
 }
 // CHECK-LABEL: func public @dont_clone_index_type_op
 //       CHECK:   arith.index_cast
@@ -346,14 +346,14 @@ util.func public @dont_clone_index_type_op(%arg0 : i64) {
 // -----
 // Do no clone index cast operations when they are in-direct operands to the dispatch
 #map = affine_map<()[s0] -> (s0 * 12)>
-util.func public @dont_clone_index_type_op_2(%arg0: i64) {
+util.func public @dont_clone_index_type_op_2(%arg0: i64) -> tensor<?xf32> {
   %0 = arith.index_cast %arg0 : i64 to index
   %1 = affine.apply #map()[%0]
   %2 = flow.dispatch.region -> (tensor<?xf32>{%1}) {
     %3 = tensor.empty(%1) : tensor<?xf32>
     flow.return %3 : tensor<?xf32>
   }
-  util.return
+  util.return %2 : tensor<?xf32>
 }
 // CHECK-LABEL: func public @dont_clone_index_type_op_2
 //       CHECK:   arith.index_cast

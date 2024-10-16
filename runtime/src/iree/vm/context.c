@@ -349,6 +349,77 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_vm_context_fork(
+    const iree_vm_context_t* parent_context, iree_allocator_t allocator,
+    iree_vm_context_t** out_child_context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(parent_context);
+  IREE_ASSERT_ARGUMENT(out_child_context);
+  *out_child_context = NULL;
+
+  // Allocate with the same capacity as the parent context.
+  iree_host_size_t child_context_size =
+      sizeof(iree_vm_context_t) +
+      sizeof(iree_vm_module_t*) * parent_context->list.capacity +
+      sizeof(iree_vm_module_state_t*) * parent_context->list.capacity;
+
+  // Create empty context and copy over the fixed information.
+  iree_vm_context_t* child_context = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, child_context_size,
+                                (void**)&child_context));
+  iree_atomic_ref_count_init(&child_context->ref_count);
+  child_context->instance = parent_context->instance;
+  iree_vm_instance_retain(child_context->instance);
+  child_context->allocator = allocator;
+
+  // Forked contexts get their own unique ID.
+  child_context->context_id = iree_vm_context_allocate_id();
+
+  // TODO(benvanik): allow for non-frozen but static contexts.
+  child_context->is_frozen = parent_context->list.count > 0;
+  child_context->is_static = parent_context->list.count > 0;
+  child_context->flags = parent_context->flags;
+
+  uint8_t* p = (uint8_t*)child_context + sizeof(iree_vm_context_t);
+  child_context->list.modules = (iree_vm_module_t**)p;
+  p += sizeof(iree_vm_module_t*) * parent_context->list.capacity;
+  child_context->list.module_states = (iree_vm_module_state_t**)p;
+  p += sizeof(iree_vm_module_state_t*) * parent_context->list.capacity;
+  child_context->list.count = parent_context->list.count;
+  child_context->list.capacity = parent_context->list.capacity;
+
+  // Copy over modules; these will be the same as the parent.
+  for (iree_host_size_t i = 0; i < parent_context->list.count; ++i) {
+    iree_vm_module_t* module = parent_context->list.modules[i];
+    child_context->list.modules[i] = module;
+    iree_vm_module_retain(module);
+  }
+
+  // Fork module state. This will fail if any module does not support forking.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < parent_context->list.count; ++i) {
+    iree_vm_module_t* module = parent_context->list.modules[i];
+    status =
+        module->fork_state(module, parent_context->list.module_states[i],
+                           allocator, &child_context->list.module_states[i]);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  // Notify all modules the fork took place. They may reinitialize state.
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_context_notify(child_context, IREE_VM_SIGNAL_FORK);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_child_context = child_context;
+  } else {
+    iree_vm_context_destroy(child_context);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static void iree_vm_context_destroy(iree_vm_context_t* context) {
   if (!context) return;
 
@@ -717,6 +788,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
   switch (signal) {
     default:
     case IREE_VM_SIGNAL_RESUME:
+    case IREE_VM_SIGNAL_FORK:
       status = iree_vm_context_notify_forward(stack, context, signal);
       break;
     case IREE_VM_SIGNAL_SUSPEND:

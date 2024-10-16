@@ -223,9 +223,6 @@ def IREEGPU_DataTiledMMAAttr :
     AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
-    // TODO: Implement the interface method. The current implementation just
-    // returns {VectorType(), VectorType(), VectorType()} now because the dummy
-    // implementation is required by the MmaInterfaceAttr.
     "getABCVectorTypes",
     "getMNKShape",
     "getSubgroupSize",

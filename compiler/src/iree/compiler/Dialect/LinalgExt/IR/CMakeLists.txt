@@ -23,6 +23,7 @@ iree_cc_library(
     "LinalgExtOps.h.inc"
     "LinalgExtTypes.h.inc"
   SRCS
+    "AggregatedOpInterfaceImpl.cpp"
     "LinalgExtAttrs.cpp.inc"
     "LinalgExtDialect.cpp"
     "LinalgExtDialect.cpp.inc"
@@ -31,6 +32,7 @@ iree_cc_library(
     "LinalgExtOps.cpp"
     "LinalgExtOps.cpp.inc"
     "LinalgExtTypes.cpp.inc"
+    "TilingInterfaceImpl.cpp"
   DEPS
     ::LinalgExtInterfacesIncGen
     ::LinalgExtOpsIncGen

@@ -485,3 +485,37 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[RELU]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @multi_result(%arg0: tensor<64x128xf32>, %arg1: tensor<128x256xf32>, %arg2: tensor<256xf32>) -> (tensor<64x256xf32>, tensor<64x256xf32>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<64x256xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64x256xf32>) -> tensor<64x256xf32>
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<64x128xf32>, tensor<128x256xf32>) outs(%1 : tensor<64x256xf32>) -> tensor<64x256xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%2, %arg2 : tensor<64x256xf32>, tensor<256xf32>)
+      outs(%0 : tensor<64x256xf32>)
+      attrs = {lowering_config =
+        #iree_codegen.lowering_config<tile_sizes = [[16, 64, 0]]>} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %4 = arith.addf %in, %in_0 : f32
+    linalg.yield %4 : f32
+  } -> tensor<64x256xf32>
+  return %2, %3 : tensor<64x256xf32>, tensor<64x256xf32>
+}
+
+// CHECK-LABEL: func @multi_result(
+//       CHECK:   %[[RESULT:.+]]:2 = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] = {{.*}}, %[[OUTS:.+]] = {{.*}})
+//       CHECK:      linalg.matmul
+//       CHECK:      linalg.generic
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice
+//       CHECK:       tensor.parallel_insert_slice
+//       CHECK:  return %[[RESULT]]#1, %[[RESULT]]#0

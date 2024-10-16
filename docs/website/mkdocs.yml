@@ -80,6 +80,7 @@ extra_css:
 exclude_docs: |
   *.gz
   assets/images/README.md
+  **/snippets/*.md
 
 copyright: Copyright &copy; 2024 The IREE Authors
 
