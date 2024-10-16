@@ -797,8 +797,8 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
-          tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
-          tensor::ExtractSliceOp, complex::CreateOp>(op)) {
+          tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
+          complex::CreateOp>(op)) {
     return true;
   }
   if (LinalgExt::isBitExtendOp(op)) {
