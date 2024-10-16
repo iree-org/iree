@@ -452,6 +452,7 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
   return success();
 }
 
+// Remove flow.tensor.transfer ops.
 struct StripFlowTensorTransferPattern
     : public OpRewritePattern<IREE::Flow::TensorTransferOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -464,34 +465,46 @@ struct StripFlowTensorTransferPattern
   }
 };
 
-// If an op that implements AffinityOpInterface has an stream affinity
-// attribute, remove it.
-struct StripStreamAffinityAttributePattern
-    : public OpInterfaceRewritePattern<IREE::Stream::AffinityOpInterface> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Stream::AffinityOpInterface op,
-                                PatternRewriter &rewriter) const override {
-    if (op.getAffinityAttr() == nullptr) {
-      return failure();
-    }
-    op.setAffinityAttr(nullptr);
-    return success();
-  }
-};
+void stripStreamAffinityAttributes(IREE::Util::FuncOp funcOp) {
+  // Removes only from dictionaries (includes op's named attributes).
+  // We are not removing affinity attributes form an ArrayAttr as it is not
+  // clear if this would not silently change the semantics of an operation.
+  AttrTypeReplacer replacer;
+  SmallVector<NamedAttribute> namedAttrs;
+  replacer.addReplacement(
+      [&](Attribute originalAttr) -> std::optional<Attribute> {
+        if (auto dictAttr = dyn_cast<DictionaryAttr>(originalAttr)) {
+          namedAttrs.clear();
+          for (auto &namedAttr : dictAttr) {
+            if (!isa<IREE::Stream::AffinityAttr>(namedAttr.getValue())) {
+              namedAttrs.push_back(namedAttr);
+            }
+          }
+          if (namedAttrs.size() == dictAttr.size()) {
+            // Nothing to do, no affinity attributes in this dict.
+            return std::nullopt;
+          } else {
+            return DictionaryAttr::getWithSorted(dictAttr.getContext(),
+                                                 namedAttrs);
+          }
+        }
+        return std::nullopt;
+      });
+  replacer.recursivelyReplaceElementsIn(funcOp);
+}
 
 // Remove device/queue affinities for the IR.
 // E.g. remove `flow.tensor.transfer` ops.
 static LogicalResult
 stripExecutionContextAffinities(IREE::Util::FuncOp funcOp) {
   RewritePatternSet patterns(funcOp->getContext());
-  patterns
-      .add<StripFlowTensorTransferPattern, StripStreamAffinityAttributePattern>(
-          funcOp.getContext());
+  patterns.add<StripFlowTensorTransferPattern>(funcOp.getContext());
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return emitError(funcOp->getLoc())
            << "Stripping execution context affinities failed";
   }
+
+  stripStreamAffinityAttributes(funcOp);
   return success();
 }
 
@@ -540,10 +553,6 @@ public:
     initializerOp.getBody().cloneInto(&funcOp.getBody(), unusedMapping);
     if (failed(transformToJitFunction(funcOp))) {
       funcOp.erase();
-      return failure();
-    }
-
-    if (failed(stripExecutionContextAffinities(funcOp))) {
       return failure();
     }
 
@@ -649,6 +658,10 @@ private:
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
     termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
+
+    if (failed(stripExecutionContextAffinities(funcOp))) {
+      return failure();
+    }
 
     jitFunctions.push_back(std::move(desc));
     return success();

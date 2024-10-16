@@ -462,9 +462,9 @@ module @strip_flow_tensor_transfer {
 
 // -----
 
-// CHECK-LABEL: @strip_optional_stream_affinity_attribute
+// CHECK-LABEL: @strip_stream_affinity_attribute
 // CHECK: util.global private @[[EVALED:.+]] = dense<1> : tensor<2xi32>
-module @strip_optional_stream_affinity_attribute {
+module @strip_stream_affinity_attribute {
   util.global private @hoisted : tensor<2xi32>
   // CHECK-NOT: util.initializer
   util.initializer {
