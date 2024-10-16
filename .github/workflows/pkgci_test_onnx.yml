@@ -129,7 +129,7 @@ jobs:
       matrix:
         include:
           # CPU
-          - name: cpu_llvm_sync
+          - name: cpu_llvm_task
             runs-on: ubuntu-20.04
 
           # TODO(scotttodd): test other backends (parameterize the test suite)
