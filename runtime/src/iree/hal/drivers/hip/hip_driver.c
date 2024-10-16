@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/hip/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_device.h"
+#include "iree/hal/drivers/hip/hip_device_group_device.h"
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
@@ -382,15 +383,24 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   return status;
 }
 
-static iree_status_t iree_hal_hip_driver_create_device_by_uuid(
-    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
-    const hipUUID* device_uuid, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+static iree_status_t iree_hal_hip_driver_get_device_id_by_uuid(
+    iree_hal_driver_t* base_driver, iree_string_view_t device_path,
+    iree_hal_device_id_t* out_id) {
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
-
   // Ensure HIP is initialized before querying it.
-  IREE_RETURN_IF_ERROR(iree_hal_hip_init(driver));
+  if (!iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Device path is not a UUID");
+  }
+  // UUID as returned by hipDeviceGetUuid.
+  hipUUID device_uuid;
+  if (!iree_string_view_parse_hex_bytes(device_path,
+                                        IREE_ARRAYSIZE(device_uuid.bytes),
+                                        (uint8_t*)device_uuid.bytes)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid GPU UUID: '%.*s'", (int)device_path.size,
+                            device_path.data);
+  }
 
   // HIP doesn't have an API to do this so we need to scan all devices to
   // find the one with the matching UUID.
@@ -407,12 +417,13 @@ static iree_status_t iree_hal_hip_driver_create_device_by_uuid(
     IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                              hipDeviceGetUuid(&query_uuid, device),
                              "hipDeviceGetUuid");
-    if (memcmp(&device_uuid->bytes[0], &query_uuid.bytes[0],
+    if (memcmp(&device_uuid.bytes[0], &query_uuid.bytes[0],
                sizeof(device_uuid)) == 0) {
       found_device = true;
       break;
     }
   }
+
   if (!found_device) {
     return iree_make_status(
         IREE_STATUS_NOT_FOUND,
@@ -423,32 +434,29 @@ static iree_status_t iree_hal_hip_driver_create_device_by_uuid(
         "%02x%02x-"
         "%02x%02x%02x%02x%02x%02x"
         " not found",
-        (uint8_t)device_uuid->bytes[0], (uint8_t)device_uuid->bytes[1],
-        (uint8_t)device_uuid->bytes[2], (uint8_t)device_uuid->bytes[3],
-        (uint8_t)device_uuid->bytes[4], (uint8_t)device_uuid->bytes[5],
-        (uint8_t)device_uuid->bytes[6], (uint8_t)device_uuid->bytes[7],
-        (uint8_t)device_uuid->bytes[8], (uint8_t)device_uuid->bytes[9],
-        (uint8_t)device_uuid->bytes[10], (uint8_t)device_uuid->bytes[11],
-        (uint8_t)device_uuid->bytes[12], (uint8_t)device_uuid->bytes[13],
-        (uint8_t)device_uuid->bytes[14], (uint8_t)device_uuid->bytes[15]);
+        (uint8_t)device_uuid.bytes[0], (uint8_t)device_uuid.bytes[1],
+        (uint8_t)device_uuid.bytes[2], (uint8_t)device_uuid.bytes[3],
+        (uint8_t)device_uuid.bytes[4], (uint8_t)device_uuid.bytes[5],
+        (uint8_t)device_uuid.bytes[6], (uint8_t)device_uuid.bytes[7],
+        (uint8_t)device_uuid.bytes[8], (uint8_t)device_uuid.bytes[9],
+        (uint8_t)device_uuid.bytes[10], (uint8_t)device_uuid.bytes[11],
+        (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
+        (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
   }
-
-  iree_status_t status = iree_hal_hip_driver_create_device_by_id(
-      base_driver, IREE_HIPDEVICE_TO_DEVICE_ID(device), param_count, params,
-      host_allocator, out_device);
-
-  return status;
+  *out_id = IREE_HIPDEVICE_TO_DEVICE_ID(device);
+  return iree_ok_status();
 }
 
-static iree_status_t iree_hal_hip_driver_create_device_by_index(
-    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
-    int device_index, iree_host_size_t param_count,
-    const iree_string_pair_t* params, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+static iree_status_t iree_hal_hip_driver_get_device_id_by_index(
+    iree_hal_driver_t* base_driver, iree_string_view_t device_path,
+    iree_hal_device_id_t* out_id) {
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
 
-  // Ensure HIP is initialized before querying it.
-  IREE_RETURN_IF_ERROR(iree_hal_hip_init(driver));
+  int32_t device_index;
+  if (!iree_string_view_atoi_int32(device_path, &device_index)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Device path is not an index");
+  }
 
   // Query the number of available HIP devices.
   int device_count = 0;
@@ -465,10 +473,121 @@ static iree_status_t iree_hal_hip_driver_create_device_by_index(
   IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                            hipDeviceGet(&device, device_index), "hipDeviceGet");
 
-  iree_status_t status = iree_hal_hip_driver_create_device_by_id(
-      base_driver, IREE_HIPDEVICE_TO_DEVICE_ID(device), param_count, params,
-      host_allocator, out_device);
+  *out_id = IREE_HIPDEVICE_TO_DEVICE_ID(device);
+  return iree_ok_status();
+}
 
+static iree_status_t iree_hal_hip_driver_get_device_id_by_path(
+    iree_hal_driver_t* base_driver, iree_string_view_t device_path,
+    iree_hal_device_id_t* out_id) {
+  iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
+  IREE_RETURN_IF_ERROR(iree_hal_hip_init(driver));
+
+  iree_hal_device_id_t device_id = 0;
+  iree_status_t status = iree_hal_hip_driver_get_device_id_by_uuid(
+      base_driver, device_path, &device_id);
+  if (iree_status_is_ok(status)) {
+    *out_id = device_id;
+    return iree_ok_status();
+  }
+  if (!iree_status_is_invalid_argument(status)) {
+    return status;
+  }
+  status = iree_hal_hip_driver_get_device_id_by_index(base_driver, device_path,
+                                                      &device_id);
+  if (iree_status_is_ok(status)) {
+    *out_id = device_id;
+    return iree_ok_status();
+  }
+  if (!iree_status_is_invalid_argument(status)) {
+    return status;
+  }
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
+}
+
+static iree_status_t iree_hal_hip_driver_create_device_group_device_by_ids(
+    iree_hal_driver_t* base_driver, iree_hal_device_id_t* device_ids,
+    iree_host_size_t device_count, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(out_device);
+
+  iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Ensure HIP is initialized before querying it.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_hip_init(driver));
+
+  hipDevice_t* devices;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, sizeof(*devices) * device_count, (void**)&devices));
+
+  for (iree_host_size_t i = 0; i < device_count; ++i) {
+    if (device_ids[i] == IREE_HAL_DEVICE_ID_DEFAULT) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Invalid to create a device group with the default device id");
+    } else {
+      devices[i] = IREE_DEVICE_ID_TO_HIPDEVICE(device_ids[i]);
+    }
+  }
+
+  iree_string_view_t device_name = iree_make_cstring_view("hip");
+
+  // Attempt to create the device now.
+  iree_status_t status = iree_hal_hip_device_group_device_create(
+      base_driver, device_name, &driver->device_params, &driver->hip_symbols,
+      &driver->nccl_symbols, device_count, devices, host_allocator, out_device);
+  iree_allocator_free(host_allocator, devices);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_hip_driver_create_device_group_device_by_path(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    iree_string_view_t device_path, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(base_driver);
+  IREE_ASSERT_ARGUMENT(out_device);
+
+  uint64_t device_group_count = 0;
+  for (iree_host_size_t offs = 0; offs < device_path.size;) {
+    iree_host_size_t comma_pos =
+        iree_string_view_find_char(device_path, ',', offs);
+    if (comma_pos == IREE_STRING_VIEW_NPOS) {
+      comma_pos = device_path.size;
+    }
+    offs = comma_pos + 1;
+    device_group_count++;
+  }
+
+  iree_hal_device_id_t* device_ids;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, sizeof(*device_ids) * device_group_count,
+      (void**)&device_ids));
+
+  iree_host_size_t idx = 0;
+  for (iree_host_size_t offs = 0; offs < device_path.size;) {
+    iree_host_size_t comma_pos =
+        iree_string_view_find_char(device_path, ',', offs);
+    if (comma_pos == IREE_STRING_VIEW_NPOS) {
+      comma_pos = device_path.size;
+    }
+    iree_string_view_t this_device_path =
+        iree_string_view_substr(device_path, offs, comma_pos - offs);
+    IREE_RETURN_IF_ERROR(iree_hal_hip_driver_get_device_id_by_path(
+        base_driver, this_device_path, &device_ids[idx]));
+    offs = comma_pos + 1;
+    idx++;
+  }
+
+  iree_status_t status = iree_hal_hip_driver_create_device_group_device_by_ids(
+      base_driver, device_ids, idx, param_count, params, host_allocator,
+      out_device);
+  iree_allocator_free(host_allocator, device_ids);
   return status;
 }
 
@@ -486,30 +605,18 @@ static iree_status_t iree_hal_hip_driver_create_device_by_path(
         host_allocator, out_device);
   }
 
-  if (iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
-    // UUID as returned by hipDeviceGetUuid.
-    hipUUID device_uuid;
-    if (!iree_string_view_parse_hex_bytes(device_path,
-                                          IREE_ARRAYSIZE(device_uuid.bytes),
-                                          (uint8_t*)device_uuid.bytes)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "invalid GPU UUID: '%.*s'", (int)device_path.size,
-                              device_path.data);
-    }
-    return iree_hal_hip_driver_create_device_by_uuid(
-        base_driver, driver_name, &device_uuid, param_count, params,
+  if (iree_string_view_find_char(device_path, ',', 0) !=
+      IREE_STRING_VIEW_NPOS) {
+    return iree_hal_hip_driver_create_device_group_device_by_path(
+        base_driver, driver_name, device_path, param_count, params,
         host_allocator, out_device);
   }
 
-  // Try to parse as a device index.
-  int device_index = 0;
-  if (iree_string_view_atoi_int32(device_path, &device_index)) {
-    return iree_hal_hip_driver_create_device_by_index(
-        base_driver, driver_name, device_index, param_count, params,
-        host_allocator, out_device);
-  }
-
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
+  iree_hal_device_id_t id;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_driver_get_device_id_by_path(base_driver, device_path, &id));
+  return iree_hal_hip_driver_create_device_by_id(
+      base_driver, id, param_count, params, host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_hip_driver_vtable = {

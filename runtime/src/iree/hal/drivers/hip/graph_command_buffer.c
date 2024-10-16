@@ -740,7 +740,8 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
   const iree_hal_hip_kernel_params_t* kernel_params = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_native_executable_lookup_kernel_params(
-              executable, entry_point, &kernel_params));
+              executable, entry_point, command_buffer->base.queue_affinity,
+              &kernel_params));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE,

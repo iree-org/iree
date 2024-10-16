@@ -34,12 +34,15 @@ iree_cc_library(
     "hip_device.c"
     "hip_device.h"
     "hip_driver.c"
+    "hip_device_group_device.h"
+    "hip_device_group_device.c"
     "memory_pools.c"
     "memory_pools.h"
     "native_executable.c"
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "per_device_information.h"
     "rccl_channel.c"
     "rccl_channel.h"
     "stream_command_buffer.c"
@@ -67,6 +70,7 @@ iree_cc_library(
     iree::hal::utils::deferred_work_queue
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
+    iree::hal::utils::device_group_command_buffer
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing

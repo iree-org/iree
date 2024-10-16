@@ -35,13 +35,6 @@ iree_status_t iree_hal_hip_device_create_stream_command_buffer(
     iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer);
 
-// Returns the HIP context bound to the given |device| if it is a HIP device
-// and otherwise returns NULL.
-//
-// WARNING: this API is unsafe and unstable. HAL devices may have any number of
-// contexts and the context may be in use on other threads.
-hipCtx_t iree_hal_hip_device_context(iree_hal_device_t* device);
-
 // Returns the dynamic symbol table from the |device| if it is a HIP device
 // and otherwise returns NULL.
 //

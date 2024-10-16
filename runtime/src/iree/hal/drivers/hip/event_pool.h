@@ -54,7 +54,7 @@ typedef struct iree_hal_hip_event_pool_t iree_hal_hip_event_pool_t;
 iree_status_t iree_hal_hip_event_pool_allocate(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
-    iree_hal_hip_event_pool_t** out_event_pool);
+    hipCtx_t device_context, iree_hal_hip_event_pool_t** out_event_pool);
 
 // Retains the given |event_pool| by increasing its reference count.
 void iree_hal_hip_event_pool_retain(iree_hal_hip_event_pool_t* event_pool);
