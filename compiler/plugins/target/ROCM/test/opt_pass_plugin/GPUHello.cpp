@@ -26,8 +26,8 @@ struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
   }
 
   bool runOnModule(llvm::Module &module);
-  // `isRequired` being set to true keeps this pass from being skipped
-  // if it has the optnone LLVM attribute
+  // We set `isRequired` to true to keep this pass from being skipped
+  // if it has the optnone LLVM attribute.
   static bool isRequired() { return true; }
 };
 

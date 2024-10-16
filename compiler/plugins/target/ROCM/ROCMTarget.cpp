@@ -61,7 +61,10 @@ struct ROCmOptions {
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
-  // Optional pass plugins
+
+  /// List of LLVM opt pass pluggins to be loaded during GPU code
+  /// generation. The pluggins are paths to dynamic libraries that
+  /// are added to the LLVM pass manager.
   SmallVector<std::string> passPlugins;
 
   void bindOptions(OptionsBinder &binder) {
@@ -99,7 +102,7 @@ struct ROCmOptions {
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
     binder.list<std::string>(
-        "iree-hip-pass-plugin-paths", passPlugins,
+        "iree-hip-pass-plugin-path", passPlugins,
         cl::desc("LLVM pass plugins are out of tree libraries that implement "
                  "LLVM opt passes. The library paths passed in this flag are "
                  "to be passed to the target backend compiler during HIP "
