@@ -271,6 +271,9 @@ static std::optional<SmallVector<Value>> fuseAttentionWithReshapeByExpansion(
       output, rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps),
       maskOperand);
 
+  rewriter.inlineRegionBefore(attentionOp.getRegion(), fusedOp.getRegion(),
+                              fusedOp.getRegion().begin());
+
   // Reshape the result values to their original shape if this is a collapsing
   // reshape folded into its consumer.
   SmallVector<Value> resultVals;
