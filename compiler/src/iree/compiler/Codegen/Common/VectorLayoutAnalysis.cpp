@@ -734,12 +734,21 @@ static void enforceLayoutToBroadcastOp(
 
   auto resultShape = broadcast.getResultVectorType().getShape();
   auto inputType = broadcast.getSourceType();
+<<<<<<< HEAD
 
   VectorType inputVectorType = dyn_cast<VectorType>(inputType);
   if (!inputVectorType)
     return;
 
   auto inputShape = inputVectorType.getShape();
+=======
+  if (!isa<VectorType>(inputType)) {
+    return;
+  }
+  assert(isa<VectorType>(inputType) &&
+         "Scalar broadcast not supported for now.");
+  auto inputShape = cast<VectorType>(inputType).getShape();
+>>>>>>> 95676d97fe ([VectorDistribution] Patch 2: addlayout analysis and corresponding support for the case when the reduction is inside scf.for operation)
 
   SmallVector<bool> reductionMask(resultShape.size(), false);
   // Set the trailing dimensions to be reduced.
@@ -1005,7 +1014,11 @@ void EnforceLayout::visitOperation(Operation *op) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOpOperands());
 
+<<<<<<< HEAD
     // Handle the propagation from scf.for to yield op.
+=======
+    // Handle the propation from scf.for to yield op
+>>>>>>> 95676d97fe ([VectorDistribution] Patch 2: addlayout analysis and corresponding support for the case when the reduction is inside scf.for operation)
     visitRegionBranchTerminatorOpInterface(branch, RegionBranchPoint::parent());
     return;
   }
@@ -1113,15 +1126,29 @@ void EnforceLayout::visitRegionBranchTerminatorOpInterface(
     resultLattices.push_back(resultLattice);
   }
 
+<<<<<<< HEAD
+=======
+  // Result lattice not has a layout yet.
+  if (resultLattices.empty())
+    return;
+
+>>>>>>> 95676d97fe ([VectorDistribution] Patch 2: addlayout analysis and corresponding support for the case when the reduction is inside scf.for operation)
   // We do not support multiple results yet.
   if (resultLattices.size() != 1)
     return;
 
   for (RegionSuccessor successor : successors) {
+<<<<<<< HEAD
     if (Region *succ = successor.getSuccessor()) {
       Operation *terminator = succ->back().getTerminator();
       if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
         for (Value operand : yieldOp.getOperands()) {
+=======
+    if (auto succ = successor.getSuccessor()) {
+      Operation *terminator = succ->back().getTerminator();
+      if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        for (Value operand : yieldOp->getOperands()) {
+>>>>>>> 95676d97fe ([VectorDistribution] Patch 2: addlayout analysis and corresponding support for the case when the reduction is inside scf.for operation)
           if (!isa<VectorType>(operand.getType())) {
             continue;
           }

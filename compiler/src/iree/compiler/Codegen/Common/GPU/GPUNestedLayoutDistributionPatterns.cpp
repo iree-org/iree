@@ -419,29 +419,6 @@ struct DistributeMultiReduction final
     Value res = multiReduceOp.getResult();
     auto accVector = dyn_cast<VectorValue>(acc);
     auto resVector = dyn_cast<VectorValue>(res);
-<<<<<<< HEAD
-=======
-    Type accType = acc.getType();
-    Type resType = res.getType();
-    Type accElemTy;
-    if (accVector) {
-      accElemTy = accVector.getType().getElementType();
-    } else {
-      accElemTy = accType;
-    }
-
-    Type resElemTy;
-    if (resVector) {
-      resElemTy = resVector.getType().getElementType();
-    } else {
-      resElemTy = resType;
-    }
-
-    if (!accElemTy.isIntOrFloat() || !resElemTy.isIntOrFloat()) {
-      return rewriter.notifyMatchFailure(multiReduceOp,
-                                         "unsupported reduction type");
-    }
->>>>>>> 96f88f0bf3 (PATCH 1: add scalar support for distributing multi-dim reduction)
 
     auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
@@ -464,10 +441,7 @@ struct DistributeMultiReduction final
     if (accVector) {
       disAcc = getDistributed(rewriter, accVector, signature[accVector]);
     } else {
-<<<<<<< HEAD
       // Scalars are always distributed to all threads already.
-=======
->>>>>>> 96f88f0bf3 (PATCH 1: add scalar support for distributing multi-dim reduction)
       disAcc = multiReduceOp.getAcc();
     }
 
@@ -495,12 +469,8 @@ struct DistributeMultiReduction final
     if (accVector) {
       locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
     } else {
-<<<<<<< HEAD
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
-=======
-      VectorType vecType = VectorType::get(SmallVector<int64_t>{1}, elemTy);
->>>>>>> 96f88f0bf3 (PATCH 1: add scalar support for distributing multi-dim reduction)
       locallyReduced = rewriter.create<vector::BroadcastOp>(
           loc, vecType, localReduction.getResult());
     }
@@ -528,12 +498,9 @@ struct DistributeMultiReduction final
         loc, shaped, threadReduced.value());
 
     if (!accVector) {
-<<<<<<< HEAD
       // Broadcast the scalar (e.g., f32) to a vector type (e.g., vector<f32>)
       // because the following implementation requires the operand to be a
       // vector.
-=======
->>>>>>> 96f88f0bf3 (PATCH 1: add scalar support for distributing multi-dim reduction)
       disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
     }
 
@@ -548,11 +515,7 @@ struct DistributeMultiReduction final
       replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
     } else {
       Value accReducedVal = rewriter.create<vector::ExtractOp>(
-<<<<<<< HEAD
           loc, accReduction, ArrayRef{int64_t(0)});
-=======
-          loc, accReduction, SmallVector<int64_t>{0});
->>>>>>> 96f88f0bf3 (PATCH 1: add scalar support for distributing multi-dim reduction)
       replaceOpWithDistributedValues(rewriter, multiReduceOp, accReducedVal);
     }
 
