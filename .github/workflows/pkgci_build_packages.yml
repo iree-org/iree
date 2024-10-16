@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
     env:
       CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
-      MANYLINUX_DOCKER_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399
+      MANYLINUX_DOCKER_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4
       PACKAGE_SUFFIX: ""
     steps:
       - name: Prefetch Docker
@@ -85,7 +85,7 @@ jobs:
 #     fail-fast: false
 #   env:
 #     CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
-#     MANYLINUX_DOCKER_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399
+#     MANYLINUX_DOCKER_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4
 #     PACKAGE_SUFFIX: "-asserts"
 #   steps:
 #     - name: Prefetch Docker

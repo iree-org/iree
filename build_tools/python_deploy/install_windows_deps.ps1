@@ -7,19 +7,26 @@
 # Installs dependencies on Windows necessary to build IREE Python wheels.
 
 $PYTHON_VERSIONS = @(
+  "3.13" #,
+  "3.12" #,
   "3.11" #,
   # "3.10",
   # "3.9"
 )
 
 $PYTHON_VERSIONS_NO_DOT = @(
+  "313" #,
+  "312" #,
   "311" #,
   # "310",
   # "39"
 )
 
+# These can be discovered at https://www.python.org/downloads/windows/
 $PYTHON_INSTALLER_URLS = @(
-  "https://www.python.org/ftp/python/3.11.2/python-3.11.2-amd64.exe" #,
+  "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe" #,
+  "https://www.python.org/ftp/python/3.12.6/python-3.12.6-amd64.exe" #,
+  "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" #,
   # "https://www.python.org/ftp/python/3.10.5/python-3.10.5-amd64.exe",
   # "https://www.python.org/ftp/python/3.9.13/python-3.9.13-amd64.exe"
 )

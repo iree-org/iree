@@ -98,7 +98,7 @@ jobs:
 
     env:
       # These are also set in: build_tools/python_deploy/build_linux_packages.sh
-      MANYLINUX_X86_64_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:facedb71df670016e74e646d71e869e6fff70d4cdbaa6634d4d0a10d6e174399
+      MANYLINUX_X86_64_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4
       MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
@@ -119,6 +119,9 @@ jobs:
       - name: "Configure MSVC (Windows)"
         if: "matrix.build-family == 'windows'"
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Install dependencies (macOS)
+        if: "matrix.build-family == 'macos'"
+        run: sudo ./c/build_tools/python_deploy/install_macos_deps.sh
 
       ##########################################################################
       # Write version_info.json
@@ -206,7 +209,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12"
+          override_python_versions: "3.11 3.12 3.13"
         run: |
           [ -e ./bindist/* ] && rm ./bindist/*
           ./c/build_tools/python_deploy/build_macos_packages.sh
@@ -218,7 +221,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12"
+          override_python_versions: "3.11 3.12 3.13"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force
@@ -248,7 +251,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12"
+          override_python_versions: "3.11 3.12 3.13"
         run: |
           [ -e ./bindist/* ] && rm ./bindist/*
           ./c/build_tools/python_deploy/build_macos_packages.sh
@@ -260,7 +263,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
-          override_python_versions: "3.11 3.12"
+          override_python_versions: "3.11 3.12 3.13"
         run: |
           if (Test-Path -Path "${{ github.workspace }}/bindist") {
             Remove-Item -Path "${{ github.workspace }}/bindist" -Recurse -Force

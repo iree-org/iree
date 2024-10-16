@@ -18,10 +18,13 @@ if [[ "$(whoami)" != "root" ]]; then
   exit 1
 fi
 
+# These can be discovered at https://www.python.org/downloads/macos/
 PYTHON_SPECS=(
-  3.11@https://www.python.org/ftp/python/3.11.2/python-3.11.2-macos11.pkg
-  3.10@https://www.python.org/ftp/python/3.10.5/python-3.10.5-macos11.pkg
-  3.9@https://www.python.org/ftp/python/3.9.13/python-3.9.13-macos11.pkg
+  3.13@https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg
+  3.12@https://www.python.org/ftp/python/3.12.6/python-3.12.6-macos11.pkg
+  3.11@https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg
+  # 3.10@https://www.python.org/ftp/python/3.10.5/python-3.10.5-macos11.pkg
+  # 3.9@https://www.python.org/ftp/python/3.9.13/python-3.9.13-macos11.pkg
 )
 
 for python_spec in "${PYTHON_SPECS[@]}"; do
