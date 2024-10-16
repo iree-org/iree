@@ -76,7 +76,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:Dialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFDialect",
