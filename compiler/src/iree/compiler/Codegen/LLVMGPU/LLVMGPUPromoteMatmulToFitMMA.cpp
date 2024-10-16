@@ -58,7 +58,7 @@ public:
             .setPaddingDimensions(paddingDims)
             .setPaddingValues(paddingValueAttributes)
             .setPadToMultipleOf(padToMultipleOf)
-            .setPackPaddings(nofoldFlags)
+            .setNofoldFlags(nofoldFlags)
             .setCopyBackOp(linalg::LinalgPaddingOptions::CopyBackOp::None);
 
     FailureOr<linalg::LinalgOp> result =
