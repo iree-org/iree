@@ -74,7 +74,6 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFunctionInterfaces
     MLIRIR
-    MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
