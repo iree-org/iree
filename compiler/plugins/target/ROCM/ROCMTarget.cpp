@@ -33,6 +33,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -60,6 +61,11 @@ struct ROCmOptions {
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
+
+  /// List of LLVM opt pass pluggins to be loaded during GPU code
+  /// generation. The pluggins are paths to dynamic libraries that
+  /// are added to the LLVM pass manager.
+  SmallVector<std::string> passPlugins;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -95,6 +101,13 @@ struct ROCmOptions {
     binder.opt<bool>("iree-hip-legacy-sync", legacySync, cl::cat(category),
                      cl::desc("Enables 'legacy-sync' mode, which is required "
                               "for inline execution."));
+    binder.list<std::string>(
+        "iree-hip-pass-plugin-path", passPlugins,
+        cl::desc("LLVM pass plugins are out of tree libraries that implement "
+                 "LLVM opt passes. The library paths passed in this flag are "
+                 "to be passed to the target backend compiler during HIP "
+                 "executable serialization"),
+        cl::ZeroOrMore, cl::cat(category));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -272,7 +285,8 @@ public:
   // ones). Inspired by code section in
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
-                             llvm::TargetMachine &targetMachine) {
+                             llvm::TargetMachine &targetMachine,
+                             ArrayRef<std::string> passPlugins) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -295,6 +309,18 @@ public:
     pb.registerFunctionAnalyses(fam);
     pb.registerLoopAnalyses(lam);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
+
+    for (const std::string &pluginFileName : passPlugins) {
+      llvm::Expected<llvm::PassPlugin> pp =
+          llvm::PassPlugin::Load(pluginFileName);
+      if (pp) {
+        pp->registerPassBuilderCallbacks(pb);
+      } else {
+        std::string error = "unable to load plugin " + pluginFileName + ": " +
+                            llvm::toString(pp.takeError());
+        llvm::report_fatal_error(error.c_str());
+      }
+    }
 
     llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
 
@@ -522,7 +548,7 @@ public:
       }
 
       // Run LLVM optimization passes.
-      optimizeModule(*llvmModule, *targetMachine);
+      optimizeModule(*llvmModule, *targetMachine, options.passPlugins);
       if (!serOptions.dumpIntermediatesPath.empty()) {
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),
