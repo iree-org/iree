@@ -494,3 +494,36 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+
+// Propagate and enforce through scf.for
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @scffor(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<f16> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c1024 = arith.constant 1024 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<f16>
+    %cst_0 = arith.constant 0.0 : f16
+
+    %out = scf.for %iv = %c0 to %c1024 step %c1 iter_args(%arg1 = %cst) -> (vector<f16>) {
+      %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
+      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+      %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
+      %init = vector.extractelement %arg1[] : vector<f16>
+      %root_red = vector.multi_reduction<add>, %rootl, %init [0, 1]  : vector<16x16xf16> to f16
+      %c = vector.broadcast %root_red : f16 to vector<f16>
+      scf.yield %c : vector<f16>
+    }
+
+    func.return %out : vector<f16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
