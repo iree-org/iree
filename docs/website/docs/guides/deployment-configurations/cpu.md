@@ -46,7 +46,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-compiler` package includes the LLVM-based CPU compiler:
 
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-compiler-from-release.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
 #### :material-hammer-wrench: Build the compiler from source
 
@@ -74,7 +74,7 @@ You can check for CPU support by looking for the `local-sync` and `local-task`
 drivers:
 
 ```console hl_lines="5 6"
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-run-module-driver-list.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
 ```
 
 #### :octicons-package-16: Download the runtime from a release
@@ -84,7 +84,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-runtime` package includes the local CPU HAL drivers:
 
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-runtime-from-release.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
 #### :material-hammer-wrench: Build the runtime from source
 

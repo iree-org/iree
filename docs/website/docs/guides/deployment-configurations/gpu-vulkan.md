@@ -83,7 +83,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-compiler` package includes the SPIR-V compiler:
 
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-compiler-from-release.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-compiler-from-release.md"
 
 #### :material-hammer-wrench: Build the compiler from source
 
@@ -108,7 +108,7 @@ Next you will need to get an IREE runtime that supports the Vulkan HAL driver.
 You can check for Vulkan support by looking for a matching driver and device:
 
 ```console hl_lines="7"
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-run-module-driver-list.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md"
 ```
 
 ```console hl_lines="6"
@@ -127,7 +127,7 @@ Python packages are regularly published to
 [Python Bindings](../../reference/bindings/python.md) page for more details.
 The core `iree-runtime` package includes the Vulkan HAL drivers:
 
---8<-- "docs/website/docs/guides/deployment-configurations/_iree-runtime-from-release.md"
+--8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-runtime-from-release.md"
 
 #### :material-hammer-wrench: Build the runtime from source
 
