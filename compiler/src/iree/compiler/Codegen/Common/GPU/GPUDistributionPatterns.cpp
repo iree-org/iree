@@ -536,7 +536,11 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> newInitArgs;
     for (Value initArg : forOp.getInitArgs()) {
       if (auto vectorInitArg = dyn_cast<VectorValue>(initArg)) {
+<<<<<<< HEAD
         if (isNonZeroRank(vectorInitArg)) {
+=======
+        if (isVector(vectorInitArg)) {
+>>>>>>> 5dd865864c (add helper function to check whether it is vector)
           initArg =
               getDistributed(rewriter, vectorInitArg, signature[vectorInitArg]);
         }
@@ -584,11 +588,17 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> operands;
     for (Value operand : yieldOp->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
+<<<<<<< HEAD
         // Distributing the operand requires it to have a non-zero rank, meaning
         // it must have at least one dimension. If the vector has a non-zero
         // rank, the operand is distributed according to the provided layout
         // signature.
         if (isNonZeroRank(vectorOperand)) {
+=======
+        // Types such as vector<f32> can pass this condition. An additional rank
+        // check is added here to ensure that the type is indeed a vector value.
+        if (isVector(vectorOperand)) {
+>>>>>>> 5dd865864c (add helper function to check whether it is vector)
           operand = DistributionPattern::getDistributed(
               rewriter, vectorOperand, signature[vectorOperand]);
         }
@@ -614,7 +624,11 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
       Value val = bbArg;
       if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
+<<<<<<< HEAD
         if (isNonZeroRank(oldVectorInit)) {
+=======
+        if (isVector(oldVectorInit)) {
+>>>>>>> 5dd865864c (add helper function to check whether it is vector)
           val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
               oldVectorInit.getLoc(), oldVectorInit.getType(), val);
         }
