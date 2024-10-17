@@ -20,6 +20,7 @@ iree_lit_test_suite(
             "alignment_ops.mlir",
             "assignment_folding.mlir",
             "assignment_ops.mlir",
+            "assume_folding.mlir",
             "assume_ops.mlir",
             "attributes.mlir",
             "buffer_folding.mlir",

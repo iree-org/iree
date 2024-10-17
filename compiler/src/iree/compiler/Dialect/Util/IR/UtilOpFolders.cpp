@@ -27,6 +27,51 @@
 namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
+// util.assume.int
+//===----------------------------------------------------------------------===//
+
+LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
+                                        PatternRewriter &rewriter) {
+  bool needsRewrite = false;
+
+  // Quick check for any constant operands.
+  for (Value operand : op.getOperands()) {
+    if (matchPattern(operand, m_Constant())) {
+      needsRewrite = true;
+      break;
+    }
+  }
+  if (!needsRewrite)
+    return failure();
+
+  // Need to rewrite the assumption.
+  ArrayAttr assumptions = op.getAssumptions();
+  SmallVector<ArrayAttr> newAssumptions;
+  SmallVector<Value> newOperands;
+  SmallVector<Value> retainedResults;
+  for (auto [idx, operand] : llvm::enumerate(op.getOperands())) {
+    if (matchPattern(operand, m_Constant())) {
+      // Replace the result uses with its producer.
+      rewriter.replaceAllUsesWith(op.getResult(idx), operand);
+      continue;
+    }
+
+    newAssumptions.push_back(llvm::cast<ArrayAttr>(assumptions[idx]));
+    newOperands.push_back(operand);
+    retainedResults.push_back(op.getResult(idx));
+  }
+
+  if (!newOperands.empty()) {
+    auto newOp =
+        rewriter.create<AssumeIntOp>(op.getLoc(), newOperands, newAssumptions);
+    rewriter.replaceAllUsesWith(retainedResults, newOp.getResults());
+  }
+
+  rewriter.eraseOp(op);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // util.null
 //===----------------------------------------------------------------------===//
 
