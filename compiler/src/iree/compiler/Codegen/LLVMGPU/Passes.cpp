@@ -330,35 +330,13 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 }
 
-/// Control function for decomposing pack and unpack ops. Returns true if the
-/// op is a PackOp with a DispatchTensorLoadOp producer, or an UnPackOp with
-/// only DispatchTensorStoreOp consumers.
-LogicalResult isAtBoundary(Operation *op) {
-  if (isa<tensor::PackOp>(op)) {
-    if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
-            op->getOperand(0).getDefiningOp())) {
-      return success();
-    }
-  } else if (isa<tensor::UnPackOp>(op)) {
-    if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::Flow::DispatchTensorStoreOp>(user);
-        })) {
-      return success();
-    }
-  }
-  return failure();
-}
-
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions) {
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
   // Decompose packs and unpacks that are at the function boundary.
-  funcPassManager.addPass(
-      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false,
-                                       /*useOnlyReshapes=*/true,
-                                       /*controlFn=*/isAtBoundary));
+  funcPassManager.addPass(createDecomposeBoundaryPackUnPackOpsPass());
 
   // Step 1.5. Expand result shapes of MultiMmaOps before tiling, and
   // propagate reshapes to the function boundary.
@@ -383,10 +361,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
-  funcPassManager.addPass(
-      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false,
-                                       /*useOnlyReshapes=*/true,
-                                       /*controlFn=*/std::nullopt));
+  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
+      DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
+                                        /*useOnlyReshapes=*/true}));
 
   // Step 3.5. Expand the inner dimensions of MultiMma ops in preparation for
   // distribution to lanes.
@@ -1000,10 +977,9 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(
-      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true,
-                                       /*useOnlyReshapes=*/false,
-                                       /*controlFn=*/std::nullopt));
+  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
+      DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/true,
+                                        /*useOnlyReshapes=*/false}));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   addGPUVectorizationPasses(funcPassManager);
