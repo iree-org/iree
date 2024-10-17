@@ -307,8 +307,6 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:DialectUtils",
-        # TransformStrategies
-        "//compiler/src/iree/compiler/Codegen/TransformStrategies/Common:TransformStrategies",
         # TransformExtensions (needed for registration in the pass)
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",

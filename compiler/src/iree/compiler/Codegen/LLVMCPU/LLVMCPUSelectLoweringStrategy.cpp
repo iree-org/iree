@@ -10,16 +10,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/PDL/IR/PDL.h"
-#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -38,22 +28,7 @@ class LLVMCPUSelectLoweringStrategyPass
           LLVMCPUSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
-    // unnecessary dialect registrations.
-    // clang-format off
-    registry.insert<IREE::Codegen::IREECodegenDialect,
-                    IREE::HAL::HALDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
-                    bufferization::BufferizationDialect,
-                    linalg::LinalgDialect,
-                    LLVM::LLVMDialect,
-                    pdl::PDLDialect,
-                    pdl_interp::PDLInterpDialect,
-                    scf::SCFDialect,
-                    tensor::TensorDialect,
-                    transform::TransformDialect,
-                    vector::VectorDialect>();
-    // clang-format on
+    registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override;

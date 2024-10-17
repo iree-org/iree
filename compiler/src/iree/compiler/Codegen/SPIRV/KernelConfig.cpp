@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -44,11 +43,6 @@ constexpr unsigned numKTilesPerSubgroup = 2;
 constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir::iree_compiler {
-
-llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
-    "iree-spirv-enable-transform-dialect-jit",
-    llvm::cl::desc("Enable the usage of the transform dialect JIT"),
-    llvm::cl::init(false));
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -1491,47 +1485,6 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
 }
 
 //===----------------------------------------------------------------------===//
-// Transform Dialect Specialized Configurations
-//===----------------------------------------------------------------------===//
-
-static LogicalResult
-setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
-                          IREE::GPU::TargetAttr target) {
-  if (!clSPIRVEnableTransformDialectJit) {
-    return failure();
-  }
-
-  MLIRContext *context = entryPoint.getContext();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, CodeGenPipeline::TransformDialectCodegen);
-
-  // TODO: unify the target information into one structure.
-  iree_compiler::gpu::GPUModel gpuModel;
-  gpuModel.hasWarpShuffle = target.supportsSubgroupShuffle();
-  gpuModel.hasTF32TensorCore = false;
-  gpuModel.hasMmaSync = false;
-  gpuModel.hasTF32TensorCore = false;
-  gpuModel.minSubgroupSize = target.getMinSubgroupSize();
-  gpuModel.maxSubgroupSize = target.getMaxSubgroupSize();
-  gpuModel.maxWorkGroupInvocations =
-      target.getWgp().getMaxThreadCountPerWorkgroup();
-
-  // Populates the supported WMMA fragment combinations from the target
-  // environment. Infer tf32 support from the list of supported fragment types.
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    gpuModel.supportedWMMAConfigs.emplace_back(iree_compiler::gpu::MMAConfig{
-        mSize, nSize, kSize, aType, bType, cType});
-  }
-
-  if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
-                                                              gpuModel)))
-    return failure();
-  return setTranslationInfo(entryPoint, translationInfo);
-}
-
-//===----------------------------------------------------------------------===//
 // Configuration Dispatcher
 //===----------------------------------------------------------------------===//
 
@@ -1540,11 +1493,6 @@ setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
 static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPointFn,
                                       Operation *rootOp) {
-  // First try to see if there is a matching transform dialect configuration.
-  if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, target))) {
-    return success();
-  }
-
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
   if (target.isAMD() && succeeded(detail::setAMDCodeGenConfig(target, rootOp)))

@@ -8,18 +8,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
-#include "mlir/Dialect/PDL/IR/PDL.h"
-#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -41,24 +29,8 @@ public:
       LLVMGPUSelectLoweringStrategyPass>::LLVMGPUSelectLoweringStrategyPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
-    // unnecessary dialect registrations.
-    // clang-format off
     registry
-        .insert<IREE::Codegen::IREECodegenDialect,
-                IREE::GPU::IREEGPUDialect,
-                IREE::HAL::HALDialect,
-                IREE::LinalgExt::IREELinalgExtDialect,
-                linalg::LinalgDialect,
-                gpu::GPUDialect,
-                nvgpu::NVGPUDialect,
-                pdl::PDLDialect,
-                pdl_interp::PDLInterpDialect,
-                scf::SCFDialect,
-                tensor::TensorDialect,
-                transform::TransformDialect,
-                vector::VectorDialect>();
-    // clang-format on
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void runOnOperation() override;

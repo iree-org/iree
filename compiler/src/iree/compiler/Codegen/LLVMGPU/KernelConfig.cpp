@@ -18,7 +18,6 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -62,11 +61,6 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
-
-llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
-    "iree-codegen-llvmgpu-enable-transform-dialect-jit",
-    llvm::cl::desc("enable the usage of the transform dialect JIT"),
-    llvm::cl::init(false));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -1392,57 +1386,6 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                                preferredSubgroupSize);
 }
 
-//====---------------------------------------------------------------------===//
-// Transform Dialect Pipeline Configuration
-//====---------------------------------------------------------------------===//
-
-/// Set configuration for transform dialect based strategies.
-static LogicalResult
-setTransformDialectConfig(IREE::GPU::TargetAttr target,
-                          mlir::FunctionOpInterface entryPoint, Operation *op) {
-  if (!clGPUEnableTransformDialectJit) {
-    return failure();
-  }
-
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint.getContext(), CodeGenPipeline::TransformDialectCodegen);
-
-  // TODO: unify the target informations into one structure.
-  iree_compiler::gpu::GPUModel gpuModel;
-  gpuModel.hasWarpShuffle = target.supportsSubgroupShuffle();
-  gpuModel.hasTF32TensorCore = target.supportsTF32InputMMAOps();
-  gpuModel.hasMmaSync = target.supportsSyncMMAOps();
-
-  // Populates a subset of the fragment combinations supported in MLIR lowerings
-  // to NVVM (which is itself a subset of what LLVM supports) based on what the
-  // pipeline currently supports.
-  // TODO: avoid hard coding this and populate based on hardware capabilities.
-  // TODO: add missing supported configs once the pipeline supports it.
-  MLIRContext *context = entryPoint.getContext();
-  Type f32Type = Float32Type::get(context);
-  Type f16Type = Float16Type::get(context);
-
-  iree_compiler::gpu::MMAConfig f16f32AccConfig = {
-      /*m=*/16,          /*n=*/16,          /*k=*/16,
-      /*aType=*/f16Type, /*bType=*/f16Type, /*cType=*/f32Type};
-  iree_compiler::gpu::MMAConfig f16f16AccConfig = {
-      /*m=*/16,          /*n=*/16,          /*k=*/16,
-      /*aType=*/f16Type, /*bType=*/f16Type, /*cType=*/f16Type};
-  gpuModel.supportedWMMAConfigs = {f16f32AccConfig, f16f16AccConfig};
-
-  if (target.supportsTF32InputMMAOps()) {
-    iree_compiler::gpu::MMAConfig tf32WmmaConfig = {
-        /*m=*/16,          /*n=*/16,          /*k=*/8,
-        /*aType=*/f32Type, /*bType=*/f32Type, /*cType=*/f32Type};
-    gpuModel.supportedWMMAConfigs.push_back(tf32WmmaConfig);
-  }
-
-  if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
-                                                              gpuModel)))
-    return failure();
-  return setTranslationInfo(entryPoint, translationInfo);
-}
-
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumParallelLoops() != 2)
     return false;
@@ -2015,11 +1958,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
     llvm::dbgs() << "\n";
   });
-  // First try to see if there is a transform dialect configuration existing.
-  if (succeeded(setTransformDialectConfig(target, entryPointFn, computeOp))) {
-    LDBG("Transform Dialect Config");
-    return success();
-  }
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
                                                    computeOp))) {
     LDBG("Tile and fuse data tiled multi_mma config");
