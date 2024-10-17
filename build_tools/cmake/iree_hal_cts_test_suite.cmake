@@ -87,9 +87,6 @@ function(iree_hal_cts_test_suite)
       "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
       ${_RULE_COMPILER_FLAGS}
     )
-    if(_RULE_COMPILER_TARGET_BACKEND STREQUAL "llvm-cpu")
-      list(APPEND _TRANSLATE_FLAGS "--iree-llvmcpu-target-cpu=generic")
-    endif()
 
     # Skip if already created (multiple suites using the same compiler setting).
     iree_package_name(_PACKAGE_NAME)

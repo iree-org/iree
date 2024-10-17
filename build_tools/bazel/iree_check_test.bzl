@@ -51,7 +51,6 @@ def iree_check_test(
         input_type_flags = ["--iree-input-type=%s" % input_type]
     flags = [
         "--iree-hal-target-backends=%s" % target_backend,
-        "--iree-llvmcpu-target-cpu=generic",
     ] + compiler_flags + input_type_flags
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
@@ -182,20 +181,15 @@ def iree_check_test_suite(
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
-      target_cpu_features_variants: list of target cpu features variants.
-          Currently unimplemented in Bazel due to difficulty of specializing
-          to target architecture in Bazel. The following describes the
-          semantics that this should have if implemented. Each
-          entry is either "generic" for the architecture defaults, or "host"
-          for the host CPU,or a colon-separated triple "arch:name:cpu_features"
-          where "arch" filters for a target CPU architecture (in IREE_ARCH format),
-          "name" is a short name for the CPU features set (used to generate target names)
-          and cpu_features is a comma-separated list of LLVM target attributes
-          to enable. Example:
-            x86_64:avx2_fma:+avx,+avx2,+fma
+      target_cpu_features_variants: ignored, assumed to be ["generic"] in this
+          Bazel implementation. See the CMake implementation for what this does
+          in general.
       **kwargs: any additional attributes to pass to the underlying tests and
           test suite.
     """
+
+    # Like CMake, default to "generic". Unlike CMake, do not honor other values.
+    generic_flags = compiler_flags + ["--iree-llvmcpu-target-cpu=generic"]
 
     # We could have complicated argument override logic for runner_args and such, or... the client
     # could just create a test suite. The latter seems simpler and more readable.
@@ -207,7 +201,7 @@ def iree_check_test_suite(
             srcs = srcs,
             driver = driver,
             target_backend = backend,
-            compiler_flags = compiler_flags,
+            compiler_flags = generic_flags,
             input_type = input_type,
             runner_args = runner_args,
             tags = tags,

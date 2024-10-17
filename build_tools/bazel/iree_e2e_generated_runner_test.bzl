@@ -53,7 +53,6 @@ def iree_e2e_runner_test(
         src = tests_src,
         flags = [
             "--iree-hal-target-backends=%s" % target_backend,
-            "--iree-llvmcpu-target-cpu=generic",
         ] + compiler_flags,
         visibility = ["//visibility:private"],
         testonly = True,
@@ -200,19 +199,14 @@ def iree_generated_e2e_runner_test(
             added automatically.
         test_runner: test runner program to run.
         timeout: timeout for the generated tests.
-        target_cpu_features_variants: list of target cpu features variants.
-            Currently unimplemented in Bazel due to difficulty of specializing
-            to target architecture in Bazel. The following describes the
-            semantics that this should have if implemented. Each
-            entry is either "generic" for the architecture defaults, or "host"
-            for the host CPU,or a colon-separated triple "arch:name:cpu_features"
-            where "arch" filters for a target CPU architecture (in IREE_ARCH format),
-            "name" is a short name for the CPU features set (used to generate target names)
-            and cpu_features is a comma-separated list of LLVM target attributes
-            to enable. Example:
-                x86_64:avx2_fma:+avx,+avx2,+fma
+        target_cpu_features_variants: ignored, assumed to be ["generic"] in this
+            Bazel implementation. See the CMake implementation for what this does
+            in general.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
+
+    # Like CMake, default to "generic". Unlike CMake, do not honor other values.
+    generic_flags = compiler_flags + ["--iree-llvmcpu-target-cpu=generic"]
 
     tests = []
     for backend, driver in target_backends_and_drivers:
@@ -228,7 +222,7 @@ def iree_generated_e2e_runner_test(
             driver = driver,
             target_backend = backend,
             generator_args = generator_args,
-            compiler_flags = compiler_flags,
+            compiler_flags = generic_flags,
             runner_args = runner_args,
             tags = tags,
             timeout = timeout,
