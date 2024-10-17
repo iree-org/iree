@@ -1110,7 +1110,7 @@ void AlignOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
   auto constantAlignment = argRanges[1].getConstantValue();
   // Note that for non constant alignment, there may still be something we
   // want to infer, but this is left for the future.
-  if (constantAlignment) {
+  if (constantAlignment && !constantAlignment->isZero()) {
     // We can align the range directly.
     // (value + (alignment - 1)) & ~(alignment - 1)
     // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
@@ -1119,11 +1119,19 @@ void AlignOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
     APInt one(constantAlignment->getBitWidth(), 1);
     APInt alignmentM1 = *constantAlignment - one;
     APInt alignmentM1Inv = ~alignmentM1;
-    auto align = [&](APInt value) -> APInt {
-      return (value + alignmentM1) & alignmentM1Inv;
+    auto align = [&](APInt value, bool &invalid) -> APInt {
+      APInt aligned = (value + alignmentM1) & alignmentM1Inv;
+      // Detect overflow, which commonly happens at max range.
+      if (aligned.ult(value))
+        invalid = true;
+      return aligned;
     };
-    setResultRange(getResult(),
-                   ConstantIntRanges::fromUnsigned(align(umin), align(umax)));
+    bool invalid = false;
+    auto alignedUmin = align(umin, invalid);
+    auto alignedUmax = align(umax, invalid);
+    if (!invalid)
+      setResultRange(getResult(),
+                     ConstantIntRanges::fromUnsigned(alignedUmin, alignedUmax));
   }
 }
 
