@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_onnx_ops:
-    name: "test_onnx :: ${{ matrix.name }}"
+    name: "test_onnx_ops :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           repository: iree-org/iree-test-suites
-          ref: 9e921d0ea271a85f772eee22965585461c9b14c2
+          ref: 3a0ea13cbdc954365d653a48cc99cc63a9ff09b3
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
@@ -120,3 +120,56 @@ jobs:
         with:
           name: ${{ matrix.config-file }}
           path: ${{ env.CONFIG_FILE_PATH }}
+
+  test_onnx_models:
+    name: "test_onnx_models :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_llvm_task
+            runs-on: ubuntu-20.04
+
+          # TODO(scotttodd): test other backends (parameterize the test suite)
+    env:
+      VENV_DIR: ${{ github.workspace }}/venv
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          submodules: false
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 3a0ea13cbdc954365d653a48cc99cc63a9ff09b3
+          path: iree-test-suites
+      - name: Install ONNX models test suite requirements
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install -r iree-test-suites/onnx_models/requirements.txt
+      - name: Run ONNX models test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest iree-test-suites/onnx_models/ \
+              -rA \
+              --log-cli-level=info \
+              --override-ini=xfail_strict=false \
+              --timeout=120 \
+              --durations=0
