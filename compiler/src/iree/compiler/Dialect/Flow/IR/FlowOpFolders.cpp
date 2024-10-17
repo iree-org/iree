@@ -961,6 +961,8 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
     if (!reshapeOp)
       return failure();
 
+    PatternRewriter::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(reshapeOp);
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         reshapeOp, reshapeOp.getResult().getType(), splatOp.getValue(),
         reshapeOp.getResultDims());
