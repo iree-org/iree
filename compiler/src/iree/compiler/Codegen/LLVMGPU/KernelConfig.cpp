@@ -87,6 +87,11 @@ llvm::cl::opt<int> clGPUMatmulCThreshold(
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
 
+llvm::cl::opt<bool> clGPUUseLegacySIMT(
+    "iree-codegen-llvmgpu-use-legacy-simt",
+    llvm::cl::desc("Prefer SIMT pipeline over TileAndFuse pipeline for GEMM's"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     "iree-llvmgpu-enable-prefetch",
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
@@ -1047,6 +1052,14 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
               sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
               codegenPipeline);
         }
+      }
+    }
+    if (!clGPUUseLegacySIMT) {
+      // Use TileAndFuse matmul pipeline before attempting the SIMT pipeline.
+      if (succeeded(
+              IREE::GPU::setMatmulLoweringConfig(target, entryPoint, op))) {
+        LDBG("Tile and fuse matmul config");
+        return success();
       }
     }
     // Special case for very small matrices.
