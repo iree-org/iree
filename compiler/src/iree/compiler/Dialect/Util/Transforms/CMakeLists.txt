@@ -44,6 +44,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransforms
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithTransforms
