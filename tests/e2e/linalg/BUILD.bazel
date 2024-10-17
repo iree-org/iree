@@ -35,13 +35,13 @@ LLVM_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
     tags = [
         # subbyte support for wasm is not on priorities.
         "nowasm",
     ],
     target_backend = "llvm-cpu",
-    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
 )
 
 VMVX_SRCS = enforce_glob(
