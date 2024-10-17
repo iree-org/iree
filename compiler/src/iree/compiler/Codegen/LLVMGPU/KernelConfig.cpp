@@ -63,6 +63,12 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
+    "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
+    llvm::cl::desc("enable the usage of the vector distribution pipeline for "
+                   "unaligned GEMMs when supported"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -86,6 +92,11 @@ llvm::cl::opt<int> clGPUMatmulCThreshold(
                    "as small vs. large when deciding MMA schedule"),
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
+
+llvm::cl::opt<bool> clGPUUseLegacySIMT(
+    "iree-codegen-llvmgpu-use-legacy-simt",
+    llvm::cl::desc("Prefer SIMT pipeline over TileAndFuse pipeline for GEMM's"),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     "iree-llvmgpu-enable-prefetch",
@@ -557,7 +568,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
   // TODO(hanchung): Support cases that there are fused producers.
-  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op)) {
+  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op) &&
+      clGPUUnalignedGEMMVectorDistribution) {
     LDBG("Matmul Pad and Vector Distribute");
     pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
@@ -1047,6 +1059,14 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
               sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
               codegenPipeline);
         }
+      }
+    }
+    if (!clGPUUseLegacySIMT) {
+      // Use TileAndFuse matmul pipeline before attempting the SIMT pipeline.
+      if (succeeded(
+              IREE::GPU::setMatmulLoweringConfig(target, entryPoint, op))) {
+        LDBG("Tile and fuse matmul config");
+        return success();
       }
     }
     // Special case for very small matrices.

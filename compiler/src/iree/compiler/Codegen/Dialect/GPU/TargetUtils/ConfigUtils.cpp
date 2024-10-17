@@ -207,6 +207,26 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
         transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
   }
 
+  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
+  // pipeline.
+  // TODO(hanchung): Support cases that there are fused producers.
+  if (!schedule && !contractionDims.batch.empty() &&
+      !hasFusedLeadingOp(linalgOp)) {
+    LDBG("Tile and Fuse with pack/unpack");
+    bool mustBeAligned = false;
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
+                          /*canUpcastAcc=*/false, mustBeAligned);
+    if (!schedule) {
+      // Then try again by allowing upcasting accumulator.
+      schedule =
+          deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                            targetSubgroupSize, transposedLhs, transposedRhs,
+                            /*canUpcastAcc=*/true, mustBeAligned);
+    }
+  }
+
   if (!schedule) {
     LDBG("Failed to deduce TileAndFuse MMA schedule");
     return failure();
