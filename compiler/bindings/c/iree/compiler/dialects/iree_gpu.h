@@ -19,14 +19,14 @@ MLIR_CAPI_EXPORTED bool
 ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool prefetchSharedMemory,
-                              bool noReduceSharedMemoryBankConflicts,
-                              MlirAttribute reorderWorkgroupsStrategy);
+ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,
+                              bool *noReduceSharedMemoryBankConflicts,
+                              MlirAttribute *reorderWorkgroupsStrategy);
 
-MLIR_CAPI_EXPORTED bool
+MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr);
 
-MLIR_CAPI_EXPORTED bool
+MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
     MlirAttribute attr);
 

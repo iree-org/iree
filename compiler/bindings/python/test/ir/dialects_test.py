@@ -27,12 +27,12 @@ def gpu_pipeline_options_attr():
                 reorder_attr,
             )
             assert (
-                str(gpu_attr.reorder_work_groups_strategy)
-                == "#iree_gpu<reorder_work_groups_strategy Swizzle>"
+                str(gpu_attr.reorder_workgroups_strategy)
+                == "#iree_gpu.reorder_workgroups_strategy<Swizzle>"
             )
             assert (
                 str(gpu_attr)
-                == "#iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, reorder_workgroups_strategy =  Swizzle>"
+                == "#iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, reorder_workgroups_strategy = <Swizzle>>"
             )
             assert type(gpu_attr) is iree_gpu.GPUPipelineOptionsAttr
             assert gpu_attr.prefetch_shared_memory
@@ -47,3 +47,36 @@ def gpu_pipeline_options_attr():
             )
             assert not gpu_attr.prefetch_shared_memory
             assert gpu_attr.no_reduce_shared_memory_bank_conflicts
+
+            gpu_attr = iree_gpu.GPUPipelineOptionsAttr.get()
+            assert str(gpu_attr) == "#iree_gpu.pipeline_options<>"
+
+            gpu_attr = iree_gpu.GPUPipelineOptionsAttr.get(True)
+            assert (
+                str(gpu_attr)
+                == "#iree_gpu.pipeline_options<prefetch_shared_memory = true>"
+            )
+
+            gpu_attr = iree_gpu.GPUPipelineOptionsAttr.get(True, False)
+            assert (
+                str(gpu_attr)
+                == "#iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>"
+            )
+
+            gpu_attr = iree_gpu.GPUPipelineOptionsAttr.get(
+                no_reduce_shared_memory_bank_conflicts=False
+            )
+            assert (
+                str(gpu_attr)
+                == "#iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false>"
+            )
+            assert gpu_attr.prefetch_shared_memory is None
+            assert gpu_attr.reorder_workgroups_strategy is None
+
+            gpu_attr = iree_gpu.GPUPipelineOptionsAttr.get(
+                reorder_workgroups_strategy=reorder_attr
+            )
+            assert (
+                str(gpu_attr)
+                == "#iree_gpu.pipeline_options<reorder_workgroups_strategy = <Swizzle>>"
+            )
