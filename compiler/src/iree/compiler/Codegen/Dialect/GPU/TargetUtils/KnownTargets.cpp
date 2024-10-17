@@ -1222,11 +1222,31 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   return &androidWgp;
 }
 
+const WgpDetails *getVideocoreWgpDetails() {
+  // The following details are taken from running vulkaninfo on the RPI5.
+  // The broadcom chip does not have much documentation but for the most part
+  // we know the workgroup and subgroup sizes. However, memory and thread counts
+  // are more of a guess as they are not explicit in the log output.
+
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::FP32;
+  auto storageBitwidths = StorageBitwidths::B32;
+  // clang-format off
+  static const WgpDetails androidWgp = {
+      computeBitwdiths,         storageBitwidths,         SubgroupOps::None,
+      DotProductOps::None,      /*mmaCount=*/0,           /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,     /*scaledMmaOps=*/nullptr,
+      {16, 16},                 {256, 256, 256},          32,
+      16384,
+      {65535, 65535, 65535}};
+  // clang-format on
+  return &androidWgp;
+}
+
 std::optional<TargetDetails> getBroadcomProfileDetails(StringRef target) {
-  const WgpDetails *baseline2022Wgp = getAndroidBaseline2022WgpDetails();
+  const WgpDetails *baselineWgp = getVideocoreWgpDetails();
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
-      .Case("videocore_vii", TargetDetails{baseline2022Wgp, nullptr})
+      .Case("videocore_vii", TargetDetails{baselineWgp, nullptr})
       .Default(std::nullopt);
 }
 

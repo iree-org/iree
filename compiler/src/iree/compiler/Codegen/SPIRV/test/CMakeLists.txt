@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "config_amd_matmul.mlir"
     "config_amd_matmul_cooperative_ops.mlir"
     "config_amd_matvec.mlir"
+    "config_broadcom_conv.mlir"
     "config_broadcom_matmul.mlir"
     "config_default_conv.mlir"
     "config_default_linalg_ext_ops.mlir"
