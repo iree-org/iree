@@ -12,6 +12,9 @@
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Transforms/Transforms.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/IR/Matchers.h"
@@ -108,17 +111,33 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
 // optimizations, it can be useful to eliminate them when possible.
 //===----------------------------------------------------------------------===//
 
+// Matches IR like:
+//   %5 = arith.addi %0, %1 : int64
+//   %6 = arith.index_castui %5 : int64 to index
+//
+// And moves the index_castui to the producer's operands:
+//   %3 = arith.index_castui %0 : int64 to index
+//   %4 = arith.index_castui %1 : int64 to index
+//   %5 = arith.addi %3, %4 : index
+//
 struct ConvertUnsignedI64IndexCastProducerToIndex
     : public OpRewritePattern<arith::IndexCastUIOp> {
   ConvertUnsignedI64IndexCastProducerToIndex(MLIRContext *context,
                                              DataFlowSolver &solver)
       : OpRewritePattern(context), solver(solver) {}
 
-  LogicalResult matchAndRewrite(arith::IndexCastUIOp op,
+  LogicalResult matchAndRewrite(arith::IndexCastUIOp origIndexOp,
                                 PatternRewriter &rewriter) const override {
-    Type inType = op.getIn().getType();
-    Type outType = op.getOut().getType();
+    Type inType = origIndexOp.getIn().getType();
+    Type outType = origIndexOp.getOut().getType();
     if (!inType.isSignlessInteger(64) && isa<IndexType>(outType))
+      return failure();
+
+    Operation *producer = origIndexOp.getIn().getDefiningOp();
+    if (!producer)
+      return failure();
+    auto producerResult = producer->getResult(0);
+    if (!producerResult.hasOneUse())
       return failure();
 
     auto pred = [&](Value v) -> bool {
@@ -137,7 +156,6 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
              llvm::all_of(op->getResults(), pred);
     };
 
-    Operation *producer = op.getIn().getDefiningOp();
     if (!isa_and_present<arith::AddIOp, arith::CeilDivUIOp, arith::DivUIOp,
                          arith::MaxUIOp, arith::MinUIOp, arith::MulIOp,
                          arith::RemUIOp, arith::SubIOp>(producer))
@@ -145,6 +163,7 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
     if (!isOpStaticallyLegal(producer))
       return failure();
 
+    // Make modifications.
     rewriter.modifyOpInPlace(producer, [&]() {
       rewriter.setInsertionPoint(producer);
       for (auto &operand : producer->getOpOperands()) {
@@ -156,6 +175,8 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
       }
       producer->getResult(0).setType(outType);
     });
+    origIndexOp.getOut().replaceAllUsesWith(producer->getResult(0));
+    rewriter.eraseOp(origIndexOp);
 
     return success();
   }
@@ -204,6 +225,52 @@ struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
   }
 
   DataFlowSolver &solver;
+};
+
+//===----------------------------------------------------------------------===//
+// Affine expansion
+// affine.apply expansion can fail after producing a lot of IR. Since this is
+// a bad thing to be doing as part of our overall iteration, we do it as a
+// preprocessing walk. This also lets it be well behaved with respect to
+// error messaging, etc. We will likely replace this with a more integrated
+// version at some point which can use the bounds analysis to avoid corners
+// of the original.
+//===----------------------------------------------------------------------===//
+
+void expandAffineOps(Operation *rootOp) {
+  IRRewriter rewriter(rootOp->getContext());
+  rootOp->walk([&](affine::AffineApplyOp op) {
+    LLVM_DEBUG(dbgs() << "** Expand affine.apply: " << op << "\n");
+    rewriter.setInsertionPoint(op);
+    auto maybeExpanded =
+        mlir::affine::expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(),
+                                      llvm::to_vector<4>(op.getOperands()));
+    if (!maybeExpanded) {
+      LLVM_DEBUG(dbgs() << "** ERROR: Failed to expand affine.apply\n");
+      return;
+    }
+    rewriter.replaceOp(op, *maybeExpanded);
+  });
+}
+
+//===----------------------------------------------------------------------===//
+// General optimization patterns
+//===----------------------------------------------------------------------===//
+
+struct ElideTruncOfIndexCast : public OpRewritePattern<arith::TruncIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
+                                PatternRewriter &rewriter) const override {
+    Operation *producer = truncOp.getOperand().getDefiningOp();
+    if (!producer)
+      return failure();
+    if (!isa<arith::IndexCastOp, arith::IndexCastUIOp>(producer))
+      return failure();
+    rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(
+        truncOp, truncOp.getResult().getType(), producer->getOperand(0));
+    return success();
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -270,6 +337,9 @@ class OptimizeIntArithmeticPass
   void runOnOperation() override {
     Operation *op = getOperation();
     MLIRContext *ctx = op->getContext();
+
+    expandAffineOps(op);
+
     DataFlowSolver solver;
     solver.load<DeadCodeAnalysis>();
     solver.load<IntegerRangeAnalysis>();
@@ -281,12 +351,14 @@ class OptimizeIntArithmeticPass
     arith::populateIntRangeOptimizationsPatterns(patterns, solver);
 
     // Populate canonicalization patterns.
-    auto arithDialectTypeID =
-        ctx->getOrLoadDialect<arith::ArithDialect>()->getTypeID();
+    auto arithDialect = ctx->getOrLoadDialect<arith::ArithDialect>();
     for (const RegisteredOperationName &name : ctx->getRegisteredOperations()) {
-      if (name.getDialect().getTypeID() == arithDialectTypeID)
+      if (&name.getDialect() == arithDialect)
         name.getCanonicalizationPatterns(patterns, ctx);
     }
+
+    // General optimization patterns.
+    patterns.add<ElideTruncOfIndexCast>(ctx);
 
     // Populate unsigned conversion patterns.
     patterns.add<ConvertUnsignedI64IndexCastProducerToIndex,
