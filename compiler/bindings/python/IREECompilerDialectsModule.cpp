@@ -15,11 +15,14 @@ using namespace mlir::python::adaptors;
 PYBIND11_MODULE(_ireeCompilerDialects, m) {
   m.doc() = "iree-compiler dialects python extension";
 
+  auto iree_gpu_module =
+      m.def_submodule("iree_gpu", "iree_gpu dialect bindings");
+
   //===-------------------------------------------------------------------===//
   // GPUPipelineOptionsAttr
   //===-------------------------------------------------------------------===//
 
-  mlir_attribute_subclass(m, "GPUPipelineOptionsAttr",
+  mlir_attribute_subclass(iree_gpu_module, "GPUPipelineOptionsAttr",
                           ireeAttributeIsAGPUPipelineOptionsAttr,
                           ireeGPUPipelineOptionsAttrGetTypeID)
       .def_classmethod(

@@ -6,4 +6,4 @@
 
 from ._iree_gpu_ops_gen import *
 from ._iree_gpu_enum_gen import *
-from .._mlir_libs._ireeCompilerDialects import *
+from .._mlir_libs._ireeCompilerDialects.iree_gpu import *
