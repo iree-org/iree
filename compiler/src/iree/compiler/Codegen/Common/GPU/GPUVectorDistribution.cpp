@@ -132,7 +132,6 @@ void DistributionPattern::replaceOpWithDistributedValues(
   for (auto [opResult, replacement] :
        llvm::zip_equal(op->getOpResults(), values)) {
     // If this value is a vector type, it must be converted back to simd.
-<<<<<<< HEAD
     if (auto replacementType = dyn_cast<VectorType>(replacement.getType())) {
       if (replacementType.getRank() != 0) {
         auto oldResult = cast<VectorValue>(opResult);
@@ -143,17 +142,6 @@ void DistributionPattern::replaceOpWithDistributedValues(
         // Add to replacements.
         replacement = toSIMD;
       }
-=======
-    if (isa<VectorType>(replacement.getType()) &&
-        cast<ShapedType>(replacement.getType()).getRank() != 0) {
-      auto oldResult = cast<VectorValue>(opResult);
-      // Create a toSIMD op to convert the value back to the simd.
-      rewriter.setInsertionPointAfterValue(oldResult);
-      Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-          oldResult.getLoc(), oldResult.getType(), replacement);
-      // Add to replacements.
-      replacement = toSIMD;
->>>>>>> 95676d97fe ([VectorDistribution] Patch 2: addlayout analysis and corresponding support for the case when the reduction is inside scf.for operation)
     }
     replacements.push_back(replacement);
   }

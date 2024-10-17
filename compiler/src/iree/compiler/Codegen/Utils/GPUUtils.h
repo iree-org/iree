@@ -18,6 +18,8 @@
 
 namespace mlir::iree_compiler {
 
+using VectorValue = TypedValue<VectorType>;
+
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
 
