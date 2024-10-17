@@ -66,9 +66,8 @@ struct LLVMTarget {
   void storeToConfigAttrs(MLIRContext *context,
                           SmallVector<NamedAttribute> &config) const;
 
-  static std::optional<LLVMTarget> create(std::string_view triple,
-                                          std::string_view cpu,
-                                          std::string_view cpuFeatures,
+  static std::optional<LLVMTarget> create(std::string triple, std::string cpu,
+                                          std::string cpuFeatures,
                                           bool requestLinkEmbedded);
 
   static std::optional<LLVMTarget> createForHost();
@@ -177,7 +176,7 @@ struct LLVMCPUTargetCLOptions {
 
   // Default device options.
   std::string targetTriple = "";
-  std::string targetCPU = "generic";
+  std::string targetCPU = "";
   std::string targetCPUFeatures = "";
   bool linkEmbedded = LLVMTarget::DEFAULT_LINK_EMBEDDED;
   bool linkStatic = LLVMTarget::DEFAULT_LINK_STATIC;
