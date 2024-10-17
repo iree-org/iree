@@ -1,3 +1,8 @@
+# Disabled on Windows until the shared library handling is cross-platform.
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+  return()
+endif()
+
 iree_cc_library(
   NAME
     GPUHello
