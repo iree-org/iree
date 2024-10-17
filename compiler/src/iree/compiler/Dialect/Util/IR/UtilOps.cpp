@@ -1264,6 +1264,9 @@ LogicalResult AssumeIntOp::verify() {
   for (auto [index, operandAssumptionsAttr] :
        llvm::enumerate(allOperandAssumptions)) {
     auto operandAssumptions = cast<ArrayAttr>(operandAssumptionsAttr);
+    // We always allow a single row to broadcast to any requested size.
+    if (operandAssumptions.size() == 1)
+      continue;
     if (rank && *rank != operandAssumptions.size())
       return emitOpError() << "expected operand #" << index << " to have "
                            << *rank << " assumptions but it has "

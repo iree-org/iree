@@ -518,6 +518,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     std::optional<uint64_t> getUnionedUnsignedDivisor(unsigned operandIndex);
   }];
 
+  let hasCanonicalizeMethod  = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
