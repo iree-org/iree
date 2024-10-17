@@ -462,3 +462,34 @@ util.func @util_align_bounds_div(%arg0 : index, %arg1 : index) -> index, index, 
   // CHECK: util.return %[[ALIGN]], %[[ZERO]], %[[REM128]], %[[TRUE]], %[[FALSE]]
   util.return %2, %rem64, %rem128, %in_bounds, %out_bounds : index, index, index, i1, i1
 }
+
+// -----
+// Unbounded lhs of util.align technically has a range that extends to the max
+// value of the bit width. Attempting to align this overflows (to zero). If not
+// caught, this will most likely lead the optimizer to conclude that the
+// aligned result is a constant zero. This code is verified by checking for
+// overflow generally and should handle this case.
+// CHECK-LABEL: @util_align_overflow
+util.func @util_align_overflow(%arg0 : i64) -> i64 {
+  %c64 = arith.constant 64 : i64
+  // CHECK: util.align
+  %0 = util.align %arg0, %c64 : i64
+  util.return %0 : i64
+}
+
+// -----
+// Aligning to an alignment of zero doesn't make a lot of sense but it isn't
+// numerically an error. We don't fold or optimize this case and we verify
+// it as such (and that other division by zero errors don't come up).
+// CHECK-LABEL: @util_align_zero
+util.func @util_align_zero(%arg0 : i64) -> i64 {
+  %c0 = arith.constant 0 : i64
+  %c16 = arith.constant 16 : i64
+  %assume = util.assume.int %arg0<umin=0, umax=15> : i64
+  %c128 = arith.constant 128 : i64
+  // CHECK: util.align
+  // CHECK: arith.remui
+  %0 = util.align %assume, %c0 : i64
+  %rem16 = arith.remui %0, %c16 : i64
+  util.return %rem16 : i64
+}

@@ -216,12 +216,16 @@ struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
       return failure();
 
     uint64_t rhsValue = rhsConstant.getZExtValue();
-    if (rhsValue > 0 && lhsDiv.udiv() > 0 && lhsDiv.udiv() % rhsValue != 0)
-      return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
+    if (rhsValue > 0 && lhsDiv.udiv() > 0) {
+      if (lhsDiv.udiv() % rhsValue != 0)
+        return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
 
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-        op, rewriter.getZeroAttr(op.getResult().getType()));
-    return success();
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+          op, rewriter.getZeroAttr(op.getResult().getType()));
+      return success();
+    }
+
+    return failure();
   }
 
   DataFlowSolver &solver;

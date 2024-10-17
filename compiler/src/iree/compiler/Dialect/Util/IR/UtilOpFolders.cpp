@@ -505,7 +505,7 @@ static bool isAlignedTo(Value value, Value alignment) {
   APInt staticAlignment;
   bool hasStaticAlignment =
       matchPattern(alignment, m_ConstantInt(&staticAlignment));
-  if (hasStaticValue && hasStaticAlignment) {
+  if (hasStaticValue && hasStaticAlignment && !staticAlignment.isZero()) {
     // If this value is itself a multiple of the alignment then we can fold.
     if (staticValue.urem(staticAlignment).isZero()) {
       return true; // value % alignment == 0
