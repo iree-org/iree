@@ -37,6 +37,11 @@ static void addCleanupPatterns(OpPassManager &passManager) {
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
+      // Integer optimizations. These operate best on a canonical form both
+      // for performance (post-simplifications cause less analysis) and
+      // simplified pattern matching.
+      .addPass(IREE::Util::createOptimizeIntArithmeticPass)
+
       // Simplify util.global accesses; this can help with data flow tracking as
       // redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
