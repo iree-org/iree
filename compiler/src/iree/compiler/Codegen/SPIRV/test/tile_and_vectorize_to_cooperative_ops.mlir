@@ -109,13 +109,13 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:     gpu.barrier
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
-//       CHECK:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
-//       CHECK:       %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, %[[IV_X]]]
-//       CHECK:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
-//       CHECK:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
-//       CHECK:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
+//   CHECK-DAG:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
+//   CHECK-DAG:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]
 //       CHECK:         %[[CT0:.+]] = vector.contract
 //  CHECK-SAME:           %[[READ0]], %[[READ2]], %[[READ4]] : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
 //       CHECK:         %[[CT1:.+]] = vector.contract
@@ -246,13 +246,13 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:     scf.for %[[IV_Z:.+]] = %[[ID_Z]] to %[[C1]] step %[[C1]]
 //       CHECK:       scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Z]], %[[IV_Y]], 0] [1, 16, 32]
-//       CHECK:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
-//       CHECK:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C16]]]
 //       CHECK:         scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]] {
 //       CHECK:           %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][%[[IV_Z]], 0, %[[IV_X]]] [1, 32, 16]
-//       CHECK:           %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
-//       CHECK:           %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C16]], %[[C0]]]
-//       CHECK:           %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]], %[[C0]]]
+//   CHECK-DAG:           %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
+//   CHECK-DAG:           %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]], %[[C16]]]
+//   CHECK-DAG:           %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]], %[[C0]]]
+//   CHECK-DAG:           %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C16]], %[[C0]]]
+//   CHECK-DAG:           %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]], %[[C0]]]
 //       CHECK:           %[[CT0:.+]] = vector.contract
 //  CHECK-SAME:             %[[READ0]], %[[READ2]], %[[READ4]] : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
 //       CHECK:           %[[CT1:.+]] = vector.contract
@@ -369,13 +369,13 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
 //       CHECK:     gpu.barrier
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
-//       CHECK:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
-//       CHECK:       %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, %[[IV_X]]]
-//       CHECK:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
-//       CHECK:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
-//       CHECK:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ1:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C16]]]
+//   CHECK-DAG:         %[[READ2:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C0]], %[[C0]]]
+//   CHECK-DAG:         %[[READ3:.+]] = vector.transfer_read %[[RHS_VIEW]][%[[C16]], %[[C0]]]
+//   CHECK-DAG:         %[[READ4:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[C0]]]
 //       CHECK:         %[[EXTUI0:.+]] = arith.extui %[[READ0]] : vector<16x16xi8> to vector<16x16xi32>
 //       CHECK:         %[[EXTUI1:.+]] = arith.extui %[[READ1]] : vector<16x16xi8> to vector<16x16xi32>
 //       CHECK:         %[[EXTSI0:.+]] = arith.extsi %[[READ2]] : vector<16x16xi8> to vector<16x16xi32>
