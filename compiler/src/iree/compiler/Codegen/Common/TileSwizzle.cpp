@@ -41,7 +41,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle) {
   os << "{expandShape = [";
   llvm::interleaveComma(swizzle.expandShape, os);
-  os << "], swizzle = [";
+  os << "], permutation = [";
   llvm::interleaveComma(swizzle.permutation, os);
   os << "]}";
   return os;
