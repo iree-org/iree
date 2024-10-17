@@ -14,12 +14,16 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "iree/compiler/dialects/iree_gpu.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir-c/IR.h"
+#include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -1687,3 +1691,49 @@ void IREEGPUDialect::registerAttributes() {
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
+
+bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
+      unwrap(attr));
+}
+
+MlirAttribute
+ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool prefetchSharedMemory,
+                              bool noReduceSharedMemoryBankConflicts,
+                              MlirAttribute reorderWorkgroupsStrategy) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  auto attr = llvm::dyn_cast<
+      mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
+      unwrap(reorderWorkgroupsStrategy));
+  return wrap(mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::get(
+      ctx, mlir::BoolAttr::get(ctx, prefetchSharedMemory),
+      mlir::BoolAttr::get(ctx, noReduceSharedMemoryBankConflicts), attr));
+}
+
+bool ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr) {
+  auto gpuAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
+          unwrap(attr));
+  return gpuAttr.getPrefetchSharedMemory().getValue();
+}
+
+bool ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
+    MlirAttribute attr) {
+  auto gpuAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
+          unwrap(attr));
+  return gpuAttr.getNoReduceSharedMemoryBankConflicts().getValue();
+}
+
+MlirAttribute
+ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy(MlirAttribute attr) {
+  auto gpuAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
+          unwrap(attr));
+  return wrap(gpuAttr.getReorderWorkgroupsStrategy());
+}
+
+MlirTypeID ireeGPUPipelineOptionsAttrGetTypeID(void) {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::getTypeID());
+}

@@ -67,6 +67,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 
