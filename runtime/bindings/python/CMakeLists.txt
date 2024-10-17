@@ -59,7 +59,7 @@ iree_select_compiler_opts(_RTTI_AND_EXCEPTION_COPTS
 )
 
 nanobind_add_module(iree_runtime_bindings_python_PyExtRt
-  NB_STATIC LTO
+  NB_STATIC LTO FREE_THREADED
   "binding.h"
   "initialize_module.cc"
   "invoke.h"

@@ -21,7 +21,7 @@ public:
 
 } // namespace
 
-PYBIND11_MODULE(_site_initialize_0, m) {
+PYBIND11_MODULE(_site_initialize_0, m, py::mod_gil_not_used()) {
   m.doc() = "iree-compile registration";
 
   // Make sure that GlobalInitialize and GlobalShutdown are called with module

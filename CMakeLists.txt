@@ -645,7 +645,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
-  # can be troublesome. Note that nanobind requires FindPython.
+  # can be troublesome. Note that pybind11 and nanobind require FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
   find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
@@ -926,6 +926,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   if(IREE_BUILD_COMPILER)
     if(NOT TARGET pybind11::module)
       message(STATUS "Using bundled pybind11")
+      set(PYBIND11_FINDPYTHON ON)
       add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
     else()
       message(STATUS "Not including bundled pybind11 (already configured)")

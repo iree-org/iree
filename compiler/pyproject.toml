@@ -6,12 +6,12 @@ requires = [
     # Note that the compiler wheel does not presently need nanobind, but
     # it's build is enabled by the same flag which enables the runtime
     # configuration, which does.
-    "nanobind==2.0",
+    "nanobind==2.2.0",
     "ninja",
     # MLIR build depends.
     "numpy",
     "packaging",
-    "pybind11>=2.10.1",
+    "pybind11==2.13.6",
     "sympy",
 ]
 build-backend = "setuptools.build_meta"

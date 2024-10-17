@@ -14,7 +14,7 @@
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
-PYBIND11_MODULE(_ireeDialects, m) {
+PYBIND11_MODULE(_ireeDialects, m, py::mod_gil_not_used()) {
   m.doc() = "iree-dialects main python extension";
 
   auto irModule = py::module::import(MAKE_MLIR_PYTHON_QUALNAME("ir"));
