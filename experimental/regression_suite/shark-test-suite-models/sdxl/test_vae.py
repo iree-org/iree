@@ -70,7 +70,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-dispatch-creation-enable-aggressive-fusion=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics,util.func(iree-preprocessing-generalize-linalg-matmul-experimental))",
     "--iree-scheduling-dump-statistics-format=json",
     "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]
