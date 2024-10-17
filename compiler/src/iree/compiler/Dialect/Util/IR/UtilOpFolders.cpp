@@ -33,33 +33,97 @@ namespace mlir::iree_compiler::IREE::Util {
 LogicalResult AssumeIntOp::canonicalize(AssumeIntOp op,
                                         PatternRewriter &rewriter) {
   bool needsRewrite = false;
+  ArrayAttr assumptions = op.getAssumptions();
 
-  // Quick check for any constant operands.
-  for (Value operand : op.getOperands()) {
+  // We do a fast check for the canonical form here, making any in-place updates
+  // we can and signalling needsRewrite=true when the op needs to be updated
+  // to a new canonical form.
+  SmallPtrSet<Value, 4> seenOperands;
+  seenOperands.reserve(op.getNumOperands());
+  for (auto [idx, operand] : llvm::enumerate(op.getOperands())) {
+    // Match constant.
     if (matchPattern(operand, m_Constant())) {
       needsRewrite = true;
-      break;
+      rewriter.replaceAllUsesWith(op.getResult(idx), operand);
+      continue;
+    }
+
+    // Check for a duplicate.
+    auto [foundIt, inserted] = seenOperands.insert(operand);
+    if (!inserted) {
+      // This should be the non-common path: find the original index number
+      // and rewrite.
+      for (auto [seenIdx, seenOperand] : llvm::enumerate(op.getOperands())) {
+        if (seenOperand == operand) {
+          needsRewrite = true;
+          rewriter.replaceAllUsesWith(op.getResult(idx), op.getResult(seenIdx));
+          break;
+        }
+      }
+      continue;
+    }
+
+    // Detect whether assumptions need to be normalized.
+    ArrayAttr assumptionRow = llvm::cast<ArrayAttr>(assumptions[idx]);
+    if (assumptionRow.size() > 1) {
+      bool allAssumptionsSame = true;
+      for (unsigned i = 1; i < assumptionRow.size(); ++i) {
+        if (assumptionRow[i] != assumptionRow[0]) {
+          allAssumptionsSame = false;
+          break;
+        }
+      }
+      if (allAssumptionsSame) {
+        needsRewrite = true;
+      }
     }
   }
   if (!needsRewrite)
     return failure();
 
   // Need to rewrite the assumption.
-  ArrayAttr assumptions = op.getAssumptions();
+  auto normalizeAssumptions = [](Attribute row, bool &madeChange) {
+    auto rowArray = llvm::cast<ArrayAttr>(row);
+    if (rowArray.size() <= 1)
+      return rowArray;
+
+    bool allSame = true;
+    for (unsigned i = 1; i < rowArray.size(); ++i) {
+      if (rowArray[0] != rowArray[i]) {
+        allSame = false;
+        break;
+      }
+    }
+
+    if (!allSame)
+      return rowArray;
+
+    // All entries are the same: compress down to a single column.
+    madeChange = true;
+    return ArrayAttr::get(row.getContext(), {rowArray[0]});
+  };
   SmallVector<ArrayAttr> newAssumptions;
   SmallVector<Value> newOperands;
   SmallVector<Value> retainedResults;
+  bool madeChange = false;
   for (auto [idx, operand] : llvm::enumerate(op.getOperands())) {
-    if (matchPattern(operand, m_Constant())) {
-      // Replace the result uses with its producer.
-      rewriter.replaceAllUsesWith(op.getResult(idx), operand);
+    // If the result has no uses, do not retain it.
+    if (op.getResult(idx).use_empty()) {
+      madeChange = true;
       continue;
     }
 
-    newAssumptions.push_back(llvm::cast<ArrayAttr>(assumptions[idx]));
+    newAssumptions.push_back(
+        normalizeAssumptions(assumptions[idx], madeChange));
     newOperands.push_back(operand);
     retainedResults.push_back(op.getResult(idx));
   }
+
+  // It is important to avoid canonicalizer looping that if we determined at
+  // the top that a rewrite was needed, that we actually made a change.
+  (void)madeChange;
+  assert(madeChange && "util.assume.int canonicalizer signaled a rewrite was "
+                       "needed but it produced the same op");
 
   if (!newOperands.empty()) {
     auto newOp =
