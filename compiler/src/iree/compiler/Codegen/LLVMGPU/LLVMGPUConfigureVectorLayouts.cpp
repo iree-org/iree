@@ -268,8 +268,10 @@ struct LLVMGPUConfigureVectorLayoutsPass final
         func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
     if (!scheduleAttr) {
       DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-          configDict.get(scheduleAttrName));
+      if (configDict) {
+        scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+            configDict.get(scheduleAttrName));
+      }
     }
 
     // Vector layout option setter aimed at contractions. Currently this only
