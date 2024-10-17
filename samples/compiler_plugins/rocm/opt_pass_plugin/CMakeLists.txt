@@ -1,0 +1,40 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Disabled on Windows until the shared library handling is cross-platform.
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+  return()
+endif()
+
+set(_NAME "iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginTest")
+
+add_library(${_NAME} SHARED
+  "ROCMPluginTest.cpp"
+)
+target_link_libraries(${_NAME}
+  iree_compiler_API_SharedImpl
+)
+
+# NOTE: this is only required because we want this sample to run on all
+# platforms without needing to change the library name (libfoo.so/foo.dll).
+set_target_properties(iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginTest
+  PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+    PREFIX ""
+    OUTPUT_NAME "ROCMPluginTest"
+)
+
+target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
+
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "rocm_plugin_test.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+)
