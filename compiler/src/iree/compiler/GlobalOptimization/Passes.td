@@ -14,11 +14,6 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
-def Convert1X1FilterConv2DToMatmulPass:
-    Pass<"iree-global-opt-convert-1x1-filter-conv2d-to-matmul", ""> {
-  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
-}
-
 def DecomposeConcatPass :
     Pass<"iree-global-opt-decompose-concat", ""> {
   let summary = "Decomposes concatenations into a destination and a sequence of slice inserts.";
