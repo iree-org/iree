@@ -60,6 +60,11 @@ def ConvertBf16ToUInt16BuffersPass :
   let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
 }
 
+def ConvertSplatConstantToFillPass :
+    Pass<"iree-codegen-convert-splat-constant-to-fill", ""> {
+  let summary = "Converts arith.constant ops with splat tensors to linalg.fill";
+}
+
 def ConvertToDestinationPassingStylePass :
     InterfacePass<"iree-codegen-convert-to-destination-passing-style", "mlir::FunctionOpInterface"> {
   let summary =
