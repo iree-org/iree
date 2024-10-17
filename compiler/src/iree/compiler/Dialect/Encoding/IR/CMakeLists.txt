@@ -18,6 +18,7 @@ iree_cc_library(
     "EncodingDialect.h"
     "EncodingDialect.h.inc"
     "EncodingEnums.h.inc"
+    "EncodingInterfaces.h.inc"
     "EncodingOps.h"
     "EncodingOps.h.inc"
     "EncodingTypes.h"
@@ -28,11 +29,13 @@ iree_cc_library(
     "EncodingDialect.cpp"
     "EncodingDialect.cpp.inc"
     "EncodingEnums.cpp.inc"
+    "EncodingInterfaces.cpp.inc"
     "EncodingOps.cpp"
     "EncodingOps.cpp.inc"
     "EncodingTypes.cpp.inc"
   DEPS
     ::EncodingEnumsGen
+    ::EncodingInterfacesGen
     ::EncodingOpsIncGen
     ::EncodingTypesGen
     LLVMSupport
@@ -81,6 +84,16 @@ iree_tablegen_library(
     --gen-op-defs EncodingOps.cpp.inc
     --dialect=iree_encoding --gen-dialect-decls EncodingDialect.h.inc
     --dialect=iree_encoding --gen-dialect-defs EncodingDialect.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    EncodingInterfacesGen
+  TD_FILE
+    "EncodingInterfaces.td"
+  OUTS
+    --gen-attr-interface-decls EncodingInterfaces.h.inc
+    --gen-attr-interface-defs EncodingInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
