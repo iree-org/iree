@@ -29,6 +29,7 @@ ALL_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = ALL_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
     tags = [
         # attention fails with a wasm target, just disable all tests there for now

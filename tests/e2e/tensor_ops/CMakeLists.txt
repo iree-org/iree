@@ -28,6 +28,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
 )
 
 iree_check_single_backend_test_suite(

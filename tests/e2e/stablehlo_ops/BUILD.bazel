@@ -86,6 +86,7 @@ iree_check_single_backend_test_suite(
     srcs = ALL_SRCS,
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     input_type = "stablehlo",
@@ -103,7 +104,7 @@ iree_check_single_backend_test_suite(
     srcs = ALL_SRCS,
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
-        "--iree-llvmcpu-target-cpu-features=host",
+        "--iree-llvmcpu-target-cpu=host",
     ],
     driver = "local-task",
     input_type = "stablehlo",

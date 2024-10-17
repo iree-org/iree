@@ -41,7 +41,6 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"],
     test_runner = "//tools/testing/e2e:iree-e2e-conv2d-test",
     test_type = "conv2d",
 ) for dtype in [
@@ -73,7 +72,6 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"],
     test_runner = "//tools/testing/e2e:iree-e2e-conv2d-test",
     test_type = "conv2d",
 ) for dtype in [

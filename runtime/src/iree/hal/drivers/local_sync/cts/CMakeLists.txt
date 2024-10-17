@@ -40,6 +40,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
       "semaphore_submission"  # SubmitWithWait hangs (requires async)
     LABELS
       driver=local-sync
+    COMPILER_FLAGS
+      "--iree-llvmcpu-target-cpu=generic"
     )
 endif()
 

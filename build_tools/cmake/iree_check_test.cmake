@@ -39,8 +39,6 @@ endfunction()
 #       "driver=${DRIVER}" are added automatically.
 #   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
 #       to use for the generated IREE module (.vmfb).
-#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvmcpu-target-cpu-features.
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
 #   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
 #       if no compiled support for that configuration.
@@ -53,7 +51,7 @@ function(iree_check_test)
     _RULE
     ""
     "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;INPUT_TYPE"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;DEPENDS;TIMEOUT"
     ${ARGN}
   )
 
@@ -162,9 +160,6 @@ function(iree_check_test)
   if(_RULE_INPUT_TYPE)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-input-type=${_RULE_INPUT_TYPE}")
   endif()
-  if(_RULE_TARGET_CPU_FEATURES)
-    list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
-  endif()
   if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
     list(APPEND _BASE_COMPILER_FLAGS "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}")
   endif()
@@ -242,8 +237,6 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path
 #       is added automatically.
-#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvmcpu-target-cpu-features.
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
 #   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
 #       if no compiled support for that configuration.
@@ -256,7 +249,7 @@ function(iree_check_single_backend_test_suite)
     _RULE
     ""
     "NAME;TARGET_BACKEND;DRIVER;INPUT_TYPE"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;DEPENDS;TIMEOUT"
     ${ARGN}
   )
 
@@ -284,7 +277,6 @@ function(iree_check_single_backend_test_suite)
         INPUT_TYPE ${_RULE_INPUT_TYPE}
         RUNNER_ARGS ${_RULE_RUNNER_ARGS}
         LABELS ${_RULE_LABELS}
-        TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
         DEPENDS ${_RULE_DEPENDS}
         TIMEOUT ${_RULE_TIMEOUT}
       )
@@ -309,7 +301,6 @@ function(iree_check_single_backend_test_suite)
           INPUT_TYPE ${_RULE_INPUT_TYPE}
           RUNNER_ARGS ${_RULE_RUNNER_ARGS}
           LABELS ${_RULE_LABELS}
-          TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
           DEPENDS ${_RULE_DEPENDS}
           TIMEOUT ${_RULE_TIMEOUT}
         )
@@ -328,7 +319,6 @@ function(iree_check_single_backend_test_suite)
           INPUT_TYPE ${_RULE_INPUT_TYPE}
           RUNNER_ARGS ${_RULE_RUNNER_ARGS}
           LABELS ${_RULE_LABELS}
-          TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
           DEPENDS ${_RULE_DEPENDS}
           TIMEOUT ${_RULE_TIMEOUT}
         )
@@ -342,9 +332,7 @@ endfunction()
 # This function has 3 output-params: variables that it sets with PARENT_SCOPE:
 # _ENABLED, _FEATURES_NAME, _FEATURES.
 #
-# "default" is handled specially. _ENABLED is always set to "TRUE" and
-# _FEATURES_NAME and _FEATURES are set to
-# the empty string.
+# "generic" and "host" are handled specially, as CPU names.
 #
 # Other values are parsed as "arch:features_name:features". The `arch`
 # component is  matched with `IREE_ARCH`, `_ENABLED` is set to "TRUE" if and
@@ -354,23 +342,28 @@ endfunction()
 #
 # Examples:
 #
-# default:
-#    _ENABLED="TRUE" unconditionally,
-#        other output strings are "".
+# generic:
+#    _ENABLED="TRUE" unconditionally, _FEATURES_NAME="generic", _FEATURES="".
+#
+# host:
+#    _ENABLED="TRUE" unconditionally, _FEATURES_NAME="host", _FEATURES="".
 #
 # aarch64:dotprod:+dotprod:
 #    _ENABLED="TRUE" if the target architecture is aarch64, and in that case:
 #        _FEATURES_NAME="dotprod".
 #        _FEATURES="+dotprod".
 function(parse_target_cpu_features_variant _VARIANT_STRING _ENABLED_VAR
-             _FEATURES_NAME_VAR _FEATURES_VAR)
+             _FEATURES_NAME_VAR _COMPILER_FLAGS_VAR)
   set("${_ENABLED_VAR}" FALSE PARENT_SCOPE)
   set("${_FEATURES_NAME_VAR}" "" PARENT_SCOPE)
-  set("${_FEATURES_VAR}" "" PARENT_SCOPE)
-  if("${_VARIANT_STRING}" STREQUAL "default")
+  set("${_COMPILER_FLAGS_VAR}" "" PARENT_SCOPE)
+  if("${_VARIANT_STRING}" STREQUAL "generic" OR "${_VARIANT_STRING}" STREQUAL "host")
     set("${_ENABLED_VAR}" TRUE PARENT_SCOPE)
+    set("${_FEATURES_NAME_VAR}" "${_VARIANT_STRING}" PARENT_SCOPE)
+    set("${_COMPILER_FLAGS_VAR}" "--iree-llvmcpu-target-cpu=${_VARIANT_STRING}" PARENT_SCOPE)
     return()
   endif()
+
   # Interpret _VARIANT_STRING as a CMake list (;-separated).
   string(REPLACE ":" ";" _COMPONENTS "${_VARIANT_STRING}")
   list(LENGTH _COMPONENTS _NUM_COMPONENTS)
@@ -385,7 +378,7 @@ function(parse_target_cpu_features_variant _VARIANT_STRING _ENABLED_VAR
   if(_FILTER_ARCH STREQUAL IREE_ARCH)
     set("${_ENABLED_VAR}" TRUE PARENT_SCOPE)
     set("${_FEATURES_NAME_VAR}" "${_FEATURES_NAME}" PARENT_SCOPE)
-    set("${_FEATURES_VAR}" "${_FEATURES}" PARENT_SCOPE)
+    set("${_COMPILER_FLAGS_VAR}" "--iree-llvmcpu-target-cpu-features=${_FEATURES}" PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -413,8 +406,8 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
-#       entry is either "default" for the architecture defaults, or a colon-
-#       separated triple "arch:name:cpu_features" where "arch" filters
+#       entry is either "generic" for the architecture defaults, or "host" for
+#       the host CPU, or a colon-separated triple "arch:name:cpu_features" where "arch" filters
 #       for a target CPU architecture (in IREE_ARCH format), "name" is a
 #       short name for the CPU features set (used to generate target names)
 #       and cpu_features is a comma-separated list of LLVM target attributes
@@ -443,7 +436,7 @@ function(iree_check_test_suite)
   if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
   else()
-    set(_TARGET_CPU_FEATURES_VARIANTS "default")
+    set(_TARGET_CPU_FEATURES_VARIANTS "generic")
   endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
@@ -466,7 +459,7 @@ function(iree_check_test_suite)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
     foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       parse_target_cpu_features_variant("${_VARIANT_STRING}"
-        _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)
+        _ENABLED _TARGET_CPU_FEATURES_NAME _VARIANT_COMPILER_FLAGS)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
@@ -488,12 +481,11 @@ function(iree_check_test_suite)
           ${_DRIVER}
         COMPILER_FLAGS
           ${_RULE_COMPILER_FLAGS}
+          ${_VARIANT_COMPILER_FLAGS}
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_LABELS}
-        TARGET_CPU_FEATURES
-          ${_TARGET_CPU_FEATURES}
         TIMEOUT
           ${_RULE_TIMEOUT}
         INPUT_TYPE

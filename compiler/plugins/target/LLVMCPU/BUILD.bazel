@@ -101,6 +101,21 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "ResolveCPUAndCPUFeatures",
+    srcs = [
+        "ResolveCPUAndCPUFeatures.cpp",
+    ],
+    hdrs = [
+        "ResolveCPUAndCPUFeatures.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TargetParser",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "LLVMTargetOptions",
     srcs = [
         "LLVMTargetOptions.cpp",
@@ -109,6 +124,7 @@ iree_compiler_cc_library(
         "LLVMTargetOptions.h",
     ],
     deps = [
+        ":ResolveCPUAndCPUFeatures",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",

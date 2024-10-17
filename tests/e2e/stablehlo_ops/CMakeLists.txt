@@ -82,6 +82,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+    "--iree-llvmcpu-target-cpu=generic"
   INPUT_TYPE
     "stablehlo"
   LABELS
@@ -160,7 +161,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-    "--iree-llvmcpu-target-cpu-features=host"
+    "--iree-llvmcpu-target-cpu=host"
   INPUT_TYPE
     "stablehlo"
   LABELS

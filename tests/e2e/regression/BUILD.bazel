@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-llvmcpu-reassociate-fp-reductions=false",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     input_type = "stablehlo",
@@ -78,6 +79,7 @@ iree_check_single_backend_test_suite(
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",
     ] + BACKEND_TESTS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
     input_type = "stablehlo",
     target_backend = "llvm-cpu",
@@ -91,6 +93,7 @@ iree_check_single_backend_test_suite(
         # so this tests provides e2e coverage for that pass.
         "linalg_quantized_matmul_vs_linalg_matmul.mlir",
     ],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
     input_type = "tosa",
     target_backend = "llvm-cpu",
@@ -160,7 +163,10 @@ iree_check_single_backend_test_suite(
     srcs = [
         "disable_demote_f64_to_f32.mlir",
     ],
-    compiler_flags = ["-iree-input-demote-f64-to-f32=false"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -172,6 +178,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-dispatch-creation-fuse-multi-use",
+        "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",

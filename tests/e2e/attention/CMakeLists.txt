@@ -25,8 +25,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -50,8 +48,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_e2e_runner_test(
@@ -75,8 +71,6 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 # To distinguish between CDNA(gfx9) and RDNA3(gfx11)

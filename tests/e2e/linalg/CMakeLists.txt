@@ -22,6 +22,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
   LABELS
     "nowasm"
 )
@@ -62,6 +64,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-llvmcpu-target-cpu=generic"
 )
 
 iree_check_single_backend_test_suite(

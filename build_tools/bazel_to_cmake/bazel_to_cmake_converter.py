@@ -769,7 +769,6 @@ class BuildFileFunctions(object):
         target_backends_and_drivers=None,
         runner_args=None,
         tags=None,
-        target_cpu_features=None,
         timeout=None,
         **kwargs,
     ):
@@ -787,9 +786,6 @@ class BuildFileFunctions(object):
         input_type_block = self._convert_string_arg_block("INPUT_TYPE", input_type)
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
-        target_cpu_features_block = self._convert_string_arg_block(
-            "TARGET_CPU_FEATURES", target_cpu_features
-        )
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
         self._converter.body += (
@@ -802,7 +798,6 @@ class BuildFileFunctions(object):
             f"{input_type_block}"
             f"{runner_args_block}"
             f"{labels_block}"
-            f"{target_cpu_features_block}"
             f"{timeout_block}"
             f")\n\n"
         )

@@ -38,6 +38,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
       iree::hal::drivers::local_task::registration
     LABELS
       driver=local-task
+    COMPILER_FLAGS
+      "--iree-llvmcpu-target-cpu=generic"
   )
 endif()
 

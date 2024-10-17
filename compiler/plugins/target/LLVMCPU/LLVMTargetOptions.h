@@ -9,6 +9,7 @@
 
 #include <string_view>
 
+#include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/raw_ostream.h"
@@ -66,10 +67,10 @@ struct LLVMTarget {
   void storeToConfigAttrs(MLIRContext *context,
                           SmallVector<NamedAttribute> &config) const;
 
-  static std::optional<LLVMTarget> create(std::string_view triple,
-                                          std::string_view cpu,
-                                          std::string_view cpuFeatures,
-                                          bool requestLinkEmbedded);
+  static std::optional<LLVMTarget>
+  create(std::string_view triple, std::string_view cpu,
+         std::string_view cpuFeatures, bool requestLinkEmbedded,
+         ResolveCPUAndCPUFeaturesStatus &status);
 
   static std::optional<LLVMTarget> createForHost();
 
@@ -170,25 +171,26 @@ createTargetMachine(const LLVMTarget &target);
 // Parse into LLVMTargetOptions using getTargetOptions().
 struct LLVMCPUTargetCLOptions {
   // Target invariant flags.
-  std::string systemLinkerPath = "";
-  std::string embeddedLinkerPath = "";
-  std::string wasmLinkerPath = "";
+  std::string systemLinkerPath;
+  std::string embeddedLinkerPath;
+  std::string wasmLinkerPath;
   bool keepLinkerArtifacts = false;
 
   // Default device options.
-  std::string targetTriple = "";
-  std::string targetCPU = "generic";
-  std::string targetCPUFeatures = "";
+  std::string targetTriple;
+  std::string targetCPU;
+  std::string loggingUnspecifiedTargetCPU;
+  std::string targetCPUFeatures;
   bool linkEmbedded = LLVMTarget::DEFAULT_LINK_EMBEDDED;
   bool linkStatic = LLVMTarget::DEFAULT_LINK_STATIC;
-  std::string staticLibraryOutputPath = "";
+  std::string staticLibraryOutputPath;
   bool debugSymbols = LLVMTarget::DEFAULT_DEBUG_SYMBOLS;
   bool llvmLoopInterleaving = LLVMTarget::DEFAULT_LOOP_INTERLEAVING;
   bool llvmLoopVectorization = LLVMTarget::DEFAULT_LOOP_VECTORIZATION;
   bool llvmLoopUnrolling = LLVMTarget::DEFAULT_LOOP_UNROLLING;
   bool llvmSLPVectorization = LLVMTarget::DEFAULT_SLP_VECTORIZATION;
   SanitizerKind sanitizerKind = LLVMTarget::DEFAULT_SANITIZER_KIND;
-  std::string targetABI = "";
+  std::string targetABI;
   llvm::FloatABI::ABIType targetFloatABI = LLVMTarget::DEFAULT_FLOAT_ABI;
   std::string targetDataLayout = LLVMTarget::DEFAULT_DATA_LAYOUT;
   unsigned targetVectorWidthInBytes = LLVMTarget::DEFAULT_VECTOR_WIDTH_IN_BYTES;

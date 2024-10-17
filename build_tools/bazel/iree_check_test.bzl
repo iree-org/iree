@@ -24,7 +24,6 @@ def iree_check_test(
         input_type = None,
         runner_args = [],
         tags = [],
-        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
@@ -43,14 +42,10 @@ def iree_check_test(
           driver and input file are passed automatically.
       tags: additional tags to apply to the generated test. Tag
           "driver=DRIVER" and "target=TARGET" are added automatically.
-      target_cpu_features: currently unimplemented (must be empty), will
-          eventually allow specifying target CPU features.
       timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying native_test.
     """
 
-    if target_cpu_features:
-        fail("target_cpu_features must currently be empty")
     input_type_flags = []
     if input_type:
         input_type_flags = ["--iree-input-type=%s" % input_type]
@@ -91,7 +86,6 @@ def iree_check_single_backend_test_suite(
         input_type = None,
         runner_args = [],
         tags = [],
-        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
@@ -112,8 +106,6 @@ def iree_check_single_backend_test_suite(
           iree-check-module tests. The driver and input file are passed
           automatically. To use different runner_args per test, create a
           separate suite or iree_check_test.
-      target_cpu_features: currently unimplemented (must be empty), will
-          eventually allow specifying target CPU features.
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
@@ -129,13 +121,6 @@ def iree_check_single_backend_test_suite(
     # ROCm/HIP backend/driver not supported by Bazel build.
     if target_backend == "rocm" or driver == "hip":
         return
-
-    # We haven't implemented this so far because we have been using target_cpu_features so far only
-    # for aarch64 targets, for which we use the CMake build. To future people implementing this:
-    # target_cpu_features should be a list, and here it should be joined into a comma-separated
-    # string to be passed to --iree-llvmcpu-target-cpu-features
-    if target_cpu_features:
-        fail("target_cpu_features must currently be empty")
 
     tests = []
     for src in srcs:
@@ -196,20 +181,15 @@ def iree_check_test_suite(
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
-      target_cpu_features_variants: list of target cpu features variants.
-          Currently unimplemented in Bazel due to difficulty of specializing
-          to target architecture in Bazel. The following describes the
-          semantics that this should have if implemented. Each
-          entry is either "default" for the architecture defaults, or a colon-
-          separated triple "arch:name:cpu_features" where "arch" filters
-          for a target CPU architecture (in IREE_ARCH format), "name" is a
-          short name for the CPU features set (used to generate target names)
-          and cpu_features is a comma-separated list of LLVM target attributes
-          to enable. Example:
-            x86_64:avx2_fma:+avx,+avx2,+fma
+      target_cpu_features_variants: ignored, assumed to be ["generic"] in this
+          Bazel implementation. See the CMake implementation for what this does
+          in general.
       **kwargs: any additional attributes to pass to the underlying tests and
           test suite.
     """
+
+    # Like CMake, default to "generic". Unlike CMake, do not honor other values.
+    generic_flags = compiler_flags + ["--iree-llvmcpu-target-cpu=generic"]
 
     # We could have complicated argument override logic for runner_args and such, or... the client
     # could just create a test suite. The latter seems simpler and more readable.
@@ -221,7 +201,7 @@ def iree_check_test_suite(
             srcs = srcs,
             driver = driver,
             target_backend = backend,
-            compiler_flags = compiler_flags,
+            compiler_flags = generic_flags,
             input_type = input_type,
             runner_args = runner_args,
             tags = tags,
