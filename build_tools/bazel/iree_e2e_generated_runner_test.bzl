@@ -53,7 +53,7 @@ def iree_e2e_runner_test(
         src = tests_src,
         flags = [
             "--iree-hal-target-backends=%s" % target_backend,
-            "--iree-hal-target-cpu=generic",
+            "--iree-llvmcpu-target-cpu=generic",
         ] + compiler_flags,
         visibility = ["//visibility:private"],
         testonly = True,

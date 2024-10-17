@@ -51,7 +51,7 @@ def iree_check_test(
         input_type_flags = ["--iree-input-type=%s" % input_type]
     flags = [
         "--iree-hal-target-backends=%s" % target_backend,
-        "--iree-hal-target-cpu=generic",
+        "--iree-llvmcpu-target-cpu=generic",
     ] + compiler_flags + input_type_flags
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
