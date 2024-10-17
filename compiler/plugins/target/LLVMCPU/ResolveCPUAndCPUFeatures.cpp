@@ -104,10 +104,10 @@ Examples:
 
     cpu=generic
         Target a generic CPU of the target architecture. The generated code will have poor performance, but will run on any CPU.
-    
+
     cpu=host
         Target the host CPU. The generated code will have optimal performance on the host CPU but will crash on other CPUs not supporting the same CPU features.
-  
+
     cpu="name"
         Target a specific CPU. This is mostly used on x86. The accepted values are the same as in Clang command lines.)MSG";
   if (triple.isX86()) {
