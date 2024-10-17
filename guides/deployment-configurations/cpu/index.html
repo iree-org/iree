@@ -1025,6 +1025,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#download-the-runtime-from-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Download the runtime from a release
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#build-the-runtime-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       Build the runtime from source
@@ -3786,6 +3795,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#download-the-runtime-from-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Download the runtime from a release
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#build-the-runtime-from-source" class="md-nav__link">
     <span class="md-ellipsis">
       Build the runtime from source
@@ -3927,7 +3945,7 @@ The core <code>iree-compiler</code> package includes the LLVM-based CPU compiler
 <div class="tabbed-block">
 <p>Stable release packages are
 <a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler<span class="w"> </span>iree-runtime
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3935,17 +3953,17 @@ The core <code>iree-compiler</code> package includes the LLVM-based CPU compiler
 <a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--upgrade<span class="w"> </span>iree-compiler
+<span class="w">  </span>--upgrade<span class="w"> </span>iree-compiler<span class="w"> </span>iree-runtime
 </code></pre></div>
 </div>
 </div>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p><code>iree-compile</code> is installed to your python module installation path. If you
-pip install with the user mode, it is under <code>${HOME}/.local/bin</code>, or
-<code>%APPDATA%Python</code> on Windows. You may want to include the path in your
-system's <code>PATH</code> environment variable:</p>
+<p><code>iree-compile</code> and other tools are installed to your python module
+installation path. If you pip install with the user mode, it is under
+<code>${HOME}/.local/bin</code>, or <code>%APPDATA%Python</code> on Windows. You may want to
+include the path in your system's <code>PATH</code> environment variable:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/.local/bin:<span class="si">${</span><span class="nv">PATH</span><span class="si">}</span>
 </code></pre></div>
 </div>
@@ -3971,11 +3989,35 @@ along with the appropriate executable loaders for your application.</p>
 drivers:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--list_drivers
 
-<span class="go">        cuda: CUDA (dynamic)</span>
+<span class="go">        cuda: NVIDIA CUDA HAL driver (via dylib)</span>
+<span class="go">         hip: HIP HAL driver (via dylib)</span>
 <span class="hll"><span class="go">  local-sync: Local execution using a lightweight inline synchronous queue</span>
 </span><span class="hll"><span class="go">  local-task: Local execution using the IREE multithreading task system</span>
 </span><span class="go">      vulkan: Vulkan 1.x (dynamic)</span>
 </code></pre></div>
+<h4 id="download-the-runtime-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the runtime from a release<a class="headerlink" href="#download-the-runtime-from-a-release" title="Permanent link">link</a></h4>
+<p>Python packages are regularly published to
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
+<a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
+The core <code>iree-runtime</code> package includes the local CPU HAL drivers:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Stable release packages are
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-runtime
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Nightly releases are published on
+<a href="https://github.com/iree-org/iree/releases">GitHub releases</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://iree.dev/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span>iree-runtime
+</code></pre></div>
+</div>
+</div>
+</div>
 <h4 id="build-the-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the runtime from source<a class="headerlink" href="#build-the-runtime-from-source" title="Permanent link">link</a></h4>
 <p>Please make sure you have followed the
 <a href="../../../building-from-source/getting-started/">Getting started</a> page to build
