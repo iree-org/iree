@@ -1047,3 +1047,95 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 2, stride = 32) : (f32) -> f32
 // Accumulator reduction
 // CHECK: arith.maximumf %{{.*}}, %{{.*}} : vector<1x1x1xf32>
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+func.func @mfma_16x16x16_out_reduced_alldims(%arg0: vector<32x32xf32>, %arg1: f32) -> f32 {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xf32>
+  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [0, 1] : vector<32x32xf32> to f32
+  return %0 : f32
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @mfma_16x16x16_out_reduced_alldims
+// Local reduction
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf32> to f32
+// Global reduction
+// CHECK: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 16) : (f32) -> f32
+// CHECK-NEXT: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// Accumulator reduction
+// CHECK: arith.maximumf %{{.*}}, %{{.*}} : vector<1xf32>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+func.func @distribute_scf_for(%arr: memref<32x32xf16>, %a: vector<32x32xf16>) -> vector<f32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %cst = arith.constant dense<0.000000e+00> : vector<f32>
+  %cst_0 = arith.constant 0.0 : f16
+  %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %cst) -> (vector<f32>) {
+    %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<32x32xf16>, vector<32x32xf16>
+    %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<32x32xf16>
+    %b = arith.addf %rootl, %a : vector<32x32xf16>
+    %c = arith.extf %b : vector<32x32xf16> to vector<32x32xf32>
+    %init = vector.extractelement %arg0[] : vector<f32>
+    %root_red = vector.multi_reduction<add>, %c, %init [0, 1]  : vector<32x32xf32> to f32
+    %d = vector.broadcast %root_red : f32 to vector<f32>
+    scf.yield %d : vector<f32>
+  }
+  return %out : vector<f32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @distribute_scf_for
+// CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
+// CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<f32>)
+// CHECK: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf16> -> vector<2x2x1x1x1x4xf16>
+// CHECK: %[[B:.*]] = arith.addf %{{.*}}, %[[A]]
+// CHECK: %[[C:.*]] = arith.extf %[[B]]
+// CHECK-NEXT: %[[D:.*]] = vector.extractelement %[[ARG0]][] : vector<f32>
+// Local reduction
+// CHECK: vector.multi_reduction <add>, %[[C]], %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf32> to f32
+// Global reduction
+// CHECK: gpu.subgroup_reduce add %{{.*}} cluster(size = 16) : (f32) -> f32
+// CHECK-NEXT: gpu.subgroup_reduce add %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// Accumulator reduction
+// CHECK: vector.broadcast %[[D]] : f32 to vector<1xf32>
+// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1xf32>
