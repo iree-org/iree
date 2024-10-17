@@ -228,7 +228,7 @@ hal.executable private @main {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #config = #iree_gpu.lowering_config<{
-  workgroup = [1, 4, 16, 256, 0],
+  workgroup = [1, 4, 16, 16, 0],
   reduction = [0, 0, 0, 0, 2],
   subgroup = [1, 4, 1, 4, 0],
   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -290,6 +290,7 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //      CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//         CHECK:   scf.forall ({{.*}}) in (2, 4, 1, 5) {
 //          CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x4x1x4x4x1xf32>)
 //          CHECK:     gpu.barrier
 //      CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
@@ -306,6 +307,7 @@ hal.executable private @main {
 //          CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
 //          CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<4x1x4x4x1xf32> from vector<1x4x1x4x4x1xf32>
 //          CHECK:   vector.transfer_write %[[EXTRACT]], %[[B2]]
+//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
@@ -1033,9 +1035,9 @@ hal.executable public @main {
 // TODO: The fact that this read gets hoisted out of the subsequent for loop
 // is a bug in LICM that does no verification that the loop has at least one
 // trip.
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<4xf32>
 //       CHECK:     scf.for %{{.*}} = %{{.*}} to %c1 step %c32
-//  CHECK-NEXT:       vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC]]
+//       CHECK:       %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<4xf32>
+//       CHECK:       vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC]]
 //       CHECK:     gpu.barrier
 //   CHECK-DAG:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<4xf32>
 //   CHECK-DAG:     %[[RHS_MM:.+]] = vector.transfer_read %[[RHS_ALLOC]]{{.*}} vector<4x4xf32>
