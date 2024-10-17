@@ -54,6 +54,7 @@ struct GPUPipelineOptions {
   bool prefetchSharedMemory = false;
   bool useIgemmConvolution = false;
   bool enableUkernels = false;
+  bool generateContract = true;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };
 

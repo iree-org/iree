@@ -231,6 +231,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
+  // used for supporting reduction along VectorDistribute pipeline
+  // disable conversion from reduction ops to contraction ops.
+  options.generateContract = generateContract;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -901,7 +904,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
-  addGPUVectorizationPasses(funcPassManager);
+  if (options.generateContract) {
+    addGPUVectorizationPasses(funcPassManager);
+  } else {
+    // disable conversion from reductions ops to contraction ops.
+    addGPUVectorizationPasses(funcPassManager, options.generateContract);
+  }
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
