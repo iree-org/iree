@@ -37,7 +37,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -1751,4 +1750,52 @@ ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy(MlirAttribute attr) {
 MlirTypeID ireeGPUPipelineOptionsAttrGetTypeID() {
   return wrap(
       mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::getTypeID());
+}
+
+static_assert(
+    static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumNone) ==
+            static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
+                                      ReorderWorkgroupsStrategy::None) &&
+        static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumSwizzle) ==
+            static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
+                                      ReorderWorkgroupsStrategy::Swizzle) &&
+        static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumTranspose) ==
+            static_cast<uint32_t>(mlir::iree_compiler::IREE::GPU::
+                                      ReorderWorkgroupsStrategy::Transpose) &&
+        static_cast<uint32_t>(ireeGPUReorderWorkgroupsStrategyEnumTranspose) ==
+            mlir::iree_compiler::IREE::GPU::
+                getMaxEnumValForReorderWorkgroupsStrategy(),
+    "ireeGPUReorderWorkgroupsStrategyEnum and "
+    "mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy definitions "
+    "have diverged");
+
+bool ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(MlirAttribute attr) {
+  return llvm::isa<
+      mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPUReorderWorkgroupsStrategyAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr::
+                  getTypeID());
+}
+
+MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(
+    MlirContext mlirCtx, ireeGPUReorderWorkgroupsStrategyEnum value) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr::get(
+          ctx, static_cast<
+                   mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy>(
+                   value)));
+}
+
+ireeGPUReorderWorkgroupsStrategyEnum
+ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(attr) &&
+         "attr is not a GPUReorderWorkgroupsStrategyAttr");
+  return static_cast<ireeGPUReorderWorkgroupsStrategyEnum>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
+          unwrap(attr))
+          .getValue());
 }

@@ -9,14 +9,31 @@
 
 #include "mlir-c/IR.h"
 #include "mlir-c/Support.h"
-#include "mlir/CAPI/Wrap.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+enum ireeGPUReorderWorkgroupsStrategyEnum {
+  ireeGPUReorderWorkgroupsStrategyEnumNone = 0,
+  ireeGPUReorderWorkgroupsStrategyEnumSwizzle = 1,
+  ireeGPUReorderWorkgroupsStrategyEnumTranspose = 2,
+};
+
 MLIR_CAPI_EXPORTED bool
-ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
+ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID
+ireeGPUReorderWorkgroupsStrategyAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(
+    MlirContext mlirCtx, ireeGPUReorderWorkgroupsStrategyEnum value);
+
+MLIR_CAPI_EXPORTED ireeGPUReorderWorkgroupsStrategyEnum
+ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED
+bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,

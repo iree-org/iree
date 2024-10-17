@@ -19,6 +19,53 @@ PYBIND11_MODULE(_ireeCompilerDialects, m) {
       m.def_submodule("iree_gpu", "iree_gpu dialect bindings");
 
   //===-------------------------------------------------------------------===//
+  // GPUReorderWorkgroupsStrategyAttr
+  //===-------------------------------------------------------------------===//
+
+  auto strategyEnum =
+      py::enum_<ireeGPUReorderWorkgroupsStrategyEnum>(
+          iree_gpu_module, "ReorderWorkgroupsStrategy", py::module_local())
+          .value("None_", ireeGPUReorderWorkgroupsStrategyEnumNone)
+          .value("Swizzle", ireeGPUReorderWorkgroupsStrategyEnumSwizzle)
+          .value("Transpose", ireeGPUReorderWorkgroupsStrategyEnumTranspose)
+          .def(
+              "__str__",
+              [](ireeGPUReorderWorkgroupsStrategyEnum &self) {
+                switch (self) {
+                case ireeGPUReorderWorkgroupsStrategyEnumNone:
+                  return "None";
+                case ireeGPUReorderWorkgroupsStrategyEnumSwizzle:
+                  return "Swizzle";
+                case ireeGPUReorderWorkgroupsStrategyEnumTranspose:
+                  return "Transpose";
+                default:
+                  llvm::report_fatal_error(
+                      "unknown ReorderWorkgroupsStrategy variant");
+                }
+              },
+              // pybind overloads are tried in the order they were registered.
+              // As a result, enums used the default __str__ method instead of
+              // the custom one. Adding py::prepend() fixes this issue.
+              py::prepend());
+
+  mlir_attribute_subclass(iree_gpu_module, "ReorderWorkgroupsStrategyAttr",
+                          ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr,
+                          ireeGPUReorderWorkgroupsStrategyAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, ireeGPUReorderWorkgroupsStrategyEnum value,
+             MlirContext ctx) {
+            return ireeGPUReorderWorkgroupsStrategyAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets a gpu.reorder_workgroups_strategy from parameters.")
+      .def_property_readonly(
+          "value",
+          [](MlirAttribute self) -> ireeGPUReorderWorkgroupsStrategyEnum {
+            return ireeGPUReorderWorkgroupsStrategyAttrGetValue(self);
+          });
+
+  //===-------------------------------------------------------------------===//
   // GPUPipelineOptionsAttr
   //===-------------------------------------------------------------------===//
 
