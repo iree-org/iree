@@ -752,6 +752,22 @@ util.func public @foldSplatReshapeIntoSplatDynamic(%arg0 : f32, %arg1 : index, %
 
 // -----
 
+// CHECK-LABEL: @foldSplatReshapeIntoSplatAfterDefs
+util.func public @foldSplatReshapeIntoSplatAfterDefs(%arg0 : f32) -> tensor<?x?xf32> {
+  // CHECK: %[[RES:.+]] = flow.tensor.splat %arg0 : tensor<?x?xf32>
+  // CHECK-NEXT: util.return %[[RES]] : tensor<?x?xf32>
+  %cst10 = arith.constant 10 : index
+  %cst4 = arith.constant 4 : index
+  %nofold0 = util.optimization_barrier %cst10 : index
+  %0 = flow.tensor.splat %arg0 : tensor<?x4xf32>{%nofold0}
+  %nofold1 = util.optimization_barrier %cst10 : index
+  %nofold2 = util.optimization_barrier %cst4 : index
+  %1 = flow.tensor.reshape %0 : tensor<?x4xf32>{%nofold0} -> tensor<?x?xf32>{%nofold1, %nofold2}
+  util.return %1 : tensor<?x?xf32>
+}
+
+// -----
+
 util.func public @innermost_unit_dim(%4: !flow.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>>,
     %arg0: index, %arg2 : index, %10 : index, %9 : index) -> tensor<?x?x?xf16> {
   %c16 = arith.constant 16 : index
