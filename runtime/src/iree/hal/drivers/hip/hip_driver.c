@@ -13,7 +13,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
-#include "iree/hal/drivers/hip/hip_device.h"
 #include "iree/hal/drivers/hip/hip_device_group_device.h"
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -375,9 +374,9 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   iree_string_view_t device_name = iree_make_cstring_view("hip");
 
   // Attempt to create the device now.
-  iree_status_t status = iree_hal_hip_device_create(
+  iree_status_t status = iree_hal_hip_device_group_device_create(
       base_driver, device_name, &driver->device_params, &driver->hip_symbols,
-      &driver->nccl_symbols, device, host_allocator, out_device);
+      &driver->nccl_symbols, 1, &device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

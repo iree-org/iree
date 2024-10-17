@@ -31,11 +31,11 @@ iree_cc_library(
     "hip_allocator.h"
     "hip_buffer.c"
     "hip_buffer.h"
-    "hip_device.c"
-    "hip_device.h"
     "hip_driver.c"
     "hip_device_group_device.h"
     "hip_device_group_device.c"
+    "hip_device_group_command_buffer.h"
+    "hip_device_group_command_buffer.c"
     "memory_pools.c"
     "memory_pools.h"
     "native_executable.c"
@@ -70,7 +70,6 @@ iree_cc_library(
     iree::hal::utils::deferred_work_queue
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
-    iree::hal::utils::device_group_command_buffer
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::hal::utils::stream_tracing

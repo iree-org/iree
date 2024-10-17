@@ -154,18 +154,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "device_group_command_buffer",
-    srcs = ["device_group_command_buffer.c"],
-    hdrs = ["device_group_command_buffer.h"],
-    deps = [
-        ":libmpi",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],

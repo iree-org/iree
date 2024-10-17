@@ -184,21 +184,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    device_group_command_buffer
-  HDRS
-    "device_group_command_buffer.h"
-  SRCS
-    "device_group_command_buffer.c"
-  DEPS
-    ::libmpi
-    iree::base::internal
-    iree::base::internal::arena
-    iree::hal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     resource_set
   HDRS
     "resource_set.h"

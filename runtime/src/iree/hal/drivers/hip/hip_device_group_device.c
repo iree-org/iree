@@ -19,6 +19,7 @@
 #include "iree/hal/drivers/hip/event_semaphore.h"
 #include "iree/hal/drivers/hip/graph_command_buffer.h"
 #include "iree/hal/drivers/hip/hip_allocator.h"
+#include "iree/hal/drivers/hip/hip_device_group_command_buffer.h"
 #include "iree/hal/drivers/hip/memory_pools.h"
 #include "iree/hal/drivers/hip/nop_executable_cache.h"
 #include "iree/hal/drivers/hip/per_device_information.h"
@@ -29,7 +30,6 @@
 #include "iree/hal/drivers/hip/timepoint_pool.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/deferred_work_queue.h"
-#include "iree/hal/utils/device_group_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
 #include "iree/hal/utils/stream_tracing.h"
@@ -85,14 +85,6 @@ typedef struct iree_hal_hip_device_group_device_t {
   uint32_t num_physical_devices;
   iree_hal_hip_per_device_information_t device_contexts[];
 } iree_hal_hip_device_group_device_t;
-
-static const iree_utils_device_group_command_buffer_interface_vtable_t
-    iree_hal_device_group_command_buffer_interface_vtable;
-typedef struct iree_hal_hip_device_group_command_buffer_interface_t {
-  iree_utils_device_group_command_buffer_interface_t base;
-  iree_allocator_t host_allocator;
-  iree_hal_hip_device_group_device_t* device;
-} iree_hal_hip_device_group_command_buffer_interface_t;
 
 static const iree_hal_device_vtable_t iree_hal_hip_device_group_device_vtable;
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
@@ -413,7 +405,7 @@ iree_hal_hip_device_group_device_cast_unsafe(iree_hal_device_t* base_value) {
   return (iree_hal_hip_device_group_device_t*)base_value;
 }
 
-IREE_API_EXPORT void iree_hal_hip_device_group_device_params_initialize(
+IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
     iree_hal_hip_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
@@ -988,17 +980,6 @@ iree_hal_hip_device_group_device_create_command_buffer_internal(
     ++cb_num;
   }
 
-  iree_hal_hip_device_group_command_buffer_interface_t* iface;
-  if (IREE_LIKELY(iree_status_is_ok(status))) {
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        device->host_allocator,
-        sizeof(iree_hal_hip_device_group_command_buffer_interface_t),
-        (void**)&iface));
-    iface->base.vtable = &iree_hal_device_group_command_buffer_interface_vtable;
-    iface->device = device;
-    iface->host_allocator = device->host_allocator;
-  }
-
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     for (uint32_t i = 0; i < IREE_HAL_MAX_QUEUES; ++i) {
       if (buffers[i]) {
@@ -1008,10 +989,10 @@ iree_hal_hip_device_group_device_create_command_buffer_internal(
     return status;
   }
 
-  return iree_hal_device_group_command_buffer_create(
+  return iree_hal_hip_device_group_command_buffer_create(
       device->host_allocator, cb_num, &buffers[0], device->device_allocator,
-      mode, command_categories, queue_affinity, binding_capacity,
-      (iree_utils_device_group_command_buffer_interface_t*)iface,
+      mode, command_categories, queue_affinity, device->hip_symbols,
+      device->num_physical_devices, device->device_contexts, binding_capacity,
       out_command_buffer);
 }
 
@@ -1339,8 +1320,8 @@ static iree_status_t iree_hal_hip_device_group_device_queue_execute(
       if (iree_hal_deferred_command_buffer_isa(command_buffers[j])) {
         cbs[j] = command_buffers[j];
       } else {
-        status = iree_hal_device_group_command_buffer_get(command_buffers[j],
-                                                          1 << idx, &cbs[j]);
+        status = iree_hal_hip_device_group_command_buffer_get(
+            command_buffers[j], 1 << idx, &cbs[j]);
       }
     }
     if (iree_status_is_ok(status)) {
@@ -1414,6 +1395,13 @@ static iree_status_t iree_hal_hip_device_group_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
+}
+
+const iree_hal_hip_dynamic_symbols_t* iree_hal_hip_device_group_dynamic_symbols(
+    iree_hal_device_t* base_device) {
+  iree_hal_hip_device_group_device_t* device =
+      iree_hal_hip_device_group_device_cast_unsafe(base_device);
+  return device->hip_symbols;
 }
 
 static const iree_hal_device_vtable_t iree_hal_hip_device_group_device_vtable =
@@ -1497,39 +1485,4 @@ static const iree_hal_stream_tracing_device_interface_vtable_t
             iree_hal_hip_tracing_device_group_device_interface_record_native_event,
         .add_graph_event_record_node =
             iree_hal_hip_tracing_device_group_device_interface_add_graph_event_record_node,
-};
-
-static void iree_hal_hip_device_group_command_buffer_interface_destroy(
-    iree_utils_device_group_command_buffer_interface_t* base) {
-  iree_hal_hip_device_group_command_buffer_interface_t* interface =
-      (iree_hal_hip_device_group_command_buffer_interface_t*)base;
-  iree_allocator_free(interface->host_allocator, interface);
-}
-
-static iree_status_t
-iree_hal_hip_device_group_command_buffer_interface_push_command_buffer_context(
-    iree_utils_device_group_command_buffer_interface_t* base, uint64_t index) {
-  iree_hal_hip_device_group_command_buffer_interface_t* interface =
-      (iree_hal_hip_device_group_command_buffer_interface_t*)base;
-  return IREE_HIP_RESULT_TO_STATUS(
-      interface->device->hip_symbols,
-      hipCtxPushCurrent(interface->device->device_contexts[index].hip_context));
-}
-
-static iree_status_t
-iree_hal_hip_device_group_command_buffer_interface_pop_command_buffer_context(
-    iree_utils_device_group_command_buffer_interface_t* base) {
-  iree_hal_hip_device_group_command_buffer_interface_t* interface =
-      (iree_hal_hip_device_group_command_buffer_interface_t*)base;
-  return IREE_HIP_RESULT_TO_STATUS(interface->device->hip_symbols,
-                                   hipCtxPopCurrent(NULL));
-}
-
-static const iree_utils_device_group_command_buffer_interface_vtable_t
-    iree_hal_device_group_command_buffer_interface_vtable = {
-        .destroy = &iree_hal_hip_device_group_command_buffer_interface_destroy,
-        .pop_command_buffer_context =
-            &iree_hal_hip_device_group_command_buffer_interface_pop_command_buffer_context,
-        .push_command_buffer_context =
-            &iree_hal_hip_device_group_command_buffer_interface_push_command_buffer_context,
 };

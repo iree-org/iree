@@ -29,6 +29,30 @@ iree_status_t iree_hal_hip_device_group_device_create(
     uint32_t device_count, hipDevice_t* devices,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
+// Returns the dynamic symbol table from the |device| if it is a HIP device
+// and otherwise returns NULL.
+//
+// WARNING: the symbols are only valid for as long as the device is. Hosting
+// libraries and applications should prefer to either link against HIP
+// themselves or maintain their own dynamic linking support: the IREE runtime
+// only provides the symbols required by the HAL driver and not the entirety of
+// the API.
+const iree_hal_hip_dynamic_symbols_t* iree_hal_hip_device_group_dynamic_symbols(
+    iree_hal_device_t* device);
+
+// Hide the cast in a function as HIP deliberately added a type name for it.
+// HIP seem to not provide cast functions.
+// It will probably never going to change, but lets not pretend everywhere it
+// is void*.
+static inline iree_device_size_t iree_hal_hip_device_ptr_to_device_size(
+    hipDeviceptr_t p) {
+  return (uintptr_t)p;
+}
+static inline hipDeviceptr_t iree_hal_hip_device_size_to_hip_device_prt(
+    iree_device_size_t p) {
+  return (hipDeviceptr_t)p;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
