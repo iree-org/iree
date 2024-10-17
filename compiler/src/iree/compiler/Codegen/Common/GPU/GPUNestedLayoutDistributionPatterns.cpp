@@ -308,7 +308,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     // Types such as vector<f32> can return a valid pointer. An additional
     // rank check is added to ensure that the type is indeed a vector
     // value.
-    bool isSrcVector = (srcVector) && (srcVector.getType().getRank() != 0);
+    bool isSrcVector = (srcVector) && (isVector(srcVector));
     if (!isSrcVector) {
       // The way distribution currently works, there is no partial thread
       // distribution, so a scalar is available to all threads. Scalar

@@ -536,7 +536,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> newInitArgs;
     for (Value initArg : forOp.getInitArgs()) {
       if (auto vectorInitArg = dyn_cast<VectorValue>(initArg)) {
-        if (vectorInitArg.getType().getRank() != 0) {
+        if (isVector(vectorInitArg)) {
           initArg =
               getDistributed(rewriter, vectorInitArg, signature[vectorInitArg]);
         }
@@ -586,7 +586,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         // Types such as vector<f32> can pass this condition. An additional rank
         // check is added here to ensure that the type is indeed a vector value.
-        if (vectorOperand.getType().getRank() != 0) {
+        if (isVector(vectorOperand)) {
           operand = DistributionPattern::getDistributed(
               rewriter, vectorOperand, signature[vectorOperand]);
         }
@@ -612,7 +612,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
       Value val = bbArg;
       if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
-        if (oldVectorInit.getType().getRank() != 0) {
+        if (isVector(oldVectorInit)) {
           val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
               oldVectorInit.getLoc(), oldVectorInit.getType(), val);
         }
