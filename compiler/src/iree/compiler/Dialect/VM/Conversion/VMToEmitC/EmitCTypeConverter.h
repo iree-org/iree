@@ -25,7 +25,6 @@ public:
   emitc::PointerType convertTypeAsPointer(Type type) const;
   emitc::OpaqueType convertTypeAsCType(Type type) const;
 
-  SetVector<Operation *> sourceMaterializations;
   mutable ModuleAnalysis analysis;
 };
 
