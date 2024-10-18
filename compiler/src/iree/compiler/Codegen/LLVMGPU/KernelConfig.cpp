@@ -63,6 +63,12 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUTestVectorDistributionReduction(
+    "iree-codegen-llvmgpu-test-vector-distribution-reduction",
+    llvm::cl::desc(
+        "test the vector distribution pipeline for reduction operations"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -814,6 +820,156 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                                targetSubgroupSize, configDict);
 }
 
+// Checks if 'outputOperand' is a reduction with a single combiner operation.
+// Returns the combiner operation of the reduction, or nullptr if it is not a
+// valid reduction. This function is adapted from the implementation of Linalg
+// vectorization.
+static Operation *matchLinalgReduction(OpOperand *outputOperand) {
+  auto linalgOp = cast<linalg::LinalgOp>(outputOperand->getOwner());
+  unsigned outputPos =
+      outputOperand->getOperandNumber() - linalgOp.getNumDpsInputs();
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(linalgOp.getRegionOutputArgs(), outputPos, combinerOps) ||
+      combinerOps.size() != 1)
+    return nullptr;
+
+  // Return the combiner operation.
+  return combinerOps[0];
+}
+
+static LogicalResult reductionPrecondition(linalg::LinalgOp op) {
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+  if (reductionDims.empty())
+    return failure();
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+    if (dim < numParallelDims) {
+      LDBG("Not innermost ones");
+      return failure();
+    }
+  }
+
+  // Make sure parallel dimensions are static
+  for (unsigned dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+  }
+
+  for (OpOperand &opOperand : op.getDpsInitsMutable()) {
+    AffineMap indexingMap = op.getMatchingIndexingMap(&opOperand);
+    if (indexingMap.isPermutation())
+      continue;
+
+    Operation *reduceOp = matchLinalgReduction(&opOperand);
+    if (!reduceOp || !linalg::getCombinerOpKind(reduceOp)) {
+      LDBG("reduction precondition failed: reduction detection failed\n");
+      return failure();
+    }
+  }
+  return success();
+}
+
+static LogicalResult
+setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
+                                     mlir::FunctionOpInterface entryPoint,
+                                     linalg::LinalgOp op) {
+  if (!target.supportsSubgroupShuffle())
+    return failure();
+
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+
+  int64_t reductionSize = 1;
+  for (int64_t dim : reductionDims)
+    reductionSize *= bounds[dim];
+
+  int64_t subgroupSize = 0;
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+    if (reductionSize % s == 0) {
+      subgroupSize = s;
+      break;
+    }
+  }
+  if (subgroupSize == 0)
+    return failure();
+
+  Value init = op.getDpsInitOperand(0)->get();
+  Value src = op.getDpsInputOperand(0)->get();
+  Type initElemType = getElementTypeOrSelf(init);
+  Type srcElemType = getElementTypeOrSelf(src);
+
+  if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(initOp))
+      initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+  }
+
+  if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(srcOp))
+      srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
+  }
+
+  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat())
+    return failure();
+
+  unsigned bitWidth = std::min(initElemType.getIntOrFloatBitWidth(),
+                               srcElemType.getIntOrFloatBitWidth());
+
+  // Reduction distribution only supports 8/16/32 bit types now.
+  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
+    return failure();
+
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  const unsigned largestLoadSizeInBits = 128;
+  unsigned vectorSize = largestLoadSizeInBits / bitWidth;
+  if (reductionSize % vectorSize != 0)
+    return failure();
+
+  // Set pipeline
+  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
+
+  // Since the lowering for multi_reduction does not support reductions across
+  // warps, the current strategy is to use a single warp to perform the
+  // reduction.
+  std::array<int64_t, 3> workgroupSize{subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 1);
+  int lastDim = reductionDims.back();
+  int numElements = bounds[lastDim];
+
+  if (numElements % subgroupSize != 0)
+    return failure();
+
+  int64_t tileSize = subgroupSize * vectorSize;
+  while (numElements % tileSize != 0) {
+    tileSize >>= 1;
+  }
+
+  if (tileSize < subgroupSize)
+    return failure();
+
+  workgroupTileSizes[lastDim] = tileSize;
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSizes);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, pipeline, workgroupSize, targetSubgroupSize);
+}
+
 static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
@@ -839,6 +995,17 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
       LDBG("VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
+    }
+
+    if (clGPUTestVectorDistributionReduction) {
+      // Use the flag to make it optional now.
+      // TODO: fix the performance issue.
+      if (succeeded(reductionPrecondition(linalgOp))) {
+        LDBG("VectorDistribution: trying to find a suitable convolution config "
+             "for linalg op with reduction dim");
+        return setReductionVectorDistributionConfig(target, entryPoint,
+                                                    linalgOp);
+      }
     }
   }
 
