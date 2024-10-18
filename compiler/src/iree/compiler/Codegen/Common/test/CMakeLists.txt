@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "canonicalize_interface_load_store.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
+    "convert_splat_to_fill.mlir"
     "convert_to_destination_passing_style.mlir"
     "convolution_to_igemm.mlir"
     "convolutions.mlir"
