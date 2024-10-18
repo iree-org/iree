@@ -304,6 +304,7 @@ void buildDispatchCreationPassPipeline(
   addDispatchRegionCreationPasses(passManager);
 
   FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createVerifyDispatchesPass)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)
       // Convert tensor operations to flow.tensor ops.
       // - Convert extract/insert slice to flow update ops when the tensor op
