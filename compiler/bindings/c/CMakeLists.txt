@@ -22,6 +22,7 @@ iree_cc_library(
     headers
   HDRS
     "iree/compiler/api_support.h"
+    "iree/compiler/dialects/iree_gpu.h"
     "iree/compiler/embedding_api.h"
     "iree/compiler/loader.h"
     "iree/compiler/mlir_interop.h"

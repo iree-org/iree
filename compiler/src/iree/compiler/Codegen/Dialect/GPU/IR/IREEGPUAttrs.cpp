@@ -20,6 +20,9 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir-c/IR.h"
+#include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,7 +36,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
