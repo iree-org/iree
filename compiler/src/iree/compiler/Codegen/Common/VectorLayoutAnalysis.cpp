@@ -13,6 +13,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Diagnostics.h"
@@ -134,6 +135,9 @@ private:
   void visitRegionSuccessors(RegionBranchOpInterface branch,
                              RegionBranchPoint branchPoint,
                              MutableArrayRef<OpOperand> operands);
+
+  void visitRegionBranchTerminatorOpInterface(RegionBranchOpInterface branch,
+                                              RegionBranchPoint branchPoint);
 
   DistributionLayout *getLatticeElement(Value val);
 
@@ -661,6 +665,9 @@ static void enforceLayoutToMultiReductionOp(
     ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
+  }
   // Reductions should always propagate value layout to result. Result can
   // enforce it's layout on init.
   const DistributionLayout *result = resultLattices[0];
@@ -726,6 +733,9 @@ static void enforceLayoutToBroadcastOp(
 
   auto resultShape = broadcast.getResultVectorType().getShape();
   auto inputType = broadcast.getSourceType();
+  if (!isa<VectorType>(inputType)) {
+    return;
+  }
   assert(isa<VectorType>(inputType) &&
          "Scalar broadcast not supported for now.");
   auto inputShape = cast<VectorType>(inputType).getShape();
@@ -993,6 +1003,9 @@ void EnforceLayout::visitOperation(Operation *op) {
   if (auto branch = dyn_cast<RegionBranchOpInterface>(op)) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOpOperands());
+
+    // Handle the propation from scf.for to yield op
+    visitRegionBranchTerminatorOpInterface(branch, RegionBranchPoint::parent());
     return;
   }
 
@@ -1083,6 +1096,47 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
       curr++;
     }
   }
+}
+
+void EnforceLayout::visitRegionBranchTerminatorOpInterface(
+    RegionBranchOpInterface branch, RegionBranchPoint branchPoint) {
+  SmallVector<RegionSuccessor> successors;
+  branch.getSuccessorRegions(branchPoint, successors);
+  if (!branch.hasLoop())
+    return;
+  SmallVector<DistributionLayout *> resultLattices;
+  for (Value result : branch->getResults()) {
+    DistributionLayout *resultLattice = getLatticeElement(result);
+    if (resultLattice->isUninitialized())
+      continue;
+    resultLattices.push_back(resultLattice);
+  }
+
+  // Result lattice not has a layout yet.
+  if (resultLattices.empty())
+    return;
+
+  // We do not support multiple results yet.
+  if (resultLattices.size() != 1)
+    return;
+
+  for (RegionSuccessor successor : successors) {
+    if (auto succ = successor.getSuccessor()) {
+      Operation *terminator = succ->back().getTerminator();
+      if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        for (Value operand : yieldOp->getOperands()) {
+          if (!isa<VectorType>(operand.getType())) {
+            continue;
+          }
+          DistributionLayout *forwardLattice = getLatticeElement(operand);
+          ChangeResult changed = forwardLattice->resolve(resultLattices[0]);
+          propagateIfChanged(forwardLattice, changed);
+        }
+      }
+    }
+  }
+
+  return;
 }
 
 DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
