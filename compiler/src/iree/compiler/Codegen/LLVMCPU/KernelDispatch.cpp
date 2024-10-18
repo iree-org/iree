@@ -792,11 +792,8 @@ static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
       return 16 * 128;
     }
   } else if (isAArch64(target)) {
-    // Can't determine register space size at compile time on SVE.
-    if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
-      return 0;
-    }
-    // 32 NEON registers (128-bit each).
+    // 32 NEON/SVE registers (at least 128-bit each, returns the base size for
+    // SVE).
     return 32 * 128;
   } else {
     // Don't know register space size as a compile-time constant on other
