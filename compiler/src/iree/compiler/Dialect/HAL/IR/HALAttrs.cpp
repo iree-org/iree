@@ -4,15 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Utils/StringUtils.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Parser/Parser.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
@@ -135,7 +138,7 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
   p.printAttribute(getBackend());
   os << ", ";
   p.printAttribute(getFormat());
-  auto config = getConfiguration();
+  auto config = getWrapConfiguration();
   if (config && !config.empty()) {
     os << ", ";
     p.printAttribute(config);
@@ -145,6 +148,19 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
 
 std::string ExecutableTargetAttr::getSymbolNameFragment() const {
   return sanitizeSymbolName(getFormat().getValue().lower());
+}
+
+DictionaryAttr ExecutableTargetAttr::getConfiguration() const {
+  auto configAttr = getWrapConfiguration();
+  if (!configAttr) {
+    return {};
+  }
+  if (auto encodingAttr = configAttr.getNamed("encoding_solver")) {
+    auto attr = llvm::dyn_cast<IREE::Encoding::EncodingSolverInterfaceAttr>(
+        encodingAttr->getValue());
+    return attr ? attr.getTargetConfig() : configAttr;
+  }
+  return configAttr;
 }
 
 bool ExecutableTargetAttr::hasConfigurationAttr(StringRef name) {

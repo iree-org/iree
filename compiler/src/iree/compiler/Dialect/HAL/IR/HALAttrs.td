@@ -474,7 +474,7 @@ def HAL_ExecutableTargetAttr :
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$backend,
     AttrParameter<"StringAttr", "">:$format,
-    AttrParameter<"DictionaryAttr", "">:$configuration
+    AttrParameter<"DictionaryAttr", "">:$wrap_configuration
   );
 
   let builders = [
@@ -493,6 +493,10 @@ def HAL_ExecutableTargetAttr :
     // Returns true if this attribute is a generic version of |specificAttr|.
     // A more generic version will match with many specific versions.
     bool isGenericOf(IREE::HAL::ExecutableTargetAttr specificAttr);
+
+    /// Returns the actual configuration (because it could be wrapped by
+    /// encodings.
+    DictionaryAttr getConfiguration() const;
 
     // Returns the executable target configuration for the given operation.
     // This will recursively walk parent operations until one with the

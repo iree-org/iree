@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
@@ -18,6 +19,7 @@
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
@@ -49,13 +51,15 @@ getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
   configItems.emplace_back(
       b.getStringAttr("ukernels"),
       b.getStringAttr(enableMicrokernels ? "all" : "none"));
-  configItems.emplace_back(b.getStringAttr("encoding_solver"),
-                           IREE::CPU::VMVXEncodingSolverAttr::get(
-                               context, b.getDictionaryAttr(configItems)));
+
+  SmallVector<NamedAttribute> wrapConfig;
+  wrapConfig.emplace_back(b.getStringAttr("encoding_solver"),
+                          IREE::CPU::VMVXEncodingSolverAttr::get(
+                              context, b.getDictionaryAttr(configItems)));
 
   return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
       b.getStringAttr(backend), b.getStringAttr(format),
-      b.getDictionaryAttr(configItems));
+      b.getDictionaryAttr(wrapConfig));
 }
 
 class VMVXTargetBackend final : public TargetBackend {
@@ -237,8 +241,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::CPU::IREECPUDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void
