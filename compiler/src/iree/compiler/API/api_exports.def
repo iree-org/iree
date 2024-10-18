@@ -327,17 +327,29 @@ EXPORTS
   mlirFlatSymbolRefAttrGetValue
   mlirFloat16TypeGetTypeID
   mlirFloat32TypeGetTypeID
+  mlirFloat4E2M1FNTypeGet
+  mlirFloat4E2M1FNTypeGetTypeID
   mlirFloat64TypeGetTypeID
+  mlirFloat6E2M3FNTypeGet
+  mlirFloat6E2M3FNTypeGetTypeID
+  mlirFloat6E3M2FNTypeGet
+  mlirFloat6E3M2FNTypeGetTypeID
+  mlirFloat8E3M4TypeGet
+  mlirFloat8E3M4TypeGetTypeID
   mlirFloat8E4M3B11FNUZTypeGet
   mlirFloat8E4M3B11FNUZTypeGetTypeID
   mlirFloat8E4M3FNTypeGet
   mlirFloat8E4M3FNTypeGetTypeID
   mlirFloat8E4M3FNUZTypeGet
   mlirFloat8E4M3FNUZTypeGetTypeID
+  mlirFloat8E4M3TypeGet
+  mlirFloat8E4M3TypeGetTypeID
   mlirFloat8E5M2FNUZTypeGet
   mlirFloat8E5M2FNUZTypeGetTypeID
   mlirFloat8E5M2TypeGet
   mlirFloat8E5M2TypeGetTypeID
+  mlirFloat8E8M0FNUTypeGet
+  mlirFloat8E8M0FNUTypeGetTypeID
   mlirFloatAttrDoubleGet
   mlirFloatAttrDoubleGetChecked
   mlirFloatAttrGetTypeID
@@ -352,16 +364,23 @@ EXPORTS
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
   mlirFunctionTypeGetTypeID
+  mlirGPUAsyncTokenTypeGet
   mlirGPUObjectAttrGet
   mlirGPUObjectAttrGetFormat
+  mlirGPUObjectAttrGetKernels
   mlirGPUObjectAttrGetObject
   mlirGPUObjectAttrGetProperties
   mlirGPUObjectAttrGetTarget
+  mlirGPUObjectAttrGetWithKernels
+  mlirGPUObjectAttrHasKernels
   mlirGPUObjectAttrHasProperties
   mlirGetDialectHandle__iree_input__
   mlirGetDialectHandle__transform__
   mlirIREELinalgTransformRegisterPasses
   mlirIREETransformRegisterPasses
+  mlirIRRewriterCreate
+  mlirIRRewriterCreateFromOp
+  mlirIRRewriterDestroy
   mlirIdentifierEqual
   mlirIdentifierGet
   mlirIdentifierGetContext
@@ -377,7 +396,9 @@ EXPORTS
   mlirIntegerAttrGetValueInt
   mlirIntegerAttrGetValueSInt
   mlirIntegerAttrGetValueUInt
+  mlirIntegerSetAttrGet
   mlirIntegerSetAttrGetTypeID
+  mlirIntegerSetAttrGetValue
   mlirIntegerSetDump
   mlirIntegerSetEmptyGet
   mlirIntegerSetEqual
@@ -407,15 +428,18 @@ EXPORTS
   mlirLLVMArrayTypeGet
   mlirLLVMCConvAttrGet
   mlirLLVMComdatAttrGet
+  mlirLLVMDIAnnotationAttrGet
   mlirLLVMDIBasicTypeAttrGet
   mlirLLVMDICompileUnitAttrGet
   mlirLLVMDICompositeTypeAttrGet
+  mlirLLVMDICompositeTypeAttrGetRecSelf
   mlirLLVMDIDerivedTypeAttrGet
   mlirLLVMDIDerivedTypeAttrGetBaseType
   mlirLLVMDIExpressionAttrGet
   mlirLLVMDIExpressionElemAttrGet
   mlirLLVMDIFileAttrGet
   mlirLLVMDIFlagsAttrGet
+  mlirLLVMDIImportedEntityAttrGet
   mlirLLVMDILexicalBlockAttrGet
   mlirLLVMDILexicalBlockFileAttrGet
   mlirLLVMDILocalVariableAttrGet
@@ -427,6 +451,7 @@ EXPORTS
   mlirLLVMDISubprogramAttrGetCompileUnit
   mlirLLVMDISubprogramAttrGetFile
   mlirLLVMDISubprogramAttrGetLine
+  mlirLLVMDISubprogramAttrGetRecSelf
   mlirLLVMDISubprogramAttrGetScope
   mlirLLVMDISubprogramAttrGetScopeLine
   mlirLLVMDISubprogramAttrGetType
@@ -493,8 +518,10 @@ EXPORTS
   mlirOpPrintingFlagsCreate
   mlirOpPrintingFlagsDestroy
   mlirOpPrintingFlagsElideLargeElementsAttrs
+  mlirOpPrintingFlagsElideLargeResourceString
   mlirOpPrintingFlagsEnableDebugInfo
   mlirOpPrintingFlagsPrintGenericOpForm
+  mlirOpPrintingFlagsSkipRegions
   mlirOpPrintingFlagsUseLocalScope
   mlirOpResultGetOwner
   mlirOpResultGetResultNumber
@@ -599,6 +626,39 @@ EXPORTS
   mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
   mlirRewritePatternSetFromPDLPatternModule
+  mlirRewriterBaseCancelOpModification
+  mlirRewriterBaseClearInsertionPoint
+  mlirRewriterBaseClone
+  mlirRewriterBaseCloneRegionBefore
+  mlirRewriterBaseCloneWithoutRegions
+  mlirRewriterBaseCreateBlockBefore
+  mlirRewriterBaseEraseBlock
+  mlirRewriterBaseEraseOp
+  mlirRewriterBaseFinalizeOpModification
+  mlirRewriterBaseGetBlock
+  mlirRewriterBaseGetContext
+  mlirRewriterBaseGetInsertionBlock
+  mlirRewriterBaseInlineBlockBefore
+  mlirRewriterBaseInlineRegionBefore
+  mlirRewriterBaseInsert
+  mlirRewriterBaseMergeBlocks
+  mlirRewriterBaseMoveBlockBefore
+  mlirRewriterBaseMoveOpAfter
+  mlirRewriterBaseMoveOpBefore
+  mlirRewriterBaseReplaceAllOpUsesWithOperation
+  mlirRewriterBaseReplaceAllOpUsesWithValueRange
+  mlirRewriterBaseReplaceAllUsesExcept
+  mlirRewriterBaseReplaceAllUsesWith
+  mlirRewriterBaseReplaceAllValueRangeUsesWith
+  mlirRewriterBaseReplaceOpUsesWithinBlock
+  mlirRewriterBaseReplaceOpWithOperation
+  mlirRewriterBaseReplaceOpWithValues
+  mlirRewriterBaseSetInsertionPointAfter
+  mlirRewriterBaseSetInsertionPointAfterValue
+  mlirRewriterBaseSetInsertionPointBefore
+  mlirRewriterBaseSetInsertionPointToEnd
+  mlirRewriterBaseSetInsertionPointToStart
+  mlirRewriterBaseStartOpModification
   mlirSetGlobalDebugType
   mlirSetGlobalDebugTypes
   mlirShapedTypeGetDimSize
@@ -685,12 +745,19 @@ EXPORTS
   mlirTypeIsAF32
   mlirTypeIsAF64
   mlirTypeIsAFloat
+  mlirTypeIsAFloat4E2M1FN
+  mlirTypeIsAFloat6E2M3FN
+  mlirTypeIsAFloat6E3M2FN
+  mlirTypeIsAFloat8E3M4
+  mlirTypeIsAFloat8E4M3
   mlirTypeIsAFloat8E4M3B11FNUZ
   mlirTypeIsAFloat8E4M3FN
   mlirTypeIsAFloat8E4M3FNUZ
   mlirTypeIsAFloat8E5M2
   mlirTypeIsAFloat8E5M2FNUZ
+  mlirTypeIsAFloat8E8M0FNU
   mlirTypeIsAFunction
+  mlirTypeIsAGPUAsyncTokenType
   mlirTypeIsAIndex
   mlirTypeIsAInteger
   mlirTypeIsALLVMPointerType
