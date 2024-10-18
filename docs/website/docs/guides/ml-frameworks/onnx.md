@@ -118,7 +118,8 @@ graph LR
 | Code samples |  |
 | -- | -- |
 Generated op tests | [iree-test-suites `onnx_ops`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops)
-Curated op and model tests | [SHARK-TestSuite `e2eshark/onnx`](https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx)
+Public model tests | [iree-test-suites `onnx_models`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_models)
+Curated op and model tests | SHARK-TestSuite [`e2eshark/onnx`](https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx) and [`alt_e2eshark/onnx_tests`](https://github.com/nod-ai/SHARK-TestSuite/tree/main/alt_e2eshark/onnx_tests)
 Importer tests | [torch-mlir `test/python/onnx_importer`](https://github.com/llvm/torch-mlir/tree/main/test/python/onnx_importer)
 
 ## :octicons-question-16: Troubleshooting
