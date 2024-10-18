@@ -30,6 +30,24 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
+static bool is1x1FilterConv2dOp(linalg::LinalgOp convOp) {
+  const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(convOp);
+  const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(convOp);
+  if (!isNCHW & !isNHWC)
+    return false;
+
+  auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+      convOp.getDpsInputOperand(1)->get().getType());
+  if (!filterShapeType)
+    return false;
+
+  // Adjusting dimension indices based on Conv2DOpType.
+  const int khIndex = isNHWC ? 0 : 2;
+  const int kwIndex = isNHWC ? 1 : 3;
+  auto filterShape = filterShapeType.getShape();
+  return filterShape[khIndex] == 1 && filterShape[kwIndex] == 1;
+}
+
 void GeneralizeLinalgNamedOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
@@ -44,7 +62,8 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
                         linalg::LogOp, linalg::MapOp, linalg::MaxOp,
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(
-            linalgOp.getOperation())) {
+            linalgOp.getOperation()) ||
+        is1x1FilterConv2dOp(linalgOp)) {
       namedOpCandidates.push_back(linalgOp);
     }
   });
