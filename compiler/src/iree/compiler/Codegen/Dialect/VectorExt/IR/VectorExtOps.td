@@ -40,7 +40,8 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let arguments = (ins
     AnyShaped:$input,
     VectorLayoutInterface:$layout,
-    DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion
+    DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion,
+    OptionalAttr<AnyAttr>:$intrinsic
   );
   let results = (outs
     AnyShaped:$output
@@ -54,7 +55,27 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
       } else{
         build($_builder, $_state, input.getType(), input, layout);
       }
-    }]>
+    }]>,
+  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
+              "VectorLayoutInterface":$layout), [{
+    UnitAttr defaultSharedMemoryConversion;
+    build($_builder, $_state, resultTypes, input, layout, defaultSharedMemoryConversion);
+  }]>,
+  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
+              "VectorLayoutInterface":$layout,
+              "bool":$shared_memory_conversion), [{
+    if (shared_memory_conversion) {
+      build($_builder, $_state, resultTypes, input, layout, UnitAttr::get(input.getContext()));
+    } else {
+      build($_builder, $_state, resultTypes, input, layout);
+    }
+  }]>,
+  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
+              "VectorLayoutInterface":$layout,
+              "UnitAttr":$shared_memory_conversion), [{
+    Attribute emptyIntrinsic;
+    build($_builder, $_state, resultTypes, input, layout, shared_memory_conversion, emptyIntrinsic);
+  }]>,
   ];
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {

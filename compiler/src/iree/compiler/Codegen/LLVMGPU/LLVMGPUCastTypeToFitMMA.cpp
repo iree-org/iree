@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -81,6 +83,34 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
   }
 };
 
+static void inferMmaKind(vector::ContractionOp contract) {
+  SetVector<Operation *> slice;
+  getForwardSlice(contract.getResult(), &slice);
+
+  // Operations in slice are ordered in topological order, so the first
+  // to_layout operation we encounter is setting the layout.
+  IREE::VectorExt::ToLayoutOp toLayout;
+  for (Operation *op : slice) {
+    auto candidate = dyn_cast<IREE::VectorExt::ToLayoutOp>(op);
+    if (candidate) {
+      toLayout = candidate;
+      break;
+    }
+  }
+
+  if (!toLayout) {
+    return;
+  }
+
+  auto intrinsic = dyn_cast_or_null<IREE::GPU::MmaInterfaceAttr>(
+      toLayout.getIntrinsicAttr());
+  if (!intrinsic) {
+    return;
+  }
+
+  contract->setAttr("iree.amdgpu.mma", intrinsic);
+}
+
 struct LLVMGPUCastTypeToFitMMAPass final
     : impl::LLVMGPUCastTypeToFitMMAPassBase<LLVMGPUCastTypeToFitMMAPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -103,14 +133,14 @@ struct LLVMGPUCastTypeToFitMMAPass final
       }
     }
 
-    // Import mma type from dispatch schedule attribute if present.
-    if (scheduleAttr) {
-      func.walk([&](vector::ContractionOp contract) {
-        if (!contract->hasAttr("iree.amdgpu.mma")) {
-          contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
-        }
-      });
-    }
+    // Set MMA type from config embedded in toLayoutOp of contraction.
+    // If none, use mma type from dispatch schedule attribute if present.
+    func.walk([&](vector::ContractionOp contract) {
+      inferMmaKind(contract);
+      if (!contract->hasAttr("iree.amdgpu.mma") && scheduleAttr) {
+        contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+      }
+    });
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
