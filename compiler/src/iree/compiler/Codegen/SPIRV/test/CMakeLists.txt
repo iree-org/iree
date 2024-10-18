@@ -55,7 +55,6 @@ iree_lit_test_suite(
     "pipeline_matvec.mlir"
     "pipeline_reduction_subgroup.mlir"
     "pipeline_sub_byte_dequant.mlir"
-    "set_transform_strategy.mlir"
     "tile_and_distribute.mlir"
     "tile_and_distribute_scatter.mlir"
     "tile_and_distribute_sort.mlir"

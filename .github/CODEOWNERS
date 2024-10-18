@@ -62,7 +62,6 @@
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @qedawkins @kuhar @Groverkss
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar @kuhar
-/compiler/src/iree/compiler/Codegen/TransformStrategies/ @qedawkins @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @stellaraccident
 /compiler/src/iree/compiler/Dialect/Encoding/ @bjacob @hanhanW
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1

@@ -9,16 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -42,15 +33,8 @@ public:
       SPIRVSelectLoweringStrategyPass>::SPIRVSelectLoweringStrategyPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
-    // unnecessary dialect registrations.
-    registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect,
-                affine::AffineDialect, gpu::GPUDialect, IREE::HAL::HALDialect,
-                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                memref::MemRefDialect, bufferization::BufferizationDialect,
-                scf::SCFDialect, spirv::SPIRVDialect,
-                transform::TransformDialect, vector::VectorDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::GPU::IREEGPUDialect, spirv::SPIRVDialect>();
   }
 
   void runOnOperation() override;

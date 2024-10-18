@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -98,12 +97,6 @@ static llvm::cl::opt<bool> clDisableArmSMETiling(
     "iree-llvmcpu-disable-arm-sme-tiling",
     llvm::cl::desc("Disables tiling for SME even if it is supported by the "
                    "target (i.e., when the +sme feature flag is present)"),
-    llvm::cl::init(false));
-
-// Non-static options are used in other places.
-llvm::cl::opt<bool> clEnableTransformDialectJit(
-    "iree-llvmcpu-enable-transform-dialect-jit",
-    llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
@@ -2007,28 +2000,6 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
       /*subgroupSize=*/{}, pipelineConfig);
 }
 
-/// Set lowering info to be used by the transform dialect jitter.
-static LogicalResult
-setTransformStrategyRootConfig(mlir::FunctionOpInterface entryPointFn,
-                               linalg::GenericOp genericOp,
-                               const LinalgOpInfo &linalgOpInfo,
-                               const TargetMLTransformInfo &targetMLTransInfo) {
-  assert(!getLoweringConfig(genericOp) &&
-         "expected lowering_config is not set");
-  if (!clEnableTransformDialectJit)
-    return failure();
-  cpu::CPUModel cpuModel;
-  if (failed(
-          cpu::matchAndSetReductionStrategy(entryPointFn, genericOp, cpuModel)))
-    return failure();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(),
-      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-  if (failed(setTranslationInfo(entryPointFn, translationInfo)))
-    return failure();
-  return success();
-}
-
 /// Utility to return the transpose vector `sizes` for X86. Empty `sizes` on
 /// return indicates failure.
 static void getTransposeX86VectorSizes(
@@ -2284,11 +2255,6 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
               const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
-  // First, try to apply the transform dialect strategy, if defined.
-  if (succeeded(setTransformStrategyRootConfig(
-          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
-    return success();
-  }
 
   if (succeeded(setTransposeLikeOpRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
