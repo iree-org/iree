@@ -85,3 +85,23 @@ func.func public @conv_with_lowering_config(%arg0: tensor<1x16x16x4xf32>, %arg1:
 // CHECK-NOT:    iree_linalg_ext.im2col
 // CHECK:        linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:     lowering_config
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func public @no_conv_contraction(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %cst = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<128x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<128x128xf32>) -> tensor<128x128xf32>
+  %matmul = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<128x128xf32>, tensor<128x128xf32>) outs(%fill : tensor<128x128xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %0 = arith.mulf %in, %in_0 : f32
+    %1 = arith.addf %0, %out : f32
+    linalg.yield %1 : f32
+  } -> tensor<128x128xf32>
+  return %matmul : tensor<128x128xf32>
+}
+// CHECK: func.func public @no_conv_contraction
+// CHECK:   linalg.generic
