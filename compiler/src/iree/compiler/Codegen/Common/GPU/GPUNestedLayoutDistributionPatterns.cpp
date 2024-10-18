@@ -433,11 +433,6 @@ struct DistributeMultiReduction final
       resElemTy = resType;
     }
 
-    if (!accElemTy.isIntOrFloat() || !resElemTy.isIntOrFloat()) {
-      return rewriter.notifyMatchFailure(multiReduceOp,
-                                         "unsupported reduction type");
-    }
-
     auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
       return rewriter.notifyMatchFailure(multiReduceOp,
