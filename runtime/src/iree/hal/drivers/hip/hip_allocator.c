@@ -9,9 +9,11 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/per_device_information.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
@@ -23,11 +25,9 @@ typedef struct iree_hal_hip_allocator_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
-  // The device that this allocator allocates memory from.
-  hipDevice_t device;
+  uint64_t device_count;
 
-  // The HIP stream that allocations should be used in.
-  hipStream_t stream;
+  iree_hal_hip_per_device_information_t* per_device_infos;
 
   // NOTE: optional depending on device support.
   iree_hal_hip_memory_pools_t* pools;
@@ -53,12 +53,18 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 }
 
 iree_status_t iree_hal_hip_allocator_create(
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
-    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols, uint32_t device_count,
+    iree_hal_hip_per_device_information_t* infos,
+    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (device_count < 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Invalid number of devices, must be at least one");
+  }
 
   // To support device-local + host-visible memory we need concurrent managed
   // access indicating that the host and devices can concurrently access the
@@ -72,7 +78,7 @@ iree_status_t iree_hal_hip_allocator_create(
               hip_symbols,
               hipDeviceGetAttribute(&supports_concurrent_managed_access,
                                     hipDeviceAttributeConcurrentManagedAccess,
-                                    device),
+                                    infos[0].hip_device),
               "hipDeviceGetAttribute"));
 
   IREE_TRACE_ZONE_APPEND_TEXT(
@@ -87,13 +93,13 @@ iree_status_t iree_hal_hip_allocator_create(
                                 (void**)&allocator));
   iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
                                &allocator->resource);
-  allocator->device = device;
-  allocator->stream = stream;
   allocator->pools = pools;
   allocator->symbols = hip_symbols;
   allocator->host_allocator = host_allocator;
   allocator->supports_concurrent_managed_access =
       supports_concurrent_managed_access != 0;
+  allocator->device_count = device_count;
+  allocator->per_device_infos = infos;
   *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
@@ -349,6 +355,19 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   hipDeviceptr_t device_ptr = NULL;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
+
+  uint32_t device_idx = 0;
+  if (params->queue_affinity) {
+    device_idx = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+  }
+
+  status = IREE_HIP_RESULT_TO_STATUS(
+      allocator->symbols,
+      hipCtxPushCurrent(allocator->per_device_infos[device_idx].hip_context));
+  if (!iree_status_is_ok(status)) {
+    return status;
+  }
+
   if (iree_all_bits_set(compat_params.type,
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
@@ -364,8 +383,10 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
         // Prefetch the buffer on the GPU device.
         status = IREE_HIP_RESULT_TO_STATUS(
             allocator->symbols,
-            hipMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
-                                allocator->stream));
+            hipMemPrefetchAsync(
+                device_ptr, allocation_size,
+                allocator->per_device_infos[device_idx].hip_device,
+                allocator->per_device_infos[device_idx].hip_dispatch_stream));
       }
       host_ptr = (void*)device_ptr;
     } else {
@@ -418,6 +439,11 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       iree_hal_buffer_release(buffer);
     }
   }
+
+  status = iree_status_join(
+      status,
+      IREE_HIP_RESULT_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
+
   return status;
 }
 
@@ -496,6 +522,18 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = NULL;
 
+  uint32_t device_idx = 0;
+  if (params->queue_affinity) {
+    device_idx = iree_math_count_trailing_zeros_u64(params->queue_affinity);
+  }
+
+  status = IREE_HIP_RESULT_TO_STATUS(
+      allocator->symbols,
+      hipCtxPushCurrent(allocator->per_device_infos[device_idx].hip_context));
+  if (!iree_status_is_ok(status)) {
+    return status;
+  }
+
   switch (external_buffer->type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
       if (iree_all_bits_set(compat_params.type,
@@ -555,6 +593,10 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
       iree_hal_buffer_release(buffer);
     }
   }
+
+  status = iree_status_join(
+      status,
+      IREE_HIP_RESULT_TO_STATUS(allocator->symbols, hipCtxPopCurrent(NULL)));
   return status;
 }
 

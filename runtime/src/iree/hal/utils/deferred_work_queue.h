@@ -76,7 +76,7 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
       struct iree_hal_semaphore_t*, uint64_t,
       iree_hal_deferred_work_queue_native_event_t* out_event);
 
-  // Get the device to wait on the event associated wit hthe host event.
+  // Get the device to wait on the event associated wit the host event.
   iree_status_t(IREE_API_PTR* device_wait_on_host_event)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
       iree_hal_deferred_work_queue_host_device_event_t event);
@@ -103,12 +103,14 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
   iree_status_t(IREE_API_PTR* create_stream_command_buffer)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
       iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t category,
+      iree_hal_queue_affinity_t queue_affinity,
       iree_hal_command_buffer_t** out_command_buffer);
 
   // Submits a command buffer to the device.
   iree_status_t(IREE_API_PTR* submit_command_buffer)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
-      iree_hal_command_buffer_t* command_buffer);
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_queue_affinity_t queue_affinity);
 } iree_hal_deferred_work_queue_device_interface_vtable_t;
 
 iree_status_t iree_hal_deferred_work_queue_create(
@@ -132,7 +134,8 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables);
+    iree_hal_buffer_binding_table_t const* binding_tables,
+    iree_hal_queue_affinity_t queue_affinity);
 
 // Attempts to advance the work queue by processing using
 // the current thread, rather than the worker thread.

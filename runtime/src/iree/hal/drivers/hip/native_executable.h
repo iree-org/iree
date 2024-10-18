@@ -14,6 +14,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
+#include "iree/hal/drivers/hip/per_device_information.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,7 +49,8 @@ typedef struct iree_hal_hip_kernel_params_t {
 // Creates an IREE executable from a HSACO module. The module may contain
 // several kernels that can be extracted along with the associated block size.
 iree_status_t iree_hal_hip_native_executable_create(
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
+    const iree_hal_hip_dynamic_symbols_t* symbols, uint32_t num_devices,
+    iree_hal_hip_per_device_information_t* devices,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
@@ -56,6 +58,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params);
 
 #ifdef __cplusplus

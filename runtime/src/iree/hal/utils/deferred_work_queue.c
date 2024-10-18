@@ -66,6 +66,7 @@ typedef struct iree_hal_deferred_work_queue_action_t {
       iree_host_size_t count;
       iree_hal_command_buffer_t** command_buffers;
       iree_hal_buffer_binding_table_t* binding_tables;
+      iree_hal_queue_affinity_t queue_affinity;
     } execution;
   } payload;
 
@@ -655,7 +656,8 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_buffer_binding_table_t const* binding_tables,
+    iree_hal_queue_affinity_t queue_affinity) {
   IREE_ASSERT_ARGUMENT(actions);
   IREE_ASSERT_ARGUMENT(command_buffer_count == 0 || command_buffers);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -732,6 +734,7 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
   action_ptr += signal_semaphore_list_size;
 
   // Copy the execution resources for later access.
+  action->payload.execution.queue_affinity = queue_affinity;
   action->payload.execution.count = command_buffer_count;
   action->payload.execution.command_buffers =
       (iree_hal_command_buffer_t**)action_ptr;
@@ -983,10 +986,12 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
           (iree_hal_buffer_binding_table_is_empty(binding_table)
                ? IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED
                : 0);
+
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, device_interface->vtable->create_stream_command_buffer(
-                  device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
-                  &stream_command_buffer))
+          z0,
+          device_interface->vtable->create_stream_command_buffer(
+              device_interface, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
+              action->payload.execution.queue_affinity, &stream_command_buffer))
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_resource_set_insert(action->resource_set, 1,
                                            &stream_command_buffer));
@@ -1000,8 +1005,9 @@ static iree_status_t iree_hal_deferred_work_queue_issue_execution(
     }
 
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device_interface->vtable->submit_command_buffer(device_interface,
-                                                            command_buffer));
+        z0, device_interface->vtable->submit_command_buffer(
+                device_interface, command_buffer,
+                action->payload.execution.queue_affinity));
 
     // The stream_command_buffer is going to be retained by
     // the action->resource_set and deleted after the action

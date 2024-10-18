@@ -59,6 +59,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(hip_symbols);
@@ -84,8 +85,8 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
                             (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device_allocator, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
-      binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
+      device_allocator, mode, command_categories, affinity, binding_capacity,
+      (uint8_t*)command_buffer + sizeof(*command_buffer),
       &iree_hal_hip_stream_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->hip_symbols = hip_symbols;
@@ -476,7 +477,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   const iree_hal_hip_kernel_params_t* kernel_params = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_native_executable_lookup_kernel_params(
-              executable, entry_point, &kernel_params));
+              executable, entry_point, command_buffer->base.queue_affinity,
+              &kernel_params));
 
   IREE_HAL_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, &command_buffer->tracing_event_list,
