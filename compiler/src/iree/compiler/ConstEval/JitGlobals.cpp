@@ -6,7 +6,9 @@
 
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -21,7 +23,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <cstdlib>
 
@@ -448,6 +452,63 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
   return success();
 }
 
+// Remove flow.tensor.transfer ops.
+struct StripFlowTensorTransferPattern
+    : public OpRewritePattern<IREE::Flow::TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Flow::TensorTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceAllUsesWith(op.getResult(), op.getOperand());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+void stripStreamAffinityAttributes(IREE::Util::FuncOp funcOp) {
+  // Removes affinity attributes from funcOp and nested ops.
+  // Removes only from dictionaries (includes op's named attributes).
+  // We are not removing affinity attributes form an ArrayAttr as it is not
+  // clear if this would not silently change the semantics of an operation.
+  AttrTypeReplacer replacer;
+  SmallVector<NamedAttribute> namedAttrs;
+  replacer.addReplacement(
+      [&](Attribute originalAttr) -> std::optional<Attribute> {
+        if (auto dictAttr = dyn_cast<DictionaryAttr>(originalAttr)) {
+          namedAttrs.clear();
+          for (auto &namedAttr : dictAttr) {
+            if (!isa<IREE::Stream::AffinityAttr>(namedAttr.getValue())) {
+              namedAttrs.push_back(namedAttr);
+            }
+          }
+          if (namedAttrs.size() == dictAttr.size()) {
+            // Nothing to do, no affinity attributes in this dict.
+            return std::nullopt;
+          } else {
+            return DictionaryAttr::getWithSorted(dictAttr.getContext(),
+                                                 namedAttrs);
+          }
+        }
+        return std::nullopt;
+      });
+  replacer.recursivelyReplaceElementsIn(funcOp);
+}
+
+// Remove device/queue affinities for the IR.
+// E.g. remove `flow.tensor.transfer` ops.
+static LogicalResult
+stripExecutionContextAffinities(IREE::Util::FuncOp funcOp) {
+  RewritePatternSet patterns(funcOp->getContext());
+  patterns.add<StripFlowTensorTransferPattern>(funcOp.getContext());
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return emitError(funcOp->getLoc())
+           << "Stripping execution context affinities failed";
+  }
+
+  stripStreamAffinityAttributes(funcOp);
+  return success();
+}
+
 class ProgramBuilder {
 public:
   ProgramBuilder(ModuleOp sourceModuleOp,
@@ -495,6 +556,7 @@ public:
       funcOp.erase();
       return failure();
     }
+
     return success();
   }
 
@@ -597,6 +659,10 @@ private:
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
     termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
+
+    if (failed(stripExecutionContextAffinities(funcOp))) {
+      return failure();
+    }
 
     jitFunctions.push_back(std::move(desc));
     return success();
