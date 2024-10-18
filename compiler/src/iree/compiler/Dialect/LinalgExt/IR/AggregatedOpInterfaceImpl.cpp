@@ -314,6 +314,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldSum = getSum();
   Type elementType = getElementTypeOrSelf(getOutput().getType());
 
+  auto qkAttrs = (*this)->getAttrOfType<DictionaryAttr>("qk_attrs");
+  auto pvAttrs = (*this)->getAttrOfType<DictionaryAttr>("pv_attrs");
+
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(getIndexingMapsArray());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");
@@ -368,10 +371,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
 
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
-
-  // TODO: We shouldn't be relying on such attributes. We need a better
-  // mechanism to identify attention matmuls.
-  s.getDefiningOp()->setAttr("attention_qk_matmul", b.getUnitAttr());
+  if (qkAttrs) {
+    s.getDefiningOp()->setDiscardableAttrs(qkAttrs);
+  }
 
   s = applyPostQKMatmulElementwise(b, loc, getRegion(), s);
 
@@ -448,9 +450,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // newAcc = P @ V + newAcc
   newAcc = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value, newAcc);
-  // TODO: We shouldn't be relying on such attributes. We need a better
-  // mechanism to identify attention matmuls.
-  newAcc.getDefiningOp()->setAttr("attention_pv_matmul", b.getUnitAttr());
+  if (pvAttrs) {
+    newAcc.getDefiningOp()->setDiscardableAttrs(pvAttrs);
+  }
 
   return SmallVector<Value>{newAcc, newMax, newSum};
 }

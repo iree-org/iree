@@ -825,7 +825,15 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
 
-  auto configDict = DictionaryAttr::get(context, attrs);
+  SmallVector<NamedAttribute, 2> qkAttrs;
+  SmallVector<NamedAttribute, 2> pvAttrs;
+
+  qkAttrs.emplace_back(b.getNamedAttr("attention_qk_matmul", b.getUnitAttr()));
+  pvAttrs.emplace_back(b.getNamedAttr("attention_pv_matmul", b.getUnitAttr()));
+
+  auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
+  auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
+  auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // Attach the MMA schedule as an attribute to the entry point export function
@@ -843,6 +851,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
+  op->setAttr("qk_attrs", qkAttrDict);
+  op->setAttr("pv_attrs", pvAttrDict);
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
       workgroupSize, targetSubgroupSize, pipelineConfig);
