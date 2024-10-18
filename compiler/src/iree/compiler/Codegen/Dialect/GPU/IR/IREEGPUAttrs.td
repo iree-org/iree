@@ -481,8 +481,8 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_ReorderWorkgroupsStrategyAttr :
-    EnumAttr<IREEGPU_Dialect, IREEGPU_ReorderWorkgroupsStrategy, "reorder_workgroups_strategy"> {
-  let assemblyFormat = "`<` $value `>`";
+    EnumAttr<IREEGPU_Dialect, IREEGPU_ReorderWorkgroupsStrategy, ""> {
+  let assemblyFormat = "``$value";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
 
