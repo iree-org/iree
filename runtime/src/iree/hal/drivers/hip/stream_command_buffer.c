@@ -468,6 +468,15 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // If any of the workgroup counts are zero, we can skip execution
+  // of the kernel. This prevents a 'hipErrorInvalidConfiguration' error when
+  // launching the kernel.
+  if (workgroup_count[0] == 0 || workgroup_count[1] == 0 ||
+      workgroup_count[2] == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
