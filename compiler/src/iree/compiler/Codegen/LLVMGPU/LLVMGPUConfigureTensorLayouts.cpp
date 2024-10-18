@@ -21,13 +21,37 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_LLVMGPUCONFIGURETENSORLAYOUTSPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
+using IREE::VectorExt::NestedLayoutAttr;
+using IREE::VectorExt::ToLayoutOp;
+using IREE::VectorExt::VectorLayoutInterface;
+
 namespace {
 
+static SmallVector<bool> getPromotedOperands(Operation *op) {
+  SmallVector<bool> promotedOperands(op->getNumOperands(), false);
+
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  if (!config) {
+    return promotedOperands;
+  }
+
+  std::optional<SmallVector<int64_t>> promoteConfig =
+      config.getPromotedOperandList();
+  if (!promoteConfig) {
+    return promotedOperands;
+  }
+
+  for (int64_t operand : promoteConfig.value()) {
+    promotedOperands[operand] = true;
+  }
+
+  return promotedOperands;
+}
+
 static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                                          SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
-                                          linalg::LinalgOp contract,
-                                          bool promoteLhs = true,
-                                          bool promoteRhs = true) {
+                                          linalg::LinalgOp contract) {
   // TODO: Add SIMT fallback.
   if (!schedule) {
     return contract->emitError("missing mma schedule for contraction");
@@ -56,23 +80,26 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
-  auto layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, lhs, aLayout, schedule.getIntrinsic());
-  auto layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, rhs, bLayout, schedule.getIntrinsic());
-  auto layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, acc, cLayout, schedule.getIntrinsic());
+  auto layoutedLhs =
+      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.getIntrinsic());
+  auto layoutedRhs =
+      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.getIntrinsic());
+  auto layoutedAcc =
+      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
-  // TODO: We should read this from the lowering_config on the operation.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
   // should decide where to put these shared memory conversions.
-  if (promoteLhs) {
+  if (promotedOperands[0]) {
     layoutedLhs.setSharedMemoryConversion(true);
   }
 
-  if (promoteRhs) {
+  if (promotedOperands[1]) {
     layoutedRhs.setSharedMemoryConversion(true);
+  }
+
+  if (promotedOperands[2]) {
+    layoutedAcc.setSharedMemoryConversion(true);
   }
 
   contract->setOperand(0, layoutedLhs.getResult());
@@ -81,8 +108,8 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract->getResult(0), cLayout, schedule.getIntrinsic());
+  auto toLayout = rewriter.create<ToLayoutOp>(loc, contract->getResult(0),
+                                              cLayout, schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -90,6 +117,7 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 }
 
 static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+                                          SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
                                           linalg::LinalgOp conv) {
   // TODO: Add SIMT fallback.
@@ -137,21 +165,29 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   Value rhs = conv->getOperand(1);
   Value acc = conv->getOperand(2);
 
-  // Set layouts for lhs, rhs and acc.
+  // eet layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
-  auto layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, lhs, aLayout, schedule.getIntrinsic());
-  auto layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, rhs, bLayout, schedule.getIntrinsic());
-  auto layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, acc, cLayout, schedule.getIntrinsic());
+  auto layoutedLhs =
+      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.getIntrinsic());
+  auto layoutedRhs =
+      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.getIntrinsic());
+  auto layoutedAcc =
+      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
-  // TODO: We should read this from the lowering_config on the operation.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
   // should decide where to put these shared memory conversions.
-  layoutedLhs.setSharedMemoryConversion(true);
-  layoutedRhs.setSharedMemoryConversion(true);
+  if (promotedOperands[0]) {
+    layoutedLhs.setSharedMemoryConversion(true);
+  }
+
+  if (promotedOperands[1]) {
+    layoutedRhs.setSharedMemoryConversion(true);
+  }
+
+  if (promotedOperands[2]) {
+    layoutedAcc.setSharedMemoryConversion(true);
+  }
 
   conv->setOperand(0, layoutedLhs.getResult());
   conv->setOperand(1, layoutedRhs.getResult());
@@ -159,8 +195,8 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
-  auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, conv->getResult(0), cLayout, schedule.getIntrinsic());
+  auto toLayout = rewriter.create<ToLayoutOp>(loc, conv->getResult(0), cLayout,
+                                              schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -278,6 +314,12 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
           /*subgroup_n_count=*/1);
   IREE::GPU::MMAScheduleAttr pvSchedule = schedule;
 
+  SmallVector<bool> promotedQKOperands = getPromotedOperands(qkMatmul);
+  SmallVector<bool> promotedPVOperands = getPromotedOperands(pvMatmul);
+
+  // Do not promote lhs of pvMatmul if we are reusing the intrinsic output.
+  promotedPVOperands[0] = !reuseIntrinsicOutput;
+
   // Transpose the intrinsic if requested. See docs for
   // swapOperandsToTransposeIntrinsic for more information on why this is done.
   if (transposeIntrinsic) {
@@ -292,21 +334,114 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
     swapOperandsToTransposeIntrinsic(rewriter, pvGeneric);
     qkSchedule = transposeSchedule(rewriter, qkSchedule);
     pvSchedule = transposeSchedule(rewriter, pvSchedule);
+
+    // Swap promoted operands.
+    std::swap(promotedQKOperands[0], promotedQKOperands[1]);
+    std::swap(promotedPVOperands[0], promotedPVOperands[1]);
   }
 
-  if (failed(setContractionAnchor(qkSchedule, rewriter, qkMatmul))) {
+  if (failed(setContractionAnchor(qkSchedule, promotedQKOperands, rewriter,
+                                  qkMatmul))) {
     return failure();
   }
 
-  // Do not promote lhs of pvMatmul if we are reusing the intrinsic output.
-  bool promoteLhs = !reuseIntrinsicOutput;
-  bool promoteRhs = true;
-  if (transposeIntrinsic) {
-    std::swap(promoteLhs, promoteRhs);
+  return setContractionAnchor(pvSchedule, promotedPVOperands, rewriter,
+                              pvMatmul);
+}
+
+// Apply the permuted projection map to the layout.
+static IREE::VectorExt::VectorLayoutInterface
+getLayoutForMap(VectorLayoutInterface layout, AffineMap map) {
+  // Project out unusued dims in layout.
+  SmallVector<bool> projectedDims(layout.getRank(), false);
+  for (int dim : getUnusedDimsBitVector(map).set_bits()) {
+    projectedDims[dim] = true;
+  }
+  IREE::VectorExt::VectorLayoutInterface projectedLayout =
+      layout.project(projectedDims);
+
+  // Transpose dims in layout.
+  AffineMap permMap = compressUnusedDims(map);
+  SmallVector<int64_t> identity =
+      llvm::to_vector(llvm::seq<int64_t>(permMap.getNumDims()));
+  SmallVector<int64_t> perm = applyPermutationMap<int64_t>(permMap, identity);
+  return projectedLayout.permute(perm);
+}
+
+static LogicalResult setDerivedThreadConfigLayout(
+    IREE::GPU::DerivedThreadConfigAttr config, linalg::LinalgOp linalgOp,
+    ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
+
+  int64_t opRank = linalgOp.getNumLoops();
+
+  SmallVector<int64_t> elementTile = config.getStaticTilingLevelSizes(
+      static_cast<unsigned>(IREE::GPU::TilingLevel::Thread), linalgOp);
+
+  SmallVector<int64_t> opShape = linalgOp.getStaticLoopRanges();
+  for (auto [index, size, element] : llvm::enumerate(opShape, elementTile)) {
+    if (ShapedType::isDynamic(size)) {
+      linalgOp->emitError() << "Cannot set layouts for dynamic loop ranges";
+      return failure();
+    }
+
+    if (size % element != 0) {
+      linalgOp->emitError()
+          << "Operation with unsupported number of elements. "
+             "Chosen vector tile sizes for operation are not "
+             "divisible by operation loop ranges at dim: "
+          << index << ", size=" << size << ", vector size = " << element;
+      return failure();
+    }
+
+    size /= element;
   }
 
-  return setContractionAnchor(pvSchedule, rewriter, pvMatmul, promoteLhs,
-                              promoteRhs);
+  SmallVector<int64_t> threadTile(opRank, 1);
+  SmallVector<int64_t> threadStrides(opRank, 0);
+
+  int64_t residualThreads = ShapedType::getNumElements(workgroupSize);
+  int64_t currStride = 1;
+
+  for (auto [tile, stride, size] :
+       llvm::reverse(llvm::zip(threadTile, threadStrides, opShape))) {
+    int64_t threadTile;
+    if (residualThreads % size == 0) {
+      threadTile = size;
+    } else if (size % residualThreads == 0) {
+      threadTile = residualThreads;
+    } else {
+      linalgOp->emitError() << "Operation with unsupported number of elements.";
+      return failure();
+    }
+
+    tile = threadTile;
+    stride = currStride;
+    size /= threadTile;
+
+    currStride *= threadTile;
+    residualThreads /= threadTile;
+  }
+
+  SmallVector<int64_t> subgroupTile(opRank, 1);
+  SmallVector<int64_t> subgroupStrides(opRank, 0);
+  SmallVector<int64_t> outerTile(opRank, 1);
+
+  MLIRContext *context = rewriter.getContext();
+  auto layout = IREE::VectorExt::NestedLayoutAttr::get(
+      context, subgroupTile, opShape, outerTile, threadTile, elementTile,
+      subgroupStrides, threadStrides);
+
+  Location loc = linalgOp.getLoc();
+
+  rewriter.setInsertionPointAfter(linalgOp);
+  for (OpResult result : linalgOp->getResults()) {
+    VectorLayoutInterface resultLayout =
+        getLayoutForMap(layout, linalgOp.getIndexingMapMatchingResult(result));
+    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
+  }
+
+  return success();
 }
 
 static Operation *getOpWithAttr(Operation *root, StringRef attr) {
@@ -330,13 +465,28 @@ static Operation *getOpWithAttr(Operation *root, StringRef attr) {
 struct LLVMGPUConfigureTensorLayoutsPass final
     : impl::LLVMGPUConfigureTensorLayoutsPassBase<
           LLVMGPUConfigureTensorLayoutsPass> {
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<vector::VectorDialect>();
   }
 
   void runOnOperation() override {
-    auto func = getOperation();
+    FunctionOpInterface func = getOperation();
+    IRRewriter rewriter(func);
+
+    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+        getWorkgroupSize(func);
+    if (!maybeWorkgroupSize) {
+      func->emitOpError()
+          << "unable to query workgroup_size information from entry point";
+      return signalPassFailure();
+    }
+
+    if (failed(setDerivedConfigLayouts(func, maybeWorkgroupSize.value(),
+                                       rewriter))) {
+      return signalPassFailure();
+    }
 
     llvm::StringLiteral scheduleAttrName =
         IREE::GPU::MMAScheduleAttr::getMnemonic();
@@ -377,16 +527,18 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return WalkResult::advance();
     });
 
-    IRRewriter rewriter(func);
-
     for (linalg::LinalgOp contract : contracts) {
-      if (failed(setContractionAnchor(scheduleAttr, rewriter, contract))) {
+      SmallVector<bool> promotedOperands = getPromotedOperands(contract);
+      if (failed(setContractionAnchor(scheduleAttr, promotedOperands, rewriter,
+                                      contract))) {
         return signalPassFailure();
       }
     }
 
     for (linalg::LinalgOp conv : convs) {
-      if (failed(setConvolutionAnchor(scheduleAttr, rewriter, conv))) {
+      SmallVector<bool> promotedOperands = getPromotedOperands(conv);
+      if (failed(setConvolutionAnchor(scheduleAttr, promotedOperands, rewriter,
+                                      conv))) {
         return signalPassFailure();
       }
     }
@@ -397,6 +549,31 @@ struct LLVMGPUConfigureTensorLayoutsPass final
         return signalPassFailure();
       }
     }
+  }
+
+  LogicalResult setDerivedConfigLayouts(FunctionOpInterface funcOp,
+                                        ArrayRef<int64_t> workgroupSize,
+                                        RewriterBase &rewriter) {
+    SmallVector<linalg::LinalgOp> candidates;
+    funcOp->walk([&](linalg::LinalgOp op) {
+      auto config = dyn_cast_or_null<IREE::GPU::DerivedThreadConfigAttr>(
+          getLoweringConfig(op));
+      if (config) {
+        candidates.push_back(op);
+      }
+    });
+
+    for (linalg::LinalgOp candidate : candidates) {
+      auto config = dyn_cast_or_null<IREE::GPU::DerivedThreadConfigAttr>(
+          getLoweringConfig(candidate));
+      assert(config);
+      if (failed(setDerivedThreadConfigLayout(config, candidate, workgroupSize,
+                                              rewriter))) {
+        return failure();
+      }
+    }
+
+    return success();
   }
 };
 } // namespace
