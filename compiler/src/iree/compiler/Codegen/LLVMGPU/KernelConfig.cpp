@@ -71,6 +71,12 @@ llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
                    "unaligned GEMMs when supported"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUTestVectorDistributionReduction(
+    "iree-codegen-llvmgpu-test-vector-distribution-reduction",
+    llvm::cl::desc(
+        "test the vector distribution pipeline for reduction operations"),
+    llvm::cl::init(false));
+
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
     clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
@@ -1002,6 +1008,17 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
       LDBG("VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
+    }
+
+    if (clGPUTestVectorDistributionReduction) {
+      // Use the flag to make it optional now.
+      // TODO: fix the performance issue.
+      if (succeeded(reductionPrecondition(linalgOp))) {
+        LDBG("VectorDistribution: trying to find a suitable convolution config "
+             "for linalg op with reduction dim");
+        return setReductionVectorDistributionConfig(target, entryPoint,
+                                                    linalgOp);
+      }
     }
   }
 
