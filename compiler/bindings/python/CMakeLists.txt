@@ -100,15 +100,6 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME vm
 )
 
-declare_mlir_dialect_python_bindings(
-  ADD_TO_PARENT IREEPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  TD_FILE dialects/IREEGPUBinding.td
-  GEN_ENUM_BINDINGS
-  SOURCES dialects/iree_gpu.py
-  DIALECT_NAME iree_gpu
-)
-
 declare_mlir_python_sources(IREECompilerAPIPythonCore
   ADD_TO_PARENT IREEPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
@@ -168,17 +159,6 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
   ADD_TO_PARENT IREECompilerPythonExtensions
   SOURCES
     IREECompilerRegistration.cpp
-  EMBED_CAPI_LINK_LIBS
-    iree_compiler_API_SharedImpl
-  PRIVATE_LINK_LIBS
-    LLVMSupport
-)
-
-declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
-  MODULE_NAME _ireeCompilerDialects
-  ADD_TO_PARENT IREECompilerPythonExtensions
-  SOURCES
-    IREECompilerDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
     iree_compiler_API_SharedImpl
   PRIVATE_LINK_LIBS

@@ -83,14 +83,14 @@ hal.executable public @main_0_dispatch_0 {
 
 // -----
 
-// Check that applying the `reorder_workgroups_strategy = <Transpose>` pipeline option attribute enables workgroup reordering.
+// Check that applying the `reorder_workgroups_strategy = Transpose` pipeline option attribute enables workgroup reordering.
 
 // OPT-OUT:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
-// OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>
+// OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>
 // OPT-OUT-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 
 // OPT-IN:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
-// OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>
+// OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>
 // OPT-IN-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 #config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32]}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -126,7 +126,7 @@ hal.executable public @main_0_dispatch_0 {
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2>,
-          gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>  // enable the 'reorderWorkgroups' pass.
+          gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = Transpose>  // enable the 'reorderWorkgroups' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
@@ -159,10 +159,10 @@ hal.executable public @main_0_dispatch_0 {
 }
 
 // -----
-// Check that applying the `reorder_workgroups_strategy = <None>` pipeline option disables workgroup reordering.
+// Check that applying the `reorder_workgroups_strategy = None` pipeline option disables workgroup reordering.
 
 // OPT-OUT:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
-// OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>
+// OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = None>
 // OPT-OUT-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 #config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32]}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -187,7 +187,7 @@ hal.executable public @main_0_dispatch_0 {
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2>,
-          gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>  // Disable the 'reorderWorkgroups' pass.
+          gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = None>  // Disable the 'reorderWorkgroups' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
