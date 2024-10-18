@@ -172,7 +172,9 @@ class CTSTestBase : public BaseType, public CTSTestResources {
         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(device_), params, buffer_size, out_buffer));
+        iree_hal_device_allocator(device_), params, buffer_size,
+        &device_buffer));
+    *out_buffer = device_buffer;
   }
 
   void CreateZeroedDeviceBuffer(iree_device_size_t buffer_size,
