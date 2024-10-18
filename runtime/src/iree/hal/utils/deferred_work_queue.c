@@ -879,13 +879,10 @@ static void iree_hal_deferred_work_queue_ready_action_list_fail_locked(
 static void iree_hal_deferred_work_queue_action_list_fail_locked(
     iree_hal_deferred_work_queue_action_list_t* list, iree_status_t status) {
   iree_hal_deferred_work_queue_action_t* action;
-  if (iree_hal_deferred_work_queue_action_list_is_empty(list)) {
-    return;
-  }
-  do {
+  while (!iree_hal_deferred_work_queue_action_list_is_empty(list)) {
     action = iree_hal_deferred_work_queue_action_list_pop_front(list);
     iree_hal_deferred_work_queue_action_fail_locked(action, status);
-  } while (action);
+  }
 }
 
 // Fails and destroys all actions and sets status of |actions|.
