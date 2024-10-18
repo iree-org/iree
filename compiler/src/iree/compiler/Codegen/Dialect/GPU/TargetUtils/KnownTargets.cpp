@@ -43,9 +43,12 @@ struct WgpDetails {
   // modes. Use duplicated values if the GPU only have one subgroup size.
   std::array<int32_t, 2> subgroupSizeChoices;
   std::array<int32_t, 3> maxWorkgroupSizes;
-  uint32_t maxThreadSize;
-  uint32_t maxWorkgroupMemoryBytes;
+  int32_t maxThreadSize;
+  int32_t maxWorkgroupMemoryBytes;
   std::array<int32_t, 3> maxWorkgroupCounts;
+  std::optional<int32_t> maxLoadInstructionBits;
+  std::optional<int32_t> workgroupSimds;
+  std::optional<int32_t> vgprSpaceBits;
 };
 
 // Chip level feature/limit details
@@ -109,6 +112,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupSizes),
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
+      wgp->maxLoadInstructionBits, wgp->workgroupSimds, wgp->vgprSpaceBits,
       DictionaryAttr{});
 
   TargetChipAttr targetChip;
@@ -146,7 +150,10 @@ const WgpDetails *getCDNA3WgpDetails() {
                                       {1024, 1024, 1024},
                                       1024,
                                       64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*workgroupSimds=*/4,
+                                      /*vgprSpaceBits=*/512 * 32};
   return &cdna3Wgp;
 }
 
