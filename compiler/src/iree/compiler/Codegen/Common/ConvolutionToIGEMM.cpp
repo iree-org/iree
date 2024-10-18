@@ -45,6 +45,9 @@ struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
         break;
       }
     }
+    if (!im2colOp) {
+      return rewriter.notifyMatchFailure(genericOp, "no im2colOp producer.");
+    }
 
     if (getLoweringConfig(genericOp)) {
       return rewriter.notifyMatchFailure(genericOp,
