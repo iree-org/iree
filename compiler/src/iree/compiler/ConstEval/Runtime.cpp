@@ -511,6 +511,8 @@ InMemoryCompiledBinary::translateFromModule(mlir::ModuleOp moduleOp) {
 }
 
 Runtime::Runtime() {
+  IREE_TRACE_APP_ENTER();
+
   if (iree_status_is_ok(initStatus)) {
     initStatus =
         iree_hal_driver_registry_allocate(iree_allocator_system(), &registry);
@@ -528,6 +530,8 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+  IREE_TRACE_APP_EXIT(initStatus);
+
   iree_status_free(initStatus);
   instance.reset();
   iree_hal_driver_registry_free(registry);
