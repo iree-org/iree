@@ -38,6 +38,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t affinity,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a HIP stream-based command buffer.

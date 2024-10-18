@@ -19,6 +19,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef iree_status_t (*iree_hal_hip_devent_issue_work_cb)(void* user_data);
+
 // Creates an IREE HAL semaphore with the given |initial_value|.
 //
 // The HAL semaphore are backed by iree_event_t or hipEvent_t objects for
@@ -32,15 +34,15 @@ extern "C" {
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_timepoint_pool_t* timepoint_pool,
-    iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore);
+    iree_hal_hip_devent_issue_work_cb issue_work_cb, void* issue_work_user_data,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Acquires a timepoint to signal the timeline to the given |to_value| from the
 // device. The underlying HIP event is written into |out_event| for interacting
 // with HIP APIs.
 iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
-    hipEvent_t* out_event);
+    uint64_t device_index, hipEvent_t* out_event);
 
 // Acquires an iree_hal_hip_event_t object to wait on the host for the
 // timeline to reach at least the given |min_value| on the device.

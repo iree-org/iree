@@ -14,6 +14,9 @@ set(IREE_ALL_CTS_TESTS
   "command_buffer_fill_buffer"
   "command_buffer_update_buffer"
   "driver"
+  "device_group_copy"
+  "device_group_dispatch"
+  "device_group_driver"
   "event"
   "executable_cache"
   "file"
@@ -28,6 +31,7 @@ set(IREE_ALL_CTS_TESTS
 set(IREE_EXECUTABLE_CTS_TESTS
   "command_buffer_dispatch"
   "command_buffer_dispatch_constants"
+  "device_group_dispatch"
   "executable_cache"
   PARENT_SCOPE
 )
@@ -37,6 +41,13 @@ set(IREE_ALL_CTS_EXECUTABLE_SOURCES
   "command_buffer_dispatch_test"
   "command_buffer_dispatch_constants_test"
   "executable_cache_test"
+  PARENT_SCOPE
+)
+
+set (IREE_DEVICE_GROUP_CTS_TESTS
+  "device_group_copy"
+  "device_group_dispatch"
+  "device_group_driver"
   PARENT_SCOPE
 )
 
@@ -149,6 +160,45 @@ iree_cc_library(
     command_buffer_update_buffer_test_library
   HDRS
     "command_buffer_update_buffer_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    device_group_copy_test_library
+  HDRS
+    "device_group_copy_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    device_group_dispatch_test_library
+  HDRS
+    "device_group_dispatch_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    device_group_driver_test_library
+  HDRS
+    "device_group_driver_test.h"
   DEPS
     ::cts_test_base
     iree::base

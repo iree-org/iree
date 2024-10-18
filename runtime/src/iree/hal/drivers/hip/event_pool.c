@@ -122,6 +122,8 @@ struct iree_hal_hip_event_pool_t {
   // The symbols used to create and destroy hipEvent_t objects.
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
+  hipCtx_t device_context;
+
   // Guards event related fields in the pool. We don't expect a performant
   // program to frequently allocate events for synchronization purposes; the
   // traffic to this pool should be low. So it should be fine to use mutex to
@@ -144,7 +146,7 @@ static void iree_hal_hip_event_pool_free(iree_hal_hip_event_pool_t* event_pool);
 iree_status_t iree_hal_hip_event_pool_allocate(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
-    iree_hal_hip_event_pool_t** out_event_pool) {
+    hipCtx_t device_context, iree_hal_hip_event_pool_t** out_event_pool) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_event_pool);
   *out_event_pool = NULL;
@@ -163,13 +165,21 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   iree_slim_mutex_initialize(&event_pool->event_mutex);
   event_pool->available_capacity = available_capacity;
   event_pool->available_count = 0;
+  event_pool->device_context = device_context;
 
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < available_capacity; ++i) {
-    status = iree_hal_hip_event_create(
-        symbols, event_pool, host_allocator,
-        &event_pool->available_list[event_pool->available_count++]);
-    if (!iree_status_is_ok(status)) break;
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      symbols, hipCtxPushCurrent(device_context), "hipCtxPushCurrent");
+
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < available_capacity; ++i) {
+      status = iree_hal_hip_event_create(
+          symbols, event_pool, host_allocator,
+          &event_pool->available_list[event_pool->available_count++]);
+      if (!iree_status_is_ok(status)) break;
+    }
+    status = iree_status_join(
+        status, IREE_HIP_RESULT_TO_STATUS(symbols, hipCtxPopCurrent(NULL),
+                                          "hipCtxPopCurrent"));
   }
 
   if (iree_status_is_ok(status)) {
@@ -238,17 +248,33 @@ iree_status_t iree_hal_hip_event_pool_acquire(
   // Allocate the rest of the events.
   if (remaining_count > 0) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
-    iree_status_t status = iree_ok_status();
-    for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      status = iree_hal_hip_event_create(event_pool->symbols, event_pool,
-                                         event_pool->host_allocator,
-                                         &out_events[from_pool_count + i]);
+
+    iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+        event_pool->symbols, hipCtxPushCurrent(event_pool->device_context),
+        "hipCtxPushCurrent");
+    if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0; i < remaining_count; ++i) {
+        status = iree_hal_hip_event_create(event_pool->symbols, event_pool,
+                                           event_pool->host_allocator,
+                                           &out_events[from_pool_count + i]);
+        if (!iree_status_is_ok(status)) {
+          // Must release all events we've acquired so far.
+          iree_hal_hip_event_pool_release_event(event_pool, from_pool_count + i,
+                                                out_events);
+          IREE_TRACE_ZONE_END(z1);
+          IREE_TRACE_ZONE_END(z0);
+          break;
+        }
+      }
+      iree_status_t cleanup_status = IREE_HIP_RESULT_TO_STATUS(
+          event_pool->symbols, hipCtxPopCurrent(NULL), "hipCtxPopCurrent");
+      if (iree_status_is_ok(status) && !iree_status_is_ok(cleanup_status)) {
+        // Clean up all of the events we've acquired.
+        iree_hal_hip_event_pool_release_event(
+            event_pool, from_pool_count + remaining_count, out_events);
+      }
+      status = iree_status_join(status, cleanup_status);
       if (!iree_status_is_ok(status)) {
-        // Must release all events we've acquired so far.
-        iree_hal_hip_event_pool_release_event(event_pool, from_pool_count + i,
-                                              out_events);
-        IREE_TRACE_ZONE_END(z1);
-        IREE_TRACE_ZONE_END(z0);
         return status;
       }
     }

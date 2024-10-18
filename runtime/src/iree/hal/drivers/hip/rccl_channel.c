@@ -12,7 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/hip/hip_buffer.h"
-#include "iree/hal/drivers/hip/hip_device.h"
+#include "iree/hal/drivers/hip/hip_device_group_device.h"
 #include "iree/hal/drivers/hip/rccl_status_util.h"
 #include "iree/hal/drivers/hip/status_util.h"
 

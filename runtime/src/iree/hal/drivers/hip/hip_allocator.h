@@ -16,14 +16,18 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_hip_per_device_information_t
+    iree_hal_hip_per_device_information_t;
+
 // Creates a HIP memory allocator.
 // |device| and |stream| will be used for management operations.
 // |pools| provides memory pools that may be shared across multiple allocators
 // and the pointer must remain valid for the lifetime of the allocator.
 iree_status_t iree_hal_hip_allocator_create(
-    const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
-    hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
-    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols, uint32_t num_devices,
+    iree_hal_hip_per_device_information_t* infos,
+    iree_hal_hip_memory_pools_t* pools, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -12,10 +12,21 @@
 #cmakedefine IREE_CTS_EXECUTABLE_FORMAT @IREE_CTS_EXECUTABLE_FORMAT@
 #cmakedefine IREE_CTS_EXECUTABLES_TESTDATA_HDR "@IREE_CTS_EXECUTABLES_TESTDATA_HDR@"
 #cmakedefine IREE_CTS_TARGET_BACKEND "@IREE_CTS_TARGET_BACKEND@"
+#cmakedefine IREE_CTS_DEVICE_CREATION_HDR "@IREE_CTS_DEVICE_CREATION_HDR@"
+#cmakedefine IREE_CTS_DEFAULT_DEVICE_CREATION_FN @IREE_CTS_DEFAULT_DEVICE_CREATION_FN@
+#cmakedefine IREE_CTS_DEFAULT_SUBMIT_QUEUE_AFFINITY @IREE_CTS_DEFAULT_SUBMIT_QUEUE_AFFINITY@
 
 // clang-format on
 
 #include IREE_CTS_TEST_FILE_PATH
+
+#ifndef IREE_CTS_DEFAULT_DEVICE_CREATION_FN
+#define IREE_CTS_DEFAULT_DEVICE_CREATION_FN iree_hal_driver_create_default_device
+#endif
+
+#ifndef IREE_CTS_DEFAULT_SUBMIT_QUEUE_AFFINITY
+#define IREE_CTS_DEFAULT_SUBMIT_QUEUE_AFFINITY IREE_HAL_QUEUE_AFFINITY_ANY
+#endif
 
 #include IREE_CTS_DRIVER_REGISTRATION_HDR
 #include "iree/hal/cts/cts_test_base.h"
@@ -23,6 +34,10 @@
 
 #ifdef IREE_CTS_EXECUTABLES_TESTDATA_HDR
 #include IREE_CTS_EXECUTABLES_TESTDATA_HDR
+#endif
+
+#ifdef IREE_CTS_DEVICE_CREATION_HDR
+#include IREE_CTS_DEVICE_CREATION_HDR
 #endif
 
 namespace iree {
@@ -37,12 +52,22 @@ iree_status_t register_test_driver(iree_hal_driver_registry_t* registry) {
   return IREE_CTS_DRIVER_REGISTRATION_FN(registry);
 }
 
+iree_status_t create_default_test_device(
+    iree_hal_driver_t* driver, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  return IREE_CTS_DEFAULT_DEVICE_CREATION_FN(driver, host_allocator, out_device);
+}
+
 const char* get_test_executable_format() {
 #ifdef IREE_CTS_EXECUTABLE_FORMAT
   return IREE_CTS_EXECUTABLE_FORMAT;
 #else
   return "UNDEFINED";
 #endif
+}
+
+iree_hal_queue_affinity_t get_default_submit_queue_affinity() {
+  return IREE_CTS_DEFAULT_SUBMIT_QUEUE_AFFINITY;
 }
 
 iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name) {
