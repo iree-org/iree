@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_PLUGINS_TARGET_LLVMCPU_RESOLVECPUANDCPUFEATURES_H_
 #define IREE_COMPILER_PLUGINS_TARGET_LLVMCPU_RESOLVECPUANDCPUFEATURES_H_
 
+#include <string>
 #include <string_view>
 
 namespace mlir::iree_compiler::IREE::HAL {
