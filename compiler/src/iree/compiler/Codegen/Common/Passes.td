@@ -159,6 +159,15 @@ def DecomposePackUnPackOpsPass :
   ];
 }
 
+def DecomposeBoundaryPackUnPackOpsPass :
+    InterfacePass<"iree-codegen-decompose-boundary-pack-unpack-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Wrapper for DecomposePackUnPackOpsPass to decompose ops at function boundaries";
+  let options = [
+    Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
+           "Always apply tiling to make outer dimension be ones">
+  ];
+}
+
 def DecomposeSoftmaxPass :
     InterfacePass<"iree-codegen-decompose-softmax", "mlir::FunctionOpInterface"> {
   let summary =

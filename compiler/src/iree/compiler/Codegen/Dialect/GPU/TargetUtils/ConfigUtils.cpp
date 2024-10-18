@@ -245,10 +245,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   }
 
   // Compute the M/N dimension tile size by multiplying subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mWarpCount * schedule->mTileCount * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mWarpCount * schedule->mTileCount;
+  workgroupTileSizes[nDim] = schedule->nWarpCount * schedule->nTileCount;
 
   // Specify the subgroup tile sizes from the mma schedule. This is applied
   subgroupTileSizes[mDim] = schedule->mTileCount;
