@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -20,6 +21,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-decompose-pack-unpack-ops"
@@ -27,7 +29,10 @@
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_DECOMPOSEPACKUNPACKOPSPASS
+#define GEN_PASS_DEF_DECOMPOSEBOUNDARYPACKUNPACKOPSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
+
+using PackUnPackControlFn = std::function<LogicalResult(Operation *)>;
 
 namespace {
 
@@ -105,6 +110,20 @@ struct DecomposePackUnPackOpsPass final
 
 private:
   std::optional<PackUnPackControlFn> controlFn;
+};
+
+struct DecomposeBoundaryPackUnPackOpsPass final
+    : impl::DecomposeBoundaryPackUnPackOpsPassBase<
+          DecomposeBoundaryPackUnPackOpsPass> {
+  using impl::DecomposeBoundaryPackUnPackOpsPassBase<
+      DecomposeBoundaryPackUnPackOpsPass>::
+      DecomposeBoundaryPackUnPackOpsPassBase;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override;
 };
 
 } // namespace
@@ -243,11 +262,75 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+static std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
                                  std::optional<PackUnPackControlFn> controlFn) {
   return std::make_unique<DecomposePackUnPackOpsPass>(
       tileOuterToOne, useOnlyReshapes, controlFn);
+}
+
+static bool hasPadding(Operation *op) {
+  auto needsPad = [](ShapedType unpackedType, ArrayRef<int64_t> innerDimPos,
+                     ArrayRef<int64_t> staticInnerTiles) {
+    for (auto [dimPos, tile] : llvm::zip_equal(innerDimPos, staticInnerTiles)) {
+      if (unpackedType.isDynamicDim(dimPos) || ShapedType::isDynamic(tile) ||
+          unpackedType.getDimSize(dimPos) % tile != 0) {
+        return true;
+      }
+    }
+    return false;
+  };
+  auto packOp = dyn_cast<tensor::PackOp>(op);
+  if (packOp && needsPad(packOp.getSourceType(), packOp.getInnerDimsPos(),
+                         packOp.getStaticInnerTiles())) {
+    return true;
+  }
+  auto unPackOp = dyn_cast<tensor::UnPackOp>(op);
+  if (unPackOp && needsPad(unPackOp.getDestType(), unPackOp.getInnerDimsPos(),
+                           unPackOp.getStaticInnerTiles())) {
+    return true;
+  }
+  return false;
+}
+
+/// Control function for decomposing pack and unpack ops. Returns true if the
+/// op does not require padding and is a PackOp with a DispatchTensorLoadOp
+/// producer, or an UnPackOp with only DispatchTensorStoreOp consumers.
+static LogicalResult isFoldableIntoInterfaceTensor(Operation *op) {
+  if (hasPadding(op)) {
+    return failure();
+  }
+  if (isa<tensor::PackOp>(op)) {
+    if (isa_and_nonnull<IREE::Flow::DispatchTensorLoadOp>(
+            op->getOperand(0).getDefiningOp())) {
+      return success();
+    }
+  } else if (isa<tensor::UnPackOp>(op)) {
+    if (llvm::all_of(op->getUsers(), [](Operation *user) {
+          return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+        })) {
+      return success();
+    }
+  }
+  return failure();
+}
+
+void DecomposeBoundaryPackUnPackOpsPass::runOnOperation() {
+  auto funcOp = getOperation();
+  std::optional<OpPassManager> maybeFuncPassManager =
+      getFunctionOpInterfacePassManager(funcOp);
+  if (!maybeFuncPassManager) {
+    funcOp.emitOpError("unhandled operation type while creating pass pipeline "
+                       "nested on `FunctionOpInterface`");
+    return signalPassFailure();
+  }
+  OpPassManager &funcPassManager = maybeFuncPassManager.value();
+  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
+      tileOuterToOne, /*useOnlyReshapes=*/true,
+      /*controlFn=*/isFoldableIntoInterfaceTensor));
+  if (failed(runPipeline(funcPassManager, funcOp))) {
+    return signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler

@@ -242,16 +242,16 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       return llvm::divideCeil(value, padTo) * padTo - value;
     };
 
-    if (mSize % intrinsic.mSize != 0) {
-      mPadding = getPadding(mSize, intrinsic.mSize);
+    if (mSize % intrinsic.mSizes[0] != 0) {
+      mPadding = getPadding(mSize, intrinsic.mSizes[0]);
     }
 
-    if (nSize % intrinsic.nSize != 0) {
-      nPadding = getPadding(nSize, intrinsic.nSize);
+    if (nSize % intrinsic.nSizes[0] != 0) {
+      nPadding = getPadding(nSize, intrinsic.nSizes[0]);
     }
 
-    if (kSize % intrinsic.kSize != 0) {
-      kPadding = getPadding(kSize, intrinsic.kSize);
+    if (kSize % intrinsic.kSizes[0] != 0) {
+      kPadding = getPadding(kSize, intrinsic.kSizes[0]);
     }
 
     if (!mPadding && !nPadding && !kPadding) {
@@ -381,7 +381,7 @@ static void padContractionLikeOp(
   for (GPUMatmulShapeType &intrinsic : intrinsics) {
     std::optional<OpFoldResult> mPadding, nPadding, kPadding;
     SmallVector<std::pair<int64_t, int64_t>> dimsToExpandCandidate;
-    if (mSize % intrinsic.mSize != 0 || ShapedType::isDynamic(mSize)) {
+    if (mSize % intrinsic.mSizes[0] != 0 || ShapedType::isDynamic(mSize)) {
       OpFoldResult mSizeExpr = rewriter.getIndexAttr(mSize);
       if (ShapedType::isDynamic(mSize)) {
         auto mOperandDimPair = getSrcOperandAndDim(mDim);
@@ -390,12 +390,12 @@ static void padContractionLikeOp(
         auto [mOperand, mOperandDim] = mOperandDimPair.value();
         mSizeExpr = rewriter.create<tensor::DimOp>(loc, mOperand, mOperandDim)
                         .getResult();
-        dimsToExpandCandidate.emplace_back(mDim, intrinsic.mSize);
+        dimsToExpandCandidate.emplace_back(mDim, intrinsic.mSizes[0]);
       }
-      mPadding = getPadding(mSizeExpr, intrinsic.mSize);
+      mPadding = getPadding(mSizeExpr, intrinsic.mSizes[0]);
     }
 
-    if (nSize % intrinsic.nSize != 0 || ShapedType::isDynamic(nSize)) {
+    if (nSize % intrinsic.nSizes[0] != 0 || ShapedType::isDynamic(nSize)) {
       OpFoldResult nSizeExpr = rewriter.getIndexAttr(nSize);
       if (ShapedType::isDynamic(nSize)) {
         auto nOperandDimPair = getSrcOperandAndDim(nDim);
@@ -404,12 +404,12 @@ static void padContractionLikeOp(
         auto [nOperand, nOperandDim] = nOperandDimPair.value();
         nSizeExpr = rewriter.create<tensor::DimOp>(loc, nOperand, nOperandDim)
                         .getResult();
-        dimsToExpandCandidate.emplace_back(nDim, intrinsic.nSize);
+        dimsToExpandCandidate.emplace_back(nDim, intrinsic.nSizes[0]);
       }
-      nPadding = getPadding(nSizeExpr, intrinsic.nSize);
+      nPadding = getPadding(nSizeExpr, intrinsic.nSizes[0]);
     }
 
-    if (kSize % intrinsic.kSize != 0 || ShapedType::isDynamic(kSize)) {
+    if (kSize % intrinsic.kSizes[0] != 0 || ShapedType::isDynamic(kSize)) {
       OpFoldResult kSizeExpr = rewriter.getIndexAttr(kSize);
       if (ShapedType::isDynamic(kSize)) {
         auto kOperandDimPair = getSrcOperandAndDim(kDim);
@@ -418,9 +418,9 @@ static void padContractionLikeOp(
         auto [kOperand, kOperandDim] = kOperandDimPair.value();
         kSizeExpr = rewriter.create<tensor::DimOp>(loc, kOperand, kOperandDim)
                         .getResult();
-        dimsToExpandCandidate.emplace_back(kDim, intrinsic.kSize);
+        dimsToExpandCandidate.emplace_back(kDim, intrinsic.kSizes[0]);
       }
-      kPadding = getPadding(kSizeExpr, intrinsic.kSize);
+      kPadding = getPadding(kSizeExpr, intrinsic.kSizes[0]);
     }
 
     if (!mPadding && !nPadding && !kPadding) {
