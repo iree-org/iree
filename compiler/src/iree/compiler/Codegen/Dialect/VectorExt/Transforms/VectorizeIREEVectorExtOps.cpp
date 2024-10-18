@@ -50,8 +50,7 @@ struct VectorizeToLayoutOpPattern final
     auto newLayoutOp = rewriter.create<IREE::VectorExt::ToLayoutOp>(
         loc, newInput, toLayoutOp.getLayout(),
         toLayoutOp.getSharedMemoryConversion());
-    newLayoutOp->setDiscardableAttrs(
-        toLayoutOp->getDiscardableAttrDictionary());
+    newLayoutOp.setIntrinsicAttr(toLayoutOp.getIntrinsicAttr());
 
     // Create the write back to a tensor.
     int64_t rank = inputTy.getRank();

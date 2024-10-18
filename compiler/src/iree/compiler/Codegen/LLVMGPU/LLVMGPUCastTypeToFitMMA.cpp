@@ -102,8 +102,8 @@ static void inferMmaKind(vector::ContractionOp contract) {
     return;
   }
 
-  auto intrinsic =
-      toLayout->getAttrOfType<IREE::GPU::MmaInterfaceAttr>("mma_kind");
+  auto intrinsic = dyn_cast_or_null<IREE::GPU::MmaInterfaceAttr>(
+      toLayout.getIntrinsicAttr());
   if (!intrinsic) {
     return;
   }
@@ -121,8 +121,26 @@ struct LLVMGPUCastTypeToFitMMAPass final
   void runOnOperation() override {
     auto func = getOperation();
 
-    // Import mma type from dispatch schedule attribute if present.
-    func.walk([&](vector::ContractionOp contract) { inferMmaKind(contract); });
+    llvm::StringLiteral scheduleAttrName =
+        IREE::GPU::MMAScheduleAttr::getMnemonic();
+    auto scheduleAttr =
+        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
+    if (!scheduleAttr) {
+      DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
+      if (configDict) {
+        scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+            configDict.get(scheduleAttrName));
+      }
+    }
+
+    // Set MMA type from config embedded in toLayoutOp of contraction.
+    // If none, use mma type from dispatch schedule attribute if present.
+    func.walk([&](vector::ContractionOp contract) {
+      inferMmaKind(contract);
+      if (!contract->hasAttr("iree.amdgpu.mma") && scheduleAttr) {
+        contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+      }
+    });
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

@@ -63,9 +63,9 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   auto layoutedAcc =
       rewriter.create<IREE::VectorExt::ToLayoutOp>(loc, acc, cLayout);
 
-  layoutedLhs->setAttr("mma_kind", schedule.getIntrinsic());
-  layoutedRhs->setAttr("mma_kind", schedule.getIntrinsic());
-  layoutedAcc->setAttr("mma_kind", schedule.getIntrinsic());
+  layoutedLhs.setIntrinsicAttr(schedule.getIntrinsic());
+  layoutedRhs.setIntrinsicAttr(schedule.getIntrinsic());
+  layoutedAcc.setIntrinsicAttr(schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: We should read this from the lowering_config on the operation.
@@ -87,7 +87,7 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   rewriter.setInsertionPointAfter(contract);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
       loc, contract->getResult(0), cLayout);
-  toLayout->setAttr("mma_kind", schedule.getIntrinsic());
+  toLayout.setIntrinsicAttr(schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -150,9 +150,9 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
       loc, rhs.getType(), rhs, bLayout);
   auto layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
       loc, acc.getType(), acc, cLayout);
-  layoutedLhs->setAttr("mma_kind", schedule.getIntrinsic());
-  layoutedRhs->setAttr("mma_kind", schedule.getIntrinsic());
-  layoutedAcc->setAttr("mma_kind", schedule.getIntrinsic());
+  layoutedLhs.setIntrinsicAttr(schedule.getIntrinsic());
+  layoutedRhs.setIntrinsicAttr(schedule.getIntrinsic());
+  layoutedAcc.setIntrinsicAttr(schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: We should read this from the lowering_config on the operation.
@@ -169,7 +169,7 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   rewriter.setInsertionPointAfter(conv);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
       loc, conv->getResult(0).getType(), conv->getResult(0), cLayout);
-  toLayout->setAttr("mma_kind", schedule.getIntrinsic());
+  toLayout.setIntrinsicAttr(schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
