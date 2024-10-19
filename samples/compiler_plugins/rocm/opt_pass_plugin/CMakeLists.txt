@@ -9,6 +9,11 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
   return()
 endif()
 
+# Only run if ROCM backend is enabled.
+if(NOT IREE_TARGET_BACKEND_ROCM)
+  return()
+endif()
+
 set(_NAME "iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginSample")
 
 add_library(${_NAME} SHARED
