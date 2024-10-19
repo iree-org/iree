@@ -103,6 +103,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    IREEGPUDialectCAPI
+  SRCS
+    "IREEGPUDialectCAPI.cpp"
+  DEPS
+    IREELLVMIncludeSetup
+    MLIRCAPIIR
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::bindings::c::headers
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 set(_lld_copts)

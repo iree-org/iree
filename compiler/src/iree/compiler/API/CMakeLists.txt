@@ -78,6 +78,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPITransformDialectTransforms
   iree_compiler_API_Internal_CompilerDriver.objects
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
+  iree_compiler_API_Internal_IREEGPUDialectCAPI.objects
   iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
   iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
