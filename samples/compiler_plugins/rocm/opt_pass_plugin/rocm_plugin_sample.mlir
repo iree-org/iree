@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=gfx90a \
-// RUN:   --iree-hip-pass-plugin-path=$IREE_BINARY_DIR/lib/ROCMPluginTest$IREE_DYLIB_EXT %s 2>&1 | FileCheck %s
+// RUN:   --iree-hip-pass-plugin-path=$IREE_BINARY_DIR/lib/ROCMPluginSample$IREE_DYLIB_EXT %s 2>&1 | FileCheck %s
 
 module attributes {
   hal.device.targets = [

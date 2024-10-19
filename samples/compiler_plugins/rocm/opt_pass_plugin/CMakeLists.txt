@@ -9,10 +9,10 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
   return()
 endif()
 
-set(_NAME "iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginTest")
+set(_NAME "iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginSample")
 
 add_library(${_NAME} SHARED
-  "ROCMPluginTest.cpp"
+  "ROCMPluginSample.cpp"
 )
 target_link_libraries(${_NAME}
   iree_compiler_API_SharedImpl
@@ -20,11 +20,11 @@ target_link_libraries(${_NAME}
 
 # NOTE: this is only required because we want this sample to run on all
 # platforms without needing to change the library name (libfoo.so/foo.dll).
-set_target_properties(iree_samples_compiler_plugins_rocm_opt_pass_plugin_ROCMPluginTest
+set_target_properties(${_NAME}
   PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS ON
     PREFIX ""
-    OUTPUT_NAME "ROCMPluginTest"
+    OUTPUT_NAME "ROCMPluginSample"
 )
 
 target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
@@ -33,7 +33,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "rocm_plugin_test.mlir"
+    "rocm_plugin_sample.mlir"
   TOOLS
     FileCheck
     iree-opt
