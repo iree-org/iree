@@ -107,7 +107,7 @@ func.func @to_layout_config_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: ve
     %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [6, 4],
                                       outer_tile = [1, 1], thread_tile = [16, 4], element_tile = [1, 4],
                                       subgroup_strides = [0, 0], thread_strides = [1, 16]>)
-                                      {intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<96x64xf16>
+                                      {mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<96x64xf16>
   return %1 : vector<96x64xf16>
 }
 

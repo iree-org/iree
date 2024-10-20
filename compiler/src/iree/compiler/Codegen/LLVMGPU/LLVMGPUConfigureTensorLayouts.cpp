@@ -56,16 +56,12 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
-  auto layoutedLhs =
-      rewriter.create<IREE::VectorExt::ToLayoutOp>(loc, lhs, aLayout);
-  auto layoutedRhs =
-      rewriter.create<IREE::VectorExt::ToLayoutOp>(loc, rhs, bLayout);
-  auto layoutedAcc =
-      rewriter.create<IREE::VectorExt::ToLayoutOp>(loc, acc, cLayout);
-
-  layoutedLhs.setIntrinsicAttr(schedule.getIntrinsic());
-  layoutedRhs.setIntrinsicAttr(schedule.getIntrinsic());
-  layoutedAcc.setIntrinsicAttr(schedule.getIntrinsic());
+  auto layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+      loc, lhs, aLayout, schedule.getIntrinsic());
+  auto layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+      loc, rhs, bLayout, schedule.getIntrinsic());
+  auto layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
+      loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: We should read this from the lowering_config on the operation.
@@ -86,8 +82,7 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, contract->getResult(0), cLayout);
-  toLayout.setIntrinsicAttr(schedule.getIntrinsic());
+      loc, contract->getResult(0), cLayout, schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -145,14 +140,11 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
   auto layoutedLhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, lhs.getType(), lhs, aLayout);
+      loc, lhs, aLayout, schedule.getIntrinsic());
   auto layoutedRhs = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, rhs.getType(), rhs, bLayout);
+      loc, rhs, bLayout, schedule.getIntrinsic());
   auto layoutedAcc = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, acc.getType(), acc, cLayout);
-  layoutedLhs.setIntrinsicAttr(schedule.getIntrinsic());
-  layoutedRhs.setIntrinsicAttr(schedule.getIntrinsic());
-  layoutedAcc.setIntrinsicAttr(schedule.getIntrinsic());
+      loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: We should read this from the lowering_config on the operation.
@@ -168,8 +160,7 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
   auto toLayout = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-      loc, conv->getResult(0).getType(), conv->getResult(0), cLayout);
-  toLayout.setIntrinsicAttr(schedule.getIntrinsic());
+      loc, conv->getResult(0), cLayout, schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 

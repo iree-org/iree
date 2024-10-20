@@ -41,7 +41,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
     AnyShaped:$input,
     VectorLayoutInterface:$layout,
     DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion,
-    OptionalAttr<AnyAttr>:$intrinsic
+    OptionalAttr<AnyAttr>:$mma_kind
   );
   let results = (outs
     AnyShaped:$output
@@ -49,33 +49,20 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let builders = [
     OpBuilder<(ins "Value":$input,
                    "VectorLayoutInterface":$layout,
+                   "Attribute":$mma_kind_attr,
                    CArg<"bool", "false">:$shared_memory_conversion), [{
+      UnitAttr defaultSharedMemoryConversion;
       if (shared_memory_conversion) {
-        build($_builder, $_state, input.getType(), input, layout, UnitAttr::get(input.getContext()));
-      } else{
-        build($_builder, $_state, input.getType(), input, layout);
+        defaultSharedMemoryConversion = UnitAttr::get(input.getContext());
       }
+      build($_builder, $_state, input.getType(), input, layout, defaultSharedMemoryConversion, mma_kind_attr);
     }]>,
-  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
-              "VectorLayoutInterface":$layout), [{
-    UnitAttr defaultSharedMemoryConversion;
-    build($_builder, $_state, resultTypes, input, layout, defaultSharedMemoryConversion);
-  }]>,
-  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
-              "VectorLayoutInterface":$layout,
-              "bool":$shared_memory_conversion), [{
-    if (shared_memory_conversion) {
-      build($_builder, $_state, resultTypes, input, layout, UnitAttr::get(input.getContext()));
-    } else {
-      build($_builder, $_state, resultTypes, input, layout);
-    }
-  }]>,
-  OpBuilder<(ins "TypeRange":$resultTypes, "Value":$input,
-              "VectorLayoutInterface":$layout,
-              "UnitAttr":$shared_memory_conversion), [{
-    Attribute emptyIntrinsic;
-    build($_builder, $_state, resultTypes, input, layout, shared_memory_conversion, emptyIntrinsic);
-  }]>,
+  OpBuilder<(ins "Value":$input,
+                "VectorLayoutInterface":$layout), [{
+      UnitAttr defaultSharedMemoryConversion;
+      Attribute emptyIntrinsic;
+      build($_builder, $_state, input.getType(), input, layout, defaultSharedMemoryConversion, emptyIntrinsic);
+    }]>,
   ];
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {

@@ -102,8 +102,8 @@ static void inferMmaKind(vector::ContractionOp contract) {
     return;
   }
 
-  auto intrinsic = dyn_cast_or_null<IREE::GPU::MmaInterfaceAttr>(
-      toLayout.getIntrinsicAttr());
+  auto intrinsic =
+      dyn_cast_or_null<IREE::GPU::MmaInterfaceAttr>(toLayout.getMmaKindAttr());
   if (!intrinsic) {
     return;
   }
