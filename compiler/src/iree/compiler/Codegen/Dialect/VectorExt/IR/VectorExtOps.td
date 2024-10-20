@@ -41,6 +41,8 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
     AnyShaped:$input,
     VectorLayoutInterface:$layout,
     DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion,
+    // TODO: Solve cmake IREEGPU and VectorExt cyclic dependency to
+    // change mma_Kind type to be of MMAInterfaceAttr.
     OptionalAttr<AnyAttr>:$mma_kind
   );
   let results = (outs
