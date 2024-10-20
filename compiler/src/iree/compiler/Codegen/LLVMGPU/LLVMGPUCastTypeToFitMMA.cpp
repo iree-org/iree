@@ -121,24 +121,13 @@ struct LLVMGPUCastTypeToFitMMAPass final
   void runOnOperation() override {
     auto func = getOperation();
 
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
-    auto scheduleAttr =
-        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
-    if (!scheduleAttr) {
-      DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-      if (configDict) {
-        scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-            configDict.get(scheduleAttrName));
-      }
-    }
-
     // Set MMA type from config embedded in toLayoutOp of contraction.
-    // If none, use mma type from dispatch schedule attribute if present.
     func.walk([&](vector::ContractionOp contract) {
       inferMmaKind(contract);
-      if (!contract->hasAttr("iree.amdgpu.mma") && scheduleAttr) {
-        contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+      if (!contract->hasAttr("iree.amdgpu.mma")) {
+        func.emitOpError("Failed to detect valid to_layout consumer of "
+                         "vector.contract to infer MMA kind.");
+        return signalPassFailure();
       }
     });
 
