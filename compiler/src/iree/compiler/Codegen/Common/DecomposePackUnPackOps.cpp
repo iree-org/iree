@@ -120,10 +120,6 @@ struct DecomposeBoundaryPackUnPackOpsPass final
   using impl::DecomposeBoundaryPackUnPackOpsPassBase<
       DecomposeBoundaryPackUnPackOpsPass>::
       DecomposeBoundaryPackUnPackOpsPassBase;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
 
   void runOnOperation() override;
 };
@@ -264,6 +260,10 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
+/// This is left static because it should not be used in codegen pipelines.
+/// Passing control functions in codegen pipelines makes it difficult to
+/// make simple bug reproducers, so this ensures that control functions are
+/// only used behind wrapper passes or pass options.
 static std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
                                  std::optional<PackUnPackControlFn> controlFn) {
@@ -317,7 +317,7 @@ static LogicalResult isFoldableIntoInterfaceTensor(Operation *op) {
                areAllConstantIntValue(strides, 1) &&
                areConstantIntValues(sizes, fullTensorShape);
       };
-  if (!isa<tensor::PackOp>(op) && !isa<tensor::UnPackOp>(op)) {
+  if (!isa<tensor::PackOp, tensor::UnPackOp>(op)) {
     return failure();
   }
   if (hasPadding(op)) {

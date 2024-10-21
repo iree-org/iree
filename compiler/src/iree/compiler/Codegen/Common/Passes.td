@@ -166,6 +166,12 @@ def DecomposeBoundaryPackUnPackOpsPass :
     Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
            "Always apply tiling to make outer dimension be ones">
   ];
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
 }
 
 def DecomposeSoftmaxPass :
