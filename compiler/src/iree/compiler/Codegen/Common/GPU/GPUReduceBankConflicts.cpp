@@ -28,6 +28,13 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   int64_t innerDim = allocOpShape.back();
   if (ShapedType::isDynamic(innerDim))
     return;
+
+  // Return if we have collapseShape op as an user as padding in that case is
+  // unsupported.
+  for (auto user : allocOp->getUsers()) {
+    if (isa<memref::CollapseShapeOp>(user))
+      return;
+  }
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
