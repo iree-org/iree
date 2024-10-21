@@ -18,6 +18,8 @@
 
 namespace mlir::iree_compiler {
 
+using VectorValue = TypedValue<VectorType>;
+
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
 
@@ -104,6 +106,10 @@ FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
 /// compute ops in `funcOp`.
 FailureOr<scf::SCFTileSizeComputationFunction>
 getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
+
+// Returns a boolean flag indicating whether the input value 'val' is a
+// vector, determined by checking its rank.
+bool isVector(VectorValue val);
 
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory

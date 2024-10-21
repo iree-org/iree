@@ -58,6 +58,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAnalysis
     MLIRIR
+    MLIRSCFDialect
     MLIRVectorDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
   PUBLIC
