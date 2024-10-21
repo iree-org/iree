@@ -22,19 +22,22 @@ concurrency:
 
 jobs:
   windows_x64_msvc:
-    runs-on: windows-2022
-    defaults:
-      run:
-        shell: bash
+    runs-on: arc-runner-set
     env:
-      BUILD_DIR: build-windows
+      BUILD_DIR: C:\mnt\azure\build-windows
     steps:
+      - name: "Install choco reqs"
+        run: |
+          Get-PSDrive | Format-Table Name, Used, Free
+          Test-Path C:\mnt\azure
+          Get-ChildItem -Path C:\mnt\azure
+          fsutil volume diskfree C:\mnt\azure
       - name: "Checking out repository"
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Setting up Python"
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
       - name: "Installing Python packages"
@@ -44,9 +47,37 @@ jobs:
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Installing requirements"
         run: choco install ccache --yes
+      - name: "Installing MSVC requirements"
+        run: |
+          choco install visualstudio2022buildtools -y 
+          choco install visualstudio2022community --package-parameters "--add Microsoft.VisualStudio.Workload.CoreEditor --add Microsoft.VisualStudio.Workload.ManagedDesktop --add Microsoft.VisualStudio.Workload.DesktopDevelopmentWithC++" -y
+          choco install visualstudio2022-workload-nativedesktop -y
       - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
-      - name: "Building IREE"
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: "Installing iree reqs"
+        run: |
+          choco install cmake
+          choco install ninja
+          choco install Ninja
+          Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+          refreshenv
+      - name: "check space"
+        run: |
+          Get-PSDrive | Format-Table Name, Used, Free
+          Test-Path C:\mnt\azure
+      - name: "Install Bash"
+        run: |
+          $gitPath = "C:\Program Files\Git\bin"
+          $env:PATH += ";C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin"
+          [System.Environment]::GetEnvironmentVariable("PATH", "Process")
+          Test-Path -Path "C:/Program Files/Git/bin/bash.exe"
+      - name: Add Bash to PATH
+        run: |
+          echo "Adding Bash to PATH"
+          echo "C:\Program Files\Git\bin" >> $Env:GITHUB_PATH
+      - name: "Building Iree"
+        run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
       - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/ctest_all.sh "/c/mnt/azure/build-windows"
+      - name: "Clean up build dir"
+        run: Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
