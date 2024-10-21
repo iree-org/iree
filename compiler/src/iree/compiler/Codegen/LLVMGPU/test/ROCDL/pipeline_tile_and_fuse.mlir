@@ -1013,11 +1013,8 @@ hal.executable public @main {
 //       CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1000 step %c4 {{.*}} -> (vector<1x4xf32>)
 //       CHECK:     gpu.barrier
 
-// TODO: The fact that this read gets hoisted out of the subsequent for loop
-// is a bug in LICM that does no verification that the loop has at least one
-// trip.
-//       CHECK:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<4xf32>
 //       CHECK:     scf.for %{{.*}} = %{{.*}} to %c1 step %c32
+//       CHECK:       %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<4xf32>
 //  CHECK-NEXT:       vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC]]
 //       CHECK:     gpu.barrier
 //   CHECK-DAG:     %[[LHS_MM:.+]] = vector.transfer_read %[[LHS_ALLOC]]{{.*}} vector<4xf32>
