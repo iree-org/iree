@@ -18,6 +18,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Check if AllocOp has a CollapseShapeOp user.
 static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
   SmallVector<Operation *> users;
   for (auto user : allocOp->getUsers()) {
