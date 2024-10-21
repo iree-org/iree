@@ -60,9 +60,6 @@ def AssignLegacyTargetDevicesPass :
       "List of target backends to assign as device targets."
     >,
   ];
-  let dependentDialects = [
-    "IREE::HAL::HALDialect",
-  ];
 }
 
 def AssignTargetDevicesPass :

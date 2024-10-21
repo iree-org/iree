@@ -108,6 +108,18 @@ struct ResolveDeviceAliasesPass
           ResolveDeviceAliasesPass> {
   using IREE::HAL::impl::ResolveDeviceAliasesPassBase<
       ResolveDeviceAliasesPass>::ResolveDeviceAliasesPassBase;
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    for (const auto &targetBackendName :
+         targetRegistry.value->getRegisteredTargetBackends()) {
+      auto targetBackend = targetRegistry->getTargetBackend(targetBackendName);
+      if (targetBackend) {
+        targetBackend->getDependentDialects(registry);
+      }
+    }
+  }
+
   void runOnOperation() override {
     // Walks all device globals and resolve any aliases found.
     auto moduleOp = getOperation();

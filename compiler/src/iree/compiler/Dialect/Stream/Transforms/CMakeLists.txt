@@ -28,6 +28,7 @@ iree_cc_library(
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
     "LayoutSlices.cpp"
+    "MakeEncodingSolvable.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
     "PackConstants.cpp"

@@ -37,6 +37,16 @@ struct AssignLegacyTargetDevicesPass
   using IREE::HAL::impl::AssignLegacyTargetDevicesPassBase<
       AssignLegacyTargetDevicesPass>::AssignLegacyTargetDevicesPassBase;
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    for (const auto &targetBackendName : targetBackends) {
+      auto targetBackend = targetRegistry->getTargetBackend(targetBackendName);
+      if (targetBackend) {
+        targetBackend->getDependentDialects(registry);
+      }
+    }
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
