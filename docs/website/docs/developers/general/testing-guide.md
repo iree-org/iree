@@ -412,6 +412,18 @@ repository also contains tests for many machine learning models. Some of these
 tests are planned to be migrated into
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites).
 
+### linalg operator tests
+
+Tests for operators in the MLIR linalg dialect like `matmul`, and `convolution`
+are being migrated from folders like
+[`tests/e2e/matmul/`](https://github.com/iree-org/iree/tree/main/tests/e2e/matmul)
+in the
+[iree-org/iree](https://github.com/iree-org/iree) repository to
+[`linalg_ops/`](https://github.com/iree-org/iree-test-suites/tree/main/linalg_ops)
+in the
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+repository.
+
 ### ONNX operator tests
 
 Tests for individual ONNX operators are included at
@@ -483,3 +495,12 @@ The workflow job that failed should then upload a new config file as an
 committed:
 
 ![image](https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2)
+
+### ONNX model tests
+
+Tests for ONNX models are included at
+[`onnx_models/`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_models)
+in the
+[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
+repository. These tests use models from the upstream
+[onnx/models](https://github.com/onnx/models) repository.
