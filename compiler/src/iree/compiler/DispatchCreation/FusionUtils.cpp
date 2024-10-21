@@ -101,11 +101,23 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   return true;
 }
 
+static bool usesValuesDefinedAbove(Operation *op) {
+  bool usesValuesFromAbove = false;
+  mlir::visitUsedValuesDefinedAbove(
+      op->getRegions(), [&](void *) { usesValuesFromAbove = true; });
+  return usesValuesFromAbove;
+}
+
 bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
                          const DominanceInfo &dominanceInfo,
                          Operation *seedOp) {
   assert(dominanceInfo.properlyDominates(seedOp, op) &&
          op->getParentRegion() == seedOp->getParentRegion());
+
+  if (usesValuesDefinedAbove(op)) {
+    return false;
+  }
+
   BackwardSliceOptions options;
   // Limit the slice to the seed to make sure the slice is small.
   options.filter = [&](Operation *op) {
@@ -116,13 +128,8 @@ bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
 
   // `getBackwardSlice` doesnt track uses from within an ops region, so make
   // sure there are no values defined above.
-  for (Operation *sliceOp : slice) {
-    bool usesValuesFromAbove = false;
-    mlir::visitUsedValuesDefinedAbove(
-        sliceOp->getRegions(), [&](void *) { usesValuesFromAbove = true; });
-    if (usesValuesFromAbove) {
-      return false;
-    }
+  if (llvm::any_of(slice, usesValuesDefinedAbove)) {
+    return false;
   }
 
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
