@@ -41,66 +41,62 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPUMATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-static bool hasIntrinsic(IREE::GPU::TargetAttr target,
-                         IREE::GPU::MMAIntrinsic intrinsic) {
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getIntrinsic().getValue() == intrinsic) {
-      return true;
+static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
+                                                 IREE::GPU::TargetWgpAttr wgp) {
+  IREE::GPU::MMAAttr candidateMma;
+  for (auto mma : wgp.getMma()) {
+    // Filter out intrinsics that don't match the element types of this matmul.
+    auto [et0, et1, et2] = mma.getABCElementTypes();
+    if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
+      continue;
     }
+    // If multiple intrinsics are available for the given element types, we have
+    // to make a choice. On CDNA3, there may be an intrinsic with larger M/N and
+    // smaller K, which would optimize power, and an intrinsic with larger K,
+    // which would optimize performance when power is not the bottleneck.
+    // Currently we just choose the intrinsic maximizing K, but that can be
+    // revisited later.
+    if (candidateMma && candidateMma.getKSize() > mma.getKSize()) {
+      continue;
+    }
+    candidateMma = mma;
+    break;
   }
-  return false;
+  return candidateMma;
 }
 
-static std::optional<IREE::GPU::DataTiledMMAAttr>
+static IREE::GPU::DataTiledMMAAttr
 chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
                        IREE::Encoding::EncodingAttr encoding) {
   using namespace IREE::GPU;
   if (!target) {
-    return std::nullopt;
+    return {};
   }
   MLIRContext *ctx = target.getContext();
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
+      !wgp.getSimdsPerWgp()) {
+    // Missing workgroup parameters: data tiling not supported on this target.
+    return {};
+  }
 
   //
   // Step 1: select a MMAIntrinsic.
   //
-  const MMAIntrinsic candidateIntrinsics[] = {
-      MMAIntrinsic::MFMA_F32_16x16x4_F32,
-      MMAIntrinsic::MFMA_F32_16x16x16_F16,
-      MMAIntrinsic::MFMA_I32_16x16x32_I8,
-  };
-  std::optional<MMAIntrinsic> intrinsic;
-  for (MMAIntrinsic candidateIntrinsic : candidateIntrinsics) {
-    if (!hasIntrinsic(target, candidateIntrinsic)) {
-      continue;
-    }
-    auto [et0, et1, et2] =
-        MMAAttr::get(ctx, candidateIntrinsic).getABCElementTypes();
-    if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
-      continue;
-    }
-    intrinsic = candidateIntrinsic;
-    break;
-  }
-  if (!intrinsic) {
-    return std::nullopt;
+  MMAAttr intrinsicMma = chooseIntrinsicMMAAttr(eTypes, wgp);
+  if (!intrinsicMma) {
+    return {};
   }
 
   //
   // Step 2: Select the unrolling factors for the generic case where there is no
   //         narrow dimension.
   //
-  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
-  if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
-      !wgp.getSimdsPerWgp()) {
-    // Missing workgroup parameters: data tiling not supported on this target.
-    return std::nullopt;
-  }
 
   auto sizeInBits = [](VectorType type) -> int {
     return type.getElementTypeBitWidth() * type.getNumElements();
   };
 
-  MMAAttr intrinsicMma = MMAAttr::get(ctx, *intrinsic);
   auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
   // The unrollK factor serves to allow loads from the A and B matrices to use
   // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
@@ -111,7 +107,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   if (*wgp.getMaxLoadInstructionBits() % intrinsicLoadBits != 0) {
     // Never seen that case: the ISA does not have a suitable load instruction
     // to feed that intrinsic?!
-    return std::nullopt;
+    return {};
   }
   const int unrollK = *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits;
 
@@ -161,7 +157,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // and `totalUnrollN`, under the constraints:
   // 1. totalUnrollM * totalUnrollN <= x * x
   //    * Reason: by construction of x, any larger area would exceed the
-  //      wgp.getVgprSpaceBits() budget)
+  //      wgp.getVgprSpaceBits() budget.
   // 2. totalUnrollM and totalUnrollN are powers of 2.
   //    * Reason: that is a self-imposed constraint for now to avoid prematurely
   //      entering excessing fine-tuning of unrolling factors. Also, since below
@@ -243,7 +239,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   } else {
     gpuTargetAttr = getCLGPUTarget(tensorType.getContext());
   }
-  std::optional<IREE::GPU::DataTiledMMAAttr> mma = chooseDataTiledMMAAttr(
+  IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
       encoding.getElementTypesArray(), gpuTargetAttr, encoding);
   if (!mma) {
     return failure();
@@ -253,11 +249,11 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // based on its operand index in the matmul.
   auto rank = tensorType.getRank();
   TileMxNxK innerTile;
-  std::tie(innerTile.M, innerTile.N, innerTile.K) = mma->getMNKShape();
+  std::tie(innerTile.M, innerTile.N, innerTile.K) = mma.getMNKShape();
   auto encodingInfo = getEncodingInfoForMatmul(encoding, rank, innerTile);
   auto fragment =
       static_cast<IREE::GPU::MMAFragment>(encoding.getOperandIndex().getInt());
-  encodingInfo.swizzle = getSwizzle(*mma, fragment);
+  encodingInfo.swizzle = getSwizzle(mma, fragment);
   return encodingInfo;
 }
 
