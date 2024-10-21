@@ -19,8 +19,7 @@ struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
   llvm::PreservedAnalyses run(llvm::Module &module,
                               llvm::ModuleAnalysisManager &) {
     bool modifiedCodeGen = runOnModule(module);
-    if (!modifiedCodeGen)
-      return llvm::PreservedAnalyses::none();
+    if (!modifiedCodeGen) return llvm::PreservedAnalyses::none();
 
     return llvm::PreservedAnalyses::all();
   }
@@ -33,8 +32,7 @@ struct GpuHello final : llvm::PassInfoMixin<GpuHello> {
 
 bool GpuHello::runOnModule(llvm::Module &module) {
   for (llvm::Function &function : module) {
-    if (function.isIntrinsic() || function.isDeclaration())
-      continue;
+    if (function.isIntrinsic() || function.isDeclaration()) continue;
 
     if (function.getCallingConv() != llvm::CallingConv::AMDGPU_KERNEL &&
         function.getCallingConv() != llvm::CallingConv::PTX_Kernel)
@@ -63,7 +61,7 @@ bool GpuHello::runOnModule(llvm::Module &module) {
   return false;
 }
 
-} // end anonymous namespace
+}  // end anonymous namespace
 
 llvm::PassPluginLibraryInfo getPassPluginInfo() {
   const auto callback = [](llvm::PassBuilder &pb) {
