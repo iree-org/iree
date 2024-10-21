@@ -144,38 +144,19 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   return swizzle;
 }
 
-// Returns the index of the dimension whose flattened size (flattening inner
-// dimensions into it) matches the given `targetSize`. This is used to compute
-// interleaving indices.
-//
-// Example:
-//    Input shape = [16, 8, 4, 4]
-//    Input targetSize = 16
-// -> Return 2, because the tail of the shape starting at index 2 is [4, 4],
-//    whose product equals targetSize.
-static int64_t
-getDimIdxForTargetSize(const TileSwizzle::ExpandShapeDimVectorType &shape,
-                       int64_t targetSize) {
-  int interleaveAt = 0;
-  int size = 1;
-  for (interleaveAt = shape.size() - 1; interleaveAt >= 0; --interleaveAt) {
-    assert(size <= targetSize);
-    assert((targetSize % size) == 0);
-    if (size == targetSize) {
-      break;
+static int getInnermostNonInternalDimIdx(
+    const TileSwizzle::ExpandShapeDimVectorType &shape) {
+  for (int idx = shape.size() - 1; idx >= 0; --idx) {
+    if (shape[idx].kind != TileSwizzle::Dim::Kind::Internal) {
+      return idx;
     }
-    size *= shape[interleaveAt].size;
   }
-  return interleaveAt;
+  assert(false && "all dimensions are internal!");
+  return 0;
 }
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                        IREE::GPU::MMAFragment fragment) {
-  auto [aType, bType, cType] = mma.getABCElementTypes();
-  int aBits = aType.getIntOrFloatBitWidth();
-  int bBits = bType.getIntOrFloatBitWidth();
-  // TODO(bjacob): Should be looked up from GPU target, instead of hard-coded.
-  const int targetPreferredLoadBitWidth = 128;
   auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic().getValue(), fragment);
   using Kind = TileSwizzle::Dim::Kind;
   switch (fragment) {
@@ -184,9 +165,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     // Unroll on K with interleaving, then on M.
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
-      int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * aBits));
+      int interleavingIdx =
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollM() > 1) {
@@ -202,9 +182,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     // Unroll on K with interleaving, then on N.
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
-      int interleavingIdx = getDimIdxForTargetSize(
-          swizzle.expandShape[1],
-          targetPreferredLoadBitWidth / (mma.getUnrollK() * bBits));
+      int interleavingIdx =
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollN() > 1) {

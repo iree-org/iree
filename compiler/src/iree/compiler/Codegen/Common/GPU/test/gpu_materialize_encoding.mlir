@@ -429,6 +429,8 @@ func.func @batch_matmul_lowering_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 4>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
 
+// -----
+
 //-----------------------------------------------------------------------------
 // 2. MFMA_I32_16x16x32_I8
 //-----------------------------------------------------------------------------
@@ -622,3 +624,447 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8() {
 // CHECK-SAME:    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 2>
 // CHECK:       flow.dispatch.tensor.store %[[MMA]], %[[ACC_BINDING]]
+
+// -----
+
+//-------------------------------------------------------------------------
+// 3. Custom target parameters to test more MaterializeEncoding heuristics.
+//-------------------------------------------------------------------------
+
+// Custom {max_load_instruction_bits = 64} => implied default {unroll_k = 1} (omitted in output) instead of {unroll_k = 2}.
+
+#target_gfx942_except_max_load_instruction_bits_64 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 64,
+      simds_per_wgp = 4,
+      vgpr_space_bits = 16384
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits_64() attributes {hal.executable.target = #target_gfx942_except_max_load_instruction_bits_64} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits_64
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4>
+
+// -----
+
+// Custom {max_load_instruction_bits = 256} => {unroll_k = 4} instead of {unroll_k = 2}.
+
+#target_gfx942_except_max_load_instruction_bits_256 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 256,
+      simds_per_wgp = 4,
+      vgpr_space_bits = 16384
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits_64() attributes {hal.executable.target = #target_gfx942_except_max_load_instruction_bits_256} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits_64
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 4>
+
+// -----
+
+// Custom {simds_per_wgp = 1} => implied default {unroll_n_to_subgroups = 1} (omitted in output) and {unroll_n = 8} instead of {unroll_n_to_subgroups = 4}.
+
+#target_gfx942_except_simds_per_wgp_1 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 128,
+      simds_per_wgp = 1,
+      vgpr_space_bits = 16384
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1() attributes {hal.executable.target = #target_gfx942_except_simds_per_wgp_1} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 8, unroll_k = 2>
+
+// -----
+
+// Custom 2x smaller {vgpr_space_bits = 8192} => smaller unroll_m and unroll_n
+
+#target_gfx942_except_vgpr_space_bits_8192 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 128,
+      simds_per_wgp = 4,
+      vgpr_space_bits = 8192
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_8192() attributes {hal.executable.target = #target_gfx942_except_vgpr_space_bits_8192} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_8192
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 4, unroll_n = 2, unroll_n_to_subgroups = 4, unroll_k = 2>
+
+// -----
+
+// Custom 4x smaller {vgpr_space_bits = 4096} => smaller unroll_m and unroll_n
+
+#target_gfx942_except_vgpr_space_bits_4096 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 128,
+      simds_per_wgp = 4,
+      vgpr_space_bits = 4096
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096() attributes {hal.executable.target = #target_gfx942_except_vgpr_space_bits_4096} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8,  unroll_m = 4, unroll_n_to_subgroups = 4, unroll_k = 2>
+
+// -----
+
+// Custom smaller {vgpr_space_bits = 32768} => larger unroll_m and/or unroll_n
+
+#target_gfx942_except_vgpr_space_bits_32768 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  iree.gpu.target = #iree_gpu.target<
+    arch = "gfx942", features = "", wgp = <
+      compute =  fp64|fp32|fp16|int64|int32|int16|int8,
+      storage =  b64|b32|b16|b8,
+      subgroup = shuffle|arithmetic,
+      dot =  dp4xi8toi32,
+      mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
+      subgroup_size_choices = [64],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 65536,
+      max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+      max_load_instruction_bits = 128,
+      simds_per_wgp = 4,
+      vgpr_space_bits = 32768
+    >
+  >,
+  ukernels = "none"
+}>
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 16, 16, 32>>
+#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_32768() attributes {hal.executable.target = #target_gfx942_except_vgpr_space_bits_32768} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
+  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
+  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_lhs>>{%M, %K}
+      -> tensor<?x?xi8, #encoding_lhs>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #encoding_rhs>>{%K, %N}
+      -> tensor<?x?xi8, #encoding_rhs>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+      -> tensor<?x?xi32, #encoding_result>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
+                   tensor<?x?xi8, #encoding_rhs>)
+      outs(%5 : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #encoding_result>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #encoding_result>>{%M, %N}
+  return
+}
+
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_32768
+// CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
+// CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 4, unroll_n_to_subgroups = 4, unroll_k = 2>
+
+// -----
