@@ -85,9 +85,9 @@ public:
                executableTarget.getBackend() == "rocm") {
       passManager.addPass(createGPUMaterializeHostEncodingPass());
       FunctionLikeNest(passManager).addPass([&]() {
-        return createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false,
-                                                /*useOnlyReshapes=*/true,
-                                                /*controlFn=*/std::nullopt);
+        return createDecomposePackUnPackOpsPass(
+            DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
+                                              /*useOnlyReshapes=*/true});
       });
     } else {
       addNopPipeline(passManager);

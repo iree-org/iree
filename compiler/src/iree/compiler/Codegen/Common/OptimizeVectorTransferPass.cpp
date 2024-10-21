@@ -91,7 +91,8 @@ struct OptimizeVectorTransferPass final
       // Workaround, run loop invariant code motion before hoist redundant
       // vector transfer to workaround a bug upstream.
       loopInvariantCodeMotion(funcOp);
-      linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
+      linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp),
+                                            /*verifyNonZeroTrip=*/true);
     }
     IRRewriter rewriter(funcOp->getContext());
     vector::transferOpflowOpt(rewriter, funcOp);
