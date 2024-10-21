@@ -308,7 +308,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     // Types such as vector<f32> can return a valid pointer. An additional
     // rank check is added to ensure that the type is indeed a vector
     // value.
-    bool isSrcVector = (srcVector) && (isVector(srcVector));
+    bool isSrcVector = (srcVector) && (isNonZeroRank(srcVector));
     if (!isSrcVector) {
       // The way distribution currently works, there is no partial thread
       // distribution, so a scalar is available to all threads. Scalar
@@ -421,21 +421,9 @@ struct DistributeMultiReduction final
     Value res = multiReduceOp.getResult();
     auto accVector = dyn_cast<VectorValue>(acc);
     auto resVector = dyn_cast<VectorValue>(res);
-    Type accType = acc.getType();
-    Type resType = res.getType();
-    Type accElemTy;
-    if (accVector) {
-      accElemTy = accVector.getType().getElementType();
-    } else {
-      accElemTy = accType;
-    }
 
-    Type resElemTy;
-    if (resVector) {
-      resElemTy = resVector.getType().getElementType();
-    } else {
-      resElemTy = resType;
-    }
+    Type accElemTy = getElementTypeOrSelf(acc.getType());
+    Type resElemTy = getElementTypeOrSelf(res.getType());
 
     if (!accElemTy.isIntOrFloat() || !resElemTy.isIntOrFloat()) {
       return rewriter.notifyMatchFailure(multiReduceOp,
@@ -490,7 +478,7 @@ struct DistributeMultiReduction final
     if (accVector) {
       locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
     } else {
-      VectorType vecType = VectorType::get(SmallVector<int64_t>{1}, elemTy);
+      VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
       locallyReduced = rewriter.create<vector::BroadcastOp>(
           loc, vecType, localReduction.getResult());
     }
@@ -532,7 +520,7 @@ struct DistributeMultiReduction final
       replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
     } else {
       Value accReducedVal = rewriter.create<vector::ExtractOp>(
-          loc, accReduction, SmallVector<int64_t>{0});
+          loc, accReduction, ArrayRef{int64_t(0)});
       replaceOpWithDistributedValues(rewriter, multiReduceOp, accReducedVal);
     }
 

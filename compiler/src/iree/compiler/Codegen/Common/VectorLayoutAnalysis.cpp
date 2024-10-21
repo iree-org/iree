@@ -709,8 +709,7 @@ static void enforceLayoutToBroadcastOp(
   if (!isa<VectorType>(inputType)) {
     return;
   }
-  assert(isa<VectorType>(inputType) &&
-         "Scalar broadcast not supported for now.");
+
   auto inputShape = cast<VectorType>(inputType).getShape();
 
   SmallVector<bool> reductionMask(resultShape.size(), false);
@@ -1054,19 +1053,15 @@ void EnforceLayout::visitRegionBranchTerminatorOpInterface(
     resultLattices.push_back(resultLattice);
   }
 
-  // Result lattice not has a layout yet.
-  if (resultLattices.empty())
-    return;
-
   // We do not support multiple results yet.
   if (resultLattices.size() != 1)
     return;
 
   for (RegionSuccessor successor : successors) {
-    if (auto succ = successor.getSuccessor()) {
+    if (Region *succ = successor.getSuccessor()) {
       Operation *terminator = succ->back().getTerminator();
-      if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
-        for (Value operand : yieldOp->getOperands()) {
+      if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        for (Value operand : yieldOp.getOperands()) {
           if (!isa<VectorType>(operand.getType())) {
             continue;
           }

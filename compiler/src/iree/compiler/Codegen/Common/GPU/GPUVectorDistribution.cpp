@@ -132,15 +132,17 @@ void DistributionPattern::replaceOpWithDistributedValues(
   for (auto [opResult, replacement] :
        llvm::zip_equal(op->getOpResults(), values)) {
     // If this value is a vector type, it must be converted back to simd.
-    if (isa<VectorType>(replacement.getType()) &&
-        cast<ShapedType>(replacement.getType()).getRank() != 0) {
-      auto oldResult = cast<VectorValue>(opResult);
-      // Create a toSIMD op to convert the value back to the simd.
-      rewriter.setInsertionPointAfterValue(oldResult);
-      Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-          oldResult.getLoc(), oldResult.getType(), replacement);
-      // Add to replacements.
-      replacement = toSIMD;
+    if (VectorType replacementType =
+            dyn_cast<VectorType>(replacement.getType())) {
+      if (replacementType.getRank() != 0) {
+        auto oldResult = cast<VectorValue>(opResult);
+        // Create a toSIMD op to convert the value back to the simd.
+        rewriter.setInsertionPointAfterValue(oldResult);
+        Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+            oldResult.getLoc(), oldResult.getType(), replacement);
+        // Add to replacements.
+        replacement = toSIMD;
+      }
     }
     replacements.push_back(replacement);
   }

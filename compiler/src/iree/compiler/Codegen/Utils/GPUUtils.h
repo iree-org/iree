@@ -107,9 +107,9 @@ FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
 FailureOr<scf::SCFTileSizeComputationFunction>
 getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
-// Returns a boolean flag indicating whether the input value 'val' is a
-// vector, determined by checking its rank.
-bool isVector(VectorValue val);
+// Determines whether the rank of the input value 'val' is non-zero.
+// Returns true if the rank is non-zero; otherwise, returns false.
+bool isNonZeroRank(VectorValue val);
 
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
