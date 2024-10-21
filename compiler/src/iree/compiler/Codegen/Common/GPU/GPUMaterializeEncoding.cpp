@@ -92,7 +92,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   auto wgp = target.getWgp();
   if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
       !wgp.getSimdsPerWgp()) {
-    // Missing worgroup parameters: data tiling not supported on this target.
+    // Missing workgroup parameters: data tiling not supported on this target.
     return std::nullopt;
   }
 
@@ -106,9 +106,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
   // and each intrinsic consumes only 32 bits from A and B, then we want to set
   // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
-  const int unrollK =
-      std::max(1, *wgp.getMaxLoadInstructionBits() /
-                      std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB)));
+  int intrinsicLoadBits =
+      std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB));
+  if (*wgp.getMaxLoadInstructionBits() % intrinsicLoadBits) {
+    // Never seen that case: the ISA does not have a suitable load instruction
+    // to feed that intrinsic?!
+    return std::nullopt;
+  }
+  const int unrollK = *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits;
 
   // The total amount of unrolling along the M and N dimensions is normally
   // limited only by the number of available registers, since larger M and N
@@ -119,10 +124,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // subgroups, making it cancel out of the equation here.
   //
   // We need to solve for two variables here, unroll_m and unroll_n, constrained
-  // by one second-degree polynomial equation expressing that the A, B and C
-  // tiles must fit in VGPR space. Since we have only 1 constraint for two
-  // variables, we self-impose a second constraint for now: that the unrolling
-  // shape should be square, i.e. unrollM == unrollN.
+  // by one quadratic equation expressing that the A, B and C tiles must fit in
+  // VGPR space. Since we have only 1 constraint for two variables, we
+  // self-impose a second constraint for now: that the unrolling shape should be
+  // square, i.e. unrollM == unrollN.
   // TODO(#18850): that is suboptimal for narrow cases.
   //
   // Now we have only one variable, call it x, to solve for.
