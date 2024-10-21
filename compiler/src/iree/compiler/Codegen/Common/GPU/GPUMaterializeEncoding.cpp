@@ -44,7 +44,7 @@ namespace mlir::iree_compiler {
 static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
                                                  IREE::GPU::TargetWgpAttr wgp) {
   IREE::GPU::MMAAttr candidateMma;
-  for (auto mma : wgp.getMma()) {
+  for (IREE::GPU::MMAAttr mma : wgp.getMma()) {
     // Filter out intrinsics that don't match the element types of this matmul.
     auto [et0, et1, et2] = mma.getABCElementTypes();
     if (et0 != eTypes[0] || et1 != eTypes[1] || et2 != eTypes[2]) {
@@ -60,7 +60,6 @@ static IREE::GPU::MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes,
       continue;
     }
     candidateMma = mma;
-    break;
   }
   return candidateMma;
 }
