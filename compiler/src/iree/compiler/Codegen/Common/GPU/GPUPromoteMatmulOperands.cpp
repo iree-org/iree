@@ -53,9 +53,17 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
         return;
       }
     }
-    setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
-                                    builder.getContext()));
-    return;
+
+    bool promoteProducer = true;
+    if (isa<tensor::PadOp>(producer)) {
+      promoteProducer = false;
+    }
+
+    if (promoteProducer) {
+      setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
+                                      builder.getContext()));
+      return;
+    }
   }
 
   auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
