@@ -49,7 +49,7 @@ jobs:
         run: choco install ccache --yes
       - name: "Installing MSVC requirements"
         run: |
-          choco install visualstudio2022buildtools -y 
+          choco install visualstudio2022buildtools -y
           choco install visualstudio2022community --package-parameters "--add Microsoft.VisualStudio.Workload.CoreEditor --add Microsoft.VisualStudio.Workload.ManagedDesktop --add Microsoft.VisualStudio.Workload.DesktopDevelopmentWithC++" -y
           choco install visualstudio2022-workload-nativedesktop -y
       - name: "Configuring MSVC"
