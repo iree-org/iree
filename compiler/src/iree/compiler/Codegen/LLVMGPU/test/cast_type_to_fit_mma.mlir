@@ -9,7 +9,11 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
       %lhs, %rhs, %init : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf16>
-  return %0 : vector<96x64xf16>
+    %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [3, 2],
+                                      outer_tile = [4, 1], thread_tile = [2, 32], element_tile = [4, 1],
+                                      subgroup_strides = [0, 0], thread_strides = [32, 1]>)
+                                      {mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>} : vector<96x64xf16>
+  return %1 : vector<96x64xf16>
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_96x64x16_mm
@@ -21,7 +25,6 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
 //  CHECK-SAME:     vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>
-//       CHECK:   return %[[TRUNC]] : vector<96x64xf16>
 
 // -----
 
@@ -34,7 +37,11 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
       %lhs, %rhs, %init : vector<96x16xf16>, vector<64x16xf16> into vector<96x64xf16>
-  return %0 : vector<96x64xf16>
+    %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [3, 2],
+                                      outer_tile = [4, 1], thread_tile = [2, 32], element_tile = [4, 1],
+                                      subgroup_strides = [0, 0], thread_strides = [32, 1]>)
+                                      {mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>} : vector<96x64xf16>
+  return %1 : vector<96x64xf16>
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_96x64x16_mmt
@@ -55,7 +62,11 @@ func.func @mfma_matmul_96x64x16_mm_cannot_downcast(%lhs: vector<96x16xf16>, %rhs
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
       %lhs, %rhs, %init : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf64>
-  return %0 : vector<96x64xf64>
+    %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [3, 2],
+                                      outer_tile = [4, 1], thread_tile = [2, 32], element_tile = [4, 1],
+                                      subgroup_strides = [0, 0], thread_strides = [32, 1]>)
+                                      {mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>} : vector<96x64xf64>
+  return %1 : vector<96x64xf64>
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_96x64x16_mm_cannot_downcast
@@ -75,7 +86,11 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
       %lhs, %rhs, %init : vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf16>
-  return %0 : vector<48x32xf16>
+    %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [3, 2],
+                                      outer_tile = [8, 1], thread_tile = [2, 16], element_tile = [1, 1],
+                                      subgroup_strides = [0, 0], thread_strides = [16, 1]>)
+                                      {mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>} : vector<48x32xf16>
+  return %1 : vector<48x32xf16>
 }
 
 // CHECK-LABEL: func.func @wmma_matmul_48x32x32_mm
@@ -87,7 +102,36 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
 //  CHECK-SAME:     vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<48x32xf32> to vector<48x32xf16>
-//       CHECK:   return %[[TRUNC]] : vector<48x32xf16>
+
+// -----
+
+// This tests cast_type_to_fit_mma works on contract where intrinsic is set by to_layout.
+// "iree.amdgpu.mma" will be generated from the "intrinsic" attribute of to_layout.
+// this also shows that we can overwrite default intrinsics if explicitly set.
+
+func.func @to_layout_config_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> attributes {
+    mma_schedule = #iree_gpu.mma_schedule<
+      intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+      subgroup_m_count = 1, subgroup_n_count = 1>,
+    workgroup_size = [64, 1, 1]} {
+    %0 = vector.contract {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+      %lhs, %rhs, %init : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf16>
+    %1 = iree_vector_ext.to_layout %0 to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [6, 4],
+                                      outer_tile = [1, 1], thread_tile = [16, 4], element_tile = [1, 4],
+                                      subgroup_strides = [0, 0], thread_strides = [1, 16]>)
+                                      {mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>} : vector<96x64xf16>
+  return %1 : vector<96x64xf16>
+}
+
+// CHECK-LABEL: func.func @to_layout_config_matmul_96x64x16_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<96x16xf16>, %[[B:.+]]: vector<16x64xf16>, %[[INIT:.+]]: vector<96x64xf16>)
+//       CHECK:   arith.extf
+//       CHECK:   vector.contract
+//  CHECK-SAME:     {iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
+//  CHECK-SAME:     : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
+//       CHECK:   arith.truncf
 
 // -----
 
