@@ -89,7 +89,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // Step 2: Select the unrolling factors for the generic case where there is no
   //         narrow dimension.
   //
-  auto wgp = target.getWgp();
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
       !wgp.getSimdsPerWgp()) {
     // Missing workgroup parameters: data tiling not supported on this target.
@@ -108,7 +108,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
   int intrinsicLoadBits =
       std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB));
-  if (*wgp.getMaxLoadInstructionBits() % intrinsicLoadBits) {
+  if (*wgp.getMaxLoadInstructionBits() % intrinsicLoadBits != 0) {
     // Never seen that case: the ISA does not have a suitable load instruction
     // to feed that intrinsic?!
     return std::nullopt;
