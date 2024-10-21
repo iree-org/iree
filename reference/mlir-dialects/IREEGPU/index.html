@@ -5652,9 +5652,12 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
   MMAOpsArrayAttr,   # mma
   DenseI32ArrayAttr,   # subgroup_size_choices
   DenseI32ArrayAttr,   # max_workgroup_sizes
-  uint32_t,   # max_thread_count_per_workgroup
-  uint32_t,   # max_workgroup_memory_bytes
+  int32_t,   # max_thread_count_per_workgroup
+  int32_t,   # max_workgroup_memory_bytes
   DenseI32ArrayAttr,   # max_workgroup_counts
+  std::optional&lt;int32_t&gt;,   # max_load_instruction_bits
+  std::optional&lt;int32_t&gt;,   # simds_per_wgp
+  std::optional&lt;int32_t&gt;,   # vgpr_space_bits
   DictionaryAttr   # extra
 &gt;
 </code></pre></div>
@@ -5710,17 +5713,32 @@ NVIDIA GPUs.</p>
 </tr>
 <tr>
 <td style="text-align: center;">max_thread_count_per_workgroup</td>
-<td style="text-align: center;"><code>uint32_t</code></td>
+<td style="text-align: center;"><code>int32_t</code></td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align: center;">max_workgroup_memory_bytes</td>
-<td style="text-align: center;"><code>uint32_t</code></td>
+<td style="text-align: center;"><code>int32_t</code></td>
 <td></td>
 </tr>
 <tr>
 <td style="text-align: center;">max_workgroup_counts</td>
 <td style="text-align: center;"><code>DenseI32ArrayAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">max_load_instruction_bits</td>
+<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">simds_per_wgp</td>
+<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">vgpr_space_bits</td>
+<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
 <td></td>
 </tr>
 <tr>
