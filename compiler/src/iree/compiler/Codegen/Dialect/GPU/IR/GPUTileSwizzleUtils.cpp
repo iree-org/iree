@@ -144,15 +144,15 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
   return swizzle;
 }
 
-static int64_t getInnermostCrossThreadDimIdx(
+static int getInnermostNonInternalDimIdx(
     const TileSwizzle::ExpandShapeDimVectorType &shape) {
-  int idx = 0;
-  for (idx = shape.size() - 1; idx >= 0; --idx) {
-    if (shape[idx].kind == TileSwizzle::Dim::Kind::CrossThread) {
-      break;
+  for (int idx = shape.size() - 1; idx >= 0; --idx) {
+    if (shape[idx].kind != TileSwizzle::Dim::Kind::Internal) {
+      return idx;
     }
   }
-  return idx;
+  assert(false && "all dimensions are internal!");
+  return 0;
 }
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
@@ -166,7 +166,7 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
       int interleavingIdx =
-          getInnermostCrossThreadDimIdx(swizzle.expandShape[1]);
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollM() > 1) {
@@ -183,7 +183,7 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
     if (mma.getUnrollK() > 1) {
       unroll(swizzle, 1, mma.getUnrollK(), Kind::CrossIntrinsic);
       int interleavingIdx =
-          getInnermostCrossThreadDimIdx(swizzle.expandShape[1]);
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       interleave(swizzle, 1, interleavingIdx);
     }
     if (mma.getUnrollN() > 1) {

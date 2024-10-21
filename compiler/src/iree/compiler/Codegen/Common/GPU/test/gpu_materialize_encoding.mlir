@@ -647,7 +647,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8() {
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 64,
-      workgroup_simds = 4,
+      simds_per_wgp = 4,
       vgpr_space_bits = 16384
     >
   >,
@@ -720,7 +720,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_inst
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 256,
-      workgroup_simds = 4,
+      simds_per_wgp = 4,
       vgpr_space_bits = 16384
     >
   >,
@@ -777,9 +777,9 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_inst
 
 // -----
 
-// Custom {workgroup_simds = 1} => implied default {unroll_n_to_subgroups = 1} (omitted in output) and {unroll_n = 8} instead of {unroll_n_to_subgroups = 4}.
+// Custom {simds_per_wgp = 1} => implied default {unroll_n_to_subgroups = 1} (omitted in output) and {unroll_n = 8} instead of {unroll_n_to_subgroups = 4}.
 
-#target_gfx942_except_workgroup_simds_1 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+#target_gfx942_except_simds_per_wgp_1 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
   iree.gpu.target = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
@@ -793,7 +793,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_inst
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 128,
-      workgroup_simds = 1,
+      simds_per_wgp = 1,
       vgpr_space_bits = 16384
     >
   >,
@@ -812,7 +812,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_max_load_inst
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_workgroup_simds_1() attributes {hal.executable.target = #target_gfx942_except_workgroup_simds_1} {
+func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1() attributes {hal.executable.target = #target_gfx942_except_simds_per_wgp_1} {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
   %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
@@ -843,7 +843,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_workgroup_sim
   return
 }
 
-// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_workgroup_simds_1
+// CHECK:      func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1
 // CHECK:      iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 // CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
 // CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, unroll_m = 8, unroll_n = 8, unroll_k = 2>
@@ -866,7 +866,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_workgroup_sim
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 128,
-      workgroup_simds = 4,
+      simds_per_wgp = 4,
       vgpr_space_bits = 8192
     >
   >,
@@ -939,7 +939,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bi
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 128,
-      workgroup_simds = 4,
+      simds_per_wgp = 4,
       vgpr_space_bits = 4096
     >
   >,
@@ -1012,7 +1012,7 @@ func.func @matmul_lowering_unroll8x8x2_MFMA_I32_16x16x32_I8_custom_vgpr_space_bi
       max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647],
       max_load_instruction_bits = 128,
-      workgroup_simds = 4,
+      simds_per_wgp = 4,
       vgpr_space_bits = 32768
     >
   >,

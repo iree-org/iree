@@ -47,7 +47,7 @@ struct WgpDetails {
   int32_t maxWorkgroupMemoryBytes;
   std::array<int32_t, 3> maxWorkgroupCounts;
   std::optional<int32_t> maxLoadInstructionBits;
-  std::optional<int32_t> workgroupSimds;
+  std::optional<int32_t> simdsPerWgp;
   std::optional<int32_t> vgprSpaceBits;
 };
 
@@ -112,7 +112,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupSizes),
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
-      wgp->maxLoadInstructionBits, wgp->workgroupSimds, wgp->vgprSpaceBits,
+      wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
       DictionaryAttr{});
 
   TargetChipAttr targetChip;
@@ -152,7 +152,7 @@ const WgpDetails *getCDNA3WgpDetails() {
                                       64 * 1024,
                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                       /*maxLoadInstructionBits=*/128,
-                                      /*workgroupSimds=*/4,
+                                      /*simdsPerWgp=*/4,
                                       /*vgprSpaceBits=*/512 * 32};
   return &cdna3Wgp;
 }

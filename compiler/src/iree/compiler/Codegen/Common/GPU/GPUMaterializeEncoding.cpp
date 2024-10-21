@@ -91,10 +91,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //
   auto wgp = target.getWgp();
   if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
-      !wgp.getWorkgroupSimds()) {
+      !wgp.getSimdsPerWgp()) {
     // Missing worgroup parameters: data tiling not supported on this target.
     return std::nullopt;
   }
+
+  auto sizeInBits = [](VectorType type) -> int {
+    return type.getElementTypeBitWidth() * type.getNumElements();
+  };
 
   MMAAttr intrinsicMma = MMAAttr::get(ctx, *intrinsic);
   auto [intrinsicA, intrinsicB, intrinsicC] = intrinsicMma.getABCVectorTypes();
@@ -102,12 +106,9 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // the target ISA's vector loads. For instance, if the ISA has 128-bit loads
   // and each intrinsic consumes only 32 bits from A and B, then we want to set
   // unrollK=4 to turn 4 separate 32-bit loads into one 128-bit load.
-  const int unrollK = std::max(
-      1, static_cast<int>(*wgp.getMaxLoadInstructionBits() /
-                          std::min(intrinsicA.getElementTypeBitWidth() *
-                                       intrinsicA.getNumElements(),
-                                   intrinsicB.getElementTypeBitWidth() *
-                                       intrinsicB.getNumElements())));
+  const int unrollK =
+      std::max(1, *wgp.getMaxLoadInstructionBits() /
+                      std::min(sizeInBits(intrinsicA), sizeInBits(intrinsicB)));
 
   // The total amount of unrolling along the M and N dimensions is normally
   // limited only by the number of available registers, since larger M and N
@@ -121,8 +122,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // by one second-degree polynomial equation expressing that the A, B and C
   // tiles must fit in VGPR space. Since we have only 1 constraint for two
   // variables, we self-impose a second constraint for now: that the unrolling
-  // shape should be square, i.e. unrollM == unrollN. Now we have only one
-  // variable, call it x, to solve for.
+  // shape should be square, i.e. unrollM == unrollN.
+  // TODO(#18850): that is suboptimal for narrow cases.
+  //
+  // Now we have only one variable, call it x, to solve for.
 
   // The register space taken is:
   //     A-tile: x * unrollK * sizeInBits(intrinsicA)
@@ -132,9 +135,6 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //       x^2 * sizeInBits(intrinsicC)
   //     + x   * unrollK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB))
   //    == wgp.getVgprSpaceBits()
-  auto sizeInBits = [](VectorType type) {
-    return type.getElementTypeBitWidth() * type.getNumElements();
-  };
   float c2 = sizeInBits(intrinsicC);
   float c1 = unrollK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB));
   float c0 = -*wgp.getVgprSpaceBits(); // negative by construction.
@@ -161,12 +161,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   //    * Reason: that is a self-imposed constraint for now to avoid prematurely
   //      entering excessing fine-tuning of unrolling factors. Also, since below
   //      we will put all the unroll-to-subgroups in the N dimension, that
-  //      requires totalUnrollN to be a multiple of wgp.getWorkgroupSimds(),
+  //      requires totalUnrollN to be a multiple of wgp.getSimdsPerWgp(),
   //      which is typically a power of 2, specifically 4.
+  //      TODO(#18851): we will not always put all the unroll-to-subgroups on N.
   // 3. totalUnrollN >= totalUnrollM.
   //    * Reason: Just like the previous constraint, that is also motivated by
   //      the code below currently putting all the unroll-to-subgroups in the N
   //      dimension, which requires a sufficiently large totalUnrollN.
+  //      TODO(#18851): we will not always put all the unroll-to-subgroups on N.
   //
   // Set totalUnrollN = round x to nearest power of two, break ties away from 0
   // per specification of std::round.
@@ -182,19 +184,18 @@ chooseDataTiledMMAAttr(TypeRange eTypes, IREE::GPU::TargetAttr target,
   // overall number of registers, not with how they are split between subgroups.
   //
   // For now for simplicity we put all the unroll-to-subgroups in the N
-  // dimension. That might be suboptimal, revisit later. That does simplify the
-  // below adjustments for narrow M/N, as we don't need to think about
-  // unroll-to-subgroups when making the narrowing adjustment.
+  // dimension. TODO(#18851): revisit that.
   //
-  // Note: if we ever have unrollMToSubgroups != 1, the above logic computing
-  // totalUnrollM will need to be reconsidered, see comments above.
+  // That does simplify the below adjustments for narrow M/N, as we don't need
+  // to think about unroll-to-subgroups when making the narrowing adjustment.
   int unrollMToSubgroups = 1;
-  int unrollNToSubgroups = *wgp.getWorkgroupSimds();
+  int unrollNToSubgroups = *wgp.getSimdsPerWgp();
   int unrollM = totalUnrollM / unrollMToSubgroups;
   int unrollN = totalUnrollN / unrollNToSubgroups;
 
   //
   // Step 3: Adjust the unrolling factors when there is a narrow dimension.
+  // TODO(#18850): dealing with narrow cases as a fix-up is suboptimal.
   //
   IREE::Encoding::MatmulNarrowDim narrowDim =
       IREE::Encoding::getMatmulNarrowDim(encoding);

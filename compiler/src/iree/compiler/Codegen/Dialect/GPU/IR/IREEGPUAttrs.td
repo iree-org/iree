@@ -338,11 +338,11 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "int32_t":$max_workgroup_memory_bytes,
     // The maximum number of workgroups per X/Y/Z dimension in a dispatch.
     "DenseI32ArrayAttr":$max_workgroup_counts,
-    // Max load instruction size in bits
+    // Max load instruction size in bits. TODO(#18849): drop optional.
     OptionalParameter<"std::optional<int32_t>">:$max_load_instruction_bits,
-    // Number of SIMDs per workgroup
-    OptionalParameter<"std::optional<int32_t>">:$workgroup_simds,
-    // VGPR register space size in bits
+    // Number of SIMDs per workgroup processor. TODO(#18849): drop optional.
+    OptionalParameter<"std::optional<int32_t>">:$simds_per_wgp,
+    // VGPR register space size in bits. TODO(#18849): drop optional.
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
 
     // An optional extra dict
