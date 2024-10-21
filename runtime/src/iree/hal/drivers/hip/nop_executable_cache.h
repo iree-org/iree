@@ -11,6 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
+#include "iree/hal/drivers/hip/per_device_information.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,8 @@ extern "C" {
 // behavior.
 iree_status_t iree_hal_hip_nop_executable_cache_create(
     iree_string_view_t identifier,
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
+    const iree_hal_hip_dynamic_symbols_t* symbols, uint32_t num_devices,
+    iree_hal_hip_per_device_information_t* devices,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 

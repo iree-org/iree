@@ -23,6 +23,10 @@ extern "C" {
 // Forward declaration of the timepoint pool.
 typedef struct iree_hal_hip_timepoint_pool_t iree_hal_hip_timepoint_pool_t;
 
+// Forward declaration of the per device information;
+typedef struct iree_hal_hip_per_device_information_t
+    iree_hal_hip_per_device_information_t;
+
 // An enum to identify the timepoint kind in iree_hal_hip_timepoint_t objects.
 typedef enum iree_hal_hip_timepoint_kind_e {
   // None; for uninitialized timepoint objects.
@@ -78,8 +82,8 @@ typedef struct iree_hal_hip_timepoint_pool_t iree_hal_hip_timepoint_pool_t;
 // Extra timepoint requests beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_hip_timepoint_pool_allocate(
-    iree_event_pool_t* host_event_pool,
-    iree_hal_hip_event_pool_t* device_event_pool,
+    iree_event_pool_t* host_event_pool, uint64_t num_device_event_pools,
+    iree_hal_hip_per_device_information_t* devices,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_hip_timepoint_pool_t** out_timepoint_pool);
 
@@ -100,11 +104,7 @@ iree_status_t iree_hal_hip_timepoint_pool_acquire_host_wait(
     iree_hal_hip_timepoint_t** out_timepoints);
 iree_status_t iree_hal_hip_timepoint_pool_acquire_device_signal(
     iree_hal_hip_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_hip_timepoint_t** out_timepoints);
-iree_status_t iree_hal_hip_timepoint_pool_acquire_device_wait(
-    iree_hal_hip_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
+    iree_host_size_t timepoint_count, uint64_t device_index,
     iree_hal_hip_timepoint_t** out_timepoints);
 
 // Releases one or more timepoints back to the timepoint pool.
