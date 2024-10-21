@@ -20,10 +20,7 @@ namespace {
 
 /// Check if AllocOp has a CollapseShapeOp user.
 static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
-  SmallVector<Operation *> users;
-  for (auto user : allocOp->getUsers()) {
-    users.push_back(user);
-  }
+  SmallVector<Operation *> users(allocOp->getUsers());
   while (!users.empty()) {
     auto user = users.pop_back_val();
     if (isa<memref::CollapseShapeOp>(user)) {
