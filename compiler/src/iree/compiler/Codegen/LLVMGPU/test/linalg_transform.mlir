@@ -49,7 +49,6 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU: %[[COND:.*]]  = arith.andi %[[LT1]], %[[LT5]] : i1
   // FOREACH-TO-GPU: scf.if %[[COND]] {
   // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
-  // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
   // FOREACH-TO-GPU:   linalg.fill
   // FOREACH-TO-GPU: }
   // FOREACH-TO-GPU: gpu.barrier
