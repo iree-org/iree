@@ -220,8 +220,9 @@ func.func @depthwise_conv() attributes {hal.executable.target = #executable_targ
 
 // -----
 
-// Regression test. SVE isn't used, but used to fail to compile when SVE was
-// enabled due to tile sizes leading to large vectors.
+// Regression test. SVE isn't used (scalable vectorizaton of this op is not yet
+// supported), but used to fail to compile when SVE was enabled due to tile
+// sizes leading to large vectors.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
