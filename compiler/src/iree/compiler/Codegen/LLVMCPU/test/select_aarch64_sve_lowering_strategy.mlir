@@ -28,7 +28,7 @@ func.func @matmul_tensors() attributes {hal.executable.target = #executable_targ
   return
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: func.func @matmul_tensors()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -118,7 +118,7 @@ func.func @matmul_tensors() attributes {hal.executable.target = #executable_targ
   return
 }
 
-//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //  DISABLE-ARM-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      DISABLE-ARM-SME: func.func @matmul_tensors()
 //  DISABLE-ARM-SME-SAME:     translation_info = #[[TRANSLATION]]
@@ -179,8 +179,8 @@ func.func @matmul_with_fill() attributes {hal.executable.target = #executable_ta
   return
 }
 
-// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [8, [16]], [0, 0], [0, 0]]>
-// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [4, [16]], [0, 0], [0, 0]]>
+// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, [16], 0], [0, 0, 1], [0, 0, 0]]>
 // CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 // CHECK:      func.func @matmul_with_fill()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -216,4 +216,35 @@ func.func @depthwise_conv() attributes {hal.executable.target = #executable_targ
 // CHECK:      func.func @depthwise_conv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK:      linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// Regression test. SVE isn't used (scalable vectorizaton of this op is not yet
+// supported), but used to fail to compile when SVE was enabled due to tile
+// sizes leading to large vectors.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+func.func @pooling_nchw_max(%arg0: !flow.dispatch.tensor<readonly:tensor<1x64x114x114xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>) attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+  %cst = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x64x114x114xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 64, 114, 114], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x64x114x114xf32>> -> tensor<1x64x114x114xf32>
+  %3 = tensor.empty() : tensor<1x64x56x56xf32>
+  %4 = tensor.empty() : tensor<3x3xf32>
+  %5 = linalg.fill ins(%cst : f32) outs(%3 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+  %6 = linalg.pooling_nchw_max {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%2, %4 : tensor<1x64x114x114xf32>, tensor<3x3xf32>) outs(%3 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
+  flow.dispatch.tensor.store %6, %1, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : tensor<1x64x56x56xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x64x56x56xf32>>
+  return
+}
+
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32, 56, 8, 0, 0], [1, 2, 1, 8, 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
+// CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+// CHECK:      func.func @pooling_nchw_max
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK:      linalg.pooling_nchw_max
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
