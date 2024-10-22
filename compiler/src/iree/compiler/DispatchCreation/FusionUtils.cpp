@@ -101,11 +101,24 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   return true;
 }
 
-static bool usesValuesDefinedAbove(Operation *op) {
-  bool usesValuesFromAbove = false;
-  mlir::visitUsedValuesDefinedAbove(
-      op->getRegions(), [&](void *) { usesValuesFromAbove = true; });
-  return usesValuesFromAbove;
+void getBackwardSliceIncludingUsesFromAbove(
+    Operation *op, SetVector<Operation *> *backwardSlice,
+    const BackwardSliceOptions &options) {
+  BackwardSliceOptions wrappedOptions(options);
+  wrappedOptions.filter = [&](Operation *op) {
+    if (!options.filter(op)) {
+      return false;
+    }
+    BackwardSliceOptions regionOptions(wrappedOptions);
+    regionOptions.inclusive = true;
+    mlir::visitUsedValuesDefinedAbove(
+        op->getRegions(), [&](OpOperand *operand) {
+          getBackwardSlice(operand->get(), backwardSlice, regionOptions);
+        });
+    return true;
+  };
+
+  getBackwardSlice(op, backwardSlice, wrappedOptions);
 }
 
 bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
@@ -114,23 +127,13 @@ bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
   assert(dominanceInfo.properlyDominates(seedOp, op) &&
          op->getParentRegion() == seedOp->getParentRegion());
 
-  if (usesValuesDefinedAbove(op)) {
-    return false;
-  }
-
   BackwardSliceOptions options;
   // Limit the slice to the seed to make sure the slice is small.
   options.filter = [&](Operation *op) {
     return !dominanceInfo.properlyDominates(op, seedOp);
   };
   llvm::SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
-
-  // `getBackwardSlice` doesnt track uses from within an ops region, so make
-  // sure there are no values defined above.
-  if (llvm::any_of(slice, usesValuesDefinedAbove)) {
-    return false;
-  }
+  getBackwardSliceIncludingUsesFromAbove(op, &slice, options);
 
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
