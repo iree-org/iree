@@ -49,9 +49,9 @@ public:
   int64_t getBatchCount() const { return contractionDims.batch.size(); }
 
   SmallVector<int64_t> lhsMDims;
-  int64_t lhsKDim;
+  SmallVector<int64_t> lhsKDim;
   SmallVector<int64_t> rhsNDims;
-  int64_t rhsKDim;
+  SmallVector<int64_t> rhsKDim;
   SmallVector<int64_t> outMDims;
   SmallVector<int64_t> outNDims;
 
