@@ -26,16 +26,14 @@ jobs:
     env:
       BUILD_DIR: C:\mnt\azure\build-windows
     steps:
-      - name: "Install choco reqs"
-        run: |
-          Get-PSDrive | Format-Table Name, Used, Free
-          Test-Path C:\mnt\azure
-          Get-ChildItem -Path C:\mnt\azure
-          fsutil volume diskfree C:\mnt\azure
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
+      - name: "Clean up build dir"
+        run: | 
+          Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
+          mkdir "C:\mnt\azure\build-windows"
       - name: "Setting up Python"
         uses: actions/setup-python@v4
         with:
@@ -45,6 +43,7 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+          python3 -m pip install --upgrade certifi
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Installing MSVC requirements"
@@ -61,10 +60,6 @@ jobs:
           choco install Ninja
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
-      - name: "check space"
-        run: |
-          Get-PSDrive | Format-Table Name, Used, Free
-          Test-Path C:\mnt\azure
       - name: "Install Bash"
         run: |
           $gitPath = "C:\Program Files\Git\bin"
