@@ -83,6 +83,10 @@ def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
       "Transforms convolution operations into an implicit GEMM format.";
+  let dependentDialects = [
+    "tensor::TensorDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
 }
 
 def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {

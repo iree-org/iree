@@ -1170,29 +1170,12 @@ void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
 // Common Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-static LogicalResult igemmConfigFn(linalg::GenericOp genericOp,
-                                   IREE::LinalgExt::Im2colOp im2colOp) {
-  auto funcOp = genericOp->getParentOfType<FunctionOpInterface>();
-  if (!funcOp) {
-    return genericOp.emitError("cannot find parent funcOp");
-  }
-  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!target) {
-    return funcOp.emitError("missing GPU target in parent funcOp");
-  }
-  if (failed(IREE::GPU::setMatmulLoweringConfig(target, funcOp, genericOp))) {
-    return IREE::GPU::setTileAndFuseLoweringConfig(target, funcOp, genericOp);
-  }
-  return success();
-}
-
 static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm, []() {
-      return createConvolutionToIGEMMPass(igemmConfigFn);
-    });
+    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm,
+                                      createLLVMGPUConvolutionToIGEMMPass);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
@@ -1242,9 +1225,8 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm, []() {
-      return createConvolutionToIGEMMPass(igemmConfigFn);
-    });
+    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm,
+                                      createLLVMGPUConvolutionToIGEMMPass);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }
