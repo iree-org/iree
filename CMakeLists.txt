@@ -772,6 +772,19 @@ endif()
 # MLIR/LLVM Dependency
 #-------------------------------------------------------------------------------
 
+# Both the IREE and MLIR Python bindings require pybind11. We initialize it here
+# at the top level so that everything uses ours consistently.
+if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
+  include(FetchContent)
+  FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11
+      GIT_TAG        v2.13.6
+      FIND_PACKAGE_ARGS NAMES pybind11
+  )
+  FetchContent_MakeAvailable(pybind11)
+endif()
+
 if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
 else()
@@ -919,19 +932,6 @@ endif()
 
 if(IREE_BUILD_TESTS)
   include(iree_configure_testing)
-endif()
-
-if(IREE_BUILD_PYTHON_BINDINGS)
-  # The compiler uses pybind11
-  if(IREE_BUILD_COMPILER)
-    if(NOT TARGET pybind11::module)
-      message(STATUS "Using bundled pybind11")
-      set(PYBIND11_FINDPYTHON ON)
-      add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
-    else()
-      message(STATUS "Not including bundled pybind11 (already configured)")
-    endif()
-  endif()
 endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
