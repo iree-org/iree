@@ -57,8 +57,12 @@ struct TorchSession
       OpPassManager &passManager, std::string_view typeMnemonic) override {
     if (typeMnemonic == "onnx") {
       // ONNX input is a pre-processing step to torch.
-      passManager.addNestedPass<func::FuncOp>(
-          mlir::torch::onnx_c::createTorchOnnxToTorchPass());
+      mlir::torch::Torch::TorchLoweringPipelineOptions torchOnnxPipelineOptions;
+      torchOnnxPipelineOptions.backendLegalOps = {"aten.flatten.using_ints",
+                                                  "aten.unflatten.int"};
+      torchOnnxPipelineOptions.decompose = true;
+      mlir::torch::Torch::createTorchOnnxToTorchBackendPipeline(
+          passManager, torchOnnxPipelineOptions);
     }
 
     if (typeMnemonic == "torch" || typeMnemonic == "onnx") {
