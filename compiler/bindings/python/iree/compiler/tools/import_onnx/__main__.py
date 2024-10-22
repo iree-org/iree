@@ -19,6 +19,12 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import warnings
+import random
+import iree.runtime as rt
+
+from ...dialects import util
+from typing import Optional, Tuple, Any
 
 try:
     import onnx
@@ -27,6 +33,8 @@ except ModuleNotFoundError as e:
         f"iree-import-onnx requires that the `onnx` Python package is installed "
         f"(typically `{sys.executable} -m pip install onnx`)"
     ) from e
+
+from onnx import numpy_helper
 
 try:
     from ...extras import onnx_importer
@@ -37,7 +45,216 @@ except ModuleNotFoundError as e:
 
 from ...ir import (
     Context,
+    Type as IrType,
+    TypeAttr,
+    RankedTensorType,
+    StringAttr,
+    Attribute,
+    Operation,
+    Location,
+    InsertionPoint,
+    Value,
+    SymbolTable,
 )
+
+
+class IREENodeImporter(onnx_importer.NodeImporter):
+    def __init__(
+        self,
+        graph_info: onnx_importer.GraphInfo,
+        *,
+        parent_op: Operation,
+        block: onnx_importer.Block,
+        context_cache: "onnx_importer.ContextCache",
+        module_op: Operation,
+        module_cache: "onnx_importer.ModuleCache",
+        max_numel: int,
+    ):
+        super().__init__(
+            graph_info,
+            parent_op=parent_op,
+            block=block,
+            context_cache=context_cache,
+            module_op=module_op,
+            module_cache=module_cache,
+        )
+        self.last_global_op = None
+        self.symbol_table = SymbolTable(module_op)
+        self.symbol_table.insert(parent_op)
+        self.max_numel = max_numel
+        self.param_archive = rt.ParameterIndex()
+
+    def sanitize_name(self, name: str) -> str:
+        new_name: str = ""
+        for c in range(len(name)):
+            if name[c] == ":":
+                new_name += "_"
+            else:
+                new_name += name[c]
+
+        if len(new_name) == 0:
+            alpha = [chr(v) for v in range(ord("a"), ord("a") + 26)]
+            ch = random.choice(alpha)
+            new_name = str(random.randrange(1, 1000)) + "__" + ch
+        return new_name
+
+    def create_tensor_global(
+        self,
+        t: onnx.TensorProto,
+    ) -> Tuple[str, IrType]:
+        # Always create globals at the top. Then after created, if there was
+        # a prior one, move the new one to after it to maintain declaration
+        # order.
+        name = self.sanitize_name(t.name)
+        with InsertionPoint.at_block_begin(
+            self._m.regions[0].blocks[0]
+        ), Location.unknown():
+            vtensor_type = RankedTensorType.get(
+                tuple(t.dims), self._cc.tensor_element_type(t.data_type)
+            )
+            ir_attrs = {
+                "sym_name": StringAttr.get(name),
+                "sym_visibility": StringAttr.get("private"),
+                "type": TypeAttr.get(vtensor_type),
+            }
+
+            external_scope_attr = StringAttr.get("model")
+            external_name_attr = StringAttr.get(name)
+            ir_attrs["initial_value"] = Attribute.parse(
+                f"#stream.parameter.named<{external_scope_attr}::{external_name_attr}> : {vtensor_type}"
+            )
+            global_op = util.GlobalOp(
+                ir_attrs["sym_name"],
+                ir_attrs["type"],
+                sym_visibility=ir_attrs["sym_visibility"],
+                initial_value=ir_attrs["initial_value"],
+            )
+            self.symbol_table.insert(global_op)
+            if self.last_global_op is not None:
+                global_op.move_after(self.last_global_op)
+            self.last_global_op = global_op
+            actual_symbol_name = StringAttr(global_op.attributes["sym_name"]).value
+        return actual_symbol_name, vtensor_type
+
+    @classmethod
+    def define_function(
+        cls,
+        graph_info: onnx_importer.GraphInfo,
+        module_op: Operation,
+        max_numel: int,
+        context_cache: Optional["onnx_importer.ContextCache"] = None,
+        module_cache: Optional["onnx_importer.ModuleCache"] = None,
+        private: bool = False,
+    ) -> "IREENodeImporter":
+        cc = (
+            context_cache
+            if context_cache is not None
+            else onnx_importer.ContextCache(module_op.context)
+        )
+        mc = (
+            module_cache
+            if module_cache is not None
+            else onnx_importer.ModuleCache(module_op, cc)
+        )
+        with module_op.context, Location.name(f"graph:{graph_info.graph_proto.name}"):
+            body = module_op.regions[0].blocks[0]
+            func_name = graph_info.graph_proto.name
+            input_types = [
+                cc.type_proto_to_type(inp.type) for inp in graph_info.input_map.values()
+            ]
+            output_types = [
+                cc.type_proto_to_type(out.type)
+                for out in graph_info.output_map.values()
+            ]
+            ftype = onnx_importer.FunctionType.get(input_types, output_types)
+            func_op = onnx_importer.func_dialect.FuncOp(
+                func_name,
+                ftype,
+                ip=InsertionPoint(body),
+                visibility="private" if private else None,
+            )
+            block = func_op.add_entry_block(
+                [Location.name(k) for k in graph_info.input_map.keys()]
+            )
+        imp = IREENodeImporter(
+            graph_info,
+            parent_op=func_op,
+            block=block,
+            context_cache=cc,
+            module_op=module_op,
+            module_cache=mc,
+            max_numel=max_numel,
+        )
+        for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
+            imp._nv_map[node_name] = input_value
+        imp._populate_graph_attrs(func_op)
+        return imp
+
+    def import_all(self, func=True):
+        for init in self._gi.initializer_map.values():
+            self.import_initializer(init)
+
+        self.get_none()
+        for node in self._gi.graph_proto.node:
+            self.import_node(node)
+
+        outputs = []
+        for output_name in self._gi.output_map.keys():
+            try:
+                outputs.append(self._nv_map[output_name])
+            except KeyError:
+                raise onnx_importer.OnnxImportError(
+                    f"Non topologically produced ONNX graph output '{output_name}'"
+                )
+        with InsertionPoint(self._b), Location.unknown():
+            if func:
+                onnx_importer.func_dialect.ReturnOp(outputs)
+            else:
+                Operation.create(name="torch.operator_terminator", operands=outputs)
+
+    def import_initializer(
+        self, initializer: onnx.TensorProto, extern_name: Optional[str] = None
+    ) -> Value:
+        # If an explicitly specified name is given, use that; otherwise, pick
+        # up the name from the tensor proto itself
+        iname = extern_name if extern_name else initializer.name
+        dims = list(initializer.dims)
+        acc = 1
+        for d in dims:
+            acc = acc * d
+        if acc < self.max_numel:
+            with InsertionPoint(self._b), Location.name(iname):
+                value_attr = self._cc.tensor_proto_to_attr(initializer)
+                vtensor_type = self._cc.tensor_proto_to_type(initializer)
+                attrs = {
+                    "name": StringAttr.get(f"onnx.Constant"),
+                    "torch.onnx.value": value_attr,
+                }
+                literal_op = Operation.create(
+                    name="torch.operator",
+                    results=[vtensor_type],
+                    attributes=attrs,
+                )
+                self._nv_map[iname] = literal_op.result
+                return literal_op.result
+
+        x, t = self.create_tensor_global(initializer)
+        vtensor_type = self._cc.get_vtensor_type(
+            tuple(initializer.dims), self._cc.tensor_element_type(initializer.data_type)
+        )
+
+        with InsertionPoint(self._b), Location.name(iname):
+            old_op = util.GlobalLoadOp(t, x)
+            converted_value = Operation.create(
+                "torch_c.from_builtin_tensor",
+                results=[vtensor_type],
+                operands=[old_op.result],
+            ).result
+
+        self._nv_map[iname] = converted_value
+        tensor_as_array = numpy_helper.to_array(initializer)
+        self.param_archive.add_buffer(x, tensor_as_array)
+        return converted_value
 
 
 def main(args: argparse.Namespace):
@@ -45,10 +262,23 @@ def main(args: argparse.Namespace):
     context = Context()
     model_info = onnx_importer.ModelInfo(model_proto)
     m = model_info.create_module(context=context).operation
-    imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
+
+    imp: Any = None
+    if args.externalize_params:
+        imp = IREENodeImporter.define_function(model_info.main_graph, m, args.max_numel)
+    else:
+        if args.max_numel:
+            warnings.warn(
+                "'--max-numel' has no effect until externalization is enabled with '--externalize-params'"
+            )
+        imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
     imp.import_all()
+
     if not args.no_verify:
         m.verify()
+
+    if args.externalize_params:
+        imp.param_archive.create_archive_file(args.save_params_to)
 
     # TODO: This isn't very efficient output. If these files ever
     # get large, enable bytecode and direct binary emission to save
@@ -70,6 +300,11 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     else:
         raw_model = onnx.load(args.input_file, load_external_data=False)
         onnx.load_external_data_for_model(raw_model, str(args.data_dir))
+
+    if args.opset_version:
+        raw_model = onnx.version_converter.convert_version(
+            raw_model, args.opset_version
+        )
 
     # Do shape inference two ways.  First, attempt in-memory to avoid redundant
     # loading and the need for writing a temporary file somewhere.  If that
@@ -131,6 +366,29 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         help="Path to the base directory of the data."
         " Defaults to the directory of the input file.",
         type=Path,
+    )
+    parser.add_argument(
+        "--opset-version",
+        help="Allows specification of a newer opset_version to update the model"
+        " to before importing to MLIR. This can sometime assist with shape inference.",
+        type=int,
+    )
+    parser.add_argument(
+        "--max-numel",
+        help="Maximum number of elements allowed in an inlined parameter constant.",
+        type=int,
+        default=100,
+    )
+    parser.add_argument(
+        "--externalize-params",
+        help="Externalize large parameters and store them on the disk, to load at runtime.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+    parser.add_argument(
+        "--save-params-to",
+        help="Location to save the externalized parameters",
+        default="params.irpa",
     )
     args = parser.parse_args(argv)
     return args
