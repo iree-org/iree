@@ -32,6 +32,30 @@ namespace mlir::iree_compiler {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
+static VectorValue getPackedVector(RewriterBase &rewriter,
+                                   NestedLayoutAttr layout,
+                                   VectorValue vector) {
+  // Pack the vector to [subgroup, batch, outer, thread, element]
+  SmallVector<int64_t> packedShape;
+
+  ArrayRef<int64_t> subgroupShape = layout.getSubgroupTile();
+  ArrayRef<int64_t> batchShape = layout.getBatchTile();
+  ArrayRef<int64_t> outerShape = layout.getOuterTile();
+  ArrayRef<int64_t> threadShape = layout.getThreadTile();
+  ArrayRef<int64_t> elementShape = layout.getElementTile();
+
+  packedShape.append(subgroupShape.begin(), subgroupShape.end());
+  packedShape.append(batchShape.begin(), batchShape.end());
+  packedShape.append(outerShape.begin(), outerShape.end());
+  packedShape.append(threadShape.begin(), threadShape.end());
+  packedShape.append(elementShape.begin(), elementShape.end());
+
+  VectorType packedType =
+      VectorType::get(packedShape, vector.getType().getElementType());
+  return rewriter.create<vector::ShapeCastOp>(vector.getLoc(), packedType,
+                                              vector);
+}
+
 /// Helper to linearize the given |ids| with maximum values given as |sizes|.
 /// Gets the element ID in terms of |elementCount| and adds the element
 /// |offset|. For example,
@@ -678,14 +702,129 @@ struct DistributeBatchOuterToLayoutConversions final
   }
 };
 
+struct DistributeDenseConstant final
+    : OpDistributionPattern<arith::ConstantOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeDenseConstant(MLIRContext *context, Value threadId,
+                          int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    auto valueAttr = dyn_cast<DenseElementsAttr>(constantOp.getValue());
+    if (!valueAttr) {
+      return failure();
+    }
+
+    auto vector = dyn_cast<VectorValue>(constantOp.getResult());
+    if (!vector) {
+      return failure();
+    }
+
+    auto layout = dyn_cast<NestedLayoutAttr>(signature[vector]);
+    if (!layout) {
+      return rewriter.notifyMatchFailure(constantOp,
+                                         "non-nested transfer_read layout");
+    }
+
+    // Create an alloc for the constant.
+    VectorType vectorTy = vector.getType();
+    Location loc = constantOp.getLoc();
+    auto memrefType =
+        MemRefType::get(vectorTy.getShape(), vectorTy.getElementType());
+
+    // Allocate a buffer for this vector.
+    auto alloc = rewriter.create<memref::AllocOp>(loc, memrefType);
+
+    // Zero indices.
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(rewriter.getIndexType()));
+    SmallVector<Value> indices(vectorTy.getRank(), zero);
+
+    // Write to the alloc.
+    auto clonedVector = cast<arith::ConstantOp>(rewriter.clone(*constantOp));
+    rewriter.create<vector::TransferWriteOp>(
+        loc, clonedVector.getResult(), alloc, indices,
+        SmallVector<bool>(vectorTy.getRank(), true));
+
+    // auto memrefValueAttr =
+    //     DenseElementsAttr::get(memrefType, valueAttr.reshape(memrefType));
+
+    // // Convert the constant op to a memref constant op and transfer_read from
+    // // it in the right layout.
+    // valueAttr.getType();
+    // auto memrefConstant =
+    //     rewriter.create<arith::ConstantOp>(loc, memrefType, memrefValueAttr);
+
+    // Create a transfer_read from this memref constant.
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc, vector.getType(), alloc, indices,
+        SmallVector<bool>(vectorTy.getRank(), true));
+
+    auto unitAttr = UnitAttr::get(rewriter.getContext());
+    ArrayAttr readOperandsAttr = ArrayAttr::get(
+        rewriter.getContext(),
+        SmallVector<Attribute>(read->getNumOperands(), unitAttr));
+    ArrayAttr readResultsAttr = ArrayAttr::get(rewriter.getContext(), {layout});
+    setSignatureForRedistribution(rewriter, read, readOperandsAttr,
+                                  readResultsAttr);
+
+    rewriter.replaceOp(constantOp, read);
+    return success();
+
+    // // Clone the constant op.
+    // auto clone = cast<arith::ConstantOp>(rewriter.clone(*constantOp));
+    // auto clonedVector = cast<VectorValue>(clone.getResult());
+
+    // int64_t rank = layout.getRank();
+    // VectorValue packedVector = getPackedVector(rewriter, layout,
+    // clonedVector); VectorType packedType = packedVector.getType();
+
+    // // Transpose the packed vector from:
+    // // [subgroup, batch, thread, outer, element] to
+    // // [subgroup, thread, batch, outer, element].
+    // SmallVector<int64_t> permutation =
+    //     llvm::to_vector(llvm::seq<int64_t>(packedType.getRank()));
+    // // Transpose batch and thread.
+    // for (int64_t i = 0; i < rank; ++i) {
+    //   std::swap(permutation[i + rank], permutation[i + rank * 2]);
+    // }
+    // VectorValue transposed = rewriter.create<vector::TransposeOp>(
+    //     vector.getLoc(), packedVector, permutation);
+
+    // SmallVector<Value> warpIndices, threadIndices;
+    // populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+    // layout,
+    //                              warpIndices, threadIndices);
+    // SmallVector<Value> indices;
+    // indices.append(warpIndices);
+    // indices.append(threadIndices);
+
+    // Value result = rewriter.create<vector::ExtractOp>(
+    //     vector.getLoc(), transposed, indices,
+    //     SmallVector<int64_t>(indices.size(), ShapedType::kDynamic));
+    // replaceOpWithDistributedValues(rewriter, constantOp, result);
+
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    Value threadId,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite>(
-      patterns.getContext(), threadId, subgroupSize);
+  patterns.add<DistributeTransferRead, DistributeTransferWrite,
+               DistributeDenseConstant>(patterns.getContext(), threadId,
+                                        subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
