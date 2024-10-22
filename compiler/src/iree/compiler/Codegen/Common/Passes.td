@@ -157,6 +157,12 @@ def DecomposePackUnPackOpsPass :
     Option<"useOnlyReshapes", "use-only-reshapes", "bool", "false",
            "Use decomposition into reshape ops, even when packing unit dimensions.">
   ];
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
 }
 
 def DecomposeBoundaryPackUnPackOpsPass :

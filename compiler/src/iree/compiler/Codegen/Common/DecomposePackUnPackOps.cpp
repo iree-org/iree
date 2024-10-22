@@ -38,6 +38,10 @@ using PackUnPackControlFn = std::function<LogicalResult(Operation *)>;
 
 namespace {
 
+//===----------------------------------------------------------------------===//
+// Shared rewrite patterns
+//===----------------------------------------------------------------------===//
+
 /// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
 /// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
@@ -92,43 +96,14 @@ private:
   std::optional<PackUnPackControlFn> controlFn;
 };
 
-struct DecomposePackUnPackOpsPass final
-    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
-  using impl::DecomposePackUnPackOpsPassBase<
-      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
-  explicit DecomposePackUnPackOpsPass(
-      bool tileOuterToOne, bool useOnlyReshapes,
-      std::optional<PackUnPackControlFn> controlFn) {
-    this->tileOuterToOne = tileOuterToOne;
-    this->useOnlyReshapes = useOnlyReshapes;
-    this->controlFn = controlFn;
-  }
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// Shared pass implementation
+//===----------------------------------------------------------------------===//
 
-  void runOnOperation() override;
-
-private:
-  std::optional<PackUnPackControlFn> controlFn;
-};
-
-struct DecomposeBoundaryPackUnPackOpsPass final
-    : impl::DecomposeBoundaryPackUnPackOpsPassBase<
-          DecomposeBoundaryPackUnPackOpsPass> {
-  using impl::DecomposeBoundaryPackUnPackOpsPassBase<
-      DecomposeBoundaryPackUnPackOpsPass>::
-      DecomposeBoundaryPackUnPackOpsPassBase;
-
-  void runOnOperation() override;
-};
-
-} // namespace
-
-void DecomposePackUnPackOpsPass::runOnOperation() {
-  MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+static LogicalResult commonRunOnOperation(
+    MLIRContext *ctx, FunctionOpInterface funcOp, bool useOnlyReshapes,
+    bool tileOuterToOne,
+    std::optional<PackUnPackControlFn> controlFn = std::nullopt) {
   // Generalization patterns for outer unit dims have higher priority because
   // they do not generate reshape ops.
   if (!useOnlyReshapes) {
@@ -139,7 +114,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "outer unit dims cases");
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -152,7 +127,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "general cases.");
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -180,17 +155,24 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
                                                   builder.getIndexAttr(1));
               return tileSizes;
             }));
-    funcOp->walk([&](tensor::PackOp op) {
-      if (controlFn && failed(controlFn.value()(op))) {
-        return;
+    {
+      WalkResult status = funcOp->walk([&](tensor::PackOp op) {
+        if (controlFn && failed(controlFn.value()(op))) {
+          return WalkResult::advance();
+        }
+        FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+            scf::tileConsumerAndFuseProducersUsingSCF(
+                rewriter, cast<TilingInterface>(op.getOperation()),
+                packOptions);
+        if (failed(tileAndFuseResult))
+          return WalkResult::interrupt();
+        rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
+        return WalkResult::advance();
+      });
+      if (status.wasInterrupted()) {
+        return failure();
       }
-      FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-          scf::tileConsumerAndFuseProducersUsingSCF(
-              rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
-      if (failed(tileAndFuseResult))
-        return signalPassFailure();
-      rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
-    });
+    }
 
     auto unpackTilingOptions =
         scf::SCFTilingOptions().setTileSizeComputationFunction(
@@ -208,17 +190,23 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               }
               return tileSizes;
             });
-    funcOp->walk([&](tensor::UnPackOp op) {
-      if (controlFn && failed(controlFn.value()(op))) {
-        return;
+    {
+      WalkResult status = funcOp->walk([&](tensor::UnPackOp op) {
+        if (controlFn && failed(controlFn.value()(op))) {
+          return WalkResult::advance();
+        }
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
+            rewriter, cast<TilingInterface>(op.getOperation()),
+            unpackTilingOptions);
+        if (failed(tilingResult))
+          return WalkResult::interrupt();
+        rewriter.replaceOp(op, tilingResult->replacements);
+        return WalkResult::advance();
+      });
+      if (status.wasInterrupted()) {
+        return failure();
       }
-      FailureOr<scf::SCFTilingResult> tilingResult =
-          scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
-                            unpackTilingOptions);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(op, tilingResult->replacements);
-    });
+    }
 
     LLVM_DEBUG({
       llvm::dbgs()
@@ -236,7 +224,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -255,21 +243,50 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
                    linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
     }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+      return failure();
     }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DecomposePackUnPackOpsPass
+//===----------------------------------------------------------------------===//
+
+struct DecomposePackUnPackOpsPass final
+    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
+  using impl::DecomposePackUnPackOpsPassBase<
+      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
+
+  void runOnOperation() override;
+};
+
+} // namespace
+
+void DecomposePackUnPackOpsPass::runOnOperation() {
+  if (failed(commonRunOnOperation(&getContext(), getOperation(),
+                                  useOnlyReshapes, tileOuterToOne))) {
+    return signalPassFailure();
   }
 }
 
-/// This is left static because it should not be used in codegen pipelines.
-/// Passing control functions in codegen pipelines makes it difficult to
-/// make simple bug reproducers, so this ensures that control functions are
-/// only used behind wrapper passes or pass options.
-static std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
-                                 std::optional<PackUnPackControlFn> controlFn) {
-  return std::make_unique<DecomposePackUnPackOpsPass>(
-      tileOuterToOne, useOnlyReshapes, controlFn);
-}
+//===----------------------------------------------------------------------===//
+// DecomposeBoundaryPackUnPackOpsPass
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DecomposeBoundaryPackUnPackOpsPass final
+    : impl::DecomposeBoundaryPackUnPackOpsPassBase<
+          DecomposeBoundaryPackUnPackOpsPass> {
+  using impl::DecomposeBoundaryPackUnPackOpsPassBase<
+      DecomposeBoundaryPackUnPackOpsPass>::
+      DecomposeBoundaryPackUnPackOpsPassBase;
+
+  void runOnOperation() override;
+};
+
+} // namespace
 
 /// Check if the given `op` is a pack or unpack op with padding.
 static bool hasPadding(Operation *op) {
@@ -349,19 +366,9 @@ static LogicalResult isFoldableIntoInterfaceTensor(Operation *op) {
 }
 
 void DecomposeBoundaryPackUnPackOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
-  std::optional<OpPassManager> maybeFuncPassManager =
-      getFunctionOpInterfacePassManager(funcOp);
-  if (!maybeFuncPassManager) {
-    funcOp.emitOpError("unhandled operation type while creating pass pipeline "
-                       "nested on `FunctionOpInterface`");
-    return signalPassFailure();
-  }
-  OpPassManager &funcPassManager = maybeFuncPassManager.value();
-  funcPassManager.addPass(createDecomposePackUnPackOpsPass(
-      tileOuterToOne, /*useOnlyReshapes=*/true,
-      /*controlFn=*/isFoldableIntoInterfaceTensor));
-  if (failed(runPipeline(funcPassManager, funcOp))) {
+  if (failed(commonRunOnOperation(&getContext(), getOperation(),
+                                  /*useOnlyReshapes=*/true, tileOuterToOne,
+                                  isFoldableIntoInterfaceTensor))) {
     return signalPassFailure();
   }
 }
