@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 
-#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -103,6 +102,63 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+std::optional<GPUMMASchedule>
+getMmaScheduleFromProblemAndTarget(IREE::GPU::TargetAttr target,
+                                   GPUMatmulShapeType problem,
+                                   bool transposedLhs, bool transposedRhs) {
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  SmallVector<GPUMatmulShapeType> intrinsics;
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+  }
+  if (intrinsics.empty())
+    return std::nullopt;
+
+  GPUMMAHeuristicSeeds seeds;
+  assert(problem.aType == problem.bType &&
+         "expected the same aType and bType.");
+  int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
+
+  // Note that the following heuristic seeds are just placeholder values.
+  // We need to clean it up and make it adjusting to different targets.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  if (mSize * nSize <= 512 * 512) {
+    // For matmuls with small M*N size, we want to distribute M*N onto more
+    // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
+    // and a larger bestKTileCountPerSubgroup.
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+             /*bestMNTileCountPerSubgroup=*/4,
+             /*bestKTileCountPerSubgroup=*/8,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+  } else {
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+             /*bestMNTileCountPerSubgroup=*/16,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                 inBitWidth};
+  }
+
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  // First try to find a schedule with an exactly matching intrinsic.
+  std::optional<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                        targetSubgroupSize, transposedLhs, transposedRhs);
+  if (!schedule) {
+    // Then try again by allowing upcasting accumulator.
+    schedule = deduceMMASchedule(
+        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+        transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
+  }
+  return schedule;
+}
+
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op) {
@@ -168,45 +224,6 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                              getDimBounds(kDims), lhsElemType,
                              rhsElemType,         initElemType};
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    if (mma.getSubgroupSize() != targetSubgroupSize)
-      continue;
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-  }
-  if (intrinsics.empty())
-    return failure();
-
-  GPUMMAHeuristicSeeds seeds;
-  int64_t inBitWidth = lhsElemType.getIntOrFloatBitWidth();
-
-  // Note that the following heuristic seeds are just placeholder values.
-  // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/iree-org/iree/issues/16341 for details.
-  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
-  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  if (mSize * nSize <= 512 * 512) {
-    // For matmuls with small M*N size, we want to distribute M*N onto more
-    // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
-    // and a larger bestKTileCountPerSubgroup.
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
-  } else {
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
-  }
-
-  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
-  LDBG("Matmul TileAndFuse Config");
-
   // Infer if lhs or rhs is transposed to help generate better schedule.
   // TODO: Drop this. This is only a consideration for other pipelines.
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
@@ -217,16 +234,10 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       nDims.back() !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, transposedLhs, transposedRhs);
-  if (!schedule) {
-    // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(
-        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-        transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
-  }
+  LDBG("Matmul TileAndFuse Config");
+
+  std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
+      target, problem, transposedLhs, transposedRhs);
 
   if (!schedule) {
     LDBG("Failed to deduce TileAndFuse MMA schedule");

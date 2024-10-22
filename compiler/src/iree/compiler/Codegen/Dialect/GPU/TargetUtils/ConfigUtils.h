@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 
+#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
@@ -20,6 +21,11 @@ LogicalResult
 setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPoint,
                                    Operation *op);
+
+std::optional<GPUMMASchedule>
+getMmaScheduleFromProblemAndTarget(IREE::GPU::TargetAttr target,
+                                   GPUMatmulShapeType problem,
+                                   bool transposedLhs, bool transposedRhs);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma

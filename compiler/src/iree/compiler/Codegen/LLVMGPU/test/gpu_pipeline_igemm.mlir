@@ -16,6 +16,74 @@ func.func @nhwc_conv() {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
   %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x34x34x128xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x3x128x64xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x128xf32>> -> tensor<2x34x34x128xf32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x128x64xf32>> -> tensor<3x3x128x64xf32>
+  %empty = tensor.empty() : tensor<2x32x32x64xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
+  %5 = linalg.conv_2d_nhwc_hwcf
+    {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+     ins(%3, %4: tensor<2x34x34x128xf32>, tensor<3x3x128x64xf32>)
+    outs(%fill: tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
+  flow.dispatch.tensor.store %5, %2, offsets = [0, 0, 0, 0], sizes = [2, 32, 32, 64], strides = [1, 1, 1, 1] : tensor<2x32x32x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
+  return
+}
+// CHECK:       #[[$TRANSLATION_INFO:.+]] = #iree_codegen.translation_info
+// CHECK-SAME:      LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:      gpu_pipeline_options = #iree_gpu.pipeline_options<
+// CHECK-SAME:        prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+// CHECK-LABEL: func.func @nhwc_conv
+// CHECK-SAME:      translation_info = #[[$TRANSLATION_INFO]]
+// CHECK:         iree_linalg_ext.im2col
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, Indirect>
+]>
+
+func.func @nchw_conv() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x128x3x3xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 34, 34], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x128x34x34xf32>> -> tensor<2x128x34x34xf32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [64, 128, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x128x3x3xf32>> -> tensor<64x128x3x3xf32>
+  %empty = tensor.empty() : tensor<2x64x32x32xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
+  %5 = linalg.conv_2d_nchw_fchw
+    {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+     ins(%3, %4: tensor<2x128x34x34xf32>, tensor<64x128x3x3xf32>)
+    outs(%fill: tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
+  flow.dispatch.tensor.store %5, %2, offsets = [0, 0, 0, 0], sizes = [2, 64, 32, 32], strides = [1, 1, 1, 1] : tensor<2x64x32x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
+  return
+}
+// CHECK:       #[[$TRANSLATION_INFO:.+]] = #iree_codegen.translation_info
+// CHECK-SAME:      LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:      gpu_pipeline_options = #iree_gpu.pipeline_options<
+// CHECK-SAME:        prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+// CHECK-LABEL: func.func @nchw_conv
+// CHECK-SAME:      translation_info = #[[$TRANSLATION_INFO]]
+// CHECK:         iree_linalg_ext.im2col
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, Indirect>
+]>
+
+func.func @nhwc_conv_unaligned() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
+  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<1x16x16x4xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x3x4x16xf32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<1x14x14x16xf32>>
@@ -30,11 +98,8 @@ func.func @nhwc_conv() {
   flow.dispatch.tensor.store %5, %2, offsets = [0, 0, 0, 0], sizes = [1, 14, 14, 16], strides = [1, 1, 1, 1] : tensor<1x14x14x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x14x14x16xf32>>
   return
 }
-// CHECK:       #[[$TRANSLATION_INFO:.+]] = #iree_codegen.translation_info
-// CHECK-SAME:      LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-// CHECK-LABEL: func.func @nhwc_conv
-// CHECK-SAME:      translation_info = #[[$TRANSLATION_INFO]]
-// CHECK:         iree_linalg_ext.im2col
+// CHECK-LABEL: func.func @nhwc_conv_unaligned
+// CHECK-NOT:     iree_linalg_ext.im2col
 
 // -----
 
@@ -44,7 +109,7 @@ func.func @nhwc_conv() {
   #hal.pipeline.binding<storage_buffer, Indirect>
 ]>
 
-func.func @nchw_conv() {
+func.func @nchw_conv_unaligned() {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant dense<1.0> : tensor<1x64xf32>
   %c0 = arith.constant 0 : index
@@ -62,8 +127,5 @@ func.func @nchw_conv() {
   flow.dispatch.tensor.store %5, %2, offsets = [0, 0, 0, 0], sizes = [1, 16, 14, 14], strides = [1, 1, 1, 1] : tensor<1x16x14x14xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x16x14x14xf32>>
   return
 }
-// CHECK:       #[[$TRANSLATION_INFO:.+]] = #iree_codegen.translation_info
-// CHECK-SAME:      LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-// CHECK-LABEL: func.func @nchw_conv
-// CHECK-SAME:      translation_info = #[[$TRANSLATION_INFO]]
-// CHECK:         iree_linalg_ext.im2col
+// CHECK-LABEL: func.func @nchw_conv_unaligned
+// CHECK-NOT:     iree_linalg_ext.im2col
