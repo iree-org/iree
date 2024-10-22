@@ -1280,9 +1280,6 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getKDims().size() != 1) {
-    return contractOp->emitError("Unimplemented: > 1 k dims");
-  }
 
   int64_t rank = contractOp.getIteratorTypesArray().size();
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
@@ -1450,6 +1447,10 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     aSubgroupSizes[dim] = subgroupMBasis[i];
     aSubgroupStrides[dim] = subgroupMStrides[i];
   }
+  for (auto [kDim, lhsKDim] :
+       llvm::zip_equal(opInfo.getKDims(), opInfo.lhsKDim)) {
+    aBatchSizes[lhsKDim] = bounds[kDim];
+  }
   aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
   auto aLayout = createNestedLayout(context, aRank, afm, afk,
@@ -1469,6 +1470,10 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     bBatchSizes[dim] = batchNSizes[i];
     bSubgroupSizes[dim] = subgroupNBasis[i];
     bSubgroupStrides[dim] = subgroupNStrides[i];
+  }
+  for (auto [kDim, rhsKDim] :
+       llvm::zip_equal(opInfo.getKDims(), opInfo.rhsKDim)) {
+    bBatchSizes[rhsKDim] = bounds[kDim];
   }
   bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
