@@ -18,7 +18,7 @@ std::pair<int, int> VectorContractOpInfo::getOperandMNIndex() const {
 
 // Returns the (LHS K, RHS K) dimension index pair.
 std::pair<int, int> VectorContractOpInfo::getOperandKIndex() const {
-  return std::make_pair(lhsKDim, rhsKDim);
+  return std::make_pair(lhsKDim.back(), rhsKDim.back());
 }
 
 // Returns the result (M, N) dimension index pair.
@@ -55,9 +55,12 @@ VectorContractOpInfo::inferFromIndexingMaps(ArrayRef<AffineMap> maps) {
     opInfo.outNDims.push_back(
         *maps[2].getResultPosition(getAffineDimExpr(n, ctx)));
   }
-  int64_t k = contractionDims.k.back();
-  opInfo.lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
-  opInfo.rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
+  for (auto k : contractionDims.k) {
+    opInfo.lhsKDim.push_back(
+        *maps[0].getResultPosition(getAffineDimExpr(k, ctx)));
+    opInfo.rhsKDim.push_back(
+        *maps[1].getResultPosition(getAffineDimExpr(k, ctx)));
+  }
 
   opInfo.lhsUnitDims = maps[0].getBroadcastDims();
   opInfo.rhsUnitDims = maps[1].getBroadcastDims();
