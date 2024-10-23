@@ -1179,6 +1179,9 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
+    funcPassManager.addPass(createBlockDynamicDimensionsPass);
+    funcPassManager.addPass(createCanonicalizerPass);
+    funcPassManager.addPass(createCSEPass);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
