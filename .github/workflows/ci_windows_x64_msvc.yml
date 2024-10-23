@@ -30,10 +30,10 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
-      - name: "Clean up build dir"
-        run: | 
-          Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
-          mkdir "C:\mnt\azure\build-windows"
+      #- name: "Clean up build dir"
+      #  run: | 
+      #    Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
+      #    mkdir "C:\mnt\azure\build-windows"
       - name: "Setting up Python"
         uses: actions/setup-python@v4
         with:
@@ -44,6 +44,8 @@ jobs:
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
           python3 -m pip install --upgrade certifi
+          python3 -m certifi
+          type "C:\home\runner\_work\_tool\Python\3.10.11\x64\lib\site-packages\certifi\cacert.pem"
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Installing MSVC requirements"
@@ -70,9 +72,9 @@ jobs:
         run: |
           echo "Adding Bash to PATH"
           echo "C:\Program Files\Git\bin" >> $Env:GITHUB_PATH
-      - name: "Building Iree"
-        run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
+      #- name: "Building Iree"
+      #  run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "/c/mnt/azure/build-windows"
-      - name: "Clean up build dir"
-        run: Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
+      #- name: "Clean up build dir"
+      #  run: Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
