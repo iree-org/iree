@@ -711,7 +711,7 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
     if (!subspanOp)
       return failure();
 
-    OpBuilder::InsertionGuard gaurd(rewriter);
+    OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(subspanOp);
 
     auto currDynamicDims = subspanOp.getDynamicDims();
