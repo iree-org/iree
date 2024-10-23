@@ -71,26 +71,36 @@ func.func @dont_fold_reshape_with_not_full_load() {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-// CHECK-LABEL: func.func @dont_fold_dynamic_reshape()
-func.func @dont_fold_dynamic_reshape() {
+func.func @fold_dynamic_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %dim1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %dim2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<?x?x96xf32>>{%dim0, %dim1}
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
   %3 = flow.dispatch.tensor.load %1, offsets=[0, 0, 0], sizes =[%dim0, %dim1, 96], strides=[1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x96xf32>>{%dim0, %dim1} -> tensor<?x?x96xf32>
-  // CHECK: tensor.collapse_shape
-  // CHECK: tensor.expand_shape
   %4 = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<?x?x96xf32> into tensor<?x96xf32>
   %dyn = tensor.dim %4, %c0 : tensor<?x96xf32>
   %5 = tensor.expand_shape %4 [[0], [1, 2]] output_shape [%dyn, 12, 8] : tensor<?x96xf32> into tensor<?x12x8xf32>
-  flow.dispatch.tensor.store %5, %2, offsets = [%c0, %c0, %c0], sizes = [%c1, 12, 8], strides = [%c1, %c1, %c1] : tensor<?x12x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
+  flow.dispatch.tensor.store %5, %2, offsets = [0, 0, 0], sizes = [%dim2, 12, 8], strides = [1, 1, 1] : tensor<?x12x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
   return
 }
+//       CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//       CHECK: func.func @fold_dynamic_reshape()
+//   CHECK-DAG:   %[[CST0:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(0)
+//   CHECK-DAG:   %[[CST1:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(1)
+//   CHECK-DAG:   %[[CST2:.+]] = hal.interface.constant.load layout(#{{.+}}) ordinal(2)
+//       CHECK:   %[[COLLAPSED:.+]] = affine.apply #[[MAP]]()[%[[CST0]], %[[CST1]]]
+//       CHECK:   %[[IN_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(0) : !flow.dispatch.tensor<readonly:tensor<?x96xf32>>{%[[COLLAPSED]]}
+//       CHECK:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(1) : !flow.dispatch.tensor<writeonly:tensor<?x96xf32>>{%[[CST2]]}
+//       CHECK:   %[[IN:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
+//       CHECK:   flow.dispatch.tensor.store %[[IN]], %[[OUT_BINDING]]
 
 // -----
 
