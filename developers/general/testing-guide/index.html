@@ -2467,6 +2467,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#linalg-operator-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      linalg operator tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onnx-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
       ONNX operator tests
@@ -2487,6 +2496,15 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onnx-model-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      ONNX model tests
+    </span>
+  </a>
   
 </li>
         
@@ -3988,6 +4006,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#linalg-operator-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      linalg operator tests
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onnx-operator-tests" class="md-nav__link">
     <span class="md-ellipsis">
       ONNX operator tests
@@ -4008,6 +4035,15 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onnx-model-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      ONNX model tests
+    </span>
+  </a>
   
 </li>
         
@@ -4385,6 +4421,16 @@ repository.</p>
 repository also contains tests for many machine learning models. Some of these
 tests are planned to be migrated into
 <a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>.</p>
+<h3 id="linalg-operator-tests">linalg operator tests<a class="headerlink" href="#linalg-operator-tests" title="Permanent link">link</a></h3>
+<p>Tests for operators in the MLIR linalg dialect like <code>matmul</code>, and <code>convolution</code>
+are being migrated from folders like
+<a href="https://github.com/iree-org/iree/tree/main/tests/e2e/matmul"><code>tests/e2e/matmul/</code></a>
+in the
+<a href="https://github.com/iree-org/iree">iree-org/iree</a> repository to
+<a href="https://github.com/iree-org/iree-test-suites/tree/main/linalg_ops"><code>linalg_ops/</code></a>
+in the
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
+repository.</p>
 <h3 id="onnx-operator-tests">ONNX operator tests<a class="headerlink" href="#onnx-operator-tests" title="Permanent link">link</a></h3>
 <p>Tests for individual ONNX operators are included at
 <a href="https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops"><code>onnx_ops/</code></a>
@@ -4471,6 +4517,13 @@ _ IREE compile and run: test_mod_uint64::model.mlir::model.mlir::cpu_llvm_sync _
 "Artifact", which can be downloaded from the action run summary page and then
 committed:</p>
 <p><img alt="image" src="https://github.com/user-attachments/assets/b5dbdcb4-4c0a-4ff2-adc6-9021614179b2" /></p>
+<h3 id="onnx-model-tests">ONNX model tests<a class="headerlink" href="#onnx-model-tests" title="Permanent link">link</a></h3>
+<p>Tests for ONNX models are included at
+<a href="https://github.com/iree-org/iree-test-suites/tree/main/onnx_models"><code>onnx_models/</code></a>
+in the
+<a href="https://github.com/iree-org/iree-test-suites">iree-org/iree-test-suites</a>
+repository. These tests use models from the upstream
+<a href="https://github.com/onnx/models">onnx/models</a> repository.</p>
 
 
 
