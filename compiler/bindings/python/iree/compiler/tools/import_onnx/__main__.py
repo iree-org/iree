@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-import warnings
+import copy
 import random
 import iree.runtime as rt
 import string
@@ -56,6 +56,7 @@ from ...ir import (
     InsertionPoint,
     Value,
     SymbolTable,
+    IntegerType,
 )
 
 
@@ -115,8 +116,11 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         with InsertionPoint.at_block_begin(
             self._m.regions[0].blocks[0]
         ), Location.unknown():
+            # After lowering to linalg-on-tensors, the data type need to be signless.
+            # So, we construct the globals to have signless types, and use
+            # torch_c.from_builtin_tensor to convert to the correct frontend type.
             vtensor_type = RankedTensorType.get(
-                tuple(t.dims), self._cc.tensor_element_type(t.data_type)
+                tuple(t.dims), ELEM_TYPE_TO_SIGNLESS_IR_TYPE[t.data_type]()
             )
             ir_attrs = {
                 "sym_name": StringAttr.get(name),
@@ -240,10 +244,6 @@ def main(args: argparse.Namespace):
     if args.externalize_params:
         imp = IREENodeImporter.define_function(model_info.main_graph, m, args.max_numel)
     else:
-        if args.max_numel:
-            warnings.warn(
-                "'--max-numel' has no effect until externalization is enabled with '--externalize-params'"
-            )
         imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
     imp.import_all()
 
@@ -315,6 +315,40 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         onnx.load_external_data_for_model(inferred_model, str(data_dir))
 
         return inferred_model
+
+
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE = copy.deepcopy(onnx_importer.ELEM_TYPE_TO_IR_TYPE_CB)
+
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT64
+] = lambda: IntegerType.get_signless(64)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT32
+] = lambda: IntegerType.get_signless(32)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT16
+] = lambda: IntegerType.get_signless(16)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT8
+] = lambda: IntegerType.get_signless(8)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.INT4
+] = lambda: IntegerType.get_signless(4)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT8
+] = lambda: IntegerType.get_signless(8)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT4
+] = lambda: IntegerType.get_signless(4)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT16
+] = lambda: IntegerType.get_signless(16)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT64
+] = lambda: IntegerType.get_signless(64)
+ELEM_TYPE_TO_SIGNLESS_IR_TYPE[
+    onnx.TensorProto.DataType.UINT32
+] = lambda: IntegerType.get_signless(32)
 
 
 def parse_arguments(argv=None) -> argparse.Namespace:
