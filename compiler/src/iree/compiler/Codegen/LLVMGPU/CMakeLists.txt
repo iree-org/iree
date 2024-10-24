@@ -80,6 +80,7 @@ iree_cc_library(
     "LLVMGPUCastTypeToFitMMA.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
     "LLVMGPUConfigureVectorLayouts.cpp"
+    "LLVMGPUConvolutionToIGEMM.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUPrefetching.cpp"
