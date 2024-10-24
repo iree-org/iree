@@ -224,6 +224,11 @@ struct ConvertToStreamPass final
     // for all SSA values we'll use during conversion are available.
     AffinityAnalysis affinityAnalysis(getOperation());
     if (failed(affinityAnalysis.run())) {
+      getOperation().emitError()
+          << "affinity analysis failed to converge (input program may have "
+             "invalid affinities assigned); use"
+             "`--iree-stream-annotate-input-affinities` to help identify the "
+             "invalid affinities";
       return signalPassFailure();
     }
 
