@@ -103,10 +103,6 @@ verifyGPUMatmulPipeline(Operation *op,
 // Wrappers that not use tablegen options.
 //------------------------------------------------------------------------------
 
-enum class LLVMGPUMatmulPadOption { ParallelDims, ReductionDims };
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUPromoteMatmulToFitMMAPass(LLVMGPUMatmulPadOption option);
-
 enum class GPUTensorCoreType {
   WMMA = 0,
   MMA_SYNC = 1,
