@@ -205,6 +205,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   if (!opOperand.get().hasOneUse() && !vectorLayout &&
       llvm::dyn_cast_or_null<arith::ConstantOp>(
           opOperand.get().getDefiningOp())) {
+    builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
     Value copiedConst = copiedConstOp->getResult(0);
     builder.replaceAllUsesExcept(opOperand.get(), copiedConst,
