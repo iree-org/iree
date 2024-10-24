@@ -706,11 +706,12 @@ static void enforceLayoutToBroadcastOp(
 
   auto resultShape = broadcast.getResultVectorType().getShape();
   auto inputType = broadcast.getSourceType();
-  if (!isa<VectorType>(inputType)) {
-    return;
-  }
 
-  auto inputShape = cast<VectorType>(inputType).getShape();
+  VectorType inputVectorType = dyn_cast<VectorType>(inputType);
+  if (!inputVectorType)
+    return;
+
+  auto inputShape = inputVectorType.getShape();
 
   SmallVector<bool> reductionMask(resultShape.size(), false);
   // Set the trailing dimensions to be reduced.
@@ -945,7 +946,7 @@ void EnforceLayout::visitOperation(Operation *op) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOpOperands());
 
-    // Handle the propation from scf.for to yield op
+    // Handle the propagation from scf.for to yield op.
     visitRegionBranchTerminatorOpInterface(branch, RegionBranchPoint::parent());
     return;
   }

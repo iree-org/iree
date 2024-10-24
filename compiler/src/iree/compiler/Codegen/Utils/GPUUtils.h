@@ -107,8 +107,7 @@ FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
 FailureOr<scf::SCFTileSizeComputationFunction>
 getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
-// Determines whether the rank of the input value 'val' is non-zero.
-// Returns true if the rank is non-zero; otherwise, returns false.
+/// Returns true iff the rank of the input value 'val' is non-zero.
 bool isNonZeroRank(VectorValue val);
 
 //===----------------------------------------------------------------------===//

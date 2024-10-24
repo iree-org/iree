@@ -305,11 +305,9 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     auto vectorType = VectorType::get(distShape, elementType);
 
     VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
-    // Types such as vector<f32> can return a valid pointer. An additional
-    // rank check is added to ensure that the type is indeed a vector
-    // value.
-    bool isSrcVector = (srcVector) && (isNonZeroRank(srcVector));
-    if (!isSrcVector) {
+    // If the srcVector is a scalar (like f32) or a rank-0 vector (like
+    // vector<f32>), we proceed with the scalar distribution branch.
+    if (!srcVector || !isNonZeroRank(srcVector)) {
       // The way distribution currently works, there is no partial thread
       // distribution, so a scalar is available to all threads. Scalar
       // distribution is simply a broadcast from scalar to the distributed
