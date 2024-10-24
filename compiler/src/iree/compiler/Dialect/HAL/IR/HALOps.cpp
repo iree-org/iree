@@ -878,6 +878,10 @@ enum class NumericalType : uint32_t {
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
   kFloatComplex = kFloat | 0x03,
+  kFloat8E5M2 = kFloat | 0x04,
+  kFloat8E4M3 = kFloat | 0x05,
+  kFloat8E5M2FNUZ = kFloat | 0x06,
+  kFloat8E4M3FNUZ = kFloat | 0x07,
 };
 
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
@@ -905,7 +909,14 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
     return makeElementTypeValue(numericalType, intType.getWidth());
   } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
+    case APFloat::S_Float8E5M2:
+      return makeElementTypeValue(NumericalType::kFloat8E5M2, 8);
+    case APFloat::S_Float8E4M3:
+      return makeElementTypeValue(NumericalType::kFloat8E4M3, 8);
+    case APFloat::S_Float8E5M2FNUZ:
+      return makeElementTypeValue(NumericalType::kFloat8E5M2FNUZ, 8);
     case APFloat::S_Float8E4M3FNUZ:
+      return makeElementTypeValue(NumericalType::kFloat8E4M3FNUZ, 8);
     case APFloat::S_IEEEhalf:
     case APFloat::S_IEEEsingle:
     case APFloat::S_IEEEdouble:
