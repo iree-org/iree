@@ -347,7 +347,7 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     // Allowlist of function attributes to retain when importing funcs.
     constexpr const char *kRetainedAttributes[] = {
         "iree.reflection", "stream.affinity", "vm.fallback",
-        "vm.signature",    "vm.version",
+        "vm.signature",    "vm.version",      "nosideeffects",
     };
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,
