@@ -464,6 +464,47 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#contract_layout = #iree_vector_ext.nested_layout<
+    subgroup_tile = [1, 1],
+    batch_tile = [3, 2],
+    outer_tile = [4, 1],
+    thread_tile = [2, 32],
+    element_tile = [4, 1],
+
+    subgroup_strides = [0, 0],
+    thread_strides = [32, 1]
+>
+
+// This test ensures that we are not running into ops not dominating constantOp operands after layout analysis.
+// We simulate that by doing elmentwise op on the value with "layout" i.e scaled_lhs after scaled_rhs.
+// If not handled properly, will generate constOp before "scaled_lhs", but would get used also by "scaled_rhs".
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @handle_multiuse_constant(%lhs: vector<96x64xf16>, %rhs: vector<96x64xf16>, %arr: memref<96x64xf16>) -> () {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f16
+    %cst_1 = arith.constant dense<1.562500e-02> : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %lhs_layout = iree_vector_ext.to_layout %lhs to layout(#contract_layout) : vector<96x64xf16>
+
+    %scaled_rhs = arith.mulf %rhs, %cst_1 : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %scaled_lhs = arith.mulf %lhs_layout, %cst_1 : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %add = arith.addf %scaled_lhs, %scaled_rhs : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    vector.transfer_write %add, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<96x64xf16>, memref<96x64xf16>
+    func.return
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 1, 1],
   batch_tile = [1, 2, 4],
