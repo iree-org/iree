@@ -5388,6 +5388,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 * MFMA_F32_16x16x16_F16 (<code>MFMA_F32_16x16x16_F16</code>)
 * MFMA_F32_32x32x8_F16 (<code>MFMA_F32_32x32x8_F16</code>)
 * MFMA_F32_16x16x32_F8E4M3FNUZ (<code>MFMA_F32_16x16x32_F8E4M3FNUZ</code>)
+* MFMA_F32_16x16x32_F8E5M2FNUZ (<code>MFMA_F32_16x16x32_F8E5M2FNUZ</code>)
 * MFMA_I32_16x16x32_I8 (<code>MFMA_I32_16x16x32_I8</code>)
 * MFMA_I32_32x32x16_I8 (<code>MFMA_I32_32x32x16_I8</code>)
 * MFMA_I32_16x16x16_I8 (<code>MFMA_I32_16x16x16_I8</code>)
@@ -5865,57 +5866,62 @@ NVIDIA GPUs.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">MFMA_F32_16x16x4_F32</td>
-<td style="text-align: center;"><code>0</code></td>
+<td style="text-align: center;"><code>2304</code></td>
 <td>MFMA_F32_16x16x4_F32</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>1</code></td>
+<td style="text-align: center;"><code>2320</code></td>
 <td>MFMA_F32_16x16x16_F16</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_F32_32x32x8_F16</td>
-<td style="text-align: center;"><code>2</code></td>
+<td style="text-align: center;"><code>2321</code></td>
 <td>MFMA_F32_32x32x8_F16</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>3</code></td>
+<td style="text-align: center;"><code>2368</code></td>
 <td>MFMA_F32_16x16x32_F8E4M3FNUZ</td>
 </tr>
 <tr>
+<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2FNUZ</td>
+<td style="text-align: center;"><code>2352</code></td>
+<td>MFMA_F32_16x16x32_F8E5M2FNUZ</td>
+</tr>
+<tr>
 <td style="text-align: center;">MFMA_I32_16x16x32_I8</td>
-<td style="text-align: center;"><code>4</code></td>
+<td style="text-align: center;"><code>2432</code></td>
 <td>MFMA_I32_16x16x32_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_I32_32x32x16_I8</td>
-<td style="text-align: center;"><code>5</code></td>
+<td style="text-align: center;"><code>2433</code></td>
 <td>MFMA_I32_32x32x16_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_I32_16x16x16_I8</td>
-<td style="text-align: center;"><code>6</code></td>
+<td style="text-align: center;"><code>2176</code></td>
 <td>MFMA_I32_16x16x16_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">MFMA_I32_32x32x8_I8</td>
-<td style="text-align: center;"><code>7</code></td>
+<td style="text-align: center;"><code>2177</code></td>
 <td>MFMA_I32_32x32x8_I8</td>
 </tr>
 <tr>
 <td style="text-align: center;">WMMA_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>8</code></td>
+<td style="text-align: center;"><code>16</code></td>
 <td>WMMA_F32_16x16x16_F16</td>
 </tr>
 <tr>
 <td style="text-align: center;">WMMA_F16_16x16x16_F16</td>
-<td style="text-align: center;"><code>9</code></td>
+<td style="text-align: center;"><code>17</code></td>
 <td>WMMA_F16_16x16x16_F16</td>
 </tr>
 <tr>
 <td style="text-align: center;">WMMA_I32_16x16x16_I8</td>
-<td style="text-align: center;"><code>10</code></td>
+<td style="text-align: center;"><code>128</code></td>
 <td>WMMA_I32_16x16x16_I8</td>
 </tr>
 </tbody>
