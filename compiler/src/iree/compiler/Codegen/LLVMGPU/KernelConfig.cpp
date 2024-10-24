@@ -361,11 +361,11 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
 
-  reductionTileSizes[kDim] = schedule->kTileCounts[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
@@ -576,9 +576,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
                            << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileCounts[0] << ", "
-                                 << schedule->nTileCounts[0] << ", "
-                                 << schedule->kTileCounts[0] << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileSizes[0] << ", "
+                                 << schedule->nTileSizes[0] << ", "
+                                 << schedule->kTileSizes[0] << "]");
   LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
                                  << schedule->nSubgroupCounts[0] << "]");
 
@@ -607,11 +607,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
 
-  reductionTileSizes[kDim] = schedule->kTileCounts[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
@@ -775,16 +775,16 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // the N dimension. This is however ok, because we generally do not want to
   // distribute subgroups on N dimension anyway.
   if (schedule->nSubgroupCounts[0] != 1) {
-    schedule->nTileCounts[0] *= schedule->nSubgroupCounts[0];
+    schedule->nTileSizes[0] *= schedule->nSubgroupCounts[0];
     schedule->nSubgroupCounts[0] = 1;
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
                            << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileCounts[0] << ", "
-                                 << schedule->nTileCounts[0] << ", "
-                                 << schedule->kTileCounts[0] << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileSizes[0] << ", "
+                                 << schedule->nTileSizes[0] << ", "
+                                 << schedule->kTileSizes[0] << "]");
   LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
                                  << schedule->nSubgroupCounts[0] << "]");
 
@@ -814,11 +814,11 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileCounts[0] * schedule->mSize;
+      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
   workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileCounts[0] * schedule->nSize;
+      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
 
-  reductionTileSizes[k2Dim] = schedule->kTileCounts[0] * schedule->kSize;
+  reductionTileSizes[k2Dim] = schedule->kTileSizes[0] * schedule->kSize;
 
   MLIRContext *context = op.getContext();
   SmallVector<NamedAttribute, 2> attrs;

@@ -245,9 +245,9 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
                            << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileCounts << ", "
-                                 << schedule->nTileCounts << ", "
-                                 << schedule->kTileCounts << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileSizes << ", "
+                                 << schedule->nTileSizes << ", "
+                                 << schedule->kTileSizes << "]");
   LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts << ", "
                                  << schedule->nSubgroupCounts << "]");
 
@@ -288,18 +288,18 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   // Compute the M/N dimension tile sizes by multiplying subgroup information.
   for (auto [i, mDim] : llvm::enumerate(mDims)) {
     workgroupTileSizes[mDim] =
-        schedule->mSubgroupCounts[i] * schedule->mTileCounts[i];
-    subgroupTileSizes[mDim] = schedule->mTileCounts[i];
+        schedule->mSubgroupCounts[i] * schedule->mTileSizes[i];
+    subgroupTileSizes[mDim] = schedule->mTileSizes[i];
   }
   for (auto [i, nDim] : llvm::enumerate(nDims)) {
     workgroupTileSizes[nDim] =
-        schedule->nSubgroupCounts[i] * schedule->nTileCounts[i];
-    subgroupTileSizes[nDim] = schedule->nTileCounts[i];
+        schedule->nSubgroupCounts[i] * schedule->nTileSizes[i];
+    subgroupTileSizes[nDim] = schedule->nTileSizes[i];
   }
 
   // Similarly the reduction tile size is just the post-packing tile count.
   for (auto [i, kDim] : llvm::enumerate(kDims)) {
-    reductionTileSizes[kDim] = schedule->kTileCounts[i];
+    reductionTileSizes[kDim] = schedule->kTileSizes[i];
   }
 
   IREE::GPU::MmaInterfaceAttr mmaKind =
