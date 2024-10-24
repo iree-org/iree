@@ -336,6 +336,11 @@ def HAL_CollectiveElementType_Float16 : I32EnumAttrCase<"Float16", 8, "f16">;
 def HAL_CollectiveElementType_Float32 : I32EnumAttrCase<"Float32", 9, "f32">;
 def HAL_CollectiveElementType_Float64 : I32EnumAttrCase<"Float64", 10, "f64">;
 def HAL_CollectiveElementType_BFloat16 : I32EnumAttrCase<"BFloat16", 11, "bf16">;
+def HAL_CollectiveElementType_Float8E5M2 : I32EnumAttrCase<"Float8E5M2", 12, "f8E5M2">;
+def HAL_CollectiveElementType_Float8E4M3 : I32EnumAttrCase<"Float8E4M3", 13, "f8E4M3">;
+def HAL_CollectiveElementType_Float8E5M2FNUZ : I32EnumAttrCase<"Float8E5M2FNUZ", 14, "f8E5M2FNUZ">;
+def HAL_CollectiveElementType_Float8E4M3FNUZ : I32EnumAttrCase<"Float8E4M3FNUZ", 15, "f8E4M3FNUZ">;
+
 def HAL_CollectiveElementTypeAttr :
     I32EnumAttr<"CollectiveElementType", "valid CollectiveElementType", [
       HAL_CollectiveElementType_Sint8,
@@ -350,6 +355,10 @@ def HAL_CollectiveElementTypeAttr :
       HAL_CollectiveElementType_Float32,
       HAL_CollectiveElementType_Float64,
       HAL_CollectiveElementType_BFloat16,
+      HAL_CollectiveElementType_Float8E5M2,
+      HAL_CollectiveElementType_Float8E4M3,
+      HAL_CollectiveElementType_Float8E5M2FNUZ,
+      HAL_CollectiveElementType_Float8E4M3FNUZ
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
