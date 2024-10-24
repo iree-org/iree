@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "convolution_to_igemm.mlir"
     "convolutions.mlir"
     "decompose_affine_ops.mlir"
+    "decompose_boundary_pack_unpack_ops.mlir"
     "decompose_conv2d.mlir"
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
