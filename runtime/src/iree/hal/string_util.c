@@ -134,6 +134,18 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("ui"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
+  } else if (iree_string_view_equal(str_value, IREE_SV("f8E5M2"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f8E4M3"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f8E5M2FNUZ"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(str_value, IREE_SV("f8E4M3FNUZ"))) {
+    *out_element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ;
+    return iree_ok_status();
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("f"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("bf"))) {
@@ -164,6 +176,37 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
 IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
     iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
+  const char* special_name = NULL;
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
+      special_name = "f8E5M2";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3:
+      special_name = "f8E4M3";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
+      special_name = "f8E5M2FNUZ";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
+      special_name = "f8E4M3FNUZ";
+      break;
+    default:
+      break;
+  }
+  if (special_name) {
+    int n = snprintf(buffer, buffer_capacity, "%s", special_name);
+    if (n < 0) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "snprintf failed");
+    }
+    if (out_buffer_length) {
+      *out_buffer_length = n;
+    }
+    return n >= buffer_capacity
+               ? iree_status_from_code(IREE_STATUS_OUT_OF_RANGE)
+               : iree_ok_status();
+  }
+
   if (out_buffer_length) {
     *out_buffer_length = 0;
   }
@@ -366,6 +409,38 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return iree_string_view_atoi_uint64(data_str, (uint64_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e5m2(temp_float);
+      return iree_ok_status();
+    }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e4m3(temp_float);
+      return iree_ok_status();
+    }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e5m2fnuz(temp_float);
+      return iree_ok_status();
+    }
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ: {
+      float temp_float = 0;
+      if (!iree_string_view_atof(data_str, &temp_float)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint8_t*)out_data = (uint8_t)iree_math_f32_to_f8e4m3fnuz(temp_float);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16: {
       float temp = 0;
       if (!iree_string_view_atof(data_str, &temp)) {
