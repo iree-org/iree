@@ -30,20 +30,30 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
-static bool is1x1FilterConv2dOp(linalg::LinalgOp convOp) {
-  const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(convOp);
-  const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(convOp);
-  if (!isNCHW & !isNHWC)
+/// Returns true of `linalgOp` is a Conv2DNchwFchwOp or Conv2DNhwcHwcfOp with
+/// all strides equal to 1 and with a kernel height and width of 1
+static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
+  auto NCHWOp = dyn_cast<linalg::Conv2DNchwFchwOp>(linalgOp.getOperation());
+  auto NHWCOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation());
+
+  if (!NCHWOp && !NHWCOp)
     return false;
 
+  DenseIntElementsAttr strides =
+      NCHWOp ? NCHWOp.getStrides() : NHWCOp.getStrides();
+  if (!llvm::all_of(
+          strides, [](APInt element) { return element.getSExtValue() == 1; })) {
+    return false;
+  }
+
   auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
-      convOp.getDpsInputOperand(1)->get().getType());
+      linalgOp.getDpsInputOperand(1)->get().getType());
   if (!filterShapeType)
     return false;
 
   // Adjusting dimension indices based on Conv2DOpType.
-  const int khIndex = isNHWC ? 0 : 2;
-  const int kwIndex = isNHWC ? 1 : 3;
+  const int khIndex = NHWCOp ? 0 : 2;
+  const int kwIndex = NHWCOp ? 1 : 3;
   auto filterShape = filterShapeType.getShape();
   return filterShape[khIndex] == 1 && filterShape[kwIndex] == 1;
 }
@@ -63,7 +73,7 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(
             linalgOp.getOperation()) ||
-        is1x1FilterConv2dOp(linalgOp)) {
+        isConvFoldableToContraction(linalgOp)) {
       namedOpCandidates.push_back(linalgOp);
     }
   });
