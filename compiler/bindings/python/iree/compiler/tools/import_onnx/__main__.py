@@ -22,6 +22,7 @@ import tempfile
 import warnings
 import random
 import iree.runtime as rt
+import string
 
 from ...dialects import util
 from typing import Optional, Tuple, Any
@@ -85,6 +86,11 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.param_archive = rt.ParameterIndex()
 
     def sanitize_name(self, name: str) -> str:
+        # There are often some initializers in the models that have no name
+        # labels, or contain substrings like '::', which can cause conflicts,
+        # and invalid symbol names for symbolic references. This function will
+        # remove substrings like '::' when the name is not empty, and generate
+        # a random string when it is, as a placeholder.
         new_name: str = ""
         for c in range(len(name)):
             if name[c] == ":":
@@ -93,7 +99,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 new_name += name[c]
 
         if len(new_name) == 0:
-            alpha = [chr(v) for v in range(ord("a"), ord("a") + 26)]
+            alpha = string.ascii_lowercase
             ch = random.choice(alpha)
             new_name = str(random.randrange(1, 1000)) + "__" + ch
         return new_name
@@ -190,28 +196,6 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         imp._populate_graph_attrs(func_op)
         return imp
 
-    def import_all(self, func=True):
-        for init in self._gi.initializer_map.values():
-            self.import_initializer(init)
-
-        self.get_none()
-        for node in self._gi.graph_proto.node:
-            self.import_node(node)
-
-        outputs = []
-        for output_name in self._gi.output_map.keys():
-            try:
-                outputs.append(self._nv_map[output_name])
-            except KeyError:
-                raise onnx_importer.OnnxImportError(
-                    f"Non topologically produced ONNX graph output '{output_name}'"
-                )
-        with InsertionPoint(self._b), Location.unknown():
-            if func:
-                onnx_importer.func_dialect.ReturnOp(outputs)
-            else:
-                Operation.create(name="torch.operator_terminator", operands=outputs)
-
     def import_initializer(
         self, initializer: onnx.TensorProto, extern_name: Optional[str] = None
     ) -> Value:
@@ -223,20 +207,9 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         for d in dims:
             acc = acc * d
         if acc < self.max_numel:
-            with InsertionPoint(self._b), Location.name(iname):
-                value_attr = self._cc.tensor_proto_to_attr(initializer)
-                vtensor_type = self._cc.tensor_proto_to_type(initializer)
-                attrs = {
-                    "name": StringAttr.get(f"onnx.Constant"),
-                    "torch.onnx.value": value_attr,
-                }
-                literal_op = Operation.create(
-                    name="torch.operator",
-                    results=[vtensor_type],
-                    attributes=attrs,
-                )
-                self._nv_map[iname] = literal_op.result
-                return literal_op.result
+            imported_tensor = super().import_initializer(initializer)
+            self._nv_map[iname] = imported_tensor
+            return imported_tensor
 
         x, t = self.create_tensor_global(initializer)
         vtensor_type = self._cc.get_vtensor_type(
