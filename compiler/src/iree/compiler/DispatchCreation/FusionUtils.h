@@ -29,6 +29,14 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
 bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
                          const DominanceInfo &dominanceInfo, Operation *seedOp);
 
+/// Wrapps `filter` so that operations used in a region of an op also get
+/// included in the backward slice. This breaks the topological sorting of the
+/// original `getBackwardsSlice` but isn't nessasary for the uses here.
+/// TODO: Upstream this as a part of `getBackwardsSlice`.
+void getBackwardSliceIncludingUsesFromAbove(
+    Operation *op, SetVector<Operation *> *backwardSlice,
+    const BackwardSliceOptions &options);
+
 /// Moves the operands and transitive defs for each op in `operations` directly
 /// after `insertionPoint`. Note: this does not check if it is legal to move the
 /// operands.
@@ -44,16 +52,11 @@ moveOperandDefs(RewriterBase &rewriter, ArrayRef<T> operations,
     return !dominanceInfo.properlyDominates(op, insertionPoint) &&
            !ignoreOperationsSet.contains(op);
   };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.inclusive = true;
 
   llvm::SetVector<Operation *> slice;
   for (auto op : operations) {
     assert(insertionPoint->getBlock() == op->getBlock());
-    for (auto operand : op->getOperands()) {
-      getBackwardSlice(operand, &slice, options);
-    }
+    getBackwardSliceIncludingUsesFromAbove(op, &slice, options);
   }
 
   mlir::topologicalSort(slice);
