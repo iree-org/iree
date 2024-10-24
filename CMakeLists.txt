@@ -780,7 +780,7 @@ if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
       pybind11
       GIT_REPOSITORY https://github.com/pybind/pybind11
       GIT_TAG        v2.13.6
-      FIND_PACKAGE_ARGS NAMES pybind11
+      OVERRIDE_FIND_PACKAGE
   )
   set(PYBIND11_FINDPYTHON ON)
   FetchContent_MakeAvailable(pybind11)
