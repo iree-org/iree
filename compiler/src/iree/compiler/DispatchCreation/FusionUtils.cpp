@@ -10,11 +10,7 @@
 #include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/IR/Dominance.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -99,35 +95,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     }
   }
   return true;
-}
-
-bool isHorizontalToGroup(Operation *op, ArrayRef<Operation *> currGroup,
-                         const DominanceInfo &dominanceInfo,
-                         Operation *seedOp) {
-  assert(dominanceInfo.properlyDominates(seedOp, op) &&
-         op->getParentRegion() == seedOp->getParentRegion());
-  BackwardSliceOptions options;
-  // Limit the slice to the seed to make sure the slice is small.
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, seedOp);
-  };
-  llvm::SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
-
-  // `getBackwardSlice` doesnt track uses from within an ops region, so make
-  // sure there are no values defined above.
-  for (Operation *sliceOp : slice) {
-    bool usesValuesFromAbove = false;
-    mlir::visitUsedValuesDefinedAbove(
-        sliceOp->getRegions(), [&](void *) { usesValuesFromAbove = true; });
-    if (usesValuesFromAbove) {
-      return false;
-    }
-  }
-
-  return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
-    return slice.contains(groupedOp);
-  });
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation
