@@ -61,6 +61,7 @@ struct ROCmOptions {
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
+  bool slpVectorization = false;
 
   /// List of LLVM opt pass pluggins to be loaded during GPU code
   /// generation. The pluggins are paths to dynamic libraries that
@@ -108,6 +109,11 @@ struct ROCmOptions {
                  "to be passed to the target backend compiler during HIP "
                  "executable serialization"),
         cl::ZeroOrMore, cl::cat(category));
+    binder.opt<bool>(
+        "iree-hip-llvm-slp-vec", slpVectorization, cl::cat(category),
+        cl::desc(
+            "Enable slp vectorization in llvm opt. This can have an impact on "
+            "performance/numerics so its turned off by default currently."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -286,7 +292,8 @@ public:
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine,
-                             ArrayRef<std::string> passPlugins) {
+                             ArrayRef<std::string> passPlugins,
+                             bool slpVectorization) {
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -295,7 +302,7 @@ public:
     fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
     llvm::PipelineTuningOptions pto;
-    pto.SLPVectorization = false;
+    pto.SLPVectorization = slpVectorization;
 
     llvm::PassInstrumentationCallbacks pic;
 
@@ -548,7 +555,8 @@ public:
       }
 
       // Run LLVM optimization passes.
-      optimizeModule(*llvmModule, *targetMachine, options.passPlugins);
+      optimizeModule(*llvmModule, *targetMachine, options.passPlugins,
+                     options.slpVectorization);
       if (!serOptions.dumpIntermediatesPath.empty()) {
         dumpModuleToPath(serOptions.dumpIntermediatesPath,
                          serOptions.dumpBaseName, variantOp.getName(),

@@ -147,7 +147,7 @@ if crashes, bugs, numerical issues, etc. can be reproduced at that scale.
 Some existing test suites can be found at these locations:
 
 * <https://github.com/iree-org/iree/tree/main/tests/e2e>
-* <https://github.com/nod-ai/SHARK-TestSuite/tree/main/iree_tests/onnx/node/generated>
+* <https://github.com/iree-org/iree-test-suites>
 * <https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx/operators>
 * <https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/pytorch/operators>
 * <https://github.com/openxla/stablehlo/tree/main/stablehlo/tests/interpret>
