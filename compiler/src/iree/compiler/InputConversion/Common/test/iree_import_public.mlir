@@ -14,6 +14,13 @@ func.func @noinline_func() -> () attributes {noinline} {
 }
 
 // -----
+// CHECK-LABEL: util.func public @nosideeffects_func
+// CHECK: nosideeffects
+func.func @nosideeffects_func() -> () attributes {nosideeffects} {
+  return
+}
+
+// -----
 // CHECK-LABEL: util.func public @b_func
 // CHECK-SAME: (%arg0: !hal.buffer, %arg1: !hal.buffer) -> (!hal.buffer, !hal.buffer)
 // CHECK: util.return %arg0, %arg1 : !hal.buffer, !hal.buffer
