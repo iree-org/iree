@@ -788,7 +788,7 @@ if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
   # a shame since sub-projects can require that to work. If we were using
   # CMake 3.24, we could just add OVERRIDE_FIND_PACKAGE to the
   # FetchContent_Declare call above and it would take care of doing the
-  # following to let subsequence sub-project find_package calls to resolve
+  # following to let subsequent sub-project find_package calls to resolve
   # successfully.
   set(pybind11_DIR "${pybind11_BINARY_DIR}")
   file(WRITE "${pybind11_BINARY_DIR}/pybind11Config.cmake" "")
