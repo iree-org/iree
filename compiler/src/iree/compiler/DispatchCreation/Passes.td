@@ -348,4 +348,12 @@ def MaterializeDefaultWorkgroupCountRegionPass:
 }
 
 
+def VerifyDispatchesPass :
+  InterfacePass<"iree-dispatch-creation-verify-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "";
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 #endif // IREE_COMPILER_DISPATCHCREATION_PASSES
