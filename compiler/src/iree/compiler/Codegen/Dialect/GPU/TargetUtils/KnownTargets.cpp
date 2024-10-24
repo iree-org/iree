@@ -137,6 +137,7 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
   };
