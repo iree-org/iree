@@ -782,6 +782,7 @@ if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_COMPILER)
       GIT_TAG        v2.13.6
       FIND_PACKAGE_ARGS NAMES pybind11
   )
+  set(PYBIND11_FINDPYTHON ON)
   FetchContent_MakeAvailable(pybind11)
 endif()
 
