@@ -6,7 +6,8 @@
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -26,134 +27,51 @@ public:
 
   LogicalResult matchAndRewrite(Conv2DOpType convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputShapeType = llvm::dyn_cast<RankedTensorType>(
-        convOp.getDpsInputOperand(0)->get().getType());
     auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
         convOp.getDpsInputOperand(1)->get().getType());
-    auto outputShapeType = llvm::dyn_cast<RankedTensorType>(
-        convOp.getDpsInitOperand(0)->get().getType());
-
-    const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(convOp);
-    const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(convOp);
-    if (!isNCHW & !isNHWC)
+    if (!filterShapeType)
       return failure();
 
-    if (!inputShapeType || !filterShapeType || !outputShapeType)
-      return failure();
+    constexpr bool isNCHW =
+        std::is_same_v<linalg::Conv2DNchwFchwOp, Conv2DOpType>;
+    constexpr bool isNHWC =
+        std::is_same_v<linalg::Conv2DNhwcHwcfOp, Conv2DOpType>;
+    static_assert(isNCHW || isNHWC);
 
-    auto inputShape = inputShapeType.getShape();
     auto filterShape = filterShapeType.getShape();
-    auto outputShape = outputShapeType.getShape();
+
+    constexpr int64_t numLoops = 7;
 
     // Adjusting dimension indices based on Conv2DOpType.
-    const int nIndex = 0;
-    const int kcIndex = isNHWC ? 2 : 1;
-    const int kfIndex = isNHWC ? 3 : 0;
-    const int khIndex = isNHWC ? 0 : 2;
-    const int kwIndex = isNHWC ? 1 : 3;
-    const int ohIndex = isNHWC ? 1 : 2;
-    const int owIndex = isNHWC ? 2 : 3;
-    const int ocIndex = isNHWC ? 3 : 1;
-
-    bool isInputHWDynamic = ShapedType::isDynamic(inputShape[ohIndex]) &&
-                            ShapedType::isDynamic(inputShape[owIndex]);
-
-    // We cannot merge the width and height if they are both dynamic as we
-    // cannot expand them back to their dynamic values.
-    if (isInputHWDynamic)
-      return failure();
+    constexpr int khIndex = isNHWC ? 0 : 2;
+    constexpr int kwIndex = isNHWC ? 1 : 3;
+    constexpr int khLoopIndex = isNHWC ? 4 : 5;
+    constexpr int kwLoopIndex = isNHWC ? 5 : 6;
 
     if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1)
       return failure();
 
-    // TODO(ataei): Support conversion to linalg.batch_matmul.
-    if (inputShape[0] != 1)
-      return failure();
-
-    if (!llvm::all_of(convOp.getStrides(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
-    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
-
-    auto combineDims = [](int64_t a, int64_t b) {
-      if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b))
-        return ShapedType::kDynamic;
-      return a * b;
-    };
-
-    SmallVector<ReassociationIndices> reassociationInputOutputIndices;
-    SmallVector<ReassociationIndices> reassociationFilterIndices;
-    SmallVector<int64_t> reshapedInputShape(2, 0);
-    SmallVector<int64_t> reshapedFilterShape(2, 0);
-    SmallVector<int64_t> reshapedOutputShape(2, 0);
-    if (isNHWC) {
-      // Generate reassociation indices.
-      reassociationInputOutputIndices = {{nIndex, ohIndex, owIndex}, {ocIndex}};
-      reassociationFilterIndices = {{khIndex, kwIndex, kcIndex}, {kfIndex}};
-
-      // Generate matmul shapes from 1x1 conv.
-      reshapedInputShape = {
-          combineDims(inputShape[ohIndex], inputShape[owIndex]),
-          inputShape[ocIndex]};
-      reshapedFilterShape = {filterShape[kcIndex], filterShape[kfIndex]};
-      reshapedOutputShape = {
-          combineDims(outputShape[ohIndex], outputShape[owIndex]),
-          outputShape[ocIndex]};
-    } else if (isNCHW) {
-      // Generate reassociation indices.
-      reassociationInputOutputIndices = {{nIndex, ocIndex}, {ohIndex, owIndex}};
-      reassociationFilterIndices = {{kfIndex}, {kcIndex, khIndex, kwIndex}};
-
-      // Generate matmul shapes from 1x1 conv.
-      reshapedInputShape = {
-          inputShape[ocIndex],
-          combineDims(inputShape[ohIndex], inputShape[owIndex])};
-      reshapedFilterShape = {filterShape[kfIndex], filterShape[kcIndex]};
-      reshapedOutputShape = {
-          outputShape[ocIndex],
-          combineDims(outputShape[ohIndex], outputShape[owIndex])};
+    SmallVector<AffineExpr> dimReplacements;
+    for (int i = 0; i < numLoops; i++) {
+      if (llvm::is_contained({khLoopIndex, kwLoopIndex}, i)) {
+        dimReplacements.push_back(
+            getAffineConstantExpr(0, rewriter.getContext()));
+      } else {
+        dimReplacements.push_back(getAffineDimExpr(i, rewriter.getContext()));
+      }
     }
 
-    auto reshapedInputType = RankedTensorType::get(
-        reshapedInputShape, inputShapeType.getElementType());
+    SmallVector<AffineMap> newMaps = convOp.getIndexingMapsArray();
+    AffineMap inputMap = newMaps[0];
+    SmallVector<AffineExpr> newExprs =
+        llvm::map_to_vector(inputMap.getResults(), [&](AffineExpr resultExpr) {
+          return resultExpr.replaceDims(dimReplacements);
+        });
+    newMaps[0] = AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
+                                newExprs, rewriter.getContext());
 
-    auto reshapedFilterType = RankedTensorType::get(
-        reshapedFilterShape, filterShapeType.getElementType());
-
-    auto reshapedOutputType = RankedTensorType::get(
-        reshapedOutputShape, outputShapeType.getElementType());
-
-    Value input = convOp.getDpsInputOperand(0)->get();
-    Value filter = convOp.getDpsInputOperand(1)->get();
-    Value output = convOp.getDpsInitOperand(0)->get();
-    auto loc = convOp.getLoc();
-
-    Value reshapedInput = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedInputType, input, reassociationInputOutputIndices);
-    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterType, filter, reassociationFilterIndices);
-    Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedOutputType, output, reassociationInputOutputIndices);
-
-    SmallVector<Value, 2> matmulInput;
-    if (isNHWC) {
-      matmulInput = {reshapedInput, reshapedFilter};
-    } else if (isNCHW) {
-      matmulInput = {reshapedFilter, reshapedInput};
-    }
-    auto matmulResult = rewriter.create<linalg::MatmulOp>(
-        loc, reshapedOutputType, matmulInput, ArrayRef<Value>{reshapedOutput});
-
-    auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
-        loc, outputShapeType, matmulResult.getResults()[0],
-        reassociationInputOutputIndices);
-
-    rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
-
+    auto genericOp = linalg::generalizeNamedOp(rewriter, convOp).value();
+    genericOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(newMaps));
     return success();
   }
 };
