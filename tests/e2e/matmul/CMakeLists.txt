@@ -927,6 +927,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=small"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -948,6 +949,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=small"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -969,6 +971,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=LLVMGPUMatmulSimt"
   TEST_RUNNER
@@ -994,6 +997,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=LLVMGPUMatmulTensorCore"
   TEST_RUNNER
@@ -1021,6 +1025,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1046,6 +1051,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1071,6 +1077,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TEST_RUNNER
@@ -1098,6 +1105,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=LLVMGPUMatmulTensorCore"
   TEST_RUNNER
@@ -1125,6 +1133,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
   TEST_RUNNER
@@ -1152,6 +1161,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1177,6 +1187,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
@@ -1201,6 +1212,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
@@ -1225,6 +1237,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
@@ -1249,6 +1262,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
@@ -1273,6 +1287,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
@@ -1297,6 +1312,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
@@ -1321,6 +1337,7 @@ iree_generated_e2e_runner_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
+    "--acc_type=f32"
     "--shapes=easy_large_static"
     "--compilation_info=SPIRVCooperativeMatrixVectorize"
   TEST_RUNNER
