@@ -27,8 +27,11 @@ class MatrixElemTypeId(enum.Enum):
     I32 = "i32"
     F32 = "f32"
     F16 = "f16"
-    F8E4M3FNUZ = "f8E4M3FNUZ"
     BF16 = "bf16"
+    F8E5M2 = "f8E5M2"
+    F8E4M3 = "f8E4M3"
+    F8E5M2FNUZ = "f8E5M2FNUZ"
+    F8E4M3FNUZ = "f8E4M3FNUZ"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -905,7 +908,17 @@ def parse_arguments():
     parser.add_argument(
         "--lhs_rhs_type",
         type=str,
-        choices=["i32", "i8", "f32", "f16", "f8E4M3FNUZ", "bf16"],
+        choices=[
+            "i32",
+            "i8",
+            "f32",
+            "f16",
+            "bf16",
+            "f8E5M2",
+            "f8E4M3",
+            "f8E5M2FNUZ",
+            "f8E4M3FNUZ",
+        ],
         help="Numeric type of input matrices",
         required=True,
     )
@@ -999,6 +1012,12 @@ def write_calls_file(functions, calls, filename, requirements):
 def infer_acc_type(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId):
     if acc_type != MatrixElemTypeId.NONE:
         return acc_type
+    if lhs_rhs_type == MatrixElemTypeId.F8E5M2:
+        return MatrixElemTypeId.F32
+    if lhs_rhs_type == MatrixElemTypeId.F8E4M3:
+        return MatrixElemTypeId.F32
+    if lhs_rhs_type == MatrixElemTypeId.F8E5M2FNUZ:
+        return MatrixElemTypeId.F32
     if lhs_rhs_type == MatrixElemTypeId.F8E4M3FNUZ:
         return MatrixElemTypeId.F32
     if lhs_rhs_type == MatrixElemTypeId.I8:

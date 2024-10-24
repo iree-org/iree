@@ -128,6 +128,29 @@ static void reference_matmul_bf16_bf16_f32_f32(
   result_data[n + m * n_size] = acc;
 }
 
+#define REFERENCE_MATMUL_F8(LHSTYPE, RHSTYPE)                                  \
+  static void reference_matmul_##LHSTYPE##_##RHSTYPE##_f32_f32(                \
+      iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,     \
+      iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,      \
+      iree_hal_element_type_t acc_type, bool transpose_rhs,                    \
+      const uint8_t* lhs_data, const uint8_t* rhs_data, const float* acc_data, \
+      float* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {                \
+    float acc = acc_data ? acc_data[n + m * n_size] : 0;                       \
+    for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
+      float lhs_float =                                                        \
+          iree_math_##LHSTYPE##_to_f32(lhs_data[k + m * k_size]);              \
+      float rhs_float = iree_math_##RHSTYPE##_to_f32(                          \
+          rhs_data[transpose_rhs ? k + n * k_size : n + k * n_size]);          \
+      acc += lhs_float * rhs_float;                                            \
+    }                                                                          \
+    result_data[n + m * n_size] = acc;                                         \
+  }
+
+REFERENCE_MATMUL_F8(f8e5m2, f8e5m2)
+REFERENCE_MATMUL_F8(f8e4m3, f8e4m3)
+REFERENCE_MATMUL_F8(f8e5m2fnuz, f8e5m2fnuz)
+REFERENCE_MATMUL_F8(f8e4m3fnuz, f8e4m3fnuz)
+
 // Helper for reference_matmul.
 // Computes one element in the result matrix.
 static iree_status_t reference_matmul_element(
@@ -184,6 +207,34 @@ static iree_status_t reference_matmul_element(
     reference_matmul_bf16_bf16_f32_f32(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f8e5m2_f8e5m2_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f8e4m3_f8e4m3_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f8e5m2fnuz_f8e5m2fnuz_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f8e4m3fnuz_f8e4m3fnuz_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const uint8_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
