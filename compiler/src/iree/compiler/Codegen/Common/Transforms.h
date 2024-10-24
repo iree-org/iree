@@ -25,7 +25,7 @@ using IGEMMControlFn = std::function<bool(Operation *)>;
 /// Converts conv_2d ops into linalg_ext.im2col + matmul, and sets a lowering
 /// configuration on the matmul.
 LogicalResult convertToIGEMMAndSetConfig(
-    MLIRContext *context, FunctionOpInterface funcOp,
+    FunctionOpInterface funcOp,
     std::optional<IGEMMConfigFn> configFn = std::nullopt,
     std::optional<IGEMMControlFn> controlFn = std::nullopt);
 

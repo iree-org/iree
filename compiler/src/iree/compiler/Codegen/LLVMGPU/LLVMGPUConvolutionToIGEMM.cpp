@@ -56,8 +56,8 @@ struct LLVMGPUConvolutionToIGEMMPass final
 };
 
 void LLVMGPUConvolutionToIGEMMPass::runOnOperation() {
-  if (failed(convertToIGEMMAndSetConfig(&getContext(), getOperation(),
-                                        llvmgpuConfigFn, llvmgpuControlFn))) {
+  if (failed(convertToIGEMMAndSetConfig(getOperation(), llvmgpuConfigFn,
+                                        llvmgpuControlFn))) {
     return signalPassFailure();
   }
 }

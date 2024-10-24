@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -79,8 +80,8 @@ class ConvolutionToIGEMMPass final
 public:
   using ConvolutionToIGEMMPassBase::ConvolutionToIGEMMPassBase;
 
-  explicit ConvolutionToIGEMMPass(std::optional<IGEMMConfigFn> configFn,
-                                  std::optional<IGEMMControlFn> controlFn)
+  ConvolutionToIGEMMPass(std::optional<IGEMMConfigFn> configFn,
+                         std::optional<IGEMMControlFn> controlFn)
       : configFn(configFn), controlFn(controlFn) {}
 
   void runOnOperation() override;
@@ -93,10 +94,11 @@ private:
 } // namespace
 
 LogicalResult
-convertToIGEMMAndSetConfig(MLIRContext *context, FunctionOpInterface funcOp,
+convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
                            std::optional<IGEMMConfigFn> configFn,
                            std::optional<IGEMMControlFn> controlFn) {
   // Rewrite convolutions into a im2col and GEMM.
+  MLIRContext *context = funcOp->getContext();
   {
     RewritePatternSet patterns(context);
     iree_compiler::IREE::LinalgExt::populateConv2DToIm2colOpPatterns(patterns,
@@ -156,7 +158,7 @@ convertToIGEMMAndSetConfig(MLIRContext *context, FunctionOpInterface funcOp,
 }
 
 void ConvolutionToIGEMMPass::runOnOperation() {
-  if (failed(convertToIGEMMAndSetConfig(&getContext(), getOperation()))) {
+  if (failed(convertToIGEMMAndSetConfig(getOperation()))) {
     return signalPassFailure();
   }
 }
