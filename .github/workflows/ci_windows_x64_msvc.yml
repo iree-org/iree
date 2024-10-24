@@ -30,10 +30,10 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           submodules: true
-      #- name: "Clean up build dir"
-      #  run: | 
-      #    Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
-      #    mkdir "C:\mnt\azure\build-windows"
+      - name: "Clean up build dir"
+        run: |
+          if (Test-Path -Path "C:\mnt\azure\build-windows") {Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force}
+          mkdir "C:\mnt\azure\build-windows"
       - name: "Setting up Python"
         uses: actions/setup-python@v4
         with:
@@ -43,13 +43,10 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-          python3 -m pip install --upgrade certifi
-          python3 -m certifi
-          type "C:\home\runner\_work\_tool\Python\3.10.11\x64\lib\site-packages\certifi\cacert.pem"
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Installing MSVC requirements"
-        run: |
+        run: | # TODO: Find a way to move this into the dockerfile
           choco install visualstudio2022buildtools -y
           choco install visualstudio2022community --package-parameters "--add Microsoft.VisualStudio.Workload.CoreEditor --add Microsoft.VisualStudio.Workload.ManagedDesktop --add Microsoft.VisualStudio.Workload.DesktopDevelopmentWithC++" -y
           choco install visualstudio2022-workload-nativedesktop -y
@@ -59,22 +56,11 @@ jobs:
         run: |
           choco install cmake
           choco install ninja
-          choco install Ninja
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
-      - name: "Install Bash"
-        run: |
-          $gitPath = "C:\Program Files\Git\bin"
-          $env:PATH += ";C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin"
-          [System.Environment]::GetEnvironmentVariable("PATH", "Process")
-          Test-Path -Path "C:/Program Files/Git/bin/bash.exe"
-      - name: Add Bash to PATH
-        run: |
-          echo "Adding Bash to PATH"
-          echo "C:\Program Files\Git\bin" >> $Env:GITHUB_PATH
-      #- name: "Building Iree"
-      #  run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
+      - name: "Building Iree"
+        run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "/c/mnt/azure/build-windows"
-      #- name: "Clean up build dir"
-      #  run: Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
+      - name: "Clean up build dir"
+        run: Remove-Item -Path "C:\mnt\azure\build-windows" -Recurse -Force
