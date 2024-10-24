@@ -45,6 +45,8 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
+      - name: "Mark git safe.directory"
+        run: git config --global --add safe.directory /__w/iree/iree
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: CMake - configure
