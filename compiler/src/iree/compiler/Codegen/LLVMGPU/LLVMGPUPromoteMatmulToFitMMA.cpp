@@ -32,14 +32,13 @@ public:
   }
 
   void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
-                        ArrayRef<int64_t> paddingDims,
                         ArrayRef<int64_t> padToMultipleOf) const {
-    assert(paddingDims.size() == padToMultipleOf.size() &&
-           "invalid pad multiples for padding dimensions");
-
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
+
+    SmallVector<int64_t> paddingDims =
+        llvm::to_vector(llvm::seq<int64_t>(padToMultipleOf.size()));
 
     SmallVector<Attribute> paddingValueAttributes;
     for (auto &operand : op->getOpOperands()) {
@@ -94,7 +93,7 @@ public:
       SmallVector<int64_t> paddingDimensions =
           llvm::to_vector(llvm::seq<int64_t>(op.getNumLoops()));
 
-      padWithZeroValue(rewriter, op, paddingDimensions, padToMultipleOf);
+      padWithZeroValue(rewriter, op, padToMultipleOf);
     }
 
     {
