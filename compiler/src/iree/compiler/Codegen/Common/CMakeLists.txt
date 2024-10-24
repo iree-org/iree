@@ -72,11 +72,13 @@ iree_cc_library(
     "ExtractAddressComputation.h"
     "PassUtils.h"
     "Passes.h"
+    "TensorDynamicDimAnalysis.h"
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
     "AddFastMathFlags.cpp"
+    "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
@@ -128,6 +130,7 @@ iree_cc_library(
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
     "SplitFullPartialTransferPass.cpp"
+    "TensorDynamicDimAnalysis.cpp"
     "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
@@ -154,6 +157,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRFunctionInterfaces
@@ -203,6 +207,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

@@ -21,6 +21,7 @@ iree_lit_test_suite(
             "add_fmfs.mlir",
             "affinemin_canonicalization.mlir",
             "batch_matmuls.mlir",
+            "block_dynamic_dims.mlir",
             "bubble_up_ordinal_ops.mlir",
             "bufferize_copy_only_dispatches.mlir",
             "canonicalize_interface_load_store.mlir",
