@@ -31,6 +31,7 @@ using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
 /// Pattern to set a lowering configuration on an IGEMM convolution. Searches
 /// for a contraction with a linalg_ext.im2col producer, and calls the configFn
 /// to set the configuration.
+/// TODO(Max191): Use a funcOp walk instead of a pattern for this.
 struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
