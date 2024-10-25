@@ -9,7 +9,7 @@
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/bytecode/module_size_benchmark_module_c.h"
 
-extern "C" int main(int argc, char** argv) {
+int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;
   iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                           iree_allocator_system(), &instance);
