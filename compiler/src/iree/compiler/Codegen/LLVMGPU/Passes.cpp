@@ -75,11 +75,6 @@ static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
-static llvm::cl::opt<bool>
-    clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
-                      llvm::cl::desc("Enable implicit gemm for convolutions."),
-                      llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -328,6 +323,12 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+}
+
+void addGPUIGEMMTileAndFusePassPipeline(
+    OpPassManager &funcPassManager, const GPUPipelineOptions &pipelineOptions) {
+  funcPassManager.addPass(createConvolutionToIGEMMPass());
+  addGPUTileAndFusePassPipeline(funcPassManager, pipelineOptions);
 }
 
 /// Control function for decomposing pack and unpack ops. Returns true if the
@@ -1175,8 +1176,6 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm,
-                                      createLLVMGPUConvolutionToIGEMMPass);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
@@ -1248,8 +1247,6 @@ static void buildROCDLCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPredicatedPass(clLLVMGPUUseIgemm,
-                                      createLLVMGPUConvolutionToIGEMMPass);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
   }

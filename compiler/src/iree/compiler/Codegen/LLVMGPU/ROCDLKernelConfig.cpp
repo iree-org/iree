@@ -281,6 +281,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                                      linalgOp))) {
       return success();
     }
+    if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
+            target, entryPointFn, computeOp))) {
+      return success();
+    }
     if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       return success();
     }
@@ -345,7 +349,10 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     // Currently ROCDL requires propagation of user lowering configs for
     // all pipelines except TileAndFuse.
     if (translationInfo.getDispatchLoweringPassPipeline() !=
-        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse &&
+        translationInfo.getDispatchLoweringPassPipeline() !=
+            IREE::Codegen::DispatchLoweringPassPipeline::
+                LLVMGPUIGEMMTileAndFuse) {
       for (auto op : computeOps) {
         if (getLoweringConfig(op)) {
           propagateLoweringConfig(op, computeOps);
@@ -396,7 +403,10 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     return failure();
 
   if (getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse &&
+      getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
+          IREE::Codegen::DispatchLoweringPassPipeline::
+              LLVMGPUIGEMMTileAndFuse) {
     propagateLoweringConfig(rootOp, computeOps);
   }
   return success();

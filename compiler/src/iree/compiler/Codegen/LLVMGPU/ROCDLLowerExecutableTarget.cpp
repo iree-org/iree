@@ -73,6 +73,9 @@ public:
     case CodeGenPipeline::LLVMGPUTileAndFuse:
       addGPUTileAndFusePassPipeline(pipeline, pipelineOptions);
       break;
+    case CodeGenPipeline::LLVMGPUIGEMMTileAndFuse:
+      addGPUIGEMMTileAndFusePassPipeline(pipeline, pipelineOptions);
+      break;
     // If no pipeline specified, then nothing to do.
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
       return;

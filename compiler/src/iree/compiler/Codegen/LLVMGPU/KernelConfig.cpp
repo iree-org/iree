@@ -86,6 +86,10 @@ static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+    clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
+                      llvm::cl::desc("Enable implicit gemm for convolutions."),
+                      llvm::cl::init(false));
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -114,6 +118,7 @@ static bool needsLoweringConfigPropagation(
   using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
   // Pipelines that do not need propagation of lowering config.
   Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
+                                   Pipeline::LLVMGPUIGEMMTileAndFuse,
                                    Pipeline::LLVMGPUVectorDistribute,
                                    Pipeline::LLVMGPUPadAndVectorDistribute};
   return !llvm::is_contained(supportedPipelines, pipeline);
@@ -2017,6 +2022,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
                                                      computeOp))) {
       LDBG("Tile and fuse matmul config");
+      return success();
+    }
+  }
+  if (clLLVMGPUUseIgemm) {
+    if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
+            target, entryPointFn, computeOp))) {
+      LDBG("Tile and fuse IGEMM config");
       return success();
     }
   }
