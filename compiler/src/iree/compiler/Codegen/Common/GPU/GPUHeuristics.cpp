@@ -60,10 +60,10 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
   return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
 }
 
-// Check that a GPUMMASchedule fits alignment restrictions. To be aligned,
-// the problem must be evenly divisible by the number of elements in the
-// schedule for each dimension. If `mustBeAligned` is false, then the innermost
-// problem dimension is allowed to be unaligned .
+/// Check that a GPUMMASchedule fits alignment restrictions. To be aligned,
+/// the problem must be evenly divisible by the number of elements in the
+/// schedule for each dimension. If `mustBeAligned` is false, then the innermost
+/// problem dimension is allowed to be unaligned .
 static bool isScheduleAligned(const GPUMatmulShapeType &problem,
                               const GPUMMASchedule &schedule,
                               bool mustBeAligned) {
@@ -116,11 +116,11 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
   return isValidM && isValidN && isValidK;
 }
 
-// Returns whether or not a GPUMMASchedule is valid for the given problem.
-// This checks that:
-//  - The problem is aligned to the schedule
-//  - the number of threads in the schedule workgroup can be distributed
-//    to a corresponding vector.transfer read in VectorDistribute.
+/// Returns whether or not a GPUMMASchedule is valid for the given problem.
+/// This checks that:
+///  - The problem is aligned to the schedule
+///  - the number of threads in the schedule workgroup can be distributed
+///    to a corresponding vector.transfer read in VectorDistribute.
 static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
                                const GPUMMASchedule &schedule,
                                bool mustBeAligned, int64_t subgroupSize,
@@ -152,10 +152,10 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   return isAligned && isDistributableLhs && isDistributableRhs;
 }
 
-// Tries to fit the schedule into shared memory by decrementing the size of the
-// schedule dimensions in descending order until a valid schedule is found.
-/// The schedule sizes are reduced in the order of mTileSizes, nTileSizes,
-/// kTileSizes, mSubgroupCounts, nSubgroupCounts.
+/// Tries to fit the schedule into shared memory by decrementing the size of the
+/// schedule dimensions from outermost to innermost until a valid schedule is
+/// found. The schedule sizes are reduced in the order of mTileSizes,
+/// nTileSizes, kTileSizes, mSubgroupCounts, nSubgroupCounts.
 static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     GPUMatmulShapeType intrinsic, GPUMMASchedule schedule,
     llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
@@ -167,12 +167,12 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
       llvm::dbgs() << "Shrinking schedule...\n";
     });
 
-    auto decrementIfPossible = [](SmallVector<int64_t> &c) -> LogicalResult {
-      for (int i = 0; i < c.size(); ++i) {
-        if (c[i] <= 1) {
+    auto decrementIfPossible =
+        [](SmallVector<int64_t> &sizes) -> LogicalResult {
+      for (int64_t &size : sizes) {
+        if (size <= 1)
           continue;
-        }
-        --c[i];
+        --size;
         return success();
       }
       return failure();

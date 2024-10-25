@@ -884,6 +884,11 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   Type lhsElem = getElementType(lhs);
   Type rhsElem = getElementType(rhs);
   Type initElem = getElementType(init);
+  // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
+  // once the pipeline is able to support it. After adding multiple dimensions,
+  // all instances of schedule->m/nSubgroupCounts[0] and
+  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
+  // just the first element.
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
   SmallVector<GPUMatmulShapeType> intrinsics;

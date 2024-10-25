@@ -301,6 +301,11 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
+  // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
+  // once the pipeline is able to support it. After adding multiple dimensions,
+  // all instances of schedule->m/nSubgroupCounts[0] and
+  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
+  // just the first element.
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
@@ -490,6 +495,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
   }
 
+  // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
+  // once the pipeline is able to support it. After adding multiple dimensions,
+  // all instances of schedule->m/nSubgroupCounts[0] and
+  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
+  // just the first element.
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
@@ -574,13 +584,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
-                           << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileSizes[0] << ", "
-                                 << schedule->nTileSizes[0] << ", "
-                                 << schedule->kTileSizes[0] << "]");
-  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
-                                 << schedule->nSubgroupCounts[0] << "]");
+  LDBG("Schedule: " << schedule);
 
   std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            targetSubgroupSize,
@@ -780,13 +784,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
-                           << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileSizes[0] << ", "
-                                 << schedule->nTileSizes[0] << ", "
-                                 << schedule->kTileSizes[0] << "]");
-  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts[0] << ", "
-                                 << schedule->nSubgroupCounts[0] << "]");
+  LDBG("Schedule: " << schedule);
 
   std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
                                            targetSubgroupSize,

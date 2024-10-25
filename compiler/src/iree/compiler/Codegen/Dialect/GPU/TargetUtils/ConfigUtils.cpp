@@ -31,15 +31,6 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 
-template <typename T>
-static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const llvm::SmallVectorImpl<T> &vector) {
-  os << "[";
-  llvm::interleaveComma(vector, os);
-  os << "]";
-  return os;
-}
-
 LogicalResult
 setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPoint,
@@ -243,13 +234,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   }
 
   LDBG("Target Subgroup size: " << targetSubgroupSize);
-  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
-                           << schedule->kSize << "]");
-  LDBG("Schedule: tile counts [" << schedule->mTileSizes << ", "
-                                 << schedule->nTileSizes << ", "
-                                 << schedule->kTileSizes << "]");
-  LDBG("Schedule: warp counts [" << schedule->mSubgroupCounts << ", "
-                                 << schedule->nSubgroupCounts << "]");
+  LDBG("Schedule: " << schedule);
 
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
