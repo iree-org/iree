@@ -305,7 +305,7 @@ public:
         }
 
         if (!llvm::all_of(producer.getIndexingMapsArray(),
-                      [](AffineMap map) { return map.isIdentity(); }))
+                          [](AffineMap map) { return map.isIdentity(); }))
           return false;
 
         std::optional<CastOpInterface> castOp =
