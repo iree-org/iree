@@ -15,7 +15,16 @@
 
 namespace mlir::iree_compiler {
 
+llvm::cl::opt<bool>
+    clEnableI1Support("iree-enable-i1",
+                      llvm::cl::desc("enable i1 data type codegen"),
+                      llvm::cl::init(false));
+
 bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
+  // Enable i1 support if requested.
+  if (clEnableI1Support) {
+    return bitWidth == 1;
+  }
   // Require the original bit width to be some power of two for now to avoid
   // trickiness and weirdness of packing and cross-byte access.
   // Also disallow boolean values for now--they may require separate interface
@@ -97,6 +106,11 @@ Value calculateStorageElementCountInBytes(Location loc,
     for (auto k : cDims->k) {
       pad(k, roundDimsTo[2]);
     }
+  }
+
+  // make sure the last dimension is byte aligned.
+  if (needToPackSubByteElementBitWidth(elementBits)) {
+    paddedShape.back() = llvm::alignTo(paddedShape.back(), 8 / elementBits);
   }
 
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {

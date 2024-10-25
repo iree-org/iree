@@ -229,7 +229,8 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         Value maskVal = args[0];
 
         // TODO: Replace bool mask condition once treated as i1 (instead of i8)
-        if (maskVal.getType().isInteger()) {
+        auto maskValType = maskVal.getType();
+        if (maskValType.isInteger() && !maskValType.isInteger(1)) {
           maskVal =
               b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
           maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
