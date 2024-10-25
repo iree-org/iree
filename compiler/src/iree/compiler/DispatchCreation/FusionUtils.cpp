@@ -75,7 +75,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
 
   // Do not fuse truncate-like with consumer, they should be fused with their
   // producer.
-  if (LinalgExt::isBitTruncateOp(producerOp)) {
+  if (IREE::LinalgExt::isBitTruncateOp(producerOp)) {
     return false;
   }
 
