@@ -33,4 +33,4 @@ func.func public @set_lowering_config(%arg0: tensor<1x34x34x128xf32>, %arg1: ten
 // CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<
 // CHECK-SAME:         {mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
 // CHECK-SAME:          promote_operands = [0, 1], reduction = [0, 0, 0, 0, 8],
-// CHECK-SAME:          subgroup = [0, 0, 2, 2, 0], workgroup = [1, 1, 32, 128, 0]}>
+// CHECK-SAME:          subgroup = [0, 0, 2, 2, 0], workgroup = [1, 1, 2, 8, 0]}>
