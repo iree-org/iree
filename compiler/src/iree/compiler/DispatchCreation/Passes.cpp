@@ -49,10 +49,10 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
 
 static llvm::cl::opt<int> clPadFactor(
     "iree-dispatch-creation-pad-factor",
-    llvm::cl::desc(
-        "Provides padding size hints that will be attached to "
-        "encodings. This only affects the experimental data tiling "
-        "path in Flow with iree-dispatch-creation-experimental-data-tiling."),
+    llvm::cl::desc("Provides padding size hints that will be attached to "
+                   "encodings. This only affects the experimental data tiling "
+                   "path in DispatchCreation with "
+                   "iree-dispatch-creation-experimental-data-tiling."),
     llvm::cl::init(32));
 
 static llvm::cl::opt<bool> clEnablePadHandling(
@@ -337,14 +337,14 @@ void registerDispatchCreationPasses() {
 }
 
 void registerDispatchCreationPipelines() {
-  PassPipelineRegistration<TransformOptions> flowDispatchRegionCreationPipeline(
+  PassPipelineRegistration<TransformOptions> dispatchCreationPipeline(
       "iree-dispatch-creation-pipeline",
       "Flag used to run passes that form dispatch regions",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
         buildDispatchCreationPassPipeline(passManager, transformOptions);
       });
 
-  PassPipelineRegistration<> flowDispatchRegionFormationPreprocessingPipeline(
+  PassPipelineRegistration<> dispatchCreationPreprocessingPipeline(
       "iree-dispatch-creation-preprocessing-pipeline",
       "Flag used to run preprocessing passes that run passes before dispatch "
       "region formation. Used only for testing",
