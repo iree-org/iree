@@ -26,9 +26,10 @@ typedef struct iree_hal_hip_semaphore_t {
   // The timepoint pool to acquire timepoint objects.
   iree_hal_hip_timepoint_pool_t* timepoint_pool;
 
-  // The list of actions that this semaphore may need to advance on
-  // new signaled values.
-  iree_hal_deferred_work_queue_t* work_queue;
+  // Callback and user data to ask the device to issue
+  // additional work to the work queue(s).
+  iree_hal_hip_devent_issue_work_cb issue_work_cb;
+  void* issue_work_user_data;
 
   // Guards value and status. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
@@ -57,11 +58,11 @@ static iree_hal_hip_semaphore_t* iree_hal_hip_semaphore_cast(
 iree_status_t iree_hal_hip_event_semaphore_create(
     uint64_t initial_value, const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_timepoint_pool_t* timepoint_pool,
-    iree_hal_deferred_work_queue_t* work_queue, iree_allocator_t host_allocator,
-    iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_hip_devent_issue_work_cb issue_work_cb, void* issue_work_user_data,
+    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
-  IREE_ASSERT_ARGUMENT(work_queue);
+  IREE_ASSERT_ARGUMENT(issue_work_cb);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -75,7 +76,8 @@ iree_status_t iree_hal_hip_event_semaphore_create(
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
   semaphore->timepoint_pool = timepoint_pool;
-  semaphore->work_queue = work_queue;
+  semaphore->issue_work_cb = issue_work_cb;
+  semaphore->issue_work_user_data = issue_work_user_data;
   iree_slim_mutex_initialize(&semaphore->mutex);
   semaphore->current_value = initial_value;
   semaphore->failure_status = iree_ok_status();
@@ -152,7 +154,7 @@ static iree_status_t iree_hal_hip_semaphore_signal(
   // Advance the deferred work queue if possible. This also must happen
   // outside the lock to avoid nesting.
   iree_status_t status =
-      iree_hal_deferred_work_queue_issue(semaphore->work_queue);
+      (*semaphore->issue_work_cb)(semaphore->issue_work_user_data);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -190,7 +192,7 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
   // Advance the deferred work queue if possible. This also must happen
   // outside the lock to avoid nesting.
-  status = iree_hal_deferred_work_queue_issue(semaphore->work_queue);
+  status = (*semaphore->issue_work_cb)(semaphore->issue_work_user_data);
   iree_status_ignore(status);
 
   IREE_TRACE_ZONE_END(z0);
@@ -473,7 +475,7 @@ static iree_status_t iree_hal_hip_semaphore_timepoint_device_signal_callback(
 // device.
 iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
-    hipEvent_t* out_event) {
+    uint64_t device_index, hipEvent_t* out_event) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   iree_hal_hip_timepoint_t* signal_timepoint = NULL;
@@ -481,7 +483,7 @@ iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_signal(
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_hip_timepoint_pool_acquire_device_signal(
-              semaphore->timepoint_pool, 1, &signal_timepoint));
+              semaphore->timepoint_pool, device_index, 1, &signal_timepoint));
 
   // Initialize the timepoint with the value and callback, and connect it to
   // this semaphore.
@@ -527,45 +529,6 @@ static iree_status_t iree_hal_hip_semaphore_timepoint_device_wait_callback(
   // Just release the timepoint back to the pool. This will decrease the
   // reference count of the underlying HIP event internally.
   iree_hal_hip_timepoint_pool_release(timepoint->pool, 1, &timepoint);
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-// Acquires a timepoint to wait the timeline to reach at least the given
-// |min_value| on the device.
-iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_wait(
-    iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
-    hipEvent_t* out_event) {
-  iree_hal_hip_semaphore_t* semaphore =
-      iree_hal_hip_semaphore_cast(base_semaphore);
-  iree_hal_hip_timepoint_t* wait_timepoint = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_timepoint_pool_acquire_device_wait(
-              semaphore->timepoint_pool, 1, &wait_timepoint));
-
-  // Initialize the timepoint with the value and callback, and connect it to
-  // this semaphore.
-  iree_hal_semaphore_acquire_timepoint(
-      &semaphore->base, min_value, iree_infinite_timeout(),
-      (iree_hal_semaphore_callback_t){
-          .fn = iree_hal_hip_semaphore_timepoint_device_wait_callback,
-          .user_data = wait_timepoint,
-      },
-      &wait_timepoint->base);
-
-  iree_hal_hip_event_t* wait_event = NULL;
-  if (iree_hal_hip_semaphore_acquire_event_host_wait(&semaphore->base,
-                                                     min_value, &wait_event)) {
-    // We've found an existing signal timepoint to wait on; we don't need a
-    // standalone wait timepoint anymore. Decrease its refcount before
-    // overwriting it to return it back to the pool and retain the existing one.
-    iree_hal_hip_event_release(wait_timepoint->timepoint.device_wait);
-    wait_timepoint->timepoint.device_wait = wait_event;
-  }
-
-  *out_event = iree_hal_hip_event_handle(wait_timepoint->timepoint.device_wait);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

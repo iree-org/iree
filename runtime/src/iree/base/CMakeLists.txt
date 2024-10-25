@@ -149,6 +149,34 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+
+iree_cc_library(
+  NAME
+    indexable_deque
+  HDRS
+    "indexable_deque.h"
+  SRCS
+    "indexable_deque.c"
+  DEPS
+    ::base
+    iree::base::internal
+    iree::base::internal::wait_handle
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    indexable_deque_test
+  SRCS
+    "indexable_deque_test.cc"
+  DEPS
+    ::base
+    ::indexable_deque
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+
 if(EMSCRIPTEN)
   iree_cc_library(
     NAME

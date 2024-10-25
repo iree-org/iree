@@ -37,7 +37,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      "semaphore_submission"  # SubmitWithWait hangs (requires async)
+      "semaphore_submission",  # SubmitWithWait hangs (requires async)
+      ${IREE_DEVICE_GROUP_CTS_TESTS} # Device groups not supported yet
     LABELS
       driver=local-sync
     COMPILER_FLAGS
@@ -64,7 +65,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      "semaphore_submission"  # SubmitWithWait hangs (requires async)
+      "semaphore_submission",  # SubmitWithWait hangs (requires async)
+      ${IREE_DEVICE_GROUP_CTS_TESTS} # Device groups not supported yet
     LABELS
       driver=local-sync
   )

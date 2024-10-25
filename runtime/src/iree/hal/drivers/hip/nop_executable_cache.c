@@ -22,7 +22,8 @@ typedef struct iree_hal_hip_nop_executable_cache_t {
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
-  hipDevice_t device;
+  uint32_t num_devices;
+  iree_hal_hip_per_device_information_t* device_infos;
 } iree_hal_hip_nop_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -37,7 +38,8 @@ iree_hal_hip_nop_executable_cache_cast(
 
 iree_status_t iree_hal_hip_nop_executable_cache_create(
     iree_string_view_t identifier,
-    const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
+    const iree_hal_hip_dynamic_symbols_t* symbols, uint32_t num_devices,
+    iree_hal_hip_per_device_information_t* devices,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(symbols);
@@ -54,8 +56,9 @@ iree_status_t iree_hal_hip_nop_executable_cache_create(
                                &executable_cache->resource);
   executable_cache->host_allocator = host_allocator;
   executable_cache->symbols = symbols;
-  executable_cache->device = device;
 
+  executable_cache->num_devices = num_devices;
+  executable_cache->device_infos = devices;
   *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
 
   IREE_TRACE_ZONE_END(z0);
@@ -89,7 +92,8 @@ static iree_status_t iree_hal_hip_nop_executable_cache_prepare_executable(
   iree_hal_hip_nop_executable_cache_t* executable_cache =
       iree_hal_hip_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_hip_native_executable_create(
-      executable_cache->symbols, executable_cache->device, executable_params,
+      executable_cache->symbols, executable_cache->num_devices,
+      executable_cache->device_infos, executable_params,
       executable_cache->host_allocator, out_executable);
 }
 

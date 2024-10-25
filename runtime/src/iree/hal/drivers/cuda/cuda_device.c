@@ -228,7 +228,7 @@ static iree_status_t
 iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
     iree_hal_command_buffer_mode_t mode, iree_hal_command_category_t categories,
-    iree_hal_command_buffer_t** out) {
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_command_buffer_t** out) {
   iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
       (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   return iree_hal_cuda_device_create_stream_command_buffer(
@@ -238,7 +238,8 @@ iree_hal_cuda_deferred_work_queue_device_interface_create_stream_command_buffer(
 static iree_status_t
 iree_hal_cuda_deferred_work_queue_device_interface_submit_command_buffer(
     iree_hal_deferred_work_queue_device_interface_t* base_device_interface,
-    iree_hal_command_buffer_t* command_buffer) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_queue_affinity_t queue_affinity) {
   iree_hal_cuda_deferred_work_queue_device_interface_t* device_interface =
       (iree_hal_cuda_deferred_work_queue_device_interface_t*)(base_device_interface);
   iree_status_t status = iree_ok_status();
@@ -1062,7 +1063,7 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
   iree_status_t status = iree_hal_deferred_work_queue_enqueue(
       device->work_queue, iree_hal_cuda_device_collect_tracing_context,
       device->tracing_context, wait_semaphore_list, signal_semaphore_list,
-      command_buffer_count, command_buffers, binding_tables);
+      command_buffer_count, command_buffers, binding_tables, queue_affinity);
   if (iree_status_is_ok(status)) {
     // Try to advance the deferred work queue.
     status = iree_hal_deferred_work_queue_issue(device->work_queue);

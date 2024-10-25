@@ -13,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/string_view.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -36,6 +37,17 @@ const char* get_test_executable_format();
 // Returns a file's executable data for the driver under test.
 // Leaf test binaries must implement this function.
 iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name);
+
+// Creates a default test device for the given driver under test.
+// Leaf test binaries must implement this function if it differs
+// from iree_hal_driver_create_default_device.
+iree_status_t create_default_test_device(iree_hal_driver_t* driver,
+                                         iree_allocator_t host_allocator,
+                                         iree_hal_device_t** out_device);
+
+// Returns the default queue afinity that should be used
+// for tests.
+iree_hal_queue_affinity_t get_default_submit_queue_affinity();
 
 enum class RecordingType {
   kDirect = 0,
@@ -91,10 +103,13 @@ class CTSTestResources {
   static iree_hal_driver_t* driver_;
   static iree_hal_device_t* device_;
   static iree_hal_allocator_t* device_allocator_;
+  static iree_hal_queue_affinity_t default_submit_affinity_;
 };
 /*static*/ iree_hal_driver_t* CTSTestResources::driver_ = NULL;
 /*static*/ iree_hal_device_t* CTSTestResources::device_ = NULL;
 /*static*/ iree_hal_allocator_t* CTSTestResources::device_allocator_ = NULL;
+/*static*/ iree_hal_queue_affinity_t
+    CTSTestResources::default_submit_affinity_ = 0;
 
 // Common setup for tests parameterized on driver names.
 template <typename BaseType = ::testing::Test>
@@ -120,14 +135,16 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     driver_ = driver;
 
     iree_hal_device_t* device = NULL;
-    status = iree_hal_driver_create_default_device(
-        driver_, iree_allocator_system(), &device);
+    status =
+        create_default_test_device(driver_, iree_allocator_system(), &device);
     if (iree_status_is_unavailable(status)) {
       iree_status_ignore(status);
       return;
     }
     IREE_CHECK_OK(status);
     device_ = device;
+
+    default_submit_affinity_ = get_default_submit_queue_affinity();
 
     device_allocator_ = iree_hal_device_allocator(device_);
     iree_hal_allocator_retain(device_allocator_);
@@ -149,6 +166,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
   }
 
   virtual void SetUp() {
+    IREE_TRACE_FRAME_MARK();
     if (!driver_) {
       GTEST_SKIP() << "Skipping test as '" << get_test_driver_name()
                    << "' driver is unavailable";
@@ -204,6 +222,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
+    params.queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_), params, buffer_size,
@@ -218,8 +237,10 @@ class CTSTestBase : public BaseType, public CTSTestResources {
   iree_status_t SubmitCommandBufferAndWait(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_binding_table_t binding_table =
-          iree_hal_buffer_binding_table_empty()) {
-    return SubmitCommandBuffersAndWait(1, &command_buffer, &binding_table);
+          iree_hal_buffer_binding_table_empty(),
+      iree_hal_queue_affinity_t affinity = default_submit_affinity_) {
+    return SubmitCommandBuffersAndWait(1, &command_buffer, &binding_table,
+                                       affinity);
   }
 
   // Submits |command_buffers| to the device and waits for them to complete
@@ -227,7 +248,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
   iree_status_t SubmitCommandBuffersAndWait(
       iree_host_size_t command_buffer_count,
       iree_hal_command_buffer_t** command_buffers,
-      const iree_hal_buffer_binding_table_t* binding_tables = nullptr) {
+      const iree_hal_buffer_binding_table_t* binding_tables = nullptr,
+      iree_hal_queue_affinity_t affinity = default_submit_affinity_) {
     // No wait semaphores.
     iree_hal_semaphore_list_t wait_semaphores = iree_hal_semaphore_list_empty();
 
@@ -243,9 +265,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     };
 
     iree_status_t status = iree_hal_device_queue_execute(
-        device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
-        signal_semaphores, command_buffer_count, command_buffers,
-        binding_tables);
+        device_, affinity, wait_semaphores, signal_semaphores,
+        command_buffer_count, command_buffers, binding_tables);
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout());
