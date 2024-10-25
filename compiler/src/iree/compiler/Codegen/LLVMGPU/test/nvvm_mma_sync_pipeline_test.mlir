@@ -79,7 +79,7 @@ hal.executable @mma_fused_fp16 {
 //          CHECK:   llvm.br
 //      CHECK-NOT:   nvvm.mma.sync
 //  CHECK-COUNT-4:   llvm.store {{.*}} : vector<2xf16>, !llvm.ptr<3>
-//          CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
+//          CHECK:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<16xf16>
 //          CHECK:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr
 
 // -----
