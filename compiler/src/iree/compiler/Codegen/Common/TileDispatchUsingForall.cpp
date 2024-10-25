@@ -202,13 +202,16 @@ static LogicalResult dropUnitDistributedDims(RewriterBase &rewriter,
   llvm::SmallDenseSet<int> droppedLoops;
   for (auto [index, lb, ub, step] :
        llvm::enumerate(mixedLbs, mixedUbs, mixedSteps)) {
-    if (!isa<Attribute>(lb) || !isa<Attribute>(ub) || !isa<Attribute>(step)) {
+
+    std::optional<int64_t> lbVal = getConstantIntValue(lb);
+    std::optional<int64_t> ubVal = getConstantIntValue(ub);
+    std::optional<int64_t> stepVal = getConstantIntValue(step);
+
+    if (!(lbVal && ubVal && stepVal)) {
       continue;
     }
-    int64_t lbVal = getConstantIntValue(lb).value();
-    int64_t ubVal = getConstantIntValue(ub).value();
-    int64_t stepVal = getConstantIntValue(step).value();
-    if (CEILDIV(ubVal - lbVal, stepVal) == 1) {
+
+    if (CEILDIV(ubVal.value() - lbVal.value(), stepVal.value()) == 1) {
       droppedLoops.insert(index);
     }
   }
