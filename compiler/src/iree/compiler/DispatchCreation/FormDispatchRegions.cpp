@@ -547,6 +547,14 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // TODO: Enable grouped convolution and depth wise pooling fusion.
+  // Rightnow, this is going through the default CPU pipeline and not through
+  // CONVTilingExpert.
+  if (isa<linalg::Conv2DNgchwFgchwOp, linalg::Conv2DNgchwGfchwOp,
+          linalg::PoolingNdhwcSumOp>(producer)) {
+    return false;
+  }
+
   auto producerFusionOp =
       dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(producer);
   auto consumerFusionOp =
