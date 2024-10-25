@@ -41,11 +41,25 @@ struct GPUDistributePass final
     int64_t subgroupSize = maybeSubgroupSize.value_or(kCudaWarpSize);
 
     rewriter.setInsertionPointToStart(&funcOp.front());
-    DiagnosedSilenceableFailure result =
-        mlir::transform::gpu::mapNestedForallToThreadsImpl(
-            rewriter, std::nullopt, funcOp, workgroupSize.value(), subgroupSize,
-            false);
-    if (!result.succeeded())
+
+    DiagnosedSilenceableFailure result = DiagnosedSilenceableFailure::success();
+    WalkResult walkResult = funcOp->walk([&](scf::ForallOp forallOp) {
+      bool hasWorkgroupMapping =
+          llvm::any_of(forallOp.getMapping().value(),
+                       llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>);
+      if (!hasWorkgroupMapping) {
+        result = mlir::transform::gpu::mapNestedForallToThreadsImpl(
+            rewriter, std::nullopt, forallOp, workgroupSize.value(),
+            subgroupSize, false);
+        if (result.isDefiniteFailure())
+          return WalkResult::interrupt();
+        if (result.succeeded())
+          return WalkResult::skip();
+      }
+      return WalkResult::advance();
+    });
+
+    if (walkResult.wasInterrupted())
       return signalPassFailure();
   }
 };
