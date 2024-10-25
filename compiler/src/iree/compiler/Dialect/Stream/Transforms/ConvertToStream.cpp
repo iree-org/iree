@@ -263,7 +263,7 @@ struct ConvertToStreamPass final
         });
     typeConverter.addArgumentMaterialization(
         [](OpBuilder &builder, TensorType resultType, ValueRange inputs,
-           Location loc) -> std::optional<Value> {
+           Location loc) -> Value {
           assert(inputs.size() >= 2);
           auto resourceValue = inputs[0];
           auto resourceSize = inputs[1];

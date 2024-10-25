@@ -65,13 +65,13 @@ Type convertShapedToSignless(ShapedType shapedType) {
   return shapedType;
 }
 
-std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
-                                     ValueRange inputs, Location loc) {
+Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
+                      Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = dyn_cast<RankedTensorType>(fromValue.getType());
   if (!fromType)
-    return std::nullopt;
+    return Value();
 
   if (auto intFromType = dyn_cast<IntegerType>(fromType.getElementType())) {
     Type castType = getElementTypeOrSelf(toType);
