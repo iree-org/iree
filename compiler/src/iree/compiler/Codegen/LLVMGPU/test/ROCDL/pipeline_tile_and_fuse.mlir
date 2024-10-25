@@ -290,7 +290,7 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C720:.+]] = arith.constant 720 : index
 //      CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//         CHECK:   scf.forall ({{.*}}) in (2, 4, 1, 5) {
+//         CHECK:   scf.forall ({{.*}}) in (2, 4, 5) {
 //          CHECK:   %[[LOOP:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C720]] step %[[C2]] {{.*}} -> (vector<1x4x1x4x4x1xf32>)
 //          CHECK:     gpu.barrier
 //      CHECK-DAG:     %[[LHS_RD:.+]] = vector.transfer_read %[[B0]]{{.*}} vector<8xf16>
@@ -307,7 +307,7 @@ hal.executable private @main {
 //          CHECK:   %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
 //          CHECK:   %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<4x1x4x4x1xf32> from vector<1x4x1x4x4x1xf32>
 //          CHECK:   vector.transfer_write %[[EXTRACT]], %[[B2]]
-//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
