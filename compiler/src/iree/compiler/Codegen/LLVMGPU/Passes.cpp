@@ -858,23 +858,18 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   if (usePadToModelSharedMemcpy) {
-    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims;
-    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
+    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
   }
 
   // Tile to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    options.allowZeroSlices = true;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(affine::createLoopCoalescingPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
-  }
-
-  if (usePadToModelSharedMemcpy) {
-    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ReductionDims;
-    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
   }
 
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
