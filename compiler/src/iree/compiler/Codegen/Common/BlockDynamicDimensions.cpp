@@ -186,7 +186,6 @@ static LogicalResult blockDynamicDimensions(
     Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandIndices) {
   OpBuilder::InsertionGuard g(rewriter);
 
-  bool addedReshape = false;
   for (OpOperand &operand : operation->getOpOperands()) {
     if (!limitToOperandIndices.contains(operand.getOperandNumber()))
       continue;
@@ -199,12 +198,11 @@ static LogicalResult blockDynamicDimensions(
     std::optional<Value> newOperand = blockDynamicDimensionsOfValue(
         rewriter, operandDivisibilityInfo, operand.get());
     if (newOperand) {
-      addedReshape = true;
       rewriter.modifyOpInPlace(operation,
                                [&]() { operand.set(newOperand.value()); });
     }
   }
-  return success(addedReshape);
+  return success();
 }
 
 /// Insert `tensor.expand_shape` operations to materialize in IR information
