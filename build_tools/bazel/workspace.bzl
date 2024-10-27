@@ -149,6 +149,13 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
+        name = "hsa_runtime_headers",
+        build_file = iree_repo_alias + "//:build_tools/third_party/hsa-runtime-headers/BUILD.overlay",
+        path = paths.join(iree_path, "third_party/hsa-runtime-headers"),
+    )
+
+    maybe(
+        native.new_local_repository,
         name = "webgpu_headers",
         build_file = iree_repo_alias + "//:build_tools/third_party/webgpu-headers/BUILD.overlay",
         path = paths.join(iree_path, "third_party/webgpu-headers"),
