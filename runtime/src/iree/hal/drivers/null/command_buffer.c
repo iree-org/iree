@@ -10,6 +10,10 @@
 #include "iree/hal/drivers/null/channel.h"
 #include "iree/hal/drivers/null/executable.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_command_buffer_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_command_buffer_t {
   iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
@@ -31,8 +35,8 @@ iree_status_t iree_hal_null_command_buffer_create(
     iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
-  *out_command_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_command_buffer = NULL;
 
   iree_hal_null_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

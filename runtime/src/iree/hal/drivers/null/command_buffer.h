@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_command_buffer_t
+//===----------------------------------------------------------------------===//
+
 // Creates {Null} command buffer.
 iree_status_t iree_hal_null_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,

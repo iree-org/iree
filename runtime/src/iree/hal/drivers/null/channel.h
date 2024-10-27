@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_channel_t
+//===----------------------------------------------------------------------===//
+
 // Creates a {Null} HAL collective channel using the given |params|.
 iree_status_t iree_hal_null_channel_create(iree_hal_channel_params_t params,
                                            iree_allocator_t host_allocator,
