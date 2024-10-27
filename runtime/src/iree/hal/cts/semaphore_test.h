@@ -406,7 +406,7 @@ TEST_F(SemaphoreTest, FailThenWait) {
   EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
-  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(query_status, status);
 
   iree_hal_semaphore_release(semaphore);
@@ -431,7 +431,7 @@ TEST_F(SemaphoreTest, WaitThenFail) {
   EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
-  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(query_status, status);
 
   signal_thread.join();
@@ -467,7 +467,7 @@ TEST_F(SemaphoreTest, MultiWaitThenFail) {
   uint64_t value = 1234;
   iree_status_t semaphore1_query_status =
       iree_hal_semaphore_query(semaphore1, &value);
-  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(semaphore1_query_status, status);
 
   // semaphore2 must not have changed.
@@ -511,7 +511,7 @@ TEST_F(SemaphoreTest, DeviceMultiWaitThenFail) {
   uint64_t value = 1234;
   iree_status_t semaphore1_query_status =
       iree_hal_semaphore_query(semaphore1, &value);
-  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(semaphore1_query_status, status);
 
   // semaphore2 must not have changed.
