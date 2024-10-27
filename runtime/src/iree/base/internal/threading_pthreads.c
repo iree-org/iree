@@ -51,8 +51,8 @@ static void iree_thread_set_priority_class(
 
 static bool iree_thread_resumed_predicate(void* arg) {
   iree_thread_t* thread = (iree_thread_t*)arg;
-  return iree_atomic_load_int32(&thread->suspend_count,
-                                iree_memory_order_acquire) == 0;
+  return iree_atomic_load(&thread->suspend_count, iree_memory_order_acquire) ==
+         0;
 }
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
@@ -99,8 +99,8 @@ static void* iree_thread_start_routine(void* param) {
   IREE_TRACE_SET_THREAD_NAME(thread->name);
 
   // Wait until we resume if we were created suspended.
-  while (iree_atomic_load_int32(&thread->suspend_count,
-                                iree_memory_order_acquire) > 0) {
+  while (iree_atomic_load(&thread->suspend_count, iree_memory_order_acquire) >
+         0) {
     iree_notification_await(&thread->suspend_barrier,
                             iree_thread_resumed_predicate, thread,
                             iree_infinite_timeout());
@@ -335,8 +335,8 @@ void iree_thread_request_affinity(iree_thread_t* thread,
 void iree_thread_resume(iree_thread_t* thread) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (iree_atomic_exchange_int32(&thread->suspend_count, 0,
-                                 iree_memory_order_acq_rel) == 1) {
+  if (iree_atomic_exchange(&thread->suspend_count, 0,
+                           iree_memory_order_acq_rel) == 1) {
     iree_notification_post(&thread->suspend_barrier, IREE_ALL_WAITERS);
   }
 

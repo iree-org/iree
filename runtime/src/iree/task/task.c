@@ -39,13 +39,13 @@ void iree_task_set_completion_task(iree_task_t* task,
                                    iree_task_t* completion_task) {
   IREE_ASSERT(!task->completion_task);
   task->completion_task = completion_task;
-  iree_atomic_fetch_add_int32(&completion_task->pending_dependency_count, 1,
-                              iree_memory_order_acq_rel);
+  iree_atomic_fetch_add(&completion_task->pending_dependency_count, 1,
+                        iree_memory_order_acq_rel);
 }
 
 bool iree_task_is_ready(iree_task_t* task) {
-  if (iree_atomic_load_int32(&task->pending_dependency_count,
-                             iree_memory_order_acquire) > 0) {
+  if (iree_atomic_load(&task->pending_dependency_count,
+                       iree_memory_order_acquire) > 0) {
     // At least one dependency is still pending.
     return false;
   }
@@ -62,7 +62,7 @@ static void iree_task_try_set_status(iree_atomic_intptr_t* permanent_status,
       z0, iree_status_code_string(iree_status_code(new_status)));
 
   iree_status_t old_status = iree_ok_status();
-  if (!iree_atomic_compare_exchange_strong_intptr(
+  if (!iree_atomic_compare_exchange_strong(
           permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
           iree_memory_order_acq_rel,
           iree_memory_order_relaxed /* old_status is unused */)) {
@@ -102,16 +102,15 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
   // tasks in the appropriate order: if we had a DAG of A -> B, C -> D we must
   // discard respecting the same topological ordering.
 
-  IREE_ASSERT_EQ(0, iree_atomic_load_int32(&task->pending_dependency_count,
-                                           iree_memory_order_acquire));
+  IREE_ASSERT_EQ(0, iree_atomic_load(&task->pending_dependency_count,
+                                     iree_memory_order_acquire));
 
   // Almost all tasks will have a completion task; some may have additional
   // dependent tasks (like barriers) that will be handled below.
   const bool completion_task_ready =
       task->completion_task &&
-      iree_atomic_fetch_sub_int32(
-          &task->completion_task->pending_dependency_count, 1,
-          iree_memory_order_acq_rel) == 1;
+      iree_atomic_fetch_sub(&task->completion_task->pending_dependency_count, 1,
+                            iree_memory_order_acq_rel) == 1;
   if (completion_task_ready) {
     iree_task_list_push_back(discard_worklist, task->completion_task);
   }
@@ -147,8 +146,8 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
 static void iree_task_retire(iree_task_t* task,
                              iree_task_submission_t* pending_submission,
                              iree_status_t status) {
-  IREE_ASSERT_EQ(0, iree_atomic_load_int32(&task->pending_dependency_count,
-                                           iree_memory_order_acquire));
+  IREE_ASSERT_EQ(0, iree_atomic_load(&task->pending_dependency_count,
+                                     iree_memory_order_acquire));
 
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
@@ -159,8 +158,8 @@ static void iree_task_retire(iree_task_t* task,
     iree_task_cleanup(task, IREE_STATUS_OK);
     bool completion_task_ready =
         completion_task &&
-        iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count,
-                                    1, iree_memory_order_acq_rel) == 1;
+        iree_atomic_fetch_sub(&completion_task->pending_dependency_count, 1,
+                              iree_memory_order_acq_rel) == 1;
     if (completion_task_ready) {
       // This was the last pending dependency and the completion task is ready
       // to run.
@@ -180,8 +179,8 @@ static void iree_task_retire(iree_task_t* task,
 
     bool completion_task_ready =
         completion_task &&
-        iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count,
-                                    1, iree_memory_order_acq_rel) == 1;
+        iree_atomic_fetch_sub(&completion_task->pending_dependency_count, 1,
+                              iree_memory_order_acq_rel) == 1;
     if (completion_task_ready) {
       // This was the last pending dependency and we know that we can safely
       // abort the completion task by discarding.
@@ -239,7 +238,7 @@ void iree_task_call_initialize(iree_task_scope_t* scope,
                                iree_task_call_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_CALL, scope, &out_task->header);
   out_task->closure = closure;
-  iree_atomic_store_intptr(&out_task->status, 0, iree_memory_order_release);
+  iree_atomic_store(&out_task->status, 0, iree_memory_order_release);
 }
 
 void iree_task_call_execute(iree_task_call_t* task,
@@ -272,9 +271,9 @@ void iree_task_call_execute(iree_task_call_t* task,
 
   // Check to see if there are no pending dependencies before retiring; the
   // dependency count can go up if new nested tasks were enqueued.
-  if (iree_atomic_load_int32(&task->header.pending_dependency_count,
-                             iree_memory_order_acquire) == 0) {
-    iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+  if (iree_atomic_load(&task->header.pending_dependency_count,
+                       iree_memory_order_acquire) == 0) {
+    iree_status_t status = (iree_status_t)iree_atomic_exchange(
         &task->status, 0, iree_memory_order_acq_rel);
     iree_task_retire(&task->header, pending_submission, status);
   }
@@ -295,8 +294,8 @@ void iree_task_barrier_initialize(iree_task_scope_t* scope,
   out_task->dependent_tasks = dependent_tasks;
   for (iree_host_size_t i = 0; i < out_task->dependent_task_count; ++i) {
     iree_task_t* dependent_task = out_task->dependent_tasks[i];
-    iree_atomic_fetch_add_int32(&dependent_task->pending_dependency_count, 1,
-                                iree_memory_order_acq_rel);
+    iree_atomic_fetch_add(&dependent_task->pending_dependency_count, 1,
+                          iree_memory_order_acq_rel);
   }
 }
 
@@ -314,8 +313,8 @@ void iree_task_barrier_set_dependent_tasks(
   task->dependent_tasks = dependent_tasks;
   for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
     iree_task_t* dependent_task = task->dependent_tasks[i];
-    iree_atomic_fetch_add_int32(&dependent_task->pending_dependency_count, 1,
-                                iree_memory_order_acq_rel);
+    iree_atomic_fetch_add(&dependent_task->pending_dependency_count, 1,
+                          iree_memory_order_acq_rel);
   }
 }
 
@@ -329,8 +328,8 @@ static void iree_task_barrier_discard(iree_task_barrier_t* task,
   for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
     iree_task_t* dependent_task = task->dependent_tasks[i];
     const bool dependent_task_ready =
-        iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
-                                    1, iree_memory_order_acq_rel) == 1;
+        iree_atomic_fetch_sub(&dependent_task->pending_dependency_count, 1,
+                              iree_memory_order_acq_rel) == 1;
     if (dependent_task_ready) {
       // The dependent task has retired and can now be discard.
       iree_task_list_push_back(discard_worklist, dependent_task);
@@ -348,8 +347,8 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
   for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
     iree_task_t* dependent_task =
         task->dependent_tasks[task->dependent_task_count - i - 1];
-    if (iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
-                                    1, iree_memory_order_acq_rel) == 1) {
+    if (iree_atomic_fetch_sub(&dependent_task->pending_dependency_count, 1,
+                              iree_memory_order_acq_rel) == 1) {
       // The dependent task has retired and can now be made ready.
       iree_task_submission_enqueue(pending_submission, dependent_task);
     }
@@ -530,13 +529,13 @@ static void iree_task_dispatch_initialize_base(
   memcpy(out_task->workgroup_size, workgroup_size,
          sizeof(out_task->workgroup_size));
   out_task->local_memory_size = 0;
-  iree_atomic_store_intptr(&out_task->status, 0, iree_memory_order_release);
+  iree_atomic_store(&out_task->status, 0, iree_memory_order_release);
   memset(&out_task->statistics, 0, sizeof(out_task->statistics));
 
   IREE_TRACE({
     static iree_atomic_int64_t next_dispatch_id = IREE_ATOMIC_VAR_INIT(0);
-    out_task->dispatch_id = iree_atomic_fetch_add_int64(
-        &next_dispatch_id, 1ll, iree_memory_order_acq_rel);
+    out_task->dispatch_id = iree_atomic_fetch_add(&next_dispatch_id, 1ll,
+                                                  iree_memory_order_acq_rel);
   });
 }
 
@@ -597,8 +596,7 @@ void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
   // Setup the iteration space for shards to pull work from the complete grid.
-  iree_atomic_store_int32(&dispatch_task->tile_index, 0,
-                          iree_memory_order_relaxed);
+  iree_atomic_store(&dispatch_task->tile_index, 0, iree_memory_order_relaxed);
   dispatch_task->tile_count =
       workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
 
@@ -672,7 +670,7 @@ void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
   // any other has hit an error; failure in a dispatch should be so exceedingly
   // rare that allowing some shards to complete after one encounters an error is
   // not a problem.
-  iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+  iree_status_t status = (iree_status_t)iree_atomic_exchange(
       &dispatch_task->status, 0, iree_memory_order_acq_rel);
 
   iree_task_retire(&dispatch_task->header, pending_submission, status);
@@ -763,9 +761,9 @@ void iree_task_dispatch_shard_execute(
   const uint32_t tiles_per_reservation = dispatch_task->tiles_per_reservation;
   // relaxed order because we only care about atomic increments, not about
   // ordering of tile_index accesses w.r.t. other memory accesses.
-  uint32_t tile_base = iree_atomic_fetch_add_int32(&dispatch_task->tile_index,
-                                                   tiles_per_reservation,
-                                                   iree_memory_order_relaxed);
+  uint32_t tile_base =
+      iree_atomic_fetch_add(&dispatch_task->tile_index, tiles_per_reservation,
+                            iree_memory_order_relaxed);
   while (tile_base < tile_count) {
     const uint32_t tile_range =
         iree_min(tile_base + tiles_per_reservation, tile_count);
@@ -813,9 +811,9 @@ void iree_task_dispatch_shard_execute(
     }
 
     // Try to grab the next slice of tiles.
-    tile_base = iree_atomic_fetch_add_int32(&dispatch_task->tile_index,
-                                            tiles_per_reservation,
-                                            iree_memory_order_relaxed);
+    tile_base =
+        iree_atomic_fetch_add(&dispatch_task->tile_index, tiles_per_reservation,
+                              iree_memory_order_relaxed);
   }
 abort_shard:
 

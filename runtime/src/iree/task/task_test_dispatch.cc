@@ -35,8 +35,7 @@ class GridCoverage {
   bool Verify() {
     fflush(stdout);
     for (iree_host_size_t i = 0; i < workgroup_count_; ++i) {
-      if (iree_atomic_load_int32(&storage_[i], iree_memory_order_seq_cst) !=
-          1) {
+      if (iree_atomic_load(&storage_[i], iree_memory_order_seq_cst) != 1) {
         return false;
       }
     }
@@ -52,8 +51,8 @@ class GridCoverage {
                                           tile_context->workgroup_count[0]) +
         tile_context->workgroup_xyz[1] * tile_context->workgroup_count[0] +
         tile_context->workgroup_xyz[0];
-    iree_atomic_fetch_add_int32(&coverage->storage_[slot], 1,
-                                iree_memory_order_seq_cst);
+    iree_atomic_fetch_add(&coverage->storage_[slot], 1,
+                          iree_memory_order_seq_cst);
 
     // Useful when testing large grids:
     // printf("%u, %u, %u\n", tile_context->workgroup_xyz[0],
