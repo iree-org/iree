@@ -28,9 +28,9 @@ using TensorDivisibilityInfo =
 
 namespace {
 
-struct RemoveOptimizationBarrier
+struct RemoveOptimizationBarrier final
     : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using OpRewritePattern<IREE::Util::OptimizationBarrierOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
@@ -46,14 +46,14 @@ struct RemoveOptimizationBarrier
 /// is of shape `tensor<...x?x...>` and that dimension is known to be a
 /// multiple of 16, this operand is expanded to `tensor<...x?x16x...>` where the
 /// size of the new dynamic dimension is 1/16-th the size of the original
-/// dynamic dimension size. This is done in two steps. 1) Replace operands with
-/// such dynamic dimension with the result of a
-/// `tensor.expand_shape/tensor.collapse_shape` pair
+/// dynamic dimension size. This is done in two steps.
+/// 1) Replace operands with such dynamic dimension with the result of a
+///    `tensor.expand_shape/tensor.collapse_shape` pair
 ///    to materialize the new static dimension and immediately fold it away. A
 ///    optimization barrier is added in between to prevent these operations from
 ///    being folded.
 /// 2) Use patterns that propagate the `tensor.collapse_shape` down to
-/// manipulate the operation appropriately. This
+///    manipulate the operation appropriately. This
 ///    allows re-using the (fairly complex) logic used to expand dimensions of
 ///    operations implemented in the propagation patterns.
 /// At the end of the pass the optimization barriers are removed to fold away
@@ -176,9 +176,11 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 /// If the dynamic dimension is known to be a multiple of 16, then generate
 ///
 /// ```mlir
-/// %expanded = tensor.expand_shape %0
+/// %expanded = tensor.expand_shape %0 :
+///    tensor<4x?x5xf32> into tensor<4x?x16x6xf32>
 /// %barrier = util.optimization.barrier %expanded
 /// %collapsed = tensor.collapse_shape %barrier
+///     : tensor<4x?x16x5xf32> into tensor<4x?x5xf32>
 /// %1 = <some_op>(..., %collaped, ...) : ... , tensor<4x?x6xf32>
 /// ```
 static LogicalResult blockDynamicDimensions(
