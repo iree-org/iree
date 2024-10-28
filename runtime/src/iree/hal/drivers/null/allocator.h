@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_allocator_t
+//===----------------------------------------------------------------------===//
+
 // Creates a {Null} buffer allocator used for persistent allocations.
 iree_status_t iree_hal_null_allocator_create(
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
