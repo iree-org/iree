@@ -82,3 +82,27 @@ func.func @no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x128xf32> {
 // CHECK-LABEL: func.func @no_promote_fill
 //   CHECK-NOT:   iree_gpu.derived_thread_config
 //       CHECK: return
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{promote_operands = [0]}>
+
+func.func @promote_pad(%a : tensor<4x127xf32>, %b: tensor<128x128xf32>) -> tensor<4x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4x128xf32>) -> tensor<4x128xf32>
+  %padded = tensor.pad %a low[0, 0] high[0, 1] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : f32
+  } : tensor<4x127xf32> to tensor<4x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%padded, %b : tensor<4x128xf32>, tensor<128x128xf32>) outs(%fill : tensor<4x128xf32>) -> tensor<4x128xf32>
+  return %mm : tensor<4x128xf32>
+}
+
+// Verify that pad is promoted with linalg.copy
+// CHECK-LABEL: func.func @promote_pad
+//   CHECK:   tensor.pad
+//   CHECK:   linalg.copy
+// CHECK-SAME: derived_thread_config
+//       CHECK: return
