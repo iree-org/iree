@@ -8,6 +8,10 @@
 
 #include "iree/hal/drivers/null/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_driver_t
+//===----------------------------------------------------------------------===//
+
 // TODO(null): if it's possible to have more than one device use real IDs.
 // This is a placeholder for this skeleton that just indicates the first and
 // only device.
@@ -57,8 +61,8 @@ IREE_API_EXPORT iree_status_t iree_hal_null_driver_create(
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(out_driver);
-  *out_driver = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_driver = NULL;
 
   // TODO(null): verify options; this may be moved after any libraries are
   // loaded so the verification can use underlying implementation queries.

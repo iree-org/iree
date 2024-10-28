@@ -6,6 +6,10 @@
 
 #include "iree/hal/drivers/null/event.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_event_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_event_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
@@ -23,8 +27,8 @@ iree_status_t iree_hal_null_event_create(
     iree_hal_queue_affinity_t queue_affinity, iree_hal_event_flags_t flags,
     iree_allocator_t host_allocator, iree_hal_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(out_event);
-  *out_event = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_event = NULL;
 
   iree_hal_null_event_t* event = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
