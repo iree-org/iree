@@ -16,6 +16,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -1741,7 +1742,11 @@ def FLOW_DispatchWorkgroupCountFromSliceOp :
 }
 
 def FLOW_DispatchWorkloadOrdinalOp :
-    FLOW_PureOp<"dispatch.workload.ordinal"> {
+    FLOW_PureOp<"dispatch.workload.ordinal", [
+      DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface>,
+      DeclareOpInterfaceMethods<InferIntRangeInterface,
+        ["inferResultRanges"]>
+    ]> {
   let arguments = (ins
     Index:$operand,
     IndexAttr:$ordinal

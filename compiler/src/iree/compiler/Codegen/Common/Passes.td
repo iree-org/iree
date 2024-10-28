@@ -19,6 +19,12 @@ def AddFastMathFlagsPass
                 "given a floating-point mode.";
 }
 
+def BlockDynamicDimensionsPass
+    : Pass<"iree-codegen-block-dynamic-dimensions"> {
+  let summary = "Expand dynamic dimensions that are known to be multiples of "
+                "statically known values.";
+}
+
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
   let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
   let description = [{
@@ -83,6 +89,10 @@ def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
       "Transforms convolution operations into an implicit GEMM format.";
+  let dependentDialects = [
+    "tensor::TensorDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
 }
 
 def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {

@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "legalize.mlir"
     "linalg_transform.mlir"
     "llvmgpu_bufferize.mlir"
+    "llvmgpu_convolution_to_igemm.mlir"
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"

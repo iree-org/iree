@@ -360,6 +360,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
         "--shapes=small",
     ],
     target_backends_and_drivers = [
@@ -367,9 +368,9 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f32", "f32"),
 ]]
 
 ###########################################################################
@@ -383,6 +384,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulSimt",
     ],
@@ -411,6 +413,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
@@ -437,6 +440,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
+        "--acc_type=f32",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -461,6 +465,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
+        "--acc_type=f32",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -486,6 +491,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
@@ -513,6 +519,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCore",
     ],
@@ -540,6 +547,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync",
     ],
@@ -566,6 +574,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -580,8 +589,8 @@ iree_generated_e2e_runner_test(
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
-) for lhs_rhs_type in [
-    "f32",
+) for (lhs_rhs_type, acc_type) in [
+    ("f32", "f32"),
 ]]
 
 ###########################################################################
@@ -598,6 +607,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeMali",
     ],
@@ -611,10 +621,10 @@ iree_generated_e2e_runner_test(
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
-) for lhs_rhs_type in [
-    "i8",
-    "f16",
-    "f32",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f16", "f32"),
+    ("f32", "f32"),
 ]]
 
 [iree_generated_e2e_runner_test(
@@ -625,6 +635,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
         "--compilation_info=SPIRVVectorizeNVIDIA",
     ],
@@ -637,10 +648,10 @@ iree_generated_e2e_runner_test(
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
-) for lhs_rhs_type in [
-    "i8",
-    "f16",
-    "f32",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f16", "f32"),
+    ("f32", "f32"),
 ]]
 
 iree_generated_e2e_runner_test(
@@ -651,6 +662,7 @@ iree_generated_e2e_runner_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f16",
+        "--acc_type=f32",
         "--shapes=easy_large_static",
         "--compilation_info=SPIRVCooperativeMatrixVectorize",
     ],
