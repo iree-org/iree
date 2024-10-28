@@ -121,8 +121,8 @@ static void iree_hal_cuda_memory_pool_track_alloc(
     iree_atomic_int64_t* bytes_allocated =
         is_device_local ? &pools->statistics.device_bytes_allocated
                         : &pools->statistics.host_bytes_allocated;
-    iree_atomic_fetch_add_int64(bytes_allocated, allocation_size,
-                                iree_memory_order_relaxed);
+    iree_atomic_fetch_add(bytes_allocated, allocation_size,
+                          iree_memory_order_relaxed);
   });
 }
 
@@ -141,8 +141,8 @@ static void iree_hal_cuda_memory_pool_track_free(
                         : &pools->statistics.host_bytes_freed;
     iree_device_size_t allocation_size =
         iree_hal_buffer_allocation_size(buffer);
-    iree_atomic_fetch_add_int64(bytes_freed, allocation_size,
-                                iree_memory_order_relaxed);
+    iree_atomic_fetch_add(bytes_freed, allocation_size,
+                          iree_memory_order_relaxed);
   });
 }
 
@@ -150,13 +150,13 @@ void iree_hal_cuda_memory_pools_merge_statistics(
     iree_hal_cuda_memory_pools_t* pools,
     iree_hal_allocator_statistics_t* statistics) {
   IREE_STATISTICS({
-    statistics->device_bytes_allocated = iree_atomic_load_int64(
+    statistics->device_bytes_allocated = iree_atomic_load(
         &pools->statistics.device_bytes_allocated, iree_memory_order_relaxed);
-    statistics->host_bytes_allocated = iree_atomic_load_int64(
+    statistics->host_bytes_allocated = iree_atomic_load(
         &pools->statistics.host_bytes_allocated, iree_memory_order_relaxed);
-    statistics->device_bytes_freed = iree_atomic_load_int64(
+    statistics->device_bytes_freed = iree_atomic_load(
         &pools->statistics.device_bytes_freed, iree_memory_order_relaxed);
-    statistics->host_bytes_freed = iree_atomic_load_int64(
+    statistics->host_bytes_freed = iree_atomic_load(
         &pools->statistics.host_bytes_freed, iree_memory_order_relaxed);
     if (pools->device_local) {
       cuuint64_t pool_peak = 0;

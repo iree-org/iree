@@ -21,9 +21,9 @@ TEST(AtomicPtr, LoadStore) {
   intptr_t ptr_0 = 0x0;
   intptr_t ptr_1 = 0x1;
   iree_atomic_intptr_t value = IREE_ATOMIC_VAR_INIT(ptr_0);
-  EXPECT_EQ(ptr_0, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
-  iree_atomic_store_intptr(&value, ptr_1, iree_memory_order_seq_cst);
-  EXPECT_EQ(ptr_1, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_0, iree_atomic_load(&value, iree_memory_order_seq_cst));
+  iree_atomic_store(&value, ptr_1, iree_memory_order_seq_cst);
+  EXPECT_EQ(ptr_1, iree_atomic_load(&value, iree_memory_order_seq_cst));
 }
 
 TEST(AtomicPtr, AddSub) {
@@ -31,15 +31,15 @@ TEST(AtomicPtr, AddSub) {
   intptr_t ptr_1 = 0x1;
   intptr_t ptr_2 = 0x2;
   iree_atomic_intptr_t value = IREE_ATOMIC_VAR_INIT(ptr_0);
-  EXPECT_EQ(ptr_0, iree_atomic_fetch_add_intptr(&value, ptr_1,
-                                                iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_1, iree_atomic_fetch_add_intptr(&value, ptr_1,
-                                                iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_2, iree_atomic_fetch_sub_intptr(&value, ptr_1,
-                                                iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_1, iree_atomic_fetch_sub_intptr(&value, ptr_1,
-                                                iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_0, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_0,
+            iree_atomic_fetch_add(&value, ptr_1, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_1,
+            iree_atomic_fetch_add(&value, ptr_1, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_2,
+            iree_atomic_fetch_sub(&value, ptr_1, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_1,
+            iree_atomic_fetch_sub(&value, ptr_1, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_0, iree_atomic_load(&value, iree_memory_order_seq_cst));
 }
 
 TEST(AtomicPtr, Exchange) {
@@ -47,11 +47,11 @@ TEST(AtomicPtr, Exchange) {
   intptr_t ptr_1 = 0x1;
   intptr_t ptr_2 = 0x2;
   iree_atomic_intptr_t value = IREE_ATOMIC_VAR_INIT(ptr_0);
-  EXPECT_EQ(ptr_0, iree_atomic_exchange_intptr(&value, ptr_1,
-                                               iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_1, iree_atomic_exchange_intptr(&value, ptr_2,
-                                               iree_memory_order_seq_cst));
-  EXPECT_EQ(ptr_2, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_0,
+            iree_atomic_exchange(&value, ptr_1, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_1,
+            iree_atomic_exchange(&value, ptr_2, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_2, iree_atomic_load(&value, iree_memory_order_seq_cst));
 }
 
 TEST(AtomicPtr, CompareExchange) {
@@ -62,31 +62,31 @@ TEST(AtomicPtr, CompareExchange) {
   intptr_t ptr_expected = 0;
 
   // OK: value == ptr_0, CAS(ptr_0 -> ptr_1)
-  iree_atomic_store_intptr(&value, ptr_0, iree_memory_order_seq_cst);
+  iree_atomic_store(&value, ptr_0, iree_memory_order_seq_cst);
   ptr_expected = ptr_0;
-  EXPECT_TRUE(iree_atomic_compare_exchange_strong_intptr(
-      &value, &ptr_expected, ptr_1, iree_memory_order_seq_cst,
-      iree_memory_order_seq_cst));
+  EXPECT_TRUE(iree_atomic_compare_exchange_strong(&value, &ptr_expected, ptr_1,
+                                                  iree_memory_order_seq_cst,
+                                                  iree_memory_order_seq_cst));
   EXPECT_EQ(ptr_0, ptr_expected);
-  EXPECT_EQ(ptr_1, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_1, iree_atomic_load(&value, iree_memory_order_seq_cst));
 
   // OK: value == ptr_1, CAS(ptr_1 -> ptr_2)
-  iree_atomic_store_intptr(&value, ptr_1, iree_memory_order_seq_cst);
+  iree_atomic_store(&value, ptr_1, iree_memory_order_seq_cst);
   ptr_expected = ptr_1;
-  EXPECT_TRUE(iree_atomic_compare_exchange_strong_intptr(
-      &value, &ptr_expected, ptr_2, iree_memory_order_seq_cst,
-      iree_memory_order_seq_cst));
+  EXPECT_TRUE(iree_atomic_compare_exchange_strong(&value, &ptr_expected, ptr_2,
+                                                  iree_memory_order_seq_cst,
+                                                  iree_memory_order_seq_cst));
   EXPECT_EQ(ptr_1, ptr_expected);
-  EXPECT_EQ(ptr_2, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_2, iree_atomic_load(&value, iree_memory_order_seq_cst));
 
   // FAIL: value == ptr_0, CAS(ptr_1 -> ptr_2)
-  iree_atomic_store_intptr(&value, ptr_0, iree_memory_order_seq_cst);
+  iree_atomic_store(&value, ptr_0, iree_memory_order_seq_cst);
   ptr_expected = ptr_1;
-  EXPECT_FALSE(iree_atomic_compare_exchange_strong_intptr(
-      &value, &ptr_expected, ptr_2, iree_memory_order_seq_cst,
-      iree_memory_order_seq_cst));
+  EXPECT_FALSE(iree_atomic_compare_exchange_strong(&value, &ptr_expected, ptr_2,
+                                                   iree_memory_order_seq_cst,
+                                                   iree_memory_order_seq_cst));
   EXPECT_EQ(ptr_0, ptr_expected);
-  EXPECT_EQ(ptr_0, iree_atomic_load_intptr(&value, iree_memory_order_seq_cst));
+  EXPECT_EQ(ptr_0, iree_atomic_load(&value, iree_memory_order_seq_cst));
 }
 
 TEST(AtomicRefCount, IncDec) {

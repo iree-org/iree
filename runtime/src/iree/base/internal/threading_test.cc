@@ -34,12 +34,11 @@ TEST(ThreadTest, Lifetime) {
     iree_atomic_int32_t value;
     iree_notification_t barrier;
   } entry_data;
-  iree_atomic_store_int32(&entry_data.value, 123, iree_memory_order_relaxed);
+  iree_atomic_store(&entry_data.value, 123, iree_memory_order_relaxed);
   iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
     auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-    iree_atomic_fetch_add_int32(&entry_data->value, 1,
-                                iree_memory_order_acq_rel);
+    iree_atomic_fetch_add(&entry_data->value, 1, iree_memory_order_acq_rel);
     iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
     return 0;
   };
@@ -55,8 +54,8 @@ TEST(ThreadTest, Lifetime) {
       &entry_data.barrier,
       +[](void* entry_arg) -> bool {
         auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-        return iree_atomic_load_int32(&entry_data->value,
-                                      iree_memory_order_relaxed) == (123 + 1);
+        return iree_atomic_load(&entry_data->value,
+                                iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
 
@@ -76,12 +75,11 @@ TEST(ThreadTest, CreateSuspended) {
     iree_atomic_int32_t value;
     iree_notification_t barrier;
   } entry_data;
-  iree_atomic_store_int32(&entry_data.value, 123, iree_memory_order_relaxed);
+  iree_atomic_store(&entry_data.value, 123, iree_memory_order_relaxed);
   iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
     auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-    iree_atomic_fetch_add_int32(&entry_data->value, 1,
-                                iree_memory_order_acq_rel);
+    iree_atomic_fetch_add(&entry_data->value, 1, iree_memory_order_acq_rel);
     iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
     return 0;
   };
@@ -95,11 +93,11 @@ TEST(ThreadTest, CreateSuspended) {
   // the value. I can't think of a good way to test this, though, so we'll just
   // wait a moment here and assume that if the thread was able to run it would
   // have during this wait.
-  ASSERT_EQ(123, iree_atomic_load_int32(&entry_data.value,
-                                        iree_memory_order_seq_cst));
+  ASSERT_EQ(123,
+            iree_atomic_load(&entry_data.value, iree_memory_order_seq_cst));
   std::this_thread::sleep_for(std::chrono::milliseconds(150));
-  ASSERT_EQ(123, iree_atomic_load_int32(&entry_data.value,
-                                        iree_memory_order_seq_cst));
+  ASSERT_EQ(123,
+            iree_atomic_load(&entry_data.value, iree_memory_order_seq_cst));
 
   // Resume the thread and wait for it to finish its work.
   iree_thread_resume(thread);
@@ -107,8 +105,8 @@ TEST(ThreadTest, CreateSuspended) {
       &entry_data.barrier,
       +[](void* entry_arg) -> bool {
         auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-        return iree_atomic_load_int32(&entry_data->value,
-                                      iree_memory_order_relaxed) == (123 + 1);
+        return iree_atomic_load(&entry_data->value,
+                                iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
   iree_thread_release(thread);
@@ -126,11 +124,10 @@ TEST(ThreadTest, PriorityOverride) {
   struct entry_data_t {
     iree_atomic_int32_t value;
   } entry_data;
-  iree_atomic_store_int32(&entry_data.value, 0, iree_memory_order_relaxed);
+  iree_atomic_store(&entry_data.value, 0, iree_memory_order_relaxed);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
     auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-    iree_atomic_fetch_add_int32(&entry_data->value, 1,
-                                iree_memory_order_release);
+    iree_atomic_fetch_add(&entry_data->value, 1, iree_memory_order_release);
     return 0;
   };
 
@@ -150,8 +147,7 @@ TEST(ThreadTest, PriorityOverride) {
       thread, IREE_THREAD_PRIORITY_CLASS_LOWEST);
 
   // Wait for the thread to finish.
-  while (iree_atomic_load_int32(&entry_data.value, iree_memory_order_acquire) !=
-         1) {
+  while (iree_atomic_load(&entry_data.value, iree_memory_order_acquire) != 1) {
     iree_thread_yield();
   }
 

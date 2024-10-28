@@ -242,8 +242,8 @@ static iree_status_t iree_hal_transfer_operation_create(
   // steps are part of this transfer.
   IREE_TRACE({
     static iree_atomic_int32_t next_trace_id = IREE_ATOMIC_VAR_INIT(0);
-    operation->trace_id = iree_atomic_fetch_add_int32(
-        &next_trace_id, 1, iree_memory_order_seq_cst);
+    operation->trace_id =
+        iree_atomic_fetch_add(&next_trace_id, 1, iree_memory_order_seq_cst);
     IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, operation->trace_id);
   });
 

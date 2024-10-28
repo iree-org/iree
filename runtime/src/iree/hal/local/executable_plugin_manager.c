@@ -432,8 +432,8 @@ static iree_status_t iree_hal_executable_plugin_manager_register(
 
   // Get the next provider slot. Note that we don't yet increment it as we need
   // to put the provider in there first.
-  int32_t slot = iree_atomic_load_int32(&manager->provider_count,
-                                        iree_memory_order_acquire);
+  int32_t slot =
+      iree_atomic_load(&manager->provider_count, iree_memory_order_acquire);
   if (slot >= manager->capacity) {
     iree_slim_mutex_unlock(&manager->mutex);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -449,8 +449,7 @@ static iree_status_t iree_hal_executable_plugin_manager_register(
   }
 
   // Mark the slot as valid now that the provider is in it.
-  iree_atomic_fetch_add_int32(&manager->provider_count, 1,
-                              iree_memory_order_release);
+  iree_atomic_fetch_add(&manager->provider_count, 1, iree_memory_order_release);
 
   iree_slim_mutex_unlock(&manager->mutex);
   return iree_ok_status();
@@ -506,8 +505,8 @@ static iree_status_t iree_hal_executable_plugin_manager_resolve(
   // but that's ok: multithreaded registration/resolution is non-deterministic
   // by nature. Not holding the lock here means we allow multiple threads to
   // resolve imports at the same time.
-  int32_t provider_count = iree_atomic_load_int32(&manager->provider_count,
-                                                  iree_memory_order_acquire);
+  int32_t provider_count =
+      iree_atomic_load(&manager->provider_count, iree_memory_order_acquire);
 
   // Scan in reverse registration order so that more recently registered
   // providers get queried first. try_resolve will populate any function

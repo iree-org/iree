@@ -231,7 +231,7 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
   // Create an atomic to count how many semaphores have signaled. Mark it as `__block` so different
   // threads are sharing the same data via reference.
   __block iree_atomic_int32_t wait_count;
-  iree_atomic_store_int32(&wait_count, 0, iree_memory_order_release);
+  iree_atomic_store(&wait_count, 0, iree_memory_order_release);
   // The total count we are expecting to see.
   iree_host_size_t total_count = (wait_mode == IREE_HAL_WAIT_MODE_ALL) ? semaphore_list->count : 1;
   // Theoretically we don't really need to mark the semaphore handle as __block given that the
@@ -253,7 +253,7 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
                                         // Fail as a whole if any participating semaphore failed.
                                         if (v >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) did_fail = true;
 
-                                        int32_t old_value = iree_atomic_fetch_add_int32(
+                                        int32_t old_value = iree_atomic_fetch_add(
                                             &wait_count, 1, iree_memory_order_release);
                                         // The last signaled semaphore send out the notification.
                                         // Atomic fetch add returns the old value, so need to +1.
