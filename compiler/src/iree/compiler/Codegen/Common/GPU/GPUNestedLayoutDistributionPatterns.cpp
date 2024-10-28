@@ -621,14 +621,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
           contractOp, "missing nested layout for contraction rhs");
     }
 
-    llvm::dbgs() << "lhsLayout =" << lhsLayout << "\n";
-    llvm::dbgs() << "rhsLayout =" << rhsLayout << "\n";
     Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
     Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
-    llvm::dbgs() << disLhs << "\n";
-    llvm::dbgs() << disRhs << "\n";
+
     Value acc = contractOp.getAcc();
+    Value res = contractOp.getResult();
     VectorValue accVector = dyn_cast<VectorValue>(acc);
+    VectorValue resVector = dyn_cast<VectorValue>(res);
     Value disAcc;
     if (accVector) {
       disAcc = getDistributed(rewriter, accVector, signature[accVector]);
@@ -639,21 +638,46 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Location loc = contractOp.getLoc();
 
     int64_t rank = lhsLayout.getRank();
-    assert(rank == rhsLayout.getRank() &&
-           "The layout of lhs and rhs should match");
 
     SmallVector<bool> reducedDims(rank, false);
-    // Retrieve iterator types for the contraction op.
-    ArrayAttr iteratorTypes = contractOp.getIteratorTypes();
+    auto maps = contractOp.getIndexingMapsArray();
 
     // Reduction dimensions will have the 'reduction' iterator type.
-    SmallVector<unsigned, 4> reductionDims;
-    for (auto it : llvm::enumerate(iteratorTypes)) {
-      utils::IteratorType iteratorType =
-          llvm::cast<IteratorTypeAttr>(it.value()).getValue();
-      if (iteratorType == utils::IteratorType::reduction) {
-        reducedDims[it.index()] = true;
+    SmallVector<unsigned> reductionDims;
+    MLIRContext *ctx = maps[0].getContext();
+    for (auto [index, iteratorType] :
+         llvm::enumerate(contractOp.getIteratorTypes())) {
+      if (vector::isReductionIterator(iteratorType)) {
+        int64_t lrhsRedIdx =
+            *maps[0].getResultPosition(getAffineDimExpr(index, ctx));
+        reducedDims[lrhsRedIdx] = true;
       }
+    }
+
+    ArrayRef<Attribute> iteratorTypes =
+        contractOp.getIteratorTypes().getValue();
+    SmallVector<Attribute> newIterators;
+    // Given that the distribution format is <BATCH x OUTER x ELEMENT>,
+    // the iterations and affine maps need to be replicated three times.
+    for (int i = 0; i < 3; i++) {
+      newIterators.append(iteratorTypes.begin(), iteratorTypes.end());
+    }
+
+    SmallVector<AffineMap> newMaps;
+    for (auto map : maps) {
+      int64_t numDims = map.getNumDims();
+      int64_t numResults = map.getNumResults();
+      SmallVector<AffineExpr> exprs;
+      for (int i = 0; i < 3; i++) {
+        AffineMap shiftedMap = map.shiftDims(i * numDims);
+        for (int j = 0; j < numResults; j++) {
+          exprs.push_back(shiftedMap.getResult(j));
+        }
+      }
+      AffineMap newMap =
+          AffineMap::get(/*dimCount=*/3 * numDims,
+                         /*symbolCount=*/map.getNumSymbols(), exprs, ctx);
+      newMaps.push_back(newMap);
     }
 
     Type accElemTy = getElementTypeOrSelf(acc.getType());
@@ -661,8 +685,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         loc, rewriter, contractOp.getKind(), disAcc.getType());
 
     auto localContractOp = rewriter.create<vector::ContractionOp>(
-        loc, disLhs, disRhs, localInit, contractOp.getIndexingMaps(),
-        contractOp.getIteratorTypes());
+        loc, disLhs, disRhs, localInit, rewriter.getAffineMapArrayAttr(newMaps),
+        rewriter.getArrayAttr(newIterators));
     localContractOp->setDiscardableAttrs(
         contractOp->getDiscardableAttrDictionary());
 
@@ -682,16 +706,41 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     int64_t numElements = shaped.getNumElements();
     SmallVector<int64_t> flatShape(1, numElements);
     VectorType flatVecType = VectorType::get(flatShape, accElemTy);
-    VectorValue flat =
-        rewriter.create<vector::ShapeCastOp>(loc, flatVecType, accElemTy);
+    VectorValue flat = rewriter.create<vector::ShapeCastOp>(loc, flatVecType,
+                                                            localContractValue);
 
     // Do inter-thread/warp reduce.
     FailureOr<VectorValue> threadReduced = doThreadReduction(
-        rewriter, srcLayout, flat, multiReduceOp.getKind(), reducedDims);
+        rewriter, lhsLayout, flat, contractOp.getKind(), reducedDims);
     if (failed(threadReduced)) {
       return failure();
     }
-    return failure();
+
+    // Do reduction against accumulator, which needs to be done after thread
+    // reduction.
+    VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
+        loc, shaped, threadReduced.value());
+
+    if (!accVector) {
+      disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
+    }
+
+    Value accReduction = vector::makeArithReduction(
+        rewriter, loc, contractOp.getKind(), unflattened, disAcc);
+    auto accReduced = dyn_cast<VectorValue>(accReduction);
+    if (!accReduced) {
+      return failure();
+    }
+
+    if (resVector) {
+      replaceOpWithDistributedValues(rewriter, contractOp, accReduced);
+    } else {
+      Value accReducedVal = rewriter.create<vector::ExtractOp>(
+          loc, accReduction, SmallVector<int64_t>{0});
+      replaceOpWithDistributedValues(rewriter, contractOp, accReducedVal);
+    }
+
+    return success();
     // NestedLayoutAttr accLayout =
     //     dyn_cast<NestedLayoutAttr>(signature[resultValue]);
     // if (!accLayout) {

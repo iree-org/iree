@@ -107,7 +107,6 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
     Type elementType = constant.getType().getElementType();
     auto vectorType =
         VectorType::get(layout.getDistributedShape(), elementType);
-
     //@Bangtian: will revisit this part later
     bool isScalar = cast<ShapedType>(vectorType).getRank() == 0;
     if (!isScalar) {
