@@ -305,7 +305,9 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     auto vectorType = VectorType::get(distShape, elementType);
 
     VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
-    if (!srcVector) {
+    // If the srcVector is a scalar (like f32) or a rank-0 vector (like
+    // vector<f32>), we proceed with the scalar distribution branch.
+    if (!srcVector || !isNonZeroRank(srcVector)) {
       // The way distribution currently works, there is no partial thread
       // distribution, so a scalar is available to all threads. Scalar
       // distribution is simply a broadcast from scalar to the distributed
@@ -413,16 +415,10 @@ struct DistributeMultiReduction final
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue srcVector = multiReduceOp.getSource();
-    auto accVector = dyn_cast<VectorValue>(multiReduceOp.getAcc());
-    if (!accVector) {
-      return rewriter.notifyMatchFailure(
-          multiReduceOp, "unimplemented: scalar accumulator distribution");
-    }
-    auto resVector = dyn_cast<VectorValue>(multiReduceOp.getResult());
-    if (!resVector) {
-      return rewriter.notifyMatchFailure(
-          multiReduceOp, "unimplemented: scalar result distribution");
-    }
+    Value acc = multiReduceOp.getAcc();
+    Value res = multiReduceOp.getResult();
+    auto accVector = dyn_cast<VectorValue>(acc);
+    auto resVector = dyn_cast<VectorValue>(res);
 
     auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
@@ -440,8 +436,14 @@ struct DistributeMultiReduction final
 
     VectorValue disSrc =
         getDistributed(rewriter, srcVector, signature[srcVector]);
-    VectorValue disAcc =
-        getDistributed(rewriter, accVector, signature[accVector]);
+
+    Value disAcc;
+    if (accVector) {
+      disAcc = getDistributed(rewriter, accVector, signature[accVector]);
+    } else {
+      // Scalars are always distributed to all threads already.
+      disAcc = multiReduceOp.getAcc();
+    }
 
     Location loc = multiReduceOp.getLoc();
 
@@ -462,7 +464,16 @@ struct DistributeMultiReduction final
     auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
-    auto locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+
+    VectorValue locallyReduced;
+    if (accVector) {
+      locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+    } else {
+      // Broadcast scalar accumulator to vector.
+      VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
+      locallyReduced = rewriter.create<vector::BroadcastOp>(
+          loc, vecType, localReduction.getResult());
+    }
 
     assert(locallyReduced && "result should have been a vector");
 
@@ -485,15 +496,30 @@ struct DistributeMultiReduction final
     // reduction.
     VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
         loc, shaped, threadReduced.value());
+
+    if (!accVector) {
+      // Broadcast the scalar (e.g., f32) to a vector type (e.g., vector<f32>)
+      // because the following implementation requires the operand to be a
+      // vector.
+      disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
+    }
+
     Value accReduction = vector::makeArithReduction(
         rewriter, loc, multiReduceOp.getKind(), unflattened, disAcc);
     auto accReduced = dyn_cast<VectorValue>(accReduction);
     if (!accReduced) {
       return failure();
     }
-    replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
 
-    return failure();
+    if (resVector) {
+      replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
+    } else {
+      Value accReducedVal = rewriter.create<vector::ExtractOp>(
+          loc, accReduction, ArrayRef{int64_t(0)});
+      replaceOpWithDistributedValues(rewriter, multiReduceOp, accReducedVal);
+    }
+
+    return success();
   }
 
   FailureOr<VectorValue> doThreadReduction(RewriterBase &rewriter,

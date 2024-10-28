@@ -212,6 +212,10 @@ getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   return computeFn;
 }
 
+bool isNonZeroRank(TypedValue<VectorType> val) {
+  return val.getType().getRank() != 0;
+}
+
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//

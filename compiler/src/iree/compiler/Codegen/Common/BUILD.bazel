@@ -78,6 +78,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:VectorDialect",
     ],
 )
