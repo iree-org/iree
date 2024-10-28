@@ -18,8 +18,6 @@
 
 namespace mlir::iree_compiler {
 
-using VectorValue = TypedValue<VectorType>;
-
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
 
@@ -108,7 +106,7 @@ FailureOr<scf::SCFTileSizeComputationFunction>
 getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
 /// Returns true iff the rank of the input value 'val' is non-zero.
-bool isNonZeroRank(VectorValue val);
+bool isNonZeroRank(TypedValue<VectorType> val);
 
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
