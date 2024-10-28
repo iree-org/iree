@@ -584,12 +584,10 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     SmallVector<Value> operands;
     for (Value operand : yieldOp->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        // Check if the operand is a vector type (e.g., vector<f32>), which
-        // passes this condition as it is indeed a vector. However, distributing
-        // the operand requires it to have a non-zero rank, meaning it must have
-        // at least one dimension. To ensure this, we add a necessary rank
-        // check. If the vector has a non-zero rank, the operand is distributed
-        // according to the provided layout signature.
+        // Distributing the operand requires it to have a non-zero rank, meaning
+        // it must have at least one dimension. If the vector has a non-zero
+        // rank, the operand is distributed according to the provided layout
+        // signature.
         if (isNonZeroRank(vectorOperand)) {
           operand = DistributionPattern::getDistributed(
               rewriter, vectorOperand, signature[vectorOperand]);
