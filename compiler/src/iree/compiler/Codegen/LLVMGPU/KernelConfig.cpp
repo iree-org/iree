@@ -833,6 +833,15 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
+
+  SmallVector<NamedAttribute, 2> decompositionConfig;
+  decompositionConfig.emplace_back(
+      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getQKAttrStr(), qkAttrDict));
+  decompositionConfig.emplace_back(
+      b.getNamedAttr(IREE::LinalgExt::AttentionOp::getPVAttrStr(), pvAttrDict));
+
+  DictionaryAttr decompositionConfigDict;
+
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
@@ -851,8 +860,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
-  op->setAttr("qk_attrs", qkAttrDict);
-  op->setAttr("pv_attrs", pvAttrDict);
+  // Set attention decomposition control config.
+  op.setDecompositionConfigAttr(decompositionConfigDict);
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
       workgroupSize, targetSubgroupSize, pipelineConfig);

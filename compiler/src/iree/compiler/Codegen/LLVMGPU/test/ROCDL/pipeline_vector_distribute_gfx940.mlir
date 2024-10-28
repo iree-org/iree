@@ -689,8 +689,8 @@ hal.executable private @attention_20x4096x64x4096x64 {
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>],
                      lowering_config = #config,
-                     qk_attrs = {attention_qk_matmul},
-                     pv_attrs = {attention_pv_matmul}}
+                     decomposition_config = {qk_attrs = {attention_qk_matmul},
+                                             pv_attrs = {attention_pv_matmul}}}
                      ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
@@ -761,8 +761,8 @@ hal.executable private @attention_multiple_m_transpose {
                                                          affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>],
                                                          lowering_config = #config,
-                                                         qk_attrs = {attention_qk_matmul},
-                                                         pv_attrs = {attention_pv_matmul}}
+                                                         decomposition_config = {qk_attrs = {attention_qk_matmul},
+                                                                                 pv_attrs = {attention_pv_matmul}}}
         ins(%4, %5, %6, %cst : tensor<24x64x4608x128xf16>, tensor<24x4608x128xf16>, tensor<24x4608x128xf16>, f16) outs(%8 : tensor<24x64x4608x128xf16>) {
               ^bb0(%score: f32):
                 iree_linalg_ext.yield %score : f32
@@ -827,8 +827,8 @@ hal.executable private @attention_mfma_32x32x8 {
                                                          affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>],
                                                          lowering_config = #config,
-                                                         qk_attrs = {attention_qk_matmul},
-                                                         pv_attrs = {attention_pv_matmul}}
+                                                         decomposition_config = {qk_attrs = {attention_qk_matmul},
+                                                                                 pv_attrs = {attention_pv_matmul}}}
         ins(%4, %5, %6, %cst : tensor<24x64x4608x128xf16>, tensor<24x4608x128xf16>, tensor<24x4608x128xf16>, f16) outs(%8 : tensor<24x64x4608x128xf16>) {
               ^bb0(%score: f32):
                 iree_linalg_ext.yield %score : f32

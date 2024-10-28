@@ -313,9 +313,13 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldMax = getMax();
   Value oldSum = getSum();
   Type elementType = getElementTypeOrSelf(getOutput().getType());
+  DictionaryAttr config = getDecompositionConfigAttr();
 
-  auto qkAttrs = (*this)->getAttrOfType<DictionaryAttr>("qk_attrs");
-  auto pvAttrs = (*this)->getAttrOfType<DictionaryAttr>("pv_attrs");
+  DictionaryAttr qkAttrs, pvAttrs;
+  if (config) {
+    qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
+    pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+  }
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(getIndexingMapsArray());
