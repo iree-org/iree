@@ -393,9 +393,9 @@ static void iree_hal_deferred_work_queue_working_area_initialize(
   iree_notification_initialize(&working_area->state_notification);
   iree_hal_deferred_work_queue_ready_action_list_deinitialize(
       &working_area->ready_worklist, host_allocator);
-  iree_atomic_store_int32(&working_area->worker_state,
-                          IREE_HAL_WORKER_STATE_IDLE_WAITING,
-                          iree_memory_order_release);
+  iree_atomic_store(&working_area->worker_state,
+                    IREE_HAL_WORKER_STATE_IDLE_WAITING,
+                    iree_memory_order_release);
 }
 
 static void iree_hal_deferred_work_queue_working_area_deinitialize(
@@ -413,9 +413,9 @@ static void iree_hal_deferred_work_queue_completion_area_initialize(
   iree_notification_initialize(&completion_area->state_notification);
   iree_hal_deferred_work_queue_completion_list_initialize(
       &completion_area->completion_list);
-  iree_atomic_store_int32(&completion_area->worker_state,
-                          IREE_HAL_WORKER_STATE_IDLE_WAITING,
-                          iree_memory_order_release);
+  iree_atomic_store(&completion_area->worker_state,
+                    IREE_HAL_WORKER_STATE_IDLE_WAITING,
+                    iree_memory_order_release);
 }
 
 static void iree_hal_deferred_work_queue_completion_area_deinitialize(
@@ -557,17 +557,17 @@ static iree_hal_deferred_work_queue_t* iree_hal_deferred_work_queue_cast(
 
 static void iree_hal_deferred_work_queue_notify_worker_thread(
     iree_hal_deferred_work_queue_working_area_t* working_area) {
-  iree_atomic_store_int32(&working_area->worker_state,
-                          IREE_HAL_WORKER_STATE_WORKLOAD_PENDING,
-                          iree_memory_order_release);
+  iree_atomic_store(&working_area->worker_state,
+                    IREE_HAL_WORKER_STATE_WORKLOAD_PENDING,
+                    iree_memory_order_release);
   iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
 }
 
 static void iree_hal_deferred_work_queue_notify_completion_thread(
     iree_hal_deferred_work_queue_completion_area_t* completion_area) {
-  iree_atomic_store_int32(&completion_area->worker_state,
-                          IREE_HAL_WORKER_STATE_WORKLOAD_PENDING,
-                          iree_memory_order_release);
+  iree_atomic_store(&completion_area->worker_state,
+                    IREE_HAL_WORKER_STATE_WORKLOAD_PENDING,
+                    iree_memory_order_release);
   iree_notification_post(&completion_area->state_notification,
                          IREE_ALL_WAITERS);
 }
@@ -1236,14 +1236,14 @@ iree_status_t iree_hal_deferred_work_queue_issue(
 
 static bool iree_hal_deferred_work_queue_worker_has_incoming_request(
     iree_hal_deferred_work_queue_working_area_t* working_area) {
-  iree_hal_deferred_work_queue_worker_state_t value = iree_atomic_load_int32(
-      &working_area->worker_state, iree_memory_order_acquire);
+  iree_hal_deferred_work_queue_worker_state_t value =
+      iree_atomic_load(&working_area->worker_state, iree_memory_order_acquire);
   return value == IREE_HAL_WORKER_STATE_WORKLOAD_PENDING;
 }
 
 static bool iree_hal_deferred_work_queue_completion_has_incoming_request(
     iree_hal_deferred_work_queue_completion_area_t* completion_area) {
-  iree_hal_deferred_work_queue_worker_state_t value = iree_atomic_load_int32(
+  iree_hal_deferred_work_queue_worker_state_t value = iree_atomic_load(
       &completion_area->worker_state, iree_memory_order_acquire);
   return value == IREE_HAL_WORKER_STATE_WORKLOAD_PENDING;
 }
@@ -1369,9 +1369,9 @@ static int iree_hal_deferred_work_queue_completion_execute(
     // sure that we don't accidentally ignore new workload pushed after done
     // ready list processing but before overwriting the state from this worker
     // thread.
-    iree_atomic_store_int32(&completion_area->worker_state,
-                            IREE_HAL_WORKER_STATE_IDLE_WAITING,
-                            iree_memory_order_release);
+    iree_atomic_store(&completion_area->worker_state,
+                      IREE_HAL_WORKER_STATE_IDLE_WAITING,
+                      iree_memory_order_release);
     iree_hal_deferred_work_queue_worker_process_completion(actions);
 
     iree_slim_mutex_lock(&actions->action_mutex);
@@ -1424,9 +1424,9 @@ static int iree_hal_deferred_work_queue_worker_execute(
     // sure that we don't accidentally ignore new workload pushed after done
     // ready list processing but before overwriting the state from this worker
     // thread.
-    iree_atomic_store_int32(&working_area->worker_state,
-                            IREE_HAL_WORKER_STATE_IDLE_WAITING,
-                            iree_memory_order_release);
+    iree_atomic_store(&working_area->worker_state,
+                      IREE_HAL_WORKER_STATE_IDLE_WAITING,
+                      iree_memory_order_release);
 
     iree_hal_deferred_work_queue_worker_process_ready_list(actions);
 

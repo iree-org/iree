@@ -32,8 +32,8 @@ iree_status_t iree_task_poller_initialize(
   // thread as it performs the initial resume of the wait thread. We'll need to
   // check in enqueue to see if the wait thread needs to be resumed.
   // initial_state = IREE_TASK_POLLER_STATE_SUSPENDED;
-  iree_atomic_store_int32(&out_poller->state, initial_state,
-                          iree_memory_order_release);
+  iree_atomic_store(&out_poller->state, initial_state,
+                    iree_memory_order_release);
 
   // Acquire an event we can use to wake the wait thread from other threads.
   iree_status_t status = iree_event_pool_acquire(
@@ -83,7 +83,7 @@ void iree_task_poller_request_exit(iree_task_poller_t* poller) {
   // If the thread is already in the exiting/zombie state we don't need to do
   // anything.
   iree_task_poller_state_t prev_state =
-      (iree_task_poller_state_t)iree_atomic_exchange_int32(
+      (iree_task_poller_state_t)iree_atomic_exchange(
           &poller->state, IREE_TASK_POLLER_STATE_EXITING,
           iree_memory_order_acq_rel);
   switch (prev_state) {
@@ -93,8 +93,8 @@ void iree_task_poller_request_exit(iree_task_poller_t* poller) {
       break;
     case IREE_TASK_POLLER_STATE_ZOMBIE:
       // Poller already exited; reset state to ZOMBIE.
-      iree_atomic_store_int32(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
-                              iree_memory_order_release);
+      iree_atomic_store(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
+                        iree_memory_order_release);
       break;
     default:
       // Poller now set to EXITING and should exit soon.
@@ -111,7 +111,7 @@ void iree_task_poller_request_exit(iree_task_poller_t* poller) {
 // Returns true if the wait thread is in the zombie state (exited and awaiting
 // teardown).
 static bool iree_task_poller_is_zombie(iree_task_poller_t* poller) {
-  return iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
+  return iree_atomic_load(&poller->state, iree_memory_order_acquire) ==
          IREE_TASK_POLLER_STATE_ZOMBIE;
 }
 
@@ -240,8 +240,8 @@ static iree_task_poller_prepare_result_t iree_task_poller_prepare_task(
     // scan of tasks.
     wait_status_code = IREE_STATUS_OK;
   } else if (task->cancellation_flag != NULL &&
-             iree_atomic_load_int32(task->cancellation_flag,
-                                    iree_memory_order_acquire) != 0) {
+             iree_atomic_load(task->cancellation_flag,
+                              iree_memory_order_acquire) != 0) {
     // Task was cancelled by the user (or a wait-any). These retire without
     // failure and it's up to the user to handle what happens to them.
     wait_status_code = IREE_STATUS_CANCELLED;
@@ -313,8 +313,8 @@ static iree_task_poller_prepare_result_t iree_task_poller_prepare_task(
   // If this was part of a wait-any operation then set the cancellation flag
   // such that other waits are cancelled.
   if (iree_any_bit_set(task->header.flags, IREE_TASK_FLAG_WAIT_ANY)) {
-    if (iree_atomic_fetch_add_int32(task->cancellation_flag, 1,
-                                    iree_memory_order_release) == 0) {
+    if (iree_atomic_fetch_add(task->cancellation_flag, 1,
+                              iree_memory_order_release) == 0) {
       // Ensure we scan again to clean up any potentially cancelled tasks.
       // If this was task 4 in a wait-any list then tasks 0-3 need to be
       // retired.
@@ -429,7 +429,7 @@ static void iree_task_poller_wake_task(iree_task_poller_t* poller,
 // wait handles were resolved.
 static void iree_task_poller_commit_wait(iree_task_poller_t* poller,
                                          iree_time_t deadline_ns) {
-  if (iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
+  if (iree_atomic_load(&poller->state, iree_memory_order_acquire) ==
       IREE_TASK_POLLER_STATE_EXITING) {
     // Thread exit requested - don't block shutdown.
     return;
@@ -486,7 +486,7 @@ static void iree_task_poller_commit_wait(iree_task_poller_t* poller,
 static void iree_task_poller_pump_until_exit(iree_task_poller_t* poller) {
   while (true) {
     // Check state to see if we've been asked to exit.
-    if (iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
+    if (iree_atomic_load(&poller->state, iree_memory_order_acquire) ==
         IREE_TASK_POLLER_STATE_EXITING) {
       // Thread exit requested - cancel pumping.
       break;
@@ -536,8 +536,8 @@ static int iree_task_poller_main(iree_task_poller_t* poller) {
   // to exit while suspended/still starting up, so check that here before we
   // mess with any data structures.
   const bool should_run =
-      iree_atomic_exchange_int32(&poller->state, IREE_TASK_POLLER_STATE_RUNNING,
-                                 iree_memory_order_acq_rel) !=
+      iree_atomic_exchange(&poller->state, IREE_TASK_POLLER_STATE_RUNNING,
+                           iree_memory_order_acq_rel) !=
       IREE_TASK_POLLER_STATE_EXITING;
   if (IREE_LIKELY(should_run)) {
     // << work happens here >>
@@ -545,8 +545,8 @@ static int iree_task_poller_main(iree_task_poller_t* poller) {
   }
 
   IREE_TRACE_ZONE_END(thread_zone);
-  iree_atomic_store_int32(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
-                          iree_memory_order_release);
+  iree_atomic_store(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
+                    iree_memory_order_release);
   iree_notification_post(&poller->state_notification, IREE_ALL_WAITERS);
   return 0;
 }

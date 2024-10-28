@@ -61,25 +61,25 @@ typedef iree_atomic_int64_t iree_atomic_task_affinity_set_t;
 
 static inline iree_task_affinity_set_t iree_atomic_task_affinity_set_load(
     iree_atomic_task_affinity_set_t* set, iree_memory_order_t order) {
-  return iree_atomic_load_int64(set, order);
+  return iree_atomic_load(set, order);
 }
 
 static inline void iree_atomic_task_affinity_set_store(
     iree_atomic_task_affinity_set_t* set, iree_task_affinity_set_t value,
     iree_memory_order_t order) {
-  iree_atomic_store_int64(set, value, order);
+  iree_atomic_store(set, value, order);
 }
 
 static inline iree_task_affinity_set_t iree_atomic_task_affinity_set_fetch_and(
     iree_atomic_task_affinity_set_t* set, iree_task_affinity_set_t value,
     iree_memory_order_t order) {
-  return iree_atomic_fetch_and_int64(set, value, order);
+  return iree_atomic_fetch_and(set, value, order);
 }
 
 static inline iree_task_affinity_set_t iree_atomic_task_affinity_set_fetch_or(
     iree_atomic_task_affinity_set_t* set, iree_task_affinity_set_t value,
     iree_memory_order_t order) {
-  return iree_atomic_fetch_or_int64(set, value, order);
+  return iree_atomic_fetch_or(set, value, order);
 }
 
 #ifdef __cplusplus

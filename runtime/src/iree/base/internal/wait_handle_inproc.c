@@ -240,7 +240,7 @@ static bool iree_wait_set_check(const iree_wait_set_check_params_t* params) {
     iree_wait_handle_t* wait_handle = &params->set->handles[i];
     iree_futex_handle_t* futex =
         (iree_futex_handle_t*)wait_handle->value.local_futex;
-    if (iree_atomic_load_int64(&futex->value, iree_memory_order_acquire) != 0) {
+    if (iree_atomic_load(&futex->value, iree_memory_order_acquire) != 0) {
       ++ready_count;
       if (params->wake_handle) {
         *params->wake_handle = *wait_handle;
@@ -292,7 +292,7 @@ iree_status_t iree_wait_any(iree_wait_set_t* set, iree_time_t deadline_ns,
 }
 
 static bool iree_futex_handle_check(iree_futex_handle_t* futex) {
-  return iree_atomic_load_int64(&futex->value, iree_memory_order_acquire) != 0;
+  return iree_atomic_load(&futex->value, iree_memory_order_acquire) != 0;
 }
 
 iree_status_t iree_wait_one(iree_wait_handle_t* handle,
@@ -335,8 +335,8 @@ iree_status_t iree_event_initialize(bool initial_state,
   if (iree_status_is_ok(status)) {
     out_event->type = IREE_WAIT_PRIMITIVE_TYPE_LOCAL_FUTEX;
     out_event->value.local_futex = (void*)futex;
-    iree_atomic_store_int64(&futex->value, initial_state ? 1 : 0,
-                            iree_memory_order_release);
+    iree_atomic_store(&futex->value, initial_state ? 1 : 0,
+                      iree_memory_order_release);
     iree_notification_initialize(&futex->notification);
   }
 
@@ -358,8 +358,7 @@ void iree_event_set(iree_event_t* event) {
   // Try to transition from unset -> set.
   // No-op if already set and otherwise we successfully signaled the event and
   // need to notify all waiters.
-  if (iree_atomic_exchange_int64(&futex->value, 1, iree_memory_order_release) ==
-      0) {
+  if (iree_atomic_exchange(&futex->value, 1, iree_memory_order_release) == 0) {
     // Notify those waiting on just this event.
     iree_notification_post(&futex->notification, IREE_ALL_WAITERS);
     // Notify any multi-waits that may have this event as part of their set.
@@ -371,7 +370,7 @@ void iree_event_reset(iree_event_t* event) {
   if (!event) return;
   iree_futex_handle_t* futex = (iree_futex_handle_t*)event->value.local_futex;
   if (!futex) return;
-  iree_atomic_store_int64(&futex->value, 0, iree_memory_order_release);
+  iree_atomic_store(&futex->value, 0, iree_memory_order_release);
 }
 
 #endif  // IREE_WAIT_API == IREE_WAIT_API_INPROC
