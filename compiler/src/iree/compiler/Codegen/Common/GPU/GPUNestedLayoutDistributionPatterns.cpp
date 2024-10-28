@@ -420,14 +420,6 @@ struct DistributeMultiReduction final
     auto accVector = dyn_cast<VectorValue>(acc);
     auto resVector = dyn_cast<VectorValue>(res);
 
-    Type accElemTy = getElementTypeOrSelf(acc.getType());
-    Type resElemTy = getElementTypeOrSelf(res.getType());
-
-    if (!accElemTy.isIntOrFloat() || !resElemTy.isIntOrFloat()) {
-      return rewriter.notifyMatchFailure(multiReduceOp,
-                                         "unsupported reduction type");
-    }
-
     auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
       return rewriter.notifyMatchFailure(multiReduceOp,
@@ -449,6 +441,7 @@ struct DistributeMultiReduction final
     if (accVector) {
       disAcc = getDistributed(rewriter, accVector, signature[accVector]);
     } else {
+      // Scalars are always distributed to all threads already.
       disAcc = multiReduceOp.getAcc();
     }
 
@@ -476,6 +469,7 @@ struct DistributeMultiReduction final
     if (accVector) {
       locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
     } else {
+      // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
       locallyReduced = rewriter.create<vector::BroadcastOp>(
           loc, vecType, localReduction.getResult());
@@ -504,6 +498,9 @@ struct DistributeMultiReduction final
         loc, shaped, threadReduced.value());
 
     if (!accVector) {
+      // Broadcast the scalar (e.g., f32) to a vector type (e.g., vector<f32>)
+      // because the following implementation requires the operand to be a
+      // vector.
       disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
     }
 
