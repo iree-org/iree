@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -56,8 +57,10 @@ struct SPIRVTrimExecutableTargetEnvPass final
     // Replace the provided allow list to the minimal requirement deduced
     // from compilation.
     IREE::HAL::ExecutableTargetAttr providedTarget = variant.getTarget();
-    auto deducedConfig = providedTarget.getConfiguration().replace(
-        [&](spirv::TargetEnvAttr attr) { return minimalTarget; });
+    auto deducedConfig =
+        getTargetConfig(providedTarget).replace([&](spirv::TargetEnvAttr attr) {
+          return minimalTarget;
+        });
     auto deducedTarget = IREE::HAL::ExecutableTargetAttr::get(
         providedTarget.getContext(), providedTarget.getBackend(),
         providedTarget.getFormat(), cast<DictionaryAttr>(deducedConfig));

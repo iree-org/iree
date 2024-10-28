@@ -28,7 +28,7 @@ struct TestExecutablePreprocessingPass final
     // configuration. A real pipeline would use the target information to do
     // whatever it needed to the executable instead.
     getOperation()->walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
-      auto configAttr = variantOp.getTarget().getConfiguration();
+      auto configAttr = getTargetConfig(variantOp.getTarget());
       if (!configAttr)
         return;
       auto replacementAttr = configAttr.getAs<IntegerAttr>("replace_i64");

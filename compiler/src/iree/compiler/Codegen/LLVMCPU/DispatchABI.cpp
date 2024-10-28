@@ -882,7 +882,7 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
 
   // Lookup CPU features.
   std::optional<NamedAttribute> cpuFeatures =
-      targetAttr.getConfiguration().getNamed("cpu_features");
+      getTargetConfig(targetAttr).getNamed("cpu_features");
   if (!cpuFeatures) {
     return processorDataPtrValue;
   }

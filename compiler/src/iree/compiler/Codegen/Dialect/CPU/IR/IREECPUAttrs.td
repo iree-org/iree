@@ -19,6 +19,7 @@ def IREECPU_VMVXEncodingSolverAttr :
     AttrDef<IREECPU_Dialect, "VMVXEncodingSolver", [
   DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [
     "calculateStorageElementCountInBytes",
+    "getTargetConfig",
   ]>
 ]> {
   let mnemonic = "vmvx_encoding_solver";
@@ -26,8 +27,6 @@ def IREECPU_VMVXEncodingSolverAttr :
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  // The target configuration (from HAL::ExecutableTargetAttr) needs to be
-  // initalized. Otherwise, it is not able to resolve encodings.
   let parameters = (ins
     AttrParameter<"DictionaryAttr", "">:$target_configuration
   );

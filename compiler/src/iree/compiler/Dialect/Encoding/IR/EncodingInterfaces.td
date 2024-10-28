@@ -33,6 +33,21 @@ def IREEEncoding_EncodingSolverInterfaceAttr :
       /*defaultImplementation=*/[{
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the actual config that used in the solver. The config is
+        expected to be wrapped into the encoding. Otherwise, we will duplicate
+        the configuration in EncodingSolver and HAL::ExecutableTarget.
+      }],
+      /*retTy=*/"::mlir::DictionaryAttr",
+      /*methodName=*/"getTargetConfig",
+      /*args=*/(ins
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
     >
   ];
 }
