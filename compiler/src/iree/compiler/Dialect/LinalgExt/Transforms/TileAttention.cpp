@@ -106,7 +106,8 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       loc, TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
       mask, accFill, maxFill, sumFill,
-      rewriter.getAffineMapArrayAttr(indexingMaps));
+      rewriter.getAffineMapArrayAttr(indexingMaps),
+      attnOp.getDecompositionConfigAttr());
 
   rewriter.cloneRegionBefore(attnOp.getRegion(), onlineAttn.getRegion(),
                              onlineAttn.getRegion().begin());

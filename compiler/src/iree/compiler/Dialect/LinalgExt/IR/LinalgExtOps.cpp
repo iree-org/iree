@@ -1213,7 +1213,7 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
-        indexingMaps);
+        indexingMaps, DictionaryAttr());
 }
 
 LogicalResult AttentionOp::verify() {
@@ -1388,7 +1388,7 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
-        max, sum, indexingMaps);
+        max, sum, indexingMaps, DictionaryAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {
