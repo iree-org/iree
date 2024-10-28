@@ -127,10 +127,12 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
-  // 1. Do some simple elementwise op fusion. This could be skipped,
-  //    but could reduce the surface area of ops to handle later.
   FunctionLikeNest(passManager)
+      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
       .addPass(DispatchCreation::createFusionPreprocessingPass)
+      // 1. Do some simple elementwise op fusion. This could be skipped,
+      //    but could reduce the surface area of ops to handle later.
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
@@ -295,12 +297,6 @@ void buildDispatchCreationPassPipeline(
     passManager.addPass(
         IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
   }
-
-  FunctionLikeNest(passManager)
-      // Preprocess the input to a form more amenable for fusion.
-      .addPass(DispatchCreation::createFusionPreprocessingPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
   addDispatchRegionCreationPasses(passManager);
