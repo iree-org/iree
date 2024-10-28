@@ -323,7 +323,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   }
 
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+  if (semaphore->current_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     iree_slim_mutex_unlock(&semaphore->mutex);
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_ABORTED);
@@ -346,7 +346,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   }
 
   iree_slim_mutex_lock(&semaphore->mutex);
-  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+  if (semaphore->current_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     status = iree_make_status(IREE_STATUS_ABORTED);
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
@@ -440,7 +440,7 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
     iree_hal_hip_semaphore_t* semaphore =
         iree_hal_hip_semaphore_cast(semaphore_list.semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
-    if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+    if (semaphore->current_value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       status = iree_make_status(IREE_STATUS_ABORTED);
       break;

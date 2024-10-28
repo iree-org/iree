@@ -882,7 +882,7 @@ TEST_F(SemaphoreSubmissionTest, PropagateFailSignal) {
   EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore2, &value);
-  EXPECT_EQ(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(query_status, status);
 
   signal_thread.join();
