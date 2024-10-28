@@ -133,7 +133,7 @@ func.func @load_non_full_slice() {
   return
 }
 // CHECK-LABEL: func.func @load_non_full_slice
-// CHECK:         tensor.pack
+// CHECK-NOT:     tensor.pack
 
 // -----
 
@@ -152,7 +152,7 @@ func.func @store_non_full_slice() {
   return
 }
 // CHECK-LABEL: func.func @store_non_full_slice
-// CHECK:         tensor.unpack
+// CHECK-NOT:     tensor.unpack
 
 // -----
 
