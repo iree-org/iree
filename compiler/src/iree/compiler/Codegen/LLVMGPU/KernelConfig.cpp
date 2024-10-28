@@ -840,7 +840,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   decompositionConfig.emplace_back(
       b.getNamedAttr(IREE::LinalgExt::AttentionOp::getPVAttrStr(), pvAttrDict));
 
-  DictionaryAttr decompositionConfigDict;
+  DictionaryAttr decompositionConfigDict =
+      b.getDictionaryAttr(decompositionConfig);
 
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
