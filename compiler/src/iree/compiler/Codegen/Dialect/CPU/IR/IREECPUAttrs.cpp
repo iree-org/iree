@@ -92,10 +92,6 @@ OpFoldResult VMVXEncodingSolverAttr::calculateStorageElementCountInBytes(
   return mulAll(builder, loc, shape);
 }
 
-DictionaryAttr VMVXEncodingSolverAttr::getTargetConfig() const {
-  return getTargetConfiguration();
-}
-
 //===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//

@@ -19,7 +19,6 @@ def IREECPU_VMVXEncodingSolverAttr :
     AttrDef<IREECPU_Dialect, "VMVXEncodingSolver", [
   DeclareAttrInterfaceMethods<IREEEncoding_EncodingSolverInterfaceAttr, [
     "calculateStorageElementCountInBytes",
-    "getTargetConfig",
   ]>
 ]> {
   let mnemonic = "vmvx_encoding_solver";

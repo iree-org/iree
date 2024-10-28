@@ -33,19 +33,6 @@ def IREEEncoding_EncodingSolverInterfaceAttr :
       /*defaultImplementation=*/[{
         return {};
       }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the actual config that used in the solver.
-      }],
-      /*retTy=*/"::mlir::DictionaryAttr",
-      /*methodName=*/"getTargetConfig",
-      /*args=*/(ins
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return {};
-      }]
     >
   ];
 }
