@@ -489,6 +489,7 @@ IREE_API_EXPORT iree_status_t iree_io_parameters_module_create(
       .destroy = iree_io_parameters_module_destroy,
       .alloc_state = iree_io_parameters_module_alloc_state,
       .free_state = iree_io_parameters_module_free_state,
+      .fork_state = iree_io_parameters_module_fork_state,
       .notify = iree_io_parameters_module_notify,
   };
 
