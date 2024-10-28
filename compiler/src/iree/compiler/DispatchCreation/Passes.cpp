@@ -130,6 +130,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   // 1. Do some simple elementwise op fusion. This could be skipped,
   //    but could reduce the surface area of ops to handle later.
   FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createFusionPreprocessingPass)
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
@@ -148,6 +149,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
 
       // 3. Perform elementwise operation fusion again (now with higher
       //    dimensionality).
+      .addPass(DispatchCreation::createFusionPreprocessingPass)
       .addPass([]() {
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{
