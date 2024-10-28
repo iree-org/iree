@@ -1348,6 +1348,27 @@ LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.workload.ordinal
+//===----------------------------------------------------------------------===//
+
+void DispatchWorkloadOrdinalOp::inferResultDivisibility(
+    ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+    IREE::Util::SetIntDivisibilityFn setResultDivisibility) {
+  if (argDivs[0].isUninitialized()) {
+    setResultDivisibility(getResult(),
+                          IREE::Util::ConstantIntDivisibility(1, 1));
+    return;
+  }
+  setResultDivisibility(getResult(), argDivs[0].getValue());
+}
+
+void DispatchWorkloadOrdinalOp::inferResultRanges(
+    ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRange) {
+  assert(!argRanges.empty() && "expected range of input to be set");
+  setResultRange(getResult(), argRanges[0]);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.executable
 //===----------------------------------------------------------------------===//
 
