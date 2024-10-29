@@ -269,6 +269,10 @@ public:
     buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildLLVMGPULinkingPassPipeline(passManager, "rocm");
+  }
+
   // Performs optimizations on |module| (including LTO-style whole-program
   // ones). Inspired by code section in
   // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
