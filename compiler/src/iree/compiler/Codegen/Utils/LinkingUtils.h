@@ -19,6 +19,11 @@ gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps);
 // TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h version.
 // Only difference is one has the symbol map that we don't even need.
 
+static inline bool allowRenamingPrivateSymbols(Operation *op) {
+  return SymbolTable::getSymbolVisibility(op) ==
+         SymbolTable::Visibility::Private;
+}
+
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
 // |targetSymbolMap| is updated with the new symbols.
 //
@@ -29,7 +34,9 @@ gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps);
 // symbol tracked in |targetSymbolMap|.
 LogicalResult
 mergeModuleInto(Operation *sourceModuleOp, Operation *targetModuleOp,
-                DenseMap<StringRef, Operation *> &targetSymbolMap);
+                DenseMap<StringRef, Operation *> &targetSymbolMap,
+                std::function<bool(mlir::Operation *op)> canRenameSymbol =
+                    allowRenamingPrivateSymbols);
 
 // Links all executables for the current target found in |moduleOp| into
 // |linkedExecutableOp|. Functions will be moved into |linkedModuleOp|.

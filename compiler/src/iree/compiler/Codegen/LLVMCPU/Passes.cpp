@@ -827,9 +827,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
 
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
-void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager) {
+void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager,
+                                     std::optional<std::string> target) {
   // Link together executables. This may produce some IR duplication.
-  modulePassManager.addPass(createLLVMCPULinkExecutablesPass());
+  LLVMCPULinkExecutablesPassOptions linkOptions;
+  linkOptions.target = target.value_or("");
+  modulePassManager.addPass(createLLVMCPULinkExecutablesPass(linkOptions));
 
   // Cleanup IR duplication.
   modulePassManager.addNestedPass<IREE::HAL::ExecutableOp>(
