@@ -631,6 +631,19 @@ MMASingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
   return getSingleSubgroupLayout(getIntrinsic().getValue(), MMAFragment::Acc);
 }
 
+// Get virtual intrinsics that is composed/based on queried op.
+SmallVector<MMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+    return {MMAIntrinsic::VMFMA_F32_16x16x32_F16};
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+    return {MMAIntrinsic::VMFMA_F32_16x16x32_F16};
+  default:
+    return {};
+  }
+  return {};
+}
+
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
 FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
