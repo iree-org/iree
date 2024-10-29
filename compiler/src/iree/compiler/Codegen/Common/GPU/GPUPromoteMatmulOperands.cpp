@@ -56,7 +56,8 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
 
     // We only support thread tile size derivation of linalgOp and Im2colOp for
     // now.
-    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(op)) {
+    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(
+            producer.getOperation())) {
       setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
                                       builder.getContext()));
       return;
