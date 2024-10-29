@@ -1220,6 +1220,25 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
   });
 }
 
+// NOTE: this runs on the top-level program module containing all
+// hal.executable ops.
+void buildLLVMGPULinkingPassPipeline(OpPassManager &modulePassManager,
+                                     std::optional<std::string> target) {
+  // Link together executables. This may produce some IR duplication.
+  LLVMGPULinkExecutablesPassOptions linkOptions;
+  linkOptions.target = target.value_or("");
+  modulePassManager.addPass(createLLVMGPULinkExecutablesPass(linkOptions));
+
+  // Cleanup IR duplication.
+  modulePassManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      mlir::createCanonicalizerPass());
+
+  // Assign final executable constant and import ordinals.
+  auto &variantPassManager = modulePassManager.nest<IREE::HAL::ExecutableOp>()
+                                 .nest<IREE::HAL::ExecutableVariantOp>();
+  variantPassManager.addPass(createLLVMGPUAssignConstantOrdinalsPass());
+}
+
 //===----------------------------------------------------------------------===//
 // ROCDL Pass Pipelines
 //===----------------------------------------------------------------------===//
@@ -1297,6 +1316,13 @@ void registerCodegenLLVMGPUPasses() {
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
         buildLLVMGPUCodegenPassPipeline(passManager, true);
+      });
+
+  static PassPipelineRegistration<> LLVMGPULinkingPipeline(
+      "iree-codegen-llvmgpu-linking-pipeline",
+      "Runs the LLVMGPU HAL executable linking pipeline",
+      [](OpPassManager &modulePassManager) {
+        buildLLVMGPULinkingPassPipeline(modulePassManager);
       });
 }
 

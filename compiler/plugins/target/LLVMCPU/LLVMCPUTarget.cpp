@@ -241,7 +241,7 @@ public:
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
-    buildLLVMCPULinkingPassPipeline(passManager);
+    buildLLVMCPULinkingPassPipeline(passManager, "llvm-cpu");
   }
 
   // Gets the LLVM target from |variantOp|.
