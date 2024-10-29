@@ -128,9 +128,9 @@ def MFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"MFMA_F32_16x16x32_F8E4M3FNU
 def MFMA_I32_16x16x32_I8  : I32EnumAttrCase<"MFMA_I32_16x16x32_I8", 0x0980>;
 def MFMA_I32_32x32x16_I8  : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 0x0981>;
 
-// maximized kWidth CDNA3 intrinsics
-def MFMA_F32_16x16x32_F16  : I32EnumAttrCase<"MFMA_F32_16x16x32_F16", 0x0950>;
-def MFMA_F32_32x32x16_F16  : I32EnumAttrCase<"MFMA_F32_32x32x16_F16", 0x0951>;
+// "Virtual" non-native MFMA intrinsic where we modify the width of K-dim.
+def VMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F16", 0x0950>;
+def VMFMA_F32_32x32x16_F16  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F16", 0x0951>;
 
 // CDNA2 instrinsics
 def MFMA_I32_16x16x16_I8  : I32EnumAttrCase<"MFMA_I32_16x16x16_I8", 0x0880>;
@@ -153,9 +153,9 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_F32_32x32x8_BF16,
       MFMA_F32_16x16x32_F8E4M3FNUZ,
       MFMA_F32_16x16x32_F8E5M2FNUZ,
-      MFMA_F32_16x16x32_F16,
+      VMFMA_F32_16x16x32_F16,
       MFMA_I32_16x16x32_I8,
-      MFMA_F32_32x32x16_F16,
+      VMFMA_F32_32x32x16_F16,
       MFMA_I32_32x32x16_I8,
       MFMA_I32_16x16x16_I8,
       MFMA_I32_32x32x8_I8,

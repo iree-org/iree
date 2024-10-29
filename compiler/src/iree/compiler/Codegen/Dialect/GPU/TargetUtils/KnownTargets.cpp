@@ -143,8 +143,8 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
       // Non-native MFMA intrinsics with unrolled_k = 2.
-      MMAIntrinsic::MFMA_F32_16x16x32_F16,
-      MMAIntrinsic::MFMA_F32_32x32x16_F16,
+      MMAIntrinsic::VMFMA_F32_16x16x32_F16,
+      MMAIntrinsic::VMFMA_F32_32x32x16_F16,
   };
   static const WgpDetails cdna3Wgp = {allComputeBits,
                                       allStorageBits,
@@ -170,8 +170,8 @@ const WgpDetails *getCDNA2WgpDetails() {
       MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
       // Non-native MFMA intrinsics with unrolled_k = 2.
-      MMAIntrinsic::MFMA_F32_16x16x32_F16,
-      MMAIntrinsic::MFMA_F32_32x32x16_F16,
+      MMAIntrinsic::VMFMA_F32_16x16x32_F16,
+      MMAIntrinsic::VMFMA_F32_32x32x16_F16,
   };
   static const WgpDetails cdna2Wgp = {allComputeBits,
                                       allStorageBits,
@@ -192,8 +192,8 @@ const WgpDetails *getCDNA1WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       // Non-native MFMA intrinsics with unrolled_k = 2.
-      MMAIntrinsic::MFMA_F32_16x16x32_F16,
-      MMAIntrinsic::MFMA_F32_32x32x16_F16,
+      MMAIntrinsic::VMFMA_F32_16x16x32_F16,
+      MMAIntrinsic::VMFMA_F32_32x32x16_F16,
   };
   static const WgpDetails cdna1Wgp = {allComputeBits,
                                       allStorageBits,

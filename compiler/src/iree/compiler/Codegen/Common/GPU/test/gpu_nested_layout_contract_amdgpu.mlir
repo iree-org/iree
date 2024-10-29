@@ -636,7 +636,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [32, 1]
 >
 
-func.func @contract_to_mfma_32x32x16_mm(%a : vector<32x16xf16>, %b : vector<16x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
+func.func @contract_to_vmfma_32x32x16_mm(%a : vector<32x16xf16>, %b : vector<16x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
   %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<32x16xf16>
   %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<16x32xf16>
   %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<32x32xf32>
@@ -645,7 +645,7 @@ func.func @contract_to_mfma_32x32x16_mm(%a : vector<32x16xf16>, %b : vector<16x3
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+    iree.amdgpu.mma = #iree_gpu.mma_layout<VMFMA_F32_32x32x16_F16>
   } %A, %B, %C : vector<32x16xf16>, vector<16x32xf16> into vector<32x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
@@ -665,7 +665,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // 2. We slice the 8xf16 to 2 different 4xf16 per operand for use on 2 MMAs.
 // 3. Result of first mma becomes the second mma's accumulator.
 
-// CHECK-LABEL: func @contract_to_mfma_32x32x16_mm
+// CHECK-LABEL: func @contract_to_vmfma_32x32x16_mm
 // CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x1x8xf16> to vector<8xf16>
 // CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x8x1xf16> to vector<8xf16>
 // CHECK:       %[[C_CAST:.+]] = vector.shape_cast %{{.+}} : vector<4x1x4x1xf32> to vector<16xf32>
