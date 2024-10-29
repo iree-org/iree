@@ -67,6 +67,7 @@
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Wrap.h"
+#include "mlir/Debug/CLOptionsSetup.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
@@ -274,6 +275,7 @@ void GlobalInit::registerCommandLineOptions() {
   // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
   mlir::registerDefaultTimingManagerCLOptions();
+  mlir::tracing::DebugConfig::registerCLOptions();
 
   // Bind session options to the command line environment.
   clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
@@ -366,6 +368,11 @@ struct Session {
   // All user access to the context is done via this reference.
   MLIRContext &context;
   OptionsBinder binder;
+
+  // Debug configuration.
+  mlir::tracing::DebugConfig debugConfig;
+  std::optional<mlir::tracing::InstallDebugHandler> debugHandlerInstall;
+
   // PluginManagerOptions must initialize first because the session depends on
   // it.
   PluginManagerOptions pluginManagerOptions;
@@ -402,6 +409,7 @@ Session::Session(GlobalInit &globalInit)
 
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
+    debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
@@ -416,6 +424,9 @@ Session::Session(GlobalInit &globalInit)
     cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
 #endif
   }
+
+  // Enable debug integration.
+  debugHandlerInstall.emplace(context, debugConfig);
 
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.

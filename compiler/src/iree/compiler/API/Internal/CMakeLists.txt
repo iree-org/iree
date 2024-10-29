@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRBuiltinToLLVMIRTranslation
     MLIRBytecodeWriter
     MLIRCAPIIR
+    MLIRDebug
     MLIRIR
     MLIRParser
     MLIRSupport
