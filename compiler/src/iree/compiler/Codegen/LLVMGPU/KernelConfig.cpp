@@ -62,6 +62,12 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
+    "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
+    llvm::cl::desc("enable the usage of the vector distribution pipeline for "
+                   "unaligned GEMMs when supported"),
+    llvm::cl::init(false));
+
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
     clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
@@ -562,7 +568,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
   // TODO(hanchung): Support cases that there are fused producers.
-  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op)) {
+  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op) &&
+      clGPUUnalignedGEMMVectorDistribution) {
     LDBG("Matmul Pad and Vector Distribute");
     pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
