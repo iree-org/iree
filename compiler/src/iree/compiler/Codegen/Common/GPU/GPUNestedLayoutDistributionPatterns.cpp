@@ -563,6 +563,223 @@ struct DistributeMultiReduction final
   int64_t maxBitsPerShuffle;
 };
 
+/// The lowering for Contract is performed in three steps (similar to above
+/// multi_reduction):
+///   1. Local Contract: Each thread performs operations on its locally
+///   distributed elements.
+///   2. Thread Reduction: Threads collectively reduce the results from step 1
+///   across threads,
+///      using a butterfly shuffle if distribution occurs along the reduction
+///      dimension.
+///   3. Accumulator Reduction: Each thread combines its intermediate results
+///   with its held accumulator.
+///
+/// Currently, reduction across multiple warps is not supported.
+/// TODO: Add support for reductions across multiple warps.
+struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeContract(MLIRContext *context, int64_t subgroupSize,
+                     int64_t maxBitsPerShuffle, int64_t benefit = 1)
+      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
+        maxBitsPerShuffle(maxBitsPerShuffle) {}
+
+  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<VectorContractOpInfo> maybeOpInfo =
+        VectorContractOpInfo::inferFromIndexingMaps(
+            contractOp.getIndexingMapsArray());
+    if (failed(maybeOpInfo)) {
+      return rewriter.notifyMatchFailure(contractOp, "not a contraction");
+    }
+    // If mmaAttr exists, defer the lowering to use MMA.
+    // Notify failure if the "iree.amdgpu.mma" intrinsic attribute is present.
+    IREE::GPU::MMAAttr mmaAttr =
+        contractOp->getAttrOfType<IREE::GPU::MMAAttr>("iree.amdgpu.mma");
+    if (mmaAttr) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "iree.amdgpu.mma intrinsic attribute exists");
+    }
+
+    NestedLayoutAttr lhsLayout =
+        dyn_cast<NestedLayoutAttr>(signature[contractOp.getLhs()]);
+    if (!lhsLayout) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "missing nested layout for contraction lhs");
+    }
+    NestedLayoutAttr rhsLayout =
+        dyn_cast<NestedLayoutAttr>(signature[contractOp.getRhs()]);
+    if (!rhsLayout) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "missing nested layout for contraction rhs");
+    }
+
+    Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
+    Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
+
+    Value acc = contractOp.getAcc();
+    Value res = contractOp.getResult();
+    VectorValue accVector = dyn_cast<VectorValue>(acc);
+    VectorValue resVector = dyn_cast<VectorValue>(res);
+    Value disAcc;
+    if (accVector) {
+      disAcc = getDistributed(rewriter, accVector, signature[accVector]);
+    } else {
+      disAcc = contractOp.getAcc();
+    }
+
+    Location loc = contractOp.getLoc();
+    int64_t rank = lhsLayout.getRank();
+
+    SmallVector<bool> reducedDims(rank, false);
+    auto maps = contractOp.getIndexingMapsArray();
+
+    // Identify the reduction dimension and apply it for cross-thread reduction.
+    MLIRContext *ctx = maps[0].getContext();
+    for (auto [index, iteratorType] :
+         llvm::enumerate(contractOp.getIteratorTypes())) {
+      if (vector::isReductionIterator(iteratorType)) {
+        int64_t redIdx =
+            *maps[0].getResultPosition(getAffineDimExpr(index, ctx));
+        reducedDims[redIdx] = true;
+      }
+    }
+
+    ArrayRef<Attribute> iteratorTypes =
+        contractOp.getIteratorTypes().getValue();
+    SmallVector<Attribute> newIterators;
+
+    // Given that the distribution format is <BATCH x OUTER x ELEMENT>,
+    // the iterations and affine maps need to be replicated three times.
+
+    // Replicate the iterators for local vector.contract
+    for (int i = 0; i < 3; i++) {
+      newIterators.append(iteratorTypes.begin(), iteratorTypes.end());
+    }
+
+    // Replicate the affine maps for local vector.contract
+    SmallVector<AffineMap> newMaps;
+    for (auto map : maps) {
+      int64_t numDims = map.getNumDims();
+      int64_t numResults = map.getNumResults();
+      SmallVector<AffineExpr> exprs;
+      for (int i = 0; i < 3; i++) {
+        AffineMap shiftedMap = map.shiftDims(i * numDims);
+        for (int j = 0; j < numResults; j++) {
+          exprs.push_back(shiftedMap.getResult(j));
+        }
+      }
+      AffineMap newMap =
+          AffineMap::get(/*dimCount=*/3 * numDims,
+                         /*symbolCount=*/map.getNumSymbols(), exprs, ctx);
+      newMaps.push_back(newMap);
+    }
+
+    Type accElemTy = getElementTypeOrSelf(acc.getType());
+    Value localInit = getCombiningIdentityValue(
+        loc, rewriter, contractOp.getKind(), disAcc.getType());
+
+    auto localContractOp = rewriter.create<vector::ContractionOp>(
+        loc, disLhs, disRhs, localInit, rewriter.getAffineMapArrayAttr(newMaps),
+        rewriter.getArrayAttr(newIterators), contractOp.getKind());
+    localContractOp->setDiscardableAttrs(
+        contractOp->getDiscardableAttrDictionary());
+
+    VectorValue localContractValue;
+    if (accVector) {
+      localContractValue = dyn_cast<VectorValue>(localContractOp.getResult());
+    } else {
+      VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, accElemTy);
+      localContractValue = rewriter.create<vector::BroadcastOp>(
+          loc, vecType, localContractOp.getResult());
+    }
+
+    assert(localContractValue && "result should have been a vector");
+
+    // Flatten the locally result value.
+    VectorType shaped = localContractValue.getType();
+    int64_t numElements = shaped.getNumElements();
+    SmallVector<int64_t> flatShape(1, numElements);
+    VectorType flatVecType = VectorType::get(flatShape, accElemTy);
+    VectorValue flat = rewriter.create<vector::ShapeCastOp>(loc, flatVecType,
+                                                            localContractValue);
+
+    // Do inter-thread/warp reduce.
+    FailureOr<VectorValue> threadReduced = doThreadReduction(
+        rewriter, lhsLayout, flat, contractOp.getKind(), reducedDims);
+    if (failed(threadReduced)) {
+      return failure();
+    }
+
+    // Do reduction against accumulator, which needs to be done after thread
+    // reduction.
+    VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
+        loc, shaped, threadReduced.value());
+
+    if (!accVector) {
+      disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
+    }
+
+    Value accReduction = vector::makeArithReduction(
+        rewriter, loc, contractOp.getKind(), unflattened, disAcc);
+    auto accReduced = dyn_cast<VectorValue>(accReduction);
+    if (!accReduced) {
+      return failure();
+    }
+
+    if (resVector) {
+      replaceOpWithDistributedValues(rewriter, contractOp, accReduced);
+    } else {
+      Value accReducedVal = rewriter.create<vector::ExtractOp>(
+          loc, accReduction, SmallVector<int64_t>{0});
+      replaceOpWithDistributedValues(rewriter, contractOp, accReducedVal);
+    }
+
+    return success();
+  }
+
+  FailureOr<VectorValue> doThreadReduction(RewriterBase &rewriter,
+                                           NestedLayoutAttr layout,
+                                           VectorValue flat,
+                                           vector::CombiningKind kind,
+                                           ArrayRef<bool> reductionMask) const {
+    VectorType flatVecType = flat.getType();
+    int64_t numElements = flatVecType.getNumElements();
+    Location loc = flat.getLoc();
+
+    auto constOp = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(flatVecType));
+    auto res = llvm::cast<VectorValue>(constOp.getResult());
+
+    for (unsigned i = 0; i < numElements; ++i) {
+      Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
+
+      // Reduce across all reduction dimensions 1-by-1.
+      for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
+        if (reductionMask[i]) {
+          int64_t offset = getShuffleOffset(layout, i);
+          int64_t width = getShuffleWidth(layout, i);
+          assert(offset <= std::numeric_limits<uint32_t>::max() &&
+                 width <= std::numeric_limits<uint32_t>::max());
+
+          extracted = rewriter.create<gpu::SubgroupReduceOp>(
+              loc, extracted, combiningKindToAllReduce(kind),
+              /*uniform=*/false, /*cluster_size=*/width,
+              /*cluster_stride=*/offset);
+        }
+      }
+
+      res = rewriter.create<vector::InsertOp>(loc, extracted, res, i);
+    }
+
+    return res;
+  }
+
+  int64_t subgroupSize;
+  int64_t maxBitsPerShuffle;
+};
+
 struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
@@ -715,6 +932,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
+  patterns.add<DistributeContract>(patterns.getContext(), subgroupSize,
+                                   maxBitsPerShuffle);
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
 }
 
