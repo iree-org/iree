@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
         "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:CAPIIR",
+        "@llvm-project//mlir:Debug",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Support",
