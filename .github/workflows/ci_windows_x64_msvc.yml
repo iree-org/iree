@@ -45,11 +45,6 @@ jobs:
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Installing requirements"
         run: choco install ccache --yes
-      - name: "Installing MSVC requirements"
-        run: | # TODO: Find a way to move this into the dockerfile
-          choco install visualstudio2022buildtools -y
-          choco install visualstudio2022community --package-parameters "--add Microsoft.VisualStudio.Workload.CoreEditor --add Microsoft.VisualStudio.Workload.ManagedDesktop --add Microsoft.VisualStudio.Workload.DesktopDevelopmentWithC++" -y
-          choco install visualstudio2022-workload-nativedesktop -y
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@v1.13.0
       - name: "Installing iree reqs"
