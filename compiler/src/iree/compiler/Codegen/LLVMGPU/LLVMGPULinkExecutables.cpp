@@ -18,7 +18,10 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static bool isAddressSpacePrivate(uint32_t addressSpace) {
+// Returns true if the address space of a global symbol is private to the module
+// scope it originates in. AMD and NVIDIA disagree on the naming but the values
+// match. LLVM is a mess here.
+static bool isSymbolAddressSpacePrivate(uint32_t addressSpace) {
   return addressSpace == /*local*/ 3 || addressSpace == /*private*/ 5;
 }
 
@@ -40,7 +43,7 @@ convertLinkageToVisibility(LLVM::Linkage linkage) {
 // things).
 static bool allowRenamingPrivateLLVMSymbols(Operation *op) {
   if (auto globalOp = dyn_cast<LLVM::GlobalOp>(op)) {
-    if (isAddressSpacePrivate(globalOp.getAddrSpace())) {
+    if (isSymbolAddressSpacePrivate(globalOp.getAddrSpace())) {
       return true;
     }
     return convertLinkageToVisibility(globalOp.getLinkage()) ==
