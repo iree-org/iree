@@ -62,7 +62,7 @@ struct ROCmOptions {
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
   bool slpVectorization = false;
-  bool globalISel = true;
+  bool globalISel = false;
 
   /// List of LLVM opt pass pluggins to be loaded during GPU code
   /// generation. The pluggins are paths to dynamic libraries that
