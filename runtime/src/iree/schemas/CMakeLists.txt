@@ -12,6 +12,21 @@ iree_add_all_subdirs()
 
 flatbuffer_c_library(
   NAME
+    amdgpu_executable_def_c_fbs
+  SRCS
+    "amdgpu_executable_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+    "--json"
+  INCLUDES
+    "executable_debug_info.fbs"
+  PUBLIC
+)
+
+flatbuffer_c_library(
+  NAME
     bytecode_module_def_c_fbs
   SRCS
     "bytecode_module_def.fbs"

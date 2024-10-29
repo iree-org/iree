@@ -21,6 +21,13 @@ FLATCC_ARGS = [
 ]
 
 iree_flatbuffer_c_library(
+    name = "amdgpu_executable_def_c_fbs",
+    srcs = ["amdgpu_executable_def.fbs"],
+    flatcc_args = FLATCC_ARGS,
+    includes = ["executable_debug_info.fbs"],
+)
+
+iree_flatbuffer_c_library(
     name = "bytecode_module_def_c_fbs",
     srcs = ["bytecode_module_def.fbs"],
     flatcc_args = FLATCC_ARGS,
@@ -70,6 +77,7 @@ iree_flatbuffer_c_library(
 iree_build_test(
     name = "schema_build_test",
     targets = [
+        ":amdgpu_executable_def_c_fbs",
         ":bytecode_module_def_c_fbs",
         ":cuda_executable_def_c_fbs",
         ":executable_debug_info_c_fbs",
