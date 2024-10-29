@@ -62,6 +62,7 @@ struct ROCmOptions {
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
   bool slpVectorization = false;
+  bool globalISel = false;
 
   /// List of LLVM opt pass pluggins to be loaded during GPU code
   /// generation. The pluggins are paths to dynamic libraries that
@@ -114,6 +115,8 @@ struct ROCmOptions {
         cl::desc(
             "Enable slp vectorization in llvm opt. This can have an impact on "
             "performance/numerics so its turned off by default currently."));
+    binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
+                     cl::desc("Enable global instruction selection in llvm."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -466,6 +469,7 @@ public:
         opt.UnsafeFPMath = false;
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
+        opt.EnableGlobalISel = options.globalISel;
         SmallVector<std::string> features;
         if (targetArch.starts_with("gfx10") ||
             targetArch.starts_with("gfx11")) {
