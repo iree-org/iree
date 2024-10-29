@@ -9,16 +9,17 @@
 
 stream.executable private @__builtin_splat_i32 {
   stream.executable.export public @__builtin_splat_i32 workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg0
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
     func.func @__builtin_splat_i32(%value: i32, %count: index, %out_binding: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %out = stream.binding.subspan %out_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%count}
-      %0 = tensor.empty(%count) : tensor<?xi32>
+      %count0 = flow.dispatch.workload.ordinal %count, 0 : index
+      %out = stream.binding.subspan %out_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%count0}
+      %0 = tensor.empty(%count0) : tensor<?xi32>
       %1 = linalg.fill ins(%value : i32) outs(%0 : tensor<?xi32>) -> tensor<?xi32>
-      flow.dispatch.tensor.store %1, %out, offsets = [0], sizes = [%count], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%count}
+      flow.dispatch.tensor.store %1, %out, offsets = [0], sizes = [%count0], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%count}
       return
     }
   }
