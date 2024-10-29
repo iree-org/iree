@@ -309,6 +309,16 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
+  // Helper fn to store mma information.
+  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    mmaAttrs.emplace_back(mma);
+  };
+
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
@@ -316,18 +326,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
+    storeMmaInfo(mma, intrinsics, mmaAttrs);
     // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
       auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      auto [mSize, nSize, kSize] = virtualMma.getMNKShape();
-      auto [aType, bType, cType] = virtualMma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-      mmaAttrs.emplace_back(virtualMma);
+      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
     }
   }
 
@@ -518,6 +522,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
+  // Helper fn to store mma information.
+  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    mmaAttrs.emplace_back(mma);
+  };
+
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
@@ -525,18 +539,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
+    storeMmaInfo(mma, intrinsics, mmaAttrs);
     // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
       auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      auto [mSize, nSize, kSize] = virtualMma.getMNKShape();
-      auto [aType, bType, cType] = virtualMma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-      mmaAttrs.emplace_back(virtualMma);
+      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
     }
   }
 
@@ -733,6 +741,16 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Value kMatrix = op.getKey();
   Value vMatrix = op.getValue();
 
+  // Helper fn to store mma information.
+  auto storeMmaInfo = [](IREE::GPU::MMAAttr mma,
+                         SmallVector<GPUMatmulShapeType> &intrinsics,
+                         SmallVector<IREE::GPU::MMAAttr> &mmaAttrs) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    mmaAttrs.emplace_back(mma);
+  };
+
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   SmallVector<IREE::GPU::MMAAttr> mmaAttrs;
@@ -740,20 +758,15 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
-    auto [mSize, nSize, kSize] = mma.getMNKShape();
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-    mmaAttrs.emplace_back(mma);
-    // Store info on virtual intrinsics based on current mma if any.
+    storeMmaInfo(mma, intrinsics, mmaAttrs);
+    // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::MMAIntrinsic virtualIntrinsic :
          mma.getVirtualIntrinsics()) {
       auto virtualMma = IREE::GPU::MMAAttr::get(context, virtualIntrinsic);
-      auto [mSize, nSize, kSize] = virtualMma.getMNKShape();
-      auto [aType, bType, cType] = virtualMma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
-      mmaAttrs.emplace_back(virtualMma);
+      storeMmaInfo(virtualMma, intrinsics, mmaAttrs);
     }
   }
+
   if (intrinsics.empty())
     return failure();
 
