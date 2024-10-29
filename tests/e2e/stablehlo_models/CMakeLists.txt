@@ -42,7 +42,7 @@ iree_static_linker_test(
   SRC
     "mnist_fake_weights.mlir"
   STATIC_LIB_PREFIX
-    mnist_fake_weights_linked_llvm_cpu
+    mnist_fake_weights_linked
   ENTRY_FUNCTION
     "predict"
   FUNCTION_INPUTS
@@ -57,7 +57,7 @@ iree_static_linker_test(
   SRC
     "mnist_fake_weights.mlir"
   STATIC_LIB_PREFIX
-    mnist_fake_weights_linked_llvm_cpu
+    mnist_fake_weights_linked
   ENTRY_FUNCTION
     "predict"
   FUNCTION_INPUTS
