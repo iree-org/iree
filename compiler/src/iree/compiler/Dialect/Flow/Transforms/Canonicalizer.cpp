@@ -68,6 +68,9 @@ struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
         }
         continue;
       }
+
+      // `getMixedSizes` for different ops returns different attribute types
+      // (`index` or `i64`) so we compare the values of the ints directly here.
       int64_t staticInsertSize = getConstantIntValue(insertSize).value();
       int64_t staticDestSize = getConstantIntValue(insertSize).value();
       if (staticInsertSize != staticDestSize) {
