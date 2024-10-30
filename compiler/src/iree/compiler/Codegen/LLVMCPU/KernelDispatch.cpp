@@ -1289,6 +1289,51 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
   sizes[1] = std::max<int64_t>(sizes[1], minNumElements);
 }
 
+/// Utility to compute the tile sizes for RISC-V Vector.
+/// For now, it only supports nonWideningLinalgElementType float.
+/// TileSize is set to m = 7, n = maxNumberElementsForLMUL4, and k = 1.
+///
+/// Example: for an pure f32-matmul and a 512-bit vector register.
+/// nativeVectorSize is equal to VLEN * LMUL2 / 8, so it's 128.
+/// maxNumberElementsForLMUL4 = 128 * 2 * 8 / 32 = 64.
+///
+/// TODO: Currently it only supports for nonWideningLinalgElementType.
+static void
+getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
+                          linalg::LinalgOp op, int64_t vectorSize,
+                          SmallVectorImpl<int64_t> &sizes,
+                          SmallVectorImpl<bool> &scalableSizeFlags) {
+  if (sizes.empty())
+    getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+  // Todo: support widening matmul.
+  // Determines n dimension tile size with VLEN for
+  // nonWideningLinalgElementType.
+  auto elementType = nonWideningLinalgElementType(op);
+  if (failed(elementType))
+    return;
+
+  // nativeVectorSize is cacluated with VLEN and LMUL=2.
+  int64_t nativeVectorSize = getNativeVectorSizeInBytes(entryPointFn);
+  int64_t elementSize;
+  if (elementType->isF16()) {
+    elementSize = 16;
+  } else if (elementType->isF32()) {
+    elementSize = 32;
+  } else if (elementType->isF64()) {
+    elementSize = 64;
+  } else {
+    // ToDo: support int data type
+    return;
+  }
+  // Use 7 x lmul4 to fully utilize vector registers.
+  sizes[0] = 7;
+  // Calculate tile size for the main vector dimension (N).
+  constexpr int64_t byteSizeInBits = 8;
+  int64_t maxNumberElementsForLMUL4 =
+      (nativeVectorSize * 2 * byteSizeInBits) / elementSize;
+  sizes[1] = maxNumberElementsForLMUL4;
+}
+
 /// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
 /// tile sizes picked here must exactly match multiples of the SME hardware
 /// virtual tiles, as there is currently no support for lowering non-standard
@@ -1354,6 +1399,10 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
+  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+    getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
+                              matmulScalableFlags);
+  }
   // If tile sizes were not computed by previous heuristics, use default
   // hard-coded tile sizes.
   if (matmulTileSizes.empty()) {
