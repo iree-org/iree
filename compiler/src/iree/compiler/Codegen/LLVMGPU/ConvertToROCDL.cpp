@@ -66,8 +66,21 @@ struct ReplaceGPUBarrierWithLDSBarrier
   }
 };
 
+struct RemoveAssumeAlignOp
+    : public OpRewritePattern<memref::AssumeAlignmentOp> {
+public:
+  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
+  patterns.add<RemoveAssumeAlignOp>(patterns.getContext());
 }
 
 } // namespace
