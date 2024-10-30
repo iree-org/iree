@@ -110,6 +110,9 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(createExpandTensorShapesPass());
 
   FunctionLikeNest(mainPassManager)
+      // Decompose attention operations which do not have enough parallelism to
+      // justify fused attention.
+      .addPass(createDecomposeLowParallelismAttentionPass)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
