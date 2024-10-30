@@ -643,7 +643,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     auto maps = contractOp.getIndexingMapsArray();
 
     // Reduction dimensions will have the 'reduction' iterator type.
-    SmallVector<unsigned> reductionDims;
+    // SmallVector<unsigned> reductionDims;
     MLIRContext *ctx = maps[0].getContext();
     for (auto [index, iteratorType] :
          llvm::enumerate(contractOp.getIteratorTypes())) {
@@ -686,7 +686,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     auto localContractOp = rewriter.create<vector::ContractionOp>(
         loc, disLhs, disRhs, localInit, rewriter.getAffineMapArrayAttr(newMaps),
-        rewriter.getArrayAttr(newIterators));
+        rewriter.getArrayAttr(newIterators), contractOp.getKind());
     localContractOp->setDiscardableAttrs(
         contractOp->getDiscardableAttrDictionary());
 
