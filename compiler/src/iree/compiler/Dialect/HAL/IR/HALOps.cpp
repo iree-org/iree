@@ -19,6 +19,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -2037,6 +2038,18 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   // the byte offset.
   return llvm::commonAlignment(baseAlignment.value(),
                                offsetOrAlignment.value());
+}
+
+LogicalResult InterfaceBindingSubspanOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  auto resultShapedType = dyn_cast<ShapedType>(getResult().getType());
+  if (!resultShapedType) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> resultShape = mlir::getMixedValues(
+      resultShapedType.getShape(), getDynamicDims(), builder);
+  reifiedReturnShapes.emplace_back(std::move(resultShape));
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
