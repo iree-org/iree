@@ -233,3 +233,23 @@ func.func @drop_encoding_for_hal_flow_ops_dynamic() {
 // CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : !flow.dispatch.tensor<writeonly:tensor<?x?xbf16>>
 // CHECK:         %[[LOAD:.+]] = flow.dispatch.tensor.load %[[IN]]
 // CHECK:         flow.dispatch.tensor.store %[[LOAD]], %[[OUT]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @fold_extract_slice_away(%arg0: tensor<?x16384xf16>, %arg1: tensor<16384x16384xf16>, %arg2: tensor<?x16384xf32>) -> tensor<?x16384xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x16384xf16> -> tensor<?x16384xf16, #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+  %1 = iree_encoding.set_encoding %arg1 : tensor<16384x16384xf16> -> tensor<16384x16384xf16, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+  %2 = iree_encoding.set_encoding %arg2 : tensor<?x16384xf32> -> tensor<?x16384xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+  %3 = linalg.matmul_transpose_b ins(%0, %1 : tensor<?x16384xf16, #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>, tensor<16384x16384xf16, #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>) outs(%2 : tensor<?x16384xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>) -> tensor<?x16384xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>>
+  %dim = tensor.dim %arg2, %c0 : tensor<?x16384xf32>
+  %4 = iree_encoding.unset_encoding %3 : tensor<?x16384xf32, #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 32, 32, 32>>> -> tensor<?x16384xf32>
+  %extracted_slice = tensor.extract_slice %4[0, 0] [%dim, 16384] [1, 1] : tensor<?x16384xf32> to tensor<?x16384xf32>
+  return %extracted_slice : tensor<?x16384xf32>
+}
+// CHECK: func.func @fold_extract_slice_away(
+// CHECK:   %[[RES:.+]] = linalg.matmul_transpose_b
+// CHECK:   return %[[RES]]

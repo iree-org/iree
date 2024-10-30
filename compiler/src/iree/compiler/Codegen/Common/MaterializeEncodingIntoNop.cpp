@@ -24,6 +24,25 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
+
+struct FoldAwayExtractSliceOnUnsetEncodingPattern
+    : public OpConversionPattern<tensor::ExtractSliceOp> {
+  using OpConversionPattern<tensor::ExtractSliceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tensor::ExtractSliceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto unsetEncodingOp =
+        op.getSource().getDefiningOp<IREE::Encoding::UnsetEncodingOp>();
+    if (!unsetEncodingOp) {
+      return rewriter.notifyMatchFailure(op,
+                                         "source is not an unset_encoding op");
+    }
+    rewriter.replaceOp(op, adaptor.getSource());
+    return success();
+  }
+};
+
 struct MaterializeEncodingIntoNopPass final
     : impl::MaterializeEncodingIntoNopPassBase<MaterializeEncodingIntoNopPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -53,6 +72,16 @@ struct MaterializeEncodingIntoNopPass final
     populateShapeIndependentMaterializeEncodingPatterns(
         materializeEncodingPattern, target, typeConverter,
         materializeEncodingValueFn);
+
+    // Fold the extract_slice ops away if the source is from unset_encoding op.
+    target.addDynamicallyLegalOp<tensor::ExtractSliceOp>(
+        [](tensor::ExtractSliceOp op) {
+          return op.getSource().getDefiningOp<IREE::Encoding::UnsetEncodingOp>()
+                     ? false
+                     : true;
+        });
+    materializeEncodingPattern
+        .insert<FoldAwayExtractSliceOnUnsetEncodingPattern>(context);
 
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
