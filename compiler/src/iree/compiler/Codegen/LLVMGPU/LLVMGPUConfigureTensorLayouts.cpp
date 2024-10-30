@@ -165,7 +165,7 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   Value rhs = conv->getOperand(1);
   Value acc = conv->getOperand(2);
 
-  // eet layouts for lhs, rhs and acc.
+  // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
   auto layoutedLhs =
       rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.getIntrinsic());
