@@ -80,7 +80,7 @@ builtin.module attributes { transform.with_named_sequence } {
     %rhs = vector.transfer_read %b[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHX,  LANEX], [1, 16]>, <[ BATCHY,  LANEY,  VECTORX], [1, 1, 16]>>}}
     %output = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %lhs, %rhs, %init : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHX,  VECTORY,  LANEY,  VECTORX], [1, 8, 2, 1]>, <[ BATCHY,  LANEX], [1, 16]>>}}
+    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ BATCHX,  VECTORX,  LANEY], [1, 8, 2]>, <[ BATCHY,  LANEX], [1, 16]>>}}
     return %output : vector<16x16xf32>
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {

@@ -105,15 +105,13 @@ TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
     swizzle.expandShape.push_back({dim});
   }
   // The layout strides decide the initial swizzle.permutation.
-  // Some WMMA intrinsics have tstrides=0 values, assert on that as that
-  // would defeat this algorithm.
-  // TODO(bjacob): Resolve that to support WMMA intrinsics.
-  for (auto s : layout.tstrides) {
-    (void)s;
-    assert(s != 0);
+  // Some WMMA intrinsics have tstrides=0 value. That always indicates an outer
+  // dimension, so overwrite 0 with a large value to get the right order.
+  SmallVector<int64_t, 2> order = layout.tstrides;
+  for (auto &val : order) {
+    val = (val == 0) ? INT64_MAX : val;
   }
-  swizzle.permutation =
-      getSortingPermutation<std::greater, int64_t>(layout.tstrides);
+  swizzle.permutation = getSortingPermutation<std::greater, int64_t>(order);
   // Deal with any element size greater than 1 by inserting it innermost.
   // Notice that this is similar to the unroll() function, just creating an
   // inner dimension instead of an outer dimension.

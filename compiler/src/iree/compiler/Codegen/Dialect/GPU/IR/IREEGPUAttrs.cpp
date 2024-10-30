@@ -268,185 +268,72 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   return OpaqueMmaLayout{};
 }
 
+static std::tuple<PerDimLayoutAttr, PerDimLayoutAttr>
+getPerDimLayoutAttrs(MLIRContext *context, TileSwizzle swizzle) {
+  // Step 1: obtain the swizzled tile shape, but keeping track of the source
+  // dimension indices.
+  struct SrcIndexAndSwizzleDim {
+    size_t srcIndex;
+    TileSwizzle::Dim dim;
+  };
+  SmallVector<SrcIndexAndSwizzleDim> swizzledShape;
+  for (auto [i, e] : llvm::enumerate(swizzle.expandShape)) {
+    for (TileSwizzle::Dim d : e) {
+      swizzledShape.push_back(SrcIndexAndSwizzleDim{i, d});
+    }
+  }
+  applyPermutationToVector(swizzledShape, swizzle.permutation);
+
+  // Step 2: collect the appropriate labels to use for the swizzled dims.
+  LayoutDimension internalLabels[] = {LayoutDimension::VECTORZ,
+                                      LayoutDimension::VECTORY,
+                                      LayoutDimension::VECTORX};
+  LayoutDimension crossThreadLabels[] = {
+      LayoutDimension::LANEZ, LayoutDimension::LANEY, LayoutDimension::LANEX};
+  auto internalLabelIter = std::end(internalLabels);
+  auto crossThreadLabelIter = std::end(crossThreadLabels);
+  for (SrcIndexAndSwizzleDim d : swizzledShape) {
+    if (d.dim.kind == TileSwizzle::Dim::Kind::Internal) {
+      assert(internalLabelIter != std::begin(internalLabels));
+      --internalLabelIter;
+    } else if (d.dim.kind == TileSwizzle::Dim::Kind::CrossThread) {
+      assert(crossThreadLabelIter != std::begin(crossThreadLabels));
+      --crossThreadLabelIter;
+    } else {
+      assert(false && "unexpected dimension kind in intrinsic swizzle");
+    }
+  }
+
+  // Step 3: put together the result PerDimLayoutAttr'd for the two source dims.
+  SmallVector<LayoutDimensionAttr> labels[2];
+  SmallVector<int64_t> shape[2];
+  for (SrcIndexAndSwizzleDim d : swizzledShape) {
+    shape[d.srcIndex].push_back(d.dim.size);
+    auto &labelIterRef = (d.dim.kind == TileSwizzle::Dim::Kind::Internal)
+                             ? internalLabelIter
+                             : crossThreadLabelIter;
+    labels[d.srcIndex].push_back(LayoutDimensionAttr::get(
+        context, static_cast<LayoutDimension>(*labelIterRef++)));
+  }
+  return {PerDimLayoutAttr::get(context, labels[0], shape[0]),
+          PerDimLayoutAttr::get(context, labels[1], shape[1])};
+};
+
 static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
-                                               MMAIntrinsic type) {
-  auto opaqueLayout = getOpaqueMFMALayout(context, type);
-
-  LayoutDimensionAttr laneX =
-      LayoutDimensionAttr::get(context, LayoutDimension::LANEX);
-  LayoutDimensionAttr laneY =
-      LayoutDimensionAttr::get(context, LayoutDimension::LANEY);
-  LayoutDimensionAttr laneZ =
-      LayoutDimensionAttr::get(context, LayoutDimension::LANEZ);
-  LayoutDimensionAttr vectorX =
-      LayoutDimensionAttr::get(context, LayoutDimension::VECTORX);
-  LayoutDimensionAttr vectorY =
-      LayoutDimensionAttr::get(context, LayoutDimension::VECTORY);
-  LayoutDimensionAttr vectorZ =
-      LayoutDimensionAttr::get(context, LayoutDimension::VECTORZ);
-  (void)laneZ, (void)vectorZ;
-  switch (type) {
-  case MMAIntrinsic::MFMA_F32_16x16x4_F32: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 1]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 1});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout = inner;
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
-    // #inner1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
-    // #inner2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
-    //                                           [4, 2, 4]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner1>
-    // #layout_b = #iree_vector_ext.layout<#inner1, #outer>
-    // #layout_c = #iree_vector_ext.layout<#inner2, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {32});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 4});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout =
-        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {4, 2, 4});
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_F32_16x16x16_BF16: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout = inner;
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_F32_32x32x8_BF16: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
-    // #inner1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
-    // #inner2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
-    //                                           [4, 2, 4]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner1>
-    // #layout_b = #iree_vector_ext.layout<#inner1, #outer>
-    // #layout_c = #iree_vector_ext.layout<#inner2, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {32});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 4});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout =
-        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {4, 2, 4});
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-  case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 8]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 8});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 8]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {32});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 8});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout =
-        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {4, 2, 4});
-    auto cNLayout = outer;
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  case MMAIntrinsic::WMMA_F32_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_I32_16x16x16_I8: {
-    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [1, 16]>
-    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
-    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
-
-    int64_t vecYShape = type == MMAIntrinsic::WMMA_F16_16x16x16_F16 ? 16 : 8;
-    int64_t laneYShape = type == MMAIntrinsic::WMMA_F16_16x16x16_F16 ? 1 : 2;
-
-    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {1, 16});
-    auto aMLayout = outer;
-    auto aKLayout = inner;
-    auto bKLayout = inner;
-    auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX},
-                                          {vecYShape, laneYShape, 1});
-    auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
-    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
-                             bNLayout,     cMLayout, cNLayout};
-  }
-  default: {
-    break;
-  }
-  }
-  llvm_unreachable("unhandled concrete mma type");
-  return ConcreteMmaLayout{};
+                                               MMAIntrinsic intrinsic) {
+  auto opaque = getOpaqueMFMALayout(context, intrinsic);
+  ConcreteMmaLayout concreteLayout;
+  concreteLayout.base = opaque;
+  auto lhsSwizzle = getIntrinsicSwizzle(intrinsic, MMAFragment::Lhs);
+  auto rhsSwizzle = getIntrinsicSwizzle(intrinsic, MMAFragment::Rhs);
+  auto accSwizzle = getIntrinsicSwizzle(intrinsic, MMAFragment::Acc);
+  std::tie(concreteLayout.aMLayout, concreteLayout.aKLayout) =
+      getPerDimLayoutAttrs(context, lhsSwizzle);
+  std::tie(concreteLayout.bNLayout, concreteLayout.bKLayout) =
+      getPerDimLayoutAttrs(context, rhsSwizzle);
+  std::tie(concreteLayout.cMLayout, concreteLayout.cNLayout) =
+      getPerDimLayoutAttrs(context, accSwizzle);
+  return concreteLayout;
 }
 
 //===----------------------------------------------------------------------===//
@@ -960,20 +847,6 @@ LogicalResult MMAAttr::materializeOperandConcreteShape(
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
 
-std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
-  MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
-  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
-}
-
-std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
-  MLIRContext *ctx = getContext();
-  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
-  return {opaqueLayout.mSize * getUnrollM() * getUnrollMToSubgroups(),
-          opaqueLayout.nSize * getUnrollN() * getUnrollNToSubgroups(),
-          opaqueLayout.kSize * getUnrollK()};
-}
-
 /// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
 /// `predicate` returns false.
 static SmallVector<int64_t>
@@ -987,6 +860,20 @@ sliceSwizzledShape(const TileSwizzle &swizzle,
   }
   applyPermutationToVector(shape, swizzle.permutation);
   return shape;
+}
+
+std::tuple<Type, Type, Type> DataTiledMMAAttr::getABCElementTypes() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.aType, opaqueLayout.bType, opaqueLayout.cType};
+}
+
+std::tuple<int64_t, int64_t, int64_t> DataTiledMMAAttr::getMNKShape() const {
+  MLIRContext *ctx = getContext();
+  auto opaqueLayout = getOpaqueMFMALayout(ctx, getIntrinsic().getValue());
+  return {opaqueLayout.mSize * getUnrollM() * getUnrollMToSubgroups(),
+          opaqueLayout.nSize * getUnrollN() * getUnrollNToSubgroups(),
+          opaqueLayout.kSize * getUnrollK()};
 }
 
 std::tuple<VectorType, VectorType, VectorType>
