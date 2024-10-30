@@ -93,28 +93,22 @@ static void fixupGlobalMutability(Operation *moduleOp,
   explorer.initialize();
   SmallVector<Operation *> deadOps;
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
-    if (globalInfo->uses.empty()) {
-      // No uses - erase the global entirely.
-      deadOps.push_back(globalInfo->op);
-    } else {
-      // TODO(benvanik): verify we want this behavior - we likely want to change
-      // this to be mutable only if stores exist outside of initializers.
-      //
-      // If there are stores mark the global as mutable. We need to update all
-      // of the loads if this changes anything.
-      bool hasStores = !globalInfo->getStores().empty();
-      bool didChange = globalInfo->op.isGlobalMutable() != hasStores;
+    if (globalInfo->uses.empty())
+      return;
+    // TODO(benvanik): verify we want this behavior - we likely want to change
+    // this to be mutable only if stores exist outside of initializers.
+    //
+    // If there are stores mark the global as mutable. We need to update all
+    // of the loads if this changes anything.
+    bool hasStores = !globalInfo->getStores().empty();
+    bool didChange = globalInfo->op.isGlobalMutable() != hasStores;
+    if (didChange) {
       globalInfo->op.setGlobalMutable(hasStores);
-      if (didChange) {
-        for (auto loadOp : globalInfo->getLoads())
-          loadOp.setGlobalImmutable(!hasStores);
+      for (auto loadOp : globalInfo->getLoads()) {
+        loadOp.setGlobalImmutable(!hasStores);
       }
     }
-    for (auto loadOp : globalInfo->getLoads())
-      loadOp.setGlobalImmutable(!globalInfo->op.isGlobalMutable());
   });
-  for (auto *deadOp : deadOps)
-    deadOp->erase();
 }
 
 } // namespace
@@ -171,8 +165,7 @@ public:
     InlinerInterface inlinerInterface(&getContext());
     SmallVector<Operation *> deadOps;
     for (auto &op : moduleOp.getBlock().getOperations()) {
-      if (auto globalOp = dyn_cast<IREE::VM::GlobalRefOp>(op)) {
-      } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+      if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
         if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
           if (failed(appendRefInitialization(globalOp, initBuilder))) {
             globalOp.emitOpError()

@@ -69,6 +69,8 @@ void GlobalTable::rebuild() {
     globalOrder.push_back(globalName);
   }
 
+  // TODO: parallelize this by gathering on multiple threads per callable and
+  // then merging at the end.
   for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
     if (auto uses = SymbolTable::getSymbolUses(callableOp)) {
       for (auto use : *uses) {

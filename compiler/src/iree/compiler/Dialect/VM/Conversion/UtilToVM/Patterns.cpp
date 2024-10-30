@@ -45,6 +45,7 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
 void populateUtilStructuralToVMPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
                                         TypeConverter &typeConverter,
+                                        ImportTable &importTable,
                                         RewritePatternSet &patterns);
 
 namespace {
@@ -127,6 +128,7 @@ struct UnreachableOpConversion
 void populateUtilToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
+                              ImportTable &importTable,
                               RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
@@ -146,7 +148,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
   populateUtilStatusToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
   populateUtilStructuralToVMPatterns(context, conversionTarget, typeConverter,
-                                     patterns);
+                                     importTable, patterns);
 }
 
 } // namespace mlir::iree_compiler
