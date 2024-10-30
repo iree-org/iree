@@ -80,13 +80,13 @@ util.func public @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1:
 //       CHECK:   flow.executable private @[[EXECUTABLE0:[a-zA-Z0-9_]+]]
 //       CHECK:   func.func @[[FUNC0:[a-zA-Z0-9_x]+]]
 //       CHECK:   %[[GEN0:.+]] = linalg.generic
-//  CHECK-SAME:         ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:         ["parallel", "parallel", "parallel", "parallel", "parallel"]
 //       CHECK:   arith.extui
 //       CHECK:   arith.uitofp
 //       CHECK:   arith.subf
 //       CHECK:   arith.mulf
 //       CHECK:   %[[GEN1:.+]] = linalg.generic
-//  CHECK-SAME:       ["parallel", "reduction", "reduction"]
+//  CHECK-SAME:       ["parallel", "parallel", "parallel", "reduction", "reduction"]
 //  CHECK-SAME:       ins(
 //  CHECK-SAME:       %[[GEN0]]
 //  CHECK-SAME:       outs(
@@ -95,5 +95,4 @@ util.func public @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1:
 //       CHECK:   flow.dispatch.tensor.store %[[GEN1]]
 //       CHECK:   util.func public @grouped_quantized_matmul(
 //       CHECK:     %[[T0:.+]] = flow.dispatch @[[EXECUTABLE0]]::@[[FUNC0]]
-//       CHECK:     %[[RS:.+]] = flow.tensor.reshape %[[T0]] : tensor<4096xf32> -> tensor<1x1x4096xf32>
-//       CHECK:     util.return %[[RS]]
+//       CHECK:     util.return %[[T0]]
