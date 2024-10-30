@@ -45,6 +45,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRInferTypeOpInterface
     MLIRMemRefDialect
     MLIRParser
     MLIRSCFDialect
