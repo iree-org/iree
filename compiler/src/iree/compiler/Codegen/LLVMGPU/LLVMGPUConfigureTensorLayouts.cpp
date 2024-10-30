@@ -404,22 +404,22 @@ static LogicalResult setDerivedThreadConfigLayout(
 
   for (auto [tile, stride, size] :
        llvm::reverse(llvm::zip(threadTile, threadStrides, opShape))) {
-    int64_t threadTile;
+    int64_t threadBlock;
     if (residualThreads % size == 0) {
-      threadTile = size;
+      threadBlock = size;
     } else if (size % residualThreads == 0) {
-      threadTile = residualThreads;
+      threadBlock = residualThreads;
     } else {
       linalgOp->emitError() << "Operation with unsupported number of elements.";
       return failure();
     }
 
-    tile = threadTile;
+    tile = threadBlock;
     stride = currStride;
-    size /= threadTile;
+    size /= threadBlock;
 
-    currStride *= threadTile;
-    residualThreads /= threadTile;
+    currStride *= threadBlock;
+    residualThreads /= threadBlock;
   }
 
   SmallVector<int64_t> subgroupTile(opRank, 1);
