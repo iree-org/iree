@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
+# That there's various special logic throughout is _bad_. Don't replicate this.
 
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
@@ -95,6 +96,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRQuantDialect
+    MLIRROCDLDialect
     MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFTransforms
