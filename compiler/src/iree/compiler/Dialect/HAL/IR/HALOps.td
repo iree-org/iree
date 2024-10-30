@@ -19,6 +19,7 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferIntRangeInterface.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
@@ -811,12 +812,6 @@ def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
     `:` type($result)
   }];
 
-  let builders = [
-    OpBuilder<(ins "Type":$type), [{
-      build($_builder, $_state, $_builder.getI32Type(), TypeAttr::get(type));
-    }]>
-  ];
-
   let extraClassDeclaration = [{
     // Returns a stable identifier for the MLIR element type or nullopt if the
     // type is unsupported in the ABI.
@@ -847,12 +842,6 @@ def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
     attr-dict
     `:` type($result)
   }];
-
-  let builders = [
-    OpBuilder<(ins "Attribute":$encoding), [{
-      build($_builder, $_state, $_builder.getI32Type(), encoding);
-    }]>
-  ];
 
   let extraClassDeclaration = [{
     // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if
@@ -3051,6 +3040,7 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
