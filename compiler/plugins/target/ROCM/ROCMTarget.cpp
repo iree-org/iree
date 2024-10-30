@@ -64,7 +64,7 @@ struct ROCMOptions {
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
   bool legacySync = true;
-  bool slpVectorization = false;
+  bool slpVectorization = true;
   bool globalISel = false;
 
   /// List of LLVM opt pass pluggins to be loaded during GPU code
@@ -113,11 +113,9 @@ struct ROCMOptions {
                  "to be passed to the target backend compiler during HIP "
                  "executable serialization"),
         cl::ZeroOrMore, cl::cat(category));
-    binder.opt<bool>(
-        "iree-hip-llvm-slp-vec", slpVectorization, cl::cat(category),
-        cl::desc(
-            "Enable slp vectorization in llvm opt. This can have an impact on "
-            "performance/numerics so its turned off by default currently."));
+    binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
+                     cl::cat(category),
+                     cl::desc("Enable slp vectorization in llvm opt."));
     binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
   }
