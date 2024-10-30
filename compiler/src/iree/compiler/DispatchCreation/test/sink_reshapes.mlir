@@ -211,3 +211,28 @@ func.func @reduce_broadcast(%arg0: tensor<4x768xf32>, %arg1: tensor<4xf32>,
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%{{.+}}, %[[GENERIC1]] :
 //       CHECK:   tensor.expand_shape %[[GENERIC2]]
+
+// -----
+
+func.func @fuse_softmax_with_truncate(%arg0 : tensor<4x64x?xf32>) -> tensor<4x64x1x?xf16> {
+  %cst = arith.constant 0xFC00 : f16
+  %cst_0 = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 11.3137083 : f32
+  %c2 = arith.constant 2 : index
+  %dim = tensor.dim %arg0, %c2 : tensor<4x64x?xf32>
+  %0 = tensor.empty(%dim) : tensor<4x64x?xf32>
+  %2 = linalg.softmax dimension(2) ins(%arg0 : tensor<4x64x?xf32>) outs(%0 : tensor<4x64x?xf32>) -> tensor<4x64x?xf32>
+  %expanded = tensor.expand_shape %2 [[0], [1, 2], [3]] output_shape [4, 64, 1, %dim] : tensor<4x64x?xf32> into tensor<4x64x1x?xf32>
+  %3 = tensor.empty(%dim) : tensor<4x64x1x?xf16>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%expanded : tensor<4x64x1x?xf32>) outs(%3 : tensor<4x64x1x?xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %5 = arith.truncf %in : f32 to f16
+    linalg.yield %5 : f16
+  } -> tensor<4x64x1x?xf16>
+  func.return %4 : tensor<4x64x1x?xf16>
+}
+// CHECK-LABEL: func @fuse_softmax_with_truncate
+//       CHECK:   %[[SOFTMAX:.+]] = linalg.softmax
+//       CHECK:   %[[TRUNC:.+]] = linalg.generic {{.*}} ins(%[[SOFTMAX]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[TRUNC]]
+//       CHECK:   return %[[EXPAND]]
