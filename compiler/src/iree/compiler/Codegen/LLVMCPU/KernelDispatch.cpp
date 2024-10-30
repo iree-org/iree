@@ -61,6 +61,14 @@ static llvm::cl::opt<int>
     clDefaultDistTileSize("iree-llvmcpu-distribution-size",
                           llvm::cl::desc("default distribution tile size"),
                           llvm::cl::init(64));
+static llvm::cl::opt<bool> clEnableAggressiveDist(
+    "iree-llvmcpu-aggressive-distribution",
+    llvm::cl::desc(
+        "Enable aggressive method for distribution tile size. "
+        "It is only applied for linalg contraction ops now. "
+        "If distConfig.minTileSizes[i] >= distConfig.maxTileSizes[i], "
+        "set distConfig.maxTileSizes[i] to 2 * distConfig.minTileSizes[i]."),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<int> clNarrowMatmulTileBytes(
     "iree-llvmcpu-narrow-matmul-tile-bytes",
@@ -1551,13 +1559,23 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
     int64_t minTileSize = cacheTileSize != 0 ? cacheTileSize : vecTileSize;
     distConfig.minTileSizes.push_back(minTileSize);
   }
+  LLVM_DEBUG(KD_DBGS() << "Aggressive Distribution: " << clEnableAggressiveDist
+                       << "\n");
   // FIXME: Apply maxTileSize modification for all targets.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
-    // Make sure maxTileSize is larger or equal to minTileSize.
     for (auto loopNum :
          llvm::seq<unsigned>(static_cast<unsigned>(isBM), numLoops)) {
-      distConfig.maxTileSizes[loopNum] = std::max(
-          distConfig.maxTileSizes[loopNum], distConfig.minTileSizes[loopNum]);
+      if (clEnableAggressiveDist) {
+        if (distConfig.maxTileSizes[loopNum] <=
+            distConfig.minTileSizes[loopNum]) {
+          distConfig.maxTileSizes[loopNum] =
+              2 * distConfig.minTileSizes[loopNum];
+        }
+      } else {
+        distConfig.maxTileSizes[loopNum] = std::max(
+            distConfig.maxTileSizes[loopNum], distConfig.minTileSizes[loopNum]);
+      }
     }
   }
   SmallVector<int64_t> distTileSizes =
