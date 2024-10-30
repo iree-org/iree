@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Utils/StringUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -23,6 +24,8 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+#define DEBUG_TYPE "iree-hal-outline-memoize-regions"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -153,6 +156,8 @@ static IREE::Util::FuncOp outlineMemoizeRegionBody(
                                                          name, funcType);
   moduleSymbolTable.insert(funcOp);
   funcOp.setVisibility(SymbolTable::Visibility::Private);
+  funcOp.setInliningPolicyAttr(
+      moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
   auto funcBuilder = OpBuilder::atBlockBegin(funcOp.addEntryBlock());
 
   // Remap any captured operands that have corresponding function arguments.
@@ -521,8 +526,11 @@ static void memoizeRegionOp(IREE::HAL::DeviceMemoizeOp memoizeOp,
   // If we can't memoize the resources at initialization time then we need
   // to do it on-demand.
   if (!memoizeAnalysis.canRunAtInitializationTime()) {
-    memoizeOp.emitWarning(
-        "memoization failed: dynamic values captured at the call site");
+    LLVM_DEBUG({
+      llvm::dbgs()
+          << "memoization failed: dynamic values captured at the call site\n";
+      memoizeOp.dump();
+    });
     replaceMemoizeOpWithApply(memoizeOp, memoizeAnalysis, applyFuncOp);
     return;
   }
@@ -532,8 +540,11 @@ static void memoizeRegionOp(IREE::HAL::DeviceMemoizeOp memoizeOp,
   auto deviceGlobals =
       deviceAnalysis.lookupDeviceGlobals(memoizeOp.getDevice());
   if (!deviceGlobals) {
-    memoizeOp.emitWarning("memoization failed: unable to analyze devices "
-                          "that may be used with memoized region");
+    LLVM_DEBUG({
+      llvm::dbgs() << "memoization failed: unable to analyze devices that may "
+                      "be used with memoized region\n";
+      memoizeOp.dump();
+    });
     replaceMemoizeOpWithApply(memoizeOp, memoizeAnalysis, applyFuncOp);
     return;
   }

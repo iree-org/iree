@@ -160,6 +160,17 @@ private:
   }
 };
 
+// Returns the ABI or an empty string if unspecified.
+static StringRef getABI(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (targetAttr) {
+    if (auto config = targetAttr.getConfiguration()) {
+      auto abiAttr = targetAttr.getConfiguration().getAs<StringAttr>("abi");
+      return abiAttr ? abiAttr.getValue() : "";
+    }
+  }
+  return "";
+}
+
 static void dumpModuleToPath(StringRef path, StringRef baseName,
                              StringRef suffix, StringRef extension,
                              llvm::Module &module) {
@@ -585,8 +596,7 @@ public:
 
     // Wrap the HSACO ELF binary in a Flatbuffers container.
     FailureOr<DenseIntElementsAttr> binaryContainer;
-    if (targetAttr.getConfiguration() &&
-        targetAttr.getConfiguration().getAs<StringAttr>("abi") == "amdgpu") {
+    if (getABI(targetAttr) == "amdgpu") {
       binaryContainer = serializeAMDGPUBinaryContainer(
           serializationOptions, variantOp, exportOps, targetHSACO);
     } else {
