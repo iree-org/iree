@@ -1100,8 +1100,12 @@ Error *Invocation::outputHALExecutable(Output &output) {
     return new Error("not a valid HAL executable");
   }
   auto binaryOp = binaryOps.front();
-  auto rawData = binaryOp.getData().getRawData();
-  output.outputStream->write(rawData.data(), rawData.size());
+  if (failed(cast<IREE::Util::SerializableAttrInterface>(binaryOp.getData())
+                 .serializeToStream(binaryOp.getLoc(), llvm::endianness::little,
+                                    *output.outputStream))) {
+    return new Error(
+        "data attribute failed to serialize: unsupported format or encoding");
+  }
   output.outputStream->flush();
   return output.getWriteError();
 }

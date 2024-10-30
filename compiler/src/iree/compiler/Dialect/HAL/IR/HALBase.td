@@ -150,8 +150,6 @@ def HAL_Ordinal : TypeAlias<Index>;
 def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
 def HAL_OrdinalArrayAttr : TypedArrayAttrBase<HAL_OrdinalAttr, "Array of index ordinal attributes">;
 
-def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
-
 def HAL_ElementType : TypeAlias<I32>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
