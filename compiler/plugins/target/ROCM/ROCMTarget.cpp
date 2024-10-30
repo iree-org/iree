@@ -473,8 +473,12 @@ public:
         // https://github.com/iree-org/iree/issues/18746 so we disable this
         // feature.
         if (targetArch.starts_with("gfx9")) {
-          features.emplace_back("-fma-mix-insts");
+          features.emplace_back("-fma-mix-insts,-unaligned-access-mode");
         }
+
+        // There are correctness issues related to unaligned accesses.
+        // see https://github.com/iree-org/iree/issues/18798
+        features.emplace_back("-unaligned-access-mode");
 
         if (!targetFeatures.empty()) {
           features.emplace_back(targetFeatures.str());
