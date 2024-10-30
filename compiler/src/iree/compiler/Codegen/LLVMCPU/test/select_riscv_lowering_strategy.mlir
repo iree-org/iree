@@ -101,6 +101,39 @@ builtin.module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
+
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+zvl512b,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 128 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+builtin.module {
+  func.func @gemv_riscv_vl512() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+    %cst = arith.constant 0.0 : f32
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<1x512xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<1x128xf32>>
+    %lhs = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x512xf32>> -> tensor<1x512xf32>
+    %rhs = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x128xf32>> -> tensor<512x128xf32>
+    %init = tensor.empty() : tensor<1x128xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x128xf32>) -> tensor<1x128xf32>
+    %res = linalg.matmul ins(%lhs, %rhs : tensor<1x512xf32>, tensor<512x128xf32>) outs(%fill : tensor<1x128xf32>) -> tensor<1x128xf32>
+    flow.dispatch.tensor.store %res, %2, offsets = [0, 0], sizes = [1, 128], strides = [1, 1] : tensor<1x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x128xf32>>
+    return
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128], [1, 128], [0, 0], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 128, 0], [0, 128, 0], [0, 0, 0], [1, 128, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
+//      CHECK: func.func @gemv_riscv_vl512()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.matmul
+// CHECK-SAME:     lowering_config = #[[CONFIG2]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
 #executable_target_embedded_elf_riscv_32_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_32", {cpu_features = "+m,+f", data_layout = "e-m:e-p:32:32-i64:64-n32-S128", native_vector_size = 16 : index, target_triple = "riscv32-none-elf"}>
 func.func @thin_depthwise_conv_static() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_32_} {
   %cst = arith.constant 0.000000e+00 : f32
