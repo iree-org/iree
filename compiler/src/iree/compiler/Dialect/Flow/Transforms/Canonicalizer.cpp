@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -18,80 +19,66 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
-/// Folds a chain of `tensor.pad` ops with the same constant padding value.
-///
-/// Example:
-///
-/// ```mlir
-///   %1 = tensor.pad %0 low[0, 1] high[0, 2] {
-///       tensor.yield %val
-///     } : tensor<1x2xf32> to tensor<2x5xf32>
-///   %res = tensor.pad %1 low[0, 2] high[3, 0] {
-///       tensor.yield %val
-///     } : tensor<1x5xf32> to tensor<5x7xf32>
-/// ```
-///
-/// folds into:
-///
-/// ```mlir
-///   %res = tensor.pad %0 low[0, 3] high[3, 2] {
-///       tensor.yield %val
-///     } : tensor<1x2xf32> to tensor<5x7xf32>
-/// ```
-///
-/// NOTE: This wasn't sent upstream as a canonicalization due to the use of
-/// the Affine dialect.
-struct FoldConsecutiveConstantPadding : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+static std::optional<SmallVector<OpFoldResult>> getDefiningMixedSizes(Value v) {
+  if (auto empty = v.getDefiningOp<tensor::EmptyOp>()) {
+    return empty.getMixedSizes();
+  } else if (auto extract = v.getDefiningOp<tensor::ExtractSliceOp>()) {
+    // TODO: Support rank reducing cases.
+    if (extract.getSourceType().getRank() !=
+        extract.getResultType().getRank()) {
+      return {};
+    }
+    return extract.getMixedSizes();
+  }
+  return {};
+}
 
-  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertSliceOp,
                                 PatternRewriter &rewriter) const override {
-    if (padOp.getNofold()) {
-      return failure();
+    if (!insertSliceOp.hasUnitStride() || !insertSliceOp.hasZeroOffset()) {
+      return rewriter.notifyMatchFailure(insertSliceOp,
+                                         "non-unit stride or non-zero offset.");
     }
-    auto producerPad = padOp.getSource().getDefiningOp<tensor::PadOp>();
-    if (!producerPad || producerPad.getNofold()) {
+
+    RankedTensorType sourceType = insertSliceOp.getSourceType();
+    RankedTensorType resultType = insertSliceOp.getResultType();
+    if (sourceType != resultType) {
       return rewriter.notifyMatchFailure(
-          padOp, "producer is not a foldable tensor.pad op");
+          insertSliceOp,
+          "unimplemented: Cast-like or reshape-like insert ops.");
     }
 
-    // Fail if the tensor::PadOps padding values do not match.
-    Value consumerPadValue = padOp.getConstantPaddingValue();
-    Value producerPadValue = producerPad.getConstantPaddingValue();
-    if (!consumerPadValue || !producerPadValue ||
-        consumerPadValue != producerPadValue) {
+    std::optional<SmallVector<OpFoldResult>> mixedSizes =
+        getDefiningMixedSizes(insertSliceOp.getDest());
+    if (!mixedSizes) {
       return rewriter.notifyMatchFailure(
-          padOp, "cannot fold PadOps with different padding values");
+          insertSliceOp, "Could not find producer with list of tensor sizes.");
     }
 
-    Location loc = padOp.getLoc();
-    AffineExpr d0, d1;
-    bindDims(rewriter.getContext(), d0, d1);
-
-    // Combine the low/high paddings of the two tensor::PadOps.
-    auto addPaddings = [&](ArrayRef<OpFoldResult> consumerPaddings,
-                           ArrayRef<OpFoldResult> producerPaddings) {
-      SmallVector<OpFoldResult> sumPaddings;
-      for (auto [consumerIndex, producerIndex] :
-           llvm::zip_equal(consumerPaddings, producerPaddings)) {
-        sumPaddings.push_back(affine::makeComposedFoldedAffineApply(
-            rewriter, loc, d0 + d1, {consumerIndex, producerIndex}));
+    for (auto [insertSize, destSize] :
+         llvm::zip_equal(insertSliceOp.getMixedSizes(), mixedSizes.value())) {
+      if (isa<Value>(insertSize) || isa<Value>(destSize)) {
+        if (insertSize != destSize) {
+          return rewriter.notifyMatchFailure(insertSliceOp,
+                                             "dynamic size mismatch");
+        }
+        continue;
       }
-      return sumPaddings;
-    };
 
-    SmallVector<OpFoldResult> newHighPad =
-        addPaddings(padOp.getMixedHighPad(), producerPad.getMixedHighPad());
-    SmallVector<OpFoldResult> newLowPad =
-        addPaddings(padOp.getMixedLowPad(), producerPad.getMixedLowPad());
+      // `getMixedSizes` for different ops returns different attribute types
+      // (`index` or `i64`) so we compare the values of the ints directly here.
+      int64_t staticInsertSize = getConstantIntValue(insertSize).value();
+      int64_t staticDestSize = getConstantIntValue(insertSize).value();
+      if (staticInsertSize != staticDestSize) {
+        return rewriter.notifyMatchFailure(insertSliceOp,
+                                           "static size mismatch");
+      }
+    }
 
-    auto newPadOp = rewriter.create<tensor::PadOp>(
-        padOp.getLoc(), padOp.getResultType(), producerPad.getSource(),
-        newLowPad, newHighPad, padOp.getNofold(),
-        getPrunedAttributeList(padOp, tensor::PadOp::getAttributeNames()));
-    rewriter.inlineRegionBefore(padOp.getRegion(), newPadOp.getRegion(),
-                                newPadOp.getRegion().begin());
-    rewriter.replaceOp(padOp, newPadOp.getResult());
+    rewriter.replaceOp(insertSliceOp, insertSliceOp.getSource());
     return success();
   }
 };
@@ -117,7 +104,7 @@ struct CanonicalizerPass
     // Pull in some borderline/downstream canonicalizations for the Flow
     // compilation phase.
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(owningPatterns);
-    owningPatterns.add<FoldConsecutiveConstantPadding>(context);
+    owningPatterns.add<FoldFullInsertSlice>(context);
 
     patterns =
         std::make_shared<FrozenRewritePatternSet>(std::move(owningPatterns));
