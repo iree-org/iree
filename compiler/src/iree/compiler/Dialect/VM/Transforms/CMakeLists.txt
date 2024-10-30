@@ -19,6 +19,7 @@ iree_cc_library(
     "Conversion.cpp"
     "DeduplicateRodata.cpp"
     "DropEmptyModuleInitializers.cpp"
+    "DropUnusedCalls.cpp"
     "GlobalInitialization.cpp"
     "HoistInlinedRodata.cpp"
     "OrdinalAllocation.cpp"
