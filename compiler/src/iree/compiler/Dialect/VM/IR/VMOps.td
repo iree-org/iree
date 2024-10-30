@@ -1137,6 +1137,7 @@ def VM_RodataOp : VM_Op<"rodata", [
 }
 
 def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
   ]> {
@@ -1170,8 +1171,6 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
     OpBuilder<(ins "RodataOp":$rodataOp,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
-
-  let hasVerifier = 1;
 }
 
 def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [

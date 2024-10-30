@@ -403,7 +403,8 @@ private:
   DenseMap<StringRef, TraversalAction> dialectActions;
   DenseMap<OperationName, TraversalAction> opActions;
 
-  DenseMap<Operation *, GlobalInfo> globalInfos;
+  DenseMap<Operation *, std::unique_ptr<GlobalInfo>> globalInfos;
+  DenseMap<StringRef, GlobalInfo *> globalInfosByName;
   ModuleAnalysisManager analysisManager;
 };
 

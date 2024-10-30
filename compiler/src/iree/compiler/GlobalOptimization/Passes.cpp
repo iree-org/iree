@@ -182,16 +182,17 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPass(createGlobalLoopInvariantCodeMotionPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
+      .addPass(mlir::createCSEPass)
 
-  // Simplify util.global accesses early on; this can help with dispatch
-  // region formation as redundant store-loads are removed.
-  FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+      // Simplify util.global accesses early on; this can help with dispatch
+      // region formation as redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass)
+
+      // Aggressive cleanup.
+      .addPass(IREE::Util::createApplyPatternsPass);
 
   // Module level cleanup and canonicalization of util.global (and other
   // util ops).
-  mainPassManager.addPass(IREE::Util::createApplyPatternsPass());
   mainPassManager.addPass(IREE::Util::createFoldGlobalsPass());
   mainPassManager.addPass(IREE::Util::createIPOPass());
 
