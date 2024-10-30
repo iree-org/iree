@@ -6,6 +6,10 @@
 
 #include "iree/hal/drivers/null/channel.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_channel_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_channel_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
@@ -34,8 +38,8 @@ iree_status_t iree_hal_null_channel_create(iree_hal_channel_params_t params,
                                            iree_allocator_t host_allocator,
                                            iree_hal_channel_t** out_channel) {
   IREE_ASSERT_ARGUMENT(out_channel);
-  *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_channel = NULL;
 
   iree_hal_null_channel_t* channel = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

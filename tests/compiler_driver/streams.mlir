@@ -51,10 +51,10 @@ stream.executable private @executable_0 {
     }
   }
 }
-// CHECK: vm.func private @simple_mul
+// CHECK: vm.func private @__simple_mul_memoize_apply
+// CHECK:   vm.call.variadic @hal.command_buffer.dispatch
 func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   %ret0 = flow.dispatch @executable_0::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %ret0 : tensor<4xf32>
 }
@@ -98,10 +98,10 @@ stream.executable private @executable_1 {
     }
   }
 }
-// CHECK: vm.func private @simple_mul_inplace
+// CHECK: vm.func private @__simple_mul_inplace_memoize_apply
+// CHECK:   vm.call.variadic @hal.command_buffer.dispatch
 func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   %ret0 = flow.dispatch @executable_1::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> %arg0
   return %ret0 : tensor<4xf32>
 }

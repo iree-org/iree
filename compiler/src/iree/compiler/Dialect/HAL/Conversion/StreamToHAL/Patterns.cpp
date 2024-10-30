@@ -32,6 +32,15 @@ static llvm::cl::opt<bool> clIndirectCommandBuffers{
     llvm::cl::init(true),
 };
 
+// TODO(benvanik): remove when we support capturing dynamic values for reuse.
+static llvm::cl::opt<bool> clForceIndirectCommandBuffers{
+    "iree-hal-force-indirect-command-buffers",
+    llvm::cl::desc("Forces indirect command buffers when they would otherwise "
+                   "not be chosen due to the values they capture. They may not "
+                   "be reusable but will still be outlined."),
+    llvm::cl::init(false),
+};
+
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1002,7 +1011,9 @@ struct CmdExecuteOpPattern
     // changes dispatches to use them for any dispatch we can - note that there
     // may still be some that slip through due to custom executables.
     const bool capturesDynamicUniformValues =
-        regionCapturesDynamicUniformValues(executeOp);
+        clForceIndirectCommandBuffers
+            ? false
+            : regionCapturesDynamicUniformValues(executeOp);
 
     // Calculate the indirect buffer references used within the command buffer
     // by analyzing captured resources. This analysis will be used by subsequent

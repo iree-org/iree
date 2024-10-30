@@ -49,12 +49,12 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   memset(scope->name, 0xCD, sizeof(scope->name));
 
   // In most cases the status will have been consumed by the scope owner.
-  iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+  iree_status_t status = (iree_status_t)iree_atomic_exchange(
       &scope->permanent_status, (intptr_t)NULL, iree_memory_order_acquire);
   IREE_IGNORE_ERROR(status);
 
-  while (iree_atomic_load_int32(&scope->pending_idle_notification_posts,
-                                iree_memory_order_acquire)) {
+  while (iree_atomic_load(&scope->pending_idle_notification_posts,
+                          iree_memory_order_acquire)) {
     iree_thread_yield();
   }
   iree_notification_deinitialize(&scope->idle_notification);
@@ -74,14 +74,14 @@ iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
 }
 
 bool iree_task_scope_has_failed(iree_task_scope_t* scope) {
-  return iree_atomic_load_intptr(&scope->permanent_status,
-                                 iree_memory_order_acquire) != 0;
+  return iree_atomic_load(&scope->permanent_status,
+                          iree_memory_order_acquire) != 0;
 }
 
 iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
   iree_status_t old_status = iree_ok_status();
   iree_status_t new_status = iree_ok_status();
-  while (!iree_atomic_compare_exchange_strong_intptr(
+  while (!iree_atomic_compare_exchange_strong(
       &scope->permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
       iree_memory_order_acq_rel,
       iree_memory_order_acquire /* old_status is actually used */)) {
@@ -114,7 +114,7 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
   }
 
   iree_status_t old_status = iree_ok_status();
-  if (!iree_atomic_compare_exchange_strong_intptr(
+  if (!iree_atomic_compare_exchange_strong(
           &scope->permanent_status, (intptr_t*)&old_status,
           (intptr_t)new_status, iree_memory_order_acq_rel,
           iree_memory_order_relaxed /* old_status is unused */)) {
@@ -140,16 +140,16 @@ void iree_task_scope_begin(iree_task_scope_t* scope) {
   // relaxed because this 'begin' call will be paired with a 'end' call that
   // will perform the release-store, and this value is only read by
   // 'deinitialize'.
-  iree_atomic_store_int32(&scope->pending_idle_notification_posts, 1,
-                          iree_memory_order_relaxed);
+  iree_atomic_store(&scope->pending_idle_notification_posts, 1,
+                    iree_memory_order_relaxed);
 }
 
 void iree_task_scope_end(iree_task_scope_t* scope) {
   if (iree_atomic_ref_count_dec(&scope->pending_submissions) == 1) {
     // All submissions have completed in this scope - notify any waiters.
     iree_notification_post(&scope->idle_notification, IREE_ALL_WAITERS);
-    iree_atomic_store_int32(&scope->pending_idle_notification_posts, 0,
-                            iree_memory_order_release);
+    iree_atomic_store(&scope->pending_idle_notification_posts, 0,
+                      iree_memory_order_release);
   }
 }
 

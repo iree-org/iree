@@ -461,6 +461,10 @@ public:
     buildLLVMGPUCodegenPassPipeline(passManager, false);
   }
 
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildLLVMGPULinkingPassPipeline(passManager, "cuda");
+  }
+
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {

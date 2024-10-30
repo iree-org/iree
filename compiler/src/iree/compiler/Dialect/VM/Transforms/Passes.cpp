@@ -38,6 +38,11 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addPass(mlir::createCSEPass());
 
+  // Aggressive MLIR cleanup.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      IREE::VM::createDropUnusedCallsPass());
+  passManager.addPass(mlir::createSymbolDCEPass());
+
   // Simplify util.global accesses; this can help with data flow tracking as
   // redundant store-loads are removed.
   FunctionLikeNest(passManager)

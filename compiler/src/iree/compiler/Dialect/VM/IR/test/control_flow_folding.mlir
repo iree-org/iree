@@ -55,17 +55,12 @@ vm.module @cond_br_folds {
   // ^bb2(%1 : i32):
   //   vm.return %1 : i32
   // }
+}
 
-  // CHECK-LABEL: @erase_unused_pure_call
-  vm.func @erase_unused_pure_call(%arg0 : i32) {
-    %0 = vm.call @nonvariadic_pure_func(%arg0) : (i32) -> i32
-    %1 = vm.call.variadic @variadic_pure_func([%arg0]) : (i32 ...) -> i32
-    // CHECK-NEXT: vm.return
-    vm.return
-  }
-  vm.import private @nonvariadic_pure_func(%arg0 : i32) -> i32 attributes {nosideeffects}
-  vm.import private @variadic_pure_func(%arg0 : i32 ...) -> i32 attributes {nosideeffects}
+// -----
 
+// CHECK-LABEL: @call_folds
+vm.module @call_folds {
   // CHECK-LABEL: @convert_nonvariadic_to_call
   vm.func @convert_nonvariadic_to_call(%arg0 : i32) -> (i32, i32) {
     // CHECK-NEXT: vm.call @nonvariadic_func(%arg0) : (i32) -> i32

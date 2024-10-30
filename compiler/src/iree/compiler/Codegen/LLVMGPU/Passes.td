@@ -66,6 +66,11 @@ def ExtractAddressComputationGPUPass: Pass<"extract-address-computation-gpu"> {
   ];
 }
 
+def LLVMGPUAssignConstantOrdinalsPass :
+    Pass<"iree-llvmgpu-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable constant ordinals across all LLVMGPU variants.";
+}
+
 def LLVMGPUCastAddressSpaceFunctionPass :
     Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
   let summary = "Cast address space to generic in CallOp and FuncOp";
@@ -87,6 +92,29 @@ def LLVMGPUConfigureVectorLayoutsPass :
   let summary = "Pass to set layouts for vector distribution";
 }
 
+def LLVMGPUConvolutionToIGEMMPass :
+    InterfacePass<"iree-llvmgpu-convolution-to-igemm", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to convert conv_2d ops to igemm and set a lowering configuration.";
+  let dependentDialects = [
+    "tensor::TensorDialect",
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "iree_compiler::IREE::GPU::IREEGPUDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
+}
+
+def LLVMGPULinkExecutablesPass :
+    Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links LLVMGPU HAL executables within the top-level program module.";
+  let options = [
+    Option<
+      "target", "target",
+      "std::string", "",
+      "Target backend name whose executables will be linked by this pass."
+    >,
+  ];
+}
+
 def LLVMGPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
@@ -105,19 +133,6 @@ def LLVMGPUPrefetchSharedMemoryPass :
 def LLVMGPUPromoteMatmulToFitMMAPass :
     InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
   let summary = "Pass to promote contraction ops to fit mma shapes";
-  let options = [
-    Option<"targetDimensions", "target-dimensions", "mlir::iree_compiler::LLVMGPUMatmulPadOption",
-           /*default=*/"mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims",
-           "Select the strategy to control how multi_reduction is lowered.",
-           [{::llvm::cl::values(
-            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims,
-                       "parallel",
-                       "Pad all the parallel dims for contraction ops."),
-            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ReductionDims,
-                       "reduction",
-                       "Pad all the reduction dims for contraction ops.")
-        )}]>
-  ];
 }
 
 def LLVMGPUSelectLoweringStrategyPass :

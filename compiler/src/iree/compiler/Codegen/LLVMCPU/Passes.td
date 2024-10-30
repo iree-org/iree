@@ -69,6 +69,13 @@ def LLVMCPUEmitVectorizationRemarksPass :
 def LLVMCPULinkExecutablesPass :
     Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMCPU HAL executables within the top-level program module.";
+  let options = [
+    Option<
+      "target", "target",
+      "std::string", "",
+      "Target backend name whose executables will be linked by this pass."
+    >,
+  ];
 }
 
 def LLVMCPULowerExecutableTargetPass :

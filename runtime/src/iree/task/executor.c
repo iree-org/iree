@@ -103,10 +103,9 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
     char trace_name[32];
-    int trace_name_length =
-        snprintf(trace_name, sizeof(trace_name), "iree-executor-%d",
-                 iree_atomic_fetch_add_int32(&executor_id, 1,
-                                             iree_memory_order_seq_cst));
+    int trace_name_length = snprintf(
+        trace_name, sizeof(trace_name), "iree-executor-%d",
+        iree_atomic_fetch_add(&executor_id, 1, iree_memory_order_seq_cst));
     IREE_LEAK_CHECK_DISABLE_PUSH();
     executor->trace_name = malloc(trace_name_length + 1);
     memcpy((void*)executor->trace_name, trace_name, trace_name_length + 1);
@@ -540,8 +539,7 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     worker_index += offset + 1;
     mask = iree_shr(mask, offset + 1);
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
-    if (iree_atomic_load_int32(&victim_worker->state,
-                               iree_memory_order_acquire) !=
+    if (iree_atomic_load(&victim_worker->state, iree_memory_order_acquire) !=
         IREE_TASK_WORKER_STATE_RUNNING) {
       return NULL;
     }

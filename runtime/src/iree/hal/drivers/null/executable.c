@@ -6,6 +6,10 @@
 
 #include "iree/hal/drivers/null/executable.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_executable_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
@@ -24,8 +28,8 @@ iree_status_t iree_hal_null_executable_create(
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
-  *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_executable = NULL;
 
   // Allocate storage for the executable and its associated data structures.
   iree_hal_null_executable_t* executable = NULL;

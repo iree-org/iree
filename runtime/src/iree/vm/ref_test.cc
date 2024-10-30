@@ -73,9 +73,9 @@ static iree_vm_ref_t MakeRef(InstancePtr& instance, const char* type_name) {
 // WARNING: this is an implementation detail and must never be relied on - it's
 // only here to test the expected behavior.
 static int32_t ReadCounter(iree_vm_ref_t* ref) {
-  return iree_atomic_load_int32((iree_atomic_ref_count_t*)ref->ptr +
-                                    (ref->type & IREE_VM_REF_TYPE_TAG_BIT_MASK),
-                                iree_memory_order_seq_cst);
+  return iree_atomic_load((iree_atomic_ref_count_t*)ref->ptr +
+                              (ref->type & IREE_VM_REF_TYPE_TAG_BIT_MASK),
+                          iree_memory_order_seq_cst);
 }
 
 }  // namespace

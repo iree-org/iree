@@ -48,6 +48,11 @@ typedef enum iree_test_utils_value_type_e {
   IREE_TEST_UTILS_VALUE_TYPE_F64 = 7,
   // bfloat16
   IREE_TEST_UTILS_VALUE_TYPE_BF16 = 8,
+  // 8-bit float types.
+  IREE_TEST_UTILS_VALUE_TYPE_F8E5M2 = 9,
+  IREE_TEST_UTILS_VALUE_TYPE_F8E4M3 = 10,
+  IREE_TEST_UTILS_VALUE_TYPE_F8E5M2FNUZ = 11,
+  IREE_TEST_UTILS_VALUE_TYPE_F8E4M3FNUZ = 12,
 } iree_test_utils_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
@@ -64,6 +69,7 @@ typedef struct iree_test_utils_value_t {
     float f32;
     uint16_t f16_u16;
     uint16_t bf16_u16;
+    uint8_t f8_u8;
     double f64;
     uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
                                                               // value types

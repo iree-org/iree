@@ -115,6 +115,30 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
   }
 };
 
+/// Swaps tensor.extract_slice(linalg.fill(%cst, %init)) into linalg.fill(%cst,
+/// tensor.extract_slice(%init)) even when the linalg.fill has multiple users.
+/// Bubbles up tensor.extract_slice when encountered with linalg.fill and the
+/// former can be folded away.
+struct SwapExtractSliceOfFill final
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    auto fillOp = extractOp.getSource().getDefiningOp<linalg::FillOp>();
+    if (!fillOp)
+      return failure();
+
+    auto newExtractOp = rewriter.create<tensor::ExtractSliceOp>(
+        extractOp.getLoc(), extractOp.getType(), fillOp.getOutputs()[0],
+        extractOp.getMixedOffsets(), extractOp.getMixedSizes(),
+        extractOp.getMixedStrides());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(
+        extractOp, fillOp.getInputs(), ValueRange{newExtractOp.getResult()});
+    return success();
+  }
+};
+
 struct BubbleUpExtractSlicesPass
     : impl::BubbleUpExtractSlicesPassBase<BubbleUpExtractSlicesPass> {
   void runOnOperation() override {
@@ -122,6 +146,8 @@ struct BubbleUpExtractSlicesPass
     {
       RewritePatternSet patterns(context);
       patterns.insert<BubbleUpExtract>(context);
+      patterns.insert<SwapExtractSliceOfFill>(context);
+      tensor::populateFoldTensorEmptyPatterns(patterns, false);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();

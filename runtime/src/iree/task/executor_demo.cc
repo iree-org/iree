@@ -89,8 +89,8 @@ extern "C" int main(int argc, char* argv[]) {
             IREE_TRACE_SCOPE_NAMED("tile0");
             IREE_ASSERT_EQ(0, user_context);
             simulate_work(tile_context);
-            iree_atomic_fetch_add_int32(&tile_context->statistics->reserved, 1,
-                                        iree_memory_order_relaxed);
+            iree_atomic_fetch_add(&tile_context->statistics->reserved, 1,
+                                  iree_memory_order_relaxed);
             return iree_ok_status();
           },
           0),
@@ -107,8 +107,8 @@ extern "C" int main(int argc, char* argv[]) {
             IREE_TRACE_SCOPE_NAMED("tile1");
             IREE_ASSERT_EQ(0, user_context);
             simulate_work(tile_context);
-            iree_atomic_fetch_add_int32(&tile_context->statistics->reserved, 1,
-                                        iree_memory_order_relaxed);
+            iree_atomic_fetch_add(&tile_context->statistics->reserved, 1,
+                                  iree_memory_order_relaxed);
             return iree_ok_status();
           },
           0),

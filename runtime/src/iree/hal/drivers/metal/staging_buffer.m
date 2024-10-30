@@ -37,8 +37,7 @@ iree_status_t iree_hal_metal_staging_buffer_initialize(
   out_staging_buffer->host_buffer = metal_buffer.contents;
   iree_slim_mutex_initialize(&out_staging_buffer->offset_mutex);
   out_staging_buffer->offset = 0;
-  iree_atomic_store_int32(&out_staging_buffer->pending_command_buffers, 0,
-                          iree_memory_order_relaxed);
+  iree_atomic_store(&out_staging_buffer->pending_command_buffers, 0, iree_memory_order_relaxed);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -97,14 +96,13 @@ void iree_hal_metal_staging_buffer_reset(iree_hal_metal_staging_buffer_t* stagin
 
 void iree_hal_metal_staging_buffer_increase_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  iree_atomic_fetch_add_int32(&staging_buffer->pending_command_buffers, 1,
-                              iree_memory_order_relaxed);
+  iree_atomic_fetch_add(&staging_buffer->pending_command_buffers, 1, iree_memory_order_relaxed);
 }
 
 void iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  if (iree_atomic_fetch_sub_int32(&staging_buffer->pending_command_buffers, 1,
-                                  iree_memory_order_acq_rel) == 1) {
+  if (iree_atomic_fetch_sub(&staging_buffer->pending_command_buffers, 1,
+                            iree_memory_order_acq_rel) == 1) {
     iree_hal_metal_staging_buffer_reset(staging_buffer);
   }
 }

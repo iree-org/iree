@@ -91,7 +91,7 @@ static iree_status_t iree_dynamic_library_make_temp_file_path(
   static iree_atomic_int32_t next_unique_id = IREE_ATOMIC_VAR_INIT(0);
   // relaxed because we only care about uniqueness, we don't care about ordering
   // of accesses to unique_id w.r.t. other memory operations.
-  uint32_t unique_id = (uint32_t)iree_atomic_fetch_add_int32(
+  uint32_t unique_id = (uint32_t)iree_atomic_fetch_add(
       &next_unique_id, 1, iree_memory_order_relaxed);
 
   // Allocate storage for the full file path and format it in.

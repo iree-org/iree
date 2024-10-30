@@ -6,6 +6,10 @@
 
 #include "iree/hal/drivers/null/buffer.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_buffer_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_buffer_t {
   iree_hal_buffer_t base;
   iree_hal_buffer_release_callback_t release_callback;
@@ -33,8 +37,8 @@ iree_status_t iree_hal_null_buffer_wrap(
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
-  *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_buffer = NULL;
 
   iree_hal_null_buffer_t* buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

@@ -113,6 +113,9 @@ do_build_mlir() {
 
   cmake_options="-DLLVM_DIR='${main_install_dir}/lib/cmake/llvm'"
   cmake_options="${cmake_options} -DPython3_EXECUTABLE='$(which $python3_command)'"
+  # Note: Building the MLIR Python bindings requires the installation of
+  # dependencies as specified in `mlir/python/requirements.txt`, which among
+  # others include pybind11.
   cmake_options="${cmake_options} -DMLIR_ENABLE_BINDINGS_PYTHON=ON"
   cmake_options="${cmake_options} -DCMAKE_INSTALL_PREFIX=${mlir_install_dir}"
   cmake_options="${cmake_options} -C $TD/mlir_config.cmake"
