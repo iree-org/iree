@@ -2593,7 +2593,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     StrAttr:$format,
-    HAL_ExecutableDataAttr:$data,
+    Util_AnySerializableAttr:$data,
     OptionalAttr<StrAttr>:$mime_type
     // TODO(benvanik): add compatibility and versioning attributes.
   );

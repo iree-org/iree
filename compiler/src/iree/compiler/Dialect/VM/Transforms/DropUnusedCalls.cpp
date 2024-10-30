@@ -84,7 +84,6 @@ public:
     // Note that we want to remove entire chains of unused calls and run this
     // as a pattern application.
     RewritePatternSet patterns(&getContext());
-    // patterns
     patterns.insert<EraseUnusedCallOp<IREE::VM::CallOp>,
                     EraseUnusedCallOp<IREE::VM::CallVariadicOp>>(
         &getContext(), noSideEffectsSymbols);
