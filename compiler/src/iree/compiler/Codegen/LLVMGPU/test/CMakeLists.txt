@@ -24,7 +24,6 @@ iree_lit_test_suite(
     "config_matvec.mlir"
     "config_winograd.mlir"
     "configure_tensor_layout.mlir"
-    "configure_vector_layout.mlir"
     "conv_pipeline_test_cuda.mlir"
     "conv_pipeline_test_rocm.mlir"
     "convert_to_nvvm.mlir"

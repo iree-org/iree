@@ -851,15 +851,17 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
+
+  if (usePadToModelSharedMemcpy) {
+    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
+  }
+
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-
-  if (usePadToModelSharedMemcpy) {
-    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass());
-  }
+  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
   // Tile to reduction loops.
   {
@@ -918,7 +920,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
 
   // Vector SIMD -> Vector SIMT
-  funcPassManager.addPass(createLLVMGPUConfigureVectorLayoutsPass());
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());

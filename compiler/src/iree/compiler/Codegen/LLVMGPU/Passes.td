@@ -87,11 +87,6 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
-def LLVMGPUConfigureVectorLayoutsPass :
-    InterfacePass<"iree-llvmgpu-configure-vector-layouts", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to set layouts for vector distribution";
-}
-
 def LLVMGPUConvolutionToIGEMMPass :
     InterfacePass<"iree-llvmgpu-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert conv_2d ops to igemm and set a lowering configuration.";
