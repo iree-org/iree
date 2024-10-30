@@ -761,8 +761,6 @@ static void enforceLayoutToContractionOp(
     ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
-  // if (resultLattices.empty())
-  //   return;
   // Contraction has only one vector result.
   const DistributionLayout *result = resultLattices[0];
   // Contraction has init value at position 2.
