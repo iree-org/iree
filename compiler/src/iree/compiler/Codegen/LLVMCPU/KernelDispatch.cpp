@@ -1400,9 +1400,17 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
   }
 
   if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
-    getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
-                              matmulScalableFlags);
+    bool isMTB = isa<linalg::MatmulTransposeBOp>(op);
+    bool isBMTB = isa<linalg::BatchMatmulTransposeBOp>(op);
+    // Use default tile size for matmul_transpose_b &
+    // batch_matmul_transpose_b to avoid performance drop.
+    if (!isMTB && !isBMTB) {
+      // Try to maximize the vector register utilization rate for matmul.
+      getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
+                                matmulScalableFlags);
+    }
   }
+
   // If tile sizes were not computed by previous heuristics, use default
   // hard-coded tile sizes.
   if (matmulTileSizes.empty()) {
