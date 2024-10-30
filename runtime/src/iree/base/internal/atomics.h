@@ -86,47 +86,6 @@ extern "C" {
 
 #endif  // IREE_COMPILER_*
 
-// If the compiler can automatically determine the types:
-#ifdef iree_atomic_load_auto
-
-#define iree_atomic_load_int32 iree_atomic_load_auto
-#define iree_atomic_store_int32 iree_atomic_store_auto
-#define iree_atomic_fetch_add_int32 iree_atomic_fetch_add_auto
-#define iree_atomic_fetch_sub_int32 iree_atomic_fetch_sub_auto
-#define iree_atomic_fetch_and_int32 iree_atomic_fetch_and_auto
-#define iree_atomic_fetch_or_int32 iree_atomic_fetch_or_auto
-#define iree_atomic_fetch_xor_int32 iree_atomic_fetch_xor_auto
-#define iree_atomic_exchange_int32 iree_atomic_exchange_auto
-#define iree_atomic_compare_exchange_strong_int32 \
-  iree_atomic_compare_exchange_strong_auto
-#define iree_atomic_compare_exchange_weak_int32 \
-  iree_atomic_compare_exchange_weak_auto
-
-#define iree_atomic_load_int64 iree_atomic_load_auto
-#define iree_atomic_store_int64 iree_atomic_store_auto
-#define iree_atomic_fetch_add_int64 iree_atomic_fetch_add_auto
-#define iree_atomic_fetch_sub_int64 iree_atomic_fetch_sub_auto
-#define iree_atomic_fetch_and_int64 iree_atomic_fetch_and_auto
-#define iree_atomic_fetch_or_int64 iree_atomic_fetch_or_auto
-#define iree_atomic_fetch_xor_int64 iree_atomic_fetch_xor_auto
-#define iree_atomic_exchange_int64 iree_atomic_exchange_auto
-#define iree_atomic_compare_exchange_strong_int64 \
-  iree_atomic_compare_exchange_strong_auto
-#define iree_atomic_compare_exchange_weak_int64 \
-  iree_atomic_compare_exchange_weak_auto
-
-#define iree_atomic_load_intptr iree_atomic_load_auto
-#define iree_atomic_store_intptr iree_atomic_store_auto
-#define iree_atomic_fetch_add_intptr iree_atomic_fetch_add_auto
-#define iree_atomic_fetch_sub_intptr iree_atomic_fetch_sub_auto
-#define iree_atomic_exchange_intptr iree_atomic_exchange_auto
-#define iree_atomic_compare_exchange_strong_intptr \
-  iree_atomic_compare_exchange_strong_auto
-#define iree_atomic_compare_exchange_weak_intptr \
-  iree_atomic_compare_exchange_weak_auto
-
-#endif  // iree_atomic_load_auto
-
 //==============================================================================
 // Reference count atomics
 //==============================================================================
@@ -140,10 +99,10 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 // should use IREE_ATOMIC_VAR_INIT, but apparently this has to be fixed
 // at call sites (where the variables are initialized in the first place).
 #define iree_atomic_ref_count_init_value(count_ptr, value) \
-  iree_atomic_store_int32(count_ptr, value, iree_memory_order_relaxed)
+  iree_atomic_store((count_ptr), (value), iree_memory_order_relaxed)
 
 #define iree_atomic_ref_count_init(count_ptr) \
-  iree_atomic_ref_count_init_value(count_ptr, 1)
+  iree_atomic_ref_count_init_value((count_ptr), 1)
 
 // Why relaxed order:
 // https://www.boost.org/doc/libs/1_57_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters.discussion
@@ -155,9 +114,9 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 // value (unlike iree_atomic_ref_count_dec), so we make sure that it does not,
 // which allows the implementation to use faster atomic instructions where
 // available, e.g. STADD on ARMv8.1-a.
-#define iree_atomic_ref_count_inc(count_ptr)                              \
-  do {                                                                    \
-    iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed); \
+#define iree_atomic_ref_count_inc(count_ptr)                          \
+  do {                                                                \
+    iree_atomic_fetch_add((count_ptr), 1, iree_memory_order_relaxed); \
   } while (false)
 
 // For now we stick to acq_rel order. TODO: should we follow Boost's advice?
@@ -169,13 +128,13 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 // may be a pessimization... I would like to hear a second opinion on this,
 // particularly regarding how x86-centric this might be.
 #define iree_atomic_ref_count_dec(count_ptr) \
-  iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_acq_rel)
+  iree_atomic_fetch_sub((count_ptr), 1, iree_memory_order_acq_rel)
 
 // memory_order_acquire order ensures that this sees decrements from
 // iree_atomic_ref_count_dec. On the other hand, there is no ordering with
 // iree_atomic_ref_count_inc.
 #define iree_atomic_ref_count_load(count_ptr) \
-  iree_atomic_load_int32(count_ptr, iree_memory_order_acquire)
+  iree_atomic_load((count_ptr), iree_memory_order_acquire)
 
 // Aborts the program if the given reference count value is not 1.
 // This should be avoided in all situations but those where continuing execution

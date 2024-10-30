@@ -19,7 +19,8 @@ namespace {
 
 struct LLVMCPULinkExecutablesPass
     : public impl::LLVMCPULinkExecutablesPassBase<LLVMCPULinkExecutablesPass> {
-  LLVMCPULinkExecutablesPass() = default;
+  using impl::LLVMCPULinkExecutablesPassBase<
+      LLVMCPULinkExecutablesPass>::LLVMCPULinkExecutablesPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -30,29 +31,36 @@ struct LLVMCPULinkExecutablesPass
       return;
 
     // Guess a module name, if needed, to make the output files readable.
-    auto moduleName = guessModuleName(moduleOp, "llvm_module");
+    auto moduleName = guessModuleName(moduleOp, "module");
 
     // Create our new "linked" hal.executable.
-    std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "llvm_cpu");
+    SymbolTable moduleTable(moduleOp);
+    std::string linkedExecutableName = llvm::formatv("{0}_linked", moduleName);
     auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
+    moduleTable.insert(linkedExecutableOp);
     auto executableBuilder =
         OpBuilder::atBlockBegin(&linkedExecutableOp.getBlock());
 
     // Gather all unique executable targets - we may have multiple.
     auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
-    for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
+    for (auto [index, targetAttr] : llvm::enumerate(executableTargetAttrs)) {
+      // Only link the target specified. If none specified link all.
+      if (!target.empty() && targetAttr.getBackend().getValue() != target) {
+        continue; // not linking this target
+      }
+
       // Add our hal.executable.variant with an empty module.
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
-              ? attr.getSymbolNameFragment()
-              : llvm::formatv("{0}_{1}", attr.getSymbolNameFragment(), index);
+              ? targetAttr.getSymbolNameFragment()
+              : llvm::formatv("{0}_{1}", targetAttr.getSymbolNameFragment(),
+                              index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), linkedVariantName, attr);
+              moduleOp.getLoc(), linkedVariantName, targetAttr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
       targetBuilder.create<mlir::ModuleOp>(moduleOp.getLoc());
 
@@ -71,5 +79,6 @@ struct LLVMCPULinkExecutablesPass
     }
   }
 };
+
 } // namespace
 } // namespace mlir::iree_compiler

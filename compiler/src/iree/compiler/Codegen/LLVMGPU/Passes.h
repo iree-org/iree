@@ -12,6 +12,8 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 
+#include <optional>
+
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -22,7 +24,7 @@ namespace mlir::iree_compiler {
 using IREE::GPU::GPUPipelineOptions;
 
 //----------------------------------------------------------------------------//
-// LLVMGPU backend Pass Pipelines.
+// LLVMGPU Backend Pass Pipelines
 //----------------------------------------------------------------------------//
 
 /// Lowering using SIMT CUDA core operations.
@@ -99,13 +101,18 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize);
 
-//------------------------------------------------------------------------------
-// Wrappers that not use tablegen options.
-//------------------------------------------------------------------------------
+//----------------------------------------------------------------------------//
+// LLVMGPU Linking Passes and Pipelines
+//----------------------------------------------------------------------------//
 
-enum class LLVMGPUMatmulPadOption { ParallelDims, ReductionDims };
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMGPUPromoteMatmulToFitMMAPass(LLVMGPUMatmulPadOption option);
+/// Populates passes needed to link HAL executables across LLVMGPU targets.
+void buildLLVMGPULinkingPassPipeline(
+    OpPassManager &modulePassManager,
+    std::optional<std::string> target = std::nullopt);
+
+//------------------------------------------------------------------------------
+// Wrappers that do not use tablegen options
+//------------------------------------------------------------------------------
 
 enum class GPUTensorCoreType {
   WMMA = 0,

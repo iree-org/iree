@@ -1,0 +1,63 @@
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+include "iree/schemas/executable_debug_info.fbs";
+
+namespace iree.hal.amdgpu;
+
+// 'AMDGPU v1 Executable'.
+file_identifier "AMD1";
+file_extension "amd1";
+
+// A struct for the kernel block size along each dimension.
+struct Dims {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+// Describes the behavior of each binding.
+enum BindingBits:uint64 (bit_flags) {
+  READ_ONLY = 0,  // 1u << 0
+  INDIRECT = 1,  // 1u << 1
+}
+
+// Information about an exported function on the executable.
+table ExportDef {
+  // String name of the exported function symbol in the module.
+  symbol_name:string;
+
+  // Workgroup size for the export.
+  workgroup_size:Dims;
+
+  // Total number of 32-bit push constants used by the export.
+  constant_count:uint32;
+
+  // Binding count and flags for each binding.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
+// A library containing one or more exported functions.
+table ModuleDef {
+  // AMD ELF image for loading an hsa_executable_t.
+  image:string;
+}
+
+table ExecutableDef {
+  // Exported functions in canonical executable entry point order.
+  exports:[ExportDef];
+
+  // Modules containing executable code.
+  modules:[ModuleDef];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[iree.hal.debug.SourceFileDef];
+}
+
+root_type ExecutableDef;

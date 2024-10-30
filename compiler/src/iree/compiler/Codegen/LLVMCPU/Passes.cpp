@@ -95,7 +95,7 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
 static llvm::cl::opt<bool> clTileDispatchUsingForall(
     "iree-llvmcpu-tile-dispatch-using-forall",
     llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
 // presence of scalable vectors (even when using `+sme`), as currently there's
@@ -111,9 +111,8 @@ static llvm::cl::opt<bool> clForceArmStreaming(
     llvm::cl::init(false));
 
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
-static void addTileAndDistributePasses(OpPassManager &funcPassManager,
-                                       bool enableTileDispatchUsingForall) {
-  if (enableTileDispatchUsingForall || clTileDispatchUsingForall) {
+static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
+  if (clTileDispatchUsingForall) {
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
   } else {
@@ -346,8 +345,7 @@ void buildLLVMCPUVectorLoweringPipeline(
 void addCPUBufferOpsTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/true);
+  addTileAndDistributePasses(funcPassManager);
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
@@ -384,8 +382,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
 void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/true);
+  addTileAndDistributePasses(funcPassManager);
 
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
@@ -464,8 +461,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/true);
+  addTileAndDistributePasses(funcPassManager);
 
   // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -528,8 +524,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/true);
+  addTileAndDistributePasses(funcPassManager);
 
   funcPassManager.addPass(createLLVMCPUTileAndFusePass(
       static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
@@ -577,8 +572,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/true);
+  addTileAndDistributePasses(funcPassManager);
 
   // The below two passes are nop if pack/unpack is not specified in ukernels
   // attribute. By default, they are disabled.
@@ -621,8 +615,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/false);
+  addTileAndDistributePasses(funcPassManager);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   // TODO: Remove the pass once we have PartialReductionOpInterface implemented
@@ -661,8 +654,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager) {
-  addTileAndDistributePasses(funcPassManager,
-                             /*enableTileDispatchUsingForall=*/false);
+  addTileAndDistributePasses(funcPassManager);
   addCPUBufferizePasses(funcPassManager);
 }
 
@@ -835,9 +827,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
 
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
-void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager) {
+void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager,
+                                     std::optional<std::string> target) {
   // Link together executables. This may produce some IR duplication.
-  modulePassManager.addPass(createLLVMCPULinkExecutablesPass());
+  LLVMCPULinkExecutablesPassOptions linkOptions;
+  linkOptions.target = target.value_or("");
+  modulePassManager.addPass(createLLVMCPULinkExecutablesPass(linkOptions));
 
   // Cleanup IR duplication.
   modulePassManager.addNestedPass<IREE::HAL::ExecutableOp>(

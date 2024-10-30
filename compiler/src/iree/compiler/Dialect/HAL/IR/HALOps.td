@@ -18,6 +18,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
@@ -1010,7 +1011,10 @@ def HAL_BufferViewEncodingTypeOp : HAL_PureOp<"buffer_view.encoding_type"> {
   }];
 }
 
-def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank"> {
+def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank", [
+    DeclareOpInterfaceMethods<InferIntRangeInterface,
+        ["inferResultRangesFromOptional"]>,
+]> {
   let summary = [{buffer view rank query}];
   let description = [{
     Returns the rank of the buffer view.
@@ -1030,7 +1034,10 @@ def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank"> {
   }];
 }
 
-def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim"> {
+def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim", [
+    DeclareOpInterfaceMethods<InferIntRangeInterface,
+        ["inferResultRangesFromOptional"]>,
+]> {
   let summary = [{buffer view dimension value query}];
   let description = [{
     Returns the value of the given dimension.

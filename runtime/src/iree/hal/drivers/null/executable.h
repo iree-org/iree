@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_executable_t
+//===----------------------------------------------------------------------===//
+
 // Creates a {Null} executable from a binary in memory. Each executable may
 // contain multiple entry points and be composed of several modules presented to
 // the HAL as a single instance. See iree_hal_executable_params_t for more

@@ -38,7 +38,7 @@ static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
 
 namespace {
 
-using ControlFnTy = std::optional<std::function<bool(Operation *)>>;
+using ControlFnTy = std::function<bool(Operation *)>;
 
 // Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
 // and linalg.matmul.
@@ -78,7 +78,8 @@ class ConvertConv2DNhwcHwcf final
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  ConvertConv2DNhwcHwcf(MLIRContext *context, ControlFnTy controlFn)
+  ConvertConv2DNhwcHwcf(MLIRContext *context,
+                        std::optional<ControlFnTy> controlFn)
       : OpRewritePattern<linalg::Conv2DNhwcHwcfOp>(context),
         controlFn(controlFn) {}
 
@@ -192,7 +193,7 @@ public:
   }
 
 private:
-  ControlFnTy controlFn;
+  std::optional<ControlFnTy> controlFn;
 };
 
 // For nchw, because the channels are to the left of the image shape dimensions,
@@ -204,7 +205,8 @@ class ConvertConv2DNchwFchw final
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  ConvertConv2DNchwFchw(MLIRContext *context, ControlFnTy controlFn)
+  ConvertConv2DNchwFchw(MLIRContext *context,
+                        std::optional<ControlFnTy> controlFn)
       : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context),
         controlFn(controlFn) {}
 
@@ -314,7 +316,7 @@ public:
   }
 
 private:
-  ControlFnTy controlFn;
+  std::optional<ControlFnTy> controlFn;
 };
 
 struct ConvertConv2DToIm2ColOpPass final
@@ -335,7 +337,7 @@ struct ConvertConv2DToIm2ColOpPass final
 } // namespace
 
 void populateConv2DToIm2colOpPatterns(RewritePatternSet &patterns,
-                                      ControlFnTy controlFn) {
+                                      std::optional<ControlFnTy> controlFn) {
   patterns.insert<ConvertConv2DNhwcHwcf, ConvertConv2DNchwFchw>(
       patterns.getContext(), std::move(controlFn));
 }

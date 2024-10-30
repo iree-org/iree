@@ -666,10 +666,10 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 // CHECK-LABEL: func.func @resolve_constant_with_multiple_layout_uses
 // CHECK-SAME: (%[[ARG0:.+]]: vector<64x64xf16>, %[[ARG0:.+]]: vector<64x64xf16>)
-// CHECK: %[[V0:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x16xf16>
-// CHECK: %[[V1:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x8xf16>
-// CHECK: %[[ADD0:.+]] = arith.addf %{{.+}}, %[[V1]]{{.*}} : vector<2x2x8xf16>
-// CHECK: %[[ADD1:.+]] = arith.addf %{{.+}}, %[[V0]]{{.*}} : vector<2x2x16xf16>
+// CHECK: %[[V0:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x8xf16>
+// CHECK: %[[V1:.+]] = arith.constant dense<0.000000e+00> : vector<2x2x16xf16>
+// CHECK: %[[ADD0:.+]] = arith.addf %{{.+}}, %[[V0]]{{.*}} : vector<2x2x8xf16>
+// CHECK: %[[ADD1:.+]] = arith.addf %{{.+}}, %[[V1]]{{.*}} : vector<2x2x16xf16>
 // CHECK: arith.addf %{{.+}}, %[[ADD0]]{{.*}} : vector<2x2x8xf16>
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {

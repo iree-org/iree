@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -16,10 +17,13 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-decompose-pack-unpack-ops"
@@ -27,9 +31,16 @@
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_DECOMPOSEPACKUNPACKOPSPASS
+#define GEN_PASS_DEF_DECOMPOSEBOUNDARYPACKUNPACKOPSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+using PackUnPackControlFn = std::function<LogicalResult(Operation *)>;
+
 namespace {
+
+//===----------------------------------------------------------------------===//
+// Shared rewrite patterns
+//===----------------------------------------------------------------------===//
 
 /// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
 /// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
@@ -85,33 +96,14 @@ private:
   std::optional<PackUnPackControlFn> controlFn;
 };
 
-struct DecomposePackUnPackOpsPass final
-    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
-  using impl::DecomposePackUnPackOpsPassBase<
-      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
-  explicit DecomposePackUnPackOpsPass(
-      bool tileOuterToOne, bool useOnlyReshapes,
-      std::optional<PackUnPackControlFn> controlFn) {
-    this->tileOuterToOne = tileOuterToOne;
-    this->useOnlyReshapes = useOnlyReshapes;
-    this->controlFn = controlFn;
-  }
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// Shared pass implementation
+//===----------------------------------------------------------------------===//
 
-  void runOnOperation() override;
-
-private:
-  std::optional<PackUnPackControlFn> controlFn;
-};
-
-} // namespace
-
-void DecomposePackUnPackOpsPass::runOnOperation() {
-  MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+static LogicalResult commonRunOnOperation(
+    MLIRContext *ctx, FunctionOpInterface funcOp, bool useOnlyReshapes,
+    bool tileOuterToOne,
+    std::optional<PackUnPackControlFn> controlFn = std::nullopt) {
   // Generalization patterns for outer unit dims have higher priority because
   // they do not generate reshape ops.
   if (!useOnlyReshapes) {
@@ -122,7 +114,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "outer unit dims cases");
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -135,7 +127,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
           "general cases.");
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -163,17 +155,24 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
                                                   builder.getIndexAttr(1));
               return tileSizes;
             }));
-    funcOp->walk([&](tensor::PackOp op) {
-      if (controlFn && failed(controlFn.value()(op))) {
-        return;
+    {
+      WalkResult status = funcOp->walk([&](tensor::PackOp op) {
+        if (controlFn && failed(controlFn.value()(op))) {
+          return WalkResult::advance();
+        }
+        FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+            scf::tileConsumerAndFuseProducersUsingSCF(
+                rewriter, cast<TilingInterface>(op.getOperation()),
+                packOptions);
+        if (failed(tileAndFuseResult))
+          return WalkResult::interrupt();
+        rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
+        return WalkResult::advance();
+      });
+      if (status.wasInterrupted()) {
+        return failure();
       }
-      FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-          scf::tileConsumerAndFuseProducersUsingSCF(
-              rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
-      if (failed(tileAndFuseResult))
-        return signalPassFailure();
-      rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
-    });
+    }
 
     auto unpackTilingOptions =
         scf::SCFTilingOptions().setTileSizeComputationFunction(
@@ -191,17 +190,23 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               }
               return tileSizes;
             });
-    funcOp->walk([&](tensor::UnPackOp op) {
-      if (controlFn && failed(controlFn.value()(op))) {
-        return;
+    {
+      WalkResult status = funcOp->walk([&](tensor::UnPackOp op) {
+        if (controlFn && failed(controlFn.value()(op))) {
+          return WalkResult::advance();
+        }
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
+            rewriter, cast<TilingInterface>(op.getOperation()),
+            unpackTilingOptions);
+        if (failed(tilingResult))
+          return WalkResult::interrupt();
+        rewriter.replaceOp(op, tilingResult->replacements);
+        return WalkResult::advance();
+      });
+      if (status.wasInterrupted()) {
+        return failure();
       }
-      FailureOr<scf::SCFTilingResult> tilingResult =
-          scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
-                            unpackTilingOptions);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(op, tilingResult->replacements);
-    });
+    }
 
     LLVM_DEBUG({
       llvm::dbgs()
@@ -219,7 +224,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+      return failure();
     }
   }
 
@@ -238,16 +243,114 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
                    linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
     }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+      return failure();
     }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DecomposePackUnPackOpsPass
+//===----------------------------------------------------------------------===//
+
+struct DecomposePackUnPackOpsPass final
+    : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
+  using impl::DecomposePackUnPackOpsPassBase<
+      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
+
+  void runOnOperation() override;
+};
+
+} // namespace
+
+void DecomposePackUnPackOpsPass::runOnOperation() {
+  if (failed(commonRunOnOperation(&getContext(), getOperation(),
+                                  useOnlyReshapes, tileOuterToOne))) {
+    return signalPassFailure();
   }
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
-                                 std::optional<PackUnPackControlFn> controlFn) {
-  return std::make_unique<DecomposePackUnPackOpsPass>(
-      tileOuterToOne, useOnlyReshapes, controlFn);
+//===----------------------------------------------------------------------===//
+// DecomposeBoundaryPackUnPackOpsPass
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DecomposeBoundaryPackUnPackOpsPass final
+    : impl::DecomposeBoundaryPackUnPackOpsPassBase<
+          DecomposeBoundaryPackUnPackOpsPass> {
+  using impl::DecomposeBoundaryPackUnPackOpsPassBase<
+      DecomposeBoundaryPackUnPackOpsPass>::
+      DecomposeBoundaryPackUnPackOpsPassBase;
+
+  void runOnOperation() override;
+};
+
+} // namespace
+
+/// Check if the given `op` is a pack or unpack op with padding.
+static bool hasPadding(Operation *op) {
+  auto needsPad = [](ShapedType unpackedType, ArrayRef<int64_t> innerDimPos,
+                     ArrayRef<int64_t> staticInnerTiles) {
+    for (auto [dimPos, tile] : llvm::zip_equal(innerDimPos, staticInnerTiles)) {
+      if (unpackedType.isDynamicDim(dimPos) || ShapedType::isDynamic(tile) ||
+          unpackedType.getDimSize(dimPos) % tile != 0) {
+        return true;
+      }
+    }
+    return false;
+  };
+  auto packOp = dyn_cast<tensor::PackOp>(op);
+  if (packOp && needsPad(packOp.getSourceType(), packOp.getInnerDimsPos(),
+                         packOp.getStaticInnerTiles())) {
+    return true;
+  }
+  auto unPackOp = dyn_cast<tensor::UnPackOp>(op);
+  if (unPackOp && needsPad(unPackOp.getDestType(), unPackOp.getInnerDimsPos(),
+                           unPackOp.getStaticInnerTiles())) {
+    return true;
+  }
+  return false;
+}
+
+/// Control function for decomposing pack and unpack ops. Returns true if the
+/// op is an unpadded pack or unpack op, and it is at the boundary of a
+/// dispatch. The following conditions need to be met:
+/// 1. The PackOp or UnPackOp must have no padding.
+/// 2. If the op is a PackOp, then its producer must be a dispatch tensor load.
+/// 3. If the op is an UnPackOp, then all of its consumers must be dispatch
+///    tensor stores.
+static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
+  if (!isa<tensor::PackOp>(op) && !isa<tensor::UnPackOp>(op)) {
+    return failure();
+  }
+  if (hasPadding(op)) {
+    return failure();
+  }
+
+  // If the producer is a dispatch tensor load, then the `op` is decomposable
+  // if it is a PackOp.
+  if (isa<tensor::PackOp>(op) &&
+      op->getOperand(0).getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+    return success();
+  }
+  // If all consumers are dispatch tensor stores, then the `op` is decomposable
+  // if it is an UnPackOp.
+  if (isa<tensor::UnPackOp>(op) &&
+      llvm::all_of(op->getUsers(), [&](Operation *user) {
+        return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+      })) {
+    return success();
+  }
+  return failure();
+}
+
+void DecomposeBoundaryPackUnPackOpsPass::runOnOperation() {
+  if (failed(commonRunOnOperation(&getContext(), getOperation(),
+                                  /*useOnlyReshapes=*/true, tileOuterToOne,
+                                  isUnpaddedAndAtBoundary))) {
+    return signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler

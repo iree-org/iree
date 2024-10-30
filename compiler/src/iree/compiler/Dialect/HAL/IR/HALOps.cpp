@@ -22,6 +22,27 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+namespace {
+
+// We aribtrarily say that unbounded dimensions in a torch program cannot
+// exceed 53bits, making the maximum safe dimension 9007199254740991. The
+// astute reader will note that this is also the maximum safe value in
+// JavaScript, which also "happens" to be the largest mantissa value in a
+// 64bit double. We need a maximum and in the absence of a better choice,
+// with this one we are at least in good company. This limit is also used
+// in the frontends.
+static constexpr uint64_t MAX_DIM_VALUE = (static_cast<uint64_t>(1) << 53) - 1;
+
+// Similarly we use a very conservative maximum rank value for specifying
+// ranges of runtime rank resolution functions. Various frameworks have hard
+// and practical limits ranging from 32 (numpy) to hundreds. At the time of
+// writing, PyTorch throws weird errors if trying to print a tensor with a rank
+// greater than 992. We really just want a smallish integer value to bound
+// arithmetic, so we use an arbitrary maximum.
+static constexpr uint64_t MAX_RANK_VALUE = 4096;
+
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // custom<DescriptorType>($descriptor_type)
 //===----------------------------------------------------------------------===//
@@ -878,6 +899,10 @@ enum class NumericalType : uint32_t {
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
   kFloatComplex = kFloat | 0x03,
+  kFloat8E5M2 = kFloat | 0x04,
+  kFloat8E4M3 = kFloat | 0x05,
+  kFloat8E5M2FNUZ = kFloat | 0x06,
+  kFloat8E4M3FNUZ = kFloat | 0x07,
 };
 
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
@@ -905,7 +930,14 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
     return makeElementTypeValue(numericalType, intType.getWidth());
   } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
+    case APFloat::S_Float8E5M2:
+      return makeElementTypeValue(NumericalType::kFloat8E5M2, 8);
+    case APFloat::S_Float8E4M3:
+      return makeElementTypeValue(NumericalType::kFloat8E4M3, 8);
+    case APFloat::S_Float8E5M2FNUZ:
+      return makeElementTypeValue(NumericalType::kFloat8E5M2FNUZ, 8);
     case APFloat::S_Float8E4M3FNUZ:
+      return makeElementTypeValue(NumericalType::kFloat8E4M3FNUZ, 8);
     case APFloat::S_IEEEhalf:
     case APFloat::S_IEEEsingle:
     case APFloat::S_IEEEdouble:
@@ -1011,6 +1043,30 @@ void BufferViewCreateOp::getAsmResultNames(
 void BufferViewBufferOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "buffer");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer_view.dim
+//===----------------------------------------------------------------------===//
+
+void BufferViewDimOp::inferResultRangesFromOptional(
+    ArrayRef<IntegerValueRange> argRanges, SetIntLatticeFn setResultRange) {
+  const unsigned indexTypeNumBits = 64;
+  setResultRange(getResult(), IntegerValueRange(ConstantIntRanges::fromUnsigned(
+                                  APInt::getZero(indexTypeNumBits),
+                                  APInt(indexTypeNumBits, MAX_DIM_VALUE))));
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer_view.dim
+//===----------------------------------------------------------------------===//
+
+void BufferViewRankOp::inferResultRangesFromOptional(
+    ArrayRef<IntegerValueRange> argRanges, SetIntLatticeFn setResultRange) {
+  const unsigned indexTypeNumBits = 64;
+  setResultRange(getResult(), IntegerValueRange(ConstantIntRanges::fromUnsigned(
+                                  APInt::getZero(indexTypeNumBits),
+                                  APInt(indexTypeNumBits, MAX_RANK_VALUE))));
 }
 
 //===----------------------------------------------------------------------===//

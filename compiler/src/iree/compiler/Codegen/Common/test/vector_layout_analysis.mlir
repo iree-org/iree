@@ -464,6 +464,47 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#contract_layout = #iree_vector_ext.nested_layout<
+    subgroup_tile = [1, 1],
+    batch_tile = [3, 2],
+    outer_tile = [4, 1],
+    thread_tile = [2, 32],
+    element_tile = [4, 1],
+
+    subgroup_strides = [0, 0],
+    thread_strides = [32, 1]
+>
+
+// This test ensures that we are not running into ops not dominating constantOp operands after layout analysis.
+// We simulate that by doing elmentwise op on the value with "layout" i.e scaled_lhs after scaled_rhs.
+// If not handled properly, will generate constOp before "scaled_lhs", but would get used also by "scaled_rhs".
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @handle_multiuse_constant(%lhs: vector<96x64xf16>, %rhs: vector<96x64xf16>, %arr: memref<96x64xf16>) -> () {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f16
+    %cst_1 = arith.constant dense<1.562500e-02> : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %lhs_layout = iree_vector_ext.to_layout %lhs to layout(#contract_layout) : vector<96x64xf16>
+
+    %scaled_rhs = arith.mulf %rhs, %cst_1 : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %scaled_lhs = arith.mulf %lhs_layout, %cst_1 : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    %add = arith.addf %scaled_lhs, %scaled_rhs : vector<96x64xf16>
+    // expected-remark @above {{thread_strides = [32, 1]}}
+    vector.transfer_write %add, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<96x64xf16>, memref<96x64xf16>
+    func.return
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 1, 1],
   batch_tile = [1, 2, 4],
@@ -513,6 +554,39 @@ builtin.module attributes { transform.with_named_sequence } {
     %cl = iree_vector_ext.to_layout %c to layout(#layout2) : vector<16x16xf16>
     // expected-error @above {{Vector shape: [16, 16] does not match the layout (nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [1, 1], thread_tile = [8, 2], element_tile = [2, 2], subgroup_strides = [0, 0], thread_strides = [1, 8]>) at dim 0. Dimension expected by layout: 32 actual: 16}}
     func.return %cl : vector<16x16xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[BATCHY, VECTORX], [2, 8]>>
+
+// Propagate and enforce through scf.for
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @scffor(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<f16> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c1024 = arith.constant 1024 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<f16>
+    %cst_0 = arith.constant 0.0 : f16
+
+    %out = scf.for %iv = %c0 to %c1024 step %c1 iter_args(%arg1 = %cst) -> (vector<f16>) {
+      %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
+      // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [16]>, <[ BATCHY,  VECTORX], [2, 8]>>}}
+      %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
+      %init = vector.extractelement %arg1[] : vector<f16>
+      %root_red = vector.multi_reduction<add>, %rootl, %init [0, 1]  : vector<16x16xf16> to f16
+      %c = vector.broadcast %root_red : f16 to vector<f16>
+      scf.yield %c : vector<f16>
+    }
+
+    func.return %out : vector<f16>
   }
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {

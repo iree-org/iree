@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_buffer_t
+//===----------------------------------------------------------------------===//
+
 // Wraps a {Null} allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_null_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,

@@ -60,24 +60,6 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen);
 
-using ConfigFn =
-    std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
-/// Pass to convert Conv2D ops into IGEMM (Im2colOp + matmul). `configFn` is
-/// used to set lowering configurations on the resulting ops, if necessary.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createConvolutionToIGEMMPass(ConfigFn configFn);
-
-using PackUnPackControlFn = std::function<LogicalResult(Operation *)>;
-/// Pass to decompose pack and unpack ops into pad/extract_slice and reshape
-/// ops. If specified, `controlFn` controls which ops get decomposed. The
-/// `controlFn` should be used with `useOnlyReshapes` set to true.
-/// TODO(Max191): Add a controlFn upstream for `GeneralizeOuterUnitDim*`
-/// patterns and remove the need to have `useOnlyReshapes = true` when using
-/// `controlFn`.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne, bool useOnlyReshapes,
-                                 std::optional<PackUnPackControlFn> controlFn);
-
 std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion);
 
 /// Pass to perform linalg on tensor bufferization. The function passed into

@@ -64,6 +64,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
+    iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
   PUBLIC

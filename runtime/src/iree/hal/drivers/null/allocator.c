@@ -8,6 +8,10 @@
 
 #include "iree/hal/drivers/null/buffer.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_allocator_t
+//===----------------------------------------------------------------------===//
+
 // TODO(null): use one ID per address space or pool - each shows as a different
 // track in tracing tools.
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
@@ -33,6 +37,7 @@ iree_status_t iree_hal_null_allocator_create(
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_allocator = NULL;
 
   iree_hal_null_allocator_t* allocator = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

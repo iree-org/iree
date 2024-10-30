@@ -43,9 +43,12 @@ struct WgpDetails {
   // modes. Use duplicated values if the GPU only have one subgroup size.
   std::array<int32_t, 2> subgroupSizeChoices;
   std::array<int32_t, 3> maxWorkgroupSizes;
-  uint32_t maxThreadSize;
-  uint32_t maxWorkgroupMemoryBytes;
+  int32_t maxThreadSize;
+  int32_t maxWorkgroupMemoryBytes;
   std::array<int32_t, 3> maxWorkgroupCounts;
+  std::optional<int32_t> maxLoadInstructionBits;
+  std::optional<int32_t> simdsPerWgp;
+  std::optional<int32_t> vgprSpaceBits;
 };
 
 // Chip level feature/limit details
@@ -109,6 +112,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupSizes),
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
+      wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
       DictionaryAttr{});
 
   TargetChipAttr targetChip;
@@ -132,7 +136,10 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      MMAIntrinsic::MFMA_F32_16x16x16_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x8_BF16,
       MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ,
+      MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
   };
@@ -146,7 +153,10 @@ const WgpDetails *getCDNA3WgpDetails() {
                                       {1024, 1024, 1024},
                                       1024,
                                       64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/512 * 32};
   return &cdna3Wgp;
 }
 

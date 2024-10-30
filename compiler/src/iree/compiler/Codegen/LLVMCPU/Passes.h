@@ -12,6 +12,8 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 
+#include <optional>
+
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
@@ -156,7 +158,9 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
 //----------------------------------------------------------------------------//
 
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
-void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager);
+void buildLLVMCPULinkingPassPipeline(
+    OpPassManager &modulePassManager,
+    std::optional<std::string> target = std::nullopt);
 
 //----------------------------------------------------------------------------//
 // Register LLVMCPU Passes

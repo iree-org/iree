@@ -38,8 +38,8 @@ iree_status_t iree_hal_webgpu_nop_semaphore_create(
     iree_hal_resource_initialize(&iree_hal_webgpu_nop_semaphore_vtable,
                                  &semaphore->resource);
     semaphore->host_allocator = host_allocator;
-    iree_atomic_store_int64(&semaphore->value, initial_value,
-                            iree_memory_order_seq_cst);
+    iree_atomic_store(&semaphore->value, initial_value,
+                      iree_memory_order_seq_cst);
     *out_semaphore = (iree_hal_semaphore_t*)semaphore;
   }
 
@@ -63,8 +63,7 @@ static iree_status_t iree_hal_webgpu_nop_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
   iree_hal_webgpu_nop_semaphore_t* semaphore =
       iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
-  *out_value =
-      iree_atomic_load_int64(&semaphore->value, iree_memory_order_seq_cst);
+  *out_value = iree_atomic_load(&semaphore->value, iree_memory_order_seq_cst);
   return iree_ok_status();
 }
 
@@ -72,8 +71,7 @@ static iree_status_t iree_hal_webgpu_nop_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
   iree_hal_webgpu_nop_semaphore_t* semaphore =
       iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
-  iree_atomic_store_int64(&semaphore->value, new_value,
-                          iree_memory_order_seq_cst);
+  iree_atomic_store(&semaphore->value, new_value, iree_memory_order_seq_cst);
   return iree_ok_status();
 }
 
@@ -88,7 +86,7 @@ static iree_status_t iree_hal_webgpu_nop_semaphore_wait(
   iree_hal_webgpu_nop_semaphore_t* semaphore =
       iree_hal_webgpu_nop_semaphore_cast(base_semaphore);
   uint64_t current_value =
-      iree_atomic_load_int64(&semaphore->value, iree_memory_order_seq_cst);
+      iree_atomic_load(&semaphore->value, iree_memory_order_seq_cst);
   if (current_value < value) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,

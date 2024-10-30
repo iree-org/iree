@@ -19,6 +19,12 @@ def AddFastMathFlagsPass
                 "given a floating-point mode.";
 }
 
+def BlockDynamicDimensionsPass
+    : Pass<"iree-codegen-block-dynamic-dimensions"> {
+  let summary = "Expand dynamic dimensions that are known to be multiples of "
+                "statically known values.";
+}
+
 def BubbleUpOrdinalOpsPass : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
   let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
   let description = [{
@@ -83,6 +89,10 @@ def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
       "Transforms convolution operations into an implicit GEMM format.";
+  let dependentDialects = [
+    "tensor::TensorDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
 }
 
 def DecomposeAffineOpsPass: Pass<"iree-codegen-decompose-affine-ops"> {
@@ -156,6 +166,27 @@ def DecomposePackUnPackOpsPass :
            "Always apply tiling to make outer dimension be ones">,
     Option<"useOnlyReshapes", "use-only-reshapes", "bool", "false",
            "Use decomposition into reshape ops, even when packing unit dimensions.">
+  ];
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
+def DecomposeBoundaryPackUnPackOpsPass :
+    InterfacePass<"iree-codegen-decompose-boundary-pack-unpack-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Wrapper for DecomposePackUnPackOpsPass to decompose ops at function boundaries";
+  let options = [
+    Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
+           "Always apply tiling to make outer dimension be ones">
+  ];
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
   ];
 }
 

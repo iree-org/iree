@@ -34,6 +34,8 @@ typedef enum iree_memory_order_e {
 
 typedef int32_t iree_atomic_int32_t;
 typedef int64_t iree_atomic_int64_t;
+typedef uint32_t iree_atomic_uint32_t;
+typedef uint64_t iree_atomic_uint64_t;
 // typedef __int128 iree_atomic_int128_t;
 typedef intptr_t iree_atomic_intptr_t;
 
@@ -45,46 +47,46 @@ typedef intptr_t iree_atomic_intptr_t;
 #define __iree_auto_type __auto_type
 #endif
 
-#define iree_atomic_load_auto(object, order)                       \
-  __extension__({                                                  \
-    __iree_auto_type __atomic_load_ptr = (object);                 \
-    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;              \
-    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (order)); \
-    __atomic_load_tmp;                                             \
-  })
-#define iree_atomic_store_auto(object, desired, order)                \
-  __extension__({                                                     \
-    __iree_auto_type __atomic_store_ptr = (object);                   \
-    __typeof__(*__atomic_store_ptr) __atomic_store_tmp = (desired);   \
-    __atomic_store(__atomic_store_ptr, &__atomic_store_tmp, (order)); \
-  })
-#define iree_atomic_fetch_add_auto(object, operand, order) \
-  __atomic_fetch_add((object), (operand), (order))
-#define iree_atomic_fetch_sub_auto(object, operand, order) \
-  __atomic_fetch_sub((object), (operand), (order))
-#define iree_atomic_fetch_and_auto(object, operand, order) \
-  __atomic_fetch_and((object), (operand), (order))
-#define iree_atomic_fetch_or_auto(object, operand, order) \
-  __atomic_fetch_or((object), (operand), (order))
-#define iree_atomic_fetch_xor_auto(object, operand, order) \
-  __atomic_fetch_xor((object), (operand), (order))
-#define iree_atomic_exchange_auto(object, operand, order) \
-  __atomic_exchange_n((object), (operand), (order))
-#define iree_atomic_compare_exchange_strong_auto(object, expected, desired, \
-                                                 order_succ, order_fail)    \
-  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/false,    \
-                              (order_succ), (order_fail))
-#define iree_atomic_compare_exchange_weak_auto(object, expected, desired, \
-                                               order_succ, order_fail)    \
-  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/true,   \
-                              (order_succ), (order_fail))
-
 static inline void iree_atomic_thread_fence(int order) {
   // Ignore error where TSan does not support atomic thread fence.
   IREE_DISABLE_COMPILER_TSAN_ERRORS()
   __atomic_thread_fence(order);
   IREE_RESTORE_COMPILER_TSAN_ERRORS()
 }
+
+#define iree_atomic_load(object, order)                            \
+  __extension__({                                                  \
+    __iree_auto_type __atomic_load_ptr = (object);                 \
+    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;              \
+    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (order)); \
+    __atomic_load_tmp;                                             \
+  })
+#define iree_atomic_store(object, desired, order)                     \
+  __extension__({                                                     \
+    __iree_auto_type __atomic_store_ptr = (object);                   \
+    __typeof__(*__atomic_store_ptr) __atomic_store_tmp = (desired);   \
+    __atomic_store(__atomic_store_ptr, &__atomic_store_tmp, (order)); \
+  })
+#define iree_atomic_fetch_add(object, operand, order) \
+  __atomic_fetch_add((object), (operand), (order))
+#define iree_atomic_fetch_sub(object, operand, order) \
+  __atomic_fetch_sub((object), (operand), (order))
+#define iree_atomic_fetch_and(object, operand, order) \
+  __atomic_fetch_and((object), (operand), (order))
+#define iree_atomic_fetch_or(object, operand, order) \
+  __atomic_fetch_or((object), (operand), (order))
+#define iree_atomic_fetch_xor(object, operand, order) \
+  __atomic_fetch_xor((object), (operand), (order))
+#define iree_atomic_exchange(object, operand, order) \
+  __atomic_exchange_n((object), (operand), (order))
+#define iree_atomic_compare_exchange_strong(object, expected, desired,   \
+                                            order_succ, order_fail)      \
+  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/false, \
+                              (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak(object, expected, desired,    \
+                                          order_succ, order_fail)       \
+  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/true, \
+                              (order_succ), (order_fail))
 
 #ifdef __cplusplus
 }  // extern "C"

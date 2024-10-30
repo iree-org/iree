@@ -475,6 +475,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -501,7 +502,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyFloat:$scale,
                        Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
-                       AffineMapArrayAttr:$indexing_maps
+                       AffineMapArrayAttr:$indexing_maps,
+                       OptionalAttr<DictionaryAttr>:$decomposition_config
   );
   let regions = (region SizedRegion<1>:$region);
 
@@ -558,6 +560,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+
+    /* Decomposition control attributes */
+
+    // Attributes to set on QK and PV matmul after decomposition.
+    static StringRef getQKAttrStr() { return "qk_attrs"; }
+    static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
 }
 
@@ -612,7 +620,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
                        AnyShaped:$output,
                        AnyShaped:$max,
                        AnyShaped:$sum,
-                       AffineMapArrayAttr:$indexing_maps
+                       AffineMapArrayAttr:$indexing_maps,
+                       OptionalAttr<DictionaryAttr>:$decomposition_config
   );
   let regions = (region SizedRegion<1>:$region);
 
@@ -679,6 +688,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+
+    /* Decomposition control attributes */
+
+    // Attributes to set on QK and PV matmul after decomposition.
+    static StringRef getQKAttrStr() { return "qk_attrs"; }
+    static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
 }
 //===----------------------------------------------------------------------===//

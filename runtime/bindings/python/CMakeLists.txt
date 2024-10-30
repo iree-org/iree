@@ -4,21 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT nanobind_FOUND)
-  find_package(nanobind CONFIG QUIET)
-  if(NOT nanobind_FOUND)
-    execute_process(
-      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE NB_DIR
-      RESULT_VARIABLE RC)
-    if(RC AND NOT RC EQUAL 0)
-      message(WARNING "Probing for nanobind failed. Please install the project's Python dependencies or '${Python_EXECUTABLE} -m pip install nanobind'")
-    endif()
-    list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
-  endif()
-  find_package(nanobind CONFIG REQUIRED)
-endif()
+# nanobind
+include(FetchContent)
+FetchContent_Declare(
+  nanobind
+  GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+  GIT_TAG        784efa2a0358a4dc5432c74f5685ee026e20f2b6 # 2.2.0
+)
+FetchContent_MakeAvailable(nanobind)
 
 set(_EXTRA_INSTALL_TOOL_TARGETS)
 set(_TRACY_ENABLED OFF)

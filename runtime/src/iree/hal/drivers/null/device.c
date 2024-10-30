@@ -17,6 +17,10 @@
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_null_device_t
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_hal_null_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
@@ -60,8 +64,8 @@ iree_status_t iree_hal_null_device_create(
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(out_device);
-  *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  *out_device = NULL;
 
   // Verify the parameters prior to creating resources.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

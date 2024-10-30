@@ -493,3 +493,33 @@ util.func @util_align_zero(%arg0 : i64) -> i64 {
   %rem16 = arith.remui %0, %c16 : i64
   util.return %rem16 : i64
 }
+
+// -----
+
+util.func @hal_buffer_view_dim_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
+  %zero = arith.constant 0 : index
+  %max = arith.constant 9007199254740991 : index
+  %0 = hal.buffer_view.dim<%bv : !hal.buffer_view>[0] : index
+  %1 = arith.cmpi slt, %0, %zero : index
+  %2 = arith.cmpi uge, %0, %zero : index
+  %3 = arith.cmpi ugt, %0, %max : index
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK: util.return %[[FALSE]], %[[TRUE]], %[[FALSE]]
+  util.return %1, %2, %3 : i1, i1, i1
+}
+
+// -----
+
+util.func @hal_buffer_view_rank_min_max(%bv : !hal.buffer_view) -> (i1, i1, i1) {
+  %zero = arith.constant 0 : index
+  %max = arith.constant 4096 : index
+  %0 = hal.buffer_view.rank<%bv : !hal.buffer_view> : index
+  %1 = arith.cmpi slt, %0, %zero : index
+  %2 = arith.cmpi uge, %0, %zero : index
+  %3 = arith.cmpi ugt, %0, %max : index
+  // CHECK-DAG: %[[FALSE:.*]] = arith.constant false
+  // CHECK-DAG: %[[TRUE:.*]] = arith.constant true
+  // CHECK: util.return %[[FALSE]], %[[TRUE]], %[[FALSE]]
+  util.return %1, %2, %3 : i1, i1, i1
+}

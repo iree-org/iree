@@ -53,9 +53,15 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
         return;
       }
     }
-    setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
-                                    builder.getContext()));
-    return;
+
+    // We only support thread tile size derivation of linalgOp and Im2colOp for
+    // now.
+    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(
+            producer.getOperation())) {
+      setLoweringConfig(producer, IREE::GPU::DerivedThreadConfigAttr::get(
+                                      builder.getContext()));
+      return;
+    }
   }
 
   auto tensorType = dyn_cast<RankedTensorType>(operand.getType());

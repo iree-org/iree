@@ -212,7 +212,9 @@ getContractionLayout(vector::ContractionOp contract, ConcreteMmaLayout layout) {
 static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
                                            MMAIntrinsic type) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
+  Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
   Type f16 = Float16Type::get(context);
+  Type bf16 = BFloat16Type::get(context);
   Type f32 = Float32Type::get(context);
 
   Type i8 = IntegerType::get(context, 8);
@@ -228,8 +230,17 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
     return OpaqueMmaLayout{32, 32, 8, f16, f16, f32};
   }
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16: {
+    return OpaqueMmaLayout{16, 16, 16, bf16, bf16, f32};
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16: {
+    return OpaqueMmaLayout{32, 32, 8, bf16, bf16, f32};
+  }
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ: {
     return OpaqueMmaLayout{16, 16, 32, f8E4M3FNUZ, f8E4M3FNUZ, f32};
+  }
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ: {
+    return OpaqueMmaLayout{16, 16, 32, f8E5M2FNUZ, f8E5M2FNUZ, f32};
   }
   case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
     return OpaqueMmaLayout{16, 16, 32, i8, i8, i32};
@@ -312,6 +323,45 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
                              bNLayout,     cMLayout, cNLayout};
   }
   case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
+    // #inner1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
+    // #inner2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
+    //                                           [4, 2, 4]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner1>
+    // #layout_b = #iree_vector_ext.layout<#inner1, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner2, #outer>
+
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {32});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 4});
+    auto aMLayout = outer;
+    auto aKLayout = inner;
+    auto bKLayout = inner;
+    auto bNLayout = outer;
+    auto cMLayout =
+        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {4, 2, 4});
+    auto cNLayout = outer;
+    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
+                             bNLayout,     cMLayout, cNLayout};
+  }
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16: {
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
+    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
+    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
+
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
+    auto aMLayout = outer;
+    auto aKLayout = inner;
+    auto bKLayout = inner;
+    auto bNLayout = outer;
+    auto cMLayout = inner;
+    auto cNLayout = outer;
+    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
+                             bNLayout,     cMLayout, cNLayout};
+  }
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16: {
     // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
     // #inner1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
     // #inner2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
@@ -458,20 +508,23 @@ MMAAttr::getABCVectorTypes() const {
     return std::make_tuple(aType, bType, cType);
   }
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
-  case MMAIntrinsic::MFMA_F32_16x16x16_F16: {
+  case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
     auto cType = VectorType::get({4}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
-  case MMAIntrinsic::MFMA_F32_32x32x8_F16: {
+  case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
     auto cType = VectorType::get({16}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8: {
     auto aType = VectorType::get({8}, getAType());
     auto bType = VectorType::get({8}, getBType());
@@ -514,10 +567,13 @@ int64_t MMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16:
@@ -534,10 +590,13 @@ static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     return 64;
@@ -577,6 +636,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     }
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
       return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
@@ -590,6 +650,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     }
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
     switch (fragment) {
     case MMAFragment::Lhs:
       return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
@@ -602,6 +663,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
               /*element=*/{4, 1}};
     }
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
     switch (fragment) {
     case MMAFragment::Lhs:
@@ -696,9 +758,12 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
   }
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
+  case MMAIntrinsic::MFMA_F32_32x32x8_BF16:
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
   case MMAIntrinsic::MFMA_I32_32x32x16_I8: {
     auto [m, n, k] = getMNKShape();
@@ -1280,9 +1345,6 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getKDims().size() != 1) {
-    return contractOp->emitError("Unimplemented: > 1 k dims");
-  }
 
   int64_t rank = contractOp.getIteratorTypesArray().size();
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
@@ -1450,6 +1512,10 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     aSubgroupSizes[dim] = subgroupMBasis[i];
     aSubgroupStrides[dim] = subgroupMStrides[i];
   }
+  for (auto [kDim, lhsKDim] :
+       llvm::zip_equal(opInfo.getKDims(), opInfo.lhsKDim)) {
+    aBatchSizes[lhsKDim] = bounds[kDim];
+  }
   aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
   auto aLayout = createNestedLayout(context, aRank, afm, afk,
@@ -1469,6 +1535,10 @@ MMAScheduleAttr::getContractionLayout(VectorContractOpInfo &opInfo,
     bBatchSizes[dim] = batchNSizes[i];
     bSubgroupSizes[dim] = subgroupNBasis[i];
     bSubgroupStrides[dim] = subgroupNStrides[i];
+  }
+  for (auto [kDim, rhsKDim] :
+       llvm::zip_equal(opInfo.getKDims(), opInfo.rhsKDim)) {
+    bBatchSizes[rhsKDim] = bounds[kDim];
   }
   bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 

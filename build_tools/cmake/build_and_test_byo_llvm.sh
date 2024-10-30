@@ -24,6 +24,12 @@ echo "Setting up venv at $VENV_DIR"
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+python -m pip install -r third_party/llvm-project/mlir/python/requirements.txt
+# Note: IREE's Python bindings for Python 3.13 are build with support for
+# free-threading for which support was added to pybind with version 2.13.0.
+# Therefore, we upgrade to a more recent version and avoid mixing of different
+# pybind versions.
+python -m pip install pybind11==2.13.6
 
 # Note: by using the `build_llvm` action here, we are exercising byo_llvm.sh's
 # ability to build LLVM... from our own third_party/llvm-project. That's not

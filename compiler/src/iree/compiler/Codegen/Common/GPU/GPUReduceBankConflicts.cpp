@@ -18,6 +18,23 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Check if AllocOp has a CollapseShapeOp user.
+static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
+  SmallVector<Operation *> users(allocOp->getUsers());
+  while (!users.empty()) {
+    auto user = users.pop_back_val();
+    if (isa<memref::CollapseShapeOp>(user)) {
+      return true;
+    }
+    if (isa<ViewLikeOpInterface>(user)) {
+      for (auto u : user->getUsers()) {
+        users.push_back(u);
+      }
+    }
+  }
+  return false;
+}
+
 /// Pad out the inner dimension of the `memref.alloc` op in order reduce the
 /// chances to have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
@@ -28,6 +45,12 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   int64_t innerDim = allocOpShape.back();
   if (ShapedType::isDynamic(innerDim))
     return;
+
+  // Return if we have CollapseShape op as an user as padding in that case is
+  // unsupported.
+  if (hasCollapseShapeUser(allocOp))
+    return;
+
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);

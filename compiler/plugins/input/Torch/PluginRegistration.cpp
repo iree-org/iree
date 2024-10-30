@@ -57,8 +57,19 @@ struct TorchSession
       OpPassManager &passManager, std::string_view typeMnemonic) override {
     if (typeMnemonic == "onnx") {
       // ONNX input is a pre-processing step to torch.
-      passManager.addNestedPass<func::FuncOp>(
-          mlir::torch::onnx_c::createTorchOnnxToTorchPass());
+      mlir::torch::Torch::TorchLoweringPipelineOptions torchOnnxPipelineOptions;
+      // The `aten.flatten.using_ints` and `aten.unflatten.int` are added to the
+      // list of backend legal ops so that they are not decomposed into the
+      // `aten.view` op during the run of `DecomposeComplexOps` pass. The issue
+      // with this is that the `aten.view` op eventually lowers to
+      // `tensor.reshape` op while there exists a direct torch->linalg lowering
+      // for both the flatten/unflatten ops which lowers to
+      // `tensor.collapse_shape/expand_shape` op, and this is a more preferred
+      // path for the downstream pipeline.
+      torchOnnxPipelineOptions.backendLegalOps = {"aten.flatten.using_ints",
+                                                  "aten.unflatten.int"};
+      mlir::torch::Torch::createTorchOnnxToTorchBackendPipeline(
+          passManager, torchOnnxPipelineOptions);
     }
 
     if (typeMnemonic == "torch" || typeMnemonic == "onnx") {
