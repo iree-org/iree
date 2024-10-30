@@ -344,9 +344,11 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
-                                           targetSubgroupSize,
-                                       schedule->mSubgroupCounts[0], 1};
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
@@ -586,9 +588,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: " << schedule);
 
-  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
-                                           targetSubgroupSize,
-                                       schedule->mSubgroupCounts[0], 1};
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
@@ -786,9 +790,11 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG("Target Subgroup size: " << targetSubgroupSize);
   LDBG("Schedule: " << schedule);
 
-  std::array<int64_t, 3> workgroupSize{schedule->nSubgroupCounts[0] *
-                                           targetSubgroupSize,
-                                       schedule->mSubgroupCounts[0], 1};
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
