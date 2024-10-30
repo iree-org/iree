@@ -170,7 +170,6 @@ static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
   constexpr const char *kRetainedAttributes[] = {
       "nosideeffects",
       "vm.fallback",
-      "vm.signature",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,

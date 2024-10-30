@@ -18,17 +18,8 @@
 
 namespace mlir::iree_compiler {
 
-std::optional<ImportTable::Import> ImportTable::find(StringRef symbolName) {
-  auto it = symbols.find(symbolName);
-  if (it == symbols.end())
-    return std::nullopt;
-  return it->second;
-}
-
-FailureOr<ImportTable> buildImportTable(Operation *rootOp,
-                                        const TypeConverter &typeConverter) {
-  ImportTable importTable;
-
+LogicalResult ImportTable::build(Operation *rootOp,
+                                 const TypeConverter &typeConverter) {
   for (auto funcOp : rootOp->getRegion(0).getOps<FunctionOpInterface>()) {
     if (!funcOp.isExternal()) {
       continue; // only external functions are imports
@@ -64,10 +55,17 @@ FailureOr<ImportTable> buildImportTable(Operation *rootOp,
           FunctionType::get(rootOp->getContext(), argumentTypes, resultTypes);
     }
 
-    importTable.symbols[import.name.getValue()] = std::move(import);
+    symbols[import.name.getValue()] = std::move(import);
   }
 
-  return importTable;
+  return success();
+}
+
+std::optional<ImportTable::Import> ImportTable::find(StringRef symbolName) {
+  auto it = symbols.find(symbolName);
+  if (it == symbols.end())
+    return std::nullopt;
+  return it->second;
 }
 
 // TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h.
