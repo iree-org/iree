@@ -20,6 +20,33 @@ namespace mlir::iree_compiler {
 // segment_sizes array.
 constexpr int kFixedSingleValue = -1;
 
+// A table of import information.
+class ImportTable {
+public:
+  // Information about an import function.
+  struct Import {
+    // Used to ensure the StringRef in the map stays live.
+    StringAttr name;
+    // Function signature derived from the type or overridden by `vm.signature`.
+    FunctionType signature;
+    // Optional fallback function that should be used when the import is
+    // unavailable at runtime taken from `vm.fallback`.
+    SymbolRefAttr fallback;
+  };
+
+  // Builds a table of all import functions nested within the given |rootOp|.
+  // Clones any information such that the original ops can be mutated/erased.
+  // Must only be called once the type converter has been fully populated.
+  LogicalResult build(Operation *rootOp, const TypeConverter &typeConverter);
+
+  // Finds an import with the given name if there exists one.
+  std::optional<Import> find(StringRef symbolName);
+
+private:
+  // Map of symbol names within the root op to import symbol info.
+  DenseMap<StringRef, Import> symbols;
+};
+
 // Appends a set of vm.import ops from a module to a target VM module.
 // Imports will only be added if they are not already present in the target
 // module.

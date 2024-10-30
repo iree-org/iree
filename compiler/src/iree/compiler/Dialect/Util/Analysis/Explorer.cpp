@@ -126,20 +126,33 @@ void Explorer::initializeGlobalInfos() {
   // TODO(benvanik): filter the use list by traversal actions; where this runs
   // today we don't yet have the actions specified so we can't.
 
+  // Initialize the full list of globals.
+  for (auto globalOp :
+       symbolTableOp->getRegion(0).getOps<IREE::Util::GlobalOpInterface>()) {
+    auto globalInfo = std::make_unique<GlobalInfo>();
+    globalInfo->op = globalOp;
+    globalInfosByName[globalOp.getGlobalName().getValue()] = globalInfo.get();
+    globalInfos[globalOp] = std::move(globalInfo);
+  }
+
+  // Walk the module and gather uses.
+  //
+  // TODO: find a way to do this more efficiently when the module is large.
+  // We could parallelize on top-level functions and then merge at the end.
   auto allUses = symbolTable.getSymbolUses(&symbolTableOp->getRegion(0));
-  if (!allUses.has_value())
-    return;
-  for (auto use : allUses.value()) {
-    auto *symbolOp =
-        symbolTable.lookupNearestSymbolFrom(use.getUser(), use.getSymbolRef());
-    if (!isa_and_nonnull<IREE::Util::GlobalOpInterface>(symbolOp))
-      continue;
-    auto &globalInfo = globalInfos[symbolOp];
-    globalInfo.op = cast<IREE::Util::GlobalOpInterface>(symbolOp);
-    if (isa<IREE::Util::GlobalAddressOpInterface>(use.getUser())) {
-      globalInfo.isIndirect = true;
-    } else {
-      globalInfo.uses.push_back(use.getUser());
+  if (allUses.has_value()) {
+    for (auto use : allUses.value()) {
+      auto globalInfoIt = globalInfosByName.find(
+          use.getSymbolRef().getLeafReference().getValue());
+      if (globalInfoIt == globalInfosByName.end()) {
+        continue; // not a global
+      }
+      auto *globalInfo = globalInfoIt->second;
+      if (isa<IREE::Util::GlobalAddressOpInterface>(use.getUser())) {
+        globalInfo->isIndirect = true;
+      } else {
+        globalInfo->uses.push_back(use.getUser());
+      }
     }
   }
 }
@@ -175,7 +188,7 @@ Explorer::getGlobalInfo(IREE::Util::GlobalOpInterface globalOp) {
   auto it = globalInfos.find(globalOp);
   if (it == globalInfos.end())
     return nullptr;
-  return &it->second;
+  return it->second.get();
 }
 
 const Explorer::GlobalInfo *Explorer::queryGlobalInfoFrom(StringRef globalName,
@@ -189,12 +202,12 @@ const Explorer::GlobalInfo *Explorer::queryGlobalInfoFrom(StringRef globalName,
   auto it = globalInfos.find(op);
   if (it == globalInfos.end())
     return nullptr;
-  return &it->second;
+  return it->second.get();
 }
 
 void Explorer::forEachGlobal(std::function<void(const GlobalInfo *)> fn) {
-  for (auto it : globalInfos) {
-    fn(&it.second);
+  for (auto &it : globalInfos) {
+    fn(it.second.get());
   }
 }
 

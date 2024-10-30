@@ -46,7 +46,7 @@ struct FoldBlockArgumentsPattern
     if (!op.getCallableRegion())
       return failure();
     auto &region = *op.getCallableRegion();
-    if (region.empty())
+    if (region.empty() || region.hasOneBlock())
       return failure();
 
     // Analyze all branches in the op to compute the information we'll need to
@@ -501,7 +501,6 @@ void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
   context->getOrLoadDialect<IREE::Util::UtilDialect>()
       ->getCanonicalizationPatterns(patterns);
 
-  // TODO(benvanik): same as branch folding but for calls.
   patterns.insert<FoldBlockArgumentsPattern, ElideBranchOperandsPattern>(
       context);
 
