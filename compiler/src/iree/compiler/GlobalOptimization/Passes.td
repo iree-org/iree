@@ -30,7 +30,7 @@ def DecomposeConcatPass :
 }
 
 def DecomposeLowParallelismAttentionPass :
-    Pass<"iree-global-opt-decompose-low-parallelism-attention-pass", ""> {
+    Pass<"iree-global-opt-decompose-low-parallelism-attention", ""> {
   let summary = "Decompose attention when we don't have enough parallelism"
                 "available in the attention operation.";
 }

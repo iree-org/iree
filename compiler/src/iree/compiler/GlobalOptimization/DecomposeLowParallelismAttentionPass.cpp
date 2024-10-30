@@ -55,12 +55,29 @@ static bool hasLowParallelism(AttentionOp attnOp) {
   int64_t mSize = calculateSize(bounds, opInfo->getMDims());
   int64_t k1Size = calculateSize(bounds, opInfo->getK1Dims());
 
-  // TODO: Should we take batch size into account? Sometimes doing split-k
-  // gives you good parallelism.
+  // Fused Attention (aka Flash Attention) is parallelisable primarily over
+  // B, M dimensions. It is possible to parallelise over N dimension, but it
+  // leads to duplication of computation of the QK matmul and the softmax.
+  //
+  // If we do not have enough parallelism over M dimension, it is generally
+  // not useful to do fused attention, instead decomposing is a better option.
+  //
+  // Also, one of the main reasons for using fused attention is that decomposing
+  // leads to a tensor of size O(M x K2) as output, which generally grows
+  // as O(seq_len^2) and consumes a lot of memory. However, if M is small, we
+  // don't get much benefit on memory from doing fused attention.
+  //
+  // TODO: We should probably take batch size into account. Sometimes doing
+  // split-k gives you good parallelism, and we can be fine.
   if (mSize <= kMParallelismThreshold) {
     return true;
   }
 
+  // The main problem of Fused Attention is that it reduces parallelism across
+  // K1, we cannot tile K1 in Fused Attention. This is generally okay, because
+  // model people tell us it will be small, so we can completely unroll this
+  // dimension. If these assumptions go wrong, we need to decompose, as
+  // unrolling a large dimension can cause very high register pressure.
   if (k1Size >= kK1ParallelismThreshold) {
     return true;
   }
@@ -81,13 +98,17 @@ struct DecomposeLowParallelismAttentionPass
       }
     });
 
+    IRRewriter rewriter(getOperation());
     for (AttentionOp attnOp : candidates) {
       auto aggregateOp =
           cast<linalg::AggregatedOpInterface>(attnOp.getOperation());
-      OpBuilder b(attnOp);
-      if (failed(aggregateOp.decomposeOperation(b))) {
+      rewriter.setInsertionPoint(attnOp);
+      FailureOr<SmallVector<Value>> replacements =
+          aggregateOp.decomposeOperation(rewriter);
+      if (failed(replacements)) {
         return signalPassFailure();
       }
+      rewriter.replaceAllOpUsesWith(attnOp, replacements.value());
     }
   }
 };
