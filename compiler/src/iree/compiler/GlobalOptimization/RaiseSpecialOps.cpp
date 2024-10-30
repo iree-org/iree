@@ -304,6 +304,10 @@ public:
           return false;
         }
 
+        if (!llvm::all_of(producer.getIndexingMapsArray(),
+                          [](AffineMap map) { return map.isIdentity(); }))
+          return false;
+
         std::optional<CastOpInterface> castOp =
             getDefiningNonI1ExtendingCastOp(operand.get());
         if (!castOp) {
