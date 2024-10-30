@@ -386,6 +386,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -633,6 +634,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -830,12 +832,32 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                      b.getI64ArrayAttr(workgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs,
+                                                        {0, 1, 2});
+
+  SmallVector<NamedAttribute, 2> qkConfig;
+  SmallVector<NamedAttribute, 2> pvConfig;
+
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, qkConfig,
+                                                        {0, 1});
+  IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, pvConfig, {1});
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
 
   qkAttrs.emplace_back(b.getNamedAttr("attention_qk_matmul", b.getUnitAttr()));
   pvAttrs.emplace_back(b.getNamedAttr("attention_pv_matmul", b.getUnitAttr()));
+
+  auto qkConfigDict = b.getDictionaryAttr(qkConfig);
+  auto pvConfigDict = b.getDictionaryAttr(pvConfig);
+
+  auto qkLoweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, qkConfigDict);
+  auto pvLoweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, pvConfigDict);
+
+  qkAttrs.emplace_back(b.getNamedAttr("lowering_config", qkLoweringConfig));
+  pvAttrs.emplace_back(b.getNamedAttr("lowering_config", pvLoweringConfig));
 
   auto qkAttrDict = b.getDictionaryAttr(qkAttrs);
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);

@@ -41,7 +41,7 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   ^bb
 //      CHECK:     linalg.matmul
-// CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 32], workgroup = [64, 64, 0]}>
+// CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 32], workgroup = [64, 64, 0]}>
 //      CHECK:   iree_linalg_ext.yield
 
 // -----
