@@ -216,6 +216,8 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
     MMASingleSubgroupLayout getASingleSubgroupLayout() const;
     MMASingleSubgroupLayout getBSingleSubgroupLayout() const;
     MMASingleSubgroupLayout getCSingleSubgroupLayout() const;
+
+    SmallVector<MMAIntrinsic> getVirtualIntrinsics() const;
   }];
 }
 

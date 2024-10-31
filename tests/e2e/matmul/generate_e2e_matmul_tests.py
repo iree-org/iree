@@ -347,6 +347,10 @@ def get_rocm_test_compilation_infos(
             MMASchedule("MFMA_I32_32x32x16_I8", 2, 2, 1, 1, 2),
             MMASchedule("MFMA_I32_32x32x16_I8", 4, 1, 1, 2, 2),
             MMASchedule("MFMA_I32_32x32x16_I8", 4, 2, 2, 2, 2),
+            MMASchedule("VMFMA_F32_16x16x32_F16", 1, 1, 1, 1, 1),
+            MMASchedule("VMFMA_F32_16x16x32_F16", 4, 2, 1, 2, 4),
+            MMASchedule("VMFMA_F32_32x32x16_F16", 1, 1, 1, 1, 1),
+            MMASchedule("VMFMA_F32_32x32x16_F16", 4, 2, 1, 2, 4),
         ]
     elif intrinsic == "WMMA":
         schedules = [
@@ -393,13 +397,17 @@ def get_rocm_test_compilation_infos(
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
         elif (
-            schedule.intrinsic == "MFMA_I32_16x16x32_I8"
+            schedule.intrinsic == "VMFMA_F32_16x16x32_F16"
+            or schedule.intrinsic == "MFMA_I32_16x16x32_I8"
             or schedule.intrinsic == "MFMA_F32_16x16x32_F8E4M3FNUZ"
         ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
-        elif schedule.intrinsic == "MFMA_I32_32x32x16_I8":
+        elif (
+            schedule.intrinsic == "VMFMA_F32_32x32x16_F16"
+            or schedule.intrinsic == "MFMA_I32_32x32x16_I8"
+        ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 16
