@@ -101,7 +101,9 @@ class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> 
 // Format: <virtual><kind>_<output-type>_<M>x<N>x<K>_<input-type>
 //
 // "virtual": Prefixes intrinsic with "V" to represent Non native-MFMA
-//             emulating a larger MMA with smaller ones.
+//             emulating a larger MMA with smaller ones. This is useful
+//             to interleave reads in K-dim, S.T we can have wider reads
+//             or align layouts between matmuls.
 //
 // Values: 0xABCD where:
 // * A = vendor:

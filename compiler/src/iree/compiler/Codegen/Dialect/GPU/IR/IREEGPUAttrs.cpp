@@ -263,7 +263,8 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
   case MMAIntrinsic::WMMA_I32_16x16x16_I8: {
     return OpaqueMmaLayout{16, 16, 16, i8, i8, i32};
   }
-  // Non-native intrinsics with K-unrolling.
+  // V(Virtual)MFMA instructions which have 2 mfma instructions interleaved
+  // along the k dimension.
   case MMAIntrinsic::VMFMA_F32_16x16x32_F16: {
     return OpaqueMmaLayout{16, 16, 32, f16, f16, f32};
   }
