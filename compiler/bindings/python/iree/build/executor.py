@@ -334,9 +334,10 @@ class BuildContext(BuildDependency):
             all_files = [
                 f.path for f in self.executor.all.values() if isinstance(f, BuildFile)
             ]
+            all_files_lines = "\n  ".join(all_files)
             raise RuntimeError(
                 f"File with path '{path}' is not known in the build graph. Available:\n"
-                f"  {'\n  '.join(all_files)}"
+                f"  {all_files_lines}"
             )
         return existing
 
