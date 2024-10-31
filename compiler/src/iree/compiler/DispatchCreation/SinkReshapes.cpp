@@ -15,6 +15,8 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -47,7 +49,8 @@ struct SinkReshapesPass final
 /// we just approximate it (and try to be optimistic)
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
-  return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
+  return llvm::isa_and_nonnull<IREE::LinalgExt::LinalgFusionOpInterface,
+                               linalg::LinalgOp, tensor::UnPackOp,
                                IREE::Encoding::UnsetEncodingOp>(producer);
 }
 

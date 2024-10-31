@@ -113,6 +113,7 @@ def SinkReshapesPass :
   let dependentDialects = [
     "mlir::affine::AffineDialect",
     "mlir::arith::ArithDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 
