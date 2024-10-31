@@ -22,6 +22,8 @@
 build/
 build-*/
 Testing/
+# Include iree.build package
+!compiler/bindings/python/iree/compiler/build/
 
 # Bazel artifacts
 **/bazel-*
