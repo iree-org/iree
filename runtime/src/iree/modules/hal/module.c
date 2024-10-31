@@ -38,6 +38,7 @@
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_module_flags_t flags;
+  iree_hal_module_debug_sink_t debug_sink;
   iree_host_size_t device_count;
   iree_hal_device_t* devices[];
 } iree_hal_module_t;
@@ -58,6 +59,9 @@ typedef struct iree_hal_module_state_t {
   // Flags controlling HAL module behavior passed in from the hosting
   // application. All instantiations of a module share the same flags.
   iree_hal_module_flags_t flags;
+
+  // Debug sink for routing debug events.
+  iree_hal_module_debug_sink_t debug_sink;
 
   // Total number of devices available to the module.
   iree_host_size_t device_count;
@@ -94,6 +98,7 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
   memset(state, 0, total_size);
   state->host_allocator = host_allocator;
   state->flags = module->flags;
+  state->debug_sink = module->debug_sink;
   state->device_count = module->device_count;
   state->devices = module->devices;
   state->loop_status = iree_ok_status();
@@ -630,8 +635,27 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
                    iree_hal_module_state_t,            //
                    rCrD, v) {
-  return iree_hal_modules_buffer_view_trace(args->r0, args->a1_count, args->a1,
-                                            state->host_allocator);
+  if (state->debug_sink.buffer_view_trace.fn) {
+    iree_vm_buffer_t* key = NULL;
+    IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r0, &key));
+    iree_string_view_t key_str = iree_vm_buffer_as_string(key);
+    iree_host_size_t buffer_view_count =
+        iree_hal_cast_host_size(args->a1_count);
+    if (buffer_view_count > 128) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "too many buffer views for a single trace call");
+    }
+    iree_hal_buffer_view_t** buffer_views =
+        iree_alloca(buffer_view_count * sizeof(iree_hal_buffer_view_t*));
+    for (iree_host_size_t i = 0; i < buffer_view_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_view_check_deref(args->a1[i].r0, &buffer_views[i]));
+    }
+    return state->debug_sink.buffer_view_trace.fn(
+        state->debug_sink.buffer_view_trace.user_data, key_str,
+        buffer_view_count, buffer_views, state->host_allocator);
+  }
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1778,7 +1802,8 @@ static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
     iree_vm_instance_t* instance, iree_host_size_t device_count,
     iree_hal_device_t** devices, iree_hal_module_flags_t flags,
-    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+    iree_hal_module_debug_sink_t debug_sink, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(device_count);
   IREE_ASSERT_ARGUMENT(devices);
@@ -1817,6 +1842,7 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
   module->host_allocator = host_allocator;
   // TODO(benvanik): fix vm yield with result storage.
   module->flags = flags | IREE_HAL_MODULE_FLAG_SYNCHRONOUS;
+  module->debug_sink = debug_sink;
   module->device_count = device_count;
   for (iree_host_size_t i = 0; i < device_count; ++i) {
     module->devices[i] = devices[i];

@@ -1097,10 +1097,12 @@ VmModule CreateHalModule(VmInstance* instance, std::optional<HalDevice*> device,
     devices_ptr = devices_vector.data();
     device_count = devices_vector.size();
   }
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device_count,
-                                        devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(instance->raw_ptr(), device_count, devices_ptr,
+                             IREE_HAL_MODULE_FLAG_NONE,
+                             iree_hal_module_debug_sink_stdio(stderr),
+                             iree_allocator_system(), &module),
+      "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
 }
 
