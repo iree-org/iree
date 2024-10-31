@@ -903,8 +903,6 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     Value threadId, ArrayRef<int64_t> permutation,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
-  // TODO(bjacob): Support WMMA intrinsics.
-
   // Get the swizzle describing the internal layout of this fragment.
   TileSwizzle swizzle = getSwizzle(*this, fragment);
 
@@ -1019,8 +1017,6 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
                                                      Type resultType, Value lhs,
                                                      Value rhs,
                                                      Value acc) const {
-  // TODO(bjacob): Support WMMA intrinsics.
-
   // Validation. Similar to MMAAttr::buildMmaOperation.
   auto [aType, bType, cType] = getABCVectorTypes();
   if (aType != lhs.getType() || bType != rhs.getType() ||
