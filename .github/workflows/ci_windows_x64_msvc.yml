@@ -54,10 +54,8 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
-        run: |
-          bash export BUILD_DIR_BASH="/c/mnt/azure/build-windows"
-          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
+        run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR_BASH}"
+        run: bash ./build_tools/cmake/ctest_all.sh "/c/mnt/azure/build-windows"
       - name: "Clean up build dir"
         run: Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force
