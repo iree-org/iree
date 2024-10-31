@@ -229,9 +229,8 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
 // Helper functions
 //===----------------------------------------------------------------------===//
 
-std::optional<Value> materializeArithBitcast(OpBuilder &builder, Type resultTy,
-                                             mlir::ValueRange inputs,
-                                             mlir::Location loc) {
+Value materializeArithBitcast(OpBuilder &builder, Type resultTy,
+                              mlir::ValueRange inputs, mlir::Location loc) {
   return builder.create<arith::BitcastOp>(loc, resultTy, inputs);
 }
 

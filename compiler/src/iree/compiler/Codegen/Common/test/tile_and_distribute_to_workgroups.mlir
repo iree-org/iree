@@ -2088,9 +2088,7 @@ hal.executable private @dynamic_unpack {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
@@ -2111,10 +2109,14 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %cl_1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
         %cl_2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
         %cl_3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
+        %cl_4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+        %cl_5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : i32
         %0 = arith.index_castui %cl_0 : i32 to index
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
+        %tile0 = arith.index_castui %cl_3 : i32 to index
+        %tile1 = arith.index_castui %cl_3 : i32 to index
         %4 = flow.dispatch.workload.ordinal %0, 0 : index
         %5 = flow.dispatch.workload.ordinal %1, 1 : index
         %6 = flow.dispatch.workload.ordinal %2, 2 : index
@@ -2123,7 +2125,7 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, %c32, %c16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16} -> tensor<?x?x?x?xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%c32, %c16] into %11
+        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%tile0, %tile1] into %11
           {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
           : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
