@@ -31,7 +31,7 @@ namespace {
 ///    2. The converted source and the result of the tensor.extract_slice op
 ///       have the same type.
 /// If they static shapes, it can be folded away iff they have the same type.
-/// If one of dimensions is dynamic we can unconditionally remove the
+/// If one of dimensions is dynamic, we can unconditionally remove the
 /// tensor.extract_slice op because the op won't be folded away unless the
 /// folding extract_slice(extract_slice) patterns are kicked in. This pattern is
 /// fragile in the case that we set encoding at program level. Because we can't
@@ -92,9 +92,26 @@ struct MaterializeEncodingIntoNopPass final
     // Fold the extract_slice ops away if the source is from unset_encoding op.
     target.addDynamicallyLegalOp<tensor::ExtractSliceOp>(
         [](tensor::ExtractSliceOp op) {
-          return op.getSource().getDefiningOp<IREE::Encoding::UnsetEncodingOp>()
-                     ? false
-                     : true;
+          // Do nothing if the source is not unset_encoding.
+          auto encoding =
+              op.getSource().getDefiningOp<IREE::Encoding::UnsetEncodingOp>();
+          if (!encoding) {
+            return true;
+          }
+          // If it has dynamic shape, we can unconditionally remove the
+          // tensor.extract_slice op because the op won't be folded away unless
+          // the folding extract_slice(extract_slice) patterns are kicked in.
+          // TODO: This is a fragile assumption and it needs to be revisited
+          // after we switch to late materialization path.
+          if (!op.getResultType().hasStaticShape()) {
+            return false;
+          }
+          // If they have static shapes and the type is not the same, the
+          // extract_slice op is required. Otherwise, types mismatch.
+          if (op.getSource().getType() != op.getResultType()) {
+            return true;
+          }
+          return false;
         });
     materializeEncodingPattern
         .insert<FoldAwayExtractSliceOnUnsetEncodingPattern>(context);
