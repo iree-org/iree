@@ -13,6 +13,17 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "debugging",
+    srcs = ["debugging.c"],
+    hdrs = ["debugging.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "hal",
     srcs = [
         "module.c",
@@ -24,6 +35,7 @@ iree_runtime_cc_library(
         "exports.inl",
     ],
     deps = [
+        ":debugging",
         ":types",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",

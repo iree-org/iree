@@ -1601,7 +1601,8 @@ iree_status_t ClientInstance::PopulateVMModules(
   modules.push_back({});
   IREE_RETURN_IF_ERROR(iree_hal_module_create(
       vm_instance(), /*device_count=*/1, &hal_device, IREE_HAL_MODULE_FLAG_NONE,
-      host_allocator(), &modules.back()));
+      iree_hal_module_debug_sink_stdio(stderr), host_allocator(),
+      &modules.back()));
 
   // Main module.
   modules.push_back(main_module);

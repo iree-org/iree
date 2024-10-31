@@ -12,6 +12,20 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    debugging
+  HDRS
+    "debugging.h"
+  SRCS
+    "debugging.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     hal
   HDRS
     "module.h"
@@ -20,6 +34,7 @@ iree_cc_library(
   SRCS
     "module.c"
   DEPS
+    ::debugging
     ::types
     iree::base
     iree::hal
