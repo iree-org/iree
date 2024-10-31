@@ -78,11 +78,11 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._host_array: Optional[np.ndarray] = None
 
     def __array__(self, dtype=None):
-        self._transfer_to_host(True)
+        host_array = self._transfer_to_host(True)
         if dtype is None:
-            return self._host_array
+            return host_array
         else:
-            return self._host_array.__array__(dtype)  # pytype: disable=attribute-error
+            return host_array.__array__(dtype)  # pytype: disable=attribute-error
 
     def __array_function__(self, func, types, args, kwargs):
         if func in _DEVICE_HANDLED_FUNCTIONS:
@@ -104,35 +104,35 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self._host_array is not None
 
     def to_host(self) -> np.ndarray:
-        self._transfer_to_host(False)
-        return self._host_array
+        """Return the array as host accessible NumPy ndarray.
+        This may map the memory or create a copy depending on wether the array is
+        mappable to the host."""
+        return self._transfer_to_host(False)
 
     def _is_mappable(self) -> bool:
         buffer = self._buffer_view.get_buffer()
-        if (
-            buffer.memory_type() & int(MemoryType.HOST_VISIBLE)
-            != MemoryType.HOST_VISIBLE
+        if buffer.memory_type() & int(MemoryType.HOST_VISIBLE) != int(
+            MemoryType.HOST_VISIBLE
         ):
             return False
-        if (
-            buffer.allowed_usage() & int(BufferUsage.MAPPING_SCOPED)
-            != BufferUsage.MAPPING_SCOPED
+        if buffer.allowed_usage() & int(BufferUsage.MAPPING_SCOPED) != int(
+            BufferUsage.MAPPING_SCOPED
         ):
             return False
         return True
 
-    def _transfer_to_host(self, implicit):
-        if self._host_array is not None:
-            return
+    def _transfer_to_host(self, implicit) -> np.ndarray:
         if implicit and not self._implicit_host_transfer:
             raise ValueError(
                 "DeviceArray cannot be implicitly transferred to the host: "
                 "if necessary, do an explicit transfer via .to_host()"
             )
         if self._is_mappable():
-            self._mapped_memory, self._host_array = self._map_to_host()
+            if self._host_array is None:
+                self._mapped_memory, self._host_array = self._map_to_host()
+            return self._host_array
         else:
-            self._host_array = self._copy_to_host()
+            return self._copy_to_host()
 
     def _map_to_host(self) -> Tuple[MappedMemory, np.ndarray]:
         # TODO: When synchronization is enabled, need to block here.
