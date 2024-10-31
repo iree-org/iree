@@ -168,10 +168,10 @@ getMmaScheduleFromProblemAndTarget(IREE::GPU::TargetAttr target,
 /// and deduces an MMA intrinsic schedule to choose tile sizes and the
 /// workgroup size.
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
-getMatmulLowerinConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
-                                       ArrayRef<AffineMap> maps,
-                                       ArrayRef<Value> operands,
-                                       IREE::GPU::TargetAttr target) {
+getMatmulLoweringConfigAndWorkgroupSize(SmallVector<int64_t> bounds,
+                                        ArrayRef<AffineMap> maps,
+                                        ArrayRef<Value> operands,
+                                        IREE::GPU::TargetAttr target) {
   if (target.getWgp().getMma().empty())
     return failure();
 
@@ -346,7 +346,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> bounds = igemmLoopBounds.value();
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLowerinConfigAndWorkgroupSize(
+      getMatmulLoweringConfigAndWorkgroupSize(
           bounds, igemmContractionMaps.value(), igemmOperands.value(), target);
   if (failed(configAndWgSize)) {
     return failure();
@@ -389,7 +389,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG("Matmul TileAndFuse Config");
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
-      getMatmulLowerinConfigAndWorkgroupSize(bounds, maps, operands, target);
+      getMatmulLoweringConfigAndWorkgroupSize(bounds, maps, operands, target);
   if (failed(configAndWgSize)) {
     return failure();
   }

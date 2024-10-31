@@ -389,15 +389,13 @@ getIGEMMContractionIndexingMaps(linalg::LinalgOp linalgOp) {
 }
 
 FailureOr<SmallVector<int64_t>> getIGEMMLoopBounds(linalg::LinalgOp linalgOp) {
-  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
-    return failure();
-  }
-  auto filterType = cast<RankedTensorType>(linalgOp->getOperandTypes()[1]);
-  auto accType = cast<RankedTensorType>(linalgOp->getResultTypes()[0]);
   return llvm::TypeSwitch<Operation *, FailureOr<SmallVector<int64_t>>>(
              linalgOp.getOperation())
       .Case<linalg::Conv2DNchwFchwOp>(
           [&](linalg::Conv2DNchwFchwOp convOp) -> SmallVector<int64_t> {
+            auto filterType =
+                cast<RankedTensorType>(convOp.getOperandTypes()[1]);
+            auto accType = cast<RankedTensorType>(convOp.getResultTypes()[0]);
             const int64_t B = accType.getDimSize(0);
             const int64_t N0 = accType.getDimSize(2);
             const int64_t N1 = accType.getDimSize(3);
@@ -409,6 +407,9 @@ FailureOr<SmallVector<int64_t>> getIGEMMLoopBounds(linalg::LinalgOp linalgOp) {
           })
       .Case<linalg::Conv2DNhwcHwcfOp>(
           [&](linalg::Conv2DNhwcHwcfOp convOp) -> SmallVector<int64_t> {
+            auto filterType =
+                cast<RankedTensorType>(convOp.getOperandTypes()[1]);
+            auto accType = cast<RankedTensorType>(convOp.getResultTypes()[0]);
             const int64_t B = accType.getDimSize(0);
             const int64_t M0 = accType.getDimSize(1);
             const int64_t M1 = accType.getDimSize(2);

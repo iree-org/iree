@@ -145,7 +145,7 @@ SmallVector<AffineMap> convertDimsToSymbols(MLIRContext *context,
                                             unsigned numSymbols);
 
 /// Returns the indexing maps array for a convolution operation with IGEMM
-/// indexing. The resulting indexing maps should represent the indexinf of some
+/// indexing. The resulting indexing maps should represent the indexing of some
 /// contraction that computes the equivalent IGEMM matmul of the convolution.
 FailureOr<SmallVector<AffineMap>>
 getIGEMMContractionIndexingMaps(linalg::LinalgOp linalgOp);
