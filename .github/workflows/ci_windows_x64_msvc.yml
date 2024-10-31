@@ -54,7 +54,7 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
-        run: | 
+        run: |
           bash export BUILD_DIR_BASH="/c/mnt/azure/build-windows"
           bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
       - name: "Testing IREE"
