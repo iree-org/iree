@@ -25,7 +25,6 @@ jobs:
     runs-on: arc-runner-set
     env:
       BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
-      BUILD_DIR_BASH: /c/mnt/azure/build-windows
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -55,7 +54,9 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
-        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
+        run: | 
+          bash export BUILD_DIR_BASH="/c/mnt/azure/build-windows"
+          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR_BASH}"
       - name: "Clean up build dir"
