@@ -57,8 +57,12 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
+        // Do not fuse producer generic op if it has more than one user
+        // or any reduction iterators.
         if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
-          return true;
+          return producerGenericOp->hasOneUse() &&
+                 llvm::all_of(producerGenericOp.getIteratorTypesArray(),
+                              linalg::isParallelIterator);
         }
 
         // Do not fuse with any producer linalg named ops for now.
@@ -66,9 +70,11 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not fuse with consumer linalg named ops.
+        // Do not fuse with consumer linalg named ops or reductions.
         if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-          return isa<linalg::GenericOp>(consumerLinalgOp);
+          return isa<linalg::GenericOp>(consumerLinalgOp) &&
+                 llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
+                              linalg::isParallelIterator);
         }
         // Fuse in all other cases.
         return true;
