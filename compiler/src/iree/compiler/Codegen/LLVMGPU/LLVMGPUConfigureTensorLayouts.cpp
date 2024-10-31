@@ -48,6 +48,35 @@ static SmallVector<bool> getPromotedOperands(Operation *op) {
   return promotedOperands;
 }
 
+static IREE::GPU::MmaInterfaceAttr getIntrinsic(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  IREE::GPU::MmaInterfaceAttr mmaIntrinsic = config.getMmaKind();
+  assert(mmaIntrinsic && "Cannot find intrinsic in lowering config.");
+  return mmaIntrinsic;
+}
+
+static int64_t getSubgroupMCount(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  std::optional<int64_t> subgroup_m_count = config.getSubgroupMCount();
+  assert(subgroup_m_count.has_value() &&
+         "Cannot find subgroup_m_count in lowering config.");
+  return subgroup_m_count.value();
+}
+
+static int64_t getSubgroupNCount(Operation *op) {
+  auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  assert(config && "Cannot find intrinsic from unconfigured op.");
+
+  std::optional<int64_t> subgroup_n_count = config.getSubgroupNCount();
+  assert(subgroup_n_count.has_value() &&
+         "Cannot find subgroup_n_count in lowering config.");
+  return subgroup_n_count.value();
+}
+
 static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
                                           SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
@@ -264,14 +293,19 @@ transposeSchedule(RewriterBase &rewriter, IREE::GPU::MMAScheduleAttr schedule) {
       schedule.getSubgroupMCount());
 }
 
-static LogicalResult
-setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
-                         RewriterBase &rewriter, linalg::LinalgOp qkMatmul,
-                         linalg::LinalgOp pvMatmul) {
-  // TODO: Add SIMT fallback.
-  if (!schedule) {
-    return pvMatmul->emitError("missing mma schedule for contraction");
-  }
+static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
+                                              linalg::LinalgOp qkMatmul,
+                                              linalg::LinalgOp pvMatmul) {
+
+  IREE::GPU::MMAScheduleAttr qkSchedule =
+      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(qkMatmul),
+                                                   getSubgroupMCount(qkMatmul),
+                                                   getSubgroupNCount(qkMatmul));
+
+  IREE::GPU::MMAScheduleAttr pvSchedule =
+      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(pvMatmul),
+                                                   getSubgroupMCount(pvMatmul),
+                                                   getSubgroupNCount(pvMatmul));
 
   // Check if the intrinsic output for qkMatmul can be reused for pvMatmul.
   // We know that pvMatmul takes result of qkMatmul as it's lhs.
@@ -280,13 +314,14 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
   bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
-  auto intrinsic = cast<IREE::GPU::MMAAttr>(schedule.getIntrinsic());
+  auto qkIntrinsic = cast<IREE::GPU::MMAAttr>(qkSchedule.getIntrinsic());
+  auto pvIntrinsic = cast<IREE::GPU::MMAAttr>(pvSchedule.getIntrinsic());
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      intrinsic.getASingleSubgroupLayout();
+      pvIntrinsic.getASingleSubgroupLayout();
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      intrinsic.getBSingleSubgroupLayout();
+      pvIntrinsic.getBSingleSubgroupLayout();
   IREE::GPU::MMASingleSubgroupLayout outLayout =
-      intrinsic.getCSingleSubgroupLayout();
+      qkIntrinsic.getCSingleSubgroupLayout();
 
   auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
                         IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
@@ -304,15 +339,6 @@ setAttentionMatmulAnchor(IREE::GPU::MMAScheduleAttr schedule,
     reuseIntrinsicOutput = true;
     transposeIntrinsic = true;
   }
-
-  // subgroup_n count for attention matmul is always 1, because it is the
-  // reduction dimension. The subgroup_n count is in reality, for the pvMatmul.
-  IREE::GPU::MMAScheduleAttr qkSchedule =
-      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
-          schedule.getIntrinsic(),
-          /*subgroup_m_count=*/schedule.getSubgroupMCount(),
-          /*subgroup_n_count=*/1);
-  IREE::GPU::MMAScheduleAttr pvSchedule = schedule;
 
   SmallVector<bool> promotedQKOperands = getPromotedOperands(qkMatmul);
   SmallVector<bool> promotedPVOperands = getPromotedOperands(pvMatmul);
@@ -488,12 +514,6 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return signalPassFailure();
     }
 
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
-    DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-        configDict.get(scheduleAttrName));
-
     // Vector layout option setter aimed at contractions and convolutions. For
     // now, layout setting for other problems like reductions is TODO.
     SmallVector<linalg::LinalgOp> contracts;
@@ -529,23 +549,28 @@ struct LLVMGPUConfigureTensorLayoutsPass final
 
     for (linalg::LinalgOp contract : contracts) {
       SmallVector<bool> promotedOperands = getPromotedOperands(contract);
-      if (failed(setContractionAnchor(scheduleAttr, promotedOperands, rewriter,
-                                      contract))) {
+      auto contractionSchedule = rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+          getIntrinsic(contract), getSubgroupMCount(contract),
+          getSubgroupNCount(contract));
+      if (failed(setContractionAnchor(contractionSchedule, promotedOperands,
+                                      rewriter, contract))) {
         return signalPassFailure();
       }
     }
 
     for (linalg::LinalgOp conv : convs) {
       SmallVector<bool> promotedOperands = getPromotedOperands(conv);
-      if (failed(setConvolutionAnchor(scheduleAttr, promotedOperands, rewriter,
+      auto convSchedule = rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
+          getIntrinsic(conv), getSubgroupMCount(conv), getSubgroupNCount(conv));
+      if (failed(setConvolutionAnchor(convSchedule, promotedOperands, rewriter,
                                       conv))) {
         return signalPassFailure();
       }
     }
 
     if (attentionQKMatmul && attentionPVMatmul) {
-      if (failed(setAttentionMatmulAnchor(
-              scheduleAttr, rewriter, attentionQKMatmul, attentionPVMatmul))) {
+      if (failed(setAttentionMatmulAnchor(rewriter, attentionQKMatmul,
+                                          attentionPVMatmul))) {
         return signalPassFailure();
       }
     }

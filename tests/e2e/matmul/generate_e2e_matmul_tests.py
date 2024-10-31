@@ -135,9 +135,6 @@ class IREEGPUCompilationInfo(CompilationInfo):
         requested_pipeline = self.dispatch_lowering_pass_pipeline
         compiler_pipeline = requested_pipeline
 
-        mma_schedule = ""
-        if self.mma_schedule is not None:
-            mma_schedule = "{}".format(self.mma_schedule)
         subgroup_size_str = ""
         if self.subgroup_size is not None:
             subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
@@ -145,11 +142,13 @@ class IREEGPUCompilationInfo(CompilationInfo):
         return (
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = #iree_gpu.lowering_config<{{"
+            f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
+            f"  subgroup_m_count = {self.mma_schedule.m_count}, "
+            f"  subgroup_n_count = {self.mma_schedule.n_count}, "
             f"  workgroup = {self.workgroup_tile}, "
             f"  reduction = {self.reduction_tile} }}>,\n"
             f"  translation_info = <{compiler_pipeline} {self.workgroup_size_str()}\n"
-            f"  {subgroup_size_str},\n"
-            f"  {{ {mma_schedule} }}>>\n"
+            f"  {subgroup_size_str}>>\n"
         )
 
 

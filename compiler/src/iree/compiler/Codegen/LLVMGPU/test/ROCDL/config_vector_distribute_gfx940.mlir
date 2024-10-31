@@ -6,9 +6,6 @@
 // located here.
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -40,15 +37,15 @@ func.func @expanded_matmul_transpose_b() {
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b()
 // CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 128]
+// CHECK-SAME:                           subgroup_m_count = 1
+// CHECK-SAME:                           subgroup_n_count = 4
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
 // -----
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -72,7 +69,10 @@ func.func @conv_nhwc() {
 
 // CHECK-LABEL: func.func @conv_nhwc()
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 32]
+// CHECK-SAME:                           subgroup_m_count = 2
+// CHECK-SAME:                           subgroup_n_count = 2
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
 // -----
@@ -112,9 +112,6 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 // -----
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -138,15 +135,15 @@ func.func @mfma_matmul_1024x1024x1024() {
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 64]
+// CHECK-SAME:                           subgroup_m_count = 2
+// CHECK-SAME:                           subgroup_n_count = 2
 // CHECK-SAME:                           workgroup =  [64, 128, 0]
 
 // -----
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -189,15 +186,15 @@ func.func @conv_nchwc() {
 
 // CHECK-LABEL: func.func @conv_nchwc()
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 32]
+// CHECK-SAME:                           subgroup_m_count = 2
+// CHECK-SAME:                           subgroup_n_count = 2
 // CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]
 
 // -----
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 1
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -221,15 +218,15 @@ func.func @unaligned_mk_batch_matmul() {
 // CHECK-LABEL: func.func @unaligned_mk_batch_matmul()
 // CHECK:         linalg.batch_matmul
 // CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 16]
+// CHECK-SAME:                           subgroup_m_count = 1
+// CHECK-SAME:                           subgroup_n_count = 1
 // CHECK-SAME:                           workgroup =  [1, 16, 16, 0]
 
 // -----
 
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -253,7 +250,10 @@ func.func @unaligned_m_batch_matmul_64x72x1280x1280() {
 // CHECK-LABEL: func.func @unaligned_m_batch_matmul_64x72x1280x1280()
 // CHECK:         linalg.batch_matmul
 // CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 128]
+// CHECK-SAME:                           subgroup_m_count = 1
+// CHECK-SAME:                           subgroup_n_count = 4
 // CHECK-SAME:                           workgroup =  [1, 16, 128, 0]
 
 // -----
@@ -317,7 +317,6 @@ func.func @matmul_dynamic_dim() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME:  subgroup_m_count = 2, subgroup_n_count = 1
 // CHECK-NOT:   prefetch_shared_memory = true
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
@@ -353,13 +352,14 @@ func.func @attention_20x4096x64x4096x64() {
 }
 
 // CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:                           subgroup_m_count = 2
+// CHECK-SAME:                           subgroup_n_count = 1
 // CHECK-SAME:                           reduction =  [0, 0, 0, 64, 0]
 // CHECK-SAME:                           workgroup =  [1, 64, 0, 0, 64]
 
 // -----
 
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME:  subgroup_m_count = 2, subgroup_n_count = 1
 // CHECK-NOT:   prefetch_shared_memory = true
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
@@ -398,5 +398,7 @@ func.func @attention_large_head_dim_shared_mem() {
 }
 
 // CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:                           subgroup_m_count = 2
+// CHECK-SAME:                           subgroup_n_count = 1
 // CHECK-SAME:                           reduction =  [0, 0, 16, 0]
 // CHECK-SAME:                           workgroup =  [32, 0, 0, 32]

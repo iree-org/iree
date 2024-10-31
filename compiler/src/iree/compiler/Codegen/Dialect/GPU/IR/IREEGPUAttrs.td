@@ -57,8 +57,21 @@ def IREEGPU_LoweringConfigAttr :
         "The configured fields, including tiling levels">:$attributes
   );
   let extraClassDeclaration = [{
-    /// Helper to retrieve a target mma intrinsic if present.
+    /// Helper to retrieve/set a target mma intrinsic.
     ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
+    static void setMmaKind(MLIRContext *context,
+                          SmallVectorImpl<NamedAttribute> &attrs,
+                          ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr kind);
+
+    /// Helper to retrieve/set a target subgroup M/N counts.
+    std::optional<int64_t> getSubgroupMCount() const;
+    std::optional<int64_t> getSubgroupNCount() const;
+    static void setSubgroupMCount(MLIRContext *context,
+                                   SmallVectorImpl<NamedAttribute> &attrs,
+                                   int64_t subgroup_m_count);
+    static void setSubgroupNCount(MLIRContext *context,
+                                   SmallVectorImpl<NamedAttribute> &attrs,
+                                   int64_t subgroup_n_count);
 
     /// Helper to retrieve/set a list of operand indices to promote.
     std::optional<SmallVector<int64_t>> getPromotedOperandList() const;

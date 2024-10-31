@@ -2,10 +2,7 @@
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64,
-      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                             subgroup_m_count = 1,
-                                             subgroup_n_count = 1>}>
+                                              subgroup_size = 64>
 
 #maps = [
   affine_map<(m, n, k) -> (m, k)>,
@@ -15,7 +12,9 @@
 
 #traits = {
   indexing_maps = #maps,
-  iterator_types = ["parallel", "parallel", "reduction"]
+  iterator_types = ["parallel", "parallel", "reduction"],
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+                                              subgroup_m_count = 1, subgroup_n_count = 1}>
 }
 
 func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
@@ -53,10 +52,7 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64,
-      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
-                                             subgroup_m_count = 1,
-                                             subgroup_n_count = 1>}>
+                                              subgroup_size = 64>
 
 #maps = [
   affine_map<(m, n, k) -> (m, k)>,
@@ -66,7 +62,9 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 #traits = {
   indexing_maps = #maps,
-  iterator_types = ["parallel", "parallel", "reduction"]
+  iterator_types = ["parallel", "parallel", "reduction"],
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>,
+                                              subgroup_m_count = 1 : i64, subgroup_n_count = 1 : i64}>
 }
 
 func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
@@ -117,7 +115,9 @@ func.func @matmul_96x64x16_wmma(%lhs: tensor<96x16xf16>,
 
 #traits = {
   indexing_maps = #maps,
-  iterator_types = ["parallel", "parallel", "reduction"]
+  iterator_types = ["parallel", "parallel", "reduction"],
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+                                              subgroup_m_count = 4, subgroup_n_count = 1}>
 }
 
 func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
@@ -155,10 +155,7 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64,
-      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                             subgroup_m_count = 2,
-                                             subgroup_n_count = 2>}>
+                                              subgroup_size = 64>
 
 #maps = [
   affine_map<(bm, bn, m, n, k) -> (bm, m, k)>,
@@ -169,7 +166,9 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 #traits = {
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"],
-  lowering_config = #iree_gpu.lowering_config<{promote_operands = [0]}>
+  lowering_config = #iree_gpu.lowering_config<{promote_operands = [0],
+                                              mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+                                              subgroup_m_count = 2, subgroup_n_count = 2}>
 }
 
 func.func @packed_matmul_128x128x128(%lhs: tensor<8x16x16xf16>,
@@ -205,13 +204,9 @@ func.func @packed_matmul_128x128x128(%lhs: tensor<8x16x16xf16>,
 
 // -----
 
-// TODO: We shouldn't have to specify mma_schedule here.
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64,
-      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                             subgroup_m_count = 1,
-                                             subgroup_n_count = 1>}>
+                                              subgroup_size = 64>
 
 func.func @linalg_copy(%in : tensor<16x16x16xf16>) -> tensor<16x16x16xf16>
                       attributes { translation_info = #translation } {
@@ -233,10 +228,7 @@ func.func @linalg_copy(%in : tensor<16x16x16xf16>) -> tensor<16x16x16xf16>
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64,
-      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                             subgroup_m_count = 1,
-                                             subgroup_n_count = 1>}>
+                                              subgroup_size = 64>
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
