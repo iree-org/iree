@@ -1551,6 +1551,15 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
     int64_t minTileSize = cacheTileSize != 0 ? cacheTileSize : vecTileSize;
     distConfig.minTileSizes.push_back(minTileSize);
   }
+  // FIXME: Apply maxTileSize modification for all targets.
+  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+    // Make sure maxTileSize is larger or equal to minTileSize.
+    for (auto loopNum :
+         llvm::seq<unsigned>(static_cast<unsigned>(isBM), numLoops)) {
+      distConfig.maxTileSizes[loopNum] = std::max(
+          distConfig.maxTileSizes[loopNum], distConfig.minTileSizes[loopNum]);
+    }
+  }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(linalgOp, distConfig);
 
