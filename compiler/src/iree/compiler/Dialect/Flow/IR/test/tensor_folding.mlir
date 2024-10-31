@@ -411,14 +411,14 @@ util.func public @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) 
 
 // CHECK-LABEL: @ElideRedundantTransfer
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x?xf32>, %[[DIM:.+]]: index)
-util.func public @ElideRedundantTransfer(%arg0: tensor<4x?xf32>, %dim: index) -> tensor<4x?xi32> {
-  // CHECK: %[[TRANSFER:.+]] = flow.tensor.transfer %arg0
-  %transfer = flow.tensor.transfer %arg0 : tensor<4x?xf32>{%dim} to "target"
+util.func public @ElideRedundantTransfer(%operand: tensor<4x?xf32>, %dim: index) -> tensor<4x?xi32> {
+  // CHECK: %[[TRANSFER:.+]] = flow.tensor.transfer %[[OPERAND]]
+  %transfer = flow.tensor.transfer %operand : tensor<4x?xf32>{%dim} to "target"
   // CHECK: %[[BITCAST:.+]] = flow.tensor.bitcast %[[TRANSFER]]
   %bitcast = flow.tensor.bitcast %transfer : tensor<4x?xf32>{%dim} -> tensor<4x?xi32>{%dim}
-  // CHECK-NOT: flow.transfer
+  // CHECK-NOT: flow.tensor.transfer
   %redundant = flow.tensor.transfer %bitcast : tensor<4x?xi32>{%dim} to "target"
-  // CHECK-NEXT: %[[BITCAST]]
+  // CHECK-NEXT: util.return %[[BITCAST]]
   util.return %redundant : tensor<4x?xi32>
 }
 
