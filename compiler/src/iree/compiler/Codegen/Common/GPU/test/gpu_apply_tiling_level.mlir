@@ -523,3 +523,37 @@ module {
 // NOZERO: tensor.pad
 // NOZERO: tensor.pad
 // NOZERO: linalg.matmul
+
+// -----
+
+func.func @distribute_multi_result_generic(
+  %arg0: tensor<3x4x5xf32>, %arg1: tensor<3x4xf32>, %arg2: tensor<3x4xf32>) -> (tensor<3x4x5xf32>, tensor<3x4x5xf32>)
+      attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32, {}>
+      } {
+  %empty = tensor.empty() : tensor<3x4x5xf32>
+  %0:2 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg0, %arg1, %arg2 : tensor<3x4x5xf32>, tensor<3x4xf32>, tensor<3x4xf32>)
+    outs(%empty, %empty : tensor<3x4x5xf32>, tensor<3x4x5xf32>)
+    attrs =  {lowering_config = #iree_gpu.derived_thread_config} {
+    ^bb0(%in: f32, %in_1: f32, %in_2: f32, %out: f32, %out_3: f32):
+      %7 = arith.subf %in, %in_1 : f32
+      %8 = math.exp %7 : f32
+      %9 = arith.divf %8, %in_2 : f32
+      linalg.yield %8, %9 : f32, f32
+    } -> (tensor<3x4x5xf32>, tensor<3x4x5xf32>)
+  return %0#0, %0#1 : tensor<3x4x5xf32>, tensor<3x4x5xf32>
+}
+
+// THREAD-LABEL: @distribute_multi_result_generic
+//       THREAD:   %[[FORALL:.+]]:2 = scf.forall
+//       THREAD:     linalg.generic
+//  THREAD-SAME:       outs(%{{.*}}, %{{.*}}: tensor<1x1x?xf32>, tensor<1x1x?xf32>)
+//       THREAD:   return %[[FORALL]]#0, %[[FORALL]]#1
