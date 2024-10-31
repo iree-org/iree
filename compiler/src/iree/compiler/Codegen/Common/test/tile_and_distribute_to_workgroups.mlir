@@ -2115,8 +2115,8 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %tile0 = arith.index_castui %cl_3 : i32 to index
-        %tile1 = arith.index_castui %cl_3 : i32 to index
+        %tile0 = arith.index_castui %cl_4 : i32 to index
+        %tile1 = arith.index_castui %cl_5 : i32 to index
         %4 = flow.dispatch.workload.ordinal %0, 0 : index
         %5 = flow.dispatch.workload.ordinal %1, 1 : index
         %6 = flow.dispatch.workload.ordinal %2, 2 : index
