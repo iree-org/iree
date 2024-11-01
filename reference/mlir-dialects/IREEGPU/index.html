@@ -5195,6 +5195,7 @@ tiling configs.</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.pipeline_options&lt;
   BoolAttr,   # prefetch_shared_memory
   BoolAttr,   # no_reduce_shared_memory_bank_conflicts
+  BoolAttr,   # use_igemm_convolution
   ReorderWorkgroupsStrategyAttr   # reorder_workgroups_strategy
 &gt;
 </code></pre></div>
@@ -5223,6 +5224,11 @@ tiling configs.</p>
 </tr>
 <tr>
 <td style="text-align: center;">no_reduce_shared_memory_bank_conflicts</td>
+<td style="text-align: center;"><code>BoolAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">use_igemm_convolution</td>
 <td style="text-align: center;"><code>BoolAttr</code></td>
 <td></td>
 </tr>
