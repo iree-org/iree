@@ -626,10 +626,10 @@ func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<?x?xf32>{%0, %1}
-  %3 = memref.reinterpret_cast %2 to offset: [%c0], sizes: [], strides: [] : memref<?x?xf32> to memref<f32>
-  %4 = memref.load %3[] : memref<f32>
+  %3 = memref.reinterpret_cast %2 to offset: [%c0], sizes: [], strides: [] : memref<?x?xf32> to memref<f32, strided<[], offset:?>>
+  %4 = memref.load %3[] : memref<f32, strided<[], offset:?>>
   return %4 : f32
 }
 // CHECK-LABEL: func @reinterpret_cast_lowering_dynamic_zero_offset()
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [%[[C0]]], sizes: [], strides: [] : memref<?xf32> to memref<f32>
+//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [%[[C0]]], sizes: [], strides: [] : memref<?xf32> to memref<f32, strided<[], offset: ?>>
