@@ -53,10 +53,6 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager);
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions);
 
-/// Lowering pipeline for convolution using IGEMM.
-void addGPUIGEMMTileAndFusePassPipeline(
-    OpPassManager &funcPassManager, const GPUPipelineOptions &pipelineOptions);
-
 /// Transform dialect-based path.
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint);

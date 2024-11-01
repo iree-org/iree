@@ -6,6 +6,16 @@
   #hal.pipeline.binding<storage_buffer, ReadOnly>,
   #hal.pipeline.binding<storage_buffer>
 ]>
+#translation = #iree_codegen.translation_info<
+  LLVMGPUTileAndFuse
+  workgroup_size = [256, 1, 1]
+  subgroup_size = 64,
+  {
+     gpu_pipeline_options = #iree_gpu.pipeline_options<
+       prefetch_shared_memory = false,
+       no_reduce_shared_memory_bank_conflicts = false,
+       use_igemm_convolution = true>
+  }>
 #config = #iree_gpu.lowering_config<{
   workgroup = [1, 4, 1, 16, 0],
   reduction = [0, 0, 0, 0, 2],
@@ -21,7 +31,7 @@ hal.executable private @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @conv_nhwc_stride_2() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUIGEMMTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+      func.func @conv_nhwc_stride_2() attributes {translation_info = #translation} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>>

@@ -349,10 +349,7 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     // Currently ROCDL requires propagation of user lowering configs for
     // all pipelines except TileAndFuse.
     if (translationInfo.getDispatchLoweringPassPipeline() !=
-            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse &&
-        translationInfo.getDispatchLoweringPassPipeline() !=
-            IREE::Codegen::DispatchLoweringPassPipeline::
-                LLVMGPUIGEMMTileAndFuse) {
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
       for (auto op : computeOps) {
         if (getLoweringConfig(op)) {
           propagateLoweringConfig(op, computeOps);
@@ -403,10 +400,7 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     return failure();
 
   if (getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
-          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse &&
-      getTranslationInfo(funcOp).getDispatchLoweringPassPipeline() !=
-          IREE::Codegen::DispatchLoweringPassPipeline::
-              LLVMGPUIGEMMTileAndFuse) {
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse) {
     propagateLoweringConfig(rootOp, computeOps);
   }
   return success();

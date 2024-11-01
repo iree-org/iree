@@ -91,6 +91,7 @@ setDataTiledMultiMmaLoweringConfig(IREE::GPU::TargetAttr target,
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchSharedMemory=*/false,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
@@ -358,6 +359,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -370,7 +372,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUIGEMMTileAndFuse,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
@@ -400,6 +402,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -736,6 +739,10 @@ getPipelineOptions(FunctionOpInterface funcOp,
       pipelineOptions.enableReduceSharedMemoryBankConflicts =
           !noReduceBankConflicts.getValue();
     }
+    BoolAttr useIgemmConvolution = pipelineOptionsAttr.getUseIgemmConvolution();
+    if (useIgemmConvolution) {
+      pipelineOptions.useIgemmConvolution = useIgemmConvolution.getValue();
+    }
     ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
         pipelineOptionsAttr.getReorderWorkgroupsStrategy();
     if (reorderWorkgroupsStrategy) {
@@ -772,6 +779,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts << ", "
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", useIgemmConvolution = " << options.useIgemmConvolution
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }

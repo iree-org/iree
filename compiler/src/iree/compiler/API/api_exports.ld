@@ -59,6 +59,7 @@ VER_0 {
     ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
     ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
     ireeGPUPipelineOptionsAttrGetTypeID;
+    ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;
     ireeGPUReorderWorkgroupsStrategyAttrGet;
     ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;
     ireeGPUReorderWorkgroupsStrategyAttrGetValue;

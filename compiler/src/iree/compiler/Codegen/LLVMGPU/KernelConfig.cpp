@@ -118,7 +118,6 @@ static bool needsLoweringConfigPropagation(
   using Pipeline = IREE::Codegen::DispatchLoweringPassPipeline;
   // Pipelines that do not need propagation of lowering config.
   Pipeline supportedPipelines[] = {Pipeline::LLVMGPUTileAndFuse,
-                                   Pipeline::LLVMGPUIGEMMTileAndFuse,
                                    Pipeline::LLVMGPUVectorDistribute,
                                    Pipeline::LLVMGPUPadAndVectorDistribute};
   return !llvm::is_contained(supportedPipelines, pipeline);
@@ -410,6 +409,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
         StringAttr::get(context,
@@ -658,6 +658,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetchSharedMemory=*/true,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
+        /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
     pipelineAttrs.emplace_back(
         StringAttr::get(context,

@@ -52,6 +52,7 @@ using IREE::GPU::ReorderWorkgroupsStrategy;
 struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
   bool prefetchSharedMemory = false;
+  bool useIgemmConvolution = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };

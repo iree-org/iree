@@ -17,8 +17,9 @@ func.func @nhwc_conv_mfma() {
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUIGEMMTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
@@ -45,8 +46,9 @@ func.func @nchw_conv_mfma() {
 }
 
 // CHECK-LABEL: func.func @nchw_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUIGEMMTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>
+//  CHECK-SAME:   #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
@@ -73,7 +75,7 @@ func.func @nhwc_conv_no_mfma() {
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_no_mfma
-//   CHECK-NOT:   LLVMGPUIGEMMTileAndFuse
+//   CHECK-NOT:   use_igemm_convolution = true
 
 // -----
 
@@ -93,4 +95,4 @@ func.func @nchw_conv_no_mfma() {
 }
 
 // CHECK-LABEL: func.func @nchw_conv_no_mfma
-//   CHECK-NOT:   LLVMGPUIGEMMTileAndFuse
+//   CHECK-NOT:   use_igemm_convolution = true

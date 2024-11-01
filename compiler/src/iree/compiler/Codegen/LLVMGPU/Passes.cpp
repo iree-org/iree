@@ -325,12 +325,6 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 }
 
-void addGPUIGEMMTileAndFusePassPipeline(
-    OpPassManager &funcPassManager, const GPUPipelineOptions &pipelineOptions) {
-  funcPassManager.addPass(createConvolutionToIGEMMPass());
-  addGPUTileAndFusePassPipeline(funcPassManager, pipelineOptions);
-}
-
 /// Control function for decomposing pack and unpack ops. Returns true if the
 /// op is a PackOp with a DispatchTensorLoadOp producer, or an UnPackOp with
 /// only DispatchTensorStoreOp consumers.
@@ -352,6 +346,10 @@ LogicalResult isAtBoundary(Operation *op) {
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions) {
+  if (pipelineOptions.useIgemmConvolution) {
+    funcPassManager.addPass(createConvolutionToIGEMMPass());
+  }
+
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
