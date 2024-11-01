@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "./buffer_interop.h"
+#include "./hal.h"
 #include "./status_utils.h"
 #include "iree/base/api.h"
 
@@ -456,6 +457,43 @@ std::optional<iree_vm_function_t> VmModule::LookupFunction(
   }
   CheckApiStatus(status, "Error looking up function");
   return f;
+}
+
+void VmModule::SetHalModuleDebugSink(
+    const nanobind::ref<HalModuleDebugSink>& debugSink) {
+  this->debug_sink = debugSink;
+}
+
+const nanobind::ref<HalModuleDebugSink>& VmModule::GetHalModuleDebugSink()
+    const {
+  return this->debug_sink;
+}
+
+static int VmModuleTpTraverse(PyObject* self, visitproc visit, void* arg) {
+  // Inform Python's garbage collector about the references we hold.
+
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  VmModule* vm_module = nanobind::inst_ptr<VmModule>(self);
+
+  // If the debug sink has an associated CPython object, return it.
+  // If not, debug_sink.ptr() will equal NULL, which is also fine.
+  nanobind::handle debug_sink =
+      nanobind::find(vm_module->GetHalModuleDebugSink().get());
+
+  // Inform the Python GC about the instance.
+  Py_VISIT(debug_sink.ptr());
+
+  return 0;
+}
+
+int VmModuleTpClear(PyObject* self) {
+  // Retrieve a pointer to the C++ instance associated with 'self'
+  // (never fails)
+  VmModule* vm_module = nanobind::inst_ptr<VmModule>(self);
+  vm_module->SetHalModuleDebugSink(nullptr);
+
+  return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -932,7 +970,10 @@ void SetupVmBindings(nanobind::module_ m) {
       .def_prop_ro("context_id", &VmContext::context_id)
       .def("invoke", &VmContext::Invoke);
 
-  py::class_<VmModule>(m, "VmModule")
+  PyType_Slot vm_module_slots[] = {{Py_tp_traverse, (void*)VmModuleTpTraverse},
+                                   {Py_tp_clear, (void*)VmModuleTpClear},
+                                   {0, nullptr}};
+  py::class_<VmModule>(m, "VmModule", nanobind::type_slots(vm_module_slots))
       .def_static("resolve_module_dependency",
                   &VmModule::ResolveModuleDependency)
       .def_static("from_flatbuffer", &VmModule::FromBuffer, py::arg("instance"),

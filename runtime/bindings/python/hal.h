@@ -7,6 +7,9 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 #define IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 
+#include <nanobind/intrusive/counter.h>
+
+#include <functional>
 #include <vector>
 
 #include "./binding.h"
@@ -14,6 +17,7 @@
 #include "./vm.h"
 #include "iree/base/string_view.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/debugging.h"
 
 namespace iree {
 namespace python {
@@ -288,6 +292,24 @@ class HalMappedMemory {
 
 class HalCommandBuffer
     : public ApiRefCounted<HalCommandBuffer, iree_hal_command_buffer_t> {};
+
+using HalModuleBufferViewTraceCallback =
+    std::function<void(const std::string&, const std::vector<HalBufferView>&)>;
+class HalModuleDebugSink : public nanobind::intrusive_base {
+ public:
+  HalModuleDebugSink(
+      HalModuleBufferViewTraceCallback buffer_view_trace_callback);
+  iree_hal_module_debug_sink_t AsIreeHalModuleHalModuleDebugSink() const;
+  HalModuleBufferViewTraceCallback& GetHalModuleBufferViewTraceCallback();
+
+ private:
+  HalModuleBufferViewTraceCallback buffer_view_trace_callback_;
+
+  static iree_status_t IreeHalModuleBufferViewTrace(
+      void* user_data, iree_string_view_t key,
+      iree_host_size_t buffer_view_count, iree_hal_buffer_view_t** buffer_views,
+      iree_allocator_t host_allocator);
+};
 
 void SetupHalBindings(nanobind::module_ m);
 

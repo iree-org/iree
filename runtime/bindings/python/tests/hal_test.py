@@ -4,7 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import List
 import iree.runtime
+import iree.compiler
 
 import gc
 import numpy as np
@@ -631,6 +633,157 @@ class DeviceDLPackTest(unittest.TestCase):
             ).astype(np.complex128),
             iree.runtime.HalElementType.COMPLEX_64,
         )
+
+
+class HalModuleDebugSinkTest(unittest.TestCase):
+    COMPILED_TRACE_TENSOR: bytes
+
+    @classmethod
+    def compile_trace_tensor(cls):
+        if not hasattr(cls, "COMPILED_TRACE_TENSOR"):
+            cls.COMPILED_TRACE_TENSOR = iree.compiler.compile_str(
+                """
+                func.func @trace_args(%arg0: tensor<2xi32>, %arg1: tensor<3xi32>) {
+                    flow.tensor.trace "debug_sink_test" = [
+                        %arg0: tensor<2xi32>,
+                        %arg1: tensor<3xi32>
+                    ]
+                    return
+                }
+                """,
+                target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
+            )
+        return cls.COMPILED_TRACE_TENSOR
+
+    def testHalModuleBufferViewTraceCallback(self):
+        """Check that the trace tensor callback gets called with the expected
+        arguments."""
+        program_bytes = HalModuleDebugSinkTest.compile_trace_tensor()
+
+        arg0 = np.array([1, 2], dtype=np.int32)
+        arg1 = np.array([3, 4, 5], dtype=np.int32)
+
+        callback_key: str = None
+        callback_buffer_views = None
+
+        def callback(key: str, buffer_views: List[iree.runtime.HalBufferView]):
+            nonlocal callback_key
+            callback_key = key
+            nonlocal callback_buffer_views
+            callback_buffer_views = buffer_views
+
+        instance = iree.runtime.VmInstance()
+        device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+        hal_module = iree.runtime.create_hal_module(
+            instance, device, debug_sink=iree.runtime.HalModuleDebugSink(callback)
+        )
+        program_module = iree.runtime.VmModule.copy_buffer(instance, program_bytes)
+        context = iree.runtime.VmContext(instance)
+        context.register_modules([hal_module, program_module])
+        fn = program_module.lookup_function("trace_args")
+        fn_invoker = iree.runtime.FunctionInvoker(context, device, fn)
+        fn_invoker(arg0, arg1)
+
+        assert callback_key == "debug_sink_test"
+        assert len(callback_buffer_views) == 2
+        actual_arg0 = iree.runtime.DeviceArray(
+            device, callback_buffer_views[0]
+        ).to_host()
+        actual_arg1 = iree.runtime.DeviceArray(
+            device, callback_buffer_views[1]
+        ).to_host()
+        np.testing.assert_equal(actual_arg0, arg0)
+        np.testing.assert_equal(actual_arg1, arg1)
+
+    def testNoneHalModuleDebugSink(self):
+        device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+        instance = iree.runtime.VmInstance()
+        hal_module = iree.runtime.create_hal_module(
+            instance,
+            device,
+            debug_sink=None,
+        )
+
+    def testExceptionInHalModuleBufferViewTraceCallback(self):
+        """When an exception occurs in the callback check that it properly propagates
+        through the bindings and results in a IREE module function failed invocation.
+        """
+        program_bytes = HalModuleDebugSinkTest.compile_trace_tensor()
+
+        arg0 = np.array([1, 2], dtype=np.int32)
+        arg1 = np.array([3, 4, 5], dtype=np.int32)
+
+        device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+
+        class TestException(Exception):
+            def __init__(self, msg: str):
+                super().__init__(msg)
+
+        def callback(key: str, buffer_views: List[iree.runtime.HalBufferView]):
+            raise TestException("This is a test exception")
+
+        instance = iree.runtime.VmInstance()
+        hal_module = iree.runtime.create_hal_module(
+            instance, device, debug_sink=iree.runtime.HalModuleDebugSink(callback)
+        )
+        program_module = iree.runtime.VmModule.copy_buffer(instance, program_bytes)
+        context = iree.runtime.VmContext(instance)
+        context.register_modules([hal_module, program_module])
+        fn = program_module.lookup_function("trace_args")
+        fn_invoker = iree.runtime.FunctionInvoker(context, device, fn)
+        # TODO: once IREE status chains messages test for the actual message we raise
+        # within the callback.
+        self.assertRaisesRegex(RuntimeError, "UNKNOWN", fn_invoker, arg0, arg1)
+
+    def testHalModuleBufferViewTraceCallbackCircularReferenceDoesNotLeak(self):
+        """Check that if we hold the HAL module in the callback object, when we
+        delete everything no memory is leaked.
+
+        The circular reference is
+        hal_module -> debug_sink -> callback -> hal_module_holder
+             ↑                                          |
+             --------------------------------------------
+        """
+        is_destructor_called: bool = False
+
+        class HalModuleHolder:
+            def __del__(self):
+                nonlocal is_destructor_called
+                is_destructor_called = True
+
+            def hold_hal_module(self, hal_module: iree.runtime.VmModule):
+                self.hal_module = hal_module
+
+        hal_module_holder = HalModuleHolder()
+
+        device = iree.runtime.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+
+        class Callback:
+            def __init__(self, hal_module_holder: HalModuleHolder):
+                self.hal_module_holder = hal_module_holder
+
+            def __call__(
+                self, key: str, buffer_views: List[iree.runtime.HalBufferView]
+            ):
+                pass
+
+        instance = iree.runtime.VmInstance()
+        hal_module = iree.runtime.create_hal_module(
+            instance,
+            device,
+            debug_sink=iree.runtime.HalModuleDebugSink(Callback(hal_module_holder)),
+        )
+        hal_module_holder.hold_hal_module(hal_module)
+        assert not is_destructor_called
+
+        del hal_module_holder
+        gc.collect()
+        assert not is_destructor_called
+
+        del hal_module
+        del instance
+        gc.collect()
+        assert is_destructor_called
 
 
 if __name__ == "__main__":
