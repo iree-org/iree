@@ -35,10 +35,10 @@ ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr);
 MLIR_CAPI_EXPORTED
 bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
 
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,
-                              bool *noReduceSharedMemoryBankConflicts,
-                              MlirAttribute *reorderWorkgroupsStrategy);
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUPipelineOptionsAttrGet(
+    MlirContext mlirCtx, bool *prefetchSharedMemory,
+    bool *noReduceSharedMemoryBankConflicts, bool *useIgemmConvolution,
+    MlirAttribute *reorderWorkgroupsStrategy);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr);
@@ -46,6 +46,9 @@ ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
     MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUPipelineOptionsAttrGetUseIgemmConvolution(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy(MlirAttribute attr);

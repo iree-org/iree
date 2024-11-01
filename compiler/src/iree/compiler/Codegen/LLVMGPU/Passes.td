@@ -87,17 +87,6 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
-def LLVMGPUConvolutionToIGEMMPass :
-    InterfacePass<"iree-llvmgpu-convolution-to-igemm", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to convert conv_2d ops to igemm and set a lowering configuration.";
-  let dependentDialects = [
-    "tensor::TensorDialect",
-    "iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "iree_compiler::IREE::GPU::IREEGPUDialect",
-    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
-  ];
-}
-
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";

@@ -513,6 +513,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let parameters = (ins
     OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
+    OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
   );
 
@@ -520,6 +521,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
     AttrBuilder<(ins
         CArg<"bool", "false">:$prefetch_shared_memory,
         CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
+        CArg<"bool", "false">:$use_igemm_convolution,
         CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>
   ];
 

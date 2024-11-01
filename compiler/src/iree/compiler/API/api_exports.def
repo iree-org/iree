@@ -58,6 +58,7 @@ EXPORTS
   ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory
   ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy
   ireeGPUPipelineOptionsAttrGetTypeID
+  ireeGPUPipelineOptionsAttrGetUseIgemmConvolution
   ireeGPUReorderWorkgroupsStrategyAttrGet
   ireeGPUReorderWorkgroupsStrategyAttrGetTypeID
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
