@@ -352,6 +352,9 @@ bool isGatherlikeOp(Operation *op) {
 
   // `yieldOp` should yield a single value from a `tensor.extract`
   auto yieldOp = cast<linalg::YieldOp>(region.front().getTerminator());
+  if (yieldOp.getNumOperands() != 1) {
+    return false;
+  }
   auto extractOp = yieldOp.getOperand(0).getDefiningOp<tensor::ExtractOp>();
   if (!extractOp) {
     return false;
