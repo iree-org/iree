@@ -62,6 +62,9 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(true));
 
+// TODO (nirvedhmeshram): Drop this whole path after we have support with
+// TileAndFuse pipeline from completion of
+// https://github.com/iree-org/iree/issues/18858
 llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
     "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline for "
