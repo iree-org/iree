@@ -56,6 +56,10 @@ from ._binding import (
     VmRef,
 )
 
+# Debug imports
+from ._binding import HalModuleDebugSink
+from .typing import HalModuleBufferViewTraceCallback
+
 from .array_interop import *
 from .benchmark import *
 from .system_api import *
