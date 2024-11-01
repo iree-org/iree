@@ -1081,15 +1081,27 @@ FailureOr<Value> DataTiledMMAAttr::buildMmaOperation(OpBuilder &builder,
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
+  SmallVector<int64_t> accInternalShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      });
+
   LLVM_DEBUG({
     DBGS() << "accCrossIntrinsicShape: ";
     llvm::interleaveComma(accCrossIntrinsicShape, llvm::dbgs());
     llvm::dbgs() << "\n";
+    DBGS() << "accInternalShape: ";
+    llvm::interleaveComma(accInternalShape, llvm::dbgs());
+    llvm::dbgs() << "\n";
   });
-  SmallVector<int64_t> strides(intrinsicCType.getRank(), 1);
-  SmallVector<int64_t> indices(accCrossIntrinsicShape.size(), 0);
+  int dstRank = accCrossIntrinsicShape.size();
+  SmallVector<int64_t> strides(dstRank, 1);
+  SmallVector<int64_t> indices(dstRank, 0);
   for (Value intrAcc : intrinsicsAcc) {
-    acc = builder.create<vector::InsertStridedSliceOp>(loc, intrAcc, acc,
+    auto expandedAcc = builder.create<vector::ShapeCastOp>(
+        loc, VectorType::get(accInternalShape, cType.getElementType()),
+        intrAcc);
+    acc = builder.create<vector::InsertStridedSliceOp>(loc, expandedAcc, acc,
                                                        indices, strides);
     incrementIndices(indices, accCrossIntrinsicShape);
   }
