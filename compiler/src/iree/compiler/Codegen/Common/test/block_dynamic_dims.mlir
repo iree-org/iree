@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-block-dynamic-dimensions, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-block-dynamic-dimensions{test}, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
     #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -99,3 +99,36 @@ func.func @block_attention_dims() {
 //       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK]] :
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
+
+// -----
+
+func.func @basic_blocking_test(%arg0 : index) -> tensor<?xf32> {
+  %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 16> : index
+  %1 = tensor.empty(%0) : tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+// CHECK-LABEL: func @basic_blocking_test(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?x16xf32>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EMPTY]]
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+func.func @no_blocking(%arg0 : index) -> tensor<?xf32> {
+  %1 = tensor.empty(%arg0) : tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+// CHECK-LABEL: func @no_blocking(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?xf32>
+//       CHECK:   return %[[EMPTY]]
+
+// -----
+
+func.func @no_unit_blocking(%arg0 : index) -> tensor<?xf32> {
+  %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 1> : index
+  %1 = tensor.empty(%0) : tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+// CHECK-LABEL: func @no_unit_blocking(
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?xf32>
+//       CHECK:   return %[[EMPTY]]

@@ -11,6 +11,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -1423,6 +1424,19 @@ LogicalResult OptimizationBarrierOp::verify() {
     }
   }
 
+  return success();
+}
+
+LogicalResult OptimizationBarrierOp::reifyResultShapes(
+    OpBuilder &builder,
+    ::mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  for (auto [operand, result] : llvm::zip_equal(getOperands(), getResults())) {
+    SmallVector<OpFoldResult> resultShape;
+    if (isa<RankedTensorType>(operand.getType())) {
+      resultShape = tensor::getMixedSizes(builder, getLoc(), operand);
+    }
+    reifiedReturnShapes.emplace_back(resultShape);
+  }
   return success();
 }
 
