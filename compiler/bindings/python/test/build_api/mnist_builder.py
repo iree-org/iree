@@ -23,7 +23,10 @@ def mnist(
         name="mnist.mlir",
         source="mnist.onnx",
     )
-    return "mnist.mlir"
+    return compile(
+        name="mnist",
+        source="mnist.mlir",
+    )
 
 
 if __name__ == "__main__":

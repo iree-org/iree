@@ -4,19 +4,22 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Callable, Collection, Generator, IO
+from typing import Callable, Collection, IO, Type, TypeVar
 
 import abc
-import argparse
 import concurrent.futures
 import enum
-import inspect
 import multiprocessing
-import sys
 import time
 import traceback
 from pathlib import Path
 import threading
+
+from iree.build.args import (
+    current_args_namespace,
+    expand_cl_arg_defaults,
+    extract_cl_arg_defs,
+)
 
 _locals = threading.local()
 
@@ -52,24 +55,6 @@ def join_namespace(prefix: str, suffix: str) -> str:
     return f"{prefix}/{suffix}"
 
 
-class ClArg:
-    def __init__(self, name, dest: str, **add_argument_kw):
-        self.name = name
-        self.dest = dest
-        self.add_argument_kw = add_argument_kw
-
-    def define_arg(self, parser: argparse.ArgumentParser):
-        parser.add_argument(f"--{self.name}", dest=self.dest, **self.add_argument_kw)
-
-    def resolve(self, arg_namespace: argparse.Namespace):
-        try:
-            return getattr(arg_namespace, self.dest)
-        except AttributeError as e:
-            raise RuntimeError(
-                f"Unable to resolve command line argument '{self.dest}' in namespace"
-            ) from e
-
-
 class Entrypoint:
     def __init__(
         self,
@@ -79,17 +64,12 @@ class Entrypoint:
     ):
         self.name = name
         self.description = description
-        self._wrapped = wrapped
-
-    def cl_args(self) -> Generator[ClArg, None, None]:
-        sig = inspect.signature(self._wrapped)
-        for p in sig.parameters.values():
-            def_value = p.default
-            if isinstance(def_value, ClArg):
-                yield def_value
+        self.cl_arg_defs = list(extract_cl_arg_defs(wrapped))
+        self._wrapped = expand_cl_arg_defaults(wrapped)
 
     def __call__(self, *args, **kwargs):
         parent_context = BuildContext.current()
+        args_ns = current_args_namespace()
         bep = BuildEntrypoint(
             join_namespace(parent_context.path, self.name),
             parent_context.executor,
@@ -97,18 +77,7 @@ class Entrypoint:
         )
         parent_context.executor.entrypoints.append(bep)
         with bep:
-            sig = inspect.signature(self._wrapped)
-            bound = sig.bind(*args, **kwargs)
-            bound.apply_defaults()
-
-            def filter(arg):
-                if isinstance(arg, ClArg):
-                    return arg.resolve(parent_context.executor.args_namespace)
-                return arg
-
-            new_args = [filter(arg) for arg in bound.args]
-            new_kwargs = {k: filter(v) for k, v in bound.kwargs.items()}
-            results = self._wrapped(*new_args, **new_kwargs)
+            results = self._wrapped(*args, **kwargs)
             if results is not None:
                 files = bep.files(results)
                 bep.deps.update(files)
@@ -119,15 +88,12 @@ class Entrypoint:
 class Executor:
     """Executor that all build contexts share."""
 
-    def __init__(
-        self, output_dir: Path, args_namespace: argparse.Namespace, stderr: IO
-    ):
+    def __init__(self, output_dir: Path, stderr: IO):
         self.output_dir = output_dir
         self.verbose_level = 0
         # Keyed by path
         self.all: dict[str, "BuildContext" | "BuildFile"] = {}
         self.entrypoints: list["BuildEntrypoint"] = []
-        self.args_namespace = args_namespace
         self.stderr = stderr
         BuildContext("", self)
 
@@ -189,6 +155,41 @@ class Executor:
             scheduler.shutdown()
 
 
+BuildMetaType = TypeVar("BuildMetaType", bound="BuildMeta")
+
+
+class BuildMeta:
+    """Base class for typed metadata that can be set on a BuildDependency.
+
+    This is an open namespace where each sub-class must have a unique key as the class
+    level attribute `KEY`.
+    """
+
+    def __init__(self):
+        key = getattr(self, "KEY", None)
+        assert isinstance(key, str), "BuildMeta.KEY must be a str"
+
+    @classmethod
+    def get(cls: Type[BuildMetaType], dep: "BuildDependency") -> BuildMetaType:
+        """Gets a metadata instance of this type from a dependency.
+
+        If it does not yet exist, returns the value of `create_default()`, which
+        by default returns a new instance (which is set on the dep).
+        """
+        key = getattr(cls, "KEY", None)
+        assert isinstance(key, str), f"{cls.__name__}.KEY must be a str"
+        instance = dep._metadata.get(key)
+        if instance is None:
+            instance = cls.create_default()
+            dep._metadata[key] = instance
+        return instance
+
+    @classmethod
+    def create_default(cls) -> "BuildMeta":
+        """Creates a default instance."""
+        return cls()
+
+
 class BuildDependency:
     """Base class of entities that can act as a build dependency."""
 
@@ -204,6 +205,9 @@ class BuildDependency:
         self.future: concurrent.futures.Future | None = None
         self.start_time: float | None = None
         self.finish_time: float | None = None
+
+        # Metadata.
+        self._metadata: dict[str, BuildMeta] = {}
 
     @property
     def is_scheduled(self) -> bool:
@@ -287,9 +291,11 @@ class BuildAction(BuildDependency, abc.ABC):
     def __repr__(self):
         return f"Action[{type(self).__name__}]('{self.desc}')"
 
-    @abc.abstractmethod
     def invoke(self):
-        ...
+        self._invoke()
+
+    @abc.abstractmethod
+    def _invoke(self): ...
 
 
 class BuildContext(BuildDependency):
@@ -317,7 +323,8 @@ class BuildContext(BuildDependency):
         """
         if not path.startswith("/"):
             path = join_namespace(self.path, path)
-        return BuildFile(executor=self.executor, path=path, namespace=namespace)
+        build_file = BuildFile(executor=self.executor, path=path, namespace=namespace)
+        return build_file
 
     def file(self, file: str | BuildFile) -> BuildFile:
         """Accesses a BuildFile by either string (path) or BuildFile.
@@ -373,9 +380,6 @@ class BuildContext(BuildDependency):
             raise AssertionError("BuildContext exit without enter")
         existing = stack.pop()
         assert existing is self, "Unbalanced BuildContext enter/exit"
-
-    def populate_arg_parser(self, parser: argparse.ArgumentParser):
-        ...
 
 
 class BuildEntrypoint(BuildContext):
@@ -506,7 +510,16 @@ class Scheduler:
                 return dep
 
             print(f"Scheduling action: {dep}", file=self.stderr)
-            dep.start(self.thread_pool_executor.submit(invoke))
+            if dep.concurrnecy == ActionConcurrency.NONE:
+                invoke()
+            elif dep.concurrnecy == ActionConcurrency.THREAD:
+                dep.start(self.thread_pool_executor.submit(invoke))
+            elif dep.concurrnecy == ActionConcurrency.PROCESS:
+                dep.start(self.process_pool_executor.submit(invoke))
+            else:
+                raise AssertionError(
+                    f"Unhandled ActionConcurrency value: {dep.concurrnecy}"
+                )
         else:
             # Not schedulable. Just mark it as done.
             dep.start(concurrent.futures.Future())

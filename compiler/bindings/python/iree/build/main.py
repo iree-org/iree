@@ -12,7 +12,12 @@ import importlib.util
 from pathlib import Path
 import sys
 
-from iree.build.executor import BuildEntrypoint, Entrypoint, Executor
+from iree.build.args import (
+    argument_namespace_context,
+    configure_arg_parser,
+    run_global_arg_handlers,
+)
+from iree.build.executor import BuildEntrypoint, BuildFile, Entrypoint, Executor
 
 __all__ = [
     "iree_build_main",
@@ -117,6 +122,7 @@ class CliMain:
             help="Paths of actions to build (default to top-level actions)",
         )
 
+        configure_arg_parser(p)
         self._define_action_arguments(p)
         self.args = self.arg_parser.parse_args(args)
 
@@ -126,7 +132,7 @@ class CliMain:
     def _define_action_arguments(self, p: argparse.ArgumentParser):
         user_group = p.add_argument_group("Action defined options")
         for ep in self.top_module.entrypoints.values():
-            for cl_arg in ep.cl_args():
+            for cl_arg in ep.cl_arg_defs:
                 cl_arg.define_arg(user_group)
 
     def _resolve_module_arguments(
@@ -169,15 +175,17 @@ class CliMain:
         return rem_args, top_module
 
     def _create_executor(self) -> Executor:
-        executor = Executor(self.args.output_dir, self.args, stderr=self.stderr)
+        executor = Executor(self.args.output_dir, stderr=self.stderr)
         executor.analyze(*self.top_module.entrypoints.values())
         return executor
 
     def run(self):
-        command = self.args.command
-        if command is None:
-            command = self.build_command
-        command()
+        with argument_namespace_context(self.args):
+            run_global_arg_handlers(self.args)
+            command = self.args.command
+            if command is None:
+                command = self.build_command
+            command()
 
     def build_command(self):
         executor = self._create_executor()
@@ -203,7 +211,9 @@ class CliMain:
         for build_action in build_actions:
             if isinstance(build_action, BuildEntrypoint):
                 for output in build_action.outputs:
-                    print(f"{output.get_fs_path()}", file=self.stdout)
+                    print(output.get_fs_path(), file=self.stdout)
+            elif isinstance(build_action, BuildFile):
+                print(build_action.get_fs_path(), file=self.stdout)
 
     def list_command(self):
         executor = self._create_executor()

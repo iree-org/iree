@@ -8,5 +8,7 @@ import argparse
 
 from iree.build.lang import *
 from iree.build.main import *
+
+from iree.build.compile_actions import *
 from iree.build.net_actions import *
 from iree.build.onnx_actions import *
