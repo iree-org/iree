@@ -531,7 +531,7 @@ static iree_status_t check_matmul_failure(
   fprintf(file, "actual value: %s\n", actual_value_buf);
   fprintf(file, "expected value: %s\n", expected_value_buf);
 
-  iree_hal_dim_t context = 8;
+  iree_hal_dim_t context = 16;
   const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
   if (context_env) {
     if (1 != sscanf(context_env, "%" PRIdim, &context)) {
