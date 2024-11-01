@@ -196,7 +196,9 @@ def get_test_shapes(shapes_id: ShapesId):
     #    disabled to improve the trade-off between test coverage and build
     #    latency.
     if shapes_id == ShapesId.DEFAULT:
-        return get_test_shapes(ShapesId.SMALL) + get_test_shapes(ShapesId.LARGE)
+        return [
+            TestShape(m=16, k=16, n=16, accumulate=True),
+        ]
     if shapes_id == ShapesId.SMALL:
         return [
             # square matrices. Start by the simplest case of 1x1x1.
