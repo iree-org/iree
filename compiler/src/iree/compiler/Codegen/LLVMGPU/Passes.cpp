@@ -1142,6 +1142,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic.
   modulePassManager.addPass(createLLVMGPUCastAddressSpaceFunctionPass());
+  modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   if (forROCDL) {
     // convert to ROCDL.
@@ -1200,7 +1201,6 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(createLLVMGPULowerExecutableTargetPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
