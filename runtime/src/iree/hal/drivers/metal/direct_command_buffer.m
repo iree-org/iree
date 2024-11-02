@@ -620,7 +620,7 @@ static uint32_t iree_hal_metal_duplicate_to_four_byte_value(const void* pattern,
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t target_ref,
-    const void* pattern, iree_host_size_t pattern_length) {
+    const void* pattern, iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -764,7 +764,8 @@ static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -797,7 +798,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_ref_t source_ref,
-    iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t target_ref, iree_hal_copy_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);

@@ -619,11 +619,12 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
         "Source and buffer length must be less than the target buffer length "
         "and it does not. Please check allocations");
   }
-  CheckApiStatus(iree_hal_device_queue_copy(
-                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, source_buffer.raw_ptr(), 0,
-                     target_buffer.raw_ptr(), 0, source_length),
-                 "Copying buffer on queue");
+  CheckApiStatus(
+      iree_hal_device_queue_copy(
+          raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list, signal_list,
+          source_buffer.raw_ptr(), 0, target_buffer.raw_ptr(), 0, source_length,
+          IREE_HAL_COPY_FLAG_NONE),
+      "Copying buffer on queue");
 }
 
 py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
@@ -1729,7 +1730,8 @@ void SetupHalBindings(nanobind::module_ m) {
                     iree_hal_make_buffer_ref(source_buffer.raw_ptr(),
                                              source_offset, resolved_length),
                     iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
-                                             target_offset, resolved_length)),
+                                             target_offset, resolved_length),
+                    IREE_HAL_COPY_FLAG_NONE),
                 "copy command");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
@@ -1767,7 +1769,8 @@ void SetupHalBindings(nanobind::module_ m) {
                     self.raw_ptr(),
                     iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
                                              target_offset, resolved_length),
-                    pattern_view.buf, pattern_view.len),
+                    pattern_view.buf, pattern_view.len,
+                    IREE_HAL_FILL_FLAG_NONE),
                 "command buffer fill");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),

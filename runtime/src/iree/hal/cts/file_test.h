@@ -111,7 +111,7 @@ TEST_F(FileTest, ReadEntireFile) {
       iree_hal_fence_semaphore_list(wait_fence),
       iree_hal_fence_semaphore_list(signal_fence), /*source_file=*/file,
       /*source_offset=*/0, /*target_buffer=*/buffer, /*target_offset=*/0,
-      /*length=*/file_size, /*flags=*/0));
+      /*length=*/file_size, IREE_HAL_READ_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_fence_wait(signal_fence, iree_infinite_timeout()));
   iree_hal_fence_release(wait_fence);

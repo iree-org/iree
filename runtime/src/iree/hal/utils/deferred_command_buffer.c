@@ -478,12 +478,13 @@ typedef struct iree_hal_cmd_fill_buffer_t {
   iree_hal_buffer_ref_t target_ref;
   uint64_t pattern;
   iree_host_size_t pattern_length;
+  iree_hal_fill_flags_t flags;
 } iree_hal_cmd_fill_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -501,6 +502,7 @@ static iree_status_t iree_hal_deferred_command_buffer_fill_buffer(
   cmd->target_ref = target_ref;
   memcpy(&cmd->pattern, pattern, pattern_length);
   cmd->pattern_length = pattern_length;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -513,7 +515,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_fill_buffer(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_fill_buffer(target_command_buffer, target_ref,
                                              (void**)&cmd->pattern,
-                                             cmd->pattern_length);
+                                             cmd->pattern_length, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -523,12 +525,14 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_fill_buffer(
 typedef struct iree_hal_cmd_update_buffer_t {
   iree_hal_cmd_header_t header;
   iree_hal_buffer_ref_t target_ref;
+  iree_hal_update_flags_t flags;
   uint8_t source_buffer[];
 } iree_hal_cmd_update_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -542,6 +546,7 @@ static iree_status_t iree_hal_deferred_command_buffer_update_buffer(
       sizeof(*cmd) + sizeof(cmd->source_buffer[0]) * target_ref.length,
       (void**)&cmd));
   cmd->target_ref = target_ref;
+  cmd->flags = flags;
   memcpy(cmd->source_buffer, (const uint8_t*)source_buffer + source_offset,
          sizeof(cmd->source_buffer[0]) * target_ref.length);
   return iree_ok_status();
@@ -555,7 +560,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_update_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_update_buffer(
-      target_command_buffer, cmd->source_buffer, 0, target_ref);
+      target_command_buffer, cmd->source_buffer, 0, target_ref, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//
@@ -566,11 +571,13 @@ typedef struct iree_hal_cmd_copy_buffer_t {
   iree_hal_cmd_header_t header;
   iree_hal_buffer_ref_t source_ref;
   iree_hal_buffer_ref_t target_ref;
+  iree_hal_copy_flags_t flags;
 } iree_hal_cmd_copy_buffer_t;
 
 static iree_status_t iree_hal_deferred_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
@@ -591,6 +598,7 @@ static iree_status_t iree_hal_deferred_command_buffer_copy_buffer(
       cmd_list, IREE_HAL_CMD_COPY_BUFFER, sizeof(*cmd), (void**)&cmd));
   cmd->source_ref = source_ref;
   cmd->target_ref = target_ref;
+  cmd->flags = flags;
   return iree_ok_status();
 }
 
@@ -605,7 +613,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_copy_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
       binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_copy_buffer(target_command_buffer, source_ref,
-                                             target_ref);
+                                             target_ref, cmd->flags);
 }
 
 //===----------------------------------------------------------------------===//

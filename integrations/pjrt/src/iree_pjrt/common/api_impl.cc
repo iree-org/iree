@@ -837,7 +837,8 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
   IREE_CHECK_OK(iree_hal_command_buffer_begin(transfer_cb.get()));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_fill_buffer(
       transfer_cb.get(), buffer.get(), /*target_offset=*/0,
-      /*target_size=*/byte_length, data, element_type_byte_size));
+      /*target_size=*/byte_length, data, element_type_byte_size,
+      IREE_HAL_FILL_FLAG_NONE));
   IREE_CHECK_OK(iree_hal_command_buffer_end(transfer_cb.get()));
 
   // Execute the enqueued splat:

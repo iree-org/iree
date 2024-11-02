@@ -241,7 +241,7 @@ static iree_status_t iree_hal_null_command_buffer_discard_buffer(
 static iree_status_t iree_hal_null_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_null_command_buffer_t* command_buffer =
       iree_hal_null_command_buffer_cast(base_command_buffer);
 
@@ -257,7 +257,8 @@ static iree_status_t iree_hal_null_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_null_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   iree_hal_null_command_buffer_t* command_buffer =
       iree_hal_null_command_buffer_cast(base_command_buffer);
 
@@ -275,7 +276,8 @@ static iree_status_t iree_hal_null_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_null_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   iree_hal_null_command_buffer_t* command_buffer =
       iree_hal_null_command_buffer_cast(base_command_buffer);
 

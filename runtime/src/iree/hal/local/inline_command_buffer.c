@@ -303,7 +303,7 @@ static iree_status_t iree_hal_inline_command_buffer_discard_buffer(
 static iree_status_t iree_hal_inline_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
-    iree_host_size_t pattern_length) {
+    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   return iree_hal_buffer_map_fill(target_ref.buffer, target_ref.offset,
                                   target_ref.length, pattern, pattern_length);
 }
@@ -314,7 +314,8 @@ static iree_status_t iree_hal_inline_command_buffer_fill_buffer(
 
 static iree_status_t iree_hal_inline_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags) {
   return iree_hal_buffer_map_write(
       target_ref.buffer, target_ref.offset,
       (const uint8_t*)source_buffer + source_offset, target_ref.length);
@@ -326,7 +327,8 @@ static iree_status_t iree_hal_inline_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_inline_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+    iree_hal_copy_flags_t flags) {
   return iree_hal_buffer_map_copy(source_ref.buffer, source_ref.offset,
                                   target_ref.buffer, target_ref.offset,
                                   target_ref.length);

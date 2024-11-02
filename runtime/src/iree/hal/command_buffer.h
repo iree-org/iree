@@ -214,6 +214,24 @@ typedef struct iree_hal_buffer_barrier_t {
   iree_hal_buffer_ref_t buffer_ref;
 } iree_hal_buffer_barrier_t;
 
+// Bitfield specifying flags controlling a fill operation.
+typedef uint64_t iree_hal_fill_flags_t;
+enum iree_hal_fill_flag_bits_t {
+  IREE_HAL_FILL_FLAG_NONE = 0,
+};
+
+// Bitfield specifying flags controlling a update operation.
+typedef uint64_t iree_hal_update_flags_t;
+enum iree_hal_update_flag_bits_t {
+  IREE_HAL_UPDATE_FLAG_NONE = 0,
+};
+
+// Bitfield specifying flags controlling a copy operation.
+typedef uint64_t iree_hal_copy_flags_t;
+enum iree_hal_copy_flag_bits_t {
+  IREE_HAL_COPY_FLAG_NONE = 0,
+};
+
 // Specifies the type of collective operation.
 enum iree_hal_collective_kind_e {
   // Gathers N*|element_count| elements of the specified type in |recv_binding|
@@ -391,10 +409,10 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
     iree_hal_collective_element_type_t element_type);
 
 // Bitfield specifying flags controlling a dispatch operation.
+typedef uint64_t iree_hal_dispatch_flags_t;
 enum iree_hal_dispatch_flag_bits_t {
   IREE_HAL_DISPATCH_FLAG_NONE = 0,
 };
-typedef uint64_t iree_hal_dispatch_flags_t;
 
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
@@ -684,7 +702,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
 // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t target_ref,
-    const void* pattern, iree_host_size_t pattern_length);
+    const void* pattern, iree_host_size_t pattern_length,
+    iree_hal_fill_flags_t flags);
 
 // Updates a range of the given target buffer from the source host memory.
 // The source host memory is copied immediately into the command buffer and
@@ -697,7 +716,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
 // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
     iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref);
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+    iree_hal_update_flags_t flags);
 
 // Copies a range of one buffer to another.
 // Both buffers must be compatible with the devices owned by this device
@@ -709,7 +729,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
 // copies.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t source_ref,
-    iree_hal_buffer_ref_t target_ref);
+    iree_hal_buffer_ref_t target_ref, iree_hal_copy_flags_t flags);
 
 // Dispatches a collective operation defined by |op| using the given buffers.
 // |param| must be specified for operations that require a root/peer rank
@@ -879,15 +899,17 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* fill_buffer)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_ref_t target_ref, const void* pattern,
-      iree_host_size_t pattern_length);
+      iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
 
   iree_status_t(IREE_API_PTR* update_buffer)(
       iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
-      iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref);
+      iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
+      iree_hal_update_flags_t flags);
 
   iree_status_t(IREE_API_PTR* copy_buffer)(
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref);
+      iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
+      iree_hal_copy_flags_t flags);
 
   iree_status_t(IREE_API_PTR* collective)(
       iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,

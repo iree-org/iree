@@ -1666,7 +1666,7 @@ static iree_status_t iree_hal_vulkan_device_queue_read(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_file_t* source_file, uint64_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_read_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -1687,7 +1687,7 @@ static iree_status_t iree_hal_vulkan_device_queue_write(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
-    iree_device_size_t length, uint32_t flags) {
+    iree_device_size_t length, iree_hal_write_flags_t flags) {
   // TODO: expose streaming chunk count/size options.
   iree_status_t loop_status = iree_ok_status();
   iree_hal_file_transfer_options_t options = {
@@ -1907,6 +1907,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     iree_hal_vulkan_device_query_semaphore_compatibility,
     /*.queue_alloca=*/iree_hal_vulkan_device_queue_alloca,
     /*.queue_dealloca=*/iree_hal_vulkan_device_queue_dealloca,
+    /*.queue_fill=*/iree_hal_device_queue_emulated_fill,
+    /*.queue_copy=*/iree_hal_device_queue_emulated_copy,
     /*.queue_read=*/iree_hal_vulkan_device_queue_read,
     /*.queue_write=*/iree_hal_vulkan_device_queue_write,
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
