@@ -123,7 +123,7 @@ static iree_status_t iree_hal_null_command_buffer_end(
   return status;
 }
 
-static void iree_hal_null_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_null_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
@@ -133,9 +133,11 @@ static void iree_hal_null_command_buffer_begin_debug_group(
   // TODO(null): begin a nested debug group (push) if the implementation has a
   // way to insert markers. This is informational and can be ignored.
   (void)command_buffer;
+
+  return iree_ok_status();
 }
 
-static void iree_hal_null_command_buffer_end_debug_group(
+static iree_status_t iree_hal_null_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_null_command_buffer_t* command_buffer =
       iree_hal_null_command_buffer_cast(base_command_buffer);
@@ -143,6 +145,8 @@ static void iree_hal_null_command_buffer_end_debug_group(
   // TODO(null): end a nested debug group (pop). Always called 1:1 in stack
   // order with begin_debug_group.
   (void)command_buffer;
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_null_command_buffer_execution_barrier(

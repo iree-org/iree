@@ -57,13 +57,13 @@ iree_status_t iree_hal_command_buffer_end_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state);
 
-void iree_hal_command_buffer_begin_debug_group_validation(
+iree_status_t iree_hal_command_buffer_begin_debug_group_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_string_view_t label, iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location);
 
-void iree_hal_command_buffer_end_debug_group_validation(
+iree_status_t iree_hal_command_buffer_end_debug_group_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state);
 

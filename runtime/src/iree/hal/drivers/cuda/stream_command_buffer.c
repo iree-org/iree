@@ -218,7 +218,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
   return iree_ok_status();
 }
 
-static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_cuda_stream_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
@@ -234,9 +234,11 @@ static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
       /*func_name=*/NULL, 0, label.data, label.size);
 
   // TODO: pass along to CUPTI if available.
+
+  return iree_ok_status();
 }
 
-static void iree_hal_cuda_stream_command_buffer_end_debug_group(
+static iree_status_t iree_hal_cuda_stream_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_stream_command_buffer_t* command_buffer =
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
@@ -247,6 +249,8 @@ static void iree_hal_cuda_stream_command_buffer_end_debug_group(
   IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
                                  IREE_HAL_STREAM_TRACING_VERBOSITY_COARSE);
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_execution_barrier(

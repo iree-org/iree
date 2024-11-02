@@ -258,18 +258,20 @@ iree_status_t iree_hal_command_buffer_end_validation(
   return iree_ok_status();
 }
 
-void iree_hal_command_buffer_begin_debug_group_validation(
+iree_status_t iree_hal_command_buffer_begin_debug_group_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_string_view_t label, iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
   ++validation_state->debug_group_depth;
+  return iree_ok_status();
 }
 
-void iree_hal_command_buffer_end_debug_group_validation(
+iree_status_t iree_hal_command_buffer_end_debug_group_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state) {
   --validation_state->debug_group_depth;
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_execution_barrier_validation(
