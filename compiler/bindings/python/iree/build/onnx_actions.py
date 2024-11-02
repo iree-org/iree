@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from iree.build.executor import BuildAction, BuildContext, BuildFile, BuildFileLike
+from iree.build.metadata import CompileSourceMeta
 
 __all__ = [
     "onnx_import",
@@ -30,7 +31,7 @@ def onnx_import(
             input_file=input_file,
             output_file=processed_file,
             executor=context.executor,
-            desc=f"Upgrading ONNX {name}",
+            desc=f"Upgrading ONNX {input_file} -> {processed_file}",
             deps=[
                 input_file,
             ],
@@ -41,14 +42,13 @@ def onnx_import(
     ImportOnnxAction(
         input_file=input_file,
         output_file=output_file,
-        desc=f"Importing ONNX {name}",
+        desc=f"Importing ONNX {name} -> {output_file}",
         executor=context.executor,
         deps=[
             input_file,
         ],
     )
 
-    output_file.deps.add(processed_file)
     return output_file
 
 
@@ -57,9 +57,11 @@ class UpgradeOnnxAction(BuildAction):
         super().__init__(**kwargs)
         self.input_file = input_file
         self.output_file = output_file
+        self.deps.add(self.input_file)
         output_file.deps.add(self)
+        CompileSourceMeta.get(output_file).input_type = "onnx"
 
-    def invoke(self):
+    def _invoke(self):
         import onnx
 
         input_path = self.input_file.get_fs_path()
@@ -75,9 +77,11 @@ class ImportOnnxAction(BuildAction):
         super().__init__(**kwargs)
         self.input_file = input_file
         self.output_file = output_file
+        self.deps.add(input_file)
         output_file.deps.add(self)
+        CompileSourceMeta.get(output_file).input_type = "onnx"
 
-    def invoke(self):
+    def _invoke(self):
         import iree.compiler.tools.import_onnx.__main__ as m
 
         args = m.parse_arguments(

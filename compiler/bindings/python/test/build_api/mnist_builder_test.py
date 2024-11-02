@@ -16,6 +16,11 @@ from iree.build import *
 
 THIS_DIR = Path(__file__).resolve().parent
 
+DEFAULT_TARGET_ARGS = [
+    "--iree-hal-target-device=cpu",
+    "--iree-llvmcpu-target-cpu=host",
+]
+
 
 class MnistBuilderTest(unittest.TestCase):
     def setUp(self):
@@ -39,14 +44,14 @@ class MnistBuilderTest(unittest.TestCase):
                 "--output-dir",
                 str(self.output_path),
             ]
+            + DEFAULT_TARGET_ARGS
         ).decode()
         print("OUTPUT:", output)
         output_paths = output.splitlines()
-        self.assertEqual(len(output_paths), 1)
+        self.assertEqual(len(output_paths), 1, msg=f"Found {output_paths}")
         output_path = Path(output_paths[0])
         self.assertTrue(output_path.is_relative_to(self.output_path))
-        contents = output_path.read_text()
-        self.assertIn("module", contents)
+        self.assertIn("mnist_cpu-host.vmfb", output_paths[0])
 
     # Tests that invoking via the build module itself works
     #   python {path to py file}
@@ -59,22 +64,24 @@ class MnistBuilderTest(unittest.TestCase):
                 "--output-dir",
                 str(self.output_path),
             ]
+            + DEFAULT_TARGET_ARGS
         ).decode()
         print("OUTPUT:", output)
         output_paths = output.splitlines()
-        self.assertEqual(len(output_paths), 1)
+        self.assertEqual(len(output_paths), 1, msg=f"Found {output_paths}")
+        self.assertIn("mnist_cpu-host.vmfb", output_paths[0])
 
     def testListCommand(self):
         mod = load_build_module(THIS_DIR / "mnist_builder.py")
         out_file = io.StringIO()
-        iree_build_main(mod, args=["--list"], stdout=out_file)
+        iree_build_main(mod, args=["--list"] + DEFAULT_TARGET_ARGS, stdout=out_file)
         output = out_file.getvalue().strip()
         self.assertEqual(output, "mnist")
 
     def testListAllCommand(self):
         mod = load_build_module(THIS_DIR / "mnist_builder.py")
         out_file = io.StringIO()
-        iree_build_main(mod, args=["--list-all"], stdout=out_file)
+        iree_build_main(mod, args=["--list-all"] + DEFAULT_TARGET_ARGS, stdout=out_file)
         output = out_file.getvalue().splitlines()
         self.assertIn("mnist", output)
         self.assertIn("mnist/mnist.onnx", output)
@@ -92,10 +99,23 @@ class MnistBuilderTest(unittest.TestCase):
                 args=[
                     "--mnist-onnx-url",
                     "https://github.com/iree-org/doesnotexist",
-                ],
+                ]
+                + DEFAULT_TARGET_ARGS,
                 stdout=out_file,
                 stderr=err_file,
             )
+
+    def testBuildNonDefaultSubTarget(self):
+        mod = load_build_module(THIS_DIR / "mnist_builder.py")
+        out_file = io.StringIO()
+        iree_build_main(
+            mod, args=["mnist/mnist.mlir"] + DEFAULT_TARGET_ARGS, stdout=out_file
+        )
+        output = out_file.getvalue().strip()
+        self.assertIn("genfiles/mnist/mnist.mlir", output)
+        output_path = Path(output)
+        contents = output_path.read_text()
+        self.assertIn("module", contents)
 
 
 if __name__ == "__main__":

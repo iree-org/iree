@@ -30,7 +30,7 @@ class FetchHttpAction(BuildAction):
         self.url = url
         self.output_file = output_file
 
-    def invoke(self):
+    def _invoke(self):
         path = self.output_file.get_fs_path()
         self.executor.write_status(f"Fetching URL: {self.url} -> {path}")
         try:

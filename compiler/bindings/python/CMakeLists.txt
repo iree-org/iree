@@ -249,11 +249,15 @@ ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/build"
 SOURCES
   __init__.py
   __main__.py
+  args.py
+  compile_actions.py
   executor.py
   lang.py
   main.py
+  metadata.py
   net_actions.py
   onnx_actions.py
+  target_machine.py
 )
 
 add_mlir_python_modules(IREECompilerBuildPythonModules
