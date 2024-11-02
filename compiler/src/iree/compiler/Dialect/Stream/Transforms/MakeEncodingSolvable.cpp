@@ -20,8 +20,11 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
@@ -30,6 +33,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define DEBUG_TYPE "iree-stream-specialize-encodings"
 
 #define GEN_PASS_DEF_MAKEENCODINGSOLVABLEPASS
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
@@ -58,11 +63,33 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   return results;
 }
 
+static SmallVector<Attribute>
+getOperandsResourceAffinities(AffinityAnalysis &affinityAnalysis,
+                              Stream::AsyncDispatchOp dispatchOp) {
+  MLIRContext *ctx = dispatchOp.getContext();
+  SmallVector<Attribute> operandAttrs;
+  auto emptyArray = ArrayAttr::get(ctx, {});
+  for (auto operand : dispatchOp.getResourceOperands()) {
+    if (!isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
+      continue;
+    }
+    SmallVector<IREE::Stream::AffinityAttr> affinities;
+    if (affinityAnalysis.tryLookupResourceAffinity(operand, affinities)) {
+      operandAttrs.push_back(
+          ArrayAttr::get(ctx, llvm::to_vector_of<Attribute>(affinities)));
+    } else {
+      operandAttrs.push_back(emptyArray);
+    }
+  }
+  return operandAttrs;
+}
+
 } // namespace
 
 struct MakeEncodingSolvablePass
     : public impl::MakeEncodingSolvablePassBase<MakeEncodingSolvablePass> {
   void runOnOperation() override {
+    MLIRContext *ctx = &getContext();
     ModuleOp moduleOp = getOperation();
     auto usedDialects =
         gatherUsedDialectInterfaces<AffinityAnalysisDialectInterface>(moduleOp);
@@ -70,6 +97,13 @@ struct MakeEncodingSolvablePass
       moduleOp.emitError("expected single resolver");
       return signalPassFailure();
     }
+
+    SymbolTable symbolTable(moduleOp);
+    llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
+    for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
+      executableOps[executableOp.getName()] = executableOp;
+    }
+
     std::function<LogicalResult(AffinityAttr, Operation *,
                                 SetVector<Attribute> &)>
         resolver = usedDialects[0]->makeTargetResolver(moduleOp);
@@ -131,32 +165,113 @@ struct MakeEncodingSolvablePass
     {
       AffinityAnalysis affinityAnalysis(moduleOp);
       (void)affinityAnalysis.run();
-      SmallVector<TensorExportOp> candidates;
+      SmallVector<AsyncDispatchOp> candidates;
       for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-        funcOp.walk([&](TensorExportOp op) {
+        funcOp.walk([&](AsyncDispatchOp op) {
           candidates.push_back(op);
         });
       }
+      // export -> [affinity -> array per resource of affinities PVS]
+      DenseMap<Stream::ExecutableExportOp,
+               SetVector<std::pair<AffinityAttr, ArrayAttr>>>
+          exportDispatchSites;
 
-      for (auto exportOp : candidates) {
-        exportOp.dump();
-        {
-          llvm::dbgs() << "Try Lookup Execution Affinity\n";
-          SmallVector<IREE::Stream::AffinityAttr> affinities;
-          assert(affinityAnalysis.tryLookupExecutionAffinity(exportOp,
-                                                             affinities));
-          for (auto i : affinities) i.dump();
+      llvm::MapVector<Stream::AsyncDispatchOp, SmallVector<Attribute>>
+          operandsResourceAffinities;
+      for (auto dispatchOp : candidates) {
+        SmallVector<IREE::Stream::AffinityAttr> affinities;
+        assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                           affinities));
+        assert(affinities.size() == 1);
+
+        SmallVector<Attribute> operandAttrs =
+            getOperandsResourceAffinities(affinityAnalysis, dispatchOp);
+        operandsResourceAffinities[dispatchOp] = operandAttrs;
+
+        SymbolRefAttr entryPoint =
+            *dispatchOp.getEntryPoints().getAsRange<SymbolRefAttr>().begin();
+        auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+            symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+
+        exportDispatchSites[exportOp].insert(
+            std::make_pair(affinities[0], ArrayAttr::get(ctx, operandAttrs)));
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "Dump of exportDispatchSites\n";
+        for (auto [exportOp, vec] : exportDispatchSites) {
+          llvm::dbgs() << "  ExportOp: " << exportOp.getSymName() << "\n";
+          for (auto [affinityAttr, arrayAttr] : vec) {
+            llvm::dbgs() << "    affinity: " << affinityAttr << "\n";
+            llvm::dbgs() << "    operandsResource: " << arrayAttr << "\n";
+          }
         }
-        {
-          llvm::dbgs() << "Try Lookup Resource Affinity\n";
-          SmallVector<IREE::Stream::AffinityAttr> affinities;
-          llvm::dbgs() << "Operand: " << exportOp.getSource() << "\n";
-          assert(affinityAnalysis.tryLookupResourceAffinity(
-              exportOp.getSource(), affinities));
-          for (auto i : affinities)
-            i.dump();
+      });
+
+      IRRewriter rewriter(ctx);
+      DenseMap<std::pair<AffinityAttr, ArrayAttr>, Stream::ExecutableOp>
+          dispatchSiteToExecutable;
+      for (auto [exportOp, vec] : exportDispatchSites) {
+        if (vec.size() == 1) {
+          continue;
+        }
+        int64_t dupId = -1;
+        for (auto it : vec) {
+          auto executableOp = exportOp->getParentOfType<Stream::ExecutableOp>();
+          rewriter.setInsertionPointAfter(executableOp);
+          Stream::ExecutableOp dupOp = executableOp;
+          if (dupId != -1) {
+            std::string symName = std::string(executableOp.getSymName());
+            symName += "_" + std::to_string(dupId);
+            dupOp = rewriter.cloneWithoutRegions(executableOp);
+            rewriter.modifyOpInPlace(dupOp, [&] {
+              dupOp.setSymName(symName);
+              IRMapping mapping;
+              executableOp.getRegion().cloneInto(&dupOp.getRegion(), mapping);
+            });
+          }
+          dispatchSiteToExecutable[it] = dupOp;
+          dupId++;
         }
       }
+
+      for (auto dispatchOp : candidates) {
+        SmallVector<IREE::Stream::AffinityAttr> affinities;
+        assert(affinityAnalysis.tryLookupExecutionAffinity(dispatchOp,
+                                                           affinities));
+
+        SmallVector<Attribute> operandAttrs =
+            operandsResourceAffinities[dispatchOp];
+        auto info =
+            std::make_pair(affinities[0], ArrayAttr::get(ctx, operandAttrs));
+
+        SymbolRefAttr entryPoint =
+            *dispatchOp.getEntryPoints().getAsRange<SymbolRefAttr>().begin();
+        LLVM_DEBUG({
+          auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+              symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+          if (exportDispatchSites[exportOp].count(info)) {
+            llvm::dbgs() << "found it!!\n";
+          }
+        });
+
+        if (!dispatchSiteToExecutable.count(info)) {
+          LLVM_DEBUG(llvm::dbgs() << "not found, skip\n");
+          continue;
+        }
+
+        auto executableOp = dispatchSiteToExecutable[info];
+        rewriter.modifyOpInPlace(dispatchOp, [&] {
+          SmallVector<Attribute> entryPoints;
+          auto newSym =
+              SymbolRefAttr::get(executableOp->getAttrOfType<StringAttr>(
+                                     SymbolTable::getSymbolAttrName()),
+                                 entryPoint.getNestedReferences());
+          entryPoints.push_back(newSym);
+          dispatchOp.setEntryPointsAttr(rewriter.getArrayAttr(entryPoints));
+        });
+      }
+
     }
   }
 };
