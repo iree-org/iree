@@ -377,12 +377,16 @@ iree_status_t iree_hal_hip_native_executable_create(
 
       IREE_TRACE({
         iree_hal_debug_copy_export_info(
-            iree_hal_hip_ExportDef_debug_info_get(export_def),
-            &export_infos[i]);
-        kernel_info->debug_info.function_name = export_infos[i].function_name;
-        kernel_info->debug_info.source_filename =
-            export_infos[i].source_filename;
-        kernel_info->debug_info.source_line = export_infos[i].source_line;
+            iree_hal_hip_ExportDef_debug_info_get(export_def), export_infos);
+        iree_host_size_t export_def_size =
+            iree_hal_debug_calculate_export_info_size(
+                iree_hal_hip_ExportDef_debug_info_get(export_def));
+        kernel_info->debug_info.function_name = export_infos->function_name;
+        kernel_info->debug_info.source_filename = export_infos->source_filename;
+        kernel_info->debug_info.source_line = export_infos->source_line;
+        export_infos =
+            (iree_hal_debug_export_info_t*)(((uint8_t*)export_infos) +
+                                            export_def_size);
       });
     }
   }
