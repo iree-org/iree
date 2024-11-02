@@ -51,6 +51,7 @@ class MnistBuilderTest(unittest.TestCase):
         self.assertEqual(len(output_paths), 1, msg=f"Found {output_paths}")
         output_path = Path(output_paths[0])
         self.assertTrue(output_path.is_relative_to(self.output_path))
+        self.assertIn("mnist_cpu-host.vmfb", output_paths[0])
 
     # Tests that invoking via the build module itself works
     #   python {path to py file}
@@ -68,6 +69,7 @@ class MnistBuilderTest(unittest.TestCase):
         print("OUTPUT:", output)
         output_paths = output.splitlines()
         self.assertEqual(len(output_paths), 1, msg=f"Found {output_paths}")
+        self.assertIn("mnist_cpu-host.vmfb", output_paths[0])
 
     def testListCommand(self):
         mod = load_build_module(THIS_DIR / "mnist_builder.py")
