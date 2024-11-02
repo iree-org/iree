@@ -214,6 +214,16 @@ typedef struct iree_hal_buffer_barrier_t {
   iree_hal_buffer_ref_t buffer_ref;
 } iree_hal_buffer_barrier_t;
 
+// Bitfield indicating advice for implementations managing a buffer.
+typedef uint64_t iree_hal_memory_advise_flags_t;
+enum iree_hal_memory_advise_flag_bits_t {
+  IREE_HAL_MEMORY_ADVISE_FLAG_NONE = 0,
+  // TODO(benvanik): cache control operations (invalidate/flush). arg0/arg1
+  // could source/target queue affinities.
+  // TODO(benvanik): prefetch and access type hints.
+  // TODO(benvanik): ASAN hints (protect/unprotect).
+};
+
 // Bitfield specifying flags controlling a fill operation.
 typedef uint64_t iree_hal_fill_flags_t;
 enum iree_hal_fill_flag_bits_t {
@@ -687,13 +697,12 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers);
 
-// Hints to the device queue that the given buffer will not be used again.
-// After encoding a discard the buffer contents will be considered undefined.
-// This is because the discard may be used to elide write backs to host memory
-// or aggressively reuse the allocation for other purposes.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_ref_t buffer_ref);
+// Advises the device about the usage of the given buffer.
+// The device may use this information to perform cache management or ignore it
+// entirely.
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_advise_buffer(
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_memory_advise_flags_t flags, uint64_t arg0, uint64_t arg1);
 
 // Fills the target buffer with the given repeating value.
 // Expects that |pattern_length| is one of 1, 2, or 4 and that the offset and
@@ -892,9 +901,10 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_host_size_t buffer_barrier_count,
       const iree_hal_buffer_barrier_t* buffer_barriers);
 
-  iree_status_t(IREE_API_PTR* discard_buffer)(
+  iree_status_t(IREE_API_PTR* advise_buffer)(
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_buffer_ref_t buffer_ref);
+      iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+      uint64_t arg0, uint64_t arg1);
 
   iree_status_t(IREE_API_PTR* fill_buffer)(
       iree_hal_command_buffer_t* command_buffer,

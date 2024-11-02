@@ -405,18 +405,19 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_advise_buffer(
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_memory_advise_flags_t flags, uint64_t arg0, uint64_t arg1) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_discard_buffer_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), buffer_ref));
+        z0, iree_hal_command_buffer_advise_buffer_validation(
+                command_buffer, VALIDATION_STATE(command_buffer), buffer_ref,
+                flags, arg0, arg1));
   });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, discard_buffer)(
-      command_buffer, buffer_ref);
+  iree_status_t status = _VTABLE_DISPATCH(command_buffer, advise_buffer)(
+      command_buffer, buffer_ref, flags, arg0, arg1);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

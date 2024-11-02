@@ -285,12 +285,13 @@ static iree_status_t iree_hal_inline_command_buffer_wait_events(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_discard_buffer
+// iree_hal_command_buffer_advise_buffer
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_inline_command_buffer_discard_buffer(
+static iree_status_t iree_hal_inline_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   // Could be treated as a cache invalidation as it indicates we won't be using
   // the existing buffer contents again.
   return iree_ok_status();
@@ -505,7 +506,7 @@ static const iree_hal_command_buffer_vtable_t
         .signal_event = iree_hal_inline_command_buffer_signal_event,
         .reset_event = iree_hal_inline_command_buffer_reset_event,
         .wait_events = iree_hal_inline_command_buffer_wait_events,
-        .discard_buffer = iree_hal_inline_command_buffer_discard_buffer,
+        .advise_buffer = iree_hal_inline_command_buffer_advise_buffer,
         .fill_buffer = iree_hal_inline_command_buffer_fill_buffer,
         .update_buffer = iree_hal_inline_command_buffer_update_buffer,
         .copy_buffer = iree_hal_inline_command_buffer_copy_buffer,

@@ -331,10 +331,11 @@ iree_status_t iree_hal_command_buffer_wait_events_validation(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_command_buffer_discard_buffer_validation(
+iree_status_t iree_hal_command_buffer_advise_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_ref_t buffer_ref) {
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
+    uint64_t arg0, uint64_t arg1) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
