@@ -39,8 +39,9 @@ iree_host_size_t iree_hal_debug_calculate_export_info_size(
 // Clones the given export flatbuffer data into a heap structure allocated with
 // at least the size as calculated by iree_hal_debug_calculate_export_info_size.
 // The storage is valid until freed by the caller and decoupled from the
-// Flatbuffer storage.
-void iree_hal_debug_copy_export_info(
+// Flatbuffer storage. Returns the size copied (matching
+// iree_hal_debug_calculate_export_info_size).
+iree_host_size_t iree_hal_debug_copy_export_info(
     iree_hal_debug_ExportDef_table_t export_def,
     iree_hal_debug_export_info_t* out_info);
 

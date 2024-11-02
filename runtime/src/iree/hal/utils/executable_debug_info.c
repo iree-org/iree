@@ -88,17 +88,19 @@ iree_host_size_t iree_hal_debug_calculate_export_info_size(
   return total_size;
 }
 
-void iree_hal_debug_copy_export_info(
+iree_host_size_t iree_hal_debug_copy_export_info(
     iree_hal_debug_ExportDef_table_t export_def,
     iree_hal_debug_export_info_t* out_info) {
   memset(out_info, 0, sizeof(*out_info));
-  if (!export_def) return;
+  if (!export_def) return 0;
 
+  iree_host_size_t total_size = sizeof(iree_hal_debug_export_info_t);
   char* ptr = (char*)out_info + sizeof(*out_info);
 
   flatbuffers_string_t name = iree_hal_debug_ExportDef_name_get(export_def);
   if (name) {
     size_t name_length = flatbuffers_string_len(name);
+    total_size += name_length;
     memcpy(ptr, name, name_length);
     out_info->function_name = iree_make_string_view(ptr, name_length);
     ptr += name_length;
@@ -110,10 +112,13 @@ void iree_hal_debug_copy_export_info(
     flatbuffers_string_t filename =
         iree_hal_debug_FileLineLocDef_filename_get(location_def);
     size_t filename_length = flatbuffers_string_len(filename);
+    total_size += filename_length;
     memcpy(ptr, filename, filename_length);
     out_info->source_filename = iree_make_string_view(ptr, filename_length);
     ptr += filename_length;
   }
+
+  return total_size;
 }
 
 void iree_hal_debug_publish_source_files(
