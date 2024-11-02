@@ -188,8 +188,10 @@ def _is_mlir_bytecode(view: memoryview):
     See https://mlir.llvm.org/docs/BytecodeFormat/#magic-number for more info."""
     return len(view) >= 4 and view[:4].hex() == "4d4cef52"
 
+
 class SessionObject:
-    def close(self): ...
+    def close(self):
+        ...
 
 
 class Session:
@@ -214,7 +216,7 @@ class Session:
 
     def __enter__(self) -> "Session":
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
@@ -280,7 +282,7 @@ class Output:
 
     def __enter__(self) -> "Invocation":
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
@@ -351,7 +353,7 @@ class Source(SessionObject):
 
     def __enter__(self) -> "Invocation":
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
@@ -428,7 +430,7 @@ class Invocation(SessionObject):
 
     def __enter__(self) -> "Invocation":
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 

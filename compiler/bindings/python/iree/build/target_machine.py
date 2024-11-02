@@ -170,9 +170,8 @@ def _(p: argparse.ArgumentParser):
 @expand_cl_arg_defaults
 def compute_target_machines_from_flags(
     *,
-    explicit_hal_target_devices: list[str] | None = cl_arg_ref(
-        "iree_hal_target_device"
-    ),
+    explicit_hal_target_devices: list[str]
+    | None = cl_arg_ref("iree_hal_target_device"),
 ) -> list[TargetMachine]:
     if explicit_hal_target_devices is not None:
         # Most basic default case for setting up compilation.

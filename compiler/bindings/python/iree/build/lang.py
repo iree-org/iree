@@ -29,4 +29,3 @@ def entrypoint(
     target = Entrypoint(f.__name__, f, description=description)
     functools.wraps(target, f)
     return target
-

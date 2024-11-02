@@ -295,7 +295,8 @@ class BuildAction(BuildDependency, abc.ABC):
         self._invoke()
 
     @abc.abstractmethod
-    def _invoke(self): ...
+    def _invoke(self):
+        ...
 
 
 class BuildContext(BuildDependency):
