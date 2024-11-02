@@ -372,6 +372,26 @@ static iree_status_t iree_hal_null_device_queue_fill(
       target_buffer, target_offset, length, pattern, pattern_length, flags);
 }
 
+static iree_status_t iree_hal_null_device_queue_update(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags) {
+  // TODO(null): if a native queue update operation is available use that
+  // instead. The emulated update creates a command buffer and executes it and
+  // it's best if the extra recording/upload/allocation time can be avoided.
+  // Since command buffers have a limited capacity for embedded data the
+  // emulated version may need to allocate buffers, split the update into
+  // multiple commands, or commit other sins a native implementation would be
+  // able to avoid.
+  return iree_hal_device_queue_emulated_update(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_buffer, target_offset, length,
+      flags);
+}
+
 static iree_status_t iree_hal_null_device_queue_copy(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -580,6 +600,7 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .queue_alloca = iree_hal_null_device_queue_alloca,
     .queue_dealloca = iree_hal_null_device_queue_dealloca,
     .queue_fill = iree_hal_null_device_queue_fill,
+    .queue_update = iree_hal_null_device_queue_update,
     .queue_copy = iree_hal_null_device_queue_copy,
     .queue_read = iree_hal_null_device_queue_read,
     .queue_write = iree_hal_null_device_queue_write,

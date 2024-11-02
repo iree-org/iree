@@ -230,7 +230,7 @@ enum iree_hal_fill_flag_bits_t {
   IREE_HAL_FILL_FLAG_NONE = 0,
 };
 
-// Bitfield specifying flags controlling a update operation.
+// Bitfield specifying flags controlling an update operation.
 typedef uint64_t iree_hal_update_flags_t;
 enum iree_hal_update_flag_bits_t {
   IREE_HAL_UPDATE_FLAG_NONE = 0,
@@ -802,10 +802,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
 typedef enum iree_hal_transfer_command_type_t {
   // iree_hal_command_buffer_fill_buffer
   IREE_HAL_TRANSFER_COMMAND_TYPE_FILL = 0u,
-  // iree_hal_command_buffer_copy_buffer
-  IREE_HAL_TRANSFER_COMMAND_TYPE_COPY = 1u,
   // iree_hal_command_buffer_update_buffer
-  IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE = 2u,
+  IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE = 1u,
+  // iree_hal_command_buffer_copy_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_COPY = 2u,
 } iree_hal_transfer_command_type_t;
 
 // Represents a single transfer command within a batch of commands.
@@ -821,14 +821,6 @@ typedef struct iree_hal_transfer_command_t {
       const void* pattern;
       iree_host_size_t pattern_length;
     } fill;
-    // IREE_HAL_TRANSFER_COMMAND_TYPE_COPY
-    struct {
-      iree_hal_buffer_t* source_buffer;
-      iree_device_size_t source_offset;
-      iree_hal_buffer_t* target_buffer;
-      iree_device_size_t target_offset;
-      iree_device_size_t length;
-    } copy;
     // IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE
     struct {
       const void* source_buffer;
@@ -837,6 +829,14 @@ typedef struct iree_hal_transfer_command_t {
       iree_device_size_t target_offset;
       iree_device_size_t length;
     } update;
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_COPY
+    struct {
+      iree_hal_buffer_t* source_buffer;
+      iree_device_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } copy;
   };
 } iree_hal_transfer_command_t;
 

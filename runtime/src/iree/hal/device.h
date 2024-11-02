@@ -312,11 +312,12 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
     iree_hal_buffer_t* buffer);
 
 // Enqueues a single queue-ordered fill operation.
+// The |target_buffer| must be visible to the device queue performing the fill.
 //
 // WARNING: individual fills have a high overhead and batching should be
 // performed by the caller instead of calling this multiple times. The
 // iree_hal_create_transfer_command_buffer utility makes it easy to create
-// batches of transfer operations (fill, copy, update) and is only a few lines
+// batches of transfer operations (fill, update, copy) and is only a few lines
 // more code.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -326,12 +327,36 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
 
-// Enqueues a single queue-ordered copy operation.
+// Enqueues a single queue-ordered buffer update operation.
+// The provided |source_buffer| will be captured and need not remain live or
+// unchanged while the operation is queued. The |target_buffer| must be visible
+// to the device queue performing the update.
+//
+// Some implementations may have limits on the size of the update or may perform
+// poorly if the size is larger than an implementation-defined limit. Updates
+// should be kept as small and infrequent as possible.
 //
 // WARNING: individual copies have a high overhead and batching should be
 // performed by the caller instead of calling this multiple times. The
 // iree_hal_create_transfer_command_buffer utility makes it easy to create
-// batches of transfer operations (fill, copy, update) and is only a few lines
+// batches of transfer operations (fill, update, copy) and is only a few lines
+// more code.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_update(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags);
+
+// Enqueues a single queue-ordered copy operation.
+// The |source_buffer| and |target_buffer| must both be visible to the device
+// queue performing the copy.
+//
+// WARNING: individual copies have a high overhead and batching should be
+// performed by the caller instead of calling this multiple times. The
+// iree_hal_create_transfer_command_buffer utility makes it easy to create
+// batches of transfer operations (fill, update, copy) and is only a few lines
 // more code.
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -578,6 +603,14 @@ typedef struct iree_hal_device_vtable_t {
       iree_device_size_t length, const void* pattern,
       iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
 
+  iree_status_t(IREE_API_PTR* queue_update)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      const void* source_buffer, iree_host_size_t source_offset,
+      iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+      iree_device_size_t length, iree_hal_update_flags_t flags);
+
   iree_status_t(IREE_API_PTR* queue_copy)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -633,6 +666,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_fill(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_update(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_update_flags_t flags);
 
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_copy(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,

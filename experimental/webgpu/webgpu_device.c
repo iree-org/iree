@@ -470,6 +470,7 @@ const iree_hal_device_vtable_t iree_hal_webgpu_device_vtable = {
     .queue_alloca = iree_hal_webgpu_device_queue_alloca,
     .queue_dealloca = iree_hal_webgpu_device_queue_dealloca,
     .queue_fill = iree_hal_device_queue_emulated_fill,
+    .queue_update = iree_hal_device_queue_emulated_update,
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_webgpu_device_queue_read,
     .queue_write = iree_hal_webgpu_device_queue_write,

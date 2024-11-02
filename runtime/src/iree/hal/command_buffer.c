@@ -662,6 +662,15 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
               transfer_command->fill.pattern,
               transfer_command->fill.pattern_length, IREE_HAL_FILL_FLAG_NONE);
           break;
+        case IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE:
+          status = iree_hal_command_buffer_update_buffer(
+              command_buffer, transfer_command->update.source_buffer,
+              transfer_command->update.source_offset,
+              iree_hal_make_buffer_ref(transfer_command->update.target_buffer,
+                                       transfer_command->update.target_offset,
+                                       transfer_command->update.length),
+              IREE_HAL_UPDATE_FLAG_NONE);
+          break;
         case IREE_HAL_TRANSFER_COMMAND_TYPE_COPY:
           status = iree_hal_command_buffer_copy_buffer(
               command_buffer,
@@ -672,15 +681,6 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
                                        transfer_command->copy.target_offset,
                                        transfer_command->copy.length),
               IREE_HAL_COPY_FLAG_NONE);
-          break;
-        case IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE:
-          status = iree_hal_command_buffer_update_buffer(
-              command_buffer, transfer_command->update.source_buffer,
-              transfer_command->update.source_offset,
-              iree_hal_make_buffer_ref(transfer_command->update.target_buffer,
-                                       transfer_command->update.target_offset,
-                                       transfer_command->update.length),
-              IREE_HAL_UPDATE_FLAG_NONE);
           break;
         default:
           status =
