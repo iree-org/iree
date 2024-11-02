@@ -367,12 +367,12 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags);
 
-// Executes zero or more command buffers on a device queue.
-// The command buffers are executed in order as if they were recorded as one.
+// Executes a command buffer on a device queue.
 // No commands will execute until the wait fence has been reached and the signal
-// fence will be signaled when all commands have completed.
+// fence will be signaled when all commands have completed. If a command buffer
+// is omitted this will act as a barrier.
 //
-// The queue is selected based on the command buffers submitted and the
+// The queue is selected based on the command buffer submitted and the
 // |queue_affinity|. As the number of available queues can vary the
 // |queue_affinity| is used to hash into the available queues for the required
 // categories. For example if 2 queues support transfer commands and the
@@ -381,10 +381,10 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
-// A list of binding tables matching the list of command buffers must be
-// provided if any command buffer has indirect bindings and may otherwise be
-// NULL. The binding table contents will be captured during the call and need
-// not persist after the call returns.
+// A optional binding table must be provided if the command buffer has indirect
+// bindings and may otherwise be `iree_hal_buffer_binding_table_empty()`. The
+// binding table contents will be captured during the call and need not persist
+// after the call returns.
 //
 // The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
@@ -394,9 +394,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables);
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table);
 
 // Enqueues a barrier waiting for |wait_semaphore_list| and signaling
 // |signal_semaphore_list| when reached.
@@ -607,9 +606,8 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_host_size_t command_buffer_count,
-      iree_hal_command_buffer_t* const* command_buffers,
-      iree_hal_buffer_binding_table_t const* binding_tables);
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_binding_table_t binding_table);
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);

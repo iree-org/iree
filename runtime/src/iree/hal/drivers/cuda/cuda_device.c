@@ -1053,16 +1053,16 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_deferred_work_queue_enqueue(
       device->work_queue, iree_hal_cuda_device_collect_tracing_context,
       device->tracing_context, wait_semaphore_list, signal_semaphore_list,
-      command_buffer_count, command_buffers, binding_tables);
+      command_buffer ? 1 : 0, command_buffer ? &command_buffer : NULL,
+      &binding_table);
   if (iree_status_is_ok(status)) {
     // Try to advance the deferred work queue.
     status = iree_hal_deferred_work_queue_issue(device->work_queue);

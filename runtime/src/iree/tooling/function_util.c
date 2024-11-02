@@ -123,8 +123,8 @@ static iree_status_t iree_tooling_submit_transfer(
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_queue_execute(
         device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-        iree_hal_fence_semaphore_list(signal_fence), 1, &command_buffer,
-        /*binding_tables=*/NULL);
+        iree_hal_fence_semaphore_list(signal_fence), command_buffer,
+        iree_hal_buffer_binding_table_empty());
   }
 
   if (iree_status_is_ok(status) && needs_wait) {

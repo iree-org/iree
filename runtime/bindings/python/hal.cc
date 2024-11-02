@@ -499,7 +499,7 @@ void HalDevice::QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
       "deallocating memory on queue");
 }
 
-void HalDevice::QueueExecute(py::handle command_buffers,
+void HalDevice::QueueExecute(py::handle command_buffer,
                              py::handle wait_semaphores,
                              py::handle signal_semaphores) {
   iree_hal_semaphore_list_t wait_list;
@@ -548,17 +548,14 @@ void HalDevice::QueueExecute(py::handle command_buffers,
   }
 
   // Unpack command buffers.
-  size_t cb_count = py::len(command_buffers);
-  iree_hal_command_buffer_t** cb_list =
-      static_cast<iree_hal_command_buffer_t**>(
-          alloca(sizeof(iree_hal_command_buffer_t*) * cb_count));
-  for (size_t i = 0; i < cb_count; ++i) {
-    cb_list[i] = py::cast<HalCommandBuffer*>(command_buffers[i])->raw_ptr();
-  }
+  iree_hal_command_buffer_t* cb =
+      !command_buffer.is_none()
+          ? py::cast<HalCommandBuffer*>(command_buffer)->raw_ptr()
+          : NULL;
 
   CheckApiStatus(iree_hal_device_queue_execute(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, cb_count, cb_list, /*binding_tables=*/NULL),
+                     signal_list, cb, iree_hal_buffer_binding_table_empty()),
                  "executing command buffers");
 }
 

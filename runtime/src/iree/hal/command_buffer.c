@@ -592,7 +592,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
     iree_hal_command_buffer_t* command_buffer,
-    const iree_hal_buffer_binding_table_t* binding_table) {
+    iree_hal_buffer_binding_table_t binding_table) {
   IREE_ASSERT_ARGUMENT(command_buffer);
 
   // Validate the command buffer has been recorded properly.
@@ -607,17 +607,16 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
   // the command buffer was allocated with.
   if (command_buffer->binding_count == 0) {
     return iree_ok_status();
-  } else if (!binding_table) {
+  } else if (binding_table.count == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "indirect command buffer requires at least %u "
                             "bindings but no binding table was provided",
                             command_buffer->binding_count);
-  } else if (binding_table->count < command_buffer->binding_count) {
+  } else if (binding_table.count < command_buffer->binding_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "indirect command buffer requires at least %u "
                             "bindings but only %" PRIhsz " were provided ",
-                            command_buffer->binding_count,
-                            binding_table->count);
+                            command_buffer->binding_count, binding_table.count);
   }
 
   // Validate the binding table against the commands consuming them.
@@ -625,7 +624,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
   // requested on the command buffer.
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_binding_table_validation(
-        command_buffer, VALIDATION_STATE(command_buffer), *binding_table));
+        command_buffer, VALIDATION_STATE(command_buffer), binding_table));
   });
 
   return iree_ok_status();

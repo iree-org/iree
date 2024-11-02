@@ -396,9 +396,8 @@ static iree_status_t iree_hal_webgpu_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_webgpu_device_t* device = iree_hal_webgpu_device_cast(base_device);
 
   // TODO(benvanik): this currently assumes we are synchronizing on semaphores
@@ -410,11 +409,8 @@ static iree_status_t iree_hal_webgpu_device_queue_execute(
                                                     iree_infinite_timeout()));
 
   // TODO(benvanik): propagate errors to semaphores.
-  for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
-    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
-    IREE_RETURN_IF_ERROR(
-        iree_hal_webgpu_command_buffer_issue(command_buffer, device->queue));
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_webgpu_command_buffer_issue(command_buffer, device->queue));
 
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
 

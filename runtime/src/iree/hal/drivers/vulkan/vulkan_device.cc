@@ -1706,9 +1706,8 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
 
   // NOTE: today we are not discriminating queues based on command type.
@@ -1720,23 +1719,10 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
   // buffers on demand here. When we natively support them we'll still need to
   // process the binding table prior to submission but that can be done in a
   // much more lightweight way depending on our concurrency needs.
-  if (IREE_UNLIKELY(command_buffer_count > 32)) {
-    // Guard the stack allocation, yuck.
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "currently limited to a reasonable number of "
-                            "command buffers per submission");
-  }
-  iree_hal_command_buffer_t** translated_command_buffers =
-      (iree_hal_command_buffer_t**)iree_alloca(
-          sizeof(iree_hal_command_buffer_t*) * command_buffer_count);
+  iree_hal_command_buffer_t* translated_command_buffer = NULL;
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
-    if (iree_hal_deferred_command_buffer_isa(command_buffers[i])) {
-      iree_hal_command_buffer_t* translated_command_buffer = NULL;
-      iree_hal_buffer_binding_table_t binding_table =
-          binding_tables ? binding_tables[i]
-                         : iree_hal_buffer_binding_table_empty();
+  if (command_buffer != NULL) {
+    if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
       status = iree_hal_vulkan_device_create_command_buffer(
           base_device,
           iree_hal_command_buffer_mode(command_buffer) |
@@ -1752,9 +1738,8 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
         status = iree_hal_deferred_command_buffer_apply(
             command_buffer, translated_command_buffer, binding_table);
       }
-      translated_command_buffers[i] = translated_command_buffer;
     } else {
-      translated_command_buffers[i] = command_buffer;
+      translated_command_buffer = command_buffer;
       iree_hal_command_buffer_retain(command_buffer);
     }
   }
@@ -1762,8 +1747,10 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_submission_batch_t batch = {
         /*.wait_semaphores=*/wait_semaphore_list,
-        /*.command_buffer_count=*/command_buffer_count,
-        /*.command_buffers=*/translated_command_buffers,
+        /*.command_buffer_count=*/
+        (iree_host_size_t)(translated_command_buffer ? 1 : 0),
+        /*.command_buffers=*/
+        translated_command_buffer ? &translated_command_buffer : NULL,
         /*.signal_semaphores=*/signal_semaphore_list,
     };
     status = queue->Submit(1, &batch);
@@ -1777,9 +1764,7 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
 
   // TODO(indirect-cmd): when async these need to be retained until the
   // submission completes.
-  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-    iree_hal_command_buffer_release(translated_command_buffers[i]);
-  }
+  iree_hal_command_buffer_release(translated_command_buffer);
 
   return status;
 }

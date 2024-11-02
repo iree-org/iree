@@ -193,10 +193,10 @@ typedef struct iree_hal_task_queue_issue_cmd_t {
   // the submission has completed (or failed).
   iree_hal_resource_set_t* resource_set;
 
-  // Command buffers to be issued in the order they appeared in the submission.
-  iree_host_size_t command_buffer_count;
-  iree_hal_command_buffer_t** command_buffers;
-  iree_hal_buffer_binding_table_t* binding_tables;
+  // Command buffer to be issued.
+  iree_hal_command_buffer_t* command_buffer;
+  // Optional binding table for the command buffer.
+  iree_hal_buffer_binding_table_t binding_table;
 } iree_hal_task_queue_issue_cmd_t;
 
 static iree_status_t iree_hal_task_queue_issue_cmd_deferred(
@@ -265,34 +265,28 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_ok_status();
-
   // NOTE: it's ok for there to be no command buffers - in that case the
   // submission was purely for synchronization.
-  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-    iree_hal_command_buffer_t* command_buffer = cmd->command_buffers[i];
-    if (iree_hal_task_command_buffer_isa(command_buffer)) {
-      if (cmd->binding_tables && cmd->binding_tables[i].count > 0) {
+  iree_status_t status = iree_ok_status();
+  if (cmd->command_buffer != NULL) {
+    if (iree_hal_task_command_buffer_isa(cmd->command_buffer)) {
+      if (cmd->binding_table.count > 0) {
         status = iree_make_status(
             IREE_STATUS_UNIMPLEMENTED,
             "task command buffers do not support binding tables yet");
       } else {
         status = iree_hal_task_command_buffer_issue(
-            command_buffer, &cmd->queue->state,
+            cmd->command_buffer, &cmd->queue->state,
             cmd->task.header.completion_task, cmd->arena, pending_submission);
       }
-    } else if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
-      iree_hal_buffer_binding_table_t binding_table =
-          cmd->binding_tables ? cmd->binding_tables[i]
-                              : iree_hal_buffer_binding_table_empty();
+    } else if (iree_hal_deferred_command_buffer_isa(cmd->command_buffer)) {
       status = iree_hal_task_queue_issue_cmd_deferred(
-          cmd, command_buffer, binding_table, pending_submission);
+          cmd, cmd->command_buffer, cmd->binding_table, pending_submission);
     } else {
       status = iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
           "unsupported command buffer type for task queue submission");
     }
-    if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -308,21 +302,9 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
       (iree_hal_task_submission_batch_t*)user_data;
 
   iree_hal_task_queue_issue_cmd_t* cmd = NULL;
-  iree_host_size_t command_buffers_size =
-      batch->command_buffer_count * sizeof(*cmd->command_buffers);
-  iree_host_size_t binding_tables_size = 0;
-  iree_host_size_t binding_table_elements_size = 0;
-  if (batch->binding_tables) {
-    binding_tables_size =
-        batch->command_buffer_count * sizeof(*cmd->binding_tables);
-    for (iree_host_size_t i = 0; i < batch->command_buffer_count; ++i) {
-      binding_table_elements_size += batch->binding_tables[i].count *
-                                     sizeof(*batch->binding_tables[i].bindings);
-    }
-  }
-  iree_host_size_t total_cmd_size = sizeof(*cmd) + command_buffers_size +
-                                    binding_tables_size +
-                                    binding_table_elements_size;
+  iree_host_size_t binding_table_elements_size =
+      batch->binding_table.count * sizeof(*batch->binding_table.bindings);
+  iree_host_size_t total_cmd_size = sizeof(*cmd) + binding_table_elements_size;
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(arena, total_cmd_size, (void**)&cmd));
   iree_task_call_initialize(
@@ -333,42 +315,30 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
   cmd->queue = queue;
   cmd->resource_set = resource_set;
 
-  cmd->command_buffer_count = batch->command_buffer_count;
-  cmd->command_buffers =
-      (iree_hal_command_buffer_t**)((uint8_t*)cmd + sizeof(*cmd));
-  memcpy(cmd->command_buffers, batch->command_buffers, command_buffers_size);
+  cmd->command_buffer = batch->command_buffer;
+  cmd->binding_table = iree_hal_buffer_binding_table_empty();
 
   // Binding tables are optional and we only need this extra work if there were
   // any non-empty binding tables provided during submission.
   iree_status_t status = iree_ok_status();
   if (binding_table_elements_size > 0) {
     // Copy over binding tables and all of their contents.
-    cmd->binding_tables =
-        (iree_hal_buffer_binding_table_t*)((uint8_t*)cmd->command_buffers +
-                                           command_buffers_size);
     iree_hal_buffer_binding_t* binding_element_ptr =
-        (iree_hal_buffer_binding_t*)((uint8_t*)cmd->binding_tables +
-                                     binding_tables_size);
-    for (iree_host_size_t i = 0; i < batch->command_buffer_count; ++i) {
-      iree_host_size_t element_count = batch->binding_tables[i].count;
-      cmd->binding_tables[i].count = element_count;
-      cmd->binding_tables[i].bindings = binding_element_ptr;
-      memcpy((void*)cmd->binding_tables[i].bindings,
-             batch->binding_tables[i].bindings,
-             element_count * sizeof(*binding_element_ptr));
-      binding_element_ptr += element_count;
+        (iree_hal_buffer_binding_t*)((uint8_t*)cmd + sizeof(*cmd));
+    const iree_host_size_t element_count = batch->binding_table.count;
+    cmd->binding_table.count = element_count;
+    cmd->binding_table.bindings = binding_element_ptr;
+    memcpy((void*)cmd->binding_table.bindings, batch->binding_table.bindings,
+           element_count * sizeof(*binding_element_ptr));
+    binding_element_ptr += element_count;
 
-      // Bulk insert all bindings into the resource set. This will keep the
-      // referenced buffers live until the issue has completed. Note that if we
-      // fail here we need to clean up the resource set below before returning.
-      status = iree_hal_resource_set_insert_strided(
-          cmd->resource_set, element_count, cmd->binding_tables[i].bindings,
-          offsetof(iree_hal_buffer_binding_t, buffer),
-          sizeof(iree_hal_buffer_binding_t));
-      if (!iree_status_is_ok(status)) break;
-    }
-  } else {
-    cmd->binding_tables = NULL;
+    // Bulk insert all bindings into the resource set. This will keep the
+    // referenced buffers live until the issue has completed. Note that if we
+    // fail here we need to clean up the resource set below before returning.
+    status = iree_hal_resource_set_insert_strided(
+        cmd->resource_set, element_count, cmd->binding_table.bindings,
+        offsetof(iree_hal_buffer_binding_t, buffer),
+        sizeof(iree_hal_buffer_binding_t));
   }
 
   if (iree_status_is_ok(status)) {
@@ -684,9 +654,8 @@ static iree_status_t iree_hal_task_queue_submit_batches(
   for (iree_host_size_t i = 0; i < batch_count; ++i) {
     const iree_hal_task_submission_batch_t* batch = &batches[i];
     IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit(
-        queue, batch->wait_semaphores, batch->signal_semaphores,
-        batch->command_buffer_count,
-        (iree_hal_resource_t* const*)batch->command_buffers,
+        queue, batch->wait_semaphores, batch->signal_semaphores, 1,
+        (iree_hal_resource_t* const*)&batch->command_buffer,
         iree_hal_task_queue_issue_cmd_allocate, (void*)batch));
   }
   return iree_ok_status();

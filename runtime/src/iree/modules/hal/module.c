@@ -1257,10 +1257,15 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
   iree_hal_command_buffer_t** command_buffers = NULL;
   IREE_VM_ABI_VLA_STACK_DEREF(args, a4_count, a4, iree_hal_command_buffer, 32,
                               &command_buffer_count, &command_buffers);
+  if (command_buffer_count > 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "only zero or one command buffer is allowed");
+  }
   return iree_hal_device_queue_execute(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-      iree_hal_fence_semaphore_list(signal_fence), command_buffer_count,
-      command_buffers, /*binding_tables=*/NULL);
+      iree_hal_fence_semaphore_list(signal_fence),
+      command_buffer_count > 0 ? command_buffers[0] : NULL,
+      iree_hal_buffer_binding_table_empty());
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute_indirect,  //
@@ -1312,8 +1317,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute_indirect,  //
     };
     status = iree_hal_device_queue_execute(
         device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-        iree_hal_fence_semaphore_list(signal_fence), 1, &command_buffer,
-        &binding_table);
+        iree_hal_fence_semaphore_list(signal_fence), command_buffer,
+        binding_table);
   }
 
   // If we had to heap-allocate the binding table storage it must be freed

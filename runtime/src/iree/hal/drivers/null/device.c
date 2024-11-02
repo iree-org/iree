@@ -444,9 +444,8 @@ static iree_status_t iree_hal_null_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers,
-    iree_hal_buffer_binding_table_t const* binding_tables) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
   // TODO(null): implement a wait, execute, and signal queue operation. The
@@ -454,14 +453,11 @@ static iree_status_t iree_hal_null_device_queue_execute(
   // are to be used when executing and it can be assumed that all resources
   // required for execution are accessible on those queues. If more than one
   // queue is specified the implementation may use any it prefers from the set.
-  // If more than one command buffer is provided it is expected that they are
-  // executed in order on the same queue.
 
-  // TODO(null): optional binding tables matching 1:1 with the command buffers
-  // are provided for any indirect command buffers (those who have a
-  // binding_capacity > 0). The binding tables must be captured by the
-  // implementation as they may be mutated or freed by the caller immediately
-  // after this call returns.
+  // TODO(null): an optional binding table is provided for indirect command
+  // buffers (those who have a binding_capacity > 0). The binding table must be
+  // captured by the implementation as they may be mutated or freed by the
+  // caller immediately after this call returns.
 
   // TODO(null): do this async - callers may be submitting work to multiple
   // devices or queues on the same device from the same thread and blocking here

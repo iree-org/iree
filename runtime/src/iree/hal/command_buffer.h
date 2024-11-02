@@ -792,7 +792,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
 // are used by the command buffer are provided they will be ignored.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_submission(
     iree_hal_command_buffer_t* command_buffer,
-    const iree_hal_buffer_binding_table_t* binding_table);
+    iree_hal_buffer_binding_table_t binding_table);
 
 //===----------------------------------------------------------------------===//
 // Utilities for command buffer creation
