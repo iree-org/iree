@@ -45,3 +45,15 @@ util.func @missing_udiv_skipped(%arg0 : index) -> index {
   %1 = arith.remui %0, %cst : index
   util.return %1 : index
 }
+
+// -----
+
+util.func @muli_divisibility(%arg0 : index) -> index {
+  %cst = arith.constant 16 : index
+  %0 = arith.muli %arg0, %cst : index
+  %1 = arith.remui %0, %cst : index
+  util.return %1 : index
+}
+// CHECK-LABEL: @muli_divisibility
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   return %[[C0]]

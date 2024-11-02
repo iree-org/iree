@@ -60,6 +60,7 @@ struct RemoveOptimizationBarrier final
 /// any un-propagated `tensor.expand_shape/tensor.collapse_shape` patterns.
 struct BlockDynamicDimensionsPass final
     : impl::BlockDynamicDimensionsPassBase<BlockDynamicDimensionsPass> {
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
@@ -222,6 +223,33 @@ blockDynamicDimensions(RewriterBase &rewriter,
                                 prunedOperandsList);
 }
 
+/// Generic method to block dynamic dimensions for all tensor operands.
+/// Only used for testing for now
+static LogicalResult
+blockDynamicDimensions(RewriterBase &rewriter,
+                       const TensorDynamicDimAnalysis &dynamicDimAnalysis,
+                       Operation *operation, bool test) {
+  return TypeSwitch<Operation *, LogicalResult>(operation)
+      .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
+        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
+                                      attentionOp);
+      })
+      .Default([&](Operation *op) {
+        if (!test) {
+          return success();
+        }
+        // The default path here is for now only for testing.
+        llvm::SmallDenseSet<int64_t> tensorOperandsList;
+        for (OpOperand &opOperand : operation->getOpOperands()) {
+          if (isa<RankedTensorType>(opOperand.get().getType())) {
+            tensorOperandsList.insert(opOperand.getOperandNumber());
+          }
+        }
+        return blockDynamicDimensions(rewriter, dynamicDimAnalysis, operation,
+                                      tensorOperandsList);
+      });
+}
+
 void BlockDynamicDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
@@ -231,12 +259,10 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   }
 
   IRRewriter rewriter(context);
-  auto walkResult = operation->walk(
-      [&](IREE::LinalgExt::AttentionOp attentionOp) -> WalkResult {
-        rewriter.setInsertionPoint(attentionOp);
-        return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
-                                      attentionOp);
-      });
+  auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
+    rewriter.setInsertionPoint(op);
+    return blockDynamicDimensions(rewriter, dynamicDimAnalysis, op, test);
+  });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }
