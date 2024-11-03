@@ -491,7 +491,7 @@ struct LLVMGPUConfigureTensorLayoutsPass final
     llvm::StringLiteral scheduleAttrName =
         IREE::GPU::MMAScheduleAttr::getMnemonic();
     DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-    IREE::GPU::MMAScheduleAttr scheduleAttr = nullptr;
+    IREE::GPU::MMAScheduleAttr scheduleAttr;
     if (configDict)
       scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
           configDict.get(scheduleAttrName));
