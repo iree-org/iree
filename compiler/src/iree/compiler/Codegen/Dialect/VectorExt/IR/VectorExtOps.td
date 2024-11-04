@@ -84,10 +84,10 @@ def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
     distributed vectors.
   }];
   let arguments = (ins
-    AnyVector:$input
+    AnyVectorOfAnyRank:$input
   );
   let results = (outs
-    AnyVector:$output
+    AnyVectorOfAnyRank:$output
   );
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
@@ -103,10 +103,10 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
     distributed vectors.
   }];
   let arguments = (ins
-    AnyVector:$input
+    AnyVectorOfAnyRank:$input
   );
   let results = (outs
-    AnyVector:$output
+    AnyVectorOfAnyRank:$output
   );
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
