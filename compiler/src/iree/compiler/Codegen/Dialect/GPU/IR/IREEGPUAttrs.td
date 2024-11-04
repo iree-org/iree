@@ -63,6 +63,8 @@ def IREEGPU_LoweringConfigAttr :
                           SmallVectorImpl<NamedAttribute> &attrs,
                           ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr kind);
 
+    // TODO: Merge subgroup counts functionality into subgroup tiling level
+    //       lowering, when we have it implemented.
     /// Helper to retrieve/set a target subgroup M/N counts.
     std::optional<int64_t> getSubgroupMCount() const;
     std::optional<int64_t> getSubgroupNCount() const;

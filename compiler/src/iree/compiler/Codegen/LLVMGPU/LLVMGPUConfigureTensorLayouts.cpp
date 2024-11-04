@@ -61,10 +61,7 @@ static int64_t getSubgroupMCount(Operation *op) {
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   assert(config && "Cannot find intrinsic from unconfigured op.");
 
-  std::optional<int64_t> subgroup_m_count = config.getSubgroupMCount();
-  assert(subgroup_m_count.has_value() &&
-         "Cannot find subgroup_m_count in lowering config.");
-  return subgroup_m_count.value();
+  return *config.getSubgroupMCount();
 }
 
 static int64_t getSubgroupNCount(Operation *op) {

@@ -886,9 +886,16 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
 
+  // On attention subgroup distribution:
+  // The subgroup distribution in attention is controlled by the second matmul
+  // (Parallel dimension distribution is usually (almost always) controlled by
+  // the last reduction operation in a dispatch). Since VectorDistribution
+  // doesn't have logic to set subgroup and thread layouts seperately, we
+  // explicitly set the subgroup count for the first matmul as well,
+  // corresponding to what the second matmul dictates.
+
   // Configuring for qk matmul.
-  // subgroup_n count for qk matmul is always 1, because it is the
-  // reduction dimension. The subgroup_n count is in reality, for the pvMatmul.
+  // subgroup_n count for qk matmul is always 1, since we do not tile K1.
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, qkConfig,
                                                         {0, 1});
   IREE::GPU::LoweringConfigAttr::setMmaKind(context, qkConfig,

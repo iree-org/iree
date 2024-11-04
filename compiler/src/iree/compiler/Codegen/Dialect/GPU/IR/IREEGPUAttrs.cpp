@@ -1624,6 +1624,8 @@ void LoweringConfigAttr::setMmaKind(MLIRContext *context,
   attrs.emplace_back(StringAttr::get(context, kMmaKindName), kind);
 }
 
+// TODO: Merge subgroup counts functionality into subgroup tiling level
+//       lowering, when we have it implemented.
 constexpr StringLiteral kSubgroupMCountName = "subgroup_m_count";
 constexpr StringLiteral kSubgroupNCountName = "subgroup_n_count";
 
@@ -1633,7 +1635,7 @@ std::optional<int64_t> LoweringConfigAttr::getSubgroupMCount() const {
   if (!subgroup_m_count_attr) {
     return std::nullopt;
   }
-  return std::make_optional(subgroup_m_count_attr.getInt());
+  return subgroup_m_count_attr.getInt();
 }
 
 std::optional<int64_t> LoweringConfigAttr::getSubgroupNCount() const {
