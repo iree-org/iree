@@ -145,7 +145,7 @@ util.func private @NarrowSplatPatternI64ToI16() -> !stream.resource<*> {
 util.func private @NarrowSplatPatternI64ToI32() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0xAABBCCDDAABBCCDD : i64
-  // CHECK: stream.tensor.splat %c12307677_i32
+  // CHECK: stream.tensor.splat %c-1430532899_i32
   %0 = stream.tensor.splat %pattern : i64 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
   util.return %0 : !stream.resource<*>
 }
