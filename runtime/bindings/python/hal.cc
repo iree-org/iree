@@ -1078,7 +1078,7 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 VmModule CreateHalModule(
     VmInstance* instance, std::optional<HalDevice*> device,
     std::optional<py::list> devices,
-    std::optional<nanobind::ref<HalModuleDebugSink>> debug_sink) {
+    std::optional<py::ref<HalModuleDebugSink>> debug_sink) {
   if (device && devices) {
     PyErr_SetString(
         PyExc_ValueError,
@@ -1164,7 +1164,7 @@ iree_status_t HalModuleDebugSink::IreeHalModuleBufferViewTrace(
   try {
     debug_sink->buffer_view_trace_callback_(std::string(key.data, key.size),
                                             buffer_views_vec);
-  } catch (const nanobind::python_error& e) {
+  } catch (const py::python_error& e) {
     return iree_make_status(IREE_STATUS_UNKNOWN, "%s", e.what());
   }
 
@@ -1177,13 +1177,13 @@ static int HalModuleDebugSinkTpTraverse(PyObject* self, visitproc visit,
 
   // Retrieve a pointer to the C++ instance associated with 'self'
   // (never fails)
-  HalModuleDebugSink* debug_sink = nanobind::inst_ptr<HalModuleDebugSink>(self);
+  HalModuleDebugSink* debug_sink = py::inst_ptr<HalModuleDebugSink>(self);
 
   // If debug_sink->GetHalModuleBufferViewTraceCallback() has an associated
   // CPython object, return it. If not, value.ptr() will equal NULL, which is
   // also fine.
-  nanobind::handle buffer_view_trace_callback =
-      nanobind::find(debug_sink->GetHalModuleBufferViewTraceCallback());
+  py::handle buffer_view_trace_callback =
+      py::find(debug_sink->GetHalModuleBufferViewTraceCallback());
 
   // Inform the Python GC about the instance.
   Py_VISIT(buffer_view_trace_callback.ptr());
@@ -1194,7 +1194,7 @@ static int HalModuleDebugSinkTpTraverse(PyObject* self, visitproc visit,
 int HalModuleDebugSinkTpClear(PyObject* self) {
   // Retrieve a pointer to the C++ instance associated with 'self'
   // (never fails)
-  HalModuleDebugSink* debug_sink = nanobind::inst_ptr<HalModuleDebugSink>(self);
+  HalModuleDebugSink* debug_sink = py::inst_ptr<HalModuleDebugSink>(self);
   debug_sink->GetHalModuleBufferViewTraceCallback() = nullptr;
 
   return 0;
@@ -1878,8 +1878,8 @@ void SetupHalBindings(nanobind::module_ m) {
       {Py_tp_clear, (void*)HalModuleDebugSinkTpClear},
       {0, nullptr}};
   py::class_<HalModuleDebugSink>(
-      m, "HalModuleDebugSink", nanobind::type_slots(debug_sink_slots),
-      nanobind::intrusive_ptr<HalModuleDebugSink>(
+      m, "HalModuleDebugSink", py::type_slots(debug_sink_slots),
+      py::intrusive_ptr<HalModuleDebugSink>(
           [](HalModuleDebugSink* debug_sink, PyObject* po) noexcept {
             debug_sink->set_self_py(po);
           }))

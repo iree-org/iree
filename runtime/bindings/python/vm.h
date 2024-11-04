@@ -157,9 +157,8 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
   }
 
   py::object get_stashed_flatbuffer_blob() { return stashed_flatbuffer_blob; }
-  void SetHalModuleDebugSink(
-      const nanobind::ref<HalModuleDebugSink>& debugSink);
-  const nanobind::ref<HalModuleDebugSink>& GetHalModuleDebugSink() const;
+  void SetHalModuleDebugSink(const py::ref<HalModuleDebugSink>& debugSink);
+  const py::ref<HalModuleDebugSink>& GetHalModuleDebugSink() const;
 
  private:
   // If the module was created from a FlatBuffer blob, we stash it here.
@@ -169,7 +168,7 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
   // vm module), we ensure that there are no dangling references when
   // that deallocator is called.
   py::object stashed_flatbuffer_blob = py::none();
-  nanobind::ref<HalModuleDebugSink> debug_sink;
+  py::ref<HalModuleDebugSink> debug_sink;
 };
 
 //------------------------------------------------------------------------------

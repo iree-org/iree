@@ -295,7 +295,7 @@ class HalCommandBuffer
 
 using HalModuleBufferViewTraceCallback =
     std::function<void(const std::string&, const std::vector<HalBufferView>&)>;
-class HalModuleDebugSink : public nanobind::intrusive_base {
+class HalModuleDebugSink : public py::intrusive_base {
  public:
   HalModuleDebugSink(
       HalModuleBufferViewTraceCallback buffer_view_trace_callback);

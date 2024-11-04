@@ -82,13 +82,13 @@ NB_MODULE(_runtime, m) {
 
   m.def("disable_leak_checker", []() { py::set_leak_warnings(false); });
 
-  nanobind::intrusive_init(
+  py::intrusive_init(
       [](PyObject *o) noexcept {
-        nanobind::gil_scoped_acquire guard;
+        py::gil_scoped_acquire guard;
         Py_INCREF(o);
       },
       [](PyObject *o) noexcept {
-        nanobind::gil_scoped_acquire guard;
+        py::gil_scoped_acquire guard;
         Py_DECREF(o);
       });
 }
