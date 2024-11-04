@@ -416,18 +416,17 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
+                                            mmaAttrs[schedule->index]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
+      context, attrs, schedule->mSubgroupCounts[0]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
+      context, attrs, schedule->nSubgroupCounts[0]);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  // Attach the MMA schedule as an attribute to the entry point export function
-  // for later access in the pipeline.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      context, mmaAttrs[schedule->index], schedule->mSubgroupCounts[0],
-      schedule->nSubgroupCounts[0]);
-  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
-                             scheduleAttr);
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
@@ -682,6 +681,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, attrs, {0, 1});
+  IREE::GPU::LoweringConfigAttr::setMmaKind(context, attrs,
+                                            mmaAttrs[schedule->index]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
+      context, attrs, schedule->mSubgroupCounts[0]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
+      context, attrs, schedule->nSubgroupCounts[0]);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -689,11 +694,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      context, mmaAttrs[schedule->index], schedule->mSubgroupCounts[0],
-      schedule->nSubgroupCounts[0]);
-  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
-                             scheduleAttr);
 
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
@@ -902,9 +902,32 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
 
+  // On attention subgroup distribution:
+  // The subgroup distribution in attention is controlled by the second matmul
+  // (Parallel dimension distribution is usually (almost always) controlled by
+  // the last reduction operation in a dispatch). Since VectorDistribution
+  // doesn't have logic to set subgroup and thread layouts seperately, we
+  // explicitly set the subgroup count for the first matmul as well,
+  // corresponding to what the second matmul dictates.
+
+  // Configuring for qk matmul.
+  // subgroup_n count for qk matmul is always 1, since we do not tile K1.
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, qkConfig,
                                                         {0, 1});
+  IREE::GPU::LoweringConfigAttr::setMmaKind(context, qkConfig,
+                                            mmaAttrs[schedule->index]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
+      context, qkConfig, schedule->mSubgroupCounts[0]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(context, qkConfig, 1);
+
+  // Configuring for pv matmul.
   IREE::GPU::LoweringConfigAttr::setPromotedOperandList(context, pvConfig, {1});
+  IREE::GPU::LoweringConfigAttr::setMmaKind(context, pvConfig,
+                                            mmaAttrs[schedule->index]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupMCount(
+      context, pvConfig, schedule->mSubgroupCounts[0]);
+  IREE::GPU::LoweringConfigAttr::setSubgroupNCount(
+      context, pvConfig, schedule->nSubgroupCounts[0]);
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
@@ -938,14 +961,7 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  // Attach the MMA schedule as an attribute to the entry point export function
-  // for later access in the pipeline.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      context, mmaAttrs[schedule->index], schedule->mSubgroupCounts[0],
-      schedule->nSubgroupCounts[0]);
-  pipelineAttrs.emplace_back(StringAttr::get(context, "mma_schedule"),
-                             scheduleAttr);
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
   // flag because there is a shared memory allocation the two matmuls, which

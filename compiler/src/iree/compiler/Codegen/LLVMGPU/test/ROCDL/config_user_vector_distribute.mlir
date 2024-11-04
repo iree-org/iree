@@ -11,12 +11,12 @@
 
 // OPT-OUT:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>
-// OPT-OUT-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 
 // OPT-IN:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>
-// OPT-IN-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1]}>
+#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
+                                    mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+                                    subgroup_m_count = 2, subgroup_n_count = 2}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -48,7 +48,6 @@ hal.executable public @main_0_dispatch_0 {
 
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
-          mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2>,
           gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>  // Disable the 'reduceSharedMemoryBankConflicts' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16
@@ -87,12 +86,12 @@ hal.executable public @main_0_dispatch_0 {
 
 // OPT-OUT:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>
-// OPT-OUT-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
 
 // OPT-IN:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>
-// OPT-IN-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1]}>
+#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
+                                    mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+                                    subgroup_m_count = 2, subgroup_n_count = 2}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -125,7 +124,6 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-IN:         scf.for
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
-          mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2>,
           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>  // enable the 'reorderWorkgroups' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16
@@ -163,8 +161,9 @@ hal.executable public @main_0_dispatch_0 {
 
 // OPT-OUT:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>
-// OPT-OUT-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1]}>
+#config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
+                                    mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+                                    subgroup_m_count = 2, subgroup_n_count = 2}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -186,7 +185,6 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-OUT-NEXT:    scf.for
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
-          mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2>,
           gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>  // Disable the 'reorderWorkgroups' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16

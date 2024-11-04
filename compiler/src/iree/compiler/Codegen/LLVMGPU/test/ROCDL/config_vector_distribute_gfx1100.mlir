@@ -6,9 +6,8 @@
 // located here.
 
 // WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// WMMA-SAME: mma_schedule = #iree_gpu.mma_schedule
-// WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
-// WMMA-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
+// WMMA-SAME: workgroup_size = [128, 1, 1]
+// WMMA-SAME: subgroup_size = 32
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -32,5 +31,8 @@ func.func @wmma_matmul_1024x1024x1024() {
 
 // WMMA-LABEL: func.func @wmma_matmul_1024x1024x1024()
 // WMMA: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// WMMA-SAME:                           mma_kind = #iree_gpu.mma_layout<WMMA_F32_16x16x16_F16>
 // WMMA-SAME:                           reduction =  [0, 0, 64]
+// WMMA-SAME:                           subgroup_m_count = 2
+// WMMA-SAME:                           subgroup_n_count = 2
 // WMMA-SAME:                           workgroup =  [64, 128, 0]

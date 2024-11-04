@@ -34,14 +34,13 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 }
 //      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64,
-// CHECK-SAME:     mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, subgroup_m_count = 2, subgroup_n_count = 2>
 //      CHECK: func @custom_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   ^bb
 //      CHECK:     linalg.matmul
-// CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], reduction = [0, 0, 32], workgroup = [64, 64, 0]}>
+// CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, promote_operands = [0, 1], reduction = [0, 0, 32], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [64, 64, 0]}>
 //      CHECK:   iree_linalg_ext.yield
 
 // -----
