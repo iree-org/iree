@@ -50,6 +50,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         module_op: Operation,
         module_cache: "onnx_importer.ModuleCache",
         numel_threshold: int,
+        params_scope: str,
     ):
         super().__init__(
             graph_info,
@@ -64,6 +65,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         self.symbol_table.insert(parent_op)
         self.numel_threshold = numel_threshold
         self.param_archive = rt.ParameterIndex()
+        self.params_scope = params_scope
 
     def sanitize_name(self, name: str) -> str:
         # There are often some initializers in the models that have no name
@@ -107,7 +109,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 "type": TypeAttr.get(vtensor_type),
             }
 
-            external_scope_attr = StringAttr.get("model")
+            external_scope_attr = StringAttr.get(self.params_scope)
             external_name_attr = StringAttr.get(name)
             ir_attrs["initial_value"] = Attribute.parse(
                 f"#stream.parameter.named<{external_scope_attr}::{external_name_attr}> : {vtensor_type}"
@@ -131,6 +133,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
         graph_info: onnx_importer.GraphInfo,
         module_op: Operation,
         numel_threshold: int,
+        params_scope: str,
         context_cache: Optional["onnx_importer.ContextCache"] = None,
         module_cache: Optional["onnx_importer.ModuleCache"] = None,
         private: bool = False,
@@ -173,6 +176,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             module_op=module_op,
             module_cache=mc,
             numel_threshold=numel_threshold,
+            params_scope=params_scope,
         )
         for node_name, input_value in zip(graph_info.input_map.keys(), block.arguments):
             imp._nv_map[node_name] = input_value

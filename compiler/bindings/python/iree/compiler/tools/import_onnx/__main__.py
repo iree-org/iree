@@ -33,7 +33,7 @@ def main(args: argparse.Namespace):
     imp: Any = None
     if args.externalize_params:
         imp = IREENodeImporter.define_function(
-            model_info.main_graph, m, args.numel_threshold
+            model_info.main_graph, m, args.num_elements_threshold, args.params_scope
         )
     else:
         imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
@@ -47,7 +47,7 @@ def main(args: argparse.Namespace):
         param_path = (
             (str(default_param_path) + "_params.irpa")
             if args.save_params_to is None
-            else args.save_params_to
+            else str(args.save_params_to)
         )
         imp.param_archive.create_archive_file(param_path)
 
@@ -146,7 +146,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         type=int,
     )
     parser.add_argument(
-        "--numel-threshold",
+        "--num-elements-threshold",
         help="Minimum number of elements for an initializer to be externalized. Only has an effect if 'externalize-params' is true.",
         type=int,
         default=100,
@@ -159,8 +159,16 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--save-params-to",
-        help="Location to save the externalized parameters. When not set, the parameters will be written to '<output_file_name>_params.irpa'.",
+        help="Location to save the externalized parameters. When not set, the parameters will be written to '<output_file_name>_params.irpa'"
+        " under the namespace 'model', which can be configured by passing the namespace string to 'params-scope'.",
         default=None,
+        type=Path,
+    )
+    parser.add_argument(
+        "--params-scope",
+        help="The namespace or the scope in which the externalized parameters are placed. Default is 'model'.",
+        type=str,
+        default="model",
     )
     args = parser.parse_args(argv)
     return args
