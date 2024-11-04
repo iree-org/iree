@@ -77,21 +77,22 @@ BUILD_REQUIREMENTS_TXT = os.path.join(
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
 
+# Setup and get version information.
+VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
+VERSION_INFO_RC_FILE = os.path.join(IREESRC_DIR, "version_info_rc.json")
+
 
 # Load version info.
-def load_version_info():
-    with open(os.path.join(IREESRC_DIR, "version_info.json"), "rt") as f:
+def load_version_info(version_file):
+    with open(version_file, "rt") as f:
         return json.load(f)
 
 
 try:
-    version_info = load_version_info()
+    version_info = load_version_info(VERSION_INFO_RC_FILE)
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults")
-    version_info = {
-        "package-version": "0.1dev1",
-        "package-suffix": "-dev",
-    }
+    print("version_info_rc.json not found. Default to dev build")
+    version_info = load_version_info(VERSION_INFO_FILE)
 
 
 def remove_cmake_cache():

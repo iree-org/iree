@@ -23,22 +23,22 @@ exe_suffix = ".exe" if platform.system() == "Windows" else ""
 
 # Setup and get version information.
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
-IREESRC_DIR = os.path.join(THIS_DIR, "..", "..", "..", "..")
-VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
+VERSION_INFO_FILE = os.path.join(THIS_DIR, "version_info.json")
+VERSION_INFO_RC_FILE = os.path.join(THIS_DIR, "version_info_rc.json")
 
 
-def load_version_info():
-    with open(VERSION_INFO_FILE, "rt") as f:
+def load_version_info(version_file):
+    with open(version_file, "rt") as f:
         return json.load(f)
 
 
 try:
-    version_info = load_version_info()
+    version_info = load_version_info(VERSION_INFO_RC_FILE)
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults")
-    version_info = {}
+    print("version_info_rc.json not found. Default to dev build")
+    version_info = load_version_info(VERSION_INFO_FILE)
 
-PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
+PACKAGE_SUFFIX = version_info.get("package-suffix")
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
 setup(

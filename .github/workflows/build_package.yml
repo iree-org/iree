@@ -21,7 +21,6 @@ on:
       package_version:
         description: "Version of the package"
         required: true
-        default: "0.1a1"
       release_id:
         description: "Release id to upload artifacts to"
         default: ""
@@ -131,29 +130,98 @@ jobs:
         if: "matrix.build-family != 'windows'"
         shell: bash
         run: |
-          cat << EOF > ./c/version_info.json
+          echo "meta package"
+          cat << EOF > ./c/version_info_rc.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
             "package-version": "${{ github.event.inputs.package_version }}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
-          cat ./c/version_info.json
+          cat ./c/version_info_rc.json
+
+          echo "iree-base-compiler"
+          cat << EOF > ./c/compiler/version_info_rc.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.compiler_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/compiler/version_info_rc.json
+
+          echo "iree-base-runtime"
+          cat << EOF > ./c/runtime/version_info_rc.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.runtime_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/runtime/version_info_rc.json
+
+          echo "iree-tools-tf"
+          cat << EOF > ./c/integrations/tensorflow/python_projects/iree_tf/version_info_rc.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.tf_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/integrations/tensorflow/python_projects/iree_tf/version_info_rc.json
+
+          echo "iree-tools-tflite"
+          cat << EOF > ./c/integrations/tensorflow/python_projects/iree_tflite/version_info_rc.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.tflite_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/integrations/tensorflow/python_projects/iree_tflite/version_info_rc.json
+
 
       - name: Write version info Windows (release)
         if: "matrix.build-family == 'windows'"
         shell: powershell
         run: |
           cd c
-          $verinfoprop = @{
+
+          $compilerverinfoprop = @{
             'package-suffix'= "${{ github.event.inputs.package_suffix }}"
-            'package-version'= "${{ github.event.inputs.package_version }}"
+            'package-version'= "${{ github.event.inputs.compiler_package_version }}"
             'iree-revision'= $(git rev-parse HEAD)
           }
-
-          $info = New-Object -TypeName PSObject -Prop $verinfoprop
+          $info = New-Object -TypeName PSObject -Prop $compilerverinfoprop
           $info = $info | ConvertTo-JSON
-          $info | Out-File "version_info.json" -Encoding "ASCII"
+          $info | Out-File "compiler/version_info.json" -Encoding "ASCII"
+
+          $runtimeverinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.runtime_package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+          $info = New-Object -TypeName PSObject -Prop $runtimeverinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "runtime/version_info.json" -Encoding "ASCII"
+
+          $tfverinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.tf_package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+          $info = New-Object -TypeName PSObject -Prop $tfverinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "integrations/tensorflow/python_projects/iree_tf/version_info.json" -Encoding "ASCII"
+
+          $tfliteverinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.tflite_package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+          $info = New-Object -TypeName PSObject -Prop $tfliteverinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "integrations/tensorflow/python_projects/iree_tflite/version_info.json" -Encoding "ASCII"
 
       ##########################################################################
       # Build the main distribution tarball.

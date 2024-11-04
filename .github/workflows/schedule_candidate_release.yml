@@ -37,10 +37,27 @@ jobs:
 
       - name: Compute version
         run: |
-          package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
+          # meta package + tag
+          package_version="$(python3 build_tools/gen_version_info_rc.py .)"
           tag_name="candidate-${package_version}"
           echo "package_version=${package_version}" >> $GITHUB_ENV
           echo "tag_name=${tag_name}" >> $GITHUB_ENV
+
+          # iree-base-compiler
+          compiler_package_version="$(python3 build_tools/gen_version_info_rc.py compiler)"
+          echo "compiler_package_version=${compiler_package_version}" >> $GITHUB_ENV
+
+          # iree-base-runtime
+          runtime_package_version="$(python3 build_tools/gen_version_info_rc.py runtime)"
+          echo "runtime_package_version=${runtime_package_version}" >> $GITHUB_ENV
+
+          # iree-base-tools-tf
+          tf_package_version="$(python3 build_tools/gen_version_info_rc.py integrations/tensorflow/python_projects/iree_tf)"
+          echo "tf_package_version=${tf_package_version}" >> $GITHUB_ENV
+
+          # iree-base-tools-tflite
+          tflite_package_version="$(python3 build_tools/gen_version_info_rc.py integrations/tensorflow/python_projects/iree_tflite)""
+          echo "tflite_package_version=${tflite_package_version}" >> $GITHUB_ENV
 
       - name: Updating candidate tag
         run: |
@@ -73,6 +90,10 @@ jobs:
             {
               "package_suffix": "",
               "package_version": "${{ env.package_version }}",
+              "compiler_package_version": "${{ env.compiler_package_version }}",
+              "runtime_package_version": "${{ env.runtime_package_version }}",
+              "tf_package_version": "${{ env.tf_package_version }}",
+              "tflite_package_version": "${{ env.tflite_package_version }}",
               "release_id": "${{ steps.create_release.outputs.id }}",
               "commit": "${{ steps.last_green_commit.outputs.release-commit }}"
             }

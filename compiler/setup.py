@@ -106,11 +106,12 @@ else:
     )
 
 # Setup and get version information.
-VERSION_INFO_FILE = os.path.join(IREE_SOURCE_DIR, "version_info.json")
+VERSION_INFO_FILE = os.path.join(IREE_SOURCE_DIR, "compiler/version_info.json")
+VERSION_INFO_RC_FILE = os.path.join(IREE_SOURCE_DIR, "compiler/version_info_rc.json")
 
 
-def load_version_info():
-    with open(VERSION_INFO_FILE, "rt") as f:
+def load_version_info(version_file):
+    with open(version_file, "rt") as f:
         return json.load(f)
 
 
@@ -147,16 +148,14 @@ def find_git_submodule_revision(submodule_path):
 
 
 try:
-    version_info = load_version_info()
+    version_info = load_version_info(VERSION_INFO_RC_FILE)
 except FileNotFoundError:
-    print("version_info.json not found. Using defaults", file=sys.stderr)
-    version_info = {}
+    print("version_info_rc.json not found. Default to dev build")
+    version_info = load_version_info(VERSION_INFO_FILE)
 git_versions = find_git_versions()
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version")
-if not PACKAGE_VERSION:
-    PACKAGE_VERSION = f"0.dev0+{git_versions.get('IREE') or '0'}"
 
 
 def get_cmake_version_info_args():
