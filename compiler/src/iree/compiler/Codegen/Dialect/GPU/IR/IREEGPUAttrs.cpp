@@ -1644,7 +1644,7 @@ std::optional<int64_t> LoweringConfigAttr::getSubgroupNCount() const {
   if (!subgroup_n_count_attr) {
     return std::nullopt;
   }
-  return std::make_optional(subgroup_n_count_attr.getInt());
+  return subgroup_n_count_attr.getInt();
 }
 
 void LoweringConfigAttr::setSubgroupMCount(
