@@ -26,8 +26,6 @@ concurrency:
       env:
         BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
     steps:
-      - name: "Run Docker container with more storage"
-        run: docker run --storage-opt size=100GB ghcr.io/eliasj42/arc-windows-runner:latest
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
