@@ -23,8 +23,8 @@ concurrency:
 jobs:
   windows_x64_msvc:
     runs-on: arc-runner-set
-      env:
-        BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
+    env:
+      BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
     steps:
       - name: "Run Docker container with more storage"
         run: docker run --storage-opt size=100GB ghcr.io/eliasj42/arc-windows-runner:latest
