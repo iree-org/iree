@@ -209,7 +209,8 @@ struct MakeEncodingSolvablePass
       });
 
       IRRewriter rewriter(ctx);
-      DenseMap<std::pair<AffinityAttr, ArrayAttr>, Stream::ExecutableOp>
+      DenseMap<std::tuple<AffinityAttr, ArrayAttr, Stream::ExecutableExportOp>,
+               Stream::ExecutableOp>
           dispatchSiteToExecutable;
       for (auto [exportOp, vec] : exportDispatchSites) {
         if (vec.size() == 1) {
@@ -230,7 +231,8 @@ struct MakeEncodingSolvablePass
               executableOp.getRegion().cloneInto(&dupOp.getRegion(), mapping);
             });
           }
-          dispatchSiteToExecutable[it] = dupOp;
+          dispatchSiteToExecutable[std::make_tuple(
+              std::get<0>(it), std::get<1>(it), exportOp)] = dupOp;
           dupId++;
         }
       }
@@ -242,18 +244,13 @@ struct MakeEncodingSolvablePass
 
         SmallVector<Attribute> operandAttrs =
             operandsResourceAffinities[dispatchOp];
-        auto info =
-            std::make_pair(affinities[0], ArrayAttr::get(ctx, operandAttrs));
-
         SymbolRefAttr entryPoint =
             *dispatchOp.getEntryPoints().getAsRange<SymbolRefAttr>().begin();
-        LLVM_DEBUG({
-          auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
-              symbolTable.lookupSymbolIn(moduleOp, entryPoint));
-          if (exportDispatchSites[exportOp].count(info)) {
-            llvm::dbgs() << "found it!!\n";
-          }
-        });
+        auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+            symbolTable.lookupSymbolIn(moduleOp, entryPoint));
+
+        auto info = std::make_tuple(
+            affinities[0], ArrayAttr::get(ctx, operandAttrs), exportOp);
 
         if (!dispatchSiteToExecutable.count(info)) {
           LLVM_DEBUG(llvm::dbgs() << "not found, skip\n");
