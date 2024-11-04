@@ -57,7 +57,7 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
   case SanitizerKind::kAddress: {
     passBuilder.registerOptimizerLastEPCallback(
         [](llvm::ModulePassManager &modulePassManager,
-           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase LTOPhase) {
+           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase) {
           llvm::AddressSanitizerOptions opts;
           // Can use Never or Always, just not the default Runtime, which
           // introduces a reference to
@@ -74,7 +74,7 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
   case SanitizerKind::kThread: {
     passBuilder.registerOptimizerLastEPCallback(
         [](llvm::ModulePassManager &modulePassManager,
-           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase LTOPhase) {
+           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase) {
           modulePassManager.addPass(llvm::ModuleThreadSanitizerPass());
           modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(
               llvm::ThreadSanitizerPass()));
