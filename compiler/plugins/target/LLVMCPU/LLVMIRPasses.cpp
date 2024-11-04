@@ -13,6 +13,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CodeGen.h"
@@ -56,7 +57,7 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
   case SanitizerKind::kAddress: {
     passBuilder.registerOptimizerLastEPCallback(
         [](llvm::ModulePassManager &modulePassManager,
-           llvm::OptimizationLevel Level) {
+           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase LTOPhase) {
           llvm::AddressSanitizerOptions opts;
           // Can use Never or Always, just not the default Runtime, which
           // introduces a reference to
@@ -73,7 +74,7 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
   case SanitizerKind::kThread: {
     passBuilder.registerOptimizerLastEPCallback(
         [](llvm::ModulePassManager &modulePassManager,
-           llvm::OptimizationLevel Level) {
+           llvm::OptimizationLevel Level, llvm::ThinOrFullLTOPhase LTOPhase) {
           modulePassManager.addPass(llvm::ModuleThreadSanitizerPass());
           modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(
               llvm::ThreadSanitizerPass()));
