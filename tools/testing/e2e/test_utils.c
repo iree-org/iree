@@ -50,7 +50,7 @@ int32_t iree_test_utils_max_elements_to_check(void) {
   return FLAG_max_elements_to_check;
 }
 
-const char* iree_test_utils_emoji(bool good) { return good ? "🦄" : "🐞"; }
+const char* iree_test_utils_emoji(bool good) { return good ? "🦄" : "🎃"; }
 
 int iree_test_utils_calculate_check_every(iree_hal_dim_t tot_elements,
                                           iree_hal_dim_t no_div_of) {
@@ -173,9 +173,13 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
   return iree_test_utils_value_make_none();
 }
 
+// Important: print all floating point values to FULL precision.
+// The audience is debugging low-level numerical bugs.
+// Since the values used in most tests are small and integral, these will
+// normally print just as concisely, while the extra precision requested here
+// will only kick in when it's needed, when there is a numerical bug.
 int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
-                                   iree_test_utils_e2e_value_t value,
-                                   precision_t precision) {
+                                   iree_test_utils_e2e_value_t value) {
   switch (value.type) {
     case IREE_TEST_UTILS_VALUE_TYPE_I8:
       return snprintf(buf, bufsize, "%" PRIi8, value.i8);
@@ -186,36 +190,27 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
     case IREE_TEST_UTILS_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
     case IREE_TEST_UTILS_VALUE_TYPE_F8E5M2:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.3g" : "%.2g",
+      return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e5m2_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F8E4M3:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.3g" : "%.2g",
+      return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e4m3_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F8E5M2FNUZ:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.3g" : "%.2g",
+      return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e5m2fnuz_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F8E4M3FNUZ:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.3g" : "%.2g",
+      return snprintf(buf, bufsize, "%.3g",
                       iree_math_f8e4m3fnuz_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
+      return snprintf(buf, bufsize, "%.5g",
                       iree_math_f16_to_f32(value.f16_u16));
     case IREE_TEST_UTILS_VALUE_TYPE_BF16:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
+      return snprintf(buf, bufsize, "%.5g",
                       iree_math_bf16_to_f32(value.bf16_u16));
     case IREE_TEST_UTILS_VALUE_TYPE_F32:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.8g" : "%.4g", value.f32);
+      return snprintf(buf, bufsize, "%.8g", value.f32);
     case IREE_TEST_UTILS_VALUE_TYPE_F64:
-      return snprintf(buf, bufsize,
-                      precision == PRECISION_HIGH ? "%.16g" : "%.4g",
-                      value.f64);
+      return snprintf(buf, bufsize, "%.16g", value.f64);
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                          "unhandled value type"));

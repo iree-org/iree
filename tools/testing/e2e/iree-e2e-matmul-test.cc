@@ -413,10 +413,9 @@ static void matmul_results_deinitialize(matmul_results_t* results) {
 }
 
 // Returns the largest number of characters to print any matrix element.
-static int get_max_elem_width(precision_t precision, iree_hal_dim_t rows,
-                              iree_hal_dim_t row_start, iree_hal_dim_t row_end,
-                              iree_hal_dim_t cols, iree_hal_dim_t col_start,
-                              iree_hal_dim_t col_end,
+static int get_max_elem_width(iree_hal_dim_t rows, iree_hal_dim_t row_start,
+                              iree_hal_dim_t row_end, iree_hal_dim_t cols,
+                              iree_hal_dim_t col_start, iree_hal_dim_t col_end,
                               iree_hal_element_type_t element_type,
                               const uint8_t* matrix) {
   int max_elem_width = 0;
@@ -428,7 +427,7 @@ static int get_max_elem_width(precision_t precision, iree_hal_dim_t rows,
       // NOTE: iree_max is a macro and may evaluate its args twice.
       char buf[64];
       int this_elem_width =
-          iree_test_utils_snprintf_value(buf, sizeof(buf), elem, precision);
+          iree_test_utils_snprintf_value(buf, sizeof(buf), elem);
       max_elem_width = iree_max(max_elem_width, this_elem_width);
     }
   }
@@ -436,7 +435,6 @@ static int get_max_elem_width(precision_t precision, iree_hal_dim_t rows,
 }
 
 // Prints |matrix| to |file|, with |label| as caption.
-// |precision| controls how many decimals are printed for float values.
 //
 // If |other_matrix| is not NULL, then any matrix entries that disagree
 // between |matrix| and |other_matrix| (according to
@@ -453,22 +451,21 @@ static int get_max_elem_width(precision_t precision, iree_hal_dim_t rows,
 // characters. According to
 // https://www.unicode.org/reports/tr11/#Recommendations, a single emoji
 // character should meet that requirement.
-static void print_matrix(FILE* file, const char* label, precision_t precision,
-                         iree_hal_dim_t rows, iree_hal_dim_t row_start,
-                         iree_hal_dim_t row_end, iree_hal_dim_t cols,
-                         iree_hal_dim_t col_start, iree_hal_dim_t col_end,
+static void print_matrix(FILE* file, const char* label, iree_hal_dim_t rows,
+                         iree_hal_dim_t row_start, iree_hal_dim_t row_end,
+                         iree_hal_dim_t cols, iree_hal_dim_t col_start,
+                         iree_hal_dim_t col_end,
                          iree_hal_element_type_t element_type,
                          const uint8_t* matrix, const uint8_t* other_matrix,
                          const char* highlight) {
   IREE_ASSERT((other_matrix == NULL) == (highlight == NULL));
-  int max_elem_width =
-      get_max_elem_width(precision, rows, row_start, row_end, cols, col_start,
-                         col_end, element_type, matrix);
+  int max_elem_width = get_max_elem_width(
+      rows, row_start, row_end, cols, col_start, col_end, element_type, matrix);
   if (other_matrix) {
     // NOTE: iree_max is a macro and may evaluate its args twice.
     int other_matrix_max_elem_width =
-        get_max_elem_width(precision, rows, row_start, row_end, cols, col_start,
-                           col_end, element_type, other_matrix);
+        get_max_elem_width(rows, row_start, row_end, cols, col_start, col_end,
+                           element_type, other_matrix);
     max_elem_width = iree_max(max_elem_width, other_matrix_max_elem_width);
   }
 
@@ -491,7 +488,7 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
             !iree_test_utils_result_elements_agree(element, other_element);
       }
       char buf[64];
-      iree_test_utils_snprintf_value(buf, sizeof(buf), element, precision);
+      iree_test_utils_snprintf_value(buf, sizeof(buf), element);
       fprintf(file, "%*s", max_elem_width, buf);
       // See comment on |highlight| function parameter for why 2 spaces.
       // A 3rd space is added unconditionally to make it clear that a highlight
@@ -525,13 +522,13 @@ static iree_status_t check_matmul_failure(
   char actual_value_buf[32];
   char expected_value_buf[32];
   iree_test_utils_snprintf_value(actual_value_buf, sizeof(actual_value_buf),
-                                 actual_value, PRECISION_HIGH);
+                                 actual_value);
   iree_test_utils_snprintf_value(expected_value_buf, sizeof(expected_value_buf),
-                                 expected_value, PRECISION_HIGH);
+                                 expected_value);
   fprintf(file, "actual value: %s\n", actual_value_buf);
   fprintf(file, "expected value: %s\n", expected_value_buf);
 
-  iree_hal_dim_t context = 8;
+  iree_hal_dim_t context = 16;
   const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
   if (context_env) {
     if (1 != sscanf(context_env, "%" PRIdim, &context)) {
@@ -542,39 +539,36 @@ static iree_status_t check_matmul_failure(
     }
   }
   iree_hal_dim_t m_start =
-      (iree_hal_dim_t)iree_max(0, (int64_t)row - (int64_t)context);
-  iree_hal_dim_t m_end = iree_min(results->m, row + context);
+      (iree_hal_dim_t)iree_max(0, (int64_t)row - (int64_t)context / 2);
+  iree_hal_dim_t m_end = iree_min(results->m, m_start + context);
   iree_hal_dim_t n_start =
-      (iree_hal_dim_t)iree_max(0, (int64_t)col - (int64_t)context);
-  iree_hal_dim_t n_end = iree_min(results->n, col + context);
+      (iree_hal_dim_t)iree_max(0, (int64_t)col - (int64_t)context / 2);
+  iree_hal_dim_t n_end = iree_min(results->n, n_start + context);
   iree_hal_dim_t k_start = 0;
-  iree_hal_dim_t k_end = iree_min(results->k, 2 * context);
-  // [k_start, k_end) could be arbitrarily long at this point. Constrain it a
-  // bit to avoid huge output.
-  k_end = iree_min(k_end, k_start + 4 * context);
+  iree_hal_dim_t k_end = iree_min(results->k, context);
 
   fprintf(file, "\n");
-  print_matrix(file, "left-hand side", PRECISION_LOW, results->m, m_start,
-               m_end, results->k, k_start, k_end, results->lhs_type,
-               results->lhs_contents.data, NULL, NULL);
+  print_matrix(file, "left-hand side", results->m, m_start, m_end, results->k,
+               k_start, k_end, results->lhs_type, results->lhs_contents.data,
+               NULL, NULL);
   fprintf(file, "\n");
-  print_matrix(file, "right-hand side", PRECISION_LOW, results->k, k_start,
-               k_end, results->n, n_start, n_end, results->rhs_type,
-               results->rhs_contents.data, NULL, NULL);
+  print_matrix(file, "right-hand side", results->k, k_start, k_end, results->n,
+               n_start, n_end, results->rhs_type, results->rhs_contents.data,
+               NULL, NULL);
   fprintf(file, "\n");
   if (results->acc_contents.data) {
-    print_matrix(file, "input accumulator", PRECISION_LOW, results->m, m_start,
-                 m_end, results->n, n_start, n_end, results->acc_type,
+    print_matrix(file, "input accumulator", results->m, m_start, m_end,
+                 results->n, n_start, n_end, results->acc_type,
                  results->acc_contents.data, NULL, NULL);
     fprintf(file, "\n");
   }
-  print_matrix(file, "expected result", PRECISION_LOW, results->m, m_start,
-               m_end, results->n, n_start, n_end, results->result_type,
+  print_matrix(file, "expected result", results->m, m_start, m_end, results->n,
+               n_start, n_end, results->result_type,
                results->expected_contents.data, results->actual_contents.data,
                iree_test_utils_emoji(true));
   fprintf(file, "\n");
-  print_matrix(file, "actual result", PRECISION_LOW, results->m, m_start, m_end,
-               results->n, n_start, n_end, results->result_type,
+  print_matrix(file, "actual result", results->m, m_start, m_end, results->n,
+               n_start, n_end, results->result_type,
                results->actual_contents.data, results->expected_contents.data,
                iree_test_utils_emoji(false));
   fprintf(file, "\n");
