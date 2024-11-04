@@ -914,3 +914,108 @@ hal.executable public @main {
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //  CHECK-NEXT:   return
+
+// -----
+
+#layout = #hal.pipeline.layout<
+  bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, ReadOnly>,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+
+hal.executable public @main {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @elemwise_reduction_elemwise ordinal(0) layout(#layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @elemwise_reduction_elemwise() attributes {
+        translation_info = #iree_codegen.translation_info<LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+      } {
+        %cst_3 = arith.constant 3.0 : f32
+        %cst_4 = arith.constant 4.0 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xi8>>
+        %1 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32xi8>>
+        %2 = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xf32>>
+        %3 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %4 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %5 = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x16xf32>>
+        %6 = hal.interface.binding.subspan layout(#layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !flow.dispatch.tensor<writeonly:tensor<32x16x9x9xi8>>
+        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xi8>> -> tensor<32x16x9x9xi8>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xi8>> -> tensor<32xi8>
+        %9 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16x9x9xf32>> -> tensor<32x16x9x9xf32>
+        %10 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %11 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %12 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [32, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x16xf32>> -> tensor<32x16xf32>
+        %13 = tensor.empty() : tensor<32x16x9x9xi8>
+        %14 = tensor.empty() : tensor<32xf32>
+        %15 = tensor.empty() : tensor<32x16x9x9xf32>
+        %16 = linalg.fill ins(%cst_4 : f32) outs(%14 : tensor<32xf32>) -> tensor<32xf32>
+        %17 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+            ], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+            ins(%7 : tensor<32x16x9x9xi8>) outs(%15 : tensor<32x16x9x9xf32>) {
+        ^bb0(%in: i8, %out: f32):
+          %20 = arith.extsi %in : i8 to i32
+          %21 = arith.sitofp %20 : i32 to f32
+          %22 = arith.mulf %21, %cst_3 : f32
+          linalg.yield %22 : f32
+        } -> tensor<32x16x9x9xf32>
+        %18 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>
+          ], iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
+          ins(%17, %8 : tensor<32x16x9x9xf32>, tensor<32xi8>) outs(%16 : tensor<32xf32>)
+          attrs =  {lowering_config = #iree_gpu.lowering_config<{
+            reduction = [0, 1, 3, 3], thread = [1, 0, 0, 0], workgroup = [32, 0, 0, 0]}>} {
+        ^bb0(%in: f32, %in_14: i8, %out: f32):
+          %41 = arith.sitofp %in_14 : i8 to f32
+          %42 = arith.addf %in, %41 : f32
+          %43 = arith.mulf %42, %out : f32
+          linalg.yield %43 : f32
+        } -> tensor<32xf32>
+        %19 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+          ins(%9, %10, %18, %11, %12 : tensor<32x16x9x9xf32>, tensor<32x16xf32>, tensor<32xf32>, tensor<32x16xf32>, tensor<32x16xf32>)
+          outs(%13 : tensor<32x16x9x9xi8>) {
+        ^bb0(%in: f32, %in_14: f32, %in_15: f32, %in_16: f32, %in_17: f32, %out: i8):
+          %45 = arith.addf %in, %in_14 : f32
+          %46 = arith.addf %45, %in_15 : f32
+          %47 = arith.addf %46, %in_16 : f32
+          %48 = arith.addf %47, %in_17 : f32
+          %49 = arith.fptosi %48 : f32 to i8
+          linalg.yield %49 : i8
+        } -> tensor<32x16x9x9xi8>
+        flow.dispatch.tensor.store %19, %6, offsets = [0, 0, 0, 0], sizes = [32, 16, 9, 9], strides = [1, 1, 1, 1]
+          : tensor<32x16x9x9xi8> -> !flow.dispatch.tensor<writeonly:tensor<32x16x9x9xi8>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @elemwise_reduction_elemwise
+//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1 {{.*}} -> (vector<1xf32>)
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//       CHECK:         %[[REDUCE:.+]] = vector.multi_reduction
+//       CHECK:         scf.yield %[[REDUCE]]
+
+//       CHECK:   scf.for %{{.*}} = %{{.*}} to %c16 step %c1
+//       CHECK:     scf.for
+// CHECK-COUNT-4:     arith.addf {{.*}} : vector<9xf32>
+//       CHECK:       vector.transfer_write {{.*}} vector<9xi8>, memref<32x16x9x9xi8, #hal.descriptor_type<storage_buffer>>
