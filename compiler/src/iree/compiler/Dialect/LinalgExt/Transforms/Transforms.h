@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -38,5 +39,11 @@ FailureOr<CollapseResult>
 collapseOpIterationDims(AttentionOp op,
                         ArrayRef<ReassociationIndices> foldedIterationDims,
                         RewriterBase &rewriter);
+
+// Rewrite input rfft op (dialect-agnostic) into linalg_ext.fft. Return real
+// and imaginary tensor values.
+std::tuple<LogicalResult, Value, Value>
+rewriteFft(Operation *op, Value operand, int64_t fftLength,
+           ConversionPatternRewriter &rewriter);
 
 }; // namespace mlir::iree_compiler::IREE::LinalgExt

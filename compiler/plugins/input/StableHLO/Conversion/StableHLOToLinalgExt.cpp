@@ -21,6 +21,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -296,125 +298,25 @@ struct ScatterOpConversion final
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  static Value getBitReversalBuffer(ImplicitLocOpBuilder &b, int fftLength) {
-    SmallVector<Attribute> values;
-    int logn = std::log(fftLength) / std::log(2);
-    for (int i = 0; i < fftLength; ++i) {
-      int r = 0;
-      for (int j = 0; j < logn; ++j) {
-        r |= ((i >> j) & 1) << (logn - j - 1);
-      }
-      values.push_back(b.getI32IntegerAttr(r));
-    }
-    auto type = RankedTensorType::get({fftLength}, b.getI32Type());
-    return b.create<arith::ConstantOp>(type,
-                                       DenseIntElementsAttr::get(type, values));
-  }
-
-  static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
-                                                Value real, int fftLength) {
-    auto realType = llvm::cast<ShapedType>(real.getType());
-    auto rank = realType.getRank();
-
-    SmallVector<OpFoldResult> mixedSizes =
-        tensor::getMixedSizes(b, b.getLoc(), real);
-    Value emptyTensor =
-        b.create<tensor::EmptyOp>(mixedSizes, realType.getElementType());
-
-    SmallVector<AffineMap> maps;
-    maps.push_back(
-        AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
-    maps.push_back(b.getMultiDimIdentityMap(rank));
-    SmallVector<utils::IteratorType> iterTypes(rank,
-                                               utils::IteratorType::parallel);
-
-    Value indices = getBitReversalBuffer(b, fftLength);
-    auto genericOp = b.create<linalg::GenericOp>(
-        TypeRange{realType}, indices, emptyTensor, maps, iterTypes,
-        [&](OpBuilder &b, Location loc, ValueRange args) {
-          SmallVector<Value> ivs;
-          for (auto i : llvm::seq<unsigned>(0, rank - 1)) {
-            ivs.push_back(b.create<linalg::IndexOp>(loc, i));
-          }
-          ivs.push_back(
-              b.create<arith::IndexCastOp>(loc, b.getIndexType(), args[0]));
-          b.create<linalg::YieldOp>(
-              loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
-        });
-    return {genericOp.getResult(0),
-            b.create<arith::ConstantOp>(
-                realType,
-                DenseFPElementsAttr::get(
-                    realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
-  }
-
-  static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
-                                              int stage) {
-    constexpr std::complex<double> kI(0, 1);
-    int m = 1 << stage;
-    int mh = m >> 1;
-    SmallVector<Attribute> real, imag;
-    for (auto i : llvm::seq<unsigned>(0, mh)) {
-      auto v = std::exp(-2 * M_PI * i / m * kI);
-      real.push_back(b.getF32FloatAttr(v.real()));
-      imag.push_back(b.getF32FloatAttr(v.imag()));
-    }
-    auto type = RankedTensorType::get({mh}, b.getF32Type());
-    return {
-        b.create<arith::ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
-        b.create<arith::ConstantOp>(type,
-                                    DenseFPElementsAttr::get(type, imag))};
-  }
-
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle 2^n fft length.
-    auto operandType =
-        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
-    if (!operandType || !operandType.hasStaticShape()) {
-      return failure();
-    }
     if (!llvm::all_equal(op.getFftLength())) {
       return rewriter.notifyMatchFailure(op, "non-splat length");
     }
-    int fftLength = op.getFftLength().front();
+    int64_t fftLength = op.getFftLength().front();
     if (fftLength & (fftLength - 1)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
     }
 
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    // Skip else getBitReversalOrder produces invalid dense elements attr.
-    if (isa<ComplexType>(getElementTypeOrSelf(adaptor.getOperand().getType())))
-      return rewriter.notifyMatchFailure(op, "expected real types");
-
-    SmallVector<Value> results =
-        getBitReversalOrder(b, adaptor.getOperand(), fftLength);
-    int lognPlus1 = std::log(fftLength) / std::log(2) + 1;
-    for (auto s : llvm::seq<unsigned>(1, lognPlus1)) {
-      SmallVector<Value> inputs;
-      inputs.push_back(b.create<arith::ConstantIndexOp>(s));
-      inputs.append(getCoeffConstants(b, s));
-      auto fft = b.create<IREE::LinalgExt::FftOp>(
-          TypeRange{results[0].getType(), results[1].getType()}, inputs,
-          results);
-      results = fft.getResults();
+    auto [res, real, imag] = IREE::LinalgExt::rewriteFft(
+        op, adaptor.getOperand(), fftLength, rewriter);
+    if (res.failed()) {
+      return failure();
     }
 
-    SmallVector<int64_t> shape(operandType.getShape().begin(),
-                               operandType.getShape().end());
-    shape.back() = fftLength / 2 + 1;
-    auto ty = RankedTensorType::get(shape, operandType.getElementType());
-    SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
-    SmallVector<OpFoldResult> sizes =
-        tensor::getMixedSizes(b, b.getLoc(), adaptor.getOperand());
-    sizes.back() = b.getIndexAttr(shape.back());
-    auto real = b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes,
-                                                 strides);
-    auto imag = b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes,
-                                                 strides);
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
                                                             real, imag);
     return success();
