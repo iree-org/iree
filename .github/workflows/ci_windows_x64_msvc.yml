@@ -24,7 +24,7 @@ jobs:
   windows_x64_msvc:
     runs-on: arc-runner-set
     env:
-      BASE_BUILD_DIR_POWERSHELL: C:\mnt\az\b
+      BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
