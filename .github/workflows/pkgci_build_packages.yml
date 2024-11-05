@@ -46,7 +46,7 @@ jobs:
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${{ inputs.package_version }}",
-            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
           realpath version_info.json
@@ -57,7 +57,7 @@ jobs:
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${compiler_package_version}",
-            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
 
@@ -66,7 +66,7 @@ jobs:
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${runtime_package_version}",
-            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
 
