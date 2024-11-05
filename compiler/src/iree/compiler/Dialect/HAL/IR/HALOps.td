@@ -1851,6 +1851,138 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
   let hasVerifier = 1;
 }
 
+def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill"> {
+  let summary = [{fills a buffer with a repeating pattern}];
+  let description = [{
+    The target buffer must be visible to the device queue performing the update.
+    In most cases the queue affinity should be set to where the target buffer
+    will be consumed so that it has a chance of being cached.
+
+    Note that individual queue transfer operations have a high overhead and they
+    should be batched with other operations in command buffers.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_Buffer:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    HAL_FillPatternType:$pattern,
+    I64Attr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    `pattern` `(` $pattern `:` type($pattern) `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update"> {
+  let summary = [{updates a buffer with the contents of a host buffer}];
+  let description = [{
+    The provided host source buffer will be captured and need not remain live or
+    unchanged while the operation is queued. The target buffer must be visible
+    to the device queue performing the update. In most cases the queue affinity
+    should be set to where the target buffer will be consumed so that it has a
+    chance of being cached.
+
+    Some implementations may have limits on the size of the update or may
+    perform poorly if the size is larger than an implementation-defined limit.
+    Updates should be kept as small and infrequent as possible.
+
+    Note that individual queue transfer operations have a high overhead and they
+    should be batched with other operations in command buffers.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    Util_BufferType:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    HAL_Buffer:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    I64Attr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `source` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy"> {
+  let summary = [{copies one device-visible buffer to another}];
+  let description = [{
+    The source buffer and target buffer must both be visible to the device
+    queue performing the copy. In most cases the queue affinity should be set to
+    where the target buffer will be consumed so that it has a chance of being
+    cached. The source buffer must have transfer-source usage and the target
+    buffer must have transfer-target usage.
+
+    Note that individual queue transfer operations have a high overhead and they
+    should be batched with other operations in command buffers.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_Buffer:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    HAL_Buffer:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    I64Attr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `source` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasVerifier = 1;
+}
+
 def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read"> {
   let summary = [{reads a segment from a file into a device buffer}];
   let description = [{
