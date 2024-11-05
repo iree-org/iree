@@ -24,24 +24,20 @@ jobs:
   windows_x64_msvc:
     runs-on: arc-runner-set
     env:
-      BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
+      BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\build-windows
     steps:
-      - name: "Run Docker container with more storage"
-        run: docker run --storage-opt size=100GB ghcr.io/eliasj42/arc-windows-runner:latest
       - name: "Checking out repository"
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
-      - name: "Clean up build dir" # build directory is currently persistent and stored in C:\mnt\azure\build-windows
+      - name: "Create build dir" # build directory is currently persistent and stored in C:\mnt\azure\build-windows
         run: |
-          if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
+          $currentTime = (Get-Date).ToString('yyyyMMddHHmmss')
+          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currestTime"
+          echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
           mkdir "$Env:BUILD_DIR_POWERSHELL"
-      - name: "Check all avaliable space"
-        run: |
-          Get-PSDrive
-          fsutil volume diskfree C:\mnt\azure
-          fsutil volume diskfree C:
-          fsutil volume diskfree C:\home
+          $bashBuildDir = $buildDir -replace '\\', '/', -replace '^C:', '/c'
+          echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
       - name: "Setting up Python"
         uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
         with:
@@ -62,8 +58,9 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
-        run: bash ./build_tools/cmake/build_all.sh "/c/mnt/azure/build-windows"
+        run: bash ./build_tools/cmake/build_all.sh "$BUILD_DIR_BASH"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh "/c/mnt/azure/build-windows"
+        run: bash ./build_tools/cmake/ctest_all.sh "$BUILD_DIR_BASH"
       - name: "Clean up build dir"
-        run: Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force
+        if: always()
+        run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
