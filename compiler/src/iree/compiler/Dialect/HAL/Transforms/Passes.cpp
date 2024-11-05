@@ -139,6 +139,15 @@ static llvm::cl::list<std::string> clPreprocessExecutablesWith{
         "will fail compilation."),
 };
 
+static llvm::cl::opt<bool> clDebugDisableLinkExecutables{
+    "iree-hal-debug-disable-link-executables",
+    llvm::cl::desc(
+        "Disables linking of executables. This allows inspecting serialization "
+        "of each executable in isolation and will dump a single binary per "
+        "executable when used in conjunction with "
+        "`--iree-hal-dump-executable-binaries-to`."),
+};
+
 } // namespace
 
 using FunctionLikeNest =
@@ -475,7 +484,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // example, the LLVM AOT backend may combine all executable targets for the
   // same architecture into a single executable and link it as a shared
   // library.
-  if (transformOptions.linkExecutables) {
+  if (transformOptions.linkExecutables && !clDebugDisableLinkExecutables) {
     passManager.addPass(IREE::HAL::createLinkExecutablesPass({targetRegistry}));
   }
 
