@@ -190,7 +190,7 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
       -> tensor<?x?xf32, #encoding_result>
   %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #encoding_lhs>, tensor<?x?xf32, #encoding_rhs>)
       outs(%3 : tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result>
-  %5 = iree_encoding.unset_encoding %4 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>
+  %5 = iree_encoding.unset_encoding %4 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%d0, %d1}
   return %5 : tensor<?x?xf32>
 }
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1706,6 +1706,10 @@ func.func @matmul_lowering_i8i4i32_aarch64_i8mm() attributes {
 func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {cpu_features = "+sve", target_triple="aarch64-xyz-xyz"}>
 } {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %M = tensor.dim %acc, %c0 : tensor<?x?xf32>
+  %N = tensor.dim %acc, %c1 : tensor<?x?xf32>
   %0 = iree_encoding.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
   %1 = iree_encoding.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
   %2 = iree_encoding.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
@@ -1714,7 +1718,7 @@ func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs: tensor<?x?xf32>, %rhs: te
                    tensor<?x?xf32, #encoding_rhs>)
       outs(%2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>
+  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
   return %4 : tensor<?x?xf32>
 }
 
@@ -1734,6 +1738,10 @@ func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs: tensor<?x?xf32>, %rhs: te
 func.func @matmul_lowering_f32f32f32_riscv(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="riscv32-xyz-xyz"}>
 } {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %M = tensor.dim %acc, %c0 : tensor<?x?xf32>
+  %N = tensor.dim %acc, %c1 : tensor<?x?xf32>
   %0 = iree_encoding.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
   %1 = iree_encoding.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
   %2 = iree_encoding.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
@@ -1742,7 +1750,7 @@ func.func @matmul_lowering_f32f32f32_riscv(%lhs: tensor<?x?xf32>, %rhs: tensor<?
                    tensor<?x?xf32, #encoding_rhs>)
       outs(%2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>
+  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
   return %4 : tensor<?x?xf32>
 }
 // RISC-V targets does not implement data-tiling yet.

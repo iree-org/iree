@@ -70,8 +70,25 @@ LogicalResult UnsetEncodingOp::verify() {
   if (getResultType().getRank() != getSourceType().getRank()) {
     return emitOpError("cannot change the rank of the tensor");
   }
-  if (failed(verifyCompatibleShape(getResultType(), getSourceType()))) {
-    return emitOpError("expected to preserve the logical shape of the tensor");
+
+  ArrayRef<int64_t> srcShape = getSourceType().getShape();
+  ArrayRef<int64_t> resShape = getResultType().getShape();
+  for (auto [idx, src, res] : llvm::enumerate(srcShape, resShape)) {
+    if (!ShapedType::isDynamic(src) && !ShapedType::isDynamic(res) &&
+        src < res) {
+      return emitOpError()
+             << "expected to preserve the logical shape of the tensor: the "
+             << idx << "-th dimension has source shape " << src
+             << ", which is less than the result shape " << res;
+    }
+  }
+
+  unsigned requiredDynCount = getResultType().getNumDynamicDims();
+  if (getResultDims().size() != requiredDynCount) {
+    return emitOpError() << "result type set has " << requiredDynCount
+                         << " dynamic dimensions but only "
+                         << getResultDims().size()
+                         << " dimension values are attached";
   }
   return success();
 }

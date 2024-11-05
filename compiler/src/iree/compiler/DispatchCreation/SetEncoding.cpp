@@ -48,13 +48,18 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                           Value source,
                                           SmallVector<OpFoldResult> sizes) {
+  SmallVector<Value> dynamicSizesVec;
+  SmallVector<int64_t> staticSizesVec;
+  dispatchIndexOpFoldResults(sizes, dynamicSizesVec, staticSizesVec);
+
   auto sourceType = cast<RankedTensorType>(source.getType());
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  auto unsetEncoding = builder
-                           .create<IREE::Encoding::UnsetEncodingOp>(
-                               loc, unsetEncodingReturnType, source)
-                           .getResult();
+  auto unsetEncoding =
+      builder
+          .create<IREE::Encoding::UnsetEncodingOp>(loc, unsetEncodingReturnType,
+                                                   source, dynamicSizesVec)
+          .getResult();
   auto rank = sourceType.getRank();
   SmallVector<OpFoldResult> offsets(rank, builder.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(rank, builder.getIndexAttr(1));

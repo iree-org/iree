@@ -1857,34 +1857,40 @@ util.func public @set_encoding_op(%arg0 : tensor<?x?xf32>)
 // -----
 
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
-util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>)
+util.func public @unset_encoding_op(%arg0 : tensor<?x?xf32, #encoding>, %d0 : index, %d1 : index)
     -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   util.return %0 : tensor<?x?xf32>
 }
 //      CHECK: util.func public @unset_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[ARG1]], %[[ARG2]], %[[D0]], %[[D1]]](%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[D0]], %[[D1]])
 // CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>
-// CHECK-SAME:       %[[INDEXARG0:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:       %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:       %[[ARG1_INDEX:[a-zA-Z0-9]+]]
+// CHECK-SAME:       %[[ARG2_INDEX:[a-zA-Z0-9]+]]
+// CHECK-SAME:       %[[INARG_INDEX0:[a-zA-Z0-9]+]]
+// CHECK-SAME:       %[[INARG_INDEX1:[a-zA-Z0-9]+]]
 // CHECK-SAME:       %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
-//  CHECK-DAG:     %[[D0_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG0]], 0
-//  CHECK-DAG:     %[[D1_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG1]], 1
+//  CHECK-DAG:     %[[D0_W:.+]] = flow.dispatch.workload.ordinal %[[ARG1_INDEX]], 0
+//  CHECK-DAG:     %[[D1_W:.+]] = flow.dispatch.workload.ordinal %[[ARG2_INDEX]], 1
+//  CHECK-DAG:     %[[D2_W:.+]] = flow.dispatch.workload.ordinal %[[INARG_INDEX0]], 2
+//  CHECK-DAG:     %[[D3_W:.+]] = flow.dispatch.workload.ordinal %[[INARG_INDEX1]], 3
 //      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
-// CHECK-SAME:         sizes = [%[[D0_W]], %[[D1_W]]]
-// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>{%[[D0_W]], %[[D1_W]]}
-//      CHECK:     %[[ENCODING:.+]] = iree_encoding.unset_encoding %[[LOAD]]
+// CHECK-SAME:         sizes = [%[[D2_W]], %[[D3_W]]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>>{%[[D2_W]], %[[D3_W]]}
+//      CHECK:     %[[ENCODING:.+]] = iree_encoding.unset_encoding %[[LOAD]]{{.+}}{%[[D0_W]], %[[D1_W]]
 //      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[D0_W]], %[[D1_W]]}
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[D2_W]], %[[D3_W]]}
 //      CHECK:     flow.return
-//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index)
-//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]]
+//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index, %[[WL2:[a-zA-Z0-9]+]]: index, %[[WL3:[a-zA-Z0-9]+]]: index)
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]]
 //      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
 //      CHECK:   util.return %[[DISPATCH]]
 
@@ -1953,7 +1959,7 @@ util.func public @unset_encoding_and_slice(
     %arg0: tensor<?x?xf32, #encoding>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32> {
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%arg1, %arg2}
   %1 = tensor.extract_slice %0[0, 0] [%arg1, %arg2] [1, 1]
       : tensor<?x?xf32> to tensor<?x?xf32>
   util.return %1 : tensor<?x?xf32>
