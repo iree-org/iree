@@ -37,11 +37,30 @@ jobs:
           {
             "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${{ inputs.package_version }}",
-            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
           realpath version_info.json
           cat version_info.json
+
+          compiler_package_version="$(python3 build_tools/scripts/compute_local_version.py compiler --custom-string=${{ inputs.package_version }})"
+          cat << EOF > compiler/version-local.json
+          {
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${compiler_package_version}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+
+          runtime_package_version="$(python3 build_tools/scripts/compute_local_version.py runtime --custom-string=${{ inputs.package_version }})"
+          cat << EOF > runtime/version-local.json
+          {
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${runtime_package_version}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+
       - name: Enable cache
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:

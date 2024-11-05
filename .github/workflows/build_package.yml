@@ -18,10 +18,19 @@ on:
         description: "Suffix to append to package names"
         required: false
         default: ""
-      package_version:
+      legacy_package_version:
         description: "Version of the package"
         required: true
         default: "0.1a1"
+      package_version:
+        description: "Version of the package"
+        required: true
+      compiler_package_version:
+        description: "Version of the iree-compiler package"
+        required: true
+      runtime_package_version:
+        description: "Version of the iree-runtime package"
+        required: true
       release_id:
         description: "Release id to upload artifacts to"
         default: ""
@@ -131,29 +140,80 @@ jobs:
         if: "matrix.build-family != 'windows'"
         shell: bash
         run: |
+          # Note: `version_info.json` holds the CalVer version and is still used
+          # for iree-tools-tf and iree-tools-tflite.
           cat << EOF > ./c/version_info.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.legacy_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/version_info.json
+
+          echo "iree-dist"
+          cat << EOF > ./c/version-local.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
             "package-version": "${{ github.event.inputs.package_version }}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
-          cat ./c/version_info.json
+          cat ./c/version-local.json
+
+          echo "iree-compiler"
+          cat << EOF > ./c/compiler/version-local.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.compiler_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/compiler/version-local.json
+
+          echo "iree-runtime"
+          cat << EOF > ./c/runtime/version-local.json
+          {
+            "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.runtime_package_version }}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/runtime/version-local.json
 
       - name: Write version info Windows (release)
         if: "matrix.build-family == 'windows'"
         shell: powershell
         run: |
           cd c
+
           $verinfoprop = @{
             'package-suffix'= "${{ github.event.inputs.package_suffix }}"
             'package-version'= "${{ github.event.inputs.package_version }}"
             'iree-revision'= $(git rev-parse HEAD)
           }
-
           $info = New-Object -TypeName PSObject -Prop $verinfoprop
           $info = $info | ConvertTo-JSON
           $info | Out-File "version_info.json" -Encoding "ASCII"
+
+
+          $compilerverinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.compiler_package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+          $info = New-Object -TypeName PSObject -Prop $compilerverinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "compiler/version_info.json" -Encoding "ASCII"
+
+          $runtimeverinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.runtime_package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+          $info = New-Object -TypeName PSObject -Prop $runtimeverinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "runtime/version_info.json" -Encoding "ASCII"
 
       ##########################################################################
       # Build the main distribution tarball.
