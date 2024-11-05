@@ -36,7 +36,7 @@ jobs:
           $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currestTime"
           echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
           mkdir "$Env:BUILD_DIR_POWERSHELL"
-          $bashBuildDir = $buildDir -replace '\\', '/', -replace '^C:', '/c'
+          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^C:', '/c'
           echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
       - name: "Setting up Python"
         uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.1.0
