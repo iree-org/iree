@@ -112,8 +112,8 @@ class MnistBuilderTest(unittest.TestCase):
             mod, args=["mnist/mnist.mlir"] + DEFAULT_TARGET_ARGS, stdout=out_file
         )
         output = out_file.getvalue().strip()
-        self.assertIn("genfiles/mnist/mnist.mlir", output)
         output_path = Path(output)
+        self.assertIn("genfiles/mnist/mnist.mlir", output_path.as_posix())
         contents = output_path.read_text()
         self.assertIn("module", contents)
 
