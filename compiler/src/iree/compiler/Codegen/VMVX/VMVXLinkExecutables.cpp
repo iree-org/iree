@@ -24,8 +24,7 @@ struct VMVXLinkExecutablesPass
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
-    auto sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
+    auto sourceExecutableOps = gatherExecutablesForTarget(moduleOp, "vmvx");
     if (sourceExecutableOps.size() <= 1)
       return;
 
@@ -44,15 +43,16 @@ struct VMVXLinkExecutablesPass
 
     // Gather all unique executable targets - we may have multiple.
     auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
-    for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
+    for (auto [index, targetAttr] : llvm::enumerate(executableTargetAttrs)) {
       // Add our VMVX hal.executable.variant with an empty module.
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
-              ? attr.getSymbolNameFragment()
-              : llvm::formatv("{0}_{1}", attr.getSymbolNameFragment(), index);
+              ? targetAttr.getSymbolNameFragment()
+              : llvm::formatv("{0}_{1}", targetAttr.getSymbolNameFragment(),
+                              index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), linkedVariantName, attr);
+              moduleOp.getLoc(), linkedVariantName, targetAttr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
       auto linkedModuleOp = targetBuilder.create<ModuleOp>(moduleOp.getLoc());
 

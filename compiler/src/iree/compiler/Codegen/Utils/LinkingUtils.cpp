@@ -28,6 +28,21 @@ gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
   return result;
 }
 
+SmallVector<IREE::HAL::ExecutableOp>
+gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName) {
+  SmallVector<IREE::HAL::ExecutableOp> result;
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    if (llvm::count_if(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
+                       [&](IREE::HAL::ExecutableVariantOp variantOp) {
+                         return variantOp.getTarget().getBackend().getValue() ==
+                                targetName;
+                       }) > 0) {
+      result.push_back(executableOp);
+    }
+  }
+  return result;
+}
+
 // Renames |op| within |moduleOp| with a new name that is unique within both
 // |moduleOp| and |optionalSymbolTable| (if one is provided).
 static void
@@ -221,8 +236,9 @@ LogicalResult linkExecutablesInto(
       // TODO(benvanik): allow for grouping when multi-versioning is supported?
       // We could, for example, link all aarch64 variants together and then
       // use function multi-versioning to let LLVM insert runtime switches.
-      if (variantOp.getTarget() != linkedTargetOp.getTarget())
+      if (variantOp.getTarget() != linkedTargetOp.getTarget()) {
         continue;
+      }
 
       // Add any required object files to the set we will link in the target.
       if (auto objectsAttr = variantOp.getObjectsAttr()) {
