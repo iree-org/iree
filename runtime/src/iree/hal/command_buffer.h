@@ -422,6 +422,11 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
 typedef uint64_t iree_hal_dispatch_flags_t;
 enum iree_hal_dispatch_flag_bits_t {
   IREE_HAL_DISPATCH_FLAG_NONE = 0,
+
+  // Indirect parameters such as workgroup count are static at the time the
+  // command buffer is issued. This is in contrast to dynamic parameters that
+  // may be changed by dispatches within the same command buffer.
+  IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS = 1ull << 0,
 };
 
 // An RGBA color.
@@ -637,13 +642,13 @@ iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer);
 // An optional RGBA color to show in the debug UI may be provided via
 // |label_color|; otherwise iree_hal_label_color_unspecified can be used to let
 // the debug tool choose.
-IREE_API_EXPORT void iree_hal_command_buffer_begin_debug_group(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location);
 
 // Pops a debug group from the stack.
-IREE_API_EXPORT void iree_hal_command_buffer_end_debug_group(
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* command_buffer);
 
 // Defines a memory dependency between commands recorded before and after the
@@ -866,11 +871,11 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);
 
-  void(IREE_API_PTR* begin_debug_group)(
+  iree_status_t(IREE_API_PTR* begin_debug_group)(
       iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
       iree_hal_label_color_t label_color,
       const iree_hal_label_location_t* location);
-  void(IREE_API_PTR* end_debug_group)(
+  iree_status_t(IREE_API_PTR* end_debug_group)(
       iree_hal_command_buffer_t* command_buffer);
 
   iree_status_t(IREE_API_PTR* execution_barrier)(

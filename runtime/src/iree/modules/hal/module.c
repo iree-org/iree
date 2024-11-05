@@ -781,9 +781,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin_debug_group,  //
       .file = iree_string_view_empty(),
       .line = 0,
   };
-  iree_hal_command_buffer_begin_debug_group(
+  return iree_hal_command_buffer_begin_debug_group(
       command_buffer, label_str, iree_hal_label_color_unspecified(), &location);
-  return iree_ok_status();
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end_debug_group,  //
@@ -792,8 +791,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end_debug_group,  //
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_command_buffer_end_debug_group(command_buffer);
-  return iree_ok_status();
+  return iree_hal_command_buffer_end_debug_group(command_buffer);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier,  //

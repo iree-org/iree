@@ -435,15 +435,17 @@ bool iree_hal_metal_command_buffer_isa(iree_hal_command_buffer_t* command_buffer
   return iree_hal_resource_is(&command_buffer->resource, &iree_hal_metal_command_buffer_vtable);
 }
 
-static void iree_hal_metal_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_metal_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color, const iree_hal_label_location_t* location) {
   // TODO(antiagainst): implement support for debug group
+  return iree_ok_status();
 }
 
-static void iree_hal_metal_command_buffer_end_debug_group(
+static iree_status_t iree_hal_metal_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   // TODO(antiagainst): implement support for debug group
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_barrier(

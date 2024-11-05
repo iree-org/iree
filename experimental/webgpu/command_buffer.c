@@ -496,7 +496,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_end(
   return iree_hal_webgpu_command_buffer_flush(command_buffer);
 }
 
-static void iree_hal_webgpu_command_buffer_begin_debug_group(
+static iree_status_t iree_hal_webgpu_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
@@ -504,35 +504,29 @@ static void iree_hal_webgpu_command_buffer_begin_debug_group(
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUCommandEncoder command_encoder = NULL;
-  iree_status_t status = iree_hal_webgpu_command_buffer_acquire_command_encoder(
-      command_buffer, &command_encoder);
-  if (!iree_status_is_ok(status)) {
-    // TODO(benvanik): mark recording as failed.
-    iree_status_ignore(status);
-    return;
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_acquire_command_encoder(
+      command_buffer, &command_encoder));
 
   // TODO(benvanik): ensure this works right when in a compute pass.
   char label_str[128] = {0};
   memcpy(label_str, label.data, iree_min(sizeof(label_str) - 1, label.size));
   wgpuCommandEncoderPushDebugGroup(command_encoder, label_str);
+
+  return iree_ok_status();
 }
 
-static void iree_hal_webgpu_command_buffer_end_debug_group(
+static iree_status_t iree_hal_webgpu_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   WGPUCommandEncoder command_encoder = NULL;
-  iree_status_t status = iree_hal_webgpu_command_buffer_acquire_command_encoder(
-      command_buffer, &command_encoder);
-  if (!iree_status_is_ok(status)) {
-    // TODO(benvanik): mark recording as failed.
-    iree_status_ignore(status);
-    return;
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_acquire_command_encoder(
+      command_buffer, &command_encoder));
 
   wgpuCommandEncoderPopDebugGroup(command_encoder);
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_webgpu_command_buffer_execution_barrier(
